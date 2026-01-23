@@ -11,9 +11,19 @@ from .keyword_extractor import (
     extract_resume_keywords,
     extract_top_skills,
 )
+from .ner_extractor import (
+    extract_entities,
+    extract_organizations,
+    extract_dates,
+    extract_resume_entities,
+)
 
 __all__ = [
     "extract_keywords",
-    extract_top_skills",
+    "extract_top_skills",
     "extract_resume_keywords",
+    "extract_entities",
+    "extract_organizations",
+    "extract_dates",
+    "extract_resume_entities",
 ]
