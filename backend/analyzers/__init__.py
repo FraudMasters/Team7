@@ -17,6 +17,12 @@ from .ner_extractor import (
     extract_dates,
     extract_resume_entities,
 )
+from .experience_calculator import (
+    calculate_total_experience,
+    calculate_skill_experience,
+    calculate_multiple_skills_experience,
+    format_experience_summary,
+)
 
 __all__ = [
     "extract_keywords",
@@ -26,4 +32,8 @@ __all__ = [
     "extract_organizations",
     "extract_dates",
     "extract_resume_entities",
+    "calculate_total_experience",
+    "calculate_skill_experience",
+    "calculate_multiple_skills_experience",
+    "format_experience_summary",
 ]
