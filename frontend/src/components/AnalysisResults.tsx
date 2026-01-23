@@ -1,0 +1,559 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Chip,
+  Alert,
+  AlertTitle,
+  Stack,
+  Divider,
+  Grid,
+  Card,
+  CardContent,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  CircularProgress,
+  Button,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+} from '@mui/material';
+import {
+  Error as ErrorIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon,
+  CheckCircle as CheckIcon,
+  Cancel as CrossIcon,
+  ExpandMore as ExpandMoreIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
+
+/**
+ * Error/Issue interface from backend analysis
+ */
+interface AnalysisError {
+  type: string;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  recommendation?: string;
+  category?: string;
+}
+
+/**
+ * Grammar error interface
+ */
+interface GrammarError {
+  type: string;
+  severity: 'error' | 'warning';
+  message: string;
+  context: string;
+  suggestions: string[];
+  position: {
+    start: number;
+    end: number;
+  };
+}
+
+/**
+ * Skill match interface for highlighting
+ */
+interface SkillMatch {
+  skill: string;
+  matched: boolean;
+  highlight: 'green' | 'red';
+}
+
+/**
+ * Analysis result data structure
+ */
+interface AnalysisResult {
+  resume_id: string;
+  errors: AnalysisError[];
+  grammar_errors?: GrammarError[];
+  keywords?: string[];
+  technical_skills?: string[];
+  total_experience_months?: number;
+  matched_skills?: SkillMatch[];
+  missing_skills?: SkillMatch[];
+  match_percentage?: number;
+  processing_time?: number;
+}
+
+/**
+ * AnalysisResults Component Props
+ */
+interface AnalysisResultsProps {
+  /** Resume ID from URL parameter */
+  resumeId: string;
+  /** API endpoint URL for fetching analysis results */
+  apiUrl?: string;
+}
+
+/**
+ * AnalysisResults Component
+ *
+ * Displays comprehensive resume analysis results including:
+ * - Error detection with severity badges (critical, warning, info)
+ * - Grammar and spelling issues with suggestions
+ * - Extracted keywords and technical skills
+ * - Experience summary
+ * - Skill highlighting (green for matched, red for missing)
+ * - Actionable recommendations
+ *
+ * @example
+ * ```tsx
+ * <AnalysisResults resumeId="test-id" />
+ * ```
+ */
+const AnalysisResults: React.FC<AnalysisResultsProps> = ({
+  resumeId,
+  apiUrl = 'http://localhost:8000/api/analysis',
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<AnalysisResult | null>(null);
+
+  /**
+   * Fetch analysis results from backend
+   */
+  const fetchAnalysis = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/${resumeId}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch analysis: ${response.statusText}`);
+      }
+
+      const result: AnalysisResult = await response.json();
+      setData(result);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to load analysis results';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (resumeId) {
+      fetchAnalysis();
+    }
+  }, [resumeId]);
+
+  /**
+   * Get severity color and icon for error display
+   */
+  const getSeverityConfig = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+      case 'error':
+        return {
+          color: 'error' as const,
+          icon: <ErrorIcon />,
+          label: 'Critical',
+        };
+      case 'warning':
+        return {
+          color: 'warning' as const,
+          icon: <WarningIcon />,
+          label: 'Warning',
+        };
+      case 'info':
+      default:
+        return {
+          color: 'info' as const,
+          icon: <InfoIcon />,
+          label: 'Info',
+        };
+    }
+  };
+
+  /**
+   * Format experience months to human-readable string
+   */
+  const formatExperience = (months?: number): string => {
+    if (!months) return 'Not specified';
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+
+    if (years === 0) {
+      return `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+    }
+    if (remainingMonths === 0) {
+      return `${years} year${years !== 1 ? 's' : ''}`;
+    }
+    return `${years} year${years !== 1 ? 's' : ''} ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+  };
+
+  /**
+   * Render loading state
+   */
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          py: 8,
+        }}
+      >
+        <CircularProgress size={60} sx={{ mb: 3 }} />
+        <Typography variant="h6" color="text.secondary">
+          Analyzing resume...
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          This may take a few moments
+        </Typography>
+      </Box>
+    );
+  }
+
+  /**
+   * Render error state
+   */
+  if (error) {
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" onClick={fetchAnalysis} startIcon={<RefreshIcon />}>
+            Retry
+          </Button>
+        }
+      >
+        <AlertTitle>Analysis Failed</AlertTitle>
+        {error}
+      </Alert>
+    );
+  }
+
+  /**
+   * Render no data state
+   */
+  if (!data) {
+    return (
+      <Alert severity="info">
+        <AlertTitle>No Analysis Data</AlertTitle>
+        No analysis results found for resume ID: <strong>{resumeId}</strong>
+      </Alert>
+    );
+  }
+
+  const { errors, grammar_errors, keywords, technical_skills, total_experience_months, matched_skills, missing_skills, match_percentage } = data;
+
+  // Count errors by severity
+  const criticalCount = errors.filter((e) => e.severity === 'critical').length;
+  const warningCount = errors.filter((e) => e.severity === 'warning').length;
+  const infoCount = errors.filter((e) => e.severity === 'info').length;
+  const grammarErrorCount = grammar_errors?.filter((e) => e.severity === 'error').length || 0;
+
+  return (
+    <Stack spacing={3}>
+      {/* Header Section */}
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" fontWeight={600}>
+            Analysis Results
+          </Typography>
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchAnalysis} size="small">
+            Refresh
+          </Button>
+        </Box>
+
+        {/* Summary Statistics */}
+        <Grid container spacing={2}>
+          <Grid item xs={6} sm={3}>
+            <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="error.main" fontWeight={700}>
+                  {criticalCount}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Critical
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card variant="outlined" sx={{ borderColor: 'warning.main' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="warning.main" fontWeight={700}>
+                  {warningCount}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Warnings
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card variant="outlined" sx={{ borderColor: 'info.main' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="info.main" fontWeight={700}>
+                  {infoCount}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Info
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card variant="outlined" sx={{ borderColor: grammarErrorCount > 0 ? 'error.main' : 'success.main' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color={grammarErrorCount > 0 ? 'error.main' : 'success.main'} fontWeight={700}>
+                  {grammarErrorCount}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Grammar Issues
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Errors and Issues Section */}
+      {errors.length > 0 && (
+        <Paper elevation={1} sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom fontWeight={600}>
+            Detected Issues
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <Stack spacing={2}>
+            {errors.map((errorItem, index) => {
+              const config = getSeverityConfig(errorItem.severity);
+              return (
+                <Alert key={index} severity={config.color} icon={config.icon}>
+                  <AlertTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Chip label={config.label} size="small" color={config.color} variant="filled" />
+                    <Typography variant="subtitle2" component="span" fontWeight={600}>
+                      {errorItem.type}
+                    </Typography>
+                  </AlertTitle>
+                  <Typography variant="body2" paragraph>
+                    {errorItem.message}
+                  </Typography>
+                  {errorItem.recommendation && (
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Recommendation:</strong> {errorItem.recommendation}
+                    </Typography>
+                  )}
+                </Alert>
+              );
+            })}
+          </Stack>
+        </Paper>
+      )}
+
+      {/* Grammar and Spelling Section */}
+      {grammar_errors && grammar_errors.length > 0 && (
+        <Paper elevation={1} sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom fontWeight={600}>
+            Grammar & Spelling
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="body1" fontWeight={500}>
+                View {grammar_errors.length} Grammar Issue{grammar_errors.length !== 1 ? 's' : ''}
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <List>
+                {grammar_errors.map((error, index) => {
+                  const config = getSeverityConfig(error.severity);
+                  return (
+                    <ListItem key={index} alignItems="flex-start" sx={{ px: 0 }}>
+                      <ListItemIcon>{config.icon}</ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="subtitle2" component="span">
+                              {error.type}
+                            </Typography>
+                            <Chip label={config.label} size="small" color={config.color} variant="outlined" />
+                          </Stack>
+                        }
+                        secondary={
+                          <Stack spacing={1} mt={0.5}>
+                            <Typography variant="body2" component="div">
+                              {error.message}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontFamily: 'monospace',
+                                bgcolor: 'action.hover',
+                                px: 1,
+                                py: 0.5,
+                                borderRadius: 0.5,
+                                display: 'inline-block',
+                              }}
+                            >
+                              "{error.context}"
+                            </Typography>
+                            {error.suggestions && error.suggestions.length > 0 && (
+                              <Typography variant="body2" color="primary.main">
+                                <strong>Suggestion:</strong> {error.suggestions.join(' or ')}
+                              </Typography>
+                            )}
+                          </Stack>
+                        }
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+        </Paper>
+      )}
+
+      {/* Extracted Information Section */}
+      {(keywords && keywords.length > 0) || (technical_skills && technical_skills.length > 0) ? (
+        <Paper elevation={1} sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom fontWeight={600}>
+            Extracted Information
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Total Experience */}
+          {total_experience_months !== undefined && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Total Experience
+              </Typography>
+              <Typography variant="h5" color="primary.main" fontWeight={600}>
+                {formatExperience(total_experience_months)}
+              </Typography>
+            </Box>
+          )}
+
+          {/* Keywords */}
+          {keywords && keywords.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Keywords
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {keywords.slice(0, 20).map((keyword, index) => (
+                  <Chip key={index} label={keyword} size="small" variant="outlined" />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Technical Skills */}
+          {technical_skills && technical_skills.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Technical Skills
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {technical_skills.map((skill, index) => (
+                  <Chip key={index} label={skill} size="small" color="primary" variant="filled" />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Paper>
+      ) : null}
+
+      {/* Skill Matching Section (if available) */}
+      {(matched_skills && matched_skills.length > 0) || (missing_skills && missing_skills.length > 0) ? (
+        <Paper elevation={1} sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight={600}>
+              Skill Matching
+            </Typography>
+            {match_percentage !== undefined && (
+              <Chip
+                label={`${match_percentage.toFixed(0)}% Match`}
+                color={match_percentage >= 70 ? 'success' : match_percentage >= 40 ? 'warning' : 'error'}
+                sx={{ fontWeight: 600 }}
+              />
+            )}
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Matched Skills - Green */}
+          {matched_skills && matched_skills.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" color="success.main" gutterBottom fontWeight={600}>
+                <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                Matched Skills ({matched_skills.length})
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {matched_skills.map((item, index) => (
+                  <Chip
+                    key={index}
+                    label={item.skill}
+                    size="small"
+                    sx={{
+                      bgcolor: 'success.main',
+                      color: 'success.contrastText',
+                      '&:hover': {
+                        bgcolor: 'success.dark',
+                      },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Missing Skills - Red */}
+          {missing_skills && missing_skills.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" color="error.main" gutterBottom fontWeight={600}>
+                <CrossIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                Missing Skills ({missing_skills.length})
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {missing_skills.map((item, index) => (
+                  <Chip
+                    key={index}
+                    label={item.skill}
+                    size="small"
+                    sx={{
+                      bgcolor: 'error.main',
+                      color: 'error.contrastText',
+                      '&:hover': {
+                        bgcolor: 'error.dark',
+                      },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Paper>
+      ) : null}
+
+      {/* All Clear Message */}
+      {errors.length === 0 && (!grammar_errors || grammar_errors.length === 0) && (
+        <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
+          <CheckIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
+          <Typography variant="h6" color="success.main" gutterBottom fontWeight={600}>
+            Great Job!
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            No critical issues detected in your resume. Your resume looks well-structured and professional.
+          </Typography>
+        </Paper>
+      )}
+    </Stack>
+  );
+};
+
+export default AnalysisResults;
