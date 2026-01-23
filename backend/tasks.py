@@ -12,6 +12,10 @@ from celery.result import AsyncResult
 
 from .celery_config import get_celery_config
 from .config import get_settings
+from .tasks import (
+    analyze_resume_async,
+    batch_analyze_resumes,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -271,6 +275,8 @@ __all__ = [
     "health_check_task",
     "add_numbers_task",
     "long_running_task",
+    "analyze_resume_async",
+    "batch_analyze_resumes",
     "get_task_status",
     "revoke_task",
 ]
