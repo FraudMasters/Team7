@@ -17,6 +17,11 @@ from .ner_extractor import (
     extract_dates,
     extract_resume_entities,
 )
+from .grammar_checker import (
+    check_grammar,
+    check_grammar_resume,
+    get_error_suggestions_summary,
+)
 from .experience_calculator import (
     calculate_total_experience,
     calculate_skill_experience,
@@ -32,6 +37,9 @@ __all__ = [
     "extract_organizations",
     "extract_dates",
     "extract_resume_entities",
+    "check_grammar",
+    "check_grammar_resume",
+    "get_error_suggestions_summary",
     "calculate_total_experience",
     "calculate_skill_experience",
     "calculate_multiple_skills_experience",
