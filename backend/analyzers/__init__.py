@@ -28,6 +28,11 @@ from .experience_calculator import (
     calculate_multiple_skills_experience,
     format_experience_summary,
 )
+from .error_detector import (
+    detect_resume_errors,
+    get_error_summary,
+    format_errors_for_display,
+)
 
 __all__ = [
     "extract_keywords",
@@ -44,4 +49,7 @@ __all__ = [
     "calculate_skill_experience",
     "calculate_multiple_skills_experience",
     "format_experience_summary",
+    "detect_resume_errors",
+    "get_error_summary",
+    "format_errors_for_display",
 ]
