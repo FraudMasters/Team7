@@ -230,9 +230,12 @@ async def root() -> JSONResponse:
     )
 
 
-# TODO: Include API routers below
-# from .api import resumes, analysis, matching
-# app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
+# Include API routers
+from .api import resumes
+
+app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
+# TODO: Add analysis and matching routers in future subtasks
+# from .api import analysis, matching
 # app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
 # app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
 
