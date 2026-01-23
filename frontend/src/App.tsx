@@ -1,40 +1,40 @@
 import React from 'react';
-import { Container, Typography, Box, Paper } from '@mui/material';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from '@components/Layout';
+import HomePage from '@pages/Home';
+import UploadPage from '@pages/Upload';
+import ResultsPage from '@pages/Results';
+import ComparePage from '@pages/Compare';
 
 /**
  * Main App Component
  *
- * This is the root component of the application.
- * It will eventually contain routing and layout components.
+ * Sets up React Router with all application routes.
+ * Uses the Layout component to provide consistent navigation and structure.
  */
 function App() {
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Paper elevation={3} sx={{ p: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Resume Analysis Platform
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            AI-powered resume analysis with intelligent job matching
-          </Typography>
-        </Paper>
-      </Box>
+    <BrowserRouter>
+      <Routes>
+        {/* Root route with Layout */}
+        <Route path="/" element={<Layout />}>
+          {/* Default home page */}
+          <Route index element={<HomePage />} />
 
-      <Box sx={{ mt: 4 }}>
-        <Paper elevation={1} sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Welcome
-          </Typography>
-          <Typography variant="body2">
-            This platform helps you analyze resumes, detect errors, and match candidates with job vacancies using advanced AI/ML techniques.
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            More features coming soon...
-          </Typography>
-        </Paper>
-      </Box>
-    </Container>
+          {/* Resume upload page */}
+          <Route path="upload" element={<UploadPage />} />
+
+          {/* Analysis results page with dynamic ID parameter */}
+          <Route path="results/:id" element={<ResultsPage />} />
+
+          {/* Job comparison page with dynamic resume and vacancy ID parameters */}
+          <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
+
+          {/* Catch-all route - redirect to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 
