@@ -9,7 +9,7 @@ AI-powered resume analysis platform frontend built with React 18, Vite, TypeScri
 - **UI Library**: Material-UI (MUI) v6 with Emotion
 - **Routing**: React Router v6
 - **HTTP Client**: Axios
-- **Testing**: Vitest + React Testing Library
+- **Testing**: Vitest + React Testing Library + Playwright (E2E)
 - **Code Quality**: ESLint, Prettier
 
 ## Prerequisites
@@ -36,12 +36,23 @@ The application will be available at [http://localhost:5173](http://localhost:51
 
 ## Available Scripts
 
+### Development
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build locally
-- `npm run test` - Run tests
+
+### Unit Tests
+- `npm run test` - Run unit tests
 - `npm run test:ui` - Run tests with UI
 - `npm run test:coverage` - Run tests with coverage report
+
+### E2E Tests
+- `npm run test:e2e` - Run end-to-end tests with Playwright
+- `npm run test:e2e:ui` - Run E2E tests in UI mode (interactive)
+- `npm run test:e2e:debug` - Debug E2E tests
+- `npm run test:e2e:install` - Install Playwright browsers
+
+### Code Quality
 - `npm run lint` - Run ESLint
 - `npm run format` - Format code with Prettier
 
@@ -59,9 +70,13 @@ frontend/
 │   ├── App.tsx        # Root application component
 │   ├── main.tsx       # Application entry point
 │   └── index.css      # Global styles
+├── e2e/               # End-to-end tests with Playwright
+│   ├── fixtures/      # Test data fixtures
+│   └── README.md      # E2E testing documentation
 ├── public/            # Static assets
 ├── index.html         # HTML template
 ├── package.json       # Dependencies and scripts
+├── playwright.config.ts # Playwright E2E test configuration
 ├── vite.config.ts     # Vite configuration
 ├── tsconfig.json      # TypeScript configuration
 └── .eslintrc.cjs      # ESLint configuration
@@ -99,6 +114,8 @@ The development server is configured to proxy API requests to the backend:
 
 ## Testing
 
+### Unit Tests
+
 Run tests in watch mode:
 
 ```bash
@@ -110,6 +127,39 @@ Run tests with coverage:
 ```bash
 npm run test:coverage
 ```
+
+### E2E Tests
+
+Prerequisites:
+1. Backend API running at `http://localhost:8000`
+2. Frontend dev server running at `http://localhost:5173`
+3. Playwright browsers installed (run `npm run test:e2e:install`)
+
+Run all E2E tests:
+
+```bash
+npm run test:e2e
+```
+
+Run E2E tests in interactive UI mode:
+
+```bash
+npm run test:e2e:ui
+```
+
+Debug E2E tests:
+
+```bash
+npm run test:e2e:debug
+```
+
+Verify E2E test setup:
+
+```bash
+./e2e/verify-setup.sh
+```
+
+For detailed E2E testing documentation, see [e2e/README.md](e2e/README.md).
 
 ## Building for Production
 
