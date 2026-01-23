@@ -10,6 +10,7 @@ from typing import Dict, Optional, Union
 
 import pdfplumber
 from PyPDF2 import PdfReader
+from docx import Document
 
 logger = logging.getLogger(__name__)
 
@@ -220,5 +221,178 @@ def validate_pdf_file(file_path: Union[str, Path]) -> Dict[str, Union[bool, str]
             return {"valid": False, "reason": "PDF has no pages"}
     except Exception as e:
         return {"valid": False, "reason": f"Cannot open PDF: {str(e)}"}
+
+    return {"valid": True, "reason": None}
+
+
+def extract_text_from_docx(
+    file_path: Union[str, Path]
+) -> Dict[str, Optional[str]]:
+    """
+    Extract text from a DOCX file using python-docx.
+
+    Args:
+        file_path: Path to the DOCX file
+
+    Returns:
+        Dictionary containing:
+            - text: Extracted text content (None if extraction fails)
+            - method: Always 'python-docx' if successful
+            - paragraphs: Number of paragraphs extracted
+            - error: Error message if extraction failed
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        ValueError: If the file is not a valid DOCX
+
+    Examples:
+        >>> result = extract_text_from_docx("resume.docx")
+        >>> print(result["text"])
+        'John Doe\\nSoftware Engineer...'
+        >>> print(result["method"])
+        'python-docx'
+    """
+    file_path = Path(file_path)
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    if not file_path.suffix.lower() in [".docx", ".doc"]:
+        raise ValueError(f"File is not a DOCX: {file_path}")
+
+    try:
+        result = _extract_with_python_docx(file_path)
+        text_length = len(result["text"].strip()) if result["text"] else 0
+        logger.info(
+            f"Extracted {text_length} chars from {file_path.name} using python-docx"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"python-docx extraction failed: {e}")
+        return {
+            "text": None,
+            "method": None,
+            "paragraphs": 0,
+            "error": f"DOCX extraction failed: {str(e)}",
+        }
+
+
+def _extract_with_python_docx(file_path: Path) -> Dict[str, Optional[str]]:
+    """
+    Extract text using python-docx library.
+
+    This function extracts all paragraphs from a DOCX document and joins them
+    with newlines. It preserves the document structure by reading paragraphs
+    in order.
+
+    Args:
+        file_path: Path to the DOCX file
+
+    Returns:
+        Dictionary with extracted text and metadata
+
+    Raises:
+        RuntimeError: If extraction fails
+    """
+    try:
+        doc = Document(str(file_path))
+
+        # Extract all paragraphs
+        paragraphs = []
+        for para in doc.paragraphs:
+            if para.text.strip():  # Only include non-empty paragraphs
+                paragraphs.append(para.text.strip())
+
+        # Join paragraphs with double newlines
+        text = "\n\n".join(paragraphs) if paragraphs else ""
+
+        # Also extract table contents (many resumes use tables)
+        tables_text = _extract_tables_from_docx(doc)
+        if tables_text:
+            text = text + "\n\n" + tables_text if text else tables_text
+
+        return {
+            "text": text if text.strip() else None,
+            "method": "python-docx",
+            "paragraphs": len(doc.paragraphs),
+            "error": None,
+        }
+
+    except Exception as e:
+        raise RuntimeError(f"python-docx extraction error: {e}") from e
+
+
+def _extract_tables_from_docx(doc: Document) -> str:
+    """
+    Extract text from all tables in a DOCX document.
+
+    Many resume templates use tables for layout, so we need to extract
+    table contents to get the complete text.
+
+    Args:
+        doc: python-docx Document object
+
+    Returns:
+        String containing all table contents, formatted with newlines
+    """
+    table_parts = []
+
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = []
+            for cell in row.cells:
+                if cell.text.strip():
+                    row_text.append(cell.text.strip())
+            if row_text:
+                table_parts.append(" | ".join(row_text))
+
+    return "\n".join(table_parts) if table_parts else ""
+
+
+def validate_docx_file(file_path: Union[str, Path]) -> Dict[str, Union[bool, str]]:
+    """
+    Validate a DOCX file before extraction.
+
+    Checks:
+    - File exists
+    - Has .docx or .doc extension
+    - Is not empty
+    - Can be opened by python-docx
+
+    Args:
+        file_path: Path to the DOCX file
+
+    Returns:
+        Dictionary with validation results:
+            - valid: Boolean indicating if file is valid
+            - reason: String explaining why validation failed (if applicable)
+
+    Examples:
+        >>> validation = validate_docx_file("resume.docx")
+        >>> if validation["valid"]:
+        ...     result = extract_text_from_docx("resume.docx")
+    """
+    file_path = Path(file_path)
+
+    # Check existence
+    if not file_path.exists():
+        return {"valid": False, "reason": "File not found"}
+
+    # Check extension
+    if file_path.suffix.lower() not in [".docx", ".doc"]:
+        return {"valid": False, "reason": "Not a DOCX file"}
+
+    # Check file size
+    if file_path.stat().st_size == 0:
+        return {"valid": False, "reason": "File is empty"}
+
+    # Try to open with python-docx
+    try:
+        doc = Document(str(file_path))
+        # Basic validation: check if document has any content
+        if len(doc.paragraphs) == 0 and len(doc.tables) == 0:
+            return {"valid": False, "reason": "DOCX has no content"}
+    except Exception as e:
+        return {"valid": False, "reason": f"Cannot open DOCX: {str(e)}"}
 
     return {"valid": True, "reason": None}
