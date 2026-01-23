@@ -231,13 +231,11 @@ async def root() -> JSONResponse:
 
 
 # Include API routers
-from .api import resumes, analysis
+from .api import resumes, analysis, matching
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(analysis.router, prefix="/api/resumes", tags=["Analysis"])
-# TODO: Add matching router in future subtask
-# from .api import matching
-# app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
+app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
 
 
 if __name__ == "__main__":
