@@ -1,0 +1,28 @@
+{
+  "uid": "test-vacancy-456",
+  "data": {
+    "position": "Java Developer",
+    "industry": "Financial Technology",
+    "mandatory_requirements": [
+      "Java 11",
+      "Spring Boot",
+      "PostgreSQL",
+      "Microservices",
+      "Docker",
+      "Kubernetes"
+    ],
+    "additional_requirements": [
+      "Experience with financial systems",
+      "Knowledge of CI/CD practices"
+    ],
+    "experience_levels": ["Middle", "Senior"],
+    "project_tasks": [
+      "Develop and maintain microservices",
+      "Implement REST APIs",
+      "Write unit and integration tests"
+    ],
+    "project_description": [
+      "Building next-generation financial platform"
+    ]
+  }
+}

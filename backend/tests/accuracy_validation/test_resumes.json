@@ -1,0 +1,366 @@
+{
+  "test_dataset": "Error Detection Accuracy Test Dataset",
+  "version": "1.0",
+  "description": "20 sample resumes with known errors for accuracy validation (80%+ target)",
+  "resumes": [
+    {
+      "id": "test_001",
+      "name": "Perfect Resume (No Errors)",
+      "resume_text": "John Anderson\nSenior Software Engineer\nEmail: john.anderson@example.com\nPhone: +1 (555) 123-4567\nLinkedIn: linkedin.com/in/johnanderson\nGitHub: github.com/johnanderson\n\nPROFESSIONAL SUMMARY\nExperienced software engineer with 8+ years in full-stack development. Proficient in Python, Java, React, and cloud technologies.\n\nTECHNICAL SKILLS\nProgramming: Python, Java, JavaScript, TypeScript, Go\nFrameworks: React, Spring Boot, Django, FastAPI\nDatabases: PostgreSQL, MongoDB, Redis\nCloud: AWS, Docker, Kubernetes\nTools: Git, Jenkins, Terraform\n\nWORK EXPERIENCE\n\nSenior Software Engineer | Tech Corp Inc.\nJanuary 2020 - Present (4 years 2 months)\n- Led development of microservices architecture serving 1M+ users\n- Implemented CI/CD pipelines reducing deployment time by 60%\n- Mentored team of 5 junior developers\n\nSoftware Engineer | StartupXYZ\nJune 2017 - December 2019 (2 years 6 months)\n- Built RESTful APIs using Spring Boot and PostgreSQL\n- Developed React frontend for customer portal\n- Participated in agile development ceremonies\n\nEDUCATION\nBachelor of Science in Computer Science\nUniversity of Technology | 2017\n\nPROJECTS\n- E-commerce Platform (Full-stack)\n- Real-time Chat Application\n- Cloud Infrastructure Automation\n\nCERTIFICATIONS\n- AWS Certified Solutions Architect\n- Google Cloud Professional Developer",
+      "resume_data": {
+        "contact": {
+          "email": "john.anderson@example.com",
+          "phone": "+1 (555) 123-4567",
+          "linked_in": "linkedin.com/in/johnanderson"
+        },
+        "total_experience_months": 78,
+        "portfolio": ["github.com/johnanderson"],
+        "skills": ["Python", "Java", "JavaScript", "TypeScript", "React", "PostgreSQL"],
+        "experience": [
+          {
+            "company": "Tech Corp Inc.",
+            "position": "Senior Software Engineer",
+            "start_date": "2020-01-01",
+            "end_date": null
+          }
+        ],
+        "education": [
+          {
+            "degree": "Bachelor of Science in Computer Science",
+            "school": "University of Technology",
+            "year": "2017"
+          }
+        ]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    },
+    {
+      "id": "test_002",
+      "name": "Missing Email (Critical)",
+      "resume_text": "Jane Smith\nSoftware Developer\nPhone: +1 (555) 987-6543\n\nSkills: Python, Java\n\nExperience: Developer at TechCorp\n\nEducation: BS CS",
+      "resume_data": {
+        "contact": {
+          "phone": "+1 (555) 987-6543"
+        },
+        "total_experience_months": 24,
+        "skills": ["Python", "Java"]
+      },
+      "expected_errors": [
+        {"type": "missing_email", "severity": "critical"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_003",
+      "name": "Missing Phone (Warning)",
+      "resume_text": "Bob Johnson\nDeveloper\nEmail: bob@example.com\n\nSkills: JavaScript, React\n\nExperience: Frontend Developer\n\nEducation: BS",
+      "resume_data": {
+        "contact": {
+          "email": "bob@example.com"
+        },
+        "total_experience_months": 36
+      },
+      "expected_errors": [
+        {"type": "missing_phone", "severity": "warning"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_004",
+      "name": "Resume Too Short (Warning)",
+      "resume_text": "Short resume",
+      "resume_data": {},
+      "expected_errors": [
+        {"type": "resume_too_short", "severity": "warning"},
+        {"type": "missing_email", "severity": "critical"},
+        {"type": "missing_skills_section", "severity": "critical"},
+        {"type": "missing_experience_section", "severity": "critical"}
+      ],
+      "expected_error_count": 4
+    },
+    {
+      "id": "test_005",
+      "name": "Resume Too Long (Warning)",
+      "resume_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " + "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. " * 200,
+      "resume_data": {},
+      "expected_errors": [
+        {"type": "resume_too_long", "severity": "warning"},
+        {"type": "missing_email", "severity": "critical"},
+        {"type": "missing_skills_section", "severity": "critical"}
+      ],
+      "expected_error_count": 3
+    },
+    {
+      "id": "test_006",
+      "name": "Entry Level Missing Portfolio (Warning)",
+      "resume_text": "Alice Williams\nJunior Developer\nEmail: alice@example.com\nPhone: +1 (555) 111-2222\n\nSkills: Python, JavaScript\n\nEducation: BS Computer Science, 2023\n\nRecent graduate seeking entry-level position.",
+      "resume_data": {
+        "contact": {
+          "email": "alice@example.com",
+          "phone": "+1 (555) 111-2222"
+        },
+        "total_experience_months": 6,
+        "skills": ["Python", "JavaScript"],
+        "education": [{"degree": "BS", "year": "2023"}]
+      },
+      "expected_errors": [
+        {"type": "missing_portfolio", "severity": "warning"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_007",
+      "name": "Missing Skills Section (Critical)",
+      "resume_text": "Tom Brown\nDeveloper\nEmail: tom@example.com\n\nExperience: Software developer for 5 years\n\nEducation: Computer Science degree",
+      "resume_data": {
+        "contact": {"email": "tom@example.com"},
+        "total_experience_months": 60
+      },
+      "expected_errors": [
+        {"type": "missing_skills_section", "severity": "critical"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_008",
+      "name": "Missing Experience Section (Critical)",
+      "resume_text": "Sarah Davis\nDeveloper\nEmail: sarah@example.com\n\nSkills: Python, Java, React\n\nEducation: BS in Computer Science",
+      "resume_data": {
+        "contact": {"email": "sarah@example.com"},
+        "skills": ["Python", "Java", "React"]
+      },
+      "expected_errors": [
+        {"type": "missing_experience_section", "severity": "critical"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_009",
+      "name": "Missing Education Section (Info)",
+      "resume_text": "Mike Wilson\nSenior Developer\nEmail: mike@example.com\nPhone: +1 (555) 333-4444\n\nSkills: Python, Java, JavaScript\n\nExperience: 10 years in software development\n\nPortfolio: github.com/mikewilson",
+      "resume_data": {
+        "contact": {
+          "email": "mike@example.com",
+          "phone": "+1 (555) 333-4444"
+        },
+        "total_experience_months": 120,
+        "skills": ["Python", "Java", "JavaScript"],
+        "portfolio": ["github.com/mikewilson"]
+      },
+      "expected_errors": [
+        {"type": "missing_education_section", "severity": "info"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_010",
+      "name": "Multiple Contact Issues (Critical + Warning)",
+      "resume_text": "Chris Lee\nDeveloper\n\nSkills: Python\n\nExperience: Developer",
+      "resume_data": {},
+      "expected_errors": [
+        {"type": "missing_email", "severity": "critical"},
+        {"type": "missing_phone", "severity": "warning"},
+        {"type": "missing_skills_section", "severity": "critical"},
+        {"type": "missing_experience_section", "severity": "critical"}
+      ],
+      "expected_error_count": 4
+    },
+    {
+      "id": "test_011",
+      "name": "Invalid Email Format (Critical)",
+      "resume_text": "Pat Martin\nDeveloper\nEmail: invalid-email\nPhone: +1 (555) 555-5555\n\nSkills: Java, Python",
+      "resume_data": {
+        "contact": {
+          "email": "invalid-email",
+          "phone": "+1 (555) 555-5555"
+        },
+        "skills": ["Java", "Python"]
+      },
+      "expected_errors": [
+        {"type": "invalid_email_format", "severity": "critical"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_012",
+      "name": "All Critical Errors Present",
+      "resume_text": "No Contact Info\nNo Skills\nNo Experience\n\nJust some random text here to make it long enough.",
+      "resume_data": {},
+      "expected_errors": [
+        {"type": "missing_email", "severity": "critical"},
+        {"type": "missing_phone", "severity": "warning"},
+        {"type": "missing_skills_section", "severity": "critical"},
+        {"type": "missing_experience_section", "severity": "critical"}
+      ],
+      "expected_error_count": 4
+    },
+    {
+      "id": "test_013",
+      "name": "Experienced Developer with Portfolio (No Errors)",
+      "resume_text": "David Garcia\nSenior Python Developer\nEmail: david.garcia@example.com\nPhone: +1 (555) 777-8888\nGitHub: github.com/davidgarcia\n\nSKILLS\nPython, Django, FastAPI, PostgreSQL, Docker, AWS, React, JavaScript\n\nEXPERIENCE\n\nSenior Python Developer | CloudSystems\nMarch 2019 - Present (5 years)\n- Developed scalable microservices\n- Led team of 4 developers\n\nPython Developer | DataCorp\nJanuary 2017 - February 2019 (2 years)\n- Built data pipelines\n- Automated workflows\n\nEDUCATION\nMS Computer Science | Tech University | 2016\n\nPROJECTS\n- REST API Framework (1000+ GitHub stars)\n- Data visualization dashboard",
+      "resume_data": {
+        "contact": {
+          "email": "david.garcia@example.com",
+          "phone": "+1 (555) 777-8888"
+        },
+        "total_experience_months": 84,
+        "portfolio": ["github.com/davidgarcia"],
+        "skills": ["Python", "Django", "FastAPI", "PostgreSQL", "Docker", "AWS"],
+        "experience": [
+          {"company": "CloudSystems", "position": "Senior Python Developer"}
+        ],
+        "education": [
+          {"degree": "MS Computer Science", "school": "Tech University", "year": "2016"}
+        ]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    },
+    {
+      "id": "test_014",
+      "name": "Entry Level with Portfolio (No Errors)",
+      "resume_text": "Emma Rodriguez\nJunior Frontend Developer\nEmail: emma.r@example.com\nPhone: +1 (555) 999-0000\nGitHub: github.com/emmarodriguez\nLinkedIn: linkedin.com/in/emmarodriguez\n\nSKILLS\nJavaScript, React, HTML, CSS, TypeScript\n\nEDUCATION\nBS in Computer Science | State University | 2023\n\nPROJECTS\n- Todo App (React) - github.com/emmarodriguez/todo-app\n- Weather Dashboard - github.com/emmarodriguez/weather\n- Portfolio Website - github.com/emmarodriguez/portfolio\n\nSeeking entry-level frontend developer position.",
+      "resume_data": {
+        "contact": {
+          "email": "emma.r@example.com",
+          "phone": "+1 (555) 999-0000"
+        },
+        "total_experience_months": 0,
+        "portfolio": ["github.com/emmarodriguez"],
+        "skills": ["JavaScript", "React", "HTML", "CSS", "TypeScript"],
+        "education": [
+          {"degree": "BS in Computer Science", "school": "State University", "year": "2023"}
+        ]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    },
+    {
+      "id": "test_015",
+      "name": "Mid-Level Missing Portfolio (Info)",
+      "resume_text": "Kevin Thompson\nSoftware Developer\nEmail: kevin.t@example.com\nPhone: +1 (555) 222-3333\n\nSkills: Java, Spring, PostgreSQL\n\nExperience: 4 years of software development\n\nEducation: BS Computer Science",
+      "resume_data": {
+        "contact": {
+          "email": "kevin.t@example.com",
+          "phone": "+1 (555) 222-3333"
+        },
+        "total_experience_months": 48,
+        "skills": ["Java", "Spring", "PostgreSQL"]
+      },
+      "expected_errors": [
+        {"type": "suggest_portfolio", "severity": "info"}
+      ],
+      "expected_error_count": 1
+    },
+    {
+      "id": "test_016",
+      "name": "Good Resume Minimal Issues",
+      "resume_text": "Lisa Anderson\nFull Stack Developer\nEmail: lisa.a@example.com\nPhone: +1 (555) 444-5555\n\nSkills: React, Node.js, Python, PostgreSQL\n\nExperience: 3 years full stack development\n\nEducation: BS in Computer Science, 2020",
+      "resume_data": {
+        "contact": {
+          "email": "lisa.a@example.com",
+          "phone": "+1 (555) 444-5555"
+        },
+        "total_experience_months": 36,
+        "skills": ["React", "Node.js", "Python", "PostgreSQL"]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    },
+    {
+      "id": "test_017",
+      "name": "Missing All Contact (Multiple Critical)",
+      "resume_text": "Anonymous Developer\nSkills: Python, Java\n\nExperience: Senior developer",
+      "resume_data": {
+        "skills": ["Python", "Java"]
+      },
+      "expected_errors": [
+        {"type": "missing_email", "severity": "critical"},
+        {"type": "missing_phone", "severity": "warning"},
+        {"type": "missing_skills_section", "severity": "critical"},
+        {"type": "missing_experience_section", "severity": "critical"}
+      ],
+      "expected_error_count": 4
+    },
+    {
+      "id": "test_018",
+      "name": "Valid Resume with All Sections",
+      "resume_text": "James Wilson\nData Scientist\nEmail: james.wilson@example.com\nPhone: +1 (555) 666-7777\nLinkedIn: linkedin.com/in/jameswilson\nGitHub: github.com/jameswilson\n\nSKILLS\nPython, R, SQL, Machine Learning, TensorFlow, Pandas, NumPy, Data Visualization\n\nEXPERIENCE\n\nData Scientist | Analytics Corp\nJanuary 2022 - Present (2 years)\n- Built predictive models\n- Analyzed customer behavior\n\nJunior Data Analyst | DataDriven Inc.\nJune 2020 - December 2021 (1.5 years)\n- Created dashboards\n- Cleaned and processed data\n\nEDUCATION\nMS in Data Science | University of Tech | 2020\nBS in Mathematics | State College | 2018\n\nPROJECTS\n- Stock Price Prediction (ML)\n- Customer Segmentation Analysis\n- Sales Forecasting Dashboard",
+      "resume_data": {
+        "contact": {
+          "email": "james.wilson@example.com",
+          "phone": "+1 (555) 666-7777"
+        },
+        "total_experience_months": 42,
+        "portfolio": ["github.com/jameswilson", "linkedin.com/in/jameswilson"],
+        "skills": ["Python", "R", "SQL", "Machine Learning", "TensorFlow"],
+        "experience": [
+          {"company": "Analytics Corp", "position": "Data Scientist"}
+        ],
+        "education": [
+          {"degree": "MS in Data Science", "school": "University of Tech", "year": "2020"},
+          {"degree": "BS in Mathematics", "school": "State College", "year": "2018"}
+        ]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    },
+    {
+      "id": "test_019",
+      "name": "Short but Complete Resume",
+      "resume_text": "Amy Chen\nWeb Developer\nEmail: amy.chen@example.com\nPhone: +1 (555) 888-9999\n\nSkills: HTML, CSS, JavaScript, React\n\nExperience: 2 years web development\n\nEducation: Associate Degree in Web Development\n\nPortfolio: amyportfolio.com",
+      "resume_data": {
+        "contact": {
+          "email": "amy.chen@example.com",
+          "phone": "+1 (555) 888-9999"
+        },
+        "total_experience_months": 24,
+        "portfolio": ["amyportfolio.com"],
+        "skills": ["HTML", "CSS", "JavaScript", "React"],
+        "education": [{"degree": "Associate Degree"}]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    },
+    {
+      "id": "test_020",
+      "name": "Senior with No Portfolio (Acceptable)",
+      "resume_text": "Robert Taylor\nPrincipal Engineer\nEmail: robert.taylor@example.com\nPhone: +1 (555) 123-9999\nLinkedIn: linkedin.com/in/roberttaylor\n\nSKILLS\nArchitecture, System Design, Leadership, Java, Python, Cloud\n\nEXPERIENCE\n\nPrincipal Engineer | Enterprise Inc.\nJanuary 2018 - Present (6 years)\n- Led architecture decisions\n- Managed team of 15\n\nStaff Engineer | LargeCorp\nJanuary 2014 - December 2017 (4 years)\n- Core platform development\n\nSenior Engineer | Startup\nJanuary 2011 - December 2013 (3 years)\n- Full-stack development\n\nEDUCATION\nPhD in Computer Science | MIT | 2010\nMS in Computer Engineering | Stanford | 2007\nBS in Computer Science | Berkeley | 2005",
+      "resume_data": {
+        "contact": {
+          "email": "robert.taylor@example.com",
+          "phone": "+1 (555) 123-9999"
+        },
+        "total_experience_months": 156,
+        "skills": ["Architecture", "System Design", "Leadership", "Java", "Python"],
+        "experience": [
+          {"company": "Enterprise Inc.", "position": "Principal Engineer"}
+        ],
+        "education": [
+          {"degree": "PhD in Computer Science", "school": "MIT", "year": "2010"}
+        ]
+      },
+      "expected_errors": [],
+      "expected_error_count": 0
+    }
+  ],
+  "summary": {
+    "total_resumes": 20,
+    "resumes_with_errors": 12,
+    "resumes_without_errors": 8,
+    "total_expected_errors": 29,
+    "error_types": [
+      "missing_email",
+      "missing_phone",
+      "invalid_email_format",
+      "resume_too_short",
+      "resume_too_long",
+      "missing_portfolio",
+      "suggest_portfolio",
+      "missing_skills_section",
+      "missing_experience_section",
+      "missing_education_section"
+    ]
+  }
+}

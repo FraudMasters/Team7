@@ -1,0 +1,373 @@
+{
+  "test_dataset": "Skill Matching Accuracy Test Dataset",
+  "version": "1.0",
+  "description": "20 resume-vacancy pairs with known skill matches for accuracy validation (90%+ target)",
+  "summary": {
+    "total_pairs": 20,
+    "total_expected_matches": 118,
+    "unique_skills_tested": 45,
+    "synonym_matches_tested": 15
+  },
+  "pairs": [
+    {
+      "id": "pair_001",
+      "name": "Perfect Java Developer Match",
+      "resume_text": "John Anderson\nSenior Software Engineer\nEmail: john@example.com\n\nTECHNICAL SKILLS\nJava, Spring Boot, PostgreSQL, Hibernate, Docker, Kubernetes, Git, Maven, Jenkins, REST\n\nEXPERIENCE\nSenior Java Developer at TechCorp (2020-Present)\n- Developed microservices using Spring Boot and PostgreSQL\n- Deployed applications using Docker and Kubernetes\n- Set up CI/CD with Jenkins\n\nJava Developer at StartupXYZ (2017-2020)\n- Built REST APIs with Spring Framework\n- Used Hibernate ORM with PostgreSQL databases",
+      "vacancy": {
+        "title": "Senior Java Developer",
+        "required_skills": ["Java", "Spring Boot", "PostgreSQL"],
+        "additional_skills": ["Docker", "Kubernetes"],
+        "min_experience_months": 36
+      },
+      "expected_matches": {
+        "matched_skills": ["Java", "Spring Boot", "PostgreSQL", "Docker", "Kubernetes"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_002",
+      "name": "React Developer with Synonym Match (ReactJS = React)",
+      "resume_text": "Jane Smith\nFrontend Developer\nEmail: jane@example.com\n\nSKILLS\nReactJS, TypeScript, JavaScript, HTML5, CSS3, Redux, Axios\n\nEXPERIENCE\nFrontend Developer at WebCorp (2021-Present)\n- Built SPAs using ReactJS and Redux\n- Consumed REST APIs with Axios\n- Styled with CSS3 and SASS",
+      "vacancy": {
+        "title": "React Developer",
+        "required_skills": ["React", "TypeScript", "JavaScript"],
+        "additional_skills": ["HTML", "CSS", "Redux"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["React", "TypeScript", "JavaScript", "HTML", "CSS", "Redux"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "React", "matched_as": "ReactJS"},
+          {"required": "HTML", "matched_as": "HTML5"},
+          {"required": "CSS", "matched_as": "CSS3"}
+        ]
+      }
+    },
+    {
+      "id": "pair_003",
+      "name": "Partial Match - Python Developer Missing Key Skills",
+      "resume_text": "Bob Johnson\nPython Developer\nEmail: bob@example.com\n\nSKILLS\nPython, Flask, PostgreSQL, Git\n\nEXPERIENCE\nPython Developer at DataCorp (2022-Present)\n- Built APIs with Flask\n- Worked with PostgreSQL databases",
+      "vacancy": {
+        "title": "Senior Python Developer",
+        "required_skills": ["Python", "Django", "FastAPI"],
+        "additional_skills": ["Docker", "Kubernetes", "Redis"],
+        "min_experience_months": 48
+      },
+      "expected_matches": {
+        "matched_skills": ["Python"],
+        "missing_skills": ["Django", "FastAPI", "Docker", "Kubernetes", "Redis"],
+        "expected_match_percentage": 33.33,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_004",
+      "name": "Database Synonym Match (PostgreSQL = SQL)",
+      "resume_text": "Alice Williams\nBackend Developer\nEmail: alice@example.com\n\nSKILLS\nJava, Spring, PostgreSQL, Hibernate, Maven\n\nEXPERIENCE\nBackend Developer at TechStartup (2021-Present)\n- Developed Spring Boot applications\n- Used PostgreSQL for data persistence",
+      "vacancy": {
+        "title": "Java Backend Developer",
+        "required_skills": ["Java", "Spring", "SQL"],
+        "additional_skills": ["Hibernate", "Maven"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["Java", "Spring", "SQL", "Hibernate", "Maven"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "SQL", "matched_as": "PostgreSQL"}
+        ]
+      }
+    },
+    {
+      "id": "pair_005",
+      "name": "Full-Stack Developer - Mixed Match",
+      "resume_text": "Charlie Brown\nFull-Stack Developer\nEmail: charlie@example.com\n\nSKILLS\nJavaScript, TypeScript, React, Node.js, MongoDB, Express, REST API\n\nEXPERIENCE\nFull-Stack Developer at WebAgency (2020-Present)\n- Built React frontends with TypeScript\n- Created Node.js backends with Express\n- Used MongoDB for data storage",
+      "vacancy": {
+        "title": "Full-Stack Developer",
+        "required_skills": ["JavaScript", "React", "Node.js"],
+        "additional_skills": ["TypeScript", "Express", "MongoDB", "GraphQL"],
+        "min_experience_months": 36
+      },
+      "expected_matches": {
+        "matched_skills": ["JavaScript", "React", "Node.js", "TypeScript", "Express", "MongoDB"],
+        "missing_skills": ["GraphQL"],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_006",
+      "name": "DevOps Engineer - Perfect Match",
+      "resume_text": "Diana Prince\nDevOps Engineer\nEmail: diana@example.com\n\nSKILLS\nDocker, Kubernetes, CI/CD, Jenkins, Git, Terraform, AWS, Ansible\n\nEXPERIENCE\nDevOps Engineer at CloudCorp (2019-Present)\n- Managed Kubernetes clusters\n- Set up CI/CD with Jenkins\n- Automated infrastructure with Terraform\n- Deployed to AWS cloud",
+      "vacancy": {
+        "title": "Senior DevOps Engineer",
+        "required_skills": ["Docker", "Kubernetes", "CI/CD"],
+        "additional_skills": ["Jenkins", "Terraform", "AWS"],
+        "min_experience_months": 48
+      },
+      "expected_matches": {
+        "matched_skills": ["Docker", "Kubernetes", "CI/CD", "Jenkins", "Terraform", "AWS"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_007",
+      "name": "Go Developer - No Match",
+      "resume_text": "Eve Anderson\nPython Developer\nEmail: eve@example.com\n\nSKILLS\nPython, Django, PostgreSQL, Redis\n\nEXPERIENCE\nPython Developer at DataCo (2021-Present)\n- Built Django applications",
+      "vacancy": {
+        "title": "Go Developer",
+        "required_skills": ["Go", "Docker", "Kubernetes"],
+        "additional_skills": ["PostgreSQL", "Redis"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["PostgreSQL", "Redis"],
+        "missing_skills": ["Go", "Docker", "Kubernetes"],
+        "expected_match_percentage": 0.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_008",
+      "name": "Frontend with Angular Synonym (AngularJS = Angular)",
+      "resume_text": "Frank Miller\nFrontend Developer\nEmail: frank@example.com\n\nSKILLS\nAngularJS, TypeScript, JavaScript, HTML, CSS, RxJS\n\nEXPERIENCE\nFrontend Developer at AppCorp (2020-Present)\n- Built AngularJS applications",
+      "vacancy": {
+        "title": "Angular Developer",
+        "required_skills": ["Angular", "TypeScript", "JavaScript"],
+        "additional_skills": ["HTML", "CSS", "RxJS"],
+        "min_experience_months": 36
+      },
+      "expected_matches": {
+        "matched_skills": ["Angular", "TypeScript", "JavaScript", "HTML", "CSS", "RxJS"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "Angular", "matched_as": "AngularJS"}
+        ]
+      }
+    },
+    {
+      "id": "pair_009",
+      "name": "Data Engineer - Partial Match",
+      "resume_text": "Grace Lee\nData Engineer\nEmail: grace@example.com\n\nSKILLS\nPython, SQL, Airflow, Spark\n\nEXPERIENCE\nData Engineer at DataFlow (2021-Present)\n- Built ETL pipelines with Airflow\n- Processed data with Spark",
+      "vacancy": {
+        "title": "Senior Data Engineer",
+        "required_skills": ["Python", "SQL", "Spark"],
+        "additional_skills": ["Kafka", "Airflow", "Hadoop", "Hive"],
+        "min_experience_months": 48
+      },
+      "expected_matches": {
+        "matched_skills": ["Python", "SQL", "Spark", "Airflow"],
+        "missing_skills": ["Kafka", "Hadoop", "Hive"],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_010",
+      "name": "Vue.js Developer Synonym (Vue = Vue.js)",
+      "resume_text": "Henry Chen\nFrontend Developer\nEmail: henry@example.com\n\nSKILLS\nVue.js, JavaScript, TypeScript, HTML, CSS, Vuex\n\nEXPERIENCE\nFrontend Developer at WebTech (2022-Present)\n- Built Vue.js applications",
+      "vacancy": {
+        "title": "Vue Developer",
+        "required_skills": ["Vue", "JavaScript", "TypeScript"],
+        "additional_skills": ["HTML", "CSS", "Vuex"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["Vue", "JavaScript", "TypeScript", "HTML", "CSS", "Vuex"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "Vue", "matched_as": "Vue.js"}
+        ]
+      }
+    },
+    {
+      "id": "pair_011",
+      "name": "Multiple Synonym Matches",
+      "resume_text": "Ivan Petrov\nBackend Developer\nEmail: ivan@example.com\n\nSKILLS\nJava, Spring Boot, PostgreSQL, Redis, Mongo, Docker, K8s\n\nEXPERIENCE\nBackend Developer at TechRU (2020-Present)\n- Developed Spring Boot microservices\n- Used PostgreSQL and Redis",
+      "vacancy": {
+        "title": "Java Backend Developer",
+        "required_skills": ["Java", "Spring", "SQL"],
+        "additional_skills": ["Redis", "MongoDB", "Docker", "Kubernetes"],
+        "min_experience_months": 36
+      },
+      "expected_matches": {
+        "matched_skills": ["Java", "Spring", "SQL", "Redis", "MongoDB", "Docker", "Kubernetes"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "SQL", "matched_as": "PostgreSQL"},
+          {"required": "MongoDB", "matched_as": "Mongo"},
+          {"required": "Kubernetes", "matched_as": "K8s"}
+        ]
+      }
+    },
+    {
+      "id": "pair_012",
+      "name": ".NET Developer - Partial Match",
+      "resume_text": "John Smith\nC# Developer\nEmail: johnsmith@example.com\n\nSKILLS\nC#, .NET, SQL Server, Git\n\nEXPERIENCE\nC# Developer at MicrosoftPartner (2021-Present)\n- Built .NET applications",
+      "vacancy": {
+        "title": "Senior .NET Developer",
+        "required_skills": ["C#", ".NET", "Entity Framework"],
+        "additional_skills": ["SQL", "Docker", "Azure"],
+        "min_experience_months": 48
+      },
+      "expected_matches": {
+        "matched_skills": ["C#", ".NET"],
+        "missing_skills": ["Entity Framework", "SQL", "Docker", "Azure"],
+        "expected_match_percentage": 66.67,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_013",
+      "name": "React Native Developer - Synonym Match",
+      "resume_text": "Sarah Johnson\nMobile Developer\nEmail: sarah@example.com\n\nSKILLS\nReact, JavaScript, TypeScript, iOS, Android, Redux\n\nEXPERIENCE\nMobile Developer at AppStudio (2020-Present)\n- Built React Native apps",
+      "vacancy": {
+        "title": "React Native Developer",
+        "required_skills": ["React", "JavaScript", "TypeScript"],
+        "additional_skills": ["iOS", "Android", "Redux"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["React", "JavaScript", "TypeScript", "iOS", "Android", "Redux"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_014",
+      "name": "Entry Level Developer - Minimal Skills",
+      "resume_text": "Mike Brown\nJunior Developer\nEmail: mike@example.com\n\nSKILLS\nPython, JavaScript\n\nEDUCATION\nBS Computer Science, 2023",
+      "vacancy": {
+        "title": "Junior Developer",
+        "required_skills": ["Python", "JavaScript"],
+        "additional_skills": ["Git", "SQL", "HTML"],
+        "min_experience_months": 0
+      },
+      "expected_matches": {
+        "matched_skills": ["Python", "JavaScript"],
+        "missing_skills": ["Git", "SQL", "HTML"],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_015",
+      "name": "QA Engineer - Perfect Match",
+      "resume_text": "Lisa Wang\nQA Engineer\nEmail: lisa@example.com\n\nSKILLS\nSelenium, pytest, Java, Python, Jest, TestNG, JUnit\n\nEXPERIENCE\nQA Engineer at TestCorp (2020-Present)\n- Automated tests with Selenium and pytest\n- Tested Java applications with JUnit and TestNG\n- Tested JavaScript apps with Jest",
+      "vacancy": {
+        "title": "Senior QA Engineer",
+        "required_skills": ["Selenium", "Java", "Python"],
+        "additional_skills": ["JUnit", "pytest", "TestNG"],
+        "min_experience_months": 36
+      },
+      "expected_matches": {
+        "matched_skills": ["Selenium", "Java", "Python", "JUnit", "pytest", "TestNG"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_016",
+      "name": "Machine Learning Engineer - Mixed Match",
+      "resume_text": "Alex Kim\nML Engineer\nEmail: alex@example.com\n\nSKILLS\nPython, TensorFlow, PyTorch, Scikit-learn, SQL, Docker\n\nEXPERIENCE\nML Engineer at AIStartup (2021-Present)\n- Built ML models with TensorFlow and PyTorch\n- Deployed models with Docker",
+      "vacancy": {
+        "title": "Machine Learning Engineer",
+        "required_skills": ["Python", "TensorFlow", "PyTorch"],
+        "additional_skills": ["Scikit-learn", "SQL", "Docker", "Kafka"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["Python", "TensorFlow", "PyTorch", "Scikit-learn", "SQL", "Docker"],
+        "missing_skills": ["Kafka"],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    },
+    {
+      "id": "pair_017",
+      "name": "Spring Boot Synonym (Spring = Spring Boot)",
+      "resume_text": "Tom Wilson\nJava Developer\nEmail: tom@example.com\n\nSKILLS\nJava, Spring Boot, Hibernate, Maven, PostgreSQL\n\nEXPERIENCE\nJava Developer at SpringCorp (2020-Present)\n- Built Spring Boot applications",
+      "vacancy": {
+        "title": "Java Spring Developer",
+        "required_skills": ["Java", "Spring", "Hibernate"],
+        "additional_skills": ["Maven", "PostgreSQL"],
+        "min_experience_months": 36
+      },
+      "expected_matches": {
+        "matched_skills": ["Java", "Spring", "Hibernate", "Maven", "PostgreSQL"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "Spring", "matched_as": "Spring Boot"}
+        ]
+      }
+    },
+    {
+      "id": "pair_018",
+      "name": "TypeScript Synonym (TS = TypeScript)",
+      "resume_text": "Emma Davis\nFrontend Developer\nEmail: emma@example.com\n\nSKILLS\nReact, TS, JavaScript, HTML5, CSS3\n\nEXPERIENCE\nFrontend Developer at ReactCo (2021-Present)\n- Built React apps with TypeScript",
+      "vacancy": {
+        "title": "React TypeScript Developer",
+        "required_skills": ["React", "TypeScript", "JavaScript"],
+        "additional_skills": ["HTML", "CSS"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["React", "TypeScript", "JavaScript", "HTML", "CSS"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "TypeScript", "matched_as": "TS"}
+        ]
+      }
+    },
+    {
+      "id": "pair_019",
+      "name": "Infrastructure as Code (Terraform = IaC)",
+      "resume_text": "Chris Martinez\nDevOps Engineer\nEmail: chris@example.com\n\nSKILLS\nDocker, Kubernetes, Terraform, Ansible, AWS, CI/CD\n\nEXPERIENCE\nDevOps Engineer at InfraCo (2019-Present)\n- Implemented IaC with Terraform",
+      "vacancy": {
+        "title": "Senior DevOps Engineer",
+        "required_skills": ["Docker", "Kubernetes", "IaC"],
+        "additional_skills": ["Terraform", "Ansible", "AWS"],
+        "min_experience_months": 48
+      },
+      "expected_matches": {
+        "matched_skills": ["Docker", "Kubernetes", "IaC", "Terraform", "Ansible", "AWS"],
+        "missing_skills": [],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": [
+          {"required": "IaC", "matched_as": "Terraform"}
+        ]
+      }
+    },
+    {
+      "id": "pair_020",
+      "name": "GraphQL API - Partial Match",
+      "resume_text": "Ryan Garcia\nBackend Developer\nEmail: ryan@example.com\n\nSKILLS\nNode.js, JavaScript, TypeScript, Express, MongoDB\n\nEXPERIENCE\nBackend Developer at APIStartup (2022-Present)\n- Built REST APIs with Express",
+      "vacancy": {
+        "title": "Full-Stack Developer",
+        "required_skills": ["JavaScript", "TypeScript", "Node.js"],
+        "additional_skills": ["Express", "GraphQL", "MongoDB"],
+        "min_experience_months": 24
+      },
+      "expected_matches": {
+        "matched_skills": ["JavaScript", "TypeScript", "Node.js", "Express", "MongoDB"],
+        "missing_skills": ["GraphQL"],
+        "expected_match_percentage": 100.0,
+        "synonym_matches": []
+      }
+    }
+  ]
+}
