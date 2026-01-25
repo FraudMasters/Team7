@@ -4,6 +4,7 @@ SQLAlchemy database models for Resume Analysis System
 from .base import Base
 from .resume import Resume
 from .analysis_result import AnalysisResult
+from .comparison import ResumeComparison
 from .job_vacancy import JobVacancy
 from .match_result import MatchResult
 from .skill_taxonomy import SkillTaxonomy
@@ -15,6 +16,7 @@ __all__ = [
     "Base",
     "Resume",
     "AnalysisResult",
+    "ResumeComparison",
     "JobVacancy",
     "MatchResult",
     "SkillTaxonomy",
