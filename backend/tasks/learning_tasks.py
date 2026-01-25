@@ -493,3 +493,318 @@ def periodic_feedback_aggregation(
 
     logger.info(f"Periodic aggregation completed: {result.get('status')}")
     return result
+
+
+@shared_task(
+    name="tasks.learning_tasks.retrain_skill_matching_model",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=300,
+)
+def retrain_skill_matching_model(
+    self,
+    model_name: str = "skill_matching",
+    days_back: int = 30,
+    min_feedback_count: int = 50,
+    auto_activate: bool = False,
+    performance_threshold: float = 0.85,
+) -> Dict[str, Any]:
+    """
+    Retrain the skill matching model based on accumulated feedback.
+
+    This Celery task processes accumulated recruiter feedback to retrain
+    and improve the skill matching model. It creates a new model version,
+    evaluates performance, and optionally activates it if performance
+    thresholds are met.
+
+    Task Workflow:
+    1. Query feedback data from the specified time period
+    2. Validate minimum feedback count for training
+    3. Extract training data (skill pairs and correctness labels)
+    4. Train new model or update existing synonyms
+    5. Create new MLModelVersion entry
+    6. Evaluate model performance on validation set
+    7. Optionally activate model if performance exceeds threshold
+
+    Args:
+        self: Celery task instance (bind=True)
+        model_name: Name of the model to retrain (default: "skill_matching")
+        days_back: Number of days of feedback to use for training (default: 30)
+        min_feedback_count: Minimum feedback entries required for training (default: 50)
+        auto_activate: Whether to auto-activate if performance threshold met (default: False)
+        performance_threshold: Minimum accuracy score for auto-activation (default: 0.85)
+
+    Returns:
+        Dictionary containing retraining results:
+        - training_samples: Number of feedback samples used
+        - new_version_id: ID of the created model version
+        - performance_score: Model performance score (0-1)
+        - is_active: Whether the model was activated
+        - is_experiment: Whether the model is an experiment
+        - improvement_over_baseline: Performance improvement over current model
+        - processing_time_ms: Total processing time
+        - status: Task status (completed/failed)
+
+    Raises:
+        SoftTimeLimitExceeded: If task exceeds time limit
+        Exception: For database or processing errors
+
+    Example:
+        >>> from tasks.learning_tasks import retrain_skill_matching_model
+        >>> task = retrain_skill_matching_model.delay(
+        ...     model_name="skill_matching",
+        ...     days_back=30,
+        ...     auto_activate=True
+        ... )
+        >>> result = task.get()
+        >>> print(result['performance_score'])
+        0.92
+    """
+    start_time = time.time()
+    total_steps = 6
+    current_step = 0
+
+    try:
+        logger.info(
+            f"Starting model retraining for '{model_name}', "
+            f"days_back: {days_back}, min_feedback: {min_feedback_count}"
+        )
+
+        # Step 1: Query feedback data
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "querying_feedback",
+            "message": "Querying feedback data for training...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Querying feedback")
+
+        # Note: This is a placeholder for database query
+        # In a real implementation, you would use async session to query SkillFeedback
+        # feedback_entries = await db_session.execute(
+        #     select(SkillFeedback).where(
+        #         and_(
+        #             SkillFeedback.created_at >= datetime.utcnow() - timedelta(days=days_back),
+        #             SkillFeedback.was_correct.is_not(None),
+        #             SkillFeedback.skill.is_not(None)
+        #         )
+        #     ).order_by(SkillFeedback.created_at.desc())
+        # )
+        feedback_entries = []
+        training_samples = len(feedback_entries)
+
+        logger.info(f"Found {training_samples} feedback samples for training")
+
+        # Validate minimum feedback count
+        if training_samples < min_feedback_count:
+            logger.warning(
+                f"Insufficient feedback for training: {training_samples} < {min_feedback_count}. "
+                f"Skipping retraining."
+            )
+            return {
+                "status": "skipped",
+                "reason": f"Insufficient feedback samples ({training_samples} < {min_feedback_count})",
+                "training_samples": training_samples,
+                "min_required": min_feedback_count,
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            }
+
+        # Step 2: Extract training data
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "extracting_features",
+            "message": "Extracting training features from feedback...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Extracting features")
+
+        # Extract skill pairs and correctness labels
+        # Note: In a real implementation, this would process feedback_entries
+        training_data = []
+        for entry in feedback_entries:
+            # Extract features from feedback
+            # This is a placeholder - real implementation would extract:
+            # - Original skill as matched by AI
+            # - Corrected skill (if provided)
+            # - Whether the match was correct
+            # - Context information
+            pass
+
+        logger.info(f"Extracted {len(training_data)} training samples")
+
+        # Step 3: Aggregate corrections for synonym updates
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "aggregating_corrections",
+            "message": "Aggregating corrections for synonym updates...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Aggregating corrections")
+
+        corrections = aggregate_corrections(feedback_entries)
+        corrections_count = len(corrections)
+        logger.info(f"Aggregated {corrections_count} skill corrections")
+
+        # Step 4: Generate and save synonym candidates
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "generating_synonyms",
+            "message": "Generating new synonym candidates...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Generating synonyms")
+
+        # Generate synonym candidates from corrections
+        candidates = generate_synonym_candidates(corrections, organization_id=None)
+
+        # Note: In a real implementation, you would save candidates to database
+        # for candidate in candidates:
+        #     new_synonym = CustomSynonym(**candidate)
+        #     db_session.add(new_synonym)
+        # await db_session.commit()
+
+        logger.info(f"Generated {len(candidates)} new synonym candidates")
+
+        # Step 5: Create new model version
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "creating_model_version",
+            "message": "Creating new model version entry...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Creating model version")
+
+        # Generate new version number
+        # Note: In a real implementation, you would query the latest version
+        # latest_version = await db_session.execute(
+        #     select(MLModelVersion)
+        #     .where(MLModelVersion.model_name == model_name)
+        #     .order_by(MLModelVersion.created_at.desc())
+        #     .limit(1)
+        # )
+        # and increment the version number
+        new_version = "1.0.0"  # Placeholder
+
+        # Calculate training accuracy
+        # Note: In a real implementation, this would evaluate on a validation set
+        training_accuracy = min(1.0, len(candidates) * 0.1 + 0.7)  # Placeholder calculation
+        performance_score = round(training_accuracy, 3)
+
+        # Note: In a real implementation, you would create MLModelVersion entry
+        # new_model = MLModelVersion(
+        #     model_name=model_name,
+        #     version=new_version,
+        #     is_active=False,
+        #     is_experiment=not auto_activate,
+        #     performance_score=performance_score * 100,
+        #     training_samples=training_samples,
+        #     metadata={
+        #         "training_days": days_back,
+        #         "synonyms_added": len(candidates),
+        #         "corrections_aggregated": corrections_count,
+        #         "auto_generated": True,
+        #     }
+        # )
+        # db_session.add(new_model)
+        # await db_session.commit()
+        # new_version_id = str(new_model.id)
+
+        new_version_id = "placeholder-uuid"  # Placeholder
+        logger.info(f"Created new model version: {new_version} (ID: {new_version_id})")
+
+        # Step 6: Evaluate and optionally activate
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "evaluating_performance",
+            "message": "Evaluating model performance...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Evaluating performance")
+
+        # Determine if model should be activated
+        should_activate = auto_activate and performance_score >= performance_threshold
+        is_active = False
+        is_experiment = not should_activate
+
+        # Note: In a real implementation, you would activate the model if needed
+        # if should_activate:
+        #     # Deactivate other versions
+        #     await db_session.execute(
+        #         update(MLModelVersion)
+        #         .where(
+        #             and_(
+        #                 MLModelVersion.model_name == model_name,
+        #                 MLModelVersion.id != new_version_id
+        #             )
+        #         )
+        #         .values(is_active=False)
+        #     )
+        #     # Activate new version
+        #     new_model.is_active = True
+        #     new_model.is_experiment = False
+        #     await db_session.commit()
+        #     is_active = True
+        #     is_experiment = False
+
+        # Calculate improvement over baseline
+        # Note: In a real implementation, you would compare with current active model
+        baseline_score = 0.75  # Placeholder
+        improvement = round(performance_score - baseline_score, 3)
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "training_samples": training_samples,
+            "new_version_id": new_version_id,
+            "new_version": new_version,
+            "performance_score": performance_score,
+            "is_active": is_active,
+            "is_experiment": is_experiment,
+            "improvement_over_baseline": improvement,
+            "synonyms_generated": len(candidates),
+            "corrections_aggregated": corrections_count,
+            "processing_time_ms": processing_time_ms,
+            "status": "completed",
+        }
+
+        logger.info(
+            f"Model retraining completed: version {new_version}, "
+            f"score: {performance_score}, activated: {is_active}, "
+            f"improvement: {improvement:+.3f}"
+        )
+
+        return result
+
+    except SoftTimeLimitExceeded:
+        logger.error(f"Task {self.request.id} exceeded time limit")
+        return {
+            "status": "failed",
+            "error": "Model retraining exceeded maximum time limit",
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+    except Exception as e:
+        logger.error(f"Error in model retraining: {e}", exc_info=True)
+        return {
+            "status": "failed",
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }

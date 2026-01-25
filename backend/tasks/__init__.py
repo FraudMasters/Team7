@@ -9,6 +9,7 @@ from .learning_tasks import (
     aggregate_feedback_and_generate_synonyms,
     review_and_activate_synonyms,
     periodic_feedback_aggregation,
+    retrain_skill_matching_model,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "aggregate_feedback_and_generate_synonyms",
     "review_and_activate_synonyms",
     "periodic_feedback_aggregation",
+    "retrain_skill_matching_model",
 ]
