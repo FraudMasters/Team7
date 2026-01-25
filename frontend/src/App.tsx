@@ -8,6 +8,7 @@ import ComparePage from '@pages/Compare';
 import CompareVacancyPage from '@pages/CompareVacancy';
 import AdminSynonymsPage from '@pages/AdminSynonyms';
 import AdminAnalyticsPage from '@pages/AdminAnalytics';
+import AnalyticsDashboardPage from '@pages/AnalyticsDashboard';
 
 /**
  * Main App Component
@@ -40,6 +41,9 @@ function App() {
           <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
           <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
           <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
+
+          {/* Analytics dashboard */}
+          <Route path="analytics" element={<AnalyticsDashboardPage />} />
 
           {/* Catch-all route - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />

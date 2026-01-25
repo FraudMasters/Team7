@@ -10,3 +10,4 @@ export { default as ComparePage } from './Compare';
 export { default as CompareVacancyPage } from './CompareVacancy';
 export { default as AdminSynonymsPage } from './AdminSynonyms';
 export { default as AdminAnalyticsPage } from './AdminAnalytics';
+export { default as AnalyticsDashboardPage } from './AnalyticsDashboard';
