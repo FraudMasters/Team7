@@ -15,6 +15,7 @@ from .user_preferences import UserPreferences
 from .hiring_stage import HiringStage
 from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
+from .report import Report, ScheduledReport
 
 __all__ = [
     "Base",
@@ -31,4 +32,6 @@ __all__ = [
     "HiringStage",
     "AnalyticsEvent",
     "Recruiter",
+    "Report",
+    "ScheduledReport",
 ]
