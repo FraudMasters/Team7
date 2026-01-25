@@ -23,6 +23,7 @@ from ..analyzers import (
     extract_resume_entities,
     calculate_skill_experience,
     format_experience_summary,
+    EnhancedSkillMatcher,
 )
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ class MatchRequest(BaseModel):
 
 
 class SkillMatch(BaseModel):
-    """Individual skill match result."""
+    """Individual skill match result with confidence scoring."""
 
     skill: str = Field(..., description="The skill name from the vacancy")
     status: str = Field(..., description="Match status: 'matched' or 'missing'")
@@ -239,6 +240,12 @@ class SkillMatch(BaseModel):
         None, description="The actual skill name found in resume (if matched)"
     )
     highlight: str = Field(..., description="Highlight color: 'green' or 'red'")
+    confidence: float = Field(
+        0.0, description="Confidence score from 0.0 to 1.0 (0% to 100%)"
+    )
+    match_type: str = Field(
+        "none", description="Type of match: 'direct', 'context', 'synonym', 'fuzzy', or 'none'"
+    )
 
 
 class ExperienceVerification(BaseModel):
@@ -374,7 +381,7 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
                 )
 
             resume_text = result.get("text", "")
-            if not text or len(text.strip()) < 10:
+            if not resume_text or len(resume_text.strip()) < 10:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="Extracted text is too short or empty",
@@ -421,9 +428,11 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
 
         logger.info(f"Extracted {len(resume_skills)} unique skills from resume")
 
-        # Step 5: Load skill synonyms
-        synonyms_map = load_skill_synonyms()
-        logger.info(f"Loaded {len(synonyms_map)} skill synonym mappings")
+        # Step 5: Initialize enhanced skill matcher
+        enhanced_matcher = EnhancedSkillMatcher()
+        # Pre-load synonyms for logging
+        synonyms_map = enhanced_matcher.load_synonyms()
+        logger.info(f"Initialized enhanced skill matcher with {len(synonyms_map)} synonym mappings")
 
         # Step 6: Get vacancy data
         vacancy_title = request.vacancy_data.get(
@@ -439,40 +448,72 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
         if isinstance(required_skills, str):
             required_skills = [required_skills]
 
-        # Step 7: Match required skills
+        # Step 7: Match required skills with enhanced matcher
         required_skills_matches = []
         for skill in required_skills:
-            if check_skill_match(resume_skills, skill, synonyms_map):
-                matched_as = find_matching_synonym(resume_skills, skill, synonyms_map)
+            # Use enhanced matcher with context awareness
+            match_result = enhanced_matcher.match_with_context(
+                resume_skills=resume_skills,
+                required_skill=skill,
+                context=vacancy_title.lower(),  # Use vacancy title as context hint
+                use_fuzzy=True  # Enable fuzzy matching
+            )
+
+            if match_result["matched"]:
                 required_skills_matches.append(
                     SkillMatch(
                         skill=skill,
                         status="matched",
-                        matched_as=matched_as,
+                        matched_as=match_result["matched_as"],
                         highlight="green",
+                        confidence=round(match_result["confidence"], 2),
+                        match_type=match_result["match_type"]
                     )
                 )
             else:
                 required_skills_matches.append(
-                    SkillMatch(skill=skill, status="missing", matched_as=None, highlight="red")
+                    SkillMatch(
+                        skill=skill,
+                        status="missing",
+                        matched_as=None,
+                        highlight="red",
+                        confidence=0.0,
+                        match_type="none"
+                    )
                 )
 
-        # Step 8: Match additional/preferred skills
+        # Step 8: Match additional/preferred skills with enhanced matcher
         additional_skills_matches = []
         for skill in additional_skills:
-            if check_skill_match(resume_skills, skill, synonyms_map):
-                matched_as = find_matching_synonym(resume_skills, skill, synonyms_map)
+            # Use enhanced matcher with context awareness
+            match_result = enhanced_matcher.match_with_context(
+                resume_skills=resume_skills,
+                required_skill=skill,
+                context=vacancy_title.lower(),  # Use vacancy title as context hint
+                use_fuzzy=True  # Enable fuzzy matching
+            )
+
+            if match_result["matched"]:
                 additional_skills_matches.append(
                     SkillMatch(
                         skill=skill,
                         status="matched",
-                        matched_as=matched_as,
+                        matched_as=match_result["matched_as"],
                         highlight="green",
+                        confidence=round(match_result["confidence"], 2),
+                        match_type=match_result["match_type"]
                     )
                 )
             else:
                 additional_skills_matches.append(
-                    SkillMatch(skill=skill, status="missing", matched_as=None, highlight="red")
+                    SkillMatch(
+                        skill=skill,
+                        status="missing",
+                        matched_as=None,
+                        highlight="red",
+                        confidence=0.0,
+                        match_type="none"
+                    )
                 )
 
         # Step 9: Calculate match percentage
