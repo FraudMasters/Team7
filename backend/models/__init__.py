@@ -14,6 +14,7 @@ from .ml_model_version import MLModelVersion
 from .user_preferences import UserPreferences
 from .hiring_stage import HiringStage
 from .analytics_event import AnalyticsEvent
+from .recruiter import Recruiter
 
 __all__ = [
     "Base",
@@ -29,4 +30,5 @@ __all__ = [
     "UserPreferences",
     "HiringStage",
     "AnalyticsEvent",
+    "Recruiter",
 ]
