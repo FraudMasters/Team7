@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "006-comprehensive-analytics-custom-reporting-dashboard",
+  "spec": "010-multi-language-ui-english-russian",
   "state": "building",
   "subtasks": {
-    "completed": 32,
-    "total": 33,
+    "completed": 25,
+    "total": 27,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration & End-to-End Testing",
+    "current": "Integration and Testing",
     "id": null,
-    "total": 6
+    "total": 4
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 35,
-    "started_at": "2026-01-25T23:38:36.191737"
+    "number": 24,
+    "started_at": "2026-01-25T21:53:19.768128"
   },
-  "last_update": "2026-01-26T01:54:56.297053"
+  "last_update": "2026-01-25T23:24:05.201671"
 }
