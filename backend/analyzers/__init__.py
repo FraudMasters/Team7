@@ -39,6 +39,9 @@ from .enhanced_matcher import (
 from .taxonomy_loader import (
     TaxonomyLoader,
 )
+from .model_versioning import (
+    ModelVersionManager,
+)
 
 __all__ = [
     "extract_keywords",
@@ -60,4 +63,5 @@ __all__ = [
     "format_errors_for_display",
     "EnhancedSkillMatcher",
     "TaxonomyLoader",
+    "ModelVersionManager",
 ]
