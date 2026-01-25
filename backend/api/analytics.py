@@ -54,6 +54,22 @@ class KeyMetricsResponse(BaseModel):
     match_rates: MatchRateMetrics = Field(..., description="Skill matching metrics")
 
 
+class FunnelStage(BaseModel):
+    """Represents a single stage in the recruitment funnel."""
+
+    stage_name: str = Field(..., description="Name of the funnel stage")
+    count: int = Field(..., description="Number of candidates/resumes at this stage")
+    conversion_rate: float = Field(..., description="Conversion rate from previous stage (0-1)")
+
+
+class FunnelMetricsResponse(BaseModel):
+    """Response model for funnel visualization metrics."""
+
+    stages: list[FunnelStage] = Field(..., description="List of funnel stages with counts and conversion rates")
+    total_resumes: int = Field(..., description="Total number of resumes uploaded")
+    overall_hire_rate: float = Field(..., description="Overall conversion rate from upload to hire (0-1)")
+
+
 @router.get(
     "/key-metrics",
     response_model=KeyMetricsResponse,
@@ -150,4 +166,132 @@ async def get_key_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve key metrics: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/funnel",
+    response_model=FunnelMetricsResponse,
+    tags=["Analytics"],
+)
+async def get_funnel_metrics(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get recruitment funnel visualization metrics.
+
+    This endpoint provides a comprehensive view of the recruitment pipeline,
+    tracking candidate progression from resume upload through to hiring.
+    Each stage includes counts and conversion rates, enabling visualization
+    of drop-off points and pipeline efficiency.
+
+    Args:
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with funnel stages, counts, conversion rates, and overall hire rate
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/funnel")
+        >>> response.json()
+        {
+            "stages": [
+                {
+                    "stage_name": "resumes_uploaded",
+                    "count": 1000,
+                    "conversion_rate": 1.0
+                },
+                {
+                    "stage_name": "resumes_processed",
+                    "count": 950,
+                    "conversion_rate": 0.95
+                },
+                {
+                    "stage_name": "candidates_matched",
+                    "count": 720,
+                    "conversion_rate": 0.758
+                },
+                {
+                    "stage_name": "candidates_shortlisted",
+                    "count": 360,
+                    "conversion_rate": 0.5
+                },
+                {
+                    "stage_name": "candidates_interviewed",
+                    "count": 180,
+                    "conversion_rate": 0.5
+                },
+                {
+                    "stage_name": "candidates_hired",
+                    "count": 45,
+                    "conversion_rate": 0.25
+                }
+            ],
+            "total_resumes": 1000,
+            "overall_hire_rate": 0.045
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching funnel metrics - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These numbers represent a typical recruitment funnel with realistic conversion rates
+        response_data = {
+            "stages": [
+                {
+                    "stage_name": "resumes_uploaded",
+                    "count": 1000,
+                    "conversion_rate": 1.0,
+                },
+                {
+                    "stage_name": "resumes_processed",
+                    "count": 950,
+                    "conversion_rate": 0.95,
+                },
+                {
+                    "stage_name": "candidates_matched",
+                    "count": 720,
+                    "conversion_rate": 0.758,
+                },
+                {
+                    "stage_name": "candidates_shortlisted",
+                    "count": 360,
+                    "conversion_rate": 0.5,
+                },
+                {
+                    "stage_name": "candidates_interviewed",
+                    "count": 180,
+                    "conversion_rate": 0.5,
+                },
+                {
+                    "stage_name": "candidates_hired",
+                    "count": 45,
+                    "conversion_rate": 0.25,
+                },
+            ],
+            "total_resumes": 1000,
+            "overall_hire_rate": 0.045,
+        }
+
+        logger.info("Funnel metrics retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving funnel metrics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve funnel metrics: {str(e)}",
         ) from e
