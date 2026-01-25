@@ -3,9 +3,9 @@
   "spec": "009-advanced-skill-synonym-context-matching",
   "state": "building",
   "subtasks": {
-    "completed": 4,
+    "completed": 5,
     "total": 26,
-    "in_progress": 0,
+    "in_progress": 1,
     "failed": 0
   },
   "phase": {
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 5,
+    "number": 7,
     "started_at": "2026-01-25T16:02:23.539445"
   },
-  "last_update": "2026-01-25T16:30:00.000000"
+  "last_update": "2026-01-25T16:48:44.763804"
 }
