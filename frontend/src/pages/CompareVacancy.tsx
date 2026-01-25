@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Box, Container, Typography, Paper, Alert, Stack } from '@mui/material';
+import { Box, Container, Typography, Paper, Alert, Stack, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, CircularProgress, IconButton } from '@mui/material';
+import { ContentCopy as CopyIcon, Check as CheckIcon } from '@mui/icons-material';
 import { ResumeComparisonMatrix } from '@components/ResumeComparisonMatrix';
 import { ComparisonControls } from '@components/ComparisonControls';
+import { apiClient } from '@/api/client';
+import type { ComparisonCreate } from '@/types/api';
 
 /**
  * CompareVacancy Page Component
@@ -23,6 +26,27 @@ const CompareVacancyPage: React.FC = () => {
 
   // State for managing comparison
   const [resumeIds, setResumeIds] = useState<string[]>([]);
+
+  // State for save dialog
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [comparisonName, setComparisonName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // State for share dialog
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareableUrl, setShareableUrl] = useState('');
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+
+  // State for notifications
+  const [notification, setNotification] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   /**
    * Initialize resume IDs from URL query params on mount
@@ -69,19 +93,108 @@ const CompareVacancyPage: React.FC = () => {
   };
 
   /**
-   * Handle save comparison (for future enhancement)
+   * Handle save comparison - opens dialog to enter comparison name
    */
   const handleSave = () => {
-    // TODO: Implement save comparison to backend
-    // This will be implemented in subtask-5-2
+    if (resumeIds.length < 2 || resumeIds.length > 5) {
+      setNotification({
+        open: true,
+        message: 'Please select 2-5 resumes before saving.',
+        severity: 'error',
+      });
+      return;
+    }
+    setComparisonName(`Comparison for ${vacancyId}`);
+    setSaveDialogOpen(true);
   };
 
   /**
-   * Handle share comparison (for future enhancement)
+   * Confirm save comparison - sends API request to create comparison
+   */
+  const handleConfirmSave = async () => {
+    if (!vacancyId) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const createRequest: ComparisonCreate = {
+        vacancy_id: vacancyId,
+        resume_ids: resumeIds,
+        name: comparisonName || `Comparison for ${vacancyId}`,
+        filters: {},
+      };
+
+      const response = await apiClient.createComparison(createRequest);
+
+      setSaveDialogOpen(false);
+      setComparisonName('');
+      setNotification({
+        open: true,
+        message: `Comparison "${response.name}" saved successfully! ID: ${response.id}`,
+        severity: 'success',
+      });
+    } catch (error) {
+      setNotification({
+        open: true,
+        message: error instanceof Error ? error.message : 'Failed to save comparison',
+        severity: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * Handle share comparison - generates shareable URL
    */
   const handleShare = () => {
-    // TODO: Implement share comparison
-    // This will be implemented in subtask-5-2
+    if (resumeIds.length < 2) {
+      setNotification({
+        open: true,
+        message: 'Please select at least 2 resumes before sharing.',
+        severity: 'error',
+      });
+      return;
+    }
+
+    // Generate shareable URL based on current state
+    const baseUrl = window.location.origin;
+    const url = new URL(`${baseUrl}/compare-vacancy/${vacancyId}`);
+    url.searchParams.set('resumes', resumeIds.join(','));
+
+    setShareableUrl(url.toString());
+    setShareDialogOpen(true);
+    setCopiedToClipboard(false);
+  };
+
+  /**
+   * Copy shareable URL to clipboard
+   */
+  const handleCopyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareableUrl);
+      setCopiedToClipboard(true);
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedToClipboard(false);
+      }, 2000);
+    } catch (error) {
+      setNotification({
+        open: true,
+        message: 'Failed to copy URL to clipboard',
+        severity: 'error',
+      });
+    }
+  };
+
+  /**
+   * Close notification snackbar
+   */
+  const handleNotificationClose = () => {
+    setNotification((prev) => ({ ...prev, open: false }));
   };
 
   if (!vacancyId) {
@@ -163,6 +276,86 @@ const CompareVacancyPage: React.FC = () => {
           </Alert>
         )}
       </Stack>
+
+      {/* Save Comparison Dialog */}
+      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Save Comparison</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <TextField
+              fullWidth
+              label="Comparison Name"
+              value={comparisonName}
+              onChange={(e) => setComparisonName(e.target.value)}
+              placeholder="Enter a name for this comparison"
+              autoFocus
+              disabled={isSaving}
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              This will save the current comparison with {resumeIds.length} resume(s) for vacancy{' '}
+              <strong>{vacancyId}</strong>.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveDialogOpen(false)} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmSave} variant="contained" disabled={isSaving || !comparisonName.trim()}>
+            {isSaving ? <CircularProgress size={24} /> : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Share Comparison Dialog */}
+      <Dialog open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Share Comparison</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Typography variant="body2" gutterBottom>
+              Share this comparison by sending the link below. Anyone with the link will be able to view
+              the comparison.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+              <TextField
+                fullWidth
+                value={shareableUrl}
+                InputProps={{
+                  readOnly: true,
+                }}
+                size="small"
+              />
+              <IconButton
+                onClick={handleCopyToClipboard}
+                color={copiedToClipboard ? 'success' : 'primary'}
+                sx={{ border: 1, borderColor: 'divider' }}
+              >
+                {copiedToClipboard ? <CheckIcon /> : <CopyIcon />}
+              </IconButton>
+            </Box>
+            {copiedToClipboard && (
+              <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                URL copied to clipboard!
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShareDialogOpen(false)}>{copiedToClipboard ? 'Done' : 'Close'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleNotificationClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleNotificationClose} severity={notification.severity} sx={{ width: '100%' }}>
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };
