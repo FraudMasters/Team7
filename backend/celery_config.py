@@ -47,6 +47,10 @@ celery_config: Dict[str, Any] = {
     "task_routes": {
         "tasks.analysis_task.analyze_resume_async": {"queue": "analysis"},
         "tasks.analysis_task.*": {"queue": "analysis"},
+        "tasks.learning_tasks.aggregate_feedback_and_generate_synonyms": {"queue": "learning"},
+        "tasks.learning_tasks.review_and_activate_synonyms": {"queue": "learning"},
+        "tasks.learning_tasks.periodic_feedback_aggregation": {"queue": "learning"},
+        "tasks.learning_tasks.*": {"queue": "learning"},
     },
 
     # Task priority (if needed in future)
