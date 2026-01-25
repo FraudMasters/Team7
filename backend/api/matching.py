@@ -275,6 +275,37 @@ class MatchResponse(BaseModel):
     processing_time_ms: float = Field(..., description="Processing time in milliseconds")
 
 
+class MatchFeedbackRequest(BaseModel):
+    """Request model for submitting feedback on skill matches."""
+
+    match_id: str = Field(..., description="ID of the match result")
+    skill: str = Field(..., description="The skill name that was matched")
+    was_correct: bool = Field(..., description="Whether the AI's match was correct")
+    recruiter_correction: Optional[str] = Field(
+        None, description="What the recruiter corrected it to (if incorrect)"
+    )
+    confidence_score: Optional[float] = Field(
+        None,
+        description="The confidence score the AI assigned (0-1)",
+        ge=0,
+        le=1,
+    )
+    metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
+
+
+class MatchFeedbackResponse(BaseModel):
+    """Response model for match feedback submission."""
+
+    id: str = Field(..., description="Unique identifier for the feedback entry")
+    match_id: str = Field(..., description="ID of the match result")
+    skill: str = Field(..., description="The skill name that was matched")
+    was_correct: bool = Field(..., description="Whether the AI's match was correct")
+    recruiter_correction: Optional[str] = Field(None, description="Recruiter's correction")
+    feedback_source: str = Field(..., description="Source of feedback")
+    processed: bool = Field(..., description="Whether feedback has been processed by ML pipeline")
+    created_at: str = Field(..., description="Creation timestamp")
+
+
 @router.post(
     "/compare",
     response_model=MatchResponse,
@@ -600,4 +631,97 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to match resume to vacancy: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/feedback",
+    response_model=MatchFeedbackResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Matching"],
+)
+async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
+    """
+    Submit feedback on a skill match result.
+
+    This endpoint allows recruiters to provide feedback on the AI's skill matching
+    decisions, recording whether matches were correct and any corrections needed.
+    This feedback is used to improve future matching accuracy through ML retraining.
+
+    Args:
+        request: Feedback request with match details and recruiter corrections
+
+    Returns:
+        JSON response with created feedback entry
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "match_id": "match123",
+        ...     "skill": "React",
+        ...     "was_correct": True,
+        ...     "recruiter_correction": None
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/matching/feedback",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "id": "feedback-id",
+            "match_id": "match123",
+            "skill": "React",
+            "was_correct": True,
+            "recruiter_correction": None,
+            "feedback_source": "matching_api",
+            "processed": False,
+            "created_at": "2024-01-25T00:00:00Z"
+        }
+    """
+    try:
+        logger.info(
+            f"Submitting feedback for match_id: {request.match_id}, "
+            f"skill: {request.skill}, was_correct: {request.was_correct}"
+        )
+
+        # Validate confidence score if provided
+        if request.confidence_score is not None and not (
+            0 <= request.confidence_score <= 1
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Confidence score must be between 0 and 1",
+            )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        feedback_response = {
+            "id": "placeholder-feedback-id",
+            "match_id": request.match_id,
+            "skill": request.skill,
+            "was_correct": request.was_correct,
+            "recruiter_correction": request.recruiter_correction,
+            "feedback_source": "matching_api",
+            "processed": False,
+            "created_at": "2024-01-25T00:00:00Z",
+        }
+
+        logger.info(f"Created feedback entry for match_id: {request.match_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=feedback_response,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting match feedback: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit match feedback: {str(e)}",
         ) from e
