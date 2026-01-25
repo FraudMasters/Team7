@@ -535,15 +535,23 @@ async def create_comparison(request: ComparisonCreate) -> JSONResponse:
 async def list_comparisons(
     vacancy_id: Optional[str] = Query(None, description="Filter by vacancy ID"),
     created_by: Optional[str] = Query(None, description="Filter by creator user ID"),
+    min_match_percentage: Optional[float] = Query(None, description="Filter by minimum match percentage", ge=0, le=100),
+    max_match_percentage: Optional[float] = Query(None, description="Filter by maximum match percentage", ge=0, le=100),
+    sort_by: Optional[str] = Query("created_at", description="Sort field (created_at, match_percentage, name)"),
+    order: Optional[str] = Query("desc", description="Sort order (asc or desc)"),
     limit: int = Query(50, description="Maximum number of comparisons to return", ge=1, le=100),
     offset: int = Query(0, description="Number of comparisons to skip", ge=0),
 ) -> JSONResponse:
     """
-    List resume comparison views with optional filters.
+    List resume comparison views with optional filters and sorting.
 
     Args:
         vacancy_id: Optional vacancy ID filter
         created_by: Optional creator user ID filter
+        min_match_percentage: Optional minimum match percentage filter (0-100)
+        max_match_percentage: Optional maximum match percentage filter (0-100)
+        sort_by: Sort field - created_at, match_percentage, or name (default: created_at)
+        order: Sort order - asc or desc (default: desc)
         limit: Maximum number of results to return (default: 50, max: 100)
         offset: Number of results to skip (default: 0)
 
@@ -551,24 +559,68 @@ async def list_comparisons(
         JSON response with list of comparison views
 
     Raises:
+        HTTPException(422): If sort_by or order parameters are invalid
         HTTPException(500): If database query fails
 
     Examples:
         >>> import requests
+        >>> # List comparisons for a specific vacancy
         >>> response = requests.get("http://localhost:8000/api/comparisons/?vacancy_id=vac-123")
+        >>> # Sort by match percentage descending
+        >>> response = requests.get("http://localhost:8000/api/comparisons/?sort_by=match_percentage&order=desc")
+        >>> # Filter by match percentage range
+        >>> response = requests.get("http://localhost:8000/api/comparisons/?min_match_percentage=50&max_match_percentage=90")
         >>> response.json()
     """
     try:
+        # Validate sort_by parameter
+        valid_sort_fields = ["created_at", "match_percentage", "name", "updated_at"]
+        if sort_by and sort_by not in valid_sort_fields:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid sort_by field. Must be one of: {', '.join(valid_sort_fields)}",
+            )
+
+        # Validate order parameter
+        valid_orders = ["asc", "desc"]
+        if order and order not in valid_orders:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid order field. Must be one of: {', '.join(valid_orders)}",
+            )
+
+        # Validate match percentage range
+        if min_match_percentage is not None and max_match_percentage is not None:
+            if min_match_percentage > max_match_percentage:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="min_match_percentage must be less than or equal to max_match_percentage",
+                )
+
         logger.info(
             f"Listing comparisons with filters - vacancy_id: {vacancy_id}, "
-            f"created_by: {created_by}, limit: {limit}, offset: {offset}"
+            f"created_by: {created_by}, min_match_percentage: {min_match_percentage}, "
+            f"max_match_percentage: {max_match_percentage}, sort_by: {sort_by}, "
+            f"order: {order}, limit: {limit}, offset: {offset}"
         )
 
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
+        # When database is integrated, filters and sorting will be applied at the query level:
+        # - Build WHERE clauses based on filter parameters
+        # - Apply ORDER BY with sort_by and order
+        # - Use LIMIT and OFFSET for pagination
         response_data = {
             "comparisons": [],
             "total_count": 0,
+            "filters_applied": {
+                "vacancy_id": vacancy_id,
+                "created_by": created_by,
+                "min_match_percentage": min_match_percentage,
+                "max_match_percentage": max_match_percentage,
+                "sort_by": sort_by,
+                "order": order,
+            },
         }
 
         return JSONResponse(
@@ -576,6 +628,8 @@ async def list_comparisons(
             content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing comparisons: {e}", exc_info=True)
         raise HTTPException(
