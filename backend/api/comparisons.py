@@ -4,16 +4,391 @@ Resume comparison endpoints for multi-resume analysis and ranking.
 This module provides endpoints for creating, retrieving, and managing
 multi-resume comparison views with ranking, filtering, and sorting capabilities.
 """
+import json
 import logging
-from typing import List, Optional
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+# Add parent directory to path to import from data_extractor service
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
+
+from ..analyzers import (
+    extract_resume_keywords,
+    extract_resume_entities,
+    calculate_skill_experience,
+    format_experience_summary,
+    EnhancedSkillMatcher,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Directory where uploaded resumes are stored
+UPLOAD_DIR = Path("data/uploads")
+
+# Path to skill synonyms file
+SYNONYMS_FILE = Path(__file__).parent.parent / "models" / "skill_synonyms.json"
+
+
+def compare_multiple_resumes(
+    resume_ids: List[str],
+    vacancy_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Compare multiple resumes against a job vacancy and aggregate results.
+
+    This function performs intelligent matching between each resume's skills
+    and the job vacancy requirements, handling synonyms (e.g., PostgreSQL ≈ SQL)
+    and providing aggregated results with ranking by match percentage.
+
+    Features:
+    - Skill synonym matching (PostgreSQL matches SQL requirement)
+    - Match percentage calculation for each resume
+    - Experience verification for each resume
+    - Automatic ranking by match percentage (descending)
+    - Processing time tracking
+
+    Args:
+        resume_ids: List of resume IDs to compare (2-5 resumes)
+        vacancy_data: Job vacancy data with required skills and experience
+
+    Returns:
+        Dictionary containing:
+        - vacancy_title: Title of the job vacancy
+        - comparison_results: List of match results for each resume, ranked
+        - total_resumes: Number of resumes compared
+        - processing_time_ms: Total processing time
+
+    Raises:
+        HTTPException(404): If any resume file is not found
+        HTTPException(422): If text extraction fails for any resume
+        HTTPException(500): If matching processing fails
+
+    Example:
+        >>> vacancy = {
+        ...     "title": "Java Developer",
+        ...     "required_skills": ["Java", "Spring", "SQL"],
+        ...     "min_experience_months": 36
+        ... }
+        >>> results = compare_multiple_resumes(
+        ...     ["resume1", "resume2", "resume3"],
+        ...     vacancy
+        ... )
+        >>> results["comparison_results"][0]["rank"]
+        1
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(
+            f"Starting comparison for {len(resume_ids)} resumes against vacancy: "
+            f"{vacancy_data.get('title', 'Unknown')}"
+        )
+
+        # Validate resume count
+        if len(resume_ids) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least 2 resumes must be provided for comparison",
+            )
+        if len(resume_ids) > 5:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Maximum 5 resumes can be compared at once",
+            )
+
+        # Get vacancy data
+        vacancy_title = vacancy_data.get(
+            "title", vacancy_data.get("position", "Unknown Position")
+        )
+        required_skills = vacancy_data.get("required_skills", [])
+        additional_skills = vacancy_data.get(
+            "additional_requirements", vacancy_data.get("additional_skills", [])
+        )
+        min_experience_months = vacancy_data.get("min_experience_months", None)
+
+        # If required_skills is a string list, use it directly
+        if isinstance(required_skills, str):
+            required_skills = [required_skills]
+
+        # Process each resume
+        comparison_results = []
+
+        for resume_id in resume_ids:
+            try:
+                logger.info(f"Processing resume_id: {resume_id}")
+
+                # Step 1: Find the resume file
+                for ext in [".pdf", ".docx", ".PDF", ".DOCX"]:
+                    file_path = UPLOAD_DIR / f"{resume_id}{ext}"
+                    if file_path.exists():
+                        break
+                else:
+                    logger.warning(f"Resume file not found: {resume_id}")
+                    # Add a placeholder result for missing resumes
+                    comparison_results.append({
+                        "resume_id": resume_id,
+                        "vacancy_title": vacancy_title,
+                        "match_percentage": 0.0,
+                        "required_skills_match": [],
+                        "additional_skills_match": [],
+                        "experience_verification": None,
+                        "processing_time_ms": 0.0,
+                        "error": "Resume file not found",
+                    })
+                    continue
+
+                # Step 2: Extract text from file
+                try:
+                    from extract import extract_text_from_pdf, extract_text_from_docx
+
+                    file_ext = file_path.suffix.lower()
+                    if file_ext == ".pdf":
+                        result = extract_text_from_pdf(file_path)
+                    elif file_ext == ".docx":
+                        result = extract_text_from_docx(file_path)
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                            detail=f"Unsupported file type: {file_ext}",
+                        )
+
+                    if result.get("error"):
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Text extraction failed: {result['error']}",
+                        )
+
+                    resume_text = result.get("text", "")
+                    if not resume_text or len(resume_text.strip()) < 10:
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Extracted text is too short or empty",
+                        )
+
+                    logger.info(f"Extracted {len(resume_text)} characters from resume")
+
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error extracting text: {e}", exc_info=True)
+                    comparison_results.append({
+                        "resume_id": resume_id,
+                        "vacancy_title": vacancy_title,
+                        "match_percentage": 0.0,
+                        "required_skills_match": [],
+                        "additional_skills_match": [],
+                        "experience_verification": None,
+                        "processing_time_ms": 0.0,
+                        "error": f"Text extraction failed: {str(e)}",
+                    })
+                    continue
+
+                # Step 3: Detect language
+                try:
+                    from langdetect import detect, LangDetectException
+
+                    try:
+                        detected_lang = detect(resume_text)
+                        language = "ru" if detected_lang == "ru" else "en"
+                    except LangDetectException:
+                        language = "en"
+                except ImportError:
+                    language = "en"
+
+                logger.info(f"Detected language: {language}")
+
+                # Step 4: Extract skills from resume
+                logger.info("Extracting skills from resume...")
+                keywords_result = extract_resume_keywords(
+                    resume_text, language=language, top_n=50
+                )
+                entities_result = extract_resume_entities(resume_text, language=language)
+
+                # Combine keywords and technical skills
+                resume_skills = list(set(
+                    keywords_result.get("keywords", []) +
+                    keywords_result.get("keyphrases", []) +
+                    entities_result.get("technical_skills", [])
+                ))
+
+                logger.info(f"Extracted {len(resume_skills)} unique skills from resume")
+
+                # Step 5: Initialize enhanced skill matcher
+                enhanced_matcher = EnhancedSkillMatcher()
+                synonyms_map = enhanced_matcher.load_synonyms()
+                logger.info(f"Initialized enhanced skill matcher with {len(synonyms_map)} synonym mappings")
+
+                # Step 6: Match required skills
+                required_skills_matches = []
+                for skill in required_skills:
+                    match_result = enhanced_matcher.match_with_context(
+                        resume_skills=resume_skills,
+                        required_skill=skill,
+                        context=vacancy_title.lower(),
+                        use_fuzzy=True
+                    )
+
+                    if match_result["matched"]:
+                        required_skills_matches.append({
+                            "skill": skill,
+                            "status": "matched",
+                            "matched_as": match_result["matched_as"],
+                            "highlight": "green",
+                            "confidence": round(match_result["confidence"], 2),
+                            "match_type": match_result["match_type"]
+                        })
+                    else:
+                        required_skills_matches.append({
+                            "skill": skill,
+                            "status": "missing",
+                            "matched_as": None,
+                            "highlight": "red",
+                            "confidence": 0.0,
+                            "match_type": "none"
+                        })
+
+                # Step 7: Match additional/preferred skills
+                additional_skills_matches = []
+                for skill in additional_skills:
+                    match_result = enhanced_matcher.match_with_context(
+                        resume_skills=resume_skills,
+                        required_skill=skill,
+                        context=vacancy_title.lower(),
+                        use_fuzzy=True
+                    )
+
+                    if match_result["matched"]:
+                        additional_skills_matches.append({
+                            "skill": skill,
+                            "status": "matched",
+                            "matched_as": match_result["matched_as"],
+                            "highlight": "green",
+                            "confidence": round(match_result["confidence"], 2),
+                            "match_type": match_result["match_type"]
+                        })
+                    else:
+                        additional_skills_matches.append({
+                            "skill": skill,
+                            "status": "missing",
+                            "matched_as": None,
+                            "highlight": "red",
+                            "confidence": 0.0,
+                            "match_type": "none"
+                        })
+
+                # Step 8: Calculate match percentage
+                total_required = len(required_skills)
+                matched_required = sum(
+                    1 for m in required_skills_matches if m["status"] == "matched"
+                )
+                match_percentage = (
+                    round((matched_required / total_required * 100), 2) if total_required > 0 else 0.0
+                )
+
+                logger.info(
+                    f"Matched {matched_required}/{total_required} required skills ({match_percentage}%)"
+                )
+
+                # Step 9: Verify experience (if vacancy has experience requirement)
+                experience_verification = None
+                if min_experience_months and min_experience_months > 0:
+                    logger.info(f"Verifying experience requirement: {min_experience_months} months")
+
+                    primary_skill = required_skills[0] if required_skills else None
+
+                    if primary_skill:
+                        try:
+                            skill_exp_result = calculate_skill_experience(
+                                resume_text, primary_skill, language=language
+                            )
+                            actual_months = skill_exp_result.get("total_months", 0)
+                            experience_summary = format_experience_summary(actual_months)
+
+                            experience_verification = {
+                                "required_months": min_experience_months,
+                                "actual_months": actual_months,
+                                "meets_requirement": actual_months >= min_experience_months,
+                                "summary": experience_summary,
+                            }
+
+                            logger.info(
+                                f"Experience verification: {actual_months} months (required: {min_experience_months})"
+                            )
+
+                        except Exception as e:
+                            logger.warning(f"Experience calculation failed: {e}")
+                            # Continue without experience verification
+
+                # Build result for this resume
+                resume_result = {
+                    "resume_id": resume_id,
+                    "vacancy_title": vacancy_title,
+                    "match_percentage": match_percentage,
+                    "required_skills_match": required_skills_matches,
+                    "additional_skills_match": additional_skills_matches,
+                    "experience_verification": experience_verification,
+                    "processing_time_ms": 0.0,  # Will be updated after total time calculation
+                }
+
+                comparison_results.append(resume_result)
+
+            except Exception as e:
+                logger.error(f"Error processing resume {resume_id}: {e}", exc_info=True)
+                comparison_results.append({
+                    "resume_id": resume_id,
+                    "vacancy_title": vacancy_title,
+                    "match_percentage": 0.0,
+                    "required_skills_match": [],
+                    "additional_skills_match": [],
+                    "experience_verification": None,
+                    "processing_time_ms": 0.0,
+                    "error": str(e),
+                })
+
+        # Step 10: Sort results by match percentage (descending)
+        comparison_results.sort(key=lambda x: x.get("match_percentage", 0), reverse=True)
+
+        # Assign ranks
+        for idx, result in enumerate(comparison_results, start=1):
+            result["rank"] = idx
+
+        # Calculate total processing time
+        total_processing_time_ms = (time.time() - start_time) * 1000
+
+        # Distribute processing time across resumes (approximate)
+        if comparison_results:
+            time_per_resume = total_processing_time_ms / len(comparison_results)
+            for result in comparison_results:
+                if "error" not in result:
+                    result["processing_time_ms"] = round(time_per_resume, 2)
+
+        logger.info(
+            f"Comparison completed for {len(resume_ids)} resumes in {total_processing_time_ms:.2f}ms"
+        )
+
+        return {
+            "vacancy_title": vacancy_title,
+            "comparison_results": comparison_results,
+            "total_resumes": len(resume_ids),
+            "processing_time_ms": round(total_processing_time_ms, 2),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing multiple resumes: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compare resumes: {str(e)}",
+        ) from e
 
 
 class ComparisonCreate(BaseModel):
