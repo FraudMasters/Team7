@@ -87,6 +87,29 @@ class CSVExportRequest(BaseModel):
     format: Optional[str] = Field("standard", description="CSV format variant (e.g., standard, detailed)")
 
 
+class ScheduleReportRequest(BaseModel):
+    """Request model for scheduling automated reports."""
+
+    name: str = Field(..., description="Schedule name")
+    organization_id: Optional[str] = Field(None, description="Organization identifier")
+    report_id: Optional[str] = Field(None, description="Existing report ID to schedule (optional)")
+    configuration: Dict = Field(..., description="Report configuration with metrics and filters")
+    schedule_config: Dict = Field(..., description="Schedule settings (frequency, day_of_week, day_of_month, hour, minute)")
+    delivery_config: Dict = Field(..., description="Delivery settings (format, include_charts, include_summary)")
+    recipients: List[str] = Field(..., description="List of email recipient addresses")
+    is_active: bool = Field(True, description="Whether the schedule is active")
+
+
+class ScheduleReportResponse(BaseModel):
+    """Response model for scheduled report creation."""
+
+    id: str = Field(..., description="Schedule ID")
+    name: str = Field(..., description="Schedule name")
+    report_id: Optional[str] = Field(None, description="Associated report ID")
+    next_run_at: str = Field(..., description="Next scheduled run timestamp")
+    created_at: str = Field(..., description="Creation timestamp")
+
+
 @router.post(
     "/",
     response_model=ReportResponse,
@@ -596,4 +619,192 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate CSV: {str(e)}",
+        ) from e
+
+
+@router.post("/schedule", tags=["Reports"], response_model=ScheduleReportResponse)
+async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
+    """
+    Schedule an automated report with email delivery.
+
+    This endpoint creates a scheduled report configuration that will automatically
+    generate and email reports based on the specified schedule and delivery settings.
+
+    Args:
+        request: Schedule report request with configuration, schedule, and delivery settings
+
+    Returns:
+        JSON response with schedule ID and next run time
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If scheduling fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "name": "Weekly Analytics Report",
+        ...     "organization_id": "org123",
+        ...     "report_id": None,
+        ...     "configuration": {
+        ...         "metrics": ["time_to_hire", "resumes_processed"],
+        ...         "filters": {}
+        ...     },
+        ...     "schedule_config": {
+        ...         "frequency": "weekly",
+        ...         "day_of_week": 1,
+        ...         "hour": 9,
+        ...         "minute": 0
+        ...     },
+        ...     "delivery_config": {
+        ...         "format": "pdf",
+        ...         "include_charts": True,
+        ...         "include_summary": True
+        ...     },
+        ...     "recipients": ["manager@example.com"],
+        ...     "is_active": True
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/reports/schedule",
+        ...     json=data
+        ... )
+        >>> response.json()
+    """
+    try:
+        logger.info(f"Creating scheduled report: {request.name}")
+
+        # Validate name
+        if not request.name or len(request.name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Schedule name cannot be empty",
+            )
+
+        # Validate configuration has metrics
+        if not request.configuration.get("metrics") or len(request.configuration["metrics"]) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one metric must be provided in configuration",
+            )
+
+        # Validate recipients
+        if not request.recipients or len(request.recipients) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one recipient email must be provided",
+            )
+
+        # Validate email format for recipients
+        import re
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        for email in request.recipients:
+            if not re.match(email_pattern, email):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid email address: {email}",
+                )
+
+        # Validate schedule_config
+        freq = request.schedule_config.get("frequency")
+        if freq not in ["daily", "weekly", "monthly"]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Frequency must be one of: daily, weekly, monthly",
+            )
+
+        hour = request.schedule_config.get("hour", 0)
+        if not isinstance(hour, int) or hour < 0 or hour > 23:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Hour must be an integer between 0 and 23",
+            )
+
+        minute = request.schedule_config.get("minute", 0)
+        if not isinstance(minute, int) or minute < 0 or minute > 59:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Minute must be an integer between 0 and 59",
+            )
+
+        # Validate weekly schedule has day_of_week
+        if freq == "weekly":
+            day_of_week = request.schedule_config.get("day_of_week")
+            if day_of_week is None or not isinstance(day_of_week, int) or day_of_week < 0 or day_of_week > 6:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="day_of_week must be an integer between 0 (Sunday) and 6 (Saturday) for weekly frequency",
+                )
+
+        # Validate monthly schedule has day_of_month
+        if freq == "monthly":
+            day_of_month = request.schedule_config.get("day_of_month")
+            if day_of_month is None or not isinstance(day_of_month, int) or day_of_month < 1 or day_of_month > 28:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="day_of_month must be an integer between 1 and 28 for monthly frequency",
+                )
+
+        # Validate delivery_config format
+        format_type = request.delivery_config.get("format")
+        if format_type not in ["pdf", "csv", "both"]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Format must be one of: pdf, csv, both",
+            )
+
+        # For now, generate a placeholder response
+        # Database integration and Celery task scheduling will be added in later subtasks
+        from datetime import datetime, timedelta
+        import uuid
+
+        schedule_id = str(uuid.uuid4())
+        now = datetime.utcnow()
+        created_at = now.isoformat() + "Z"
+
+        # Calculate next_run_at based on schedule configuration
+        if freq == "daily":
+            next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if next_run <= now:
+                next_run += timedelta(days=1)
+        elif freq == "weekly":
+            day_of_week = request.schedule_config.get("day_of_week", 0)
+            days_ahead = day_of_week - now.weekday()
+            if days_ahead <= 0:
+                days_ahead += 7
+            next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            next_run += timedelta(days=days_ahead)
+        else:  # monthly
+            day_of_month = request.schedule_config.get("day_of_month", 1)
+            next_run = now.replace(day=day_of_month, hour=hour, minute=minute, second=0, microsecond=0)
+            if next_run <= now:
+                # Move to next month
+                if now.month == 12:
+                    next_run = next_run.replace(year=now.year + 1, month=1)
+                else:
+                    next_run = next_run.replace(month=now.month + 1)
+
+        next_run_at = next_run.isoformat() + "Z"
+
+        response_data = {
+            "id": schedule_id,
+            "name": request.name,
+            "report_id": request.report_id,
+            "next_run_at": next_run_at,
+            "created_at": created_at,
+        }
+
+        logger.info(f"Scheduled report '{request.name}' created with ID: {schedule_id}, next run: {next_run_at}")
+
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating scheduled report: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create scheduled report: {str(e)}",
         ) from e
