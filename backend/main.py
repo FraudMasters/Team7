@@ -239,6 +239,7 @@ from .api import (
     custom_synonyms,
     feedback,
     model_versions,
+    comparisons,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -248,6 +249,7 @@ app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags
 app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=["Custom Synonyms"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
+app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 
 
 if __name__ == "__main__":
