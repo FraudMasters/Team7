@@ -6,6 +6,7 @@ import UploadPage from '@pages/Upload';
 import ResultsPage from '@pages/Results';
 import ComparePage from '@pages/Compare';
 import AdminSynonymsPage from '@pages/AdminSynonyms';
+import AdminAnalyticsPage from '@pages/AdminAnalytics';
 
 /**
  * Main App Component
@@ -33,6 +34,7 @@ function App() {
 
           {/* Admin pages */}
           <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
+          <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
 
           {/* Catch-all route - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
