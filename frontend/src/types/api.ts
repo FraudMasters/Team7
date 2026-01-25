@@ -184,3 +184,261 @@ export interface ApiClientConfig {
   timeout?: number;
   headers?: Record<string, string>;
 }
+
+/**
+ * Skill variant for taxonomy entries
+ */
+export interface SkillVariant {
+  name: string;
+  context?: string;
+  variants: string[];
+  metadata?: Record<string, unknown>;
+  is_active: boolean;
+}
+
+/**
+ * Skill taxonomy create request
+ */
+export interface SkillTaxonomyCreate {
+  industry: string;
+  skills: SkillVariant[];
+}
+
+/**
+ * Skill taxonomy update request
+ */
+export interface SkillTaxonomyUpdate {
+  skill_name?: string;
+  context?: string;
+  variants?: string[];
+  metadata?: Record<string, unknown>;
+  is_active?: boolean;
+}
+
+/**
+ * Skill taxonomy response
+ */
+export interface SkillTaxonomyResponse {
+  id: string;
+  industry: string;
+  skill_name: string;
+  context?: string;
+  variants: string[];
+  metadata?: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Skill taxonomy list response
+ */
+export interface SkillTaxonomyListResponse {
+  industry: string;
+  skills: SkillTaxonomyResponse[];
+  total_count: number;
+}
+
+/**
+ * Custom synonym entry definition
+ */
+export interface CustomSynonymEntry {
+  canonical_skill: string;
+  custom_synonyms: string[];
+  context?: string;
+  is_active: boolean;
+}
+
+/**
+ * Custom synonym create request
+ */
+export interface CustomSynonymCreate {
+  organization_id: string;
+  created_by?: string;
+  synonyms: CustomSynonymEntry[];
+}
+
+/**
+ * Custom synonym update request
+ */
+export interface CustomSynonymUpdate {
+  canonical_skill?: string;
+  custom_synonyms?: string[];
+  context?: string;
+  is_active?: boolean;
+}
+
+/**
+ * Custom synonym response
+ */
+export interface CustomSynonymResponse {
+  id: string;
+  organization_id: string;
+  canonical_skill: string;
+  custom_synonyms: string[];
+  context?: string;
+  created_by?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Custom synonym list response
+ */
+export interface CustomSynonymListResponse {
+  organization_id: string;
+  synonyms: CustomSynonymResponse[];
+  total_count: number;
+}
+
+/**
+ * Feedback entry definition
+ */
+export interface FeedbackEntry {
+  resume_id: string;
+  vacancy_id: string;
+  match_result_id?: string;
+  skill: string;
+  was_correct: boolean;
+  confidence_score?: number;
+  recruiter_correction?: string;
+  actual_skill?: string;
+  feedback_source: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Feedback create request
+ */
+export interface FeedbackCreate {
+  feedback: FeedbackEntry[];
+}
+
+/**
+ * Feedback update request
+ */
+export interface FeedbackUpdate {
+  was_correct?: boolean;
+  confidence_score?: number;
+  recruiter_correction?: string;
+  actual_skill?: string;
+  processed?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Feedback response
+ */
+export interface FeedbackResponse {
+  id: string;
+  resume_id: string;
+  vacancy_id: string;
+  match_result_id?: string;
+  skill: string;
+  was_correct: boolean;
+  confidence_score?: number;
+  recruiter_correction?: string;
+  actual_skill?: string;
+  feedback_source: string;
+  processed: boolean;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Feedback list response
+ */
+export interface FeedbackListResponse {
+  feedback: FeedbackResponse[];
+  total_count: number;
+}
+
+/**
+ * Model version entry definition
+ */
+export interface ModelVersionEntry {
+  model_name: string;
+  version: string;
+  is_active: boolean;
+  is_experiment: boolean;
+  experiment_config?: Record<string, unknown>;
+  model_metadata?: Record<string, unknown>;
+  accuracy_metrics?: Record<string, unknown>;
+  file_path?: string;
+  performance_score?: number;
+}
+
+/**
+ * Model version create request
+ */
+export interface ModelVersionCreate {
+  models: ModelVersionEntry[];
+}
+
+/**
+ * Model version update request
+ */
+export interface ModelVersionUpdate {
+  version?: string;
+  is_active?: boolean;
+  is_experiment?: boolean;
+  experiment_config?: Record<string, unknown>;
+  model_metadata?: Record<string, unknown>;
+  accuracy_metrics?: Record<string, unknown>;
+  file_path?: string;
+  performance_score?: number;
+}
+
+/**
+ * Model version response
+ */
+export interface ModelVersionResponse {
+  id: string;
+  model_name: string;
+  version: string;
+  is_active: boolean;
+  is_experiment: boolean;
+  experiment_config?: Record<string, unknown>;
+  model_metadata?: Record<string, unknown>;
+  accuracy_metrics?: Record<string, unknown>;
+  file_path?: string;
+  performance_score?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Model version list response
+ */
+export interface ModelVersionListResponse {
+  models: ModelVersionResponse[];
+  total_count: number;
+}
+
+/**
+ * Match feedback request
+ */
+export interface MatchFeedbackRequest {
+  match_id: string;
+  skill: string;
+  was_correct: boolean;
+  recruiter_correction?: string;
+  confidence_score?: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Match feedback response
+ */
+export interface MatchFeedbackResponse {
+  id: string;
+  match_id: string;
+  skill: string;
+  was_correct: boolean;
+  recruiter_correction?: string;
+  feedback_source: string;
+  processed: boolean;
+  created_at: string;
+}

@@ -3,7 +3,8 @@
  *
  * This module provides a typed Axios client for communicating with the
  * backend resume analysis service. Handles resume upload, analysis,
- * job matching, and health check endpoints.
+ * job matching, skill taxonomies, custom synonyms, feedback, model versions,
+ * and health check endpoints.
  *
  * @example
  * ```ts
@@ -17,6 +18,19 @@
  *
  * // Compare with job vacancy
  * const match = await apiClient.compareWithVacancy(resumeId, vacancyData);
+ *
+ * // Create custom synonyms
+ * const synonyms = await apiClient.createCustomSynonyms({
+ *   organization_id: 'org123',
+ *   synonyms: [{ canonical_skill: 'React', custom_synonyms: ['ReactJS'], is_active: true }],
+ * });
+ *
+ * // Submit feedback
+ * const feedback = await apiClient.submitMatchFeedback({
+ *   match_id: 'match123',
+ *   skill: 'React',
+ *   was_correct: true,
+ * });
  * ```
  */
 
@@ -31,6 +45,24 @@ import type {
   UploadProgressCallback,
   ApiClientConfig,
   ApiError,
+  SkillTaxonomyCreate,
+  SkillTaxonomyUpdate,
+  SkillTaxonomyResponse,
+  SkillTaxonomyListResponse,
+  CustomSynonymCreate,
+  CustomSynonymUpdate,
+  CustomSynonymResponse,
+  CustomSynonymListResponse,
+  FeedbackCreate,
+  FeedbackUpdate,
+  FeedbackResponse,
+  FeedbackListResponse,
+  ModelVersionCreate,
+  ModelVersionUpdate,
+  ModelVersionResponse,
+  ModelVersionListResponse,
+  MatchFeedbackRequest,
+  MatchFeedbackResponse,
 } from '@/types/api';
 
 /**
@@ -289,6 +321,617 @@ export class ApiClient {
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
+  }
+
+  // ==================== Skill Taxonomies ====================
+
+  /**
+   * Create skill taxonomy entries for an industry
+   *
+   * @param request - Create request with industry and list of skills
+   * @returns Created taxonomy entries
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.createSkillTaxonomies({
+   *   industry: 'tech',
+   *   skills: [
+   *     {
+   *       name: 'React',
+   *       context: 'web_framework',
+   *       variants: ['React', 'ReactJS', 'React.js'],
+   *       is_active: true,
+   *     },
+   *   ],
+   * });
+   * ```
+   */
+  async createSkillTaxonomies(
+    request: SkillTaxonomyCreate
+  ): Promise<SkillTaxonomyListResponse> {
+    try {
+      const response: AxiosResponse<SkillTaxonomyListResponse> = await this.client.post(
+        '/api/skill-taxonomies/',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * List skill taxonomies with optional filters
+   *
+   * @param industry - Optional industry filter
+   * @param isActive - Optional active status filter
+   * @returns List of skill taxonomy entries
+   * @throws ApiError if listing fails
+   */
+  async listSkillTaxonomies(
+    industry?: string,
+    isActive?: boolean
+  ): Promise<SkillTaxonomyListResponse[]> {
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (industry) params.industry = industry;
+      if (isActive !== undefined) params.is_active = isActive;
+
+      const response: AxiosResponse<SkillTaxonomyListResponse[]> =
+        await this.client.get('/api/skill-taxonomies/', { params });
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific skill taxonomy entry by ID
+   *
+   * @param id - Taxonomy entry ID
+   * @returns Skill taxonomy entry
+   * @throws ApiError if not found
+   */
+  async getSkillTaxonomy(id: string): Promise<SkillTaxonomyResponse> {
+    try {
+      const response: AxiosResponse<SkillTaxonomyResponse> = await this.client.get(
+        `/api/skill-taxonomies/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update a skill taxonomy entry
+   *
+   * @param id - Taxonomy entry ID
+   * @param request - Update request
+   * @returns Updated taxonomy entry
+   * @throws ApiError if update fails
+   */
+  async updateSkillTaxonomy(
+    id: string,
+    request: SkillTaxonomyUpdate
+  ): Promise<SkillTaxonomyResponse> {
+    try {
+      const response: AxiosResponse<SkillTaxonomyResponse> = await this.client.put(
+        `/api/skill-taxonomies/${id}`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a specific skill taxonomy entry
+   *
+   * @param id - Taxonomy entry ID
+   * @throws ApiError if deletion fails
+   */
+  async deleteSkillTaxonomy(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/skill-taxonomies/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete all skill taxonomies for an industry
+   *
+   * @param industry - Industry sector
+   * @throws ApiError if deletion fails
+   */
+  async deleteSkillTaxonomiesByIndustry(industry: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/skill-taxonomies/industry/${industry}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Custom Synonyms ====================
+
+  /**
+   * Create custom synonym entries for an organization
+   *
+   * @param request - Create request with organization_id and list of synonyms
+   * @returns Created synonym entries
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.createCustomSynonyms({
+   *   organization_id: 'org123',
+   *   created_by: 'user456',
+   *   synonyms: [
+   *     {
+   *       canonical_skill: 'React',
+   *       custom_synonyms: ['ReactJS', 'React.js', 'React Framework'],
+   *       context: 'web_framework',
+   *       is_active: true,
+   *     },
+   *   ],
+   * });
+   * ```
+   */
+  async createCustomSynonyms(
+    request: CustomSynonymCreate
+  ): Promise<CustomSynonymListResponse> {
+    try {
+      const response: AxiosResponse<CustomSynonymListResponse> = await this.client.post(
+        '/api/custom-synonyms/',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * List custom synonyms with optional filters
+   *
+   * @param organizationId - Optional organization ID filter
+   * @param canonicalSkill - Optional canonical skill filter
+   * @param isActive - Optional active status filter
+   * @returns List of custom synonym entries
+   * @throws ApiError if listing fails
+   */
+  async listCustomSynonyms(
+    organizationId?: string,
+    canonicalSkill?: string,
+    isActive?: boolean
+  ): Promise<CustomSynonymListResponse[]> {
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (organizationId) params.organization_id = organizationId;
+      if (canonicalSkill) params.canonical_skill = canonicalSkill;
+      if (isActive !== undefined) params.is_active = isActive;
+
+      const response: AxiosResponse<CustomSynonymListResponse[]> =
+        await this.client.get('/api/custom-synonyms/', { params });
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific custom synonym entry by ID
+   *
+   * @param id - Synonym entry ID
+   * @returns Custom synonym entry
+   * @throws ApiError if not found
+   */
+  async getCustomSynonym(id: string): Promise<CustomSynonymResponse> {
+    try {
+      const response: AxiosResponse<CustomSynonymResponse> = await this.client.get(
+        `/api/custom-synonyms/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update a custom synonym entry
+   *
+   * @param id - Synonym entry ID
+   * @param request - Update request
+   * @returns Updated synonym entry
+   * @throws ApiError if update fails
+   */
+  async updateCustomSynonym(
+    id: string,
+    request: CustomSynonymUpdate
+  ): Promise<CustomSynonymResponse> {
+    try {
+      const response: AxiosResponse<CustomSynonymResponse> = await this.client.put(
+        `/api/custom-synonyms/${id}`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a specific custom synonym entry
+   *
+   * @param id - Synonym entry ID
+   * @throws ApiError if deletion fails
+   */
+  async deleteCustomSynonym(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/custom-synonyms/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete all custom synonyms for an organization
+   *
+   * @param organizationId - Organization ID
+   * @throws ApiError if deletion fails
+   */
+  async deleteCustomSynonymsByOrganization(organizationId: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/custom-synonyms/organization/${organizationId}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Feedback ====================
+
+  /**
+   * Create feedback entries
+   *
+   * @param request - Create request with list of feedback entries
+   * @returns Created feedback entries
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.createFeedback({
+   *   feedback: [
+   *     {
+   *       resume_id: 'abc123',
+   *       vacancy_id: 'vac456',
+   *       skill: 'React',
+   *       was_correct: true,
+   *       confidence_score: 0.95,
+   *       feedback_source: 'frontend',
+   *     },
+   *   ],
+   * });
+   * ```
+   */
+  async createFeedback(request: FeedbackCreate): Promise<FeedbackListResponse> {
+    try {
+      const response: AxiosResponse<FeedbackListResponse> = await this.client.post(
+        '/api/feedback/',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * List feedback entries with optional filters
+   *
+   * @param resumeId - Optional resume ID filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param skill - Optional skill filter
+   * @param wasCorrect - Optional correctness filter
+   * @param processed - Optional processed status filter
+   * @param feedbackSource - Optional feedback source filter
+   * @returns List of feedback entries
+   * @throws ApiError if listing fails
+   */
+  async listFeedback(
+    resumeId?: string,
+    vacancyId?: string,
+    skill?: string,
+    wasCorrect?: boolean,
+    processed?: boolean,
+    feedbackSource?: string
+  ): Promise<FeedbackListResponse> {
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (resumeId) params.resume_id = resumeId;
+      if (vacancyId) params.vacancy_id = vacancyId;
+      if (skill) params.skill = skill;
+      if (wasCorrect !== undefined) params.was_correct = wasCorrect;
+      if (processed !== undefined) params.processed = processed;
+      if (feedbackSource) params.feedback_source = feedbackSource;
+
+      const response: AxiosResponse<FeedbackListResponse> = await this.client.get(
+        '/api/feedback/',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific feedback entry by ID
+   *
+   * @param id - Feedback entry ID
+   * @returns Feedback entry
+   * @throws ApiError if not found
+   */
+  async getFeedback(id: string): Promise<FeedbackResponse> {
+    try {
+      const response: AxiosResponse<FeedbackResponse> = await this.client.get(
+        `/api/feedback/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update a feedback entry
+   *
+   * @param id - Feedback entry ID
+   * @param request - Update request
+   * @returns Updated feedback entry
+   * @throws ApiError if update fails
+   */
+  async updateFeedback(
+    id: string,
+    request: FeedbackUpdate
+  ): Promise<FeedbackResponse> {
+    try {
+      const response: AxiosResponse<FeedbackResponse> = await this.client.put(
+        `/api/feedback/${id}`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a specific feedback entry
+   *
+   * @param id - Feedback entry ID
+   * @throws ApiError if deletion fails
+   */
+  async deleteFeedback(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/feedback/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Model Versions ====================
+
+  /**
+   * Create model version entries
+   *
+   * @param request - Create request with list of model versions
+   * @returns Created model version entries
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.createModelVersions({
+   *   models: [
+   *     {
+   *       model_name: 'skill_matching',
+   *       version: 'v2.0.0',
+   *       is_active: false,
+   *       is_experiment: true,
+   *       experiment_config: { traffic_percentage: 20 },
+   *       performance_score: 92.5,
+   *     },
+   *   ],
+   * });
+   * ```
+   */
+  async createModelVersions(
+    request: ModelVersionCreate
+  ): Promise<ModelVersionListResponse> {
+    try {
+      const response: AxiosResponse<ModelVersionListResponse> = await this.client.post(
+        '/api/model-versions/',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * List model versions with optional filters
+   *
+   * @param modelName - Optional model name filter
+   * @param isActive - Optional active status filter
+   * @param isExperiment - Optional experiment status filter
+   * @returns List of model version entries
+   * @throws ApiError if listing fails
+   */
+  async listModelVersions(
+    modelName?: string,
+    isActive?: boolean,
+    isExperiment?: boolean
+  ): Promise<ModelVersionListResponse> {
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (modelName) params.model_name = modelName;
+      if (isActive !== undefined) params.is_active = isActive;
+      if (isExperiment !== undefined) params.is_experiment = isExperiment;
+
+      const response: AxiosResponse<ModelVersionListResponse> = await this.client.get(
+        '/api/model-versions/',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get the active model by name
+   *
+   * @param modelName - Model name
+   * @returns Active model version
+   * @throws ApiError if not found
+   */
+  async getActiveModel(modelName: string): Promise<ModelVersionResponse> {
+    try {
+      const response: AxiosResponse<ModelVersionResponse> = await this.client.get(
+        `/api/model-versions/active`,
+        { params: { model_name: modelName } }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific model version by ID
+   *
+   * @param id - Model version ID
+   * @returns Model version entry
+   * @throws ApiError if not found
+   */
+  async getModelVersion(id: string): Promise<ModelVersionResponse> {
+    try {
+      const response: AxiosResponse<ModelVersionResponse> = await this.client.get(
+        `/api/model-versions/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update a model version
+   *
+   * @param id - Model version ID
+   * @param request - Update request
+   * @returns Updated model version
+   * @throws ApiError if update fails
+   */
+  async updateModelVersion(
+    id: string,
+    request: ModelVersionUpdate
+  ): Promise<ModelVersionResponse> {
+    try {
+      const response: AxiosResponse<ModelVersionResponse> = await this.client.put(
+        `/api/model-versions/${id}`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a specific model version
+   *
+   * @param id - Model version ID
+   * @throws ApiError if deletion fails
+   */
+  async deleteModelVersion(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/model-versions/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Activate a model version
+   *
+   * @param id - Model version ID
+   * @returns Updated model version
+   * @throws ApiError if activation fails
+   */
+  async activateModelVersion(id: string): Promise<ModelVersionResponse> {
+    try {
+      const response: AxiosResponse<ModelVersionResponse> = await this.client.post(
+        `/api/model-versions/${id}/activate`,
+        {}
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Deactivate a model version
+   *
+   * @param id - Model version ID
+   * @returns Updated model version
+   * @throws ApiError if deactivation fails
+   */
+  async deactivateModelVersion(id: string): Promise<ModelVersionResponse> {
+    try {
+      const response: AxiosResponse<ModelVersionResponse> = await this.client.post(
+        `/api/model-versions/${id}/deactivate`,
+        {}
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Matching Feedback ====================
+
+  /**
+   * Submit feedback on a skill match result
+   *
+   * @param request - Feedback request with match_id, skill, and correctness
+   * @returns Created feedback entry
+   * @throws ApiError if submission fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.submitMatchFeedback({
+   *   match_id: 'match123',
+   *   skill: 'React',
+   *   was_correct: true,
+   *   confidence_score: 0.95,
+   * });
+   * ```
+   */
+  async submitMatchFeedback(request: MatchFeedbackRequest): Promise<MatchFeedbackResponse> {
+    try {
+      const response: AxiosResponse<MatchFeedbackResponse> = await this.client.post(
+        '/api/matching/feedback',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
   }
 }
 
