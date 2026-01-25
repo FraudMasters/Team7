@@ -6,6 +6,7 @@ including time-to-hire statistics, resume processing metrics, match rates,
 and other key performance indicators for the recruitment process.
 """
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -15,6 +16,52 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def validate_date_range(start_date: Optional[str], end_date: Optional[str]) -> None:
+    """
+    Validate date range parameters.
+
+    Args:
+        start_date: Optional start date string in ISO 8601 format
+        end_date: Optional end date string in ISO 8601 format
+
+    Raises:
+        HTTPException(422): If date format is invalid or start_date > end_date
+    """
+    if start_date is None and end_date is None:
+        return
+
+    parsed_start: Optional[datetime] = None
+    parsed_end: Optional[datetime] = None
+
+    # Validate start_date format
+    if start_date is not None:
+        try:
+            parsed_start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid start_date format: {start_date}. Expected ISO 8601 format (e.g., '2024-01-01' or '2024-01-01T00:00:00Z')",
+            ) from e
+
+    # Validate end_date format
+    if end_date is not None:
+        try:
+            parsed_end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid end_date format: {end_date}. Expected ISO 8601 format (e.g., '2024-12-31' or '2024-12-31T23:59:59Z')",
+            ) from e
+
+    # Validate date range logic
+    if parsed_start is not None and parsed_end is not None:
+        if parsed_start > parsed_end:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"start_date ({start_date}) must be before or equal to end_date ({end_date})",
+            )
 
 
 class TimeToHireMetrics(BaseModel):
@@ -179,12 +226,16 @@ async def get_key_metrics(
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
             f"Fetching key metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
+        # Note: Date range filtering will be applied to database queries once integrated
         response_data = {
             "time_to_hire": {
                 "average_days": 32.5,
@@ -292,6 +343,9 @@ async def get_funnel_metrics(
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
             f"Fetching funnel metrics - start_date: {start_date}, end_date: {end_date}"
         )
@@ -299,6 +353,7 @@ async def get_funnel_metrics(
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
         # These numbers represent a typical recruitment funnel with realistic conversion rates
+        # Note: Date range filtering will be applied to database queries once integrated
         response_data = {
             "stages": [
                 {
@@ -409,6 +464,9 @@ async def get_skill_demand(
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
             f"Fetching skill demand - start_date: {start_date}, end_date: {end_date}, limit: {limit}"
         )
@@ -416,6 +474,7 @@ async def get_skill_demand(
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
         # These represent typical in-demand tech skills with realistic metrics
+        # Note: Date range filtering will be applied to database queries once integrated
         response_data = {
             "skills": [
                 {
@@ -571,6 +630,9 @@ async def get_source_tracking(
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
             f"Fetching source tracking - start_date: {start_date}, end_date: {end_date}"
         )
@@ -578,6 +640,7 @@ async def get_source_tracking(
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
         # These represent typical vacancy sources with realistic distribution and time-to-fill metrics
+        # Note: Date range filtering will be applied to database queries once integrated
         response_data = {
             "sources": [
                 {
@@ -698,6 +761,9 @@ async def get_recruiter_performance(
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
             f"Fetching recruiter performance - start_date: {start_date}, end_date: {end_date}, limit: {limit}"
         )
@@ -705,6 +771,7 @@ async def get_recruiter_performance(
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
         # These represent typical recruiter performance metrics with realistic variations
+        # Note: Date range filtering will be applied to database queries once integrated
         response_data = {
             "recruiters": [
                 {
