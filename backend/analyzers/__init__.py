@@ -33,6 +33,9 @@ from .error_detector import (
     get_error_summary,
     format_errors_for_display,
 )
+from .enhanced_matcher import (
+    EnhancedSkillMatcher,
+)
 
 __all__ = [
     "extract_keywords",
@@ -52,4 +55,5 @@ __all__ = [
     "detect_resume_errors",
     "get_error_summary",
     "format_errors_for_display",
+    "EnhancedSkillMatcher",
 ]
