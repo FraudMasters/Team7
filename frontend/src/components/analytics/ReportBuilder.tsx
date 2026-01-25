@@ -36,6 +36,7 @@ import {
   Remove as RemoveIcon,
   Description as ReportIcon,
   PictureAsPdf as PdfIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 
 /**
@@ -208,6 +209,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<ReportFormData>({
@@ -476,6 +478,58 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   };
 
   /**
+   * Export report to CSV
+   */
+  const handleExportCsv = async () => {
+    if (selectedMetrics.length === 0) {
+      setError('Please select at least one metric before exporting');
+      return;
+    }
+
+    setExportingCsv(true);
+    setError(null);
+
+    try {
+      const reportData: ReportData = {
+        metrics: selectedMetrics.map((m) => m.id),
+        filters: {},
+      };
+
+      const response = await fetch('http://localhost:8000/api/reports/export/csv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          report_id: editingReport?.id || 'custom',
+          data: reportData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to export CSV: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Download the CSV from the provided URL
+      if (result.download_url) {
+        const link = document.createElement('a');
+        link.href = result.download_url;
+        link.download = `report-${editingReport?.name || 'custom'}-${Date.now()}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to export CSV';
+      setError(errorMessage);
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  /**
    * Submit form (create or update)
    */
   const handleSubmit = async () => {
@@ -662,6 +716,15 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
             disabled={selectedMetrics.length === 0 || exportingPdf}
           >
             {exportingPdf ? 'Exporting...' : 'Export PDF'}
+          </Button>
+          <Button
+            variant="outlined"
+            color="info"
+            startIcon={exportingCsv ? <CircularProgress size={16} /> : <DownloadIcon />}
+            onClick={handleExportCsv}
+            disabled={selectedMetrics.length === 0 || exportingCsv}
+          >
+            {exportingCsv ? 'Exporting...' : 'Export CSV'}
           </Button>
           {editingReport && (
             <>
