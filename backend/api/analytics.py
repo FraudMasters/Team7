@@ -102,6 +102,28 @@ class SourceTrackingResponse(BaseModel):
     total_vacancies: int = Field(..., description="Total number of vacancies analyzed")
 
 
+class RecruiterPerformanceItem(BaseModel):
+    """Represents performance metrics for a single recruiter."""
+
+    recruiter_id: str = Field(..., description="Unique identifier for the recruiter")
+    recruiter_name: str = Field(..., description="Full name of the recruiter")
+    hires: int = Field(..., description="Number of candidates hired")
+    interviews_conducted: int = Field(..., description="Number of interviews conducted")
+    resumes_processed: int = Field(..., description="Number of resumes processed")
+    average_time_to_hire: float = Field(..., description="Average time-to-hire in days")
+    offer_acceptance_rate: float = Field(..., description="Offer acceptance rate (0-1)")
+    candidate_satisfaction_score: float = Field(..., description="Average candidate satisfaction score (0-5)")
+
+
+class RecruiterPerformanceResponse(BaseModel):
+    """Response model for recruiter performance comparison."""
+
+    recruiters: list[RecruiterPerformanceItem] = Field(..., description="List of recruiters with performance metrics, sorted by hires")
+    total_recruiters: int = Field(..., description="Total number of recruiters analyzed")
+    period_start_date: str = Field(..., description="Start date of the analysis period (ISO 8601 format)")
+    period_end_date: str = Field(..., description="End date of the analysis period (ISO 8601 format)")
+
+
 @router.get(
     "/key-metrics",
     response_model=KeyMetricsResponse,
@@ -610,4 +632,197 @@ async def get_source_tracking(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve source tracking: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/recruiter-performance",
+    response_model=RecruiterPerformanceResponse,
+    tags=["Analytics"],
+)
+async def get_recruiter_performance(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of recruiters to return"),
+) -> JSONResponse:
+    """
+    Get recruiter performance comparison metrics.
+
+    This endpoint provides comparative performance metrics for recruiters,
+    enabling managers to identify top performers, best practices, and areas
+    for improvement. Metrics include hires, interviews conducted, resumes
+    processed, time-to-hire averages, offer acceptance rates, and candidate
+    satisfaction scores.
+
+    Args:
+        start_date: Optional start date for filtering performance data (ISO 8601 format)
+        end_date: Optional end date for filtering performance data (ISO 8601 format)
+        limit: Maximum number of recruiters to return (default: 20, range: 1-100)
+
+    Returns:
+        JSON response with list of recruiters sorted by number of hires, including performance metrics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/recruiter-performance?limit=5")
+        >>> response.json()
+        {
+            "recruiters": [
+                {
+                    "recruiter_id": "REC001",
+                    "recruiter_name": "Sarah Johnson",
+                    "hires": 24,
+                    "interviews_conducted": 87,
+                    "resumes_processed": 342,
+                    "average_time_to_hire": 28.5,
+                    "offer_acceptance_rate": 0.92,
+                    "candidate_satisfaction_score": 4.7
+                },
+                {
+                    "recruiter_id": "REC002",
+                    "recruiter_name": "Michael Chen",
+                    "hires": 19,
+                    "interviews_conducted": 72,
+                    "resumes_processed": 298,
+                    "average_time_to_hire": 31.2,
+                    "offer_acceptance_rate": 0.89,
+                    "candidate_satisfaction_score": 4.5
+                }
+            ],
+            "total_recruiters": 12,
+            "period_start_date": "2024-01-01T00:00:00Z",
+            "period_end_date": "2024-12-31T23:59:59Z"
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching recruiter performance - start_date: {start_date}, end_date: {end_date}, limit: {limit}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These represent typical recruiter performance metrics with realistic variations
+        response_data = {
+            "recruiters": [
+                {
+                    "recruiter_id": "REC001",
+                    "recruiter_name": "Sarah Johnson",
+                    "hires": 24,
+                    "interviews_conducted": 87,
+                    "resumes_processed": 342,
+                    "average_time_to_hire": 28.5,
+                    "offer_acceptance_rate": 0.92,
+                    "candidate_satisfaction_score": 4.7,
+                },
+                {
+                    "recruiter_id": "REC002",
+                    "recruiter_name": "Michael Chen",
+                    "hires": 19,
+                    "interviews_conducted": 72,
+                    "resumes_processed": 298,
+                    "average_time_to_hire": 31.2,
+                    "offer_acceptance_rate": 0.89,
+                    "candidate_satisfaction_score": 4.5,
+                },
+                {
+                    "recruiter_id": "REC003",
+                    "recruiter_name": "Emily Rodriguez",
+                    "hires": 18,
+                    "interviews_conducted": 68,
+                    "resumes_processed": 276,
+                    "average_time_to_hire": 29.8,
+                    "offer_acceptance_rate": 0.94,
+                    "candidate_satisfaction_score": 4.8,
+                },
+                {
+                    "recruiter_id": "REC004",
+                    "recruiter_name": "David Kim",
+                    "hires": 15,
+                    "interviews_conducted": 54,
+                    "resumes_processed": 234,
+                    "average_time_to_hire": 33.7,
+                    "offer_acceptance_rate": 0.87,
+                    "candidate_satisfaction_score": 4.3,
+                },
+                {
+                    "recruiter_id": "REC005",
+                    "recruiter_name": "Jessica Martinez",
+                    "hires": 14,
+                    "interviews_conducted": 61,
+                    "resumes_processed": 289,
+                    "average_time_to_hire": 30.4,
+                    "offer_acceptance_rate": 0.91,
+                    "candidate_satisfaction_score": 4.6,
+                },
+                {
+                    "recruiter_id": "REC006",
+                    "recruiter_name": "Robert Thompson",
+                    "hires": 12,
+                    "interviews_conducted": 48,
+                    "resumes_processed": 198,
+                    "average_time_to_hire": 35.1,
+                    "offer_acceptance_rate": 0.85,
+                    "candidate_satisfaction_score": 4.2,
+                },
+                {
+                    "recruiter_id": "REC007",
+                    "recruiter_name": "Amanda Foster",
+                    "hires": 11,
+                    "interviews_conducted": 52,
+                    "resumes_processed": 215,
+                    "average_time_to_hire": 32.6,
+                    "offer_acceptance_rate": 0.88,
+                    "candidate_satisfaction_score": 4.4,
+                },
+                {
+                    "recruiter_id": "REC008",
+                    "recruiter_name": "Christopher Lee",
+                    "hires": 10,
+                    "interviews_conducted": 43,
+                    "resumes_processed": 187,
+                    "average_time_to_hire": 34.8,
+                    "offer_acceptance_rate": 0.86,
+                    "candidate_satisfaction_score": 4.1,
+                },
+                {
+                    "recruiter_id": "REC009",
+                    "recruiter_name": "Rachel Green",
+                    "hires": 9,
+                    "interviews_conducted": 39,
+                    "resumes_processed": 165,
+                    "average_time_to_hire": 37.2,
+                    "offer_acceptance_rate": 0.83,
+                    "candidate_satisfaction_score": 4.0,
+                },
+                {
+                    "recruiter_id": "REC010",
+                    "recruiter_name": "James Wilson",
+                    "hires": 8,
+                    "interviews_conducted": 35,
+                    "resumes_processed": 143,
+                    "average_time_to_hire": 36.5,
+                    "offer_acceptance_rate": 0.84,
+                    "candidate_satisfaction_score": 4.2,
+                },
+            ][:limit],
+            "total_recruiters": 10,
+            "period_start_date": "2024-01-01T00:00:00Z",
+            "period_end_date": "2024-12-31T23:59:59Z",
+        }
+
+        logger.info("Recruiter performance data retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving recruiter performance: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve recruiter performance: {str(e)}",
         ) from e
