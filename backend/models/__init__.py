@@ -12,6 +12,7 @@ from .custom_synonyms import CustomSynonym
 from .skill_feedback import SkillFeedback
 from .ml_model_version import MLModelVersion
 from .user_preferences import UserPreferences
+from .hiring_stage import HiringStage
 
 __all__ = [
     "Base",
@@ -25,4 +26,5 @@ __all__ = [
     "SkillFeedback",
     "MLModelVersion",
     "UserPreferences",
+    "HiringStage",
 ]

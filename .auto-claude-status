@@ -1,15 +1,15 @@
 {
   "active": true,
-  "spec": "009-advanced-skill-synonym-context-matching",
-  "state": "building",
+  "spec": "006-comprehensive-analytics-custom-reporting-dashboard",
+  "state": "planning",
   "subtasks": {
-    "completed": 25,
-    "total": 26,
+    "completed": 0,
+    "total": 0,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration & E2E Testing",
+    "current": "Database Models & Migrations",
     "id": null,
     "total": 5
   },
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 27,
-    "started_at": "2026-01-25T16:02:23.539445"
+    "number": 2,
+    "started_at": "2026-01-25T23:38:36.191737"
   },
-  "last_update": "2026-01-25T18:31:28.030548"
+  "last_update": "2026-01-25T23:44:40.004996"
 }
