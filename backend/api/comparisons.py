@@ -785,3 +785,71 @@ async def delete_comparison(comparison_id: str) -> JSONResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete comparison: {str(e)}",
         ) from e
+
+
+@router.get("/shared/{share_id}", tags=["Comparisons"])
+async def get_shared_comparison(share_id: str) -> JSONResponse:
+    """
+    Get a shared comparison view by share ID.
+
+    This endpoint allows accessing a shared comparison view without authentication.
+    It's designed for sharing comparison results with team members or external parties.
+
+    Args:
+        share_id: Unique share identifier for the comparison view
+
+    Returns:
+        JSON response with comparison view details
+
+    Raises:
+        HTTPException(404): If shared comparison view is not found
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/comparisons/shared/abc123def456"
+        ... )
+        >>> response.json()
+        {
+            "id": "comp-123",
+            "vacancy_id": "vacancy-123",
+            "resume_ids": ["resume1", "resume2", "resume3"],
+            "name": "Senior Developer Candidates",
+            "comparison_results": [...],
+            "created_at": "2024-01-25T00:00:00Z",
+            "share_id": "abc123def456"
+        }
+    """
+    try:
+        logger.info(f"Getting shared comparison: {share_id}")
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # When integrated, this will:
+        # 1. Query the resume_comparisons table by share_id
+        # 2. Verify the comparison is marked as shared
+        # 3. Return the comparison data without requiring authentication
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": "comp-123",
+                "vacancy_id": "vacancy-123",
+                "resume_ids": ["resume1", "resume2", "resume3"],
+                "name": "Shared Comparison View",
+                "filters": None,
+                "created_by": "user-123",
+                "shared_with": None,
+                "comparison_results": None,
+                "created_at": "2024-01-25T00:00:00Z",
+                "updated_at": "2024-01-25T00:00:00Z",
+                "share_id": share_id,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting shared comparison: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get shared comparison: {str(e)}",
+        ) from e
