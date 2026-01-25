@@ -4,7 +4,7 @@
  * This module provides a typed Axios client for communicating with the
  * backend resume analysis service. Handles resume upload, analysis,
  * job matching, skill taxonomies, custom synonyms, feedback, model versions,
- * resume comparisons, and health check endpoints.
+ * and health check endpoints.
  *
  * @example
  * ```ts
@@ -18,12 +18,6 @@
  *
  * // Compare with job vacancy
  * const match = await apiClient.compareWithVacancy(resumeId, vacancyData);
- *
- * // Compare multiple resumes
- * const comparison = await apiClient.compareMultipleResumes({
- *   vacancy_id: 'vacancy-123',
- *   resume_ids: ['resume1', 'resume2', 'resume3'],
- * });
  *
  * // Create custom synonyms
  * const synonyms = await apiClient.createCustomSynonyms({
@@ -69,12 +63,8 @@ import type {
   ModelVersionListResponse,
   MatchFeedbackRequest,
   MatchFeedbackResponse,
-  ComparisonCreate,
-  ComparisonUpdate,
-  ComparisonResponse,
-  ComparisonListResponse,
-  CompareMultipleRequest,
-  ComparisonMatrixData,
+  LanguagePreferenceResponse,
+  LanguagePreferenceUpdate,
 } from '@/types/api';
 
 /**
@@ -946,30 +936,27 @@ export class ApiClient {
     }
   }
 
-  // ==================== Comparisons ====================
+  // ==================== Preferences ====================
 
   /**
-   * Create a new resume comparison view
+   * Get the current language preference from the backend
    *
-   * @param request - Create request with vacancy_id, resume_ids, and optional settings
-   * @returns Created comparison view
-   * @throws ApiError if creation fails
+   * Retrieves the currently selected language for the UI.
+   * Default is 'en' (English) if not previously set.
+   *
+   * @returns Language preference response
+   * @throws ApiError if request fails
    *
    * @example
    * ```ts
-   * const result = await apiClient.createComparison({
-   *   vacancy_id: 'vacancy-123',
-   *   resume_ids: ['resume1', 'resume2', 'resume3'],
-   *   name: 'Senior Developer Candidates',
-   *   filters: { min_match_percentage: 50 },
-   * });
+   * const preference = await apiClient.getLanguagePreference();
+   * console.log(preference.language); // 'en' or 'ru'
    * ```
    */
-  async createComparison(request: ComparisonCreate): Promise<ComparisonResponse> {
+  async getLanguagePreference(): Promise<LanguagePreferenceResponse> {
     try {
-      const response: AxiosResponse<ComparisonResponse> = await this.client.post(
-        '/api/comparisons/',
-        request
+      const response: AxiosResponse<LanguagePreferenceResponse> = await this.client.get(
+        '/api/preferences/language'
       );
       return response.data;
     } catch (error) {
@@ -978,161 +965,27 @@ export class ApiClient {
   }
 
   /**
-   * List resume comparison views with optional filters and sorting
+   * Update the language preference
    *
-   * @param vacancyId - Optional vacancy ID filter
-   * @param createdBy - Optional creator user ID filter
-   * @param minMatchPercentage - Optional minimum match percentage filter (0-100)
-   * @param maxMatchPercentage - Optional maximum match percentage filter (0-100)
-   * @param sortBy - Sort field - created_at, match_percentage, name, or updated_at
-   * @param order - Sort order - asc or desc
-   * @param limit - Maximum number of results to return (default: 50, max: 100)
-   * @param offset - Number of results to skip (default: 0)
-   * @returns List of comparison views
-   * @throws ApiError if listing fails
+   * Sets the language preference for the UI. Supported languages are:
+   * - 'en' (English)
+   * - 'ru' (Russian)
+   *
+   * @param language - Language code to set ('en' or 'ru')
+   * @returns Updated language preference response
+   * @throws ApiError if request fails or language is not supported
    *
    * @example
    * ```ts
-   * const result = await apiClient.listComparisons(
-   *   'vacancy-123',
-   *   undefined,
-   *   50,
-   *   90,
-   *   'match_percentage',
-   *   'desc',
-   *   10,
-   *   0
-   * );
+   * const result = await apiClient.updateLanguagePreference('ru');
+   * console.log(result.language); // 'ru'
    * ```
    */
-  async listComparisons(
-    vacancyId?: string,
-    createdBy?: string,
-    minMatchPercentage?: number,
-    maxMatchPercentage?: number,
-    sortBy?: string,
-    order?: string,
-    limit?: number,
-    offset?: number
-  ): Promise<ComparisonListResponse> {
+  async updateLanguagePreference(language: 'en' | 'ru'): Promise<LanguagePreferenceResponse> {
     try {
-      const params: Record<string, string | number> = {};
-      if (vacancyId) params.vacancy_id = vacancyId;
-      if (createdBy) params.created_by = createdBy;
-      if (minMatchPercentage !== undefined) params.min_match_percentage = minMatchPercentage;
-      if (maxMatchPercentage !== undefined) params.max_match_percentage = maxMatchPercentage;
-      if (sortBy) params.sort_by = sortBy;
-      if (order) params.order = order;
-      if (limit !== undefined) params.limit = limit;
-      if (offset !== undefined) params.offset = offset;
-
-      const response: AxiosResponse<ComparisonListResponse> = await this.client.get(
-        '/api/comparisons/',
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Get a specific comparison view by ID
-   *
-   * @param id - Comparison view ID
-   * @returns Comparison view details
-   * @throws ApiError if not found
-   *
-   * @example
-   * ```ts
-   * const comparison = await apiClient.getComparison('comp-123');
-   * ```
-   */
-  async getComparison(id: string): Promise<ComparisonResponse> {
-    try {
-      const response: AxiosResponse<ComparisonResponse> = await this.client.get(
-        `/api/comparisons/${id}`
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Update a comparison view
-   *
-   * @param id - Comparison view ID
-   * @param request - Update request with fields to modify
-   * @returns Updated comparison view
-   * @throws ApiError if update fails
-   *
-   * @example
-   * ```ts
-   * const updated = await apiClient.updateComparison('comp-123', {
-   *   name: 'Updated Comparison Name',
-   *   filters: { min_match_percentage: 60 },
-   * });
-   * ```
-   */
-  async updateComparison(
-    id: string,
-    request: ComparisonUpdate
-  ): Promise<ComparisonResponse> {
-    try {
-      const response: AxiosResponse<ComparisonResponse> = await this.client.put(
-        `/api/comparisons/${id}`,
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Delete a comparison view
-   *
-   * @param id - Comparison view ID
-   * @throws ApiError if deletion fails
-   *
-   * @example
-   * ```ts
-   * await apiClient.deleteComparison('comp-123');
-   * ```
-   */
-  async deleteComparison(id: string): Promise<void> {
-    try {
-      await this.client.delete(`/api/comparisons/${id}`);
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Compare multiple resumes against a job vacancy
-   *
-   * This endpoint performs intelligent matching between each resume's skills
-   * and the job vacancy requirements, handling synonyms (e.g., PostgreSQL ≈ SQL)
-   * and providing aggregated results with ranking by match percentage.
-   *
-   * @param request - Compare request with vacancy_id and resume_ids
-   * @returns Comparison matrix data with ranked results
-   * @throws ApiError if comparison fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.compareMultipleResumes({
-   *   vacancy_id: 'vacancy-123',
-   *   resume_ids: ['resume1', 'resume2', 'resume3'],
-   * });
-   * // Returns ranked comparison results with match percentages
-   * ```
-   */
-  async compareMultipleResumes(request: CompareMultipleRequest): Promise<ComparisonMatrixData> {
-    try {
-      const response: AxiosResponse<ComparisonMatrixData> = await this.client.post(
-        '/api/comparisons/compare-multiple',
+      const request: LanguagePreferenceUpdate = { language };
+      const response: AxiosResponse<LanguagePreferenceResponse> = await this.client.put(
+        '/api/preferences/language',
         request
       );
       return response.data;

@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   AppBar,
   Toolbar,
@@ -15,6 +16,7 @@ import {
   Analytics as AnalysisIcon,
   Compare as CompareIcon,
 } from '@mui/icons-material';
+import LanguageSwitcher from './LanguageSwitcher';
 
 /**
  * Layout Component
@@ -27,14 +29,15 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = () => {
+  const { t } = useTranslation();
   const location = useLocation();
 
   // Navigation items configuration
   const navItems = [
-    { label: 'Home', path: '/', icon: <ResumeIcon /> },
-    { label: 'Upload Resume', path: '/upload', icon: <UploadIcon /> },
-    { label: 'Results', path: '/results', icon: <AnalysisIcon /> },
-    { label: 'Compare', path: '/compare', icon: <CompareIcon /> },
+    { label: t('nav.home'), path: '/', icon: <ResumeIcon /> },
+    { label: t('nav.uploadResume'), path: '/upload', icon: <UploadIcon /> },
+    { label: t('nav.results'), path: '/results', icon: <AnalysisIcon /> },
+    { label: t('nav.compare'), path: '/compare', icon: <CompareIcon /> },
   ];
 
   return (
@@ -57,7 +60,7 @@ const Layout: React.FC<LayoutProps> = () => {
                   letterSpacing: '-0.5px',
                 }}
               >
-                Resume Analysis Platform
+                {t('appName')}
               </Typography>
             </Box>
 
@@ -91,6 +94,9 @@ const Layout: React.FC<LayoutProps> = () => {
                 );
               })}
             </Box>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
           </Toolbar>
         </Container>
       </AppBar>
@@ -117,9 +123,7 @@ const Layout: React.FC<LayoutProps> = () => {
       >
         <Container maxWidth="lg">
           <Typography variant="body2" color="text.secondary" align="center">
-            {'© '}
-            {new Date().getFullYear()}
-            {' Iconicompany. AI-powered resume analysis platform.'}
+            {t('footer.copyright', { year: new Date().getFullYear() })}
           </Typography>
         </Container>
       </Box>

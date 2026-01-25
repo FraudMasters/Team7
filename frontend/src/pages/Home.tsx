@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Typography,
   Box,
@@ -26,27 +27,28 @@ import {
  */
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const features = [
     {
       icon: <AIIcon fontSize="large" color="primary" />,
-      title: 'AI-Powered Analysis',
-      description: 'Advanced ML/NLP techniques for intelligent resume parsing and error detection',
+      title: t('home.features.aiAnalysis.title'),
+      description: t('home.features.aiAnalysis.description'),
     },
     {
       icon: <SuccessIcon fontSize="large" color="success" />,
-      title: 'Error Detection',
-      description: 'Identify grammar issues, missing information, and structural problems instantly',
+      title: t('home.features.errorDetection.title'),
+      description: t('home.features.errorDetection.description'),
     },
     {
       icon: <CompareIcon fontSize="large" color="secondary" />,
-      title: 'Job Matching',
-      description: 'Compare resumes against job vacancies with skill highlighting and experience verification',
+      title: t('home.features.jobMatching.title'),
+      description: t('home.features.jobMatching.description'),
     },
     {
       icon: <SpeedIcon fontSize="large" color="info" />,
-      title: 'Fast Processing',
-      description: 'Get comprehensive analysis results in seconds with our optimized pipeline',
+      title: t('home.features.fastProcessing.title'),
+      description: t('home.features.fastProcessing.description'),
     },
   ];
 
@@ -60,10 +62,10 @@ const HomePage: React.FC = () => {
           gutterBottom
           sx={{ fontWeight: 700, mb: 2 }}
         >
-          Transform Your Recruitment Process
+          {t('home.hero.title')}
         </Typography>
         <Typography variant="h5" color="text.secondary" paragraph sx={{ mb: 4 }}>
-          AI-powered resume analysis platform with intelligent job matching
+          {t('home.hero.subtitle')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Button
@@ -73,7 +75,7 @@ const HomePage: React.FC = () => {
             onClick={() => navigate('/upload')}
             sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}
           >
-            Upload Resume
+            {t('home.hero.uploadButton')}
           </Button>
           <Button
             variant="outlined"
@@ -82,7 +84,7 @@ const HomePage: React.FC = () => {
             onClick={() => navigate('/results')}
             sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}
           >
-            View Sample Analysis
+            {t('home.hero.viewSampleButton')}
           </Button>
         </Box>
       </Box>
@@ -90,7 +92,7 @@ const HomePage: React.FC = () => {
       {/* Features Grid */}
       <Box sx={{ mb: 6 }}>
         <Typography variant="h4" component="h2" gutterBottom align="center" sx={{ mb: 4 }}>
-          Powerful Features
+          {t('home.features.title')}
         </Typography>
         <Grid container spacing={3}>
           {features.map((feature, index) => (
@@ -125,7 +127,7 @@ const HomePage: React.FC = () => {
       {/* How It Works Section */}
       <Box sx={{ mb: 6 }}>
         <Typography variant="h4" component="h2" gutterBottom align="center" sx={{ mb: 4 }}>
-          How It Works
+          {t('home.howItWorks.title')}
         </Typography>
         <Paper elevation={2} sx={{ p: 4 }}>
           <Grid container spacing={3} alignItems="center">
@@ -134,10 +136,10 @@ const HomePage: React.FC = () => {
                 1
               </Typography>
               <Typography variant="h6" gutterBottom>
-                Upload Resume
+                {t('home.howItWorks.step1.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Upload PDF or DOCX resume files through our intuitive interface
+                {t('home.howItWorks.step1.description')}
               </Typography>
             </Grid>
             <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
@@ -145,10 +147,10 @@ const HomePage: React.FC = () => {
                 2
               </Typography>
               <Typography variant="h6" gutterBottom>
-                AI Analysis
+                {t('home.howItWorks.step2.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Our AI extracts skills, detects errors, and calculates experience
+                {t('home.howItWorks.step2.description')}
               </Typography>
             </Grid>
             <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
@@ -156,10 +158,10 @@ const HomePage: React.FC = () => {
                 3
               </Typography>
               <Typography variant="h6" gutterBottom>
-                Get Results
+                {t('home.howItWorks.step3.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Receive detailed analysis with recommendations and job matching
+                {t('home.howItWorks.step3.description')}
               </Typography>
             </Grid>
           </Grid>
@@ -169,10 +171,10 @@ const HomePage: React.FC = () => {
       {/* CTA Section */}
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <Typography variant="h5" gutterBottom>
-          Ready to analyze your first resume?
+          {t('home.cta.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          Get started in seconds with our easy-to-use interface
+          {t('home.cta.subtitle')}
         </Typography>
         <Button
           variant="contained"
@@ -181,7 +183,7 @@ const HomePage: React.FC = () => {
           onClick={() => navigate('/upload')}
           sx={{ mt: 2 }}
         >
-          Get Started
+          {t('home.cta.button')}
         </Button>
       </Box>
     </Box>

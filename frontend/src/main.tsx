@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, CssBaseline } from '@mui/material';
+import { LanguageProvider } from './contexts/LanguageContext';
 import App from './App';
 import './index.css';
+import './i18n'; // Initialize i18n
 
 // Create a Material-UI theme
 const theme = {
@@ -49,9 +51,11 @@ const theme = {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <App />
+      </ThemeProvider>
+    </LanguageProvider>
   </React.StrictMode>
 );

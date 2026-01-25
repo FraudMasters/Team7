@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Paper,
@@ -147,6 +148,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
   feedbackApiUrl = 'http://localhost:8000/api/feedback',
   modelApiUrl = 'http://localhost:8000/api/model-versions',
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackEntry[]>([]);
@@ -168,7 +170,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
       setFeedback(result.feedback || []);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load feedback data';
+        err instanceof Error ? err.message : t('adminAnalytics.errors.failedToLoadFeedback');
       setError(errorMessage);
     }
   };
@@ -188,7 +190,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
       setModels(result.models || []);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load model data';
+        err instanceof Error ? err.message : t('adminAnalytics.errors.failedToLoadModels');
       setError(errorMessage);
     }
   };
@@ -250,10 +252,10 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
         <Typography variant="h6" color="text.secondary">
-          Loading analytics...
+          {t('adminAnalytics.loading')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          This may take a few moments
+          {t('adminAnalytics.loadingMessage')}
         </Typography>
       </Box>
     );
@@ -268,11 +270,11 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
         severity="error"
         action={
           <Button color="inherit" onClick={fetchAnalytics} startIcon={<RefreshIcon />}>
-            Retry
+            {t('common.tryAgain')}
           </Button>
         }
       >
-        <AlertTitle>Analytics Failed</AlertTitle>
+        <AlertTitle>{t('adminAnalytics.errorTitle')}</AlertTitle>
         {error}
       </Alert>
     );
@@ -284,10 +286,10 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5" fontWeight={600}>
-            Feedback Analytics Dashboard
+            {t('adminAnalytics.title')}
           </Typography>
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchAnalytics} size="small">
-            Refresh
+            {t('adminAnalytics.refreshButton')}
           </Button>
         </Box>
 
@@ -300,7 +302,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   {feedbackStats.total}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Total Feedback
+                  {t('adminAnalytics.overview.totalFeedback')}
                 </Typography>
               </CardContent>
             </Card>
@@ -312,7 +314,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   {feedbackStats.correct}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Correct Matches
+                  {t('adminAnalytics.overview.correctMatches')}
                 </Typography>
               </CardContent>
             </Card>
@@ -324,7 +326,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   {feedbackStats.incorrect}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Incorrect Matches
+                  {t('adminAnalytics.overview.incorrectMatches')}
                 </Typography>
               </CardContent>
             </Card>
@@ -353,7 +355,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   )}
                 </Box>
                 <Typography variant="caption" color="text.secondary">
-                  Match Accuracy
+                  {t('adminAnalytics.overview.accuracy')}
                 </Typography>
               </CardContent>
             </Card>
@@ -368,9 +370,9 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
           onChange={(_, newValue) => setTabValue(newValue)}
           aria-label="Analytics tabs"
         >
-          <Tab label="Learning Progress" />
-          <Tab label="Model Versions" />
-          <Tab label="Recent Feedback" />
+          <Tab label={t('adminAnalytics.tabs.learningProgress')} />
+          <Tab label={t('adminAnalytics.tabs.modelVersions')} />
+          <Tab label={t('adminAnalytics.tabs.recentFeedback')} />
         </Tabs>
 
         {/* Learning Progress Tab */}
@@ -378,7 +380,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
           <Paper elevation={1} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               <LearningIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 1 }} />
-              Learning Progress
+              {t('adminAnalytics.learningProgress.title')}
             </Typography>
             <Divider sx={{ mb: 3 }} />
 
@@ -387,7 +389,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                 <Box sx={{ mb: 3 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Processed Feedback
+                      {t('adminAnalytics.overview.processed')}
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {feedbackStats.processed} / {feedbackStats.total}
@@ -404,7 +406,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                 <Box sx={{ mb: 3 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Pending Processing
+                      {t('adminAnalytics.overview.unprocessed')}
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {feedbackStats.unprocessed} / {feedbackStats.total}
@@ -427,34 +429,34 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                         : 'info'
                   }
                 >
-                  <AlertTitle>Learning Status</AlertTitle>
+                  <AlertTitle>{t('adminAnalytics.learningProgress.statusTitle')}</AlertTitle>
                   {feedbackStats.total === 0
-                    ? 'No feedback data yet. Start collecting recruiter feedback to enable continuous learning.'
+                    ? t('adminAnalytics.learningProgress.statusNoData')
                     : feedbackStats.unprocessed > 0
-                      ? `${feedbackStats.unprocessed} feedback entries pending ML pipeline processing. Learning in progress...`
-                      : 'All feedback has been processed. Model is up to date with latest recruiter corrections.'}
+                      ? t('adminAnalytics.learningProgress.statusPending', { count: feedbackStats.unprocessed })
+                      : t('adminAnalytics.learningProgress.statusComplete')}
                 </Alert>
               </Grid>
 
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  Accuracy Trends
+                  {t('adminAnalytics.learningProgress.accuracyTrends')}
                 </Typography>
                 <List>
                   <ListItem>
                     <ListItemText
-                      primary="Current Match Accuracy"
+                      primary={t('adminAnalytics.learningProgress.currentAccuracy')}
                       secondary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                           <Typography variant="h4" fontWeight={700} color={feedbackStats.accuracy >= 80 ? 'success.main' : feedbackStats.accuracy >= 60 ? 'warning.main' : 'error.main'}>
                             {feedbackStats.accuracy.toFixed(1)}%
                           </Typography>
                           {feedbackStats.accuracy >= 80 ? (
-                            <Chip label="Excellent" size="small" color="success" />
+                            <Chip label={t('adminAnalytics.learningProgress.excellent')} size="small" color="success" />
                           ) : feedbackStats.accuracy >= 60 ? (
-                            <Chip label="Good" size="small" color="warning" />
+                            <Chip label={t('adminAnalytics.learningProgress.good')} size="small" color="warning" />
                           ) : (
-                            <Chip label="Needs Improvement" size="small" color="error" />
+                            <Chip label={t('adminAnalytics.learningProgress.needsImprovement')} size="small" color="error" />
                           )}
                         </Box>
                       }
@@ -462,20 +464,20 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   </ListItem>
                   <ListItem>
                     <ListItemText
-                      primary="Target Accuracy"
+                      primary={t('adminAnalytics.learningProgress.targetAccuracy')}
                       secondary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                           <Typography variant="h5" fontWeight={600}>
                             90.0%
                           </Typography>
-                          <Chip label="Goal" size="small" color="info" variant="outlined" />
+                          <Chip label={t('adminAnalytics.learningProgress.goal')} size="small" color="info" variant="outlined" />
                         </Box>
                       }
                     />
                   </ListItem>
                   <ListItem>
                     <ListItemText
-                      primary="Gap to Target"
+                      primary={t('adminAnalytics.learningProgress.gapToTarget')}
                       secondary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                           <Typography variant="h5" fontWeight={600} color={Math.max(0, 90 - feedbackStats.accuracy) <= 10 ? 'success.main' : 'warning.main'}>
@@ -501,14 +503,14 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
           <Paper elevation={1} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               <ModelIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 1 }} />
-              Model Versions
+              {t('adminAnalytics.models.title')}
             </Typography>
             <Divider sx={{ mb: 3 }} />
 
             {models.length === 0 ? (
               <Alert severity="info">
-                <AlertTitle>No Model Versions</AlertTitle>
-                No model versions found. Model versioning will be available after the first training cycle.
+                <AlertTitle>{t('adminAnalytics.models.noModelsTitle')}</AlertTitle>
+                {t('adminAnalytics.models.noModelsMessage')}
               </Alert>
             ) : (
               <Stack spacing={3}>
@@ -517,14 +519,14 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   <Box>
                     <Typography variant="subtitle2" color="success.main" gutterBottom fontWeight={600}>
                       <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                      Active Production Model
+                      {t('adminAnalytics.models.activeProductionModel')}
                     </Typography>
                     <Card variant="outlined" sx={{ borderColor: 'success.main' }}>
                       <CardContent>
                         <Grid container spacing={2}>
                           <Grid item xs={6}>
                             <Typography variant="caption" color="text.secondary">
-                              Model Name
+                              {t('adminAnalytics.models.modelName')}
                             </Typography>
                             <Typography variant="body1" fontWeight={600}>
                               {activeModel.model_name}
@@ -532,7 +534,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="caption" color="text.secondary">
-                              Version
+                              {t('adminAnalytics.models.version')}
                             </Typography>
                             <Typography variant="body1" fontWeight={600}>
                               {activeModel.version}
@@ -540,7 +542,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="caption" color="text.secondary">
-                              Performance Score
+                              {t('adminAnalytics.models.performanceScore')}
                             </Typography>
                             <Typography variant="body1" fontWeight={600} color={activeModel.performance_score && activeModel.performance_score >= 80 ? 'success.main' : 'warning.main'}>
                               {activeModel.performance_score?.toFixed(1) || 'N/A'} / 100
@@ -548,7 +550,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                           </Grid>
                           <Grid item xs={6}>
                             <Typography variant="caption" color="text.secondary">
-                              Last Updated
+                              {t('adminAnalytics.models.lastUpdated')}
                             </Typography>
                             <Typography variant="body1">
                               {new Date(activeModel.updated_at).toLocaleDateString()}
@@ -565,7 +567,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                   <Box>
                     <Typography variant="subtitle2" color="primary.main" gutterBottom fontWeight={600}>
                       <InfoIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                      A/B Testing Experiments ({experimentModels.length})
+                      {t('adminAnalytics.models.abTestingExperiments', { count: experimentModels.length })}
                     </Typography>
                     <Grid container spacing={2}>
                       {experimentModels.map((model) => (
@@ -577,7 +579,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                                   {model.version}
                                 </Typography>
                                 <Chip
-                                  label="Experiment"
+                                  label={t('adminAnalytics.models.experiment')}
                                   size="small"
                                   color="primary"
                                   variant="outlined"
@@ -588,7 +590,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                               </Typography>
                               <Box sx={{ mt: 1 }}>
                                 <Typography variant="caption" color="text.secondary">
-                                  Performance: {model.performance_score?.toFixed(1) || 'N/A'} / 100
+                                  {t('adminAnalytics.models.performance', { score: model.performance_score?.toFixed(1) || 'N/A' })}
                                 </Typography>
                                 <LinearProgress
                                   variant="determinate"
@@ -607,8 +609,8 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                 {/* No Active Model */}
                 {!activeModel && models.length > 0 && (
                   <Alert severity="warning">
-                    <AlertTitle>No Active Model</AlertTitle>
-                    {models.length} model version(s) found, but none are currently active as production. Activate a model version to use it for matching.
+                    <AlertTitle>{t('adminAnalytics.models.noActiveModelTitle')}</AlertTitle>
+                    {t('adminAnalytics.models.noActiveModelMessage', { count: models.length })}
                   </Alert>
                 )}
               </Stack>
@@ -620,27 +622,27 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
         <TabPanel value={tabValue} index={2}>
           <Paper elevation={1} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
-              Recent Feedback
+              {t('adminAnalytics.feedback.title')}
             </Typography>
             <Divider sx={{ mb: 3 }} />
 
             {feedback.length === 0 ? (
               <Alert severity="info">
-                <AlertTitle>No Feedback Data</AlertTitle>
-                No feedback entries found. Start collecting recruiter feedback to populate this dashboard.
+                <AlertTitle>{t('adminAnalytics.feedback.noFeedbackTitle')}</AlertTitle>
+                {t('adminAnalytics.feedback.noFeedbackMessage')}
               </Alert>
             ) : (
               <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Skill</TableCell>
-                      <TableCell>Correct</TableCell>
-                      <TableCell>Confidence</TableCell>
-                      <TableCell>Correction</TableCell>
-                      <TableCell>Source</TableCell>
-                      <TableCell>Processed</TableCell>
-                      <TableCell>Date</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.skill')}</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.correct')}</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.confidence')}</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.correction')}</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.source')}</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.processed')}</TableCell>
+                      <TableCell>{t('adminAnalytics.feedback.tableHeaders.date')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -653,9 +655,9 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                         </TableCell>
                         <TableCell>
                           {entry.was_correct ? (
-                            <Chip label="Yes" size="small" color="success" icon={<CheckIcon />} />
+                            <Chip label={t('common.yes')} size="small" color="success" icon={<CheckIcon />} />
                           ) : (
-                            <Chip label="No" size="small" color="error" icon={<ErrorIcon />} />
+                            <Chip label={t('common.no')} size="small" color="error" icon={<ErrorIcon />} />
                           )}
                         </TableCell>
                         <TableCell>
@@ -675,9 +677,9 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                         </TableCell>
                         <TableCell>
                           {entry.processed ? (
-                            <Chip label="Yes" size="small" color="success" variant="outlined" />
+                            <Chip label={t('common.yes')} size="small" color="success" variant="outlined" />
                           ) : (
-                            <Chip label="No" size="small" color="warning" variant="outlined" />
+                            <Chip label={t('common.no')} size="small" color="warning" variant="outlined" />
                           )}
                         </TableCell>
                         <TableCell>
@@ -695,7 +697,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
             {feedback.length > 20 && (
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Showing 20 of {feedback.length} feedback entries
+                  {t('adminAnalytics.feedback.showingEntries', { total: feedback.length })}
                 </Typography>
               </Box>
             )}

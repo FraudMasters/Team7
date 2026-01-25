@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Paper,
@@ -108,6 +109,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
   organizationId,
   apiUrl = 'http://localhost:8000/api/custom-synonyms',
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [synonyms, setSynonyms] = useState<CustomSynonym[]>([]);
@@ -143,7 +145,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       setSynonyms(result.synonyms || []);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load custom synonyms';
+        err instanceof Error ? err.message : t('adminSynonyms.errors.failedToLoad');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -205,7 +207,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to delete synonym: ${response.statusText}`);
+        throw new Error(`${t('adminSynonyms.errors.failedToDelete')}: ${response.statusText}`);
       }
 
       // Optimistic update
@@ -214,7 +216,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       setSynonymToDelete(null);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to delete synonym';
+        err instanceof Error ? err.message : t('adminSynonyms.errors.failedToDelete');
       setError(errorMessage);
     } finally {
       setSubmitting(false);
@@ -236,7 +238,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         .filter((s) => s.length > 0);
 
       if (customSynonymsArray.length === 0) {
-        throw new Error('At least one custom synonym is required');
+        throw new Error(t('adminSynonyms.dialog.atLeastOneError'));
       }
 
       if (editingSynonym) {
@@ -255,7 +257,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to update synonym: ${response.statusText}`);
+          throw new Error(`${t('adminSynonyms.errors.failedToUpdate')}: ${response.statusText}`);
         }
 
         const updated: CustomSynonym = await response.json();
@@ -281,7 +283,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to create synonym: ${response.statusText}`);
+          throw new Error(`${t('adminSynonyms.errors.failedToCreate')}: ${response.statusText}`);
         }
 
         const result: CustomSynonymListResponse = await response.json();
@@ -299,7 +301,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       });
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to save synonym';
+        err instanceof Error ? err.message : t('adminSynonyms.errors.failedToCreate');
       setError(errorMessage);
     } finally {
       setSubmitting(false);
@@ -340,7 +342,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
         <Typography variant="h6" color="text.secondary">
-          Loading custom synonyms...
+          {t('adminSynonyms.loading')}
         </Typography>
       </Box>
     );
@@ -355,11 +357,11 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         severity="error"
         action={
           <Button color="inherit" onClick={fetchSynonyms} startIcon={<RefreshIcon />}>
-            Retry
+            {t('common.tryAgain')}
           </Button>
         }
       >
-        <AlertTitle>Error Loading Synonyms</AlertTitle>
+        <AlertTitle>{t('adminSynonyms.errorTitle')}</AlertTitle>
         {error}
       </Alert>
     );
@@ -374,10 +376,10 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5" fontWeight={600}>
-            Custom Synonyms Management
+            {t('adminSynonyms.title')}
           </Typography>
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSynonyms} size="small">
-            Refresh
+            {t('adminSynonyms.refreshButton')}
           </Button>
         </Box>
 
@@ -390,7 +392,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
                   {synonyms.length}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Total Synonyms
+                  {t('adminSynonyms.totalSynonyms')}
                 </Typography>
               </CardContent>
             </Card>
@@ -402,7 +404,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
                   {activeCount}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Active
+                  {t('adminSynonyms.active')}
                 </Typography>
               </CardContent>
             </Card>
@@ -414,7 +416,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
                   {inactiveCount}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Inactive
+                  {t('adminSynonyms.inactive')}
                 </Typography>
               </CardContent>
             </Card>
@@ -429,7 +431,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
             onClick={handleCreate}
             size="large"
           >
-            Add Custom Synonym
+            {t('adminSynonyms.addButton')}
           </Button>
         </Box>
       </Paper>
@@ -438,10 +440,10 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       {synonyms.length === 0 ? (
         <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            No Custom Synonyms Found
+            {t('adminSynonyms.noSynonyms')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Get started by adding your first custom synonym entry for this organization.
+            {t('adminSynonyms.noSynonymsMessage')}
           </Typography>
         </Paper>
       ) : (
@@ -487,7 +489,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
                         variant="outlined"
                       />
                       <Chip
-                        label={synonym.is_active ? 'Active' : 'Inactive'}
+                        label={synonym.is_active ? t('adminSynonyms.active') : t('adminSynonyms.inactive')}
                         size="small"
                         color={synonym.is_active ? 'success' : 'default'}
                         variant="filled"
@@ -500,7 +502,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
 
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                      Custom Synonyms
+                      {t('adminSynonyms.synonym.synonyms')}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {synonym.custom_synonyms.map((custom, index) => (
@@ -516,7 +518,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
                   </Box>
 
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                    Created: {new Date(synonym.created_at).toLocaleDateString()}
+                    {t('adminSynonyms.synonym.createdAt')}: {new Date(synonym.created_at).toLocaleDateString()}
                   </Typography>
                 </CardContent>
               </Card>
@@ -535,7 +537,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">
-              {editingSynonym ? 'Edit Custom Synonym' : 'Add Custom Synonym'}
+              {editingSynonym ? t('adminSynonyms.dialog.editTitle') : t('adminSynonyms.dialog.addTitle')}
             </Typography>
             <IconButton
               onClick={() => setDialogOpen(false)}
@@ -549,61 +551,61 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 1 }}>
             <TextField
-              label="Canonical Skill Name"
+              label={t('adminSynonyms.dialog.canonicalSkill')}
               fullWidth
               required
               value={formData.canonical_skill}
               onChange={(e) => setFormData({ ...formData, canonical_skill: e.target.value })}
-              placeholder="e.g., React"
+              placeholder={t('adminSynonyms.dialog.canonicalSkillPlaceholder')}
               disabled={submitting}
             />
 
             <TextField
-              label="Custom Synonyms"
+              label={t('adminSynonyms.dialog.customSynonyms')}
               fullWidth
               required
               multiline
               rows={3}
               value={formData.custom_synonyms}
               onChange={(e) => setFormData({ ...formData, custom_synonyms: e.target.value })}
-              placeholder="e.g., ReactJS, React.js, React Framework (comma-separated)"
+              placeholder={t('adminSynonyms.dialog.customSynonymsPlaceholder')}
               disabled={submitting}
-              helperText="Enter multiple synonyms separated by commas"
+              helperText={t('adminSynonyms.dialog.customSynonymsHelper')}
             />
 
             <TextField
-              label="Context (Optional)"
+              label={t('adminSynonyms.dialog.context')}
               fullWidth
               select
               value={formData.context}
               onChange={(e) => setFormData({ ...formData, context: e.target.value })}
               disabled={submitting}
             >
-              <MenuItem value="">None</MenuItem>
-              <MenuItem value="web_framework">Web Framework</MenuItem>
-              <MenuItem value="language">Programming Language</MenuItem>
-              <MenuItem value="database">Database</MenuItem>
-              <MenuItem value="tool">Tool</MenuItem>
-              <MenuItem value="library">Library</MenuItem>
+              <MenuItem value="">{t('adminSynonyms.dialog.contextNone')}</MenuItem>
+              <MenuItem value="web_framework">{t('adminSynonyms.dialog.contextWebFramework')}</MenuItem>
+              <MenuItem value="language">{t('adminSynonyms.dialog.contextLanguage')}</MenuItem>
+              <MenuItem value="database">{t('adminSynonyms.dialog.contextDatabase')}</MenuItem>
+              <MenuItem value="tool">{t('adminSynonyms.dialog.contextTool')}</MenuItem>
+              <MenuItem value="library">{t('adminSynonyms.dialog.contextLibrary')}</MenuItem>
             </TextField>
 
             <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
+              <InputLabel>{t('adminSynonyms.dialog.status')}</InputLabel>
               <Select
                 value={formData.is_active.toString()}
-                label="Status"
+                label={t('adminSynonyms.dialog.status')}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'true' })}
                 disabled={submitting}
               >
-                <MenuItem value="true">Active</MenuItem>
-                <MenuItem value="false">Inactive</MenuItem>
+                <MenuItem value="true">{t('adminSynonyms.dialog.statusActive')}</MenuItem>
+                <MenuItem value="false">{t('adminSynonyms.dialog.statusInactive')}</MenuItem>
               </Select>
             </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)} disabled={submitting}>
-            Cancel
+            {t('adminSynonyms.dialog.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -611,26 +613,27 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
             disabled={submitting || !formData.canonical_skill || !formData.custom_synonyms}
             startIcon={submitting ? <CircularProgress size={16} /> : null}
           >
-            {submitting ? 'Saving...' : editingSynonym ? 'Update' : 'Create'}
+            {submitting ? t('adminSynonyms.dialog.saving') : editingSynonym ? t('adminSynonyms.dialog.update') : t('adminSynonyms.dialog.create')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogTitle>{t('adminSynonyms.deleteDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body1">
-            Are you sure you want to delete the custom synonym entry for{' '}
-            <strong>"{synonymToDelete?.canonical_skill}"</strong>?
+            {t('adminSynonyms.deleteDialog.message', {
+              skill: synonymToDelete?.canonical_skill
+            })}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            This action cannot be undone.
+            {t('adminSynonyms.deleteDialog.warning')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={submitting}>
-            Cancel
+            {t('adminSynonyms.deleteDialog.cancel')}
           </Button>
           <Button
             onClick={handleDeleteConfirm}
@@ -639,7 +642,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
             disabled={submitting}
             startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
           >
-            {submitting ? 'Deleting...' : 'Delete'}
+            {submitting ? t('adminSynonyms.deleteDialog.deleting') : t('adminSynonyms.deleteDialog.confirm')}
           </Button>
         </DialogActions>
       </Dialog>

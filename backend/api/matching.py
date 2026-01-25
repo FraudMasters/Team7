@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -25,6 +25,7 @@ from ..analyzers import (
     format_experience_summary,
     EnhancedSkillMatcher,
 )
+from ..i18n.backend_translations import get_error_message, get_success_message
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,23 @@ SYNONYMS_FILE = Path(__file__).parent.parent / "models" / "skill_synonyms.json"
 
 # Cache for skill synonyms
 _skill_synonyms_cache: Optional[Dict[str, List[str]]] = None
+
+
+def _extract_locale(request: Optional[Request]) -> str:
+    """
+    Extract Accept-Language header from request.
+
+    Args:
+        request: The incoming FastAPI request (optional)
+
+    Returns:
+        Language code (e.g., 'en', 'ru')
+    """
+    if request is None:
+        return "en"
+    accept_language = request.headers.get("Accept-Language", "en")
+    lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
+    return lang_code
 
 
 def load_skill_synonyms() -> Dict[str, List[str]]:
@@ -312,7 +330,7 @@ class MatchFeedbackResponse(BaseModel):
     status_code=status.HTTP_200_OK,
     tags=["Matching"],
 )
-async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
+async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest) -> JSONResponse:
     """
     Compare a resume to a job vacancy with skill synonym handling.
 
@@ -329,6 +347,7 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
     - Support for multi-word skills
 
     Args:
+        http_request: FastAPI request object (for Accept-Language header)
         request: Match request with resume_id and vacancy_data
 
     Returns:
@@ -372,6 +391,9 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
     """
     import time
 
+    # Extract locale from Accept-Language header
+    locale = _extract_locale(http_request)
+
     start_time = time.time()
 
     try:
@@ -383,9 +405,10 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
             if file_path.exists():
                 break
         else:
+            error_msg = get_error_message("file_not_found", locale)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Resume file with ID '{request.resume_id}' not found",
+                detail=error_msg,
             )
 
         logger.info(f"Found resume file: {file_path}")
@@ -400,22 +423,25 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
             elif file_ext == ".docx":
                 result = extract_text_from_docx(file_path)
             else:
+                error_msg = get_error_message("invalid_file_type", locale, file_ext=file_ext, allowed=".pdf, .docx")
                 raise HTTPException(
                     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                    detail=f"Unsupported file type: {file_ext}",
+                    detail=error_msg,
                 )
 
             if result.get("error"):
+                error_msg = get_error_message("extraction_failed", locale)
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Text extraction failed: {result['error']}",
+                    detail=error_msg,
                 )
 
             resume_text = result.get("text", "")
             if not resume_text or len(resume_text.strip()) < 10:
+                error_msg = get_error_message("file_corrupted", locale)
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Extracted text is too short or empty",
+                    detail=error_msg,
                 )
 
             logger.info(f"Extracted {len(resume_text)} characters from resume")
@@ -424,9 +450,10 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
             raise
         except Exception as e:
             logger.error(f"Error extracting text: {e}", exc_info=True)
+            error_msg = get_error_message("extraction_failed", locale)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to extract text from resume: {str(e)}",
+                detail=error_msg,
             ) from e
 
         # Step 3: Detect language
@@ -628,9 +655,10 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
         raise
     except Exception as e:
         logger.error(f"Error matching resume to vacancy: {e}", exc_info=True)
+        error_msg = get_error_message("parsing_failed", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to match resume to vacancy: {str(e)}",
+            detail=error_msg,
         ) from e
 
 
@@ -640,7 +668,7 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
     status_code=status.HTTP_201_CREATED,
     tags=["Matching"],
 )
-async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
+async def submit_match_feedback(http_request: Request, request: MatchFeedbackRequest) -> JSONResponse:
     """
     Submit feedback on a skill match result.
 
@@ -649,6 +677,7 @@ async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
     This feedback is used to improve future matching accuracy through ML retraining.
 
     Args:
+        http_request: FastAPI request object (for Accept-Language header)
         request: Feedback request with match details and recruiter corrections
 
     Returns:
@@ -682,6 +711,9 @@ async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
             "created_at": "2024-01-25T00:00:00Z"
         }
     """
+    # Extract locale from Accept-Language header
+    locale = _extract_locale(http_request)
+
     try:
         logger.info(
             f"Submitting feedback for match_id: {request.match_id}, "
@@ -692,9 +724,10 @@ async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
         if request.confidence_score is not None and not (
             0 <= request.confidence_score <= 1
         ):
+            error_msg = get_error_message("value_out_of_range", locale, field="confidence_score")
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Confidence score must be between 0 and 1",
+                detail=error_msg,
             )
 
         # For now, return placeholder response
@@ -721,7 +754,8 @@ async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
         raise
     except Exception as e:
         logger.error(f"Error submitting match feedback: {e}", exc_info=True)
+        error_msg = get_error_message("database_error", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to submit match feedback: {str(e)}",
+            detail=error_msg,
         ) from e

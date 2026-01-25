@@ -6,7 +6,7 @@ database session management, and health check endpoints.
 """
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +14,34 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from .config import get_settings
+from .i18n.backend_translations import get_error_message
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def _extract_accept_language(request: Request) -> str:
+    """
+    Extract and validate Accept-Language header from request.
+
+    Args:
+        request: The incoming FastAPI request
+
+    Returns:
+        Validated language code (e.g., 'en', 'ru')
+
+    Examples:
+        >>> _extract_accept_language(request_with_en_header)
+        'en'
+        >>> _extract_accept_language(request_with_ru_header)
+        'ru'
+        >>> _extract_accept_language(request_without_header)
+        'en'  # Falls back to default
+    """
+    accept_language = request.headers.get("Accept-Language", "en")
+    # Extract primary language code (e.g., 'en-US' -> 'en', 'ru-RU' -> 'ru')
+    lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
+    return lang_code
 
 
 @asynccontextmanager
@@ -93,11 +118,12 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError) -
         JSON response with error details
     """
     logger.error(f"Database error: {exc}")
+    locale = _extract_accept_language(request)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "error": "Database error occurred",
-            "detail": "An error occurred while accessing the database",
+            "error": get_error_message("database_error", locale),
+            "detail": get_error_message("database_query_error", locale),
             "type": "database_error",
         },
     )
@@ -116,10 +142,11 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
         JSON response with error details
     """
     logger.warning(f"Validation error: {exc}")
+    locale = _extract_accept_language(request)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "error": "Validation error",
+            "error": get_error_message("invalid_input", locale),
             "detail": str(exc),
             "type": "validation_error",
         },
@@ -139,11 +166,12 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         JSON response with error details
     """
     logger.error(f"Unexpected error: {exc}", exc_info=True)
+    locale = _extract_accept_language(request)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "error": "Internal server error",
-            "detail": "An unexpected error occurred. Please try again later.",
+            "error": get_error_message("internal_server_error", locale),
+            "detail": get_error_message("service_unavailable", locale),
             "type": "internal_error",
         },
     )
@@ -239,7 +267,7 @@ from .api import (
     custom_synonyms,
     feedback,
     model_versions,
-    comparisons,
+    preferences,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -249,7 +277,7 @@ app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags
 app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=["Custom Synonyms"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
-app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
+app.include_router(preferences.router, prefix="/api/preferences", tags=["Preferences"])
 
 
 if __name__ == "__main__":

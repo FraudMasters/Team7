@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Typography, Box, Paper } from '@mui/material';
 import ResumeUploader from '@components/ResumeUploader';
 
@@ -13,6 +14,7 @@ import ResumeUploader from '@components/ResumeUploader';
  */
 const UploadPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   /**
    * Handle successful upload by navigating to results page
@@ -33,10 +35,10 @@ const UploadPage: React.FC = () => {
     <Box>
       {/* Page Header */}
       <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
-        Upload Resume
+        {t('upload.title')}
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
-        Upload your resume (PDF or DOCX) for AI-powered analysis and job matching.
+        {t('upload.subtitle')}
       </Typography>
 
       {/* Upload Component */}
@@ -51,20 +53,19 @@ const UploadPage: React.FC = () => {
       {/* Additional Instructions */}
       <Paper elevation={0} sx={{ p: 3, mt: 3, bgcolor: 'action.hover' }}>
         <Typography variant="h6" gutterBottom fontWeight={600}>
-          What happens next?
+          {t('upload.whatHappensNext.title')}
         </Typography>
         <Typography variant="body2" paragraph>
-          1. Our AI extracts skills, experience, and qualifications from your resume
+          {t('upload.whatHappensNext.step1')}
         </Typography>
         <Typography variant="body2" paragraph>
-          2. We analyze your resume for common errors and improvement opportunities
+          {t('upload.whatHappensNext.step2')}
         </Typography>
         <Typography variant="body2" paragraph>
-          3. You can compare your resume against job vacancies to see match percentage
+          {t('upload.whatHappensNext.step3')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          The analysis typically takes 5-10 seconds. You'll be redirected automatically
-          when complete.
+          {t('upload.whatHappensNext.timeline')}
         </Typography>
       </Paper>
     </Box>

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,7 @@ from ..analyzers import (
     calculate_total_experience,
     format_experience_summary,
 )
+from ..i18n.backend_translations import get_error_message, get_success_message
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,23 @@ router = APIRouter()
 
 # Directory where uploaded resumes are stored
 UPLOAD_DIR = Path("data/uploads")
+
+
+def _extract_locale(request: Optional[Request]) -> str:
+    """
+    Extract Accept-Language header from request.
+
+    Args:
+        request: The incoming FastAPI request (optional)
+
+    Returns:
+        Language code (e.g., 'en', 'ru')
+    """
+    if request is None:
+        return "en"
+    accept_language = request.headers.get("Accept-Language", "en")
+    lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
+    return lang_code
 
 
 class AnalysisRequest(BaseModel):
@@ -123,12 +141,13 @@ class AnalysisResponse(BaseModel):
     processing_time_ms: float = Field(..., description="Analysis processing time in milliseconds")
 
 
-def find_resume_file(resume_id: str) -> Path:
+def find_resume_file(resume_id: str, locale: str = "en") -> Path:
     """
     Find the resume file by ID.
 
     Args:
         resume_id: Unique identifier of the resume
+        locale: Language code for translated error messages
 
     Returns:
         Path to the resume file
@@ -143,18 +162,20 @@ def find_resume_file(resume_id: str) -> Path:
             return file_path
 
     # If not found, raise error
+    error_msg = get_error_message("file_not_found", locale)
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Resume file with ID '{resume_id}' not found",
+        detail=error_msg,
     )
 
 
-def extract_text_from_file(file_path: Path) -> str:
+def extract_text_from_file(file_path: Path, locale: str = "en") -> str:
     """
     Extract text from resume file (PDF or DOCX).
 
     Args:
         file_path: Path to the resume file
+        locale: Language code for translated error messages
 
     Returns:
         Extracted text content
@@ -173,23 +194,26 @@ def extract_text_from_file(file_path: Path) -> str:
         elif file_ext == ".docx":
             result = extract_text_from_docx(file_path)
         else:
+            error_msg = get_error_message("invalid_file_type", locale, file_ext=file_ext, allowed=".pdf, .docx")
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                detail=f"Unsupported file type: {file_ext}",
+                detail=error_msg,
             )
 
         # Check for extraction errors
         if result.get("error"):
+            error_msg = get_error_message("extraction_failed", locale)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Text extraction failed: {result['error']}",
+                detail=error_msg,
             )
 
         text = result.get("text", "")
         if not text or len(text.strip()) < 10:
+            error_msg = get_error_message("file_corrupted", locale)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Extracted text is too short or empty. The file may be corrupted or scanned.",
+                detail=error_msg,
             )
 
         logger.info(f"Extracted {len(text)} characters from {file_path.name}")
@@ -199,9 +223,10 @@ def extract_text_from_file(file_path: Path) -> str:
         raise
     except Exception as e:
         logger.error(f"Error extracting text from {file_path}: {e}", exc_info=True)
+        error_msg = get_error_message("extraction_failed", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to extract text from resume: {str(e)}",
+            detail=error_msg,
         ) from e
 
 
@@ -211,7 +236,7 @@ def extract_text_from_file(file_path: Path) -> str:
     status_code=status.HTTP_200_OK,
     tags=["Analysis"],
 )
-async def analyze_resume(request: AnalysisRequest) -> JSONResponse:
+async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSONResponse:
     """
     Analyze a resume using integrated ML/NLP analyzers.
 
@@ -222,6 +247,7 @@ async def analyze_resume(request: AnalysisRequest) -> JSONResponse:
     - Experience calculation
 
     Args:
+        http_request: FastAPI request object (for Accept-Language header)
         request: Analysis request with resume_id and analysis options
 
     Returns:
@@ -252,17 +278,20 @@ async def analyze_resume(request: AnalysisRequest) -> JSONResponse:
     """
     import time
 
+    # Extract locale from Accept-Language header
+    locale = _extract_locale(http_request)
+
     start_time = time.time()
 
     try:
         logger.info(f"Starting analysis for resume_id: {request.resume_id}")
 
         # Step 1: Find the resume file
-        file_path = find_resume_file(request.resume_id)
+        file_path = find_resume_file(request.resume_id, locale)
         logger.info(f"Found resume file: {file_path}")
 
         # Step 2: Extract text from file
-        resume_text = extract_text_from_file(file_path)
+        resume_text = extract_text_from_file(file_path, locale)
 
         # Step 3: Detect language from text
         try:
@@ -385,7 +414,8 @@ async def analyze_resume(request: AnalysisRequest) -> JSONResponse:
         raise
     except Exception as e:
         logger.error(f"Error analyzing resume: {e}", exc_info=True)
+        error_msg = get_error_message("analysis_failed", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to analyze resume: {str(e)}",
+            detail=error_msg,
         ) from e
