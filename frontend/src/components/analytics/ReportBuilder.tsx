@@ -35,6 +35,7 @@ import {
   ChevronRight as RightIcon,
   Remove as RemoveIcon,
   Description as ReportIcon,
+  PictureAsPdf as PdfIcon,
 } from '@mui/icons-material';
 
 /**
@@ -206,6 +207,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<ReportFormData>({
@@ -422,6 +424,58 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   };
 
   /**
+   * Export report to PDF
+   */
+  const handleExportPdf = async () => {
+    if (selectedMetrics.length === 0) {
+      setError('Please select at least one metric before exporting');
+      return;
+    }
+
+    setExportingPdf(true);
+    setError(null);
+
+    try {
+      const reportData: ReportData = {
+        metrics: selectedMetrics.map((m) => m.id),
+        filters: {},
+      };
+
+      const response = await fetch('http://localhost:8000/api/reports/export/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          report_id: editingReport?.id || 'custom',
+          data: reportData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to export PDF: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Download the PDF from the provided URL
+      if (result.download_url) {
+        const link = document.createElement('a');
+        link.href = result.download_url;
+        link.download = `report-${editingReport?.name || 'custom'}-${Date.now()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to export PDF';
+      setError(errorMessage);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  /**
    * Submit form (create or update)
    */
   const handleSubmit = async () => {
@@ -599,6 +653,15 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
           </Button>
           <Button variant="outlined" startIcon={<OpenIcon />} onClick={handleLoadClick}>
             Load Report
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={exportingPdf ? <CircularProgress size={16} /> : <PdfIcon />}
+            onClick={handleExportPdf}
+            disabled={selectedMetrics.length === 0 || exportingPdf}
+          >
+            {exportingPdf ? 'Exporting...' : 'Export PDF'}
           </Button>
           {editingReport && (
             <>
