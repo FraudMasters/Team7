@@ -1,6 +1,7 @@
 import React from 'react';
-import { Container, Paper, Typography, Box, Alert, AlertTitle } from '@mui/material';
+import { Container, Paper, Typography, Box, Alert, AlertTitle, Stack } from '@mui/material';
 import { Info as InfoIcon } from '@mui/icons-material';
+import KeyMetrics from '../components/analytics/KeyMetrics';
 
 /**
  * AnalyticsDashboardPage Component
@@ -21,19 +22,24 @@ const AnalyticsDashboardPage: React.FC = () => {
         </Typography>
       </Box>
 
-      <Paper elevation={1} sx={{ p: 3 }}>
-        <Alert severity="info" icon={<InfoIcon />}>
-          <AlertTitle>Dashboard Components Coming Soon</AlertTitle>
-          The analytics dashboard is being built. Components will include:
-          <ul style={{ marginTop: '0.5em', marginBottom: 0, paddingLeft: '1.5em' }}>
-            <li>Key Metrics (time-to-hire, resumes processed, match rates)</li>
-            <li>Funnel Visualization (candidate progression through pipeline)</li>
-            <li>Skill Demand Analytics (trending skills analysis)</li>
-            <li>Source Tracking (job board, referral, etc.)</li>
-            <li>Recruiter Performance (comparative metrics)</li>
-          </ul>
-        </Alert>
-      </Paper>
+      <Stack spacing={3}>
+        {/* Key Metrics Section */}
+        <KeyMetrics />
+
+        {/* Other Components Coming Soon */}
+        <Paper elevation={1} sx={{ p: 3 }}>
+          <Alert severity="info" icon={<InfoIcon />}>
+            <AlertTitle>More Dashboard Components Coming Soon</AlertTitle>
+            Additional analytics components will include:
+            <ul style={{ marginTop: '0.5em', marginBottom: 0, paddingLeft: '1.5em' }}>
+              <li>Funnel Visualization (candidate progression through pipeline)</li>
+              <li>Skill Demand Analytics (trending skills analysis)</li>
+              <li>Source Tracking (job board, referral, etc.)</li>
+              <li>Recruiter Performance (comparative metrics)</li>
+            </ul>
+          </Alert>
+        </Paper>
+      </Stack>
     </Container>
   );
 };
