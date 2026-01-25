@@ -853,3 +853,190 @@ async def get_shared_comparison(share_id: str) -> JSONResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get shared comparison: {str(e)}",
         ) from e
+
+
+class CompareMultipleRequest(BaseModel):
+    """Request model for comparing multiple resumes."""
+
+    vacancy_id: str = Field(..., description="ID of the job vacancy to compare against")
+    resume_ids: List[str] = Field(
+        ..., description="List of resume IDs to compare (2-5 resumes)", min_length=2, max_length=5
+    )
+    vacancy_data: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional vacancy data (title, required_skills, min_experience_months). "
+        "If not provided, will be fetched from vacancy storage.",
+    )
+
+
+@router.post("/compare-multiple", tags=["Comparisons"])
+async def compare_multiple_endpoint(request: CompareMultipleRequest) -> JSONResponse:
+    """
+    Compare multiple resumes against a job vacancy.
+
+    This endpoint performs intelligent skill matching between each resume and the
+    job vacancy requirements, with synonym support and automatic ranking by match percentage.
+
+    Args:
+        request: Request containing vacancy_id and list of resume IDs
+
+    Returns:
+        JSON response with comparison results ranked by match percentage
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(404): If any resume file is not found
+        HTTPException(500): If comparison processing fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "vacancy_id": "vacancy-123",
+        ...     "resume_ids": ["resume1", "resume2", "resume3"],
+        ...     "vacancy_data": {
+        ...         "title": "Senior Java Developer",
+        ...         "required_skills": ["Java", "Spring", "SQL"],
+        ...         "min_experience_months": 60
+        ...     }
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/comparisons/compare-multiple",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "vacancy_id": "vacancy-123",
+            "vacancy_title": "Senior Java Developer",
+            "comparison_results": [
+                {
+                    "resume_id": "resume2",
+                    "match_percentage": 85.5,
+                    "rank": 1,
+                    "matched_skills": [...],
+                    "missing_skills": [...],
+                    "experience_verification": [...]
+                },
+                {
+                    "resume_id": "resume1",
+                    "match_percentage": 72.3,
+                    "rank": 2,
+                    ...
+                },
+                {
+                    "resume_id": "resume3",
+                    "match_percentage": 65.0,
+                    "rank": 3,
+                    ...
+                }
+            ],
+            "total_resumes": 3,
+            "processing_time_ms": 1234.56
+        }
+    """
+    try:
+        logger.info(
+            f"Compare multiple endpoint called for vacancy {request.vacancy_id} "
+            f"with {len(request.resume_ids)} resumes"
+        )
+
+        # If vacancy_data not provided, use default or fetch from storage
+        vacancy_data = request.vacancy_data or {
+            "title": f"Vacancy {request.vacancy_id}",
+            "required_skills": [],
+            "min_experience_months": 0,
+        }
+
+        # Call the comparison function
+        raw_results = compare_multiple_resumes(
+            resume_ids=request.resume_ids,
+            vacancy_data=vacancy_data,
+        )
+
+        # Transform results to match frontend's ComparisonMatrixData interface
+        # Extract all unique skills from all resumes
+        all_skills = set()
+        for result in raw_results.get("comparison_results", []):
+            if "error" not in result:
+                # Extract from required_skills_match
+                for skill_match in result.get("required_skills_match", []):
+                    all_skills.add(skill_match.get("skill", ""))
+                # Extract from additional_skills_match
+                for skill_match in result.get("additional_skills_match", []):
+                    all_skills.add(skill_match.get("skill", ""))
+
+        # Transform each comparison result to match frontend's ResumeComparisonResult interface
+        comparisons = []
+        for result in raw_results.get("comparison_results", []):
+            if "error" in result:
+                # Handle error case - still include in results but with minimal data
+                comparisons.append({
+                    "resume_id": result.get("resume_id", ""),
+                    "match_percentage": 0.0,
+                    "matched_skills": [],
+                    "missing_skills": [],
+                    "overall_match": False,
+                })
+            else:
+                # Transform matched skills to frontend format
+                matched_skills = []
+                for skill_match in result.get("required_skills_match", []):
+                    matched_skills.append({
+                        "skill": skill_match.get("skill", ""),
+                        "matched": skill_match.get("matched", False),
+                        "highlight": "green" if skill_match.get("matched", False) else "red",
+                    })
+
+                # Add additional matched skills
+                for skill_match in result.get("additional_skills_match", []):
+                    if skill_match.get("matched", False):
+                        matched_skills.append({
+                            "skill": skill_match.get("skill", ""),
+                            "matched": True,
+                            "highlight": "green",
+                        })
+
+                # Determine missing skills (required skills not matched)
+                missing_skills = []
+                for skill_match in result.get("required_skills_match", []):
+                    if not skill_match.get("matched", False):
+                        missing_skills.append({
+                            "skill": skill_match.get("skill", ""),
+                            "matched": False,
+                            "highlight": "red",
+                        })
+
+                # Build comparison result
+                comparison = {
+                    "resume_id": result.get("resume_id", ""),
+                    "match_percentage": result.get("match_percentage", 0.0),
+                    "matched_skills": matched_skills,
+                    "missing_skills": missing_skills,
+                    "overall_match": result.get("match_percentage", 0) > 0,
+                }
+
+                # Add experience verification if available
+                exp_verification = result.get("experience_verification")
+                if exp_verification:
+                    comparison["experience_verification"] = exp_verification
+
+                comparisons.append(comparison)
+
+        # Return transformed response matching frontend's ComparisonMatrixData interface
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "vacancy_id": request.vacancy_id,
+                "comparisons": comparisons,
+                "all_unique_skills": sorted(list(all_skills)),
+                "processing_time": raw_results.get("processing_time_ms", 0),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in compare-multiple endpoint: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compare resumes: {str(e)}",
+        ) from e
