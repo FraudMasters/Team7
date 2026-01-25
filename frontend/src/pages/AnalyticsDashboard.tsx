@@ -3,6 +3,7 @@ import { Container, Paper, Typography, Box, Alert, AlertTitle, Stack } from '@mu
 import { Info as InfoIcon } from '@mui/icons-material';
 import KeyMetrics from '../components/analytics/KeyMetrics';
 import FunnelVisualization from '../components/analytics/FunnelVisualization';
+import SkillDemandChart from '../components/analytics/SkillDemandChart';
 
 /**
  * AnalyticsDashboardPage Component
@@ -30,13 +31,15 @@ const AnalyticsDashboardPage: React.FC = () => {
         {/* Funnel Visualization Section */}
         <FunnelVisualization />
 
+        {/* Skill Demand Analytics Section */}
+        <SkillDemandChart />
+
         {/* Other Components Coming Soon */}
         <Paper elevation={1} sx={{ p: 3 }}>
           <Alert severity="info" icon={<InfoIcon />}>
             <AlertTitle>More Dashboard Components Coming Soon</AlertTitle>
             Additional analytics components will include:
             <ul style={{ marginTop: '0.5em', marginBottom: 0, paddingLeft: '1.5em' }}>
-              <li>Skill Demand Analytics (trending skills analysis)</li>
               <li>Source Tracking (job board, referral, etc.)</li>
               <li>Recruiter Performance (comparative metrics)</li>
             </ul>
