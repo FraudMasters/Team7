@@ -36,6 +36,9 @@ from .error_detector import (
 from .enhanced_matcher import (
     EnhancedSkillMatcher,
 )
+from .taxonomy_loader import (
+    TaxonomyLoader,
+)
 
 __all__ = [
     "extract_keywords",
@@ -56,4 +59,5 @@ __all__ = [
     "get_error_summary",
     "format_errors_for_display",
     "EnhancedSkillMatcher",
+    "TaxonomyLoader",
 ]
