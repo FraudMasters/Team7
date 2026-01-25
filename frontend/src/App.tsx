@@ -5,6 +5,7 @@ import HomePage from '@pages/Home';
 import UploadPage from '@pages/Upload';
 import ResultsPage from '@pages/Results';
 import ComparePage from '@pages/Compare';
+import CompareVacancyPage from '@pages/CompareVacancy';
 import AdminSynonymsPage from '@pages/AdminSynonyms';
 import AdminAnalyticsPage from '@pages/AdminAnalytics';
 
@@ -31,6 +32,9 @@ function App() {
 
           {/* Job comparison page with dynamic resume and vacancy ID parameters */}
           <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
+
+          {/* Multi-resume comparison page for a specific vacancy */}
+          <Route path="compare-vacancy/:vacancyId" element={<CompareVacancyPage />} />
 
           {/* Admin pages */}
           <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
