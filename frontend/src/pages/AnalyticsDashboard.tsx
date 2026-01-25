@@ -5,6 +5,7 @@ import KeyMetrics from '../components/analytics/KeyMetrics';
 import FunnelVisualization from '../components/analytics/FunnelVisualization';
 import SkillDemandChart from '../components/analytics/SkillDemandChart';
 import SourceTracking from '../components/analytics/SourceTracking';
+import RecruiterPerformance from '../components/analytics/RecruiterPerformance';
 
 /**
  * AnalyticsDashboardPage Component
@@ -38,13 +39,16 @@ const AnalyticsDashboardPage: React.FC = () => {
         {/* Source Tracking Section */}
         <SourceTracking />
 
+        {/* Recruiter Performance Section */}
+        <RecruiterPerformance />
+
         {/* Other Components Coming Soon */}
         <Paper elevation={1} sx={{ p: 3 }}>
           <Alert severity="info" icon={<InfoIcon />}>
             <AlertTitle>More Dashboard Components Coming Soon</AlertTitle>
             Additional analytics components will include:
             <ul style={{ marginTop: '0.5em', marginBottom: 0, paddingLeft: '1.5em' }}>
-              <li>Recruiter Performance (comparative metrics)</li>
+              <li>Date Range Filter (temporal filtering)</li>
             </ul>
           </Alert>
         </Paper>
