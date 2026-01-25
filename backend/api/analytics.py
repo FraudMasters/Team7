@@ -86,6 +86,22 @@ class SkillDemandResponse(BaseModel):
     total_postings_analyzed: int = Field(..., description="Total number of job postings analyzed")
 
 
+class SourceTrackingItem(BaseModel):
+    """Represents a single source with its vacancy metrics."""
+
+    source_name: str = Field(..., description="Name of the vacancy source (e.g., 'LinkedIn', 'Referral', 'Indeed')")
+    vacancy_count: int = Field(..., description="Number of vacancies from this source")
+    percentage: float = Field(..., description="Percentage of total vacancies from this source (0-1)")
+    average_time_to_fill: float = Field(..., description="Average time to fill (in days) for vacancies from this source")
+
+
+class SourceTrackingResponse(BaseModel):
+    """Response model for source tracking analytics."""
+
+    sources: list[SourceTrackingItem] = Field(..., description="List of sources with vacancy metrics, sorted by vacancy_count")
+    total_vacancies: int = Field(..., description="Total number of vacancies analyzed")
+
+
 @router.get(
     "/key-metrics",
     response_model=KeyMetricsResponse,
@@ -456,4 +472,142 @@ async def get_skill_demand(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve skill demand: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/source-tracking",
+    response_model=SourceTrackingResponse,
+    tags=["Analytics"],
+)
+async def get_source_tracking(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get source tracking analytics aggregating vacancies by source.
+
+    This endpoint provides insights into vacancy distribution across different sources,
+    such as job boards, referrals, and recruitment agencies. Each source includes
+    vacancy count, percentage distribution, and average time-to-fill metrics to help
+    recruitment teams optimize their sourcing strategy and allocate resources effectively.
+
+    Args:
+        start_date: Optional start date for filtering vacancies (ISO 8601 format)
+        end_date: Optional end date for filtering vacancies (ISO 8601 format)
+
+    Returns:
+        JSON response with list of sources sorted by vacancy count, including distribution and performance metrics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/source-tracking")
+        >>> response.json()
+        {
+            "sources": [
+                {
+                    "source_name": "LinkedIn",
+                    "vacancy_count": 156,
+                    "percentage": 0.312,
+                    "average_time_to_fill": 28.5
+                },
+                {
+                    "source_name": "Indeed",
+                    "vacancy_count": 98,
+                    "percentage": 0.196,
+                    "average_time_to_fill": 32.0
+                },
+                {
+                    "source_name": "Referral",
+                    "vacancy_count": 87,
+                    "percentage": 0.174,
+                    "average_time_to_fill": 21.0
+                },
+                {
+                    "source_name": "Company Website",
+                    "vacancy_count": 72,
+                    "percentage": 0.144,
+                    "average_time_to_fill": 35.5
+                },
+                {
+                    "source_name": "Recruitment Agency",
+                    "vacancy_count": 54,
+                    "percentage": 0.108,
+                    "average_time_to_fill": 24.0
+                },
+                {
+                    "source_name": "Other",
+                    "vacancy_count": 33,
+                    "percentage": 0.066,
+                    "average_time_to_fill": 38.0
+                }
+            ],
+            "total_vacancies": 500
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching source tracking - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These represent typical vacancy sources with realistic distribution and time-to-fill metrics
+        response_data = {
+            "sources": [
+                {
+                    "source_name": "LinkedIn",
+                    "vacancy_count": 156,
+                    "percentage": 0.312,
+                    "average_time_to_fill": 28.5,
+                },
+                {
+                    "source_name": "Indeed",
+                    "vacancy_count": 98,
+                    "percentage": 0.196,
+                    "average_time_to_fill": 32.0,
+                },
+                {
+                    "source_name": "Referral",
+                    "vacancy_count": 87,
+                    "percentage": 0.174,
+                    "average_time_to_fill": 21.0,
+                },
+                {
+                    "source_name": "Company Website",
+                    "vacancy_count": 72,
+                    "percentage": 0.144,
+                    "average_time_to_fill": 35.5,
+                },
+                {
+                    "source_name": "Recruitment Agency",
+                    "vacancy_count": 54,
+                    "percentage": 0.108,
+                    "average_time_to_fill": 24.0,
+                },
+                {
+                    "source_name": "Other",
+                    "vacancy_count": 33,
+                    "percentage": 0.066,
+                    "average_time_to_fill": 38.0,
+                },
+            ],
+            "total_vacancies": 500,
+        }
+
+        logger.info("Source tracking data retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving source tracking: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve source tracking: {str(e)}",
         ) from e
