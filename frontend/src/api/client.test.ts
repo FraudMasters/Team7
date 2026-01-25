@@ -12,6 +12,12 @@ import type {
   AnalysisResponse,
   MatchResponse,
   HealthResponse,
+  ComparisonCreate,
+  ComparisonUpdate,
+  ComparisonResponse,
+  ComparisonListResponse,
+  CompareMultipleRequest,
+  ComparisonMatrixData,
 } from '@/types/api';
 
 // Mock Axios
@@ -28,6 +34,8 @@ vi.mock('axios', () => ({
       },
       post: vi.fn(),
       get: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
     })),
   },
 }));
@@ -45,6 +53,8 @@ describe('ApiClient', () => {
       },
       post: vi.fn(),
       get: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
     };
 
     // Mock axios.create to return our mock instance
@@ -519,6 +529,359 @@ describe('ApiClient', () => {
       const result = responseHandler(response);
 
       expect(result.config.metadata.duration).toBeGreaterThanOrEqual(999);
+    });
+  });
+
+  describe('Comparisons', () => {
+    describe('createComparison', () => {
+      it('should create a comparison successfully', async () => {
+        const mockRequest: ComparisonCreate = {
+          vacancy_id: 'vacancy-123',
+          resume_ids: ['resume1', 'resume2', 'resume3'],
+          name: 'Senior Developer Candidates',
+          filters: { min_match_percentage: 50 },
+          created_by: 'user-123',
+        };
+
+        const mockResponse: ComparisonResponse = {
+          id: 'comp-123',
+          vacancy_id: 'vacancy-123',
+          resume_ids: ['resume1', 'resume2', 'resume3'],
+          name: 'Senior Developer Candidates',
+          filters: { min_match_percentage: 50 },
+          created_by: 'user-123',
+          shared_with: undefined,
+          created_at: '2024-01-25T00:00:00Z',
+          updated_at: '2024-01-25T00:00:00Z',
+        };
+
+        mockAxiosInstance.post.mockResolvedValue({ data: mockResponse });
+
+        const result = await apiClient.createComparison(mockRequest);
+
+        expect(result).toEqual(mockResponse);
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+          '/api/comparisons/',
+          mockRequest
+        );
+      });
+
+      it('should handle creation error', async () => {
+        const error = {
+          response: {
+            status: 422,
+            data: { detail: 'At least 2 resumes required' },
+          },
+        };
+
+        mockAxiosInstance.post.mockRejectedValue(error);
+
+        await expect(
+          apiClient.createComparison({
+            vacancy_id: 'vacancy-123',
+            resume_ids: ['resume1'],
+          })
+        ).rejects.toEqual({
+          detail: 'At least 2 resumes required',
+          status: 422,
+        });
+      });
+    });
+
+    describe('listComparisons', () => {
+      it('should list comparisons with filters', async () => {
+        const mockResponse: ComparisonListResponse = {
+          comparisons: [
+            {
+              id: 'comp-1',
+              vacancy_id: 'vacancy-123',
+              resume_ids: ['resume1', 'resume2'],
+              created_at: '2024-01-25T00:00:00Z',
+              updated_at: '2024-01-25T00:00:00Z',
+            },
+          ],
+          total_count: 1,
+          filters_applied: {
+            vacancy_id: 'vacancy-123',
+            min_match_percentage: 50,
+            sort_by: 'match_percentage',
+            order: 'desc',
+          },
+        };
+
+        mockAxiosInstance.get.mockResolvedValue({ data: mockResponse });
+
+        const result = await apiClient.listComparisons(
+          'vacancy-123',
+          undefined,
+          50,
+          90,
+          'match_percentage',
+          'desc',
+          10,
+          0
+        );
+
+        expect(result).toEqual(mockResponse);
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/comparisons/', {
+          params: expect.objectContaining({
+            vacancy_id: 'vacancy-123',
+            min_match_percentage: 50,
+            max_match_percentage: 90,
+            sort_by: 'match_percentage',
+            order: 'desc',
+            limit: 10,
+            offset: 0,
+          }),
+        });
+      });
+
+      it('should handle list error', async () => {
+        const error = {
+          response: {
+            status: 500,
+            data: { detail: 'Database query failed' },
+          },
+        };
+
+        mockAxiosInstance.get.mockRejectedValue(error);
+
+        await expect(apiClient.listComparisons()).rejects.toEqual({
+          detail: 'Database query failed',
+          status: 500,
+        });
+      });
+    });
+
+    describe('getComparison', () => {
+      it('should get a comparison by ID', async () => {
+        const mockResponse: ComparisonResponse = {
+          id: 'comp-123',
+          vacancy_id: 'vacancy-123',
+          resume_ids: ['resume1', 'resume2'],
+          name: 'Test Comparison',
+          created_at: '2024-01-25T00:00:00Z',
+          updated_at: '2024-01-25T00:00:00Z',
+        };
+
+        mockAxiosInstance.get.mockResolvedValue({ data: mockResponse });
+
+        const result = await apiClient.getComparison('comp-123');
+
+        expect(result).toEqual(mockResponse);
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+          '/api/comparisons/comp-123'
+        );
+      });
+
+      it('should handle not found error', async () => {
+        const error = {
+          response: {
+            status: 404,
+            data: { detail: 'Comparison not found' },
+          },
+        };
+
+        mockAxiosInstance.get.mockRejectedValue(error);
+
+        await expect(apiClient.getComparison('invalid-id')).rejects.toEqual({
+          detail: 'Comparison not found',
+          status: 404,
+        });
+      });
+    });
+
+    describe('updateComparison', () => {
+      it('should update a comparison successfully', async () => {
+        const mockRequest: ComparisonUpdate = {
+          name: 'Updated Comparison Name',
+          filters: { min_match_percentage: 60 },
+        };
+
+        const mockResponse: ComparisonResponse = {
+          id: 'comp-123',
+          vacancy_id: 'vacancy-123',
+          resume_ids: ['resume1', 'resume2'],
+          name: 'Updated Comparison Name',
+          filters: { min_match_percentage: 60 },
+          created_at: '2024-01-25T00:00:00Z',
+          updated_at: '2024-01-25T01:00:00Z',
+        };
+
+        mockAxiosInstance.put.mockResolvedValue({ data: mockResponse });
+
+        const result = await apiClient.updateComparison('comp-123', mockRequest);
+
+        expect(result).toEqual(mockResponse);
+        expect(mockAxiosInstance.put).toHaveBeenCalledWith(
+          '/api/comparisons/comp-123',
+          mockRequest
+        );
+      });
+
+      it('should handle update error', async () => {
+        const error = {
+          response: {
+            status: 404,
+            data: { detail: 'Comparison not found' },
+          },
+        };
+
+        mockAxiosInstance.put.mockRejectedValue(error);
+
+        await expect(
+          apiClient.updateComparison('invalid-id', { name: 'New Name' })
+        ).rejects.toEqual({
+          detail: 'Comparison not found',
+          status: 404,
+        });
+      });
+    });
+
+    describe('deleteComparison', () => {
+      it('should delete a comparison successfully', async () => {
+        mockAxiosInstance.delete.mockResolvedValue({});
+
+        await expect(apiClient.deleteComparison('comp-123')).resolves.toBeUndefined();
+        expect(mockAxiosInstance.delete).toHaveBeenCalledWith(
+          '/api/comparisons/comp-123'
+        );
+      });
+
+      it('should handle delete error', async () => {
+        const error = {
+          response: {
+            status: 404,
+            data: { detail: 'Comparison not found' },
+          },
+        };
+
+        mockAxiosInstance.delete.mockRejectedValue(error);
+
+        await expect(apiClient.deleteComparison('invalid-id')).rejects.toEqual({
+          detail: 'Comparison not found',
+          status: 404,
+        });
+      });
+    });
+
+    describe('compareMultipleResumes', () => {
+      it('should compare multiple resumes successfully', async () => {
+        const mockRequest: CompareMultipleRequest = {
+          vacancy_id: 'vacancy-123',
+          resume_ids: ['resume1', 'resume2', 'resume3'],
+        };
+
+        const mockResponse: ComparisonMatrixData = {
+          vacancy_title: 'Java Developer',
+          comparison_results: [
+            {
+              rank: 1,
+              resume_id: 'resume1',
+              vacancy_title: 'Java Developer',
+              match_percentage: 85.5,
+              required_skills_match: [],
+              additional_skills_match: [],
+              experience_verification: null,
+              processing_time_ms: 150.5,
+            },
+            {
+              rank: 2,
+              resume_id: 'resume2',
+              vacancy_title: 'Java Developer',
+              match_percentage: 72.0,
+              required_skills_match: [],
+              additional_skills_match: [],
+              experience_verification: null,
+              processing_time_ms: 145.2,
+            },
+            {
+              rank: 3,
+              resume_id: 'resume3',
+              vacancy_title: 'Java Developer',
+              match_percentage: 65.0,
+              required_skills_match: [],
+              additional_skills_match: [],
+              experience_verification: null,
+              processing_time_ms: 155.0,
+            },
+          ],
+          total_resumes: 3,
+          processing_time_ms: 450.7,
+        };
+
+        mockAxiosInstance.post.mockResolvedValue({ data: mockResponse });
+
+        const result = await apiClient.compareMultipleResumes(mockRequest);
+
+        expect(result).toEqual(mockResponse);
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+          '/api/comparisons/compare-multiple',
+          mockRequest
+        );
+      });
+
+      it('should handle comparison error with too few resumes', async () => {
+        const error = {
+          response: {
+            status: 422,
+            data: { detail: 'At least 2 resumes must be provided' },
+          },
+        };
+
+        mockAxiosInstance.post.mockRejectedValue(error);
+
+        await expect(
+          apiClient.compareMultipleResumes({
+            vacancy_id: 'vacancy-123',
+            resume_ids: ['resume1'],
+          })
+        ).rejects.toEqual({
+          detail: 'At least 2 resumes must be provided',
+          status: 422,
+        });
+      });
+
+      it('should handle comparison error with too many resumes', async () => {
+        const error = {
+          response: {
+            status: 422,
+            data: { detail: 'Maximum 5 resumes can be compared at once' },
+          },
+        };
+
+        mockAxiosInstance.post.mockRejectedValue(error);
+
+        const resumeIds = Array.from({ length: 6 }, (_, i) => `resume${i}`);
+
+        await expect(
+          apiClient.compareMultipleResumes({
+            vacancy_id: 'vacancy-123',
+            resume_ids: resumeIds,
+          })
+        ).rejects.toEqual({
+          detail: 'Maximum 5 resumes can be compared at once',
+          status: 422,
+        });
+      });
+
+      it('should handle network error during comparison', async () => {
+        const error = {
+          code: 'ECONNABORTED',
+        };
+
+        mockAxiosInstance.post.mockRejectedValue(error);
+
+        await expect(
+          apiClient.compareMultipleResumes({
+            vacancy_id: 'vacancy-123',
+            resume_ids: ['resume1', 'resume2'],
+          })
+        ).rejects.toEqual({
+          detail: 'Request timeout. Please check your connection and try again.',
+          status: 408,
+        });
+      });
     });
   });
 });
