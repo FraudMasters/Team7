@@ -231,11 +231,12 @@ async def root() -> JSONResponse:
 
 
 # Include API routers
-from .api import resumes, analysis, matching
+from .api import resumes, analysis, matching, skill_taxonomies
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(analysis.router, prefix="/api/resumes", tags=["Analysis"])
 app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
+app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags=["Skill Taxonomies"])
 
 
 if __name__ == "__main__":
