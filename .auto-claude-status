@@ -3,23 +3,23 @@
   "spec": "009-advanced-skill-synonym-context-matching",
   "state": "building",
   "subtasks": {
-    "completed": 5,
-    "total": 26,
-    "in_progress": 1,
+    "completed": 7,
+    "total": 30,
+    "in_progress": 0,
     "failed": 0
   },
   "phase": {
-    "current": "Data Foundation",
-    "id": null,
-    "total": 6
+    "current": "Enhanced Core Matching",
+    "id": "phase-2-core-matching",
+    "total": 5
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 7,
+    "number": 8,
     "started_at": "2026-01-25T16:02:23.539445"
   },
-  "last_update": "2026-01-25T16:48:44.763804"
+  "last_update": "2026-01-25T17:15:00.000000"
 }
