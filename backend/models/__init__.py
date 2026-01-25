@@ -10,6 +10,7 @@ from .skill_taxonomy import SkillTaxonomy
 from .custom_synonyms import CustomSynonym
 from .skill_feedback import SkillFeedback
 from .ml_model_version import MLModelVersion
+from .user_preferences import UserPreferences
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "CustomSynonym",
     "SkillFeedback",
     "MLModelVersion",
+    "UserPreferences",
 ]
