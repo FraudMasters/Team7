@@ -42,6 +42,9 @@ from .taxonomy_loader import (
 from .model_versioning import (
     ModelVersionManager,
 )
+from .accuracy_benchmark import (
+    AccuracyBenchmark,
+)
 
 __all__ = [
     "extract_keywords",
@@ -64,4 +67,5 @@ __all__ = [
     "EnhancedSkillMatcher",
     "TaxonomyLoader",
     "ModelVersionManager",
+    "AccuracyBenchmark",
 ]
