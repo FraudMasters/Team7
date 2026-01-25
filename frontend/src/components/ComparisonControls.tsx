@@ -23,6 +23,7 @@ import {
   RestartAlt as ResetIcon,
   Save as SaveIcon,
   Share as ShareIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 
 /**
@@ -42,6 +43,41 @@ interface ComparisonSort {
 }
 
 /**
+ * Individual skill match interface
+ */
+interface SkillMatch {
+  skill: string;
+  matched: boolean;
+  highlight: 'green' | 'red';
+}
+
+/**
+ * Individual resume comparison result
+ */
+interface ResumeComparisonResult {
+  resume_id: string;
+  match_percentage: number;
+  matched_skills: SkillMatch[];
+  missing_skills: SkillMatch[];
+  experience_verification?: Array<{
+    skill: string;
+    total_months: number;
+    required_months: number;
+    meets_requirement: boolean;
+  }>;
+  overall_match: boolean;
+}
+
+/**
+ * Comparison data interface
+ */
+interface ComparisonData {
+  vacancy_id: string;
+  comparisons: ResumeComparisonResult[];
+  all_unique_skills: string[];
+}
+
+/**
  * ComparisonControls Component Props
  */
 interface ComparisonControlsProps {
@@ -57,6 +93,10 @@ interface ComparisonControlsProps {
   onSave?: () => void;
   /** Callback when share is clicked */
   onShare?: () => void;
+  /** Callback when export is clicked */
+  onExport?: () => void;
+  /** Comparison data for export */
+  comparisonData?: ComparisonData | null;
   /** Initial filter values */
   initialFilters?: ComparisonFilters;
   /** Initial sort values */
@@ -67,6 +107,8 @@ interface ComparisonControlsProps {
   minResumes?: number;
   /** Show save/share buttons */
   showSaveActions?: boolean;
+  /** Show export button */
+  showExport?: boolean;
   /** Disabled state */
   disabled?: boolean;
 }
@@ -78,6 +120,7 @@ interface ComparisonControlsProps {
  * - Add/remove resumes from comparison
  * - Filter by match percentage range
  * - Sort by different fields and orders
+ * - Export comparison data to Excel (CSV format)
  * - Save and share comparison views
  * - Reset to defaults
  *
@@ -88,6 +131,8 @@ interface ComparisonControlsProps {
  *   onResumeIdsChange={(ids) => console.log('Resume IDs:', ids)}
  *   onFiltersChange={(filters) => console.log('Filters:', filters)}
  *   onSortChange={(sort) => console.log('Sort:', sort)}
+ *   comparisonData={comparisonData}
+ *   onExport={() => console.log('Export clicked')}
  * />
  * ```
  */
@@ -98,11 +143,14 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
   onSortChange,
   onSave,
   onShare,
+  onExport,
+  comparisonData,
   initialFilters = { min_match_percentage: 0, max_match_percentage: 100 },
   initialSort = { field: 'match_percentage', order: 'desc' },
   maxResumes = 5,
   minResumes = 2,
   showSaveActions = true,
+  showExport = true,
   disabled = false,
 }) => {
   const [filters, setFilters] = useState<ComparisonFilters>(initialFilters);
@@ -221,6 +269,107 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
   const handleShare = useCallback(() => {
     onShare?.();
   }, [onShare]);
+
+  /**
+   * Handle export to Excel (CSV format)
+   */
+  const handleExport = useCallback(() => {
+    // If custom export handler provided, use it
+    if (onExport) {
+      onExport();
+      return;
+    }
+
+    // Default export implementation using comparison data
+    if (!comparisonData || !comparisonData.comparisons || comparisonData.comparisons.length === 0) {
+      return;
+    }
+
+    try {
+      // Create CSV content
+      const csvRows: string[] = [];
+
+      // Add header with metadata
+      csvRows.push(`Resume Comparison Report,Vacancy ID,${comparisonData.vacancy_id}`);
+      csvRows.push(`Generated,${new Date().toLocaleString()}`);
+      csvRows.push('');
+
+      // Add summary section
+      csvRows.push('SUMMARY');
+      csvRows.push('Rank,Resume ID,Match %,Matched Skills,Missing Skills,Overall Match');
+
+      const sortedComparisons = [...comparisonData.comparisons].sort(
+        (a, b) => b.match_percentage - a.match_percentage
+      );
+
+      sortedComparisons.forEach((comparison, index) => {
+        const matchedSkills = comparison.matched_skills.map((s) => s.skill).join('; ');
+        const missingSkills = comparison.missing_skills.map((s) => s.skill).join('; ');
+        csvRows.push(
+          `${index + 1},"${comparison.resume_id}",${comparison.match_percentage.toFixed(1)}%,"${matchedSkills}","${missingSkills}","${comparison.overall_match ? 'Yes' : 'No'}"`
+        );
+      });
+
+      csvRows.push('');
+
+      // Add skills matrix
+      csvRows.push('SKILLS MATRIX');
+      const headerRow = ['Skill', ...sortedComparisons.map((c) => `"${c.resume_id} (${c.match_percentage.toFixed(0)}%)"`)];
+      csvRows.push(headerRow.join(','));
+
+      comparisonData.all_unique_skills.forEach((skill) => {
+        const row = [`"${skill}"`];
+        sortedComparisons.forEach((comparison) => {
+          const hasSkill = comparison.matched_skills.some((s) => s.skill === skill);
+          row.push(hasSkill ? '✓' : '✗');
+        });
+        csvRows.push(row.join(','));
+      });
+
+      csvRows.push('');
+
+      // Add experience verification if available
+      const hasExperienceData = sortedComparisons.some(
+        (c) => c.experience_verification && c.experience_verification.length > 0
+      );
+
+      if (hasExperienceData) {
+        csvRows.push('EXPERIENCE VERIFICATION');
+        csvRows.push('Resume ID,Skill,Required Months,Total Months,Meets Requirement');
+
+        sortedComparisons.forEach((comparison) => {
+          if (comparison.experience_verification && comparison.experience_verification.length > 0) {
+            comparison.experience_verification.forEach((exp) => {
+              csvRows.push(
+                `"${comparison.resume_id}","${exp.skill}",${exp.required_months},${exp.total_months},"${exp.meets_requirement ? 'Yes' : 'No'}"`
+              );
+            });
+          }
+        });
+      }
+
+      // Create blob and download
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute('href', url);
+      link.setAttribute(
+        'download',
+        `resume-comparison-${comparisonData.vacancy_id}-${new Date().getTime()}.csv`
+      );
+      link.style.visibility = 'hidden';
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      // Silently handle export errors
+      // In production, you might want to show a toast notification
+    }
+  }, [comparisonData, onExport]);
 
   /**
    * Handle key press in resume ID input
@@ -434,6 +583,20 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
           >
             Reset All
           </Button>
+
+          {/* Export Button */}
+          {showExport && (
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleExport}
+              disabled={disabled || !isValidRange || (!comparisonData && !onExport)}
+              color="info"
+            >
+              Export to Excel
+            </Button>
+          )}
 
           {/* Save Button */}
           {showSaveActions && onSave && (
