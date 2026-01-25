@@ -9,7 +9,7 @@ import logging
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -77,6 +77,14 @@ class PDFExportResponse(BaseModel):
     report_id: str = Field(..., description="Report identifier")
     download_url: str = Field(..., description="URL to download the generated PDF")
     expires_at: str = Field(..., description="Expiration timestamp for download link")
+
+
+class CSVExportRequest(BaseModel):
+    """Request model for exporting analytics data to CSV."""
+
+    metrics: List[str] = Field(..., description="List of metrics to export (e.g., time_to_hire, resumes_processed, match_rates)")
+    filters: Dict = Field(default_factory=dict, description="Filters to apply to the data (e.g., date range, sources)")
+    format: Optional[str] = Field("standard", description="CSV format variant (e.g., standard, detailed)")
 
 
 @router.post(
@@ -491,4 +499,101 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate PDF: {str(e)}",
+        ) from e
+
+
+@router.post("/export/csv", tags=["Reports"])
+async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
+    """
+    Export analytics data to CSV format.
+
+    This endpoint generates a CSV file from analytics metrics and filters,
+    returning the file directly for download.
+
+    Args:
+        request: CSV export request with metrics and filters
+
+    Returns:
+        StreamingResponse with CSV file content
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If CSV generation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "metrics": ["time_to_hire", "resumes_processed"],
+        ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"}
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/reports/export/csv",
+        ...     json=data
+        ... )
+        >>> with open("report.csv", "wb") as f:
+        ...     f.write(response.content)
+    """
+    try:
+        logger.info(f"Generating CSV for metrics: {request.metrics}")
+
+        # Validate metrics list
+        if not request.metrics or len(request.metrics) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one metric must be provided",
+            )
+
+        # Generate CSV content
+        # For now, generate a placeholder CSV with sample data
+        # Actual data fetching will be added in a later subtask when database is integrated
+        import io
+        csv_buffer = io.StringIO()
+
+        # Write CSV header
+        header = ["metric", "value", "date"]
+        csv_buffer.write(",".join(header) + "\n")
+
+        # Write sample data rows based on requested metrics
+        from datetime import datetime, timedelta
+        sample_data = {
+            "time_to_hire": {"value": "15 days", "unit": "days"},
+            "resumes_processed": {"value": "150", "unit": "count"},
+            "match_rates": {"value": "85%", "unit": "percentage"},
+            "interviews_scheduled": {"value": "25", "unit": "count"},
+            "offers_extended": {"value": "10", "unit": "count"},
+            "offers_accepted": {"value": "8", "unit": "count"},
+        }
+
+        # Generate a row for each metric with today's date
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        for metric in request.metrics:
+            if metric in sample_data:
+                row = [metric, sample_data[metric]["value"], today]
+                csv_buffer.write(",".join(row) + "\n")
+            else:
+                row = [metric, "N/A", today]
+                csv_buffer.write(",".join(row) + "\n")
+
+        csv_content = csv_buffer.getvalue()
+        csv_buffer.close()
+
+        logger.info(f"CSV generated successfully for metrics: {request.metrics}")
+
+        # Return as downloadable CSV file
+        return StreamingResponse(
+            io.BytesIO(csv_content.encode("utf-8")),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=analytics_export.csv",
+                "Content-Type": "text/csv; charset=utf-8",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating CSV: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate CSV: {str(e)}",
         ) from e
