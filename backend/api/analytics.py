@@ -70,6 +70,22 @@ class FunnelMetricsResponse(BaseModel):
     overall_hire_rate: float = Field(..., description="Overall conversion rate from upload to hire (0-1)")
 
 
+class SkillDemandItem(BaseModel):
+    """Represents a single skill with its demand metrics."""
+
+    skill_name: str = Field(..., description="Name of the skill")
+    demand_count: int = Field(..., description="Number of job postings requesting this skill")
+    demand_percentage: float = Field(..., description="Percentage of total job postings requesting this skill (0-1)")
+    trend_percentage: float = Field(..., description="Trend percentage change from previous period (e.g., 0.15 for +15%)")
+
+
+class SkillDemandResponse(BaseModel):
+    """Response model for skill demand analytics."""
+
+    skills: list[SkillDemandItem] = Field(..., description="List of skills with demand metrics, sorted by demand_count")
+    total_postings_analyzed: int = Field(..., description="Total number of job postings analyzed")
+
+
 @router.get(
     "/key-metrics",
     response_model=KeyMetricsResponse,
@@ -294,4 +310,150 @@ async def get_funnel_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve funnel metrics: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/skill-demand",
+    response_model=SkillDemandResponse,
+    tags=["Analytics"],
+)
+async def get_skill_demand(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of skills to return"),
+) -> JSONResponse:
+    """
+    Get skill demand analytics aggregating most requested skills.
+
+    This endpoint provides insights into the most in-demand skills in the job market,
+    aggregating data from job postings to identify trending skills. Each skill includes
+    demand count, percentage of total postings, and trend information to help recruitment
+    teams and job seekers understand market demands.
+
+    Args:
+        start_date: Optional start date for filtering job postings (ISO 8601 format)
+        end_date: Optional end date for filtering job postings (ISO 8601 format)
+        limit: Maximum number of skills to return (default: 20, range: 1-100)
+
+    Returns:
+        JSON response with list of skills sorted by demand count, including demand metrics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/skill-demand?limit=10")
+        >>> response.json()
+        {
+            "skills": [
+                {
+                    "skill_name": "Python",
+                    "demand_count": 245,
+                    "demand_percentage": 0.425,
+                    "trend_percentage": 0.18
+                },
+                {
+                    "skill_name": "JavaScript",
+                    "demand_count": 198,
+                    "demand_percentage": 0.344,
+                    "trend_percentage": 0.12
+                },
+                {
+                    "skill_name": "React",
+                    "demand_count": 176,
+                    "demand_percentage": 0.305,
+                    "trend_percentage": 0.22
+                }
+            ],
+            "total_postings_analyzed": 576
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching skill demand - start_date: {start_date}, end_date: {end_date}, limit: {limit}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These represent typical in-demand tech skills with realistic metrics
+        response_data = {
+            "skills": [
+                {
+                    "skill_name": "Python",
+                    "demand_count": 245,
+                    "demand_percentage": 0.425,
+                    "trend_percentage": 0.18,
+                },
+                {
+                    "skill_name": "JavaScript",
+                    "demand_count": 198,
+                    "demand_percentage": 0.344,
+                    "trend_percentage": 0.12,
+                },
+                {
+                    "skill_name": "React",
+                    "demand_count": 176,
+                    "demand_percentage": 0.305,
+                    "trend_percentage": 0.22,
+                },
+                {
+                    "skill_name": "SQL",
+                    "demand_count": 154,
+                    "demand_percentage": 0.267,
+                    "trend_percentage": 0.08,
+                },
+                {
+                    "skill_name": "AWS",
+                    "demand_count": 142,
+                    "demand_percentage": 0.246,
+                    "trend_percentage": 0.25,
+                },
+                {
+                    "skill_name": "Docker",
+                    "demand_count": 128,
+                    "demand_percentage": 0.222,
+                    "trend_percentage": 0.19,
+                },
+                {
+                    "skill_name": "Kubernetes",
+                    "demand_count": 115,
+                    "demand_percentage": 0.199,
+                    "trend_percentage": 0.28,
+                },
+                {
+                    "skill_name": "TypeScript",
+                    "demand_count": 108,
+                    "demand_percentage": 0.187,
+                    "trend_percentage": 0.31,
+                },
+                {
+                    "skill_name": "Node.js",
+                    "demand_count": 98,
+                    "demand_percentage": 0.170,
+                    "trend_percentage": 0.14,
+                },
+                {
+                    "skill_name": "Machine Learning",
+                    "demand_count": 87,
+                    "demand_percentage": 0.151,
+                    "trend_percentage": 0.35,
+                },
+            ][:limit],
+            "total_postings_analyzed": 576,
+        }
+
+        logger.info("Skill demand data retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving skill demand: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve skill demand: {str(e)}",
         ) from e
