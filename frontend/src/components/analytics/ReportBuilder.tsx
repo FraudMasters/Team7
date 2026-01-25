@@ -21,6 +21,10 @@ import {
   Chip,
   FormControlLabel,
   Switch,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,6 +41,8 @@ import {
   Description as ReportIcon,
   PictureAsPdf as PdfIcon,
   Download as DownloadIcon,
+  Schedule as ScheduleIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 
 /**
@@ -99,6 +105,37 @@ interface ReportFormData {
   name: string;
   description: string;
   is_public: boolean;
+}
+
+/**
+ * Schedule configuration for scheduled reports
+ */
+interface ScheduleConfig {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  day_of_week?: number; // 0-6 (Sunday-Saturday) for weekly
+  day_of_month?: number; // 1-31 for monthly
+  hour: number; // 0-23
+  minute: number; // 0-59
+}
+
+/**
+ * Delivery configuration for scheduled reports
+ */
+interface DeliveryConfig {
+  format: 'pdf' | 'csv' | 'both';
+  include_charts: boolean;
+  include_summary: boolean;
+}
+
+/**
+ * Form data for scheduled reports
+ */
+interface ScheduledReportFormData {
+  name: string;
+  schedule_config: ScheduleConfig;
+  delivery_config: DeliveryConfig;
+  recipients: string[];
+  is_active: boolean;
 }
 
 /**
@@ -205,6 +242,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -217,6 +255,27 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
     description: '',
     is_public: false,
   });
+
+  // Scheduled report form state
+  const [scheduleFormData, setScheduleFormData] = useState<ScheduledReportFormData>({
+    name: '',
+    schedule_config: {
+      frequency: 'weekly',
+      day_of_week: 1, // Monday
+      hour: 9,
+      minute: 0,
+    },
+    delivery_config: {
+      format: 'pdf',
+      include_charts: true,
+      include_summary: true,
+    },
+    recipients: [],
+    is_active: true,
+  });
+
+  // Recipient input for scheduled reports
+  const [recipientEmail, setRecipientEmail] = useState('');
 
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -338,6 +397,35 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
       is_public: false,
     });
     setSaveDialogOpen(true);
+    setError(null);
+  };
+
+  /**
+   * Open schedule dialog
+   */
+  const handleScheduleClick = () => {
+    if (selectedMetrics.length === 0) {
+      setError('Please select at least one metric before scheduling');
+      return;
+    }
+    setScheduleFormData({
+      name: '',
+      schedule_config: {
+        frequency: 'weekly',
+        day_of_week: 1,
+        hour: 9,
+        minute: 0,
+      },
+      delivery_config: {
+        format: 'pdf',
+        include_charts: true,
+        include_summary: true,
+      },
+      recipients: [],
+      is_active: true,
+    });
+    setRecipientEmail('');
+    setScheduleDialogOpen(true);
     setError(null);
   };
 
@@ -615,6 +703,113 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   };
 
   /**
+   * Add recipient email to scheduled report
+   */
+  const handleAddRecipient = () => {
+    const email = recipientEmail.trim();
+    if (!email) return;
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (scheduleFormData.recipients.includes(email)) {
+      setError('Email already added');
+      return;
+    }
+
+    setScheduleFormData({
+      ...scheduleFormData,
+      recipients: [...scheduleFormData.recipients, email],
+    });
+    setRecipientEmail('');
+    setError(null);
+  };
+
+  /**
+   * Remove recipient email from scheduled report
+   */
+  const handleRemoveRecipient = (email: string) => {
+    setScheduleFormData({
+      ...scheduleFormData,
+      recipients: scheduleFormData.recipients.filter((r) => r !== email),
+    });
+  };
+
+  /**
+   * Submit scheduled report form
+   */
+  const handleSubmitSchedule = async () => {
+    if (scheduleFormData.recipients.length === 0) {
+      setError('Please add at least one recipient');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const reportData: ReportData = {
+        metrics: selectedMetrics.map((m) => m.id),
+        filters: {},
+      };
+
+      const response = await fetch('http://localhost:8000/api/reports/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: scheduleFormData.name,
+          organization_id: organizationId,
+          report_id: editingReport?.id || null,
+          configuration: {
+            metrics: reportData.metrics,
+            filters: reportData.filters,
+          },
+          schedule_config: scheduleFormData.schedule_config,
+          delivery_config: scheduleFormData.delivery_config,
+          recipients: scheduleFormData.recipients,
+          is_active: scheduleFormData.is_active,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create scheduled report: ${response.statusText}`);
+      }
+
+      const created = await response.json();
+
+      setScheduleDialogOpen(false);
+      setScheduleFormData({
+        name: '',
+        schedule_config: {
+          frequency: 'weekly',
+          day_of_week: 1,
+          hour: 9,
+          minute: 0,
+        },
+        delivery_config: {
+          format: 'pdf',
+          include_charts: true,
+          include_summary: true,
+        },
+        recipients: [],
+        is_active: true,
+      });
+      setRecipientEmail('');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create scheduled report';
+      setError(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
    * Get category color
    */
   const getCategoryColor = (category: string) => {
@@ -707,6 +902,15 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
           </Button>
           <Button variant="outlined" startIcon={<OpenIcon />} onClick={handleLoadClick}>
             Load Report
+          </Button>
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<ScheduleIcon />}
+            onClick={handleScheduleClick}
+            disabled={selectedMetrics.length === 0}
+          >
+            Schedule Report
           </Button>
           <Button
             variant="outlined"
@@ -1116,6 +1320,348 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
             startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
           >
             {submitting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Schedule Report Dialog */}
+      <Dialog
+        open={scheduleDialogOpen}
+        onClose={() => !submitting && setScheduleDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ScheduleIcon color="success" />
+              <Typography variant="h6">Schedule Email Delivery</Typography>
+            </Box>
+            <IconButton
+              onClick={() => setScheduleDialogOpen(false)}
+              disabled={submitting}
+              size="small"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            {/* Schedule Name */}
+            <TextField
+              label="Schedule Name"
+              fullWidth
+              required
+              value={scheduleFormData.name}
+              onChange={(e) =>
+                setScheduleFormData({ ...scheduleFormData, name: e.target.value })
+              }
+              placeholder="e.g., Weekly Analytics Report"
+              disabled={submitting}
+            />
+
+            {/* Schedule Configuration */}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                Schedule Configuration
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Frequency</InputLabel>
+                    <Select
+                      value={scheduleFormData.schedule_config.frequency}
+                      onChange={(e) =>
+                        setScheduleFormData({
+                          ...scheduleFormData,
+                          schedule_config: {
+                            ...scheduleFormData.schedule_config,
+                            frequency: e.target.value as 'daily' | 'weekly' | 'monthly',
+                          },
+                        })
+                      }
+                      label="Frequency"
+                      disabled={submitting}
+                    >
+                      <MenuItem value="daily">Daily</MenuItem>
+                      <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="monthly">Monthly</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {scheduleFormData.schedule_config.frequency === 'weekly' && (
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Day of Week</InputLabel>
+                      <Select
+                        value={scheduleFormData.schedule_config.day_of_week}
+                        onChange={(e) =>
+                          setScheduleFormData({
+                            ...scheduleFormData,
+                            schedule_config: {
+                              ...scheduleFormData.schedule_config,
+                              day_of_week: e.target.value as number,
+                            },
+                          })
+                        }
+                        label="Day of Week"
+                        disabled={submitting}
+                      >
+                        <MenuItem value={0}>Sunday</MenuItem>
+                        <MenuItem value={1}>Monday</MenuItem>
+                        <MenuItem value={2}>Tuesday</MenuItem>
+                        <MenuItem value={3}>Wednesday</MenuItem>
+                        <MenuItem value={4}>Thursday</MenuItem>
+                        <MenuItem value={5}>Friday</MenuItem>
+                        <MenuItem value={6}>Saturday</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                )}
+
+                {scheduleFormData.schedule_config.frequency === 'monthly' && (
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Day of Month</InputLabel>
+                      <Select
+                        value={scheduleFormData.schedule_config.day_of_month}
+                        onChange={(e) =>
+                          setScheduleFormData({
+                            ...scheduleFormData,
+                            schedule_config: {
+                              ...scheduleFormData.schedule_config,
+                              day_of_month: e.target.value as number,
+                            },
+                          })
+                        }
+                        label="Day of Month"
+                        disabled={submitting}
+                      >
+                        {Array.from({ length: 28 }, (_, i) => (
+                          <MenuItem key={i + 1} value={i + 1}>
+                            {i + 1}
+                            {i === 0 && 'st'}
+                            {i === 1 && 'nd'}
+                            {i === 2 && 'rd'}
+                            {i > 2 && 'th'}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                )}
+
+                <Grid item xs={6} sm={3}>
+                  <TextField
+                    label="Hour"
+                    type="number"
+                    fullWidth
+                    InputProps={{
+                      inputProps: { min: 0, max: 23 },
+                    }}
+                    value={scheduleFormData.schedule_config.hour}
+                    onChange={(e) =>
+                      setScheduleFormData({
+                        ...scheduleFormData,
+                        schedule_config: {
+                          ...scheduleFormData.schedule_config,
+                          hour: parseInt(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    disabled={submitting}
+                  />
+                </Grid>
+
+                <Grid item xs={6} sm={3}>
+                  <TextField
+                    label="Minute"
+                    type="number"
+                    fullWidth
+                    InputProps={{
+                      inputProps: { min: 0, max: 59 },
+                    }}
+                    value={scheduleFormData.schedule_config.minute}
+                    onChange={(e) =>
+                      setScheduleFormData({
+                        ...scheduleFormData,
+                        schedule_config: {
+                          ...scheduleFormData.schedule_config,
+                          minute: parseInt(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    disabled={submitting}
+                  />
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* Delivery Configuration */}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                Delivery Configuration
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Format</InputLabel>
+                    <Select
+                      value={scheduleFormData.delivery_config.format}
+                      onChange={(e) =>
+                        setScheduleFormData({
+                          ...scheduleFormData,
+                          delivery_config: {
+                            ...scheduleFormData.delivery_config,
+                            format: e.target.value as 'pdf' | 'csv' | 'both',
+                          },
+                        })
+                      }
+                      label="Format"
+                      disabled={submitting}
+                    >
+                      <MenuItem value="pdf">PDF</MenuItem>
+                      <MenuItem value="csv">CSV</MenuItem>
+                      <MenuItem value="both">Both PDF and CSV</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+              <Stack spacing={1} sx={{ mt: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={scheduleFormData.delivery_config.include_charts}
+                      onChange={(e) =>
+                        setScheduleFormData({
+                          ...scheduleFormData,
+                          delivery_config: {
+                            ...scheduleFormData.delivery_config,
+                            include_charts: e.target.checked,
+                          },
+                        })
+                      }
+                      disabled={submitting}
+                    />
+                  }
+                  label="Include charts and visualizations"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={scheduleFormData.delivery_config.include_summary}
+                      onChange={(e) =>
+                        setScheduleFormData({
+                          ...scheduleFormData,
+                          delivery_config: {
+                            ...scheduleFormData.delivery_config,
+                            include_summary: e.target.checked,
+                          },
+                        })
+                      }
+                      disabled={submitting}
+                    />
+                  }
+                  label="Include executive summary"
+                />
+              </Stack>
+            </Paper>
+
+            {/* Email Recipients */}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                Email Recipients
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                <TextField
+                  label="Add Email"
+                  fullWidth
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  disabled={submitting}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddRecipient()}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={handleAddRecipient}
+                  disabled={!recipientEmail.trim() || submitting}
+                  startIcon={<AddIcon />}
+                >
+                  Add
+                </Button>
+              </Box>
+              {scheduleFormData.recipients.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    Recipients ({scheduleFormData.recipients.length}):
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                    {scheduleFormData.recipients.map((email) => (
+                      <Chip
+                        key={email}
+                        label={email}
+                        size="small"
+                        onDelete={() => handleRemoveRecipient(email)}
+                        deleteIcon={<CloseIcon />}
+                        icon={<EmailIcon fontSize="small" />}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Paper>
+
+            {/* Active Status */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={scheduleFormData.is_active}
+                  onChange={(e) =>
+                    setScheduleFormData({
+                      ...scheduleFormData,
+                      is_active: e.target.checked,
+                    })
+                  }
+                  disabled={submitting}
+                />
+              }
+              label="Enable this scheduled report"
+            />
+
+            {/* Selected Metrics Summary */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Selected Metrics ({selectedMetrics.length}):
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selectedMetrics.map((metric) => (
+                  <Chip
+                    key={metric.id}
+                    label={metric.name}
+                    size="small"
+                    color={getCategoryColor(metric.category)}
+                    variant="filled"
+                  />
+                ))}
+              </Box>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScheduleDialogOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitSchedule}
+            variant="contained"
+            color="success"
+            disabled={submitting || !scheduleFormData.name}
+            startIcon={submitting ? <CircularProgress size={16} /> : <ScheduleIcon />}
+          >
+            {submitting ? 'Scheduling...' : 'Schedule Report'}
           </Button>
         </DialogActions>
       </Dialog>
