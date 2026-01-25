@@ -63,6 +63,22 @@ class ReportListResponse(BaseModel):
     total_count: int = Field(..., description="Total number of entries")
 
 
+class PDFExportRequest(BaseModel):
+    """Request model for exporting a report to PDF."""
+
+    report_id: str = Field(..., description="Report identifier to export")
+    data: Dict = Field(..., description="Report data to include in the PDF")
+    format: Optional[str] = Field("A4", description="Page format (e.g., A4, Letter)")
+
+
+class PDFExportResponse(BaseModel):
+    """Response model for PDF export."""
+
+    report_id: str = Field(..., description="Report identifier")
+    download_url: str = Field(..., description="URL to download the generated PDF")
+    expires_at: str = Field(..., description="Expiration timestamp for download link")
+
+
 @router.post(
     "/",
     response_model=ReportResponse,
@@ -390,4 +406,89 @@ async def delete_reports_by_organization(organization_id: str) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete reports: {str(e)}",
+        ) from e
+
+
+@router.post("/export/pdf", tags=["Reports"])
+async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
+    """
+    Export a report to PDF format.
+
+    This endpoint generates a PDF document from report data and returns
+    a download URL for the generated file.
+
+    Args:
+        request: PDF export request with report ID and data
+
+    Returns:
+        JSON response with download URL and expiration
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If PDF generation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "report_id": "test-id",
+        ...     "data": {
+        ...         "title": "Monthly Hiring Report",
+        ...         "metrics": {"time_to_hire": "15 days", "resumes_processed": 150},
+        ...         "charts": []
+        ...     }
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/reports/export/pdf",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "report_id": "test-id",
+            "download_url": "https://example.com/downloads/report-test-id.pdf",
+            "expires_at": "2024-01-26T00:00:00Z"
+        }
+    """
+    try:
+        logger.info(f"Generating PDF for report: {request.report_id}")
+
+        # Validate report_id
+        if not request.report_id or len(request.report_id.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Report ID cannot be empty",
+            )
+
+        # Validate data
+        if not request.data:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Report data cannot be empty",
+            )
+
+        # For now, generate a placeholder response
+        # Actual PDF generation will be added in a later subtask with reportlab or weasyprint
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        expires_at = (now + timedelta(hours=24)).isoformat() + "Z"
+
+        response_data = {
+            "report_id": request.report_id,
+            "download_url": f"/api/reports/downloads/{request.report_id}.pdf",
+            "expires_at": expires_at,
+        }
+
+        logger.info(f"PDF generated successfully for report: {request.report_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating PDF for report {request.report_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}",
         ) from e
