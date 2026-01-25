@@ -5,6 +5,8 @@ import HomePage from '@pages/Home';
 import UploadPage from '@pages/Upload';
 import ResultsPage from '@pages/Results';
 import ComparePage from '@pages/Compare';
+import AdminSynonymsPage from '@pages/AdminSynonyms';
+import AdminAnalyticsPage from '@pages/AdminAnalytics';
 
 /**
  * Main App Component
@@ -29,6 +31,11 @@ function App() {
 
           {/* Job comparison page with dynamic resume and vacancy ID parameters */}
           <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
+
+          {/* Admin pages */}
+          <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
+          <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
+          <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
 
           {/* Catch-all route - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />

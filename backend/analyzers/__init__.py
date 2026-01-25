@@ -33,6 +33,18 @@ from .error_detector import (
     get_error_summary,
     format_errors_for_display,
 )
+from .enhanced_matcher import (
+    EnhancedSkillMatcher,
+)
+from .taxonomy_loader import (
+    TaxonomyLoader,
+)
+from .model_versioning import (
+    ModelVersionManager,
+)
+from .accuracy_benchmark import (
+    AccuracyBenchmark,
+)
 
 __all__ = [
     "extract_keywords",
@@ -52,4 +64,8 @@ __all__ = [
     "detect_resume_errors",
     "get_error_summary",
     "format_errors_for_display",
+    "EnhancedSkillMatcher",
+    "TaxonomyLoader",
+    "ModelVersionManager",
+    "AccuracyBenchmark",
 ]

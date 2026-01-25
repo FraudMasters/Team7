@@ -23,6 +23,7 @@ from ..analyzers import (
     extract_resume_entities,
     calculate_skill_experience,
     format_experience_summary,
+    EnhancedSkillMatcher,
 )
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ class MatchRequest(BaseModel):
 
 
 class SkillMatch(BaseModel):
-    """Individual skill match result."""
+    """Individual skill match result with confidence scoring."""
 
     skill: str = Field(..., description="The skill name from the vacancy")
     status: str = Field(..., description="Match status: 'matched' or 'missing'")
@@ -239,6 +240,12 @@ class SkillMatch(BaseModel):
         None, description="The actual skill name found in resume (if matched)"
     )
     highlight: str = Field(..., description="Highlight color: 'green' or 'red'")
+    confidence: float = Field(
+        0.0, description="Confidence score from 0.0 to 1.0 (0% to 100%)"
+    )
+    match_type: str = Field(
+        "none", description="Type of match: 'direct', 'context', 'synonym', 'fuzzy', or 'none'"
+    )
 
 
 class ExperienceVerification(BaseModel):
@@ -266,6 +273,37 @@ class MatchResponse(BaseModel):
         None, description="Experience requirement verification (if applicable)"
     )
     processing_time_ms: float = Field(..., description="Processing time in milliseconds")
+
+
+class MatchFeedbackRequest(BaseModel):
+    """Request model for submitting feedback on skill matches."""
+
+    match_id: str = Field(..., description="ID of the match result")
+    skill: str = Field(..., description="The skill name that was matched")
+    was_correct: bool = Field(..., description="Whether the AI's match was correct")
+    recruiter_correction: Optional[str] = Field(
+        None, description="What the recruiter corrected it to (if incorrect)"
+    )
+    confidence_score: Optional[float] = Field(
+        None,
+        description="The confidence score the AI assigned (0-1)",
+        ge=0,
+        le=1,
+    )
+    metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
+
+
+class MatchFeedbackResponse(BaseModel):
+    """Response model for match feedback submission."""
+
+    id: str = Field(..., description="Unique identifier for the feedback entry")
+    match_id: str = Field(..., description="ID of the match result")
+    skill: str = Field(..., description="The skill name that was matched")
+    was_correct: bool = Field(..., description="Whether the AI's match was correct")
+    recruiter_correction: Optional[str] = Field(None, description="Recruiter's correction")
+    feedback_source: str = Field(..., description="Source of feedback")
+    processed: bool = Field(..., description="Whether feedback has been processed by ML pipeline")
+    created_at: str = Field(..., description="Creation timestamp")
 
 
 @router.post(
@@ -374,7 +412,7 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
                 )
 
             resume_text = result.get("text", "")
-            if not text or len(text.strip()) < 10:
+            if not resume_text or len(resume_text.strip()) < 10:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="Extracted text is too short or empty",
@@ -421,9 +459,11 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
 
         logger.info(f"Extracted {len(resume_skills)} unique skills from resume")
 
-        # Step 5: Load skill synonyms
-        synonyms_map = load_skill_synonyms()
-        logger.info(f"Loaded {len(synonyms_map)} skill synonym mappings")
+        # Step 5: Initialize enhanced skill matcher
+        enhanced_matcher = EnhancedSkillMatcher()
+        # Pre-load synonyms for logging
+        synonyms_map = enhanced_matcher.load_synonyms()
+        logger.info(f"Initialized enhanced skill matcher with {len(synonyms_map)} synonym mappings")
 
         # Step 6: Get vacancy data
         vacancy_title = request.vacancy_data.get(
@@ -439,40 +479,72 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
         if isinstance(required_skills, str):
             required_skills = [required_skills]
 
-        # Step 7: Match required skills
+        # Step 7: Match required skills with enhanced matcher
         required_skills_matches = []
         for skill in required_skills:
-            if check_skill_match(resume_skills, skill, synonyms_map):
-                matched_as = find_matching_synonym(resume_skills, skill, synonyms_map)
+            # Use enhanced matcher with context awareness
+            match_result = enhanced_matcher.match_with_context(
+                resume_skills=resume_skills,
+                required_skill=skill,
+                context=vacancy_title.lower(),  # Use vacancy title as context hint
+                use_fuzzy=True  # Enable fuzzy matching
+            )
+
+            if match_result["matched"]:
                 required_skills_matches.append(
                     SkillMatch(
                         skill=skill,
                         status="matched",
-                        matched_as=matched_as,
+                        matched_as=match_result["matched_as"],
                         highlight="green",
+                        confidence=round(match_result["confidence"], 2),
+                        match_type=match_result["match_type"]
                     )
                 )
             else:
                 required_skills_matches.append(
-                    SkillMatch(skill=skill, status="missing", matched_as=None, highlight="red")
+                    SkillMatch(
+                        skill=skill,
+                        status="missing",
+                        matched_as=None,
+                        highlight="red",
+                        confidence=0.0,
+                        match_type="none"
+                    )
                 )
 
-        # Step 8: Match additional/preferred skills
+        # Step 8: Match additional/preferred skills with enhanced matcher
         additional_skills_matches = []
         for skill in additional_skills:
-            if check_skill_match(resume_skills, skill, synonyms_map):
-                matched_as = find_matching_synonym(resume_skills, skill, synonyms_map)
+            # Use enhanced matcher with context awareness
+            match_result = enhanced_matcher.match_with_context(
+                resume_skills=resume_skills,
+                required_skill=skill,
+                context=vacancy_title.lower(),  # Use vacancy title as context hint
+                use_fuzzy=True  # Enable fuzzy matching
+            )
+
+            if match_result["matched"]:
                 additional_skills_matches.append(
                     SkillMatch(
                         skill=skill,
                         status="matched",
-                        matched_as=matched_as,
+                        matched_as=match_result["matched_as"],
                         highlight="green",
+                        confidence=round(match_result["confidence"], 2),
+                        match_type=match_result["match_type"]
                     )
                 )
             else:
                 additional_skills_matches.append(
-                    SkillMatch(skill=skill, status="missing", matched_as=None, highlight="red")
+                    SkillMatch(
+                        skill=skill,
+                        status="missing",
+                        matched_as=None,
+                        highlight="red",
+                        confidence=0.0,
+                        match_type="none"
+                    )
                 )
 
         # Step 9: Calculate match percentage
@@ -559,4 +631,97 @@ async def compare_resume_to_vacancy(request: MatchRequest) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to match resume to vacancy: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/feedback",
+    response_model=MatchFeedbackResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Matching"],
+)
+async def submit_match_feedback(request: MatchFeedbackRequest) -> JSONResponse:
+    """
+    Submit feedback on a skill match result.
+
+    This endpoint allows recruiters to provide feedback on the AI's skill matching
+    decisions, recording whether matches were correct and any corrections needed.
+    This feedback is used to improve future matching accuracy through ML retraining.
+
+    Args:
+        request: Feedback request with match details and recruiter corrections
+
+    Returns:
+        JSON response with created feedback entry
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "match_id": "match123",
+        ...     "skill": "React",
+        ...     "was_correct": True,
+        ...     "recruiter_correction": None
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/matching/feedback",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "id": "feedback-id",
+            "match_id": "match123",
+            "skill": "React",
+            "was_correct": True,
+            "recruiter_correction": None,
+            "feedback_source": "matching_api",
+            "processed": False,
+            "created_at": "2024-01-25T00:00:00Z"
+        }
+    """
+    try:
+        logger.info(
+            f"Submitting feedback for match_id: {request.match_id}, "
+            f"skill: {request.skill}, was_correct: {request.was_correct}"
+        )
+
+        # Validate confidence score if provided
+        if request.confidence_score is not None and not (
+            0 <= request.confidence_score <= 1
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Confidence score must be between 0 and 1",
+            )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        feedback_response = {
+            "id": "placeholder-feedback-id",
+            "match_id": request.match_id,
+            "skill": request.skill,
+            "was_correct": request.was_correct,
+            "recruiter_correction": request.recruiter_correction,
+            "feedback_source": "matching_api",
+            "processed": False,
+            "created_at": "2024-01-25T00:00:00Z",
+        }
+
+        logger.info(f"Created feedback entry for match_id: {request.match_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=feedback_response,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting match feedback: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit match feedback: {str(e)}",
         ) from e
