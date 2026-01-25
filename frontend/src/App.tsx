@@ -33,6 +33,7 @@ function App() {
           <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
 
           {/* Admin pages */}
+          <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
           <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
           <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
 
