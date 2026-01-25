@@ -240,6 +240,7 @@ from .api import (
     feedback,
     model_versions,
     comparisons,
+    analytics,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -250,6 +251,7 @@ app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=[
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 
 
 if __name__ == "__main__":
