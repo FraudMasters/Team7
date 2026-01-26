@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "010-multi-language-ui-english-russian",
+  "spec": "015-i-need-you-to-fix-all-issues-and-conflicts-appeare",
   "state": "building",
   "subtasks": {
-    "completed": 25,
-    "total": 27,
+    "completed": 5,
+    "total": 20,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration and Testing",
+    "current": "Fix Database Migration Conflicts",
     "id": null,
-    "total": 4
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 24,
-    "started_at": "2026-01-25T21:53:19.768128"
+    "number": 2,
+    "started_at": "2026-01-26T03:53:15.863659"
   },
-  "last_update": "2026-01-25T23:24:05.201671"
+  "last_update": "2026-01-26T04:05:11.816276"
 }
