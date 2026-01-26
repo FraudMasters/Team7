@@ -267,7 +267,9 @@ from .api import (
     custom_synonyms,
     feedback,
     model_versions,
-    preferences,
+    comparisons,
+    analytics,
+    reports,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -277,7 +279,9 @@ app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags
 app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=["Custom Synonyms"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
-app.include_router(preferences.router, prefix="/api/preferences", tags=["Preferences"])
+app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 
 if __name__ == "__main__":

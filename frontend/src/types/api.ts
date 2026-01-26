@@ -458,3 +458,124 @@ export interface LanguagePreferenceUpdate {
   /** Language preference to set (en or ru) */
   language: 'en' | 'ru';
 }
+
+// ==================== Analytics Types ====================
+
+/**
+ * Time-to-hire metrics from backend
+ */
+export interface TimeToHireMetrics {
+  average_days: number;
+  median_days: number;
+  min_days: number;
+  max_days: number;
+  percentile_25: number;
+  percentile_75: number;
+}
+
+/**
+ * Resume processing metrics from backend
+ */
+export interface ResumeMetrics {
+  total_processed: number;
+  processed_this_month: number;
+  processed_this_week: number;
+  processing_rate_avg: number;
+}
+
+/**
+ * Match rate metrics from backend
+ */
+export interface MatchRateMetrics {
+  overall_match_rate: number;
+  high_confidence_matches: number;
+  low_confidence_matches: number;
+  average_confidence: number;
+}
+
+/**
+ * Key metrics response from backend
+ */
+export interface KeyMetricsResponse {
+  time_to_hire: TimeToHireMetrics;
+  resumes: ResumeMetrics;
+  match_rates: MatchRateMetrics;
+}
+
+/**
+ * Funnel stage interface from backend
+ */
+export interface FunnelStage {
+  stage_name: string;
+  count: number;
+  conversion_rate: number;
+}
+
+/**
+ * Funnel metrics response from backend
+ */
+export interface FunnelMetricsResponse {
+  stages: FunnelStage[];
+  total_resumes: number;
+  overall_hire_rate: number;
+}
+
+/**
+ * Skill demand item interface from backend
+ */
+export interface SkillDemandItem {
+  skill_name: string;
+  demand_count: number;
+  demand_percentage: number;
+  trend_percentage: number;
+}
+
+/**
+ * Skill demand response from backend
+ */
+export interface SkillDemandResponse {
+  skills: SkillDemandItem[];
+  total_postings_analyzed: number;
+}
+
+/**
+ * Source tracking item interface from backend
+ */
+export interface SourceTrackingItem {
+  source_name: string;
+  vacancy_count: number;
+  percentage: number;
+  average_time_to_fill: number;
+}
+
+/**
+ * Source tracking response from backend
+ */
+export interface SourceTrackingResponse {
+  sources: SourceTrackingItem[];
+  total_vacancies: number;
+}
+
+/**
+ * Individual recruiter performance metrics
+ */
+export interface RecruiterPerformanceItem {
+  recruiter_id: string;
+  recruiter_name: string;
+  hires: number;
+  interviews_conducted: number;
+  resumes_processed: number;
+  average_time_to_hire: number;
+  offer_acceptance_rate: number;
+  candidate_satisfaction_score: number;
+}
+
+/**
+ * Recruiter performance response from backend
+ */
+export interface RecruiterPerformanceResponse {
+  recruiters: RecruiterPerformanceItem[];
+  total_recruiters: number;
+  period_start_date: string;
+  period_end_date: string;
+}

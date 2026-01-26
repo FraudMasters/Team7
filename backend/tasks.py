@@ -15,6 +15,8 @@ from .config import get_settings
 from .tasks import (
     analyze_resume_async,
     batch_analyze_resumes,
+    generate_scheduled_reports,
+    process_all_pending_reports,
 )
 
 logger = logging.getLogger(__name__)
@@ -277,6 +279,8 @@ __all__ = [
     "long_running_task",
     "analyze_resume_async",
     "batch_analyze_resumes",
+    "generate_scheduled_reports",
+    "process_all_pending_reports",
     "get_task_status",
     "revoke_task",
 ]
