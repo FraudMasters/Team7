@@ -10,9 +10,17 @@ from .skills_library import (
     load_position_skills,
     get_skills_for_position,
 )
+from .skills_matcher import (
+    SkillsMatcher,
+    match_skill,
+    match_skills,
+)
 
 __all__ = [
     "SkillsLibrary",
     "load_position_skills",
     "get_skills_for_position",
+    "SkillsMatcher",
+    "match_skill",
+    "match_skills",
 ]
