@@ -63,8 +63,17 @@ import type {
   ModelVersionListResponse,
   MatchFeedbackRequest,
   MatchFeedbackResponse,
-  LanguagePreferenceResponse,
-  LanguagePreferenceUpdate,
+  ComparisonCreate,
+  ComparisonUpdate,
+  ComparisonResponse,
+  ComparisonListResponse,
+  CompareMultipleRequest,
+  ComparisonMatrixData,
+  KeyMetricsResponse,
+  FunnelMetricsResponse,
+  SkillDemandResponse,
+  SourceTrackingResponse,
+  RecruiterPerformanceResponse,
 } from '@/types/api';
 
 /**
@@ -987,6 +996,199 @@ export class ApiClient {
       const response: AxiosResponse<LanguagePreferenceResponse> = await this.client.put(
         '/api/preferences/language',
         request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Analytics ====================
+
+  /**
+   * Get key hiring metrics
+   *
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Key metrics including time-to-hire, resume processing, and match rates
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const metrics = await apiClient.getKeyMetrics();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const metrics = await apiClient.getKeyMetrics('2024-01-01', '2024-12-31');
+   * ```
+   */
+  async getKeyMetrics(
+    startDate?: string,
+    endDate?: string
+  ): Promise<KeyMetricsResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<KeyMetricsResponse> = await this.client.get(
+        '/api/analytics/key-metrics',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get funnel visualization metrics
+   *
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Funnel metrics showing candidate progression through pipeline
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const funnel = await apiClient.getFunnelMetrics();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const funnel = await apiClient.getFunnelMetrics('2024-01-01', '2024-12-31');
+   * ```
+   */
+  async getFunnelMetrics(
+    startDate?: string,
+    endDate?: string
+  ): Promise<FunnelMetricsResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<FunnelMetricsResponse> = await this.client.get(
+        '/api/analytics/funnel',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get skill demand analytics
+   *
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @param limit - Optional maximum number of skills to return (1-100, default 20)
+   * @returns Skill demand data with trending skills
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const skills = await apiClient.getSkillDemand();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const skills = await apiClient.getSkillDemand('2024-01-01', '2024-12-31', 30);
+   * ```
+   */
+  async getSkillDemand(
+    startDate?: string,
+    endDate?: string,
+    limit?: number
+  ): Promise<SkillDemandResponse> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+      if (limit !== undefined) params.limit = limit;
+
+      const response: AxiosResponse<SkillDemandResponse> = await this.client.get(
+        '/api/analytics/skill-demand',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get source tracking analytics
+   *
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Source tracking data with vacancy distribution by source
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const sources = await apiClient.getSourceTracking();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const sources = await apiClient.getSourceTracking('2024-01-01', '2024-12-31');
+   * ```
+   */
+  async getSourceTracking(
+    startDate?: string,
+    endDate?: string
+  ): Promise<SourceTrackingResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<SourceTrackingResponse> = await this.client.get(
+        '/api/analytics/source-tracking',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get recruiter performance metrics
+   *
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @param limit - Optional maximum number of recruiters to return (1-100, default 20)
+   * @returns Recruiter performance comparison data
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const recruiters = await apiClient.getRecruiterPerformance();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const recruiters = await apiClient.getRecruiterPerformance('2024-01-01', '2024-12-31', 10);
+   * ```
+   */
+  async getRecruiterPerformance(
+    startDate?: string,
+    endDate?: string,
+    limit?: number
+  ): Promise<RecruiterPerformanceResponse> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+      if (limit !== undefined) params.limit = limit;
+
+      const response: AxiosResponse<RecruiterPerformanceResponse> = await this.client.get(
+        '/api/analytics/recruiter-performance',
+        { params }
       );
       return response.data;
     } catch (error) {
