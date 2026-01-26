@@ -17,6 +17,11 @@ from .tasks import (
     batch_analyze_resumes,
     generate_scheduled_reports,
     process_all_pending_reports,
+    send_feedback_notification,
+    send_batch_notification,
+    check_resume_against_saved_searches,
+    send_search_alert_notification,
+    process_pending_alerts,
 )
 
 logger = logging.getLogger(__name__)
@@ -281,6 +286,11 @@ __all__ = [
     "batch_analyze_resumes",
     "generate_scheduled_reports",
     "process_all_pending_reports",
+    "send_feedback_notification",
+    "send_batch_notification",
+    "check_resume_against_saved_searches",
+    "send_search_alert_notification",
+    "process_pending_alerts",
     "get_task_status",
     "revoke_task",
 ]
