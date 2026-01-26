@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "010-multi-language-ui-english-russian",
-  "state": "building",
+  "spec": "003-",
+  "state": "planning",
   "subtasks": {
-    "completed": 25,
-    "total": 27,
+    "completed": 0,
+    "total": 0,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration and Testing",
+    "current": "Backend Document Parsers",
     "id": null,
-    "total": 4
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 24,
-    "started_at": "2026-01-25T21:53:19.768128"
+    "number": 3,
+    "started_at": "2026-01-26T03:36:19.209843"
   },
-  "last_update": "2026-01-25T23:24:05.201671"
+  "last_update": "2026-01-26T03:40:40.003742"
 }
