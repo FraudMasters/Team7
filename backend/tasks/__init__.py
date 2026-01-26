@@ -3,7 +3,7 @@ Celery tasks module for async processing.
 
 This module provides Celery task definitions for long-running operations
 like resume analysis, job matching, batch processing, ML learning tasks,
-and report generation.
+report generation, email notifications, and search alerts.
 """
 from .analysis_task import analyze_resume_async, batch_analyze_resumes
 from .learning_tasks import (
@@ -20,6 +20,15 @@ from .report_generation import (
     generate_scheduled_reports,
     process_all_pending_reports,
 )
+from .email_task import (
+    send_feedback_notification,
+    send_batch_notification,
+)
+from .search_alerts_task import (
+    check_resume_against_saved_searches,
+    send_search_alert_notification,
+    process_pending_alerts,
+)
 
 __all__ = [
     "analyze_resume_async",
@@ -34,4 +43,9 @@ __all__ = [
     "send_report_via_email",
     "generate_scheduled_reports",
     "process_all_pending_reports",
+    "send_feedback_notification",
+    "send_batch_notification",
+    "check_resume_against_saved_searches",
+    "send_search_alert_notification",
+    "process_pending_alerts",
 ]
