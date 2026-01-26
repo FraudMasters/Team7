@@ -79,23 +79,44 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-### 2. Start Infrastructure (Docker Compose)
+### 2. One-Click Deployment (Recommended)
+
+The easiest way to deploy the entire application is using the automated deployment script:
 
 ```bash
-# Start PostgreSQL, Redis, and application services
-docker-compose up -d
-
-# Check services status
-docker-compose ps
+# Deploy all services with one command
+bash scripts/deploy.sh
 ```
 
-This will start:
-- PostgreSQL on port 5432
-- Redis on port 6379
-- Backend API on port 8000
-- Frontend on port 5173
-- Celery worker
-- Flower monitoring on port 5555
+This script will:
+- ✅ Check prerequisites (Docker, Docker Compose)
+- ✅ Set up environment files automatically
+- ✅ Build all required Docker images
+- ✅ Start infrastructure services (PostgreSQL, Redis)
+- ✅ Run database migrations
+- ✅ Start application services in correct order (Backend → Celery Worker → Frontend → Flower)
+- ✅ Verify health of each service
+- ✅ Display deployment summary with service URLs
+
+**After successful deployment, access:**
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+- **Celery Monitoring**: http://localhost:5555
+
+**Next steps:**
+```bash
+# View logs
+docker-compose logs -f
+
+# Check specific service logs
+docker-compose logs -f backend
+docker-compose logs -f celery_worker
+docker-compose logs -f frontend
+
+# Stop all services
+docker-compose down
+```
 
 ### 3. Manual Setup (Alternative)
 
