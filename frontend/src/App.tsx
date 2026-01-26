@@ -25,10 +25,10 @@ function App() {
           <Route index element={<HomePage />} />
 
           {/* Resume upload page */}
-          <Route path="upload" element={<UploadPage />} />
+          <Route path="resume/upload" element={<UploadPage />} />
 
           {/* Analysis results page with dynamic ID parameter */}
-          <Route path="results/:id" element={<ResultsPage />} />
+          <Route path="resume/results/:id" element={<ResultsPage />} />
 
           {/* Job comparison page with dynamic resume and vacancy ID parameters */}
           <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
