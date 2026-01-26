@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Paper,
@@ -70,6 +71,8 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
   onUploadComplete,
   onUploadError,
 }) => {
+  const { t } = useTranslation();
+
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
     uploading: false,
@@ -90,18 +93,18 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
       // Check file extension
       const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
       if (!acceptedFileTypes.includes(fileExtension)) {
-        return `Invalid file type. Please upload ${acceptedFileTypes.join(', ')} files only.`;
+        return t('errors.invalidFileType', { fileTypes: acceptedFileTypes.join(', ') });
       }
 
       // Check file size
       if (file.size > maxFileSize) {
         const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(0);
-        return `File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`;
+        return t('errors.fileTooLarge', { maxSize: maxSizeMB });
       }
 
       return null;
     },
-    [acceptedFileTypes, maxFileSize]
+    [acceptedFileTypes, maxFileSize, t]
   );
 
   /**
@@ -172,11 +175,11 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
 
             onUploadComplete?.(resumeId);
           } else {
-            const error = xhr.responseText || 'Upload failed. Please try again.';
+            const error = xhr.responseText || t('errors.failedToUpload');
             setUploadState((prev) => ({
               ...prev,
               uploading: false,
-              error: `Upload failed: ${error}`,
+              error: `${t('errors.failedToUpload')}: ${error}`,
             }));
             onUploadError?.(error);
           }
@@ -184,7 +187,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
 
         // Handle errors
         xhr.addEventListener('error', () => {
-          const error = 'Network error. Please check your connection and try again.';
+          const error = t('errors.network');
           setUploadState((prev) => ({
             ...prev,
             uploading: false,
@@ -197,7 +200,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
           setUploadState((prev) => ({
             ...prev,
             uploading: false,
-            error: 'Upload cancelled.',
+            error: t('errors.uploadCancelled'),
           }));
         });
 
@@ -206,7 +209,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
         xhr.send(formData);
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : 'Failed to upload file.';
+          error instanceof Error ? error.message : t('errors.somethingWentWrong');
         setUploadState((prev) => ({
           ...prev,
           uploading: false,
@@ -215,7 +218,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
         onUploadError?.(errorMessage);
       }
     },
-    [uploadUrl, onUploadComplete, onUploadError]
+    [uploadUrl, onUploadComplete, onUploadError, t]
   );
 
   /**
@@ -340,7 +343,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
                   onClick={handleReset}
                   disabled={uploadState.uploading}
                 >
-                  Try Again
+                  {t('common.tryAgain')}
                 </Button>
               )
             }
@@ -362,11 +365,11 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
                 onClick={handleReset}
                 disabled={uploadState.uploading}
               >
-                Upload Another
+                {t('upload.uploader.uploadAnother')}
               </Button>
             }
           >
-            Resume uploaded successfully! Resume ID: {uploadState.resumeId}
+            {t('upload.uploader.success', { resumeId: uploadState.resumeId })}
           </Alert>
         )}
 
@@ -395,10 +398,10 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
             {/* Main Text */}
             <Typography variant="h6" align="center" gutterBottom fontWeight={600}>
               {uploadState.uploading
-                ? 'Uploading Resume...'
+                ? t('upload.uploader.uploading')
                 : isDragging
-                  ? 'Drop Your Resume Here'
-                  : 'Upload Your Resume'}
+                  ? t('upload.uploader.dragDrop')
+                  : t('upload.title')}
             </Typography>
 
             {/* Subtitle */}
@@ -409,8 +412,8 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
               paragraph
             >
               {uploadState.uploading
-                ? 'Please wait while we process your file...'
-                : 'Drag and drop your resume here, or click to browse'}
+                ? t('upload.uploader.pleaseWait')
+                : t('upload.uploader.clickToBrowse')}
             </Typography>
 
             {/* File Type Info */}
@@ -445,7 +448,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
                   }}
                   disabled={uploadState.uploading}
                 >
-                  Choose File
+                  {t('upload.uploader.chooseFile')}
                 </Button>
               </Box>
             )}
@@ -475,7 +478,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
                   onClick={handleReset}
                   color="error"
                 >
-                  Remove
+                  {t('common.remove')}
                 </Button>
               )}
             </Stack>
@@ -511,8 +514,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
           display="block"
           sx={{ mt: 2 }}
         >
-          Supported formats: PDF, DOCX • Maximum file size:{' '}
-          {(maxFileSize / (1024 * 1024)).toFixed(0)}MB
+          {t('upload.uploader.supportedFormats', { maxSize: (maxFileSize / (1024 * 1024)).toFixed(0) })}
         </Typography>
       )}
     </Box>

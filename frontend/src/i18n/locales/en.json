@@ -1,0 +1,388 @@
+{
+  "appName": "Resume Analysis Platform",
+  "language": "English",
+  "languageSwitcher": {
+    "ariaLabel": "Select language"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "tryAgain": "Try Again",
+    "close": "Close",
+    "refresh": "Refresh",
+    "add": "Add",
+    "remove": "Remove",
+    "clear": "Clear",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "upload": "Upload",
+    "download": "Download",
+    "view": "View",
+    "create": "Create",
+    "update": "Update",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "or": "or",
+    "and": "and"
+  },
+  "nav": {
+    "home": "Home",
+    "uploadResume": "Upload Resume",
+    "results": "Results",
+    "compare": "Compare",
+    "adminSynonyms": "Admin Synonyms",
+    "adminAnalytics": "Admin Analytics"
+  },
+  "footer": {
+    "copyright": "{{year}} Iconicompany. AI-powered resume analysis platform."
+  },
+  "home": {
+    "hero": {
+      "title": "Transform Your Recruitment Process",
+      "subtitle": "AI-powered resume analysis platform with intelligent job matching",
+      "uploadButton": "Upload Resume",
+      "viewSampleButton": "View Sample Analysis"
+    },
+    "features": {
+      "title": "Powerful Features",
+      "aiAnalysis": {
+        "title": "AI-Powered Analysis",
+        "description": "Advanced ML/NLP techniques for intelligent resume parsing and error detection"
+      },
+      "errorDetection": {
+        "title": "Error Detection",
+        "description": "Identify grammar issues, missing information, and structural problems instantly"
+      },
+      "jobMatching": {
+        "title": "Job Matching",
+        "description": "Compare resumes against job vacancies with skill highlighting and experience verification"
+      },
+      "fastProcessing": {
+        "title": "Fast Processing",
+        "description": "Get comprehensive analysis results in seconds with our optimized pipeline"
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "step1": {
+        "title": "Upload Resume",
+        "description": "Upload PDF or DOCX resume files through our intuitive interface"
+      },
+      "step2": {
+        "title": "AI Analysis",
+        "description": "Our AI extracts skills, detects errors, and calculates experience"
+      },
+      "step3": {
+        "title": "Get Results",
+        "description": "Receive detailed analysis with recommendations and job matching"
+      }
+    },
+    "cta": {
+      "title": "Ready to analyze your first resume?",
+      "subtitle": "Get started in seconds with our easy-to-use interface",
+      "button": "Get Started"
+    }
+  },
+  "upload": {
+    "title": "Upload Resume",
+    "subtitle": "Upload your resume (PDF or DOCX) for AI-powered analysis and job matching.",
+    "uploader": {
+      "dragDrop": "Drop Your Resume Here",
+      "clickToBrowse": "Drag and drop your resume here, or click to browse",
+      "uploading": "Uploading Resume...",
+      "pleaseWait": "Please wait while we process your file...",
+      "chooseFile": "Choose File",
+      "uploadAnother": "Upload Another",
+      "success": "Resume uploaded successfully! Resume ID: {{resumeId}}",
+      "maxSize": "Max {{maxSize}}MB",
+      "supportedFormats": "Supported formats: PDF, DOCX • Maximum file size: {{maxSize}}MB"
+    },
+    "whatHappensNext": {
+      "title": "What happens next?",
+      "step1": "1. Our AI extracts skills, experience, and qualifications from your resume",
+      "step2": "2. We analyze your resume for common errors and improvement opportunities",
+      "step3": "3. You can compare your resume against job vacancies to see match percentage",
+      "timeline": "The analysis typically takes 5-10 seconds. You'll be redirected automatically when complete."
+    }
+  },
+  "results": {
+    "title": "Analysis Results",
+    "resumeId": "Resume ID: {{id}}",
+    "noResumeId": "Error: No resume ID provided",
+    "loading": {
+      "title": "Analyzing resume...",
+      "subtitle": "This may take a few moments"
+    },
+    "error": {
+      "title": "Analysis Failed",
+      "retry": "Retry",
+      "failedToLoad": "Failed to load analysis results"
+    },
+    "noData": {
+      "title": "No Analysis Data",
+      "message": "No analysis results found for resume ID: <strong>{{id}}</strong>"
+    },
+    "detectedIssues": "Detected Issues",
+    "issues": {
+      "recommendation": "Recommendation:"
+    },
+    "grammar": {
+      "title": "Grammar & Spelling",
+      "viewIssues_one": "View {{count}} Grammar Issue",
+      "viewIssues_other": "View {{count}} Grammar Issues",
+      "suggestion": "Suggestion:"
+    },
+    "extractedInfo": "Extracted Information",
+    "keywords": {
+      "title": "Keywords",
+      "noKeywords": "No keywords extracted"
+    },
+    "skills": {
+      "title": "Technical Skills",
+      "noSkills": "No technical skills found",
+      "matched": "Matched Skills ({{count}})",
+      "missing": "Missing Skills ({{count}})",
+      "matchPercentage": "{{percentage}}% Match"
+    },
+    "experience": {
+      "title": "Total Experience",
+      "notSpecified": "Not specified",
+      "noExperience": "No experience data available",
+      "year_one": "{{count}} year",
+      "year_other": "{{count}} years",
+      "month_one": "{{count}} month",
+      "month_other": "{{count}} months",
+      "format": "{{years}} {{months}}"
+    },
+    "skillMatching": "Skill Matching",
+    "stats": {
+      "critical": "Critical",
+      "warnings": "Warnings",
+      "info": "Info",
+      "grammarIssues": "Grammar Issues"
+    },
+    "allClear": {
+      "title": "Great Job!",
+      "message": "No critical issues detected in your resume. Your resume looks well-structured and professional."
+    },
+    "refresh": "Refresh",
+    "processingTime": "Processing Time: {{seconds}}s",
+    "reloadButton": "Reload Analysis"
+  },
+  "compare": {
+    "title": "Job Comparison Results",
+    "loading": "Comparing resume with vacancy...",
+    "loadingSubtitle": "Analyzing skills and experience",
+    "errorTitle": "Comparison Failed",
+    "noDataTitle": "No Comparison Data",
+    "noDataMessage": "No comparison data found for resume ID: <strong>{{resumeId}}</strong> and vacancy ID: <strong>{{vacancyId}}</strong>",
+    "refreshButton": "Refresh",
+    "resumeLabel": "Resume",
+    "vacancyLabel": "Vacancy",
+    "matchPercentage": "Match Percentage",
+    "overallMatch": "Overall Match",
+    "excellent": "Excellent Match",
+    "moderate": "Moderate Match",
+    "poor": "Poor Match",
+    "skillsMatched": "{{matched}} of {{total}} skills matched",
+    "matchedSkills": "Matched Skills",
+    "matchedSkillsDescription": "Candidate has {{count}} skill{{plural}} that match the vacancy requirements.",
+    "noMatchedSkills": "No matched skills found",
+    "missingSkills": "Missing Skills",
+    "missingSkillsDescription": "Candidate is missing {{count}} skill{{plural}} from the vacancy requirements.",
+    "allSkillsMatched": "All required skills are matched!",
+    "experienceVerification": "Experience Verification",
+    "meetsRequirement": "Meets Req",
+    "belowRequirement": "Below Req",
+    "candidateExperience": "Candidate Experience:",
+    "required": "Required:",
+    "verifiedFrom": "Verified from {{count}} project{{plural}}:",
+    "present": "Present",
+    "year_one": "year",
+    "year_other": "years",
+    "month_one": "month",
+    "month_other": "months",
+    "overallAssessment": "Overall Assessment",
+    "strongCandidate": "Strong Candidate",
+    "strongCandidateMessage": "This candidate matches {{percentage}}% of the required skills and has strong potential for the role. Consider proceeding with interviews.",
+    "potentialCandidate": "Potential Candidate",
+    "potentialCandidateMessage": "This candidate matches {{percentage}}% of requirements. Review missing skills and experience gaps before proceeding.",
+    "weakMatch": "Weak Match",
+    "weakMatchMessage": "This candidate only matches {{percentage}}% of requirements. Significant skill gaps exist. Consider other candidates.",
+    "processingTime": "Comparison completed in {{seconds}} seconds",
+    "errors": {
+      "failedToLoad": "Failed to load comparison data",
+      "failedToFetch": "Failed to fetch comparison"
+    }
+  },
+  "adminSynonyms": {
+    "title": "Custom Synonyms Management",
+    "subtitle": "Manage organization-specific custom skill synonym mappings to improve matching accuracy.",
+    "addButton": "Add Custom Synonym",
+    "refreshButton": "Refresh",
+    "noSynonyms": "No Custom Synonyms Found",
+    "noSynonymsMessage": "Get started by adding your first custom synonym entry for this organization.",
+    "totalSynonyms": "Total Synonyms",
+    "active": "Active",
+    "inactive": "Inactive",
+    "loading": "Loading custom synonyms...",
+    "errorTitle": "Error Loading Synonyms",
+    "deleteDialog": {
+      "title": "Confirm Delete",
+      "message": "Are you sure you want to delete the custom synonym entry for '{{skill}}'?",
+      "warning": "This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel",
+      "deleting": "Deleting..."
+    },
+    "dialog": {
+      "addTitle": "Add Custom Synonym",
+      "editTitle": "Edit Custom Synonym",
+      "canonicalSkill": "Canonical Skill Name",
+      "canonicalSkillPlaceholder": "e.g., React",
+      "customSynonyms": "Custom Synonyms",
+      "customSynonymsPlaceholder": "e.g., ReactJS, React.js, React Framework (comma-separated)",
+      "customSynonymsHelper": "Enter multiple synonyms separated by commas",
+      "atLeastOneError": "At least one custom synonym is required",
+      "context": "Context (Optional)",
+      "contextNone": "None",
+      "contextWebFramework": "Web Framework",
+      "contextLanguage": "Programming Language",
+      "contextDatabase": "Database",
+      "contextTool": "Tool",
+      "contextLibrary": "Library",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "submit": "Save Synonym",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "create": "Create",
+      "update": "Update"
+    },
+    "synonym": {
+      "canonicalSkill": "Canonical Skill",
+      "synonyms": "Custom Synonyms",
+      "context": "Context",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "createdAt": "Created"
+    },
+    "errors": {
+      "failedToLoad": "Failed to load custom synonyms",
+      "failedToCreate": "Failed to create synonym",
+      "failedToUpdate": "Failed to update synonym",
+      "failedToDelete": "Failed to delete synonym",
+      "failedToFetch": "Failed to fetch synonyms"
+    }
+  },
+  "adminAnalytics": {
+    "title": "Feedback Analytics Dashboard",
+    "subtitle": "Monitor match accuracy, learning progress, and model performance metrics",
+    "loading": "Loading analytics...",
+    "loadingMessage": "This may take a few moments",
+    "errorTitle": "Analytics Failed",
+    "refreshButton": "Refresh",
+    "tabs": {
+      "learningProgress": "Learning Progress",
+      "modelVersions": "Model Versions",
+      "recentFeedback": "Recent Feedback"
+    },
+    "overview": {
+      "title": "Analytics Overview",
+      "totalFeedback": "Total Feedback",
+      "correctMatches": "Correct Matches",
+      "incorrectMatches": "Incorrect Matches",
+      "accuracy": "Match Accuracy",
+      "processed": "Processed",
+      "unprocessed": "Pending Processing"
+    },
+    "learningProgress": {
+      "title": "Learning Progress",
+      "accuracyTrends": "Accuracy Trends",
+      "currentAccuracy": "Current Match Accuracy",
+      "targetAccuracy": "Target Accuracy",
+      "gapToTarget": "Gap to Target",
+      "excellent": "Excellent",
+      "good": "Good",
+      "needsImprovement": "Needs Improvement",
+      "goal": "Goal",
+      "statusTitle": "Learning Status",
+      "statusNoData": "No feedback data yet. Start collecting recruiter feedback to enable continuous learning.",
+      "statusPending": "{{count}} feedback entries pending ML pipeline processing. Learning in progress...",
+      "statusComplete": "All feedback has been processed. Model is up to date with latest recruiter corrections."
+    },
+    "models": {
+      "title": "Model Versions",
+      "modelName": "Model Name",
+      "version": "Version",
+      "performanceScore": "Performance Score",
+      "lastUpdated": "Last Updated",
+      "noModelsTitle": "No Model Versions",
+      "noModelsMessage": "No model versions found. Model versioning will be available after the first training cycle.",
+      "noActiveModelTitle": "No Active Model",
+      "noActiveModelMessage": "{{count}} model version(s) found, but none are currently active as production. Activate a model version to use it for matching.",
+      "activeProductionModel": "Active Production Model",
+      "abTestingExperiments": "A/B Testing Experiments ({{count}})",
+      "experiment": "Experiment",
+      "performance": "Performance: {{score}} / 100"
+    },
+    "feedback": {
+      "title": "Recent Feedback",
+      "tableHeaders": {
+        "skill": "Skill",
+        "correct": "Correct",
+        "confidence": "Confidence",
+        "correction": "Correction",
+        "source": "Source",
+        "processed": "Processed",
+        "date": "Date"
+      },
+      "noFeedbackTitle": "No Feedback Data",
+      "noFeedbackMessage": "No feedback entries found. Start collecting recruiter feedback to populate this dashboard.",
+      "showingEntries": "Showing 20 of {{total}} feedback entries"
+    },
+    "errors": {
+      "failedToLoadFeedback": "Failed to load feedback data",
+      "failedToLoadModels": "Failed to load model data"
+    }
+  },
+  "errors": {
+    "network": "Network error. Please check your connection and try again.",
+    "failedToUpload": "Upload failed. Please try again.",
+    "failedToFetch": "Failed to fetch data. Please try again.",
+    "fileTooLarge": "File size exceeds {{maxSize}}MB limit. Please choose a smaller file.",
+    "invalidFileType": "Invalid file type. Please upload {{fileTypes}} files only.",
+    "uploadCancelled": "Upload cancelled.",
+    "somethingWentWrong": "Something went wrong. Please try again later.",
+    "notFound": "The requested resource was not found.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "forbidden": "Access forbidden.",
+    "serverError": "Server error. Please try again later.",
+    "validationError": "Validation error. Please check your input.",
+    "timeout": "Request timeout. Please try again."
+  },
+  "validation": {
+    "required": "{{field}} is required",
+    "invalidFormat": "{{field}} has invalid format",
+    "minLength": "{{field}} must be at least {{min}} characters",
+    "maxLength": "{{field}} must not exceed {{max}} characters",
+    "invalidEmail": "Invalid email address",
+    "invalidUrl": "Invalid URL",
+    "invalidNumber": "Invalid number",
+    "invalidDate": "Invalid date"
+  }
+}

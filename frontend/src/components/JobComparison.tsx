@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLanguageContext } from '@/contexts/LanguageContext';
+import { formatNumber, formatDate } from '@/utils/localeFormatters';
 import {
   Box,
   Paper,
@@ -94,6 +97,8 @@ const JobComparison: React.FC<JobComparisonProps> = ({
   vacancyId,
   apiUrl = 'http://localhost:8000/api/matching',
 }) => {
+  const { t } = useTranslation();
+  const { language } = useLanguageContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<JobComparisonData | null>(null);
@@ -116,7 +121,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
       setData(result);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load comparison data';
+        err instanceof Error ? err.message : t('compare.errors.failedToLoad');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -135,8 +140,8 @@ const JobComparison: React.FC<JobComparisonProps> = ({
   const getMatchConfig = (percentage: number) => {
     if (percentage >= 70) {
       return {
-        color: 'success' as const;
-        label: 'Excellent Match',
+        color: 'success' as const,
+        label: t('compare.excellent'),
         bgColor: 'success.main',
         textColor: 'success.contrastText',
       };
@@ -144,14 +149,14 @@ const JobComparison: React.FC<JobComparisonProps> = ({
     if (percentage >= 40) {
       return {
         color: 'warning' as const,
-        label: 'Moderate Match',
+        label: t('compare.moderate'),
         bgColor: 'warning.main',
         textColor: 'warning.contrastText',
       };
     }
     return {
       color: 'error' as const,
-      label: 'Poor Match',
+      label: t('compare.poor'),
       bgColor: 'error.main',
       textColor: 'error.contrastText',
     };
@@ -165,12 +170,12 @@ const JobComparison: React.FC<JobComparisonProps> = ({
     const remainingMonths = months % 12;
 
     if (years === 0) {
-      return `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+      return `${remainingMonths} ${t('compare.month', { count: remainingMonths })}`;
     }
     if (remainingMonths === 0) {
-      return `${years} year${years !== 1 ? 's' : ''}`;
+      return `${years} ${t('compare.year', { count: years })}`;
     }
-    return `${years}y ${remainingMonths}m`;
+    return `${years} ${t('compare.year', { count: years })} ${remainingMonths} ${t('compare.month', { count: remainingMonths })}`;
   };
 
   /**
@@ -189,10 +194,10 @@ const JobComparison: React.FC<JobComparisonProps> = ({
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
         <Typography variant="h6" color="text.secondary">
-          Comparing resume with vacancy...
+          {t('compare.loading')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Analyzing skills and experience
+          {t('compare.loadingSubtitle')}
         </Typography>
       </Box>
     );
@@ -207,12 +212,12 @@ const JobComparison: React.FC<JobComparisonProps> = ({
         severity="error"
         action={
           <Button color="inherit" onClick={fetchComparison} startIcon={<RefreshIcon />}>
-            Retry
+            {t('common.tryAgain')}
           </Button>
         }
       >
         <Typography variant="subtitle1" fontWeight={600}>
-          Comparison Failed
+          {t('compare.errorTitle')}
         </Typography>
         <Typography variant="body2">{error}</Typography>
       </Alert>
@@ -226,12 +231,17 @@ const JobComparison: React.FC<JobComparisonProps> = ({
     return (
       <Alert severity="info">
         <Typography variant="subtitle1" fontWeight={600}>
-          No Comparison Data
+          {t('compare.noDataTitle')}
         </Typography>
-        <Typography variant="body2">
-          No comparison data found for resume ID: <strong>{resumeId}</strong> and vacancy
-          ID: <strong>{vacancyId}</strong>
-        </Typography>
+        <Typography variant="body2"
+          dangerouslySetInnerHTML={{
+            __html: t('compare.noDataMessage', {
+              resumeId,
+              vacancyId,
+              interpolation: { escapeValue: false }
+            })
+          }}
+        />
       </Alert>
     );
   }
@@ -246,14 +256,14 @@ const JobComparison: React.FC<JobComparisonProps> = ({
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box>
             <Typography variant="h5" fontWeight={600}>
-              Job Comparison Results
+              {t('compare.title')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Resume: <strong>{resumeId}</strong> • Vacancy: <strong>{vacancyId}</strong>
+              {t('compare.resumeLabel')}: <strong>{resumeId}</strong> • {t('compare.vacancyLabel')}: <strong>{vacancyId}</strong>
             </Typography>
           </Box>
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
-            Refresh
+            {t('compare.refreshButton')}
           </Button>
         </Box>
 
@@ -271,13 +281,16 @@ const JobComparison: React.FC<JobComparisonProps> = ({
           }}
         >
           <Typography variant="h2" fontWeight={700} sx={{ fontSize: { xs: '3rem', md: '4rem' } }}>
-            {data.match_percentage.toFixed(0)}%
+            {formatNumber(data.match_percentage, language)}%
           </Typography>
           <Typography variant="h6" fontWeight={600} sx={{ mt: 1 }}>
             {matchConfig.label}
           </Typography>
           <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
-            {matched_skills.length} of {matched_skills.length + missing_skills.length} skills matched
+            {t('compare.skillsMatched', {
+              matched: matched_skills.length,
+              total: matched_skills.length + missing_skills.length
+            })}
           </Typography>
         </Box>
       </Paper>
@@ -290,13 +303,15 @@ const JobComparison: React.FC<JobComparisonProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <CheckIcon color="success" sx={{ mr: 1, fontSize: 28 }} />
               <Typography variant="h6" fontWeight={600} color="success.main">
-                Matched Skills
+                {t('compare.matchedSkills')}
               </Typography>
             </Box>
             <Divider sx={{ mb: 2 }} />
             <Typography variant="body2" color="text.secondary" paragraph>
-              Candidate has {matched_skills.length} skill{matched_skills.length !== 1 ? 's' : ''} that match
-              the vacancy requirements.
+              {t('compare.matchedSkillsDescription', {
+                count: matched_skills.length,
+                plural: matched_skills.length !== 1 ? 's' : ''
+              })}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {matched_skills.length > 0 ? (
@@ -317,7 +332,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                 ))
               ) : (
                 <Typography variant="body2" color="text.secondary" italic>
-                  No matched skills found
+                  {t('compare.noMatchedSkills')}
                 </Typography>
               )}
             </Box>
@@ -330,13 +345,15 @@ const JobComparison: React.FC<JobComparisonProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <CrossIcon color="error" sx={{ mr: 1, fontSize: 28 }} />
               <Typography variant="h6" fontWeight={600} color="error.main">
-                Missing Skills
+                {t('compare.missingSkills')}
               </Typography>
             </Box>
             <Divider sx={{ mb: 2 }} />
             <Typography variant="body2" color="text.secondary" paragraph>
-              Candidate is missing {missing_skills.length} skill
-              {missing_skills.length !== 1 ? 's' : ''} from the vacancy requirements.
+              {t('compare.missingSkillsDescription', {
+                count: missing_skills.length,
+                plural: missing_skills.length !== 1 ? 's' : ''
+              })}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {missing_skills.length > 0 ? (
@@ -357,7 +374,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                 ))
               ) : (
                 <Typography variant="body2" color="success.main" fontWeight={500}>
-                  All required skills are matched!
+                  {t('compare.allSkillsMatched')}
                 </Typography>
               )}
             </Box>
@@ -371,7 +388,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <WorkIcon color="primary" sx={{ mr: 1, fontSize: 28 }} />
             <Typography variant="h6" fontWeight={600}>
-              Experience Verification
+              {t('compare.experienceVerification')}
             </Typography>
           </Box>
           <Divider sx={{ mb: 2 }} />
@@ -391,15 +408,15 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                         {exp.skill}
                       </Typography>
                       {exp.meets_requirement ? (
-                        <Chip label="Meets Req" color="success" size="small" />
+                        <Chip label={t('compare.meetsRequirement')} color="success" size="small" />
                       ) : (
-                        <Chip label="Below Req" color="warning" size="small" />
+                        <Chip label={t('compare.belowRequirement')} color="warning" size="small" />
                       )}
                     </Box>
                     <Stack spacing={1}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" color="text.secondary">
-                          Candidate Experience:
+                          {t('compare.candidateExperience')}
                         </Typography>
                         <Typography variant="body2" fontWeight={600} color="primary.main">
                           {formatExperience(exp.total_months)}
@@ -407,7 +424,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" color="text.secondary">
-                          Required:
+                          {t('compare.required')}:
                         </Typography>
                         <Typography variant="body2" fontWeight={500}>
                           {formatExperience(exp.required_months)}
@@ -416,18 +433,24 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                       {exp.projects && exp.projects.length > 0 && (
                         <Box sx={{ mt: 1 }}>
                           <Typography variant="caption" color="text.secondary">
-                            Verified from {exp.projects.length} project
-                            {exp.projects.length !== 1 ? 's' : ''}:
+                            {t('compare.verifiedFrom', {
+                              count: exp.projects.length,
+                              plural: exp.projects.length !== 1 ? 's' : ''
+                            })}
                           </Typography>
                           {exp.projects.slice(0, 3).map((project, pIndex) => (
-                            <Typography
-                              key={pIndex}
-                              variant="caption"
-                              display="block"
-                              sx={{ ml: 1, color: 'text.secondary' }}
-                            >
-                              • {project.company} ({formatExperience(project.months)})
-                            </Typography>
+                            <Box key={pIndex} sx={{ ml: 1, mt: 0.5 }}>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                • {project.company} - {project.position}
+                              </Typography>
+                              <Typography variant="caption" display="block" sx={{ ml: 2 }}>
+                                {formatDate(project.start_date, language)}
+                                {project.end_date ? ` - ${formatDate(project.end_date, language)}` : ` - ${t('compare.present')}`}
+                              </Typography>
+                              <Typography variant="caption" display="block" sx={{ ml: 2 }} color="text.secondary">
+                                ({formatExperience(project.months)})
+                              </Typography>
+                            </Box>
                           ))}
                         </Box>
                       )}
@@ -443,7 +466,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
       {/* Overall Assessment */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom fontWeight={600}>
-          Overall Assessment
+          {t('compare.overallAssessment')}
         </Typography>
         <Divider sx={{ mb: 2 }} />
         <Alert
@@ -452,17 +475,17 @@ const JobComparison: React.FC<JobComparisonProps> = ({
         >
           <Typography variant="subtitle1" fontWeight={600}>
             {data.match_percentage >= 70
-              ? 'Strong Candidate'
+              ? t('compare.strongCandidate')
               : data.match_percentage >= 40
-                ? 'Potential Candidate'
-                : 'Weak Match'}
+                ? t('compare.potentialCandidate')
+                : t('compare.weakMatch')}
           </Typography>
           <Typography variant="body2" sx={{ mt: 1 }}>
             {data.match_percentage >= 70
-              ? `This candidate matches ${data.match_percentage.toFixed(0)}% of the required skills and has strong potential for the role. Consider proceeding with interviews.`
+              ? t('compare.strongCandidateMessage', { percentage: formatNumber(data.match_percentage, language) })
               : data.match_percentage >= 40
-                ? `This candidate matches ${data.match_percentage.toFixed(0)}% of requirements. Review missing skills and experience gaps before proceeding.`
-                : `This candidate only matches ${data.match_percentage.toFixed(0)}% of requirements. Significant skill gaps exist. Consider other candidates.`}
+                ? t('compare.potentialCandidateMessage', { percentage: formatNumber(data.match_percentage, language) })
+                : t('compare.weakMatchMessage', { percentage: formatNumber(data.match_percentage, language) })}
           </Typography>
         </Alert>
       </Paper>
@@ -470,7 +493,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
       {/* Processing Time */}
       {data.processing_time && (
         <Typography variant="caption" color="text.secondary" align="center" display="block">
-          Comparison completed in {data.processing_time.toFixed(2)} seconds
+          {t('compare.processingTime', { seconds: formatNumber(data.processing_time, language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
         </Typography>
       )}
     </Stack>

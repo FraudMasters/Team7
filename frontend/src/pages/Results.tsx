@@ -1,6 +1,7 @@
 import React from 'react';
 import { Typography, Box } from '@mui/material';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import AnalysisResults from '@components/AnalysisResults';
 
 /**
@@ -15,15 +16,16 @@ import AnalysisResults from '@components/AnalysisResults';
  */
 const ResultsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
 
   if (!id) {
     return (
       <Box>
         <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
-          Analysis Results
+          {t('results.title')}
         </Typography>
         <Typography variant="body1" color="error.main">
-          Error: No resume ID provided
+          {t('results.noResumeId')}
         </Typography>
       </Box>
     );
@@ -32,10 +34,10 @@ const ResultsPage: React.FC = () => {
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
-        Analysis Results
+        {t('results.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" paragraph>
-        Resume ID: <strong>{id}</strong>
+        {t('results.resumeId', { id })}
       </Typography>
 
       <AnalysisResults resumeId={id} />

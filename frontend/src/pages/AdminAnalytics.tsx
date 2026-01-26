@@ -1,5 +1,6 @@
 import React from 'react';
 import { Container, Paper, Typography, Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import FeedbackAnalytics from '@components/FeedbackAnalytics';
 
 /**
@@ -9,14 +10,16 @@ import FeedbackAnalytics from '@components/FeedbackAnalytics';
  * and learning progress metrics.
  */
 const AdminAnalyticsPage: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          Feedback Analytics
+          {t('adminAnalytics.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Monitor match accuracy, learning progress, and model performance metrics
+          {t('adminAnalytics.subtitle')}
         </Typography>
       </Box>
 

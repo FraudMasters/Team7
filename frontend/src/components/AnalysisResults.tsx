@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLanguageContext } from '@/contexts/LanguageContext';
+import { formatNumber } from '@/utils/localeFormatters';
 import {
   Box,
   Paper,
@@ -112,6 +115,8 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   resumeId,
   apiUrl = 'http://localhost:8000/api/analysis',
 }) => {
+  const { t } = useTranslation();
+  const { language } = useLanguageContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AnalysisResult | null>(null);
@@ -134,7 +139,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       setData(result);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load analysis results';
+        err instanceof Error ? err.message : t('results.error.failedToLoad');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -157,39 +162,43 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         return {
           color: 'error' as const,
           icon: <ErrorIcon />,
-          label: 'Critical',
+          label: t('results.errors.severity.critical'),
         };
       case 'warning':
         return {
           color: 'warning' as const,
           icon: <WarningIcon />,
-          label: 'Warning',
+          label: t('results.errors.severity.warning'),
         };
       case 'info':
       default:
         return {
           color: 'info' as const,
           icon: <InfoIcon />,
-          label: 'Info',
+          label: t('results.errors.severity.info'),
         };
     }
   };
 
   /**
-   * Format experience months to human-readable string
+   * Format experience months to human-readable string with proper pluralization
    */
   const formatExperience = (months?: number): string => {
-    if (!months) return 'Not specified';
+    if (!months) return t('results.experience.notSpecified');
+
     const years = Math.floor(months / 12);
     const remainingMonths = months % 12;
 
     if (years === 0) {
-      return `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+      return t('results.experience.month', { count: remainingMonths });
     }
     if (remainingMonths === 0) {
-      return `${years} year${years !== 1 ? 's' : ''}`;
+      return t('results.experience.year', { count: years });
     }
-    return `${years} year${years !== 1 ? 's' : ''} ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+    return t('results.experience.format', {
+      years: t('results.experience.year', { count: years }),
+      months: t('results.experience.month', { count: remainingMonths })
+    });
   };
 
   /**
@@ -208,10 +217,10 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
         <Typography variant="h6" color="text.secondary">
-          Analyzing resume...
+          {t('results.loading.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          This may take a few moments
+          {t('results.loading.subtitle')}
         </Typography>
       </Box>
     );
@@ -226,11 +235,11 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         severity="error"
         action={
           <Button color="inherit" onClick={fetchAnalysis} startIcon={<RefreshIcon />}>
-            Retry
+            {t('results.error.retry')}
           </Button>
         }
       >
-        <AlertTitle>Analysis Failed</AlertTitle>
+        <AlertTitle>{t('results.error.title')}</AlertTitle>
         {error}
       </Alert>
     );
@@ -242,8 +251,8 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   if (!data) {
     return (
       <Alert severity="info">
-        <AlertTitle>No Analysis Data</AlertTitle>
-        No analysis results found for resume ID: <strong>{resumeId}</strong>
+        <AlertTitle>{t('results.noData.title')}</AlertTitle>
+        <span dangerouslySetInnerHTML={{ __html: t('results.noData.message', { id: resumeId }) }} />
       </Alert>
     );
   }
@@ -262,10 +271,10 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5" fontWeight={600}>
-            Analysis Results
+            {t('results.title')}
           </Typography>
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchAnalysis} size="small">
-            Refresh
+            {t('results.refresh')}
           </Button>
         </Box>
 
@@ -278,7 +287,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   {criticalCount}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Critical
+                  {t('results.stats.critical')}
                 </Typography>
               </CardContent>
             </Card>
@@ -290,7 +299,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   {warningCount}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Warnings
+                  {t('results.stats.warnings')}
                 </Typography>
               </CardContent>
             </Card>
@@ -302,7 +311,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   {infoCount}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Info
+                  {t('results.stats.info')}
                 </Typography>
               </CardContent>
             </Card>
@@ -314,7 +323,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   {grammarErrorCount}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Grammar Issues
+                  {t('results.stats.grammarIssues')}
                 </Typography>
               </CardContent>
             </Card>
@@ -326,7 +335,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       {errors.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600}>
-            Detected Issues
+            {t('results.detectedIssues')}
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Stack spacing={2}>
@@ -345,7 +354,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   </Typography>
                   {errorItem.recommendation && (
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Recommendation:</strong> {errorItem.recommendation}
+                      <strong>{t('results.issues.recommendation')}</strong> {errorItem.recommendation}
                     </Typography>
                   )}
                 </Alert>
@@ -359,13 +368,13 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       {grammar_errors && grammar_errors.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600}>
-            Grammar & Spelling
+            {t('results.grammar.title')}
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="body1" fontWeight={500}>
-                View {grammar_errors.length} Grammar Issue{grammar_errors.length !== 1 ? 's' : ''}
+                {t('results.grammar.viewIssues', { count: grammar_errors.length })}
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
@@ -404,7 +413,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             </Typography>
                             {error.suggestions && error.suggestions.length > 0 && (
                               <Typography variant="body2" color="primary.main">
-                                <strong>Suggestion:</strong> {error.suggestions.join(' or ')}
+                                <strong>{t('results.grammar.suggestion')}</strong> {error.suggestions.join(` ${t('common.or')} `)}
                               </Typography>
                             )}
                           </Stack>
@@ -423,7 +432,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       {(keywords && keywords.length > 0) || (technical_skills && technical_skills.length > 0) ? (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600}>
-            Extracted Information
+            {t('results.extractedInfo')}
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
@@ -431,7 +440,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           {total_experience_months !== undefined && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Total Experience
+                {t('results.experience.title')}
               </Typography>
               <Typography variant="h5" color="primary.main" fontWeight={600}>
                 {formatExperience(total_experience_months)}
@@ -443,7 +452,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           {keywords && keywords.length > 0 && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Keywords
+                {t('results.keywords.title')}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {keywords.slice(0, 20).map((keyword, index) => (
@@ -457,7 +466,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           {technical_skills && technical_skills.length > 0 && (
             <Box>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Technical Skills
+                {t('results.skills.title')}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {technical_skills.map((skill, index) => (
@@ -474,11 +483,11 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         <Paper elevation={1} sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" fontWeight={600}>
-              Skill Matching
+              {t('results.skillMatching')}
             </Typography>
             {match_percentage !== undefined && (
               <Chip
-                label={`${match_percentage.toFixed(0)}% Match`}
+                label={t('results.skills.matchPercentage', { percentage: formatNumber(match_percentage, language) })}
                 color={match_percentage >= 70 ? 'success' : match_percentage >= 40 ? 'warning' : 'error'}
                 sx={{ fontWeight: 600 }}
               />
@@ -491,7 +500,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" color="success.main" gutterBottom fontWeight={600}>
                 <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                Matched Skills ({matched_skills.length})
+                {t('results.skills.matched', { count: matched_skills.length })}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {matched_skills.map((item, index) => (
@@ -517,7 +526,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
             <Box>
               <Typography variant="subtitle2" color="error.main" gutterBottom fontWeight={600}>
                 <CrossIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                Missing Skills ({missing_skills.length})
+                {t('results.skills.missing', { count: missing_skills.length })}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {missing_skills.map((item, index) => (
@@ -545,10 +554,10 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
           <CheckIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
           <Typography variant="h6" color="success.main" gutterBottom fontWeight={600}>
-            Great Job!
+            {t('results.allClear.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            No critical issues detected in your resume. Your resume looks well-structured and professional.
+            {t('results.allClear.message')}
           </Typography>
         </Paper>
       )}
