@@ -1,9 +1,9 @@
 """
-Resume parsing endpoints.
+Resume parsing API endpoints.
 
 This module provides endpoints for parsing resume files (PDF, DOCX),
-validating file format and size, extracting text content, and preparing
-the resume for analysis.
+extracting structured data including skills, position, education, work
+experience, and calculating experience metrics.
 """
 import logging
 import os
@@ -13,11 +13,13 @@ from typing import Dict, Optional
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import SQLAlchemyError
 
 from ..config import get_settings
 from ..i18n.backend_translations import get_error_message, get_success_message
-from ..models.resume import Resume, ResumeStatus
+from ..models.parsed_resume import ParsedResume, Skill, Education, WorkExperience, Language, ExperienceSummary
+from ..parsers import PDFParser, DOCXParser
+from ..nlp.resume_entities import extract_resume_entities
+from ..analyzers.experience_calculator import calculate_dual_track_experience
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -41,20 +43,14 @@ def _extract_locale(request: Optional[Request]) -> str:
     lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
     return lang_code
 
-# Directory for storing uploaded resumes
-UPLOAD_DIR = Path("data/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
 
 class ResumeParseResponse(BaseModel):
     """Response model for resume parse endpoint."""
 
-    id: str = Field(..., description="Unique identifier for the parsed resume")
-    filename: str = Field(..., description="Original filename of the parsed resume")
-    status: str = Field(..., description="Processing status of the resume")
-    raw_text: Optional[str] = Field(None, description="Extracted text content from resume")
-    language: Optional[str] = Field(None, description="Detected language code (e.g., 'en', 'ru')")
-    message: str = Field(..., description="Success message")
+    success: bool = Field(..., description="Whether parsing was successful")
+    data: Optional[ParsedResume] = Field(None, description="Parsed resume data")
+    message: str = Field(..., description="Success or error message")
+    warnings: list = Field(default_factory=list, description="Parsing warnings")
 
 
 def validate_file_type(filename: str, content_type: str, locale: str = "en") -> None:
@@ -117,31 +113,100 @@ def validate_file_size(file_size: int, locale: str = "en") -> None:
         )
 
 
+def _parse_document(file_content: bytes, filename: str, file_ext: str) -> Dict:
+    """
+    Parse document and extract text using appropriate parser.
+
+    Args:
+        file_content: File content as bytes
+        filename: Original filename
+        file_ext: File extension (.pdf or .docx)
+
+    Returns:
+        Dictionary with parsing result containing:
+        - success: bool
+        - text: str (extracted text)
+        - error: str (if failed)
+    """
+    try:
+        if file_ext == ".pdf":
+            parser = PDFParser()
+            result = parser.parse_bytes(file_content, filename)
+        elif file_ext == ".docx":
+            parser = DOCXParser()
+            result = parser.parse_bytes(file_content, filename)
+        else:
+            return {
+                "success": False,
+                "error": f"Unsupported file extension: {file_ext}",
+                "text": None,
+            }
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error parsing document {filename}: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "text": None,
+        }
+
+
+def _detect_language(text: str) -> str:
+    """
+    Detect language of text (simple heuristic).
+
+    Args:
+        text: Text to analyze
+
+    Returns:
+        Language code ('en' or 'ru')
+    """
+    if not text:
+        return "en"
+
+    # Simple heuristic: check for Cyrillic characters
+    cyrillic_chars = sum(1 for c in text if '\u0400' <= c <= '\u04FF')
+    total_chars = sum(1 for c in text if c.isalpha())
+
+    if total_chars > 0 and cyrillic_chars / total_chars > 0.3:
+        return "ru"
+
+    return "en"
+
+
 @router.post(
     "/parse",
     response_model=ResumeParseResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
     tags=["Resume Parser"],
 )
 async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONResponse:
     """
-    Parse a resume file to extract text content.
+    Parse a resume file and extract structured data.
 
     This endpoint accepts resume files in PDF or DOCX format, validates the file
-    type and size, stores the file, extracts text content, detects language,
-    and prepares the resume for further analysis.
+    type and size, extracts text, parses entities (skills, position, education,
+    work experience, languages), and calculates experience metrics.
 
     Args:
         request: FastAPI request object (for Accept-Language header)
         file: Uploaded resume file (PDF or DOCX)
 
     Returns:
-        JSON response with resume ID, filename, status, extracted text, and language
+        JSON response with parsed resume data including:
+        - skills: List of extracted skills with categories and confidence
+        - position: Most recent job position
+        - education: List of education entries
+        - work_experience: List of work experience entries
+        - languages: List of languages with proficiency
+        - experience_summary: Total and framework-specific experience
 
     Raises:
         HTTPException(415): If file type is not supported
         HTTPException(413): If file size exceeds maximum allowed
-        HTTPException(500): If file storage or parsing fails
+        HTTPException(500): If parsing or extraction fails
 
     Examples:
         >>> import requests
@@ -149,12 +214,19 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
         ...     response = requests.post("http://localhost:8000/api/resume-parser/parse", files={"file": f})
         >>> response.json()
         {
-            "id": "123e4567-e89b-12d3-a456-426614174000",
-            "filename": "resume.pdf",
-            "status": "processing",
-            "raw_text": "John Doe\\nSoftware Engineer...",
-            "language": "en",
-            "message": "Resume parsing initiated"
+            "success": true,
+            "data": {
+                "raw_text": "...",
+                "language": "en",
+                "position": "Senior Software Engineer",
+                "skills": [...],
+                "education": [...],
+                "work_experience": [...],
+                "languages": [...],
+                "experience_summary": {...}
+            },
+            "message": "Resume parsed successfully",
+            "warnings": []
         }
     """
     # Extract locale from Accept-Language header
@@ -165,7 +237,7 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
         file_content = await file.read()
         file_size = len(file_content)
 
-        logger.info(f"Received file for parsing: {file.filename} ({file_size} bytes)")
+        logger.info(f"Received resume for parsing: {file.filename} ({file_size} bytes)")
 
         # Validate file type
         validate_file_type(file.filename or "unknown", file.content_type or "application/octet-stream", locale)
@@ -173,38 +245,131 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
         # Validate file size
         validate_file_size(file_size, locale)
 
-        # Generate unique filename to avoid conflicts
+        # Get file extension
         safe_filename = Path(file.filename or "resume").name
-        file_id = f"{os.urandom(8).hex()}"
-        file_extension = Path(safe_filename).suffix
-        stored_filename = f"{file_id}{file_extension}"
-        file_path = UPLOAD_DIR / stored_filename
+        file_ext = Path(safe_filename).suffix.lower()
 
-        # Save file to disk
-        logger.info(f"Saving file to: {file_path}")
-        with open(file_path, "wb") as f:
-            f.write(file_content)
+        # Parse document and extract text
+        logger.info(f"Parsing {file_ext} document: {safe_filename}")
+        parse_result = _parse_document(file_content, safe_filename, file_ext)
+
+        if not parse_result.get("success"):
+            error_msg = parse_result.get("error", "Unknown parsing error")
+            logger.error(f"Document parsing failed: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Failed to parse document: {error_msg}",
+            )
+
+        raw_text = parse_result.get("text", "")
+        if not raw_text or len(raw_text.strip()) < 10:
+            logger.warning(f"Extracted text is too short or empty: {len(raw_text)} chars")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Could not extract sufficient text from document. "
+                      "The document may be image-based or password-protected.",
+            )
+
+        logger.info(f"Extracted {len(raw_text)} characters from document")
+
+        # Detect language
+        language = _detect_language(raw_text)
+        logger.info(f"Detected language: {language}")
+
+        # Extract resume entities
+        logger.info("Extracting resume entities...")
+        entities = extract_resume_entities(raw_text, language=language)
+
+        # Calculate experience (dual-track)
+        logger.info("Calculating experience metrics...")
+        experience_result = calculate_dual_track_experience(raw_text, language=language)
+
+        # Build parsed resume model
+        parsed_resume = ParsedResume(
+            raw_text=raw_text,
+            language=language,
+            position=entities.get("position"),
+            age=entities.get("age"),
+            skills=[
+                Skill(
+                    name=skill.get("name", ""),
+                    original_name=skill.get("original_name", skill.get("name", "")),
+                    category=skill.get("category"),
+                    variations=skill.get("variations", []),
+                    sources=skill.get("sources", []),
+                    confidence=skill.get("confidence", 0.0),
+                )
+                for skill in entities.get("skills", [])
+            ],
+            education=[
+                Education(
+                    degree=edu.get("degree"),
+                    institution=edu.get("institution"),
+                    field_of_study=edu.get("field_of_study"),
+                    start_date=edu.get("start_date"),
+                    end_date=edu.get("end_date"),
+                    gpa=edu.get("gpa"),
+                    description=edu.get("description"),
+                )
+                for edu in entities.get("education", [])
+            ],
+            work_experience=[
+                WorkExperience(
+                    company=exp.get("company"),
+                    position=exp.get("position"),
+                    start_date=exp.get("start_date"),
+                    end_date=exp.get("end_date"),
+                    duration_months=exp.get("duration_months"),
+                    description=exp.get("description"),
+                    skills=exp.get("skills", []),
+                    location=exp.get("location"),
+                )
+                for exp in entities.get("work_experience", [])
+            ],
+            languages=[
+                Language(
+                    name=lang.get("name", ""),
+                    proficiency=lang.get("proficiency"),
+                    certification=lang.get("certification"),
+                )
+                for lang in entities.get("languages", [])
+            ],
+            experience_summary=ExperienceSummary(
+                total_months=experience_result.get("total_months", 0),
+                total_years=experience_result.get("total_years", 0.0),
+                total_years_formatted=experience_result.get("total_years_formatted", "0 years"),
+                framework_specific=experience_result.get("framework_specific", {}),
+            ) if experience_result.get("total_months", 0) > 0 else None,
+            warnings=entities.get("warnings", []),
+            processing_metadata={
+                "parser": f"{file_ext[1:]}_parser",
+                "file_extension": file_ext,
+                "text_length": len(raw_text),
+                "num_skills": len(entities.get("skills", [])),
+                "num_education": len(entities.get("education", [])),
+                "num_work_experience": len(entities.get("work_experience", [])),
+                "num_languages": len(entities.get("languages", [])),
+            },
+        )
 
         # Get translated success message
-        success_message = get_success_message("resume_parsing_initiated", locale)
+        success_message = get_success_message("file_uploaded", locale)
 
-        # For now, return a response indicating parsing has been initiated
-        # Actual parsing implementation will be added in a later subtask
-        # when we have the text extraction service integrated
-        response_data = {
-            "id": file_id,
-            "filename": file.filename or "unknown",
-            "status": ResumeStatus.PROCESSING.value,
-            "raw_text": None,
-            "language": None,
-            "message": success_message,
-        }
-
-        logger.info(f"Resume parsing initiated: {file_id}")
+        logger.info(
+            f"Resume parsed successfully: "
+            f"position={parsed_resume.position}, "
+            f"skills={len(parsed_resume.skills)}, "
+            f"experience={parsed_resume.experience_summary.total_years if parsed_resume.experience_summary else 0} years"
+        )
 
         return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=response_data,
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "data": parsed_resume.model_dump(mode='json'),
+                "message": success_message,
+                "warnings": parsed_resume.warnings,
+            },
         )
 
     except HTTPException:
@@ -212,7 +377,7 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
         raise
     except Exception as e:
         logger.error(f"Error parsing resume: {e}", exc_info=True)
-        error_msg = get_error_message("resume_parsing_failed", locale)
+        error_msg = get_error_message("file_upload_failed", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg,
