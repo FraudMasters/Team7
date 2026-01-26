@@ -13,6 +13,10 @@ from .learning_tasks import (
     retrain_skill_matching_model,
 )
 from .report_generation import (
+    get_report_data,
+    format_report_as_pdf,
+    format_report_as_csv,
+    send_report_via_email,
     generate_scheduled_reports,
     process_all_pending_reports,
 )
@@ -24,6 +28,10 @@ __all__ = [
     "review_and_activate_synonyms",
     "periodic_feedback_aggregation",
     "retrain_skill_matching_model",
+    "get_report_data",
+    "format_report_as_pdf",
+    "format_report_as_csv",
+    "send_report_via_email",
     "generate_scheduled_reports",
     "process_all_pending_reports",
 ]
