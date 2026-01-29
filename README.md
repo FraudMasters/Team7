@@ -302,4 +302,4 @@ MIT
 
 ---
 
-Built for TEAM7
+Built by TEAM7
