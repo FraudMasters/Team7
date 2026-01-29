@@ -1,483 +1,190 @@
-# AI-Powered Resume Analysis Platform
+# TEAM7 Resume Analysis Platform
 
-An intelligent resume analysis platform with ML/NLP processing, job matching, error detection, and web interface for outstaffing recruitment optimization.
+AI-powered resume analysis system with intelligent job matching, multi-language support, and analytics dashboard.
 
-## 🌟 Features
+## Features
 
-- **📄 Resume Upload & Parsing**: Support for PDF and DOCX formats with drag-and-drop interface
-- **🔍 Intelligent Analysis**:
-  - KeyBERT keyword extraction with BERT-based embeddings
-  - SpaCy named entity recognition (skills, organizations, dates)
-  - LanguageTool grammar and spelling checking (English & Russian)
-  - Experience calculation with overlap detection
-- **⚠️ Error Detection**: Identifies missing contact info, length issues, portfolio requirements
-- **🎯 Job Matching**:
-  - Skill synonym handling (PostgreSQL ≈ SQL, ReactJS ≈ React)
-  - Match percentage calculation
-  - Visual highlighting (green = matched, red = missing)
-  - Experience verification by skill
-- **⚡ Async Processing**: Celery + Redis for long-running analysis tasks
-- **🎨 Modern UI**: React 18 + Material-UI with responsive design
+- **Resume Upload & Analysis**: Support for PDF and DOCX formats
+- **Intelligent Matching**: Skill-based job matching with synonym handling
+- **Multi-language**: English and Russian support
+- **Analytics Dashboard**: Hiring funnels, skill demand, recruiter performance
+- **Async Processing**: Celery + Redis for background tasks
+- **Modern UI**: React 18 + Material-UI with responsive design
 
-## 🏗️ Architecture
+## Quick Start
 
-```
-┌─────────────┐      ┌──────────────┐      ┌─────────────┐
-│  Frontend   │─────▶│   Backend    │─────▶│   Database  │
-│ (React+MUI) │      │   (FastAPI)  │      │ (PostgreSQL)│
-└─────────────┘      └──────────────┘      └─────────────┘
-                            │
-                    ┌───────┴────────┐
-                    ▼                ▼
-              ┌─────────┐      ┌──────────┐
-              │ Celery  │      │  Redis   │
-              │ Worker  │      │  Broker  │
-              └─────────┘      └──────────┘
+Choose your operating system:
+
+### macOS / Linux
+
+```bash
+git clone https://github.com/FraudMasters/Team7.git
+cd Team7
+bash setup.sh
 ```
 
-## 📋 Tech Stack
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/FraudMasters/Team7.git
+cd Team7
+.\setup.ps1
+```
+
+Then open http://localhost:5173
+
+### Load Test Data (Optional)
+
+```bash
+# macOS/Linux
+bash scripts/load_test_data.sh
+
+# Windows
+.\scripts\load-test-data.ps1
+```
+
+This uploads 65 sample resumes and 5 job vacancies.
+
+## Requirements
+
+- **Docker Desktop** (Mac/Windows) or Docker + Docker Compose (Linux)
+- **8GB RAM** minimum (16GB recommended)
+- **5GB disk space**
+
+## Services
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Frontend | http://localhost:5173 | React UI |
+| Backend API | http://localhost:8000 | FastAPI backend |
+| API Docs | http://localhost:8000/docs | Interactive documentation |
+| Flower | http://localhost:5555 | Celery monitoring |
+
+## Common Commands
+
+```bash
+# View logs
+docker compose logs -f
+
+# View specific service logs
+docker compose logs backend
+docker compose logs frontend
+
+# Restart services
+docker compose restart
+
+# Stop all services
+docker compose down
+
+# Stop and remove data
+docker compose down -v
+```
+
+## Tech Stack
 
 ### Backend
-- **Framework**: FastAPI 0.115.0 with Python 3.9+
-- **Database**: PostgreSQL 14 with SQLAlchemy 2.0 ORM
-- **ML/NLP**:
-  - KeyBERT (BERT-based keyword extraction)
-  - SpaCy 3.8 (NER with en_core_web_sm, ru_core_web_sm)
-  - LanguageTool 2.7.1 (grammar/spelling checking)
-  - langdetect (automatic language detection)
-- **File Processing**: PyPDF2, python-docx, pdfplumber
-- **Async Processing**: Celery 5.4.0 + Redis 7
-- **Testing**: pytest 8.3.3 with 70%+ coverage requirement
+- **Framework**: FastAPI with Python 3.11+
+- **Database**: PostgreSQL 14 with SQLAlchemy 2.0
+- **ML/NLP**: KeyBERT, SpaCy, LanguageTool
+- **Async**: Celery + Redis
 
 ### Frontend
 - **Framework**: React 18 with TypeScript 5.6
-- **Build Tool**: Vite 5.4
-- **UI Library**: Material-UI (MUI) v6
-- **HTTP Client**: Axios
-- **Testing**: Vitest + React Testing Library + Playwright (E2E)
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.9+
-- Node.js 18+
-- Docker & Docker Compose (for infrastructure)
-- PostgreSQL 14+ (or use Docker)
-- Redis 7+ (or use Docker)
-
-### 1. Clone & Setup
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd <repository-name>
-
-# Copy environment files
-cp .env.example .env
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-```
-
-### 2. One-Click Deployment (Recommended)
-
-The easiest way to deploy the entire application is using the automated deployment script:
-
-```bash
-# Deploy all services with one command
-bash scripts/deploy.sh
-```
-
-This script will:
-- ✅ Check prerequisites (Docker, Docker Compose)
-- ✅ Set up environment files automatically
-- ✅ Build all required Docker images
-- ✅ Start infrastructure services (PostgreSQL, Redis)
-- ✅ Run database migrations
-- ✅ Start application services in correct order (Backend → Celery Worker → Frontend → Flower)
-- ✅ Verify health of each service
-- ✅ Display deployment summary with service URLs
-
-**After successful deployment, access:**
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **Celery Monitoring**: http://localhost:5555
-
-**Next steps:**
-```bash
-# View logs
-docker-compose logs -f
-
-# Check specific service logs
-docker-compose logs -f backend
-docker-compose logs -f celery_worker
-docker-compose logs -f frontend
-
-# Stop all services
-docker-compose down
-```
-
-### 3. Manual Setup (Alternative)
-
-#### Backend Setup
-
-```bash
-# Create virtual environment
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Download ML models
-python -m spacy download en_core_web_sm
-python -m spacy download ru_core_web_sm
-
-# Run database migrations
-alembic upgrade head
-
-# Start backend server
-uvicorn main:app --reload --port 8000
-```
-
-#### Frontend Setup
-
-```bash
-# Install dependencies
-cd frontend
-npm install
-
-# Start development server
-npm run dev
-```
-
-### 4. Access the Application
-
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs (Swagger UI)
-- **Celery Monitoring**: http://localhost:5555 (Flower)
-
-## 📖 API Documentation
-
-### Resume Endpoints
-
-#### Upload Resume
-
-```http
-POST /api/resumes/upload
-Content-Type: multipart/form-data
-
-{
-  "file": <resume.pdf or resume.docx>
-}
-```
-
-Response:
-```json
-{
-  "id": "uuid",
-  "filename": "resume.pdf",
-  "status": "uploaded",
-  "created_at": "2024-01-24T00:00:00Z"
-}
-```
-
-#### Analyze Resume
-
-```http
-POST /api/resumes/analyze
-Content-Type: application/json
-
-{
-  "resume_id": "uuid",
-  "options": {
-    "extract_keywords": true,
-    "extract_entities": true,
-    "check_grammar": true,
-    "calculate_experience": true,
-    "detect_errors": true
-  }
-}
-```
-
-Response:
-```json
-{
-  "resume_id": "uuid",
-  "language": "en",
-  "keywords": ["Java", "Spring", "PostgreSQL"],
-  "entities": {
-    "organizations": ["MTS", "JBorn"],
-    "dates": ["2020-05", "2023-02"],
-    "technical_skills": ["Java", "Spring Boot", "Kafka"]
-  },
-  "grammar_issues": [
-    {
-      "type": "grammar",
-      "message": "Missing comma",
-      "context": "skills include Java Python",
-      "suggestions": ["skills include Java, Python"]
-    }
-  ],
-  "experience": {
-    "total_years": 3.6,
-    "total_months": 43,
-    "projects_count": 2
-  },
-  "errors": [
-    {
-      "type": "missing_portfolio",
-      "severity": "warning",
-      "message": "Entry-level candidates should include portfolio link"
-    }
-  ],
-  "processing_time_seconds": 2.5
-}
-```
-
-#### Compare with Job Vacancy
-
-```http
-POST /api/matching/compare
-Content-Type: application/json
-
-{
-  "resume_id": "uuid",
-  "vacancy_data": {
-    "position": "Java Developer",
-    "mandatory_requirements": [
-      "Java",
-      "Spring",
-      "PostgreSQL",
-      "Kafka"
-    ],
-    "min_experience_years": 3
-  }
-}
-```
-
-Response:
-```json
-{
-  "resume_id": "uuid",
-  "vacancy_position": "Java Developer",
-  "match_percentage": 75,
-  "matched_skills": [
-    {"skill": "Java", "status": "matched", "highlight": "green"},
-    {"skill": "Spring", "status": "matched", "highlight": "green"},
-    {"skill": "PostgreSQL", "status": "matched", "highlight": "green"}
-  ],
-  "missing_skills": [
-    {"skill": "Kafka", "status": "missing", "highlight": "red"}
-  ],
-  "experience_verification": [
-    {
-      "skill": "Java",
-      "required_years": 3,
-      "candidate_years": 3.6,
-      "meets_requirement": true
-    }
-  ]
-}
-```
-
-### Health Check Endpoints
-
-```http
-GET /health          # Service health
-GET /ready           # Readiness probe
-GET /                # API root
-```
-
-## 🧪 Testing
-
-### Backend Tests
-
-```bash
-cd backend
-
-# Run all tests
-pytest tests/ -v
-
-# Run with coverage
-pytest tests/ --cov=analyzers --cov-report=term-missing
-
-# Run integration tests
-pytest tests/integration/ -v
-
-# Run specific test file
-pytest tests/test_error_detector.py -v
-```
-
-**Coverage Requirements**: 70%+ for core modules
-
-### Frontend Tests
-
-```bash
-cd frontend
-
-# Run unit tests
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# Run E2E tests
-npm run test:e2e
-
-# Run E2E tests in UI mode
-npm run test:e2e:ui
-```
-
-### Accuracy Validation
-
-```bash
-cd backend
-
-# Validate error detection accuracy (target: 80%+)
-python tests/accuracy_validation/validate_error_detection.py
-
-# Validate skill matching accuracy (target: 90%+)
-python tests/accuracy_validation/validate_skill_matching.py
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-See `.env.example` files for all available configuration options:
-
-- **Root `.env`**: Database and Redis configuration
-- **Backend `backend/.env`**: ML model paths, API keys, CORS settings
-- **Frontend `frontend/.env`**: API URL, application settings
-
-### Key Configuration Files
-
-- `backend/config.py` - Backend settings (Pydantic Settings)
-- `backend/celery_config.py` - Celery worker configuration
-- `frontend/vite.config.ts` - Frontend build configuration
-
-## 📊 Monitoring
-
-- **Celery Flower**: http://localhost:5555 - Monitor async tasks
-- **FastAPI Docs**: http://localhost:8000/docs - Interactive API documentation
-- **Database Logs**: `docker-compose logs postgres`
-- **Application Logs**: `docker-compose logs backend`
-
-## 🛠️ Development
-
-### Code Quality
-
-```bash
-# Backend
-cd backend
-black .                    # Format code
-flake8 .                   # Lint code
-mypy .                     # Type checking
-
-# Frontend
-cd frontend
-npm run lint               # ESLint
-npm run format             # Prettier
-```
-
-### Database Migrations
-
-```bash
-cd backend
-
-# Create migration
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback migration
-alembic downgrade -1
-```
-
-## 📦 Project Structure
+- **Build**: Vite 5.4
+- **UI**: Material-UI (MUI) v6
+- **i18n**: react-i18next (EN/RU)
+
+## Project Structure
 
 ```
-.
-├── backend/                    # FastAPI backend
-│   ├── analyzers/              # ML/NLP analyzers
-│   │   ├── keyword_extractor.py
-│   │   ├── ner_extractor.py
-│   │   ├── grammar_checker.py
-│   │   ├── experience_calculator.py
-│   │   └── error_detector.py
-│   ├── api/                    # API endpoints
-│   │   ├── resumes.py
-│   │   ├── analysis.py
-│   │   └── matching.py
-│   ├── tasks/                  # Celery tasks
-│   ├── tests/                  # Backend tests
-│   ├── alembic/                # Database migrations
-│   ├── models/                 # SQLAlchemy models
-│   └── main.py                 # FastAPI app
-├── frontend/                   # React frontend
+├── backend/               # FastAPI backend
+│   ├── analyzers/         # ML/NLP analyzers
+│   ├── api/               # API endpoints
+│   ├── tasks/             # Celery tasks
+│   ├── models/            # SQLAlchemy models
+│   └── alembic/           # Database migrations
+├── frontend/              # React + Vite frontend
 │   ├── src/
-│   │   ├── api/                # API client
-│   │   ├── components/         # React components
-│   │   ├── pages/              # Page components
-│   │   ├── types/              # TypeScript types
-│   │   └── utils/              # Utilities
-│   ├── e2e/                    # E2E tests
-│   └── package.json
-├── services/                   # Shared services
-│   └── data_extractor/         # PDF/DOCX extraction
-├── docker-compose.yml          # Docker services
-├── .env.example                # Root environment template
-├── README.md                   # This file
-└── DEPLOYMENT.md               # Deployment guide
+│   │   ├── api/           # API client
+│   │   ├── components/    # React components
+│   │   ├── pages/         # Page components
+│   │   └── i18n/          # Translations (EN/RU)
+│   └── nginx.conf         # nginx config for production
+├── scripts/               # Setup and utility scripts
+│   ├── load_test_data.sh  # Test data loader
+│   └── load-test-data.ps1 # Windows version
+├── services/              # Shared services
+│   └── data_extractor/    # PDF/DOCX extraction
+├── docker-compose.yml     # Docker services
+├── setup.sh               # Setup script (Mac/Linux)
+├── setup.ps1              # Setup script (Windows)
+├── .env.example           # Environment template
+├── README.md              # This file
+└── SETUP.md               # Detailed setup guide
 ```
 
-## 🚢 Deployment
+## API Examples
 
-For production deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
-Quick deploy with Docker:
+### Upload Resume
 
 ```bash
-# Build and start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+curl -X POST http://localhost:8000/api/resumes/upload \
+  -F "file=@resume.pdf"
 ```
 
-## 📚 Documentation
+### Analyze Resume
 
-- [Backend API Documentation](http://localhost:8000/docs)
-- [Database Setup Guide](backend/DATABASE_SETUP.md)
-- [Matching Implementation](backend/MATCHING_IMPLEMENTATION.md)
-- [Security Scan Report](backend/SECURITY_SCAN_REPORT.md)
-- [Frontend Documentation](frontend/README.md)
-- [E2E Testing Guide](frontend/e2e/README.md)
+```bash
+curl -X POST http://localhost:8000/api/resumes/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"resume_id": "uuid", "extract_keywords": true}'
+```
 
-## 🤝 Contributing
+### Job Matching
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```bash
+curl -X POST http://localhost:8000/api/matching/compare \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resume_id": "uuid",
+    "vacancy_data": {
+      "position": "Java Developer",
+      "mandatory_requirements": ["Java", "Spring"]
+    }
+  }'
+```
 
-## 📝 License
+## Documentation
+
+- [Setup Guide](SETUP.md) - Detailed installation instructions
+- [Database Setup](backend/DATABASE_SETUP.md) - Database configuration
+- [Matching Implementation](backend/MATCHING_IMPLEMENTATION.md) - Job matching details
+
+## Troubleshooting
+
+**Port already in use?**
+Edit `.env` and change `FRONTEND_PORT` or `BACKEND_PORT`.
+
+**Services not starting?**
+```bash
+docker compose logs backend
+```
+
+**PowerShell scripts blocked?**
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+**Reset everything?**
+```bash
+docker compose down -v
+bash setup.sh
+```
+
+## License
 
 MIT
 
-## 📧 Support
-
-For support and questions, please open an issue in the repository.
-
 ---
 
-Built with ❤️ for Iconicompany - Smart Outstaffing Platform
+Built for TEAM7
