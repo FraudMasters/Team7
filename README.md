@@ -60,6 +60,121 @@ This uploads 65 sample resumes and 5 job vacancies.
 | API Docs | http://localhost:8000/docs | Interactive documentation |
 | Flower | http://localhost:5555 | Celery monitoring |
 
+## Architecture
+
+```
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│  Frontend   │─────▶│   Backend    │─────▶│   Database  │
+│ (React+MUI) │      │   (FastAPI)  │      │ (PostgreSQL)│
+└─────────────┘      └──────────────┘      └─────────────┘
+                            │
+                    ┌───────┴────────┐
+                    ▼                ▼
+              ┌─────────┐      ┌──────────┐
+              │ Celery  │      │  Redis   │
+              │ Worker  │      │  Broker  │
+              └─────────┘      └──────────┘
+```
+
+## How It Works
+
+### 1. Resume Upload & Parsing
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│ Upload PDF/  │────▶│ Extract Text │────▶│ Save to DB   │
+│   DOCX       │     │ (PyPDF2/     │     │ (status:     │
+│              │     │  python-docx)│     │  uploaded)   │
+└──────────────┘     └──────────────┘     └──────────────┘
+```
+
+### 2. Resume Analysis Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     RESUME ANALYSIS PIPELINE                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. LANGUAGE DETECTION (langdetect)                            │
+│     └─▶ Detects English or Russian                             │
+│                                                                 │
+│  2. KEYWORD EXTRACTION (KeyBERT)                                │
+│     └─▶ Extracts key skills and competencies                   │
+│                                                                 │
+│  3. NAMED ENTITY RECOGNITION (SpaCy)                            │
+│     ├─▶ en_core_web_sm (English)                               │
+│     └─▶ ru_core_news_sm (Russian)                              │
+│         • Organizations (companies)                            │
+│         • Dates (work periods)                                  │
+│         • Technical skills                                      │
+│         • Person names                                          │
+│                                                                 │
+│  4. EXPERIENCE CALCULATION                                     │
+│     ├─▶ Parse work periods from dates                          │
+│     ├─▶ Detect overlapping periods (avoid double-count)       │
+│     └─▶ Calculate total years/months of experience             │
+│                                                                 │
+│  5. GRAMMAR CHECKING (LanguageTool)                            │
+│     ├─▶ Grammar errors                                          │
+│     ├─▶ Spelling mistakes                                      │
+│     └─▶ Style suggestions                                       │
+│                                                                 │
+│  6. ERROR DETECTION                                            │
+│     ├─▶ Missing contact info                                    │
+│     ├─▶ Resume too short                                        │
+│     ├─▶ No portfolio (for juniors)                             │
+│     └─▶ Inconsistent dates                                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3. Job Matching Algorithm
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    JOB MATCHING ALGORITHM                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  VACANCY REQUIREMENTS                                           │
+│        │                                                        │
+│        ▼                                                        │
+│  ┌─────────────────────┐                                       │
+│  │ NORMALIZE SKILLS     │                                       │
+│  │ • PostgreSQL → SQL   │                                       │
+│  │ • ReactJS → React    │                                       │
+│  │ • Java 8 → Java      │                                       │
+│  └──────────┬──────────┘                                       │
+│             │                                                   │
+│             ▼                                                   │
+│  ┌─────────────────────┐                                       │
+│  │ COMPARE WITH RESUME │                                       │
+│  │ • Direct match       │                                       │
+│  │ • Synonym match      │                                       │
+│  │ • Related skills     │                                       │
+│  └──────────┬──────────┘                                       │
+│             │                                                   │
+│             ▼                                                   │
+│  ┌─────────────────────┐       ┌─────────────────────┐        │
+│  │ EXPERIENCE VERIFY   │──────▶│ MATCH PERCENTAGE    │        │
+│  │ • Has X years with   │       │ • Matched: 75%       │        │
+│  │   skill Y?           │       │ • Missing: 25%       │        │
+│  └─────────────────────┘       │ • Status: matched    │        │
+│                                └─────────────────────┘        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 4. Skill Synonym Matching
+
+The system understands that different terms can mean the same skill:
+
+| User Input | Matches Also |
+|-----------|--------------|
+| PostgreSQL | SQL, Postgres, psql |
+| React | ReactJS, React.js, React.js |
+| JavaScript | JS, javascript |
+| Java | Java 8, Java 11, Java 17 |
+
 ## Common Commands
 
 ```bash
