@@ -272,6 +272,8 @@ curl -X POST http://localhost:8000/api/matching/compare \
 ## Documentation
 
 - [Setup Guide](SETUP.md) - Detailed installation instructions
+- [Russian README](README_RU.md) - Версия на русском языке
+- [ML Pipeline Details](ML_PIPELINE.md) - How the ML/NLP analysis works
 - [Database Setup](backend/DATABASE_SETUP.md) - Database configuration
 - [Matching Implementation](backend/MATCHING_IMPLEMENTATION.md) - Job matching details
 
