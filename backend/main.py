@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from .config import get_settings
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -231,7 +231,7 @@ async def root() -> JSONResponse:
 
 
 # Include API routers
-from .api import (
+from api import (
     resumes,
     analysis,
     matching,
@@ -242,7 +242,7 @@ from .api import (
     comparisons,
     analytics,
     reports,
-    preferences,
+    vacancies,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -255,7 +255,7 @@ app.include_router(model_versions.router, prefix="/api/model-versions", tags=["M
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-app.include_router(preferences.router, prefix="/api/preferences", tags=["Preferences"])
+app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 
 
 if __name__ == "__main__":

@@ -99,7 +99,7 @@ interface ResumeComparisonMatrixProps {
 const getMatchConfig = (percentage: number) => {
   if (percentage >= 70) {
     return {
-      color: 'success' as const;
+      color: 'success' as const,
       label: 'Excellent',
       bgColor: 'success.main',
       textColor: 'success.contrastText',

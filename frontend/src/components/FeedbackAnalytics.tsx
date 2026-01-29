@@ -35,7 +35,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   School as LearningIcon,
-  Model as ModelIcon,
+  Science as ModelIcon,
 } from '@mui/icons-material';
 
 /**

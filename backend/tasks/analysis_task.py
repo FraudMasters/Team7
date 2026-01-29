@@ -17,15 +17,15 @@ from celery.exceptions import SoftTimeLimitExceeded
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
 
-from ..analyzers import (
-    extract_resume_keywords,
+from analyzers import (
+    extract_resume_keywords_hf as extract_resume_keywords,
     extract_resume_entities,
     check_grammar_resume,
     calculate_total_experience,
     format_experience_summary,
     detect_resume_errors,
 )
-from ..config import get_settings
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -72,7 +72,7 @@ def extract_text_from_file(file_path: Path) -> str:
     """
     try:
         # Import extraction functions
-        from extract import extract_text_from_pdf, extract_text_from_docx
+        from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
 
         file_ext = file_path.suffix.lower()
 

@@ -8,7 +8,7 @@ import {
   Typography,
   SelectChangeEvent,
 } from '@mui/material';
-import { useLanguageContext, SUPPORTED_LANGUAGES } from '@contexts/LanguageContext';
+import { useLanguageContext, SUPPORTED_LANGUAGES } from '@/contexts/LanguageContext';
 
 /**
  * LanguageSwitcher Component

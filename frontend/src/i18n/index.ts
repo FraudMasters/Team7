@@ -31,11 +31,9 @@ i18n
 
     detection: {
       // Order of language detection
-      order: ['localStorage', 'navigator', 'htmlTag'],
+      order: ['localStorage', 'navigator'],
       // Cache user language in localStorage
       caches: ['localStorage'],
-      // Only use languages that are in our resources
-      checkWhitelist: true,
     },
   });
 

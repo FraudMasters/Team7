@@ -2,6 +2,7 @@
 AnalysisResult model for storing resume analysis results
 """
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,7 +28,7 @@ class AnalysisResult(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "analysis_results"
 
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     errors: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

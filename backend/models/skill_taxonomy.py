@@ -19,7 +19,7 @@ class SkillTaxonomy(Base, UUIDMixin, TimestampMixin):
         skill_name: Canonical name of the skill
         context: Context category (e.g., web_framework, language, database)
         variants: JSON array of alternative names/spellings for this skill
-        metadata: JSON object with additional skill metadata (description, category, etc.)
+        extra_metadata: JSON object with additional skill metadata (description, category, etc.)
         is_active: Whether this taxonomy entry is currently active
         created_at: Timestamp when record was created (inherited)
         updated_at: Timestamp when record was last updated (inherited)
@@ -31,7 +31,7 @@ class SkillTaxonomy(Base, UUIDMixin, TimestampMixin):
     skill_name: Mapped[str] = mapped_column(nullable=False, index=True)
     context: Mapped[Optional[str]] = mapped_column(nullable=True)
     variants: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
 
     def __repr__(self) -> str:

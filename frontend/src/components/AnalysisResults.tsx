@@ -33,6 +33,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
+import CandidateMatchVisualization from '@components/CandidateMatchVisualization';
 
 /**
  * Error/Issue interface from backend analysis
@@ -74,6 +75,9 @@ interface SkillMatch {
  */
 interface AnalysisResult {
   resume_id: string;
+  filename: string;
+  status: string;
+  raw_text: string;
   errors: AnalysisError[];
   grammar_errors?: GrammarError[];
   keywords?: string[];
@@ -82,6 +86,16 @@ interface AnalysisResult {
   matched_skills?: SkillMatch[];
   missing_skills?: SkillMatch[];
   match_percentage?: number;
+  best_match?: {
+    vacancy_id: string;
+    vacancy_title: string;
+    match_percentage: number;
+    matched_skills: string[];
+    missing_skills: string[];
+    salary_min?: number;
+    salary_max?: number;
+    location?: string;
+  };
   processing_time?: number;
 }
 
@@ -113,7 +127,7 @@ interface AnalysisResultsProps {
  */
 const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   resumeId,
-  apiUrl = 'http://localhost:8000/api/analysis',
+  apiUrl = 'http://localhost:8000/api/resumes',
 }) => {
   const { t } = useTranslation();
   const { language } = useLanguageContext();
@@ -257,13 +271,13 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     );
   }
 
-  const { errors, grammar_errors, keywords, technical_skills, total_experience_months, matched_skills, missing_skills, match_percentage } = data;
+  const { errors, grammar_errors, keywords, technical_skills, total_experience_months, matched_skills, missing_skills, match_percentage, raw_text, filename, best_match } = data;
 
-  // Count errors by severity
-  const criticalCount = errors.filter((e) => e.severity === 'critical').length;
-  const warningCount = errors.filter((e) => e.severity === 'warning').length;
-  const infoCount = errors.filter((e) => e.severity === 'info').length;
-  const grammarErrorCount = grammar_errors?.filter((e) => e.severity === 'error').length || 0;
+  // Count errors by severity (with safety checks)
+  const criticalCount = (errors || []).filter((e) => e.severity === 'critical').length;
+  const warningCount = (errors || []).filter((e) => e.severity === 'warning').length;
+  const infoCount = (errors || []).filter((e) => e.severity === 'info').length;
+  const grammarErrorCount = (grammar_errors || []).filter((e) => e.severity === 'error').length;
 
   return (
     <Stack spacing={3}>
@@ -331,6 +345,109 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         </Grid>
       </Paper>
 
+      {/* Best Match Banner */}
+      {best_match && (
+        <Paper
+          elevation={3}
+          sx={{
+            p: 3,
+            background: (theme) =>
+              `linear-gradient(135deg, ${theme.palette.primary.main}15 0%, ${theme.palette.primary.main}05 100%)`,
+            borderLeft: 6,
+            borderColor: 'primary.main',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ flex: 1, minWidth: 250 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Best Match
+              </Typography>
+              <Typography variant="h5" fontWeight={600} color="primary.main">
+                {best_match.match_percentage}% Match
+              </Typography>
+              <Typography variant="h6" sx={{ mt: 1 }}>
+                {best_match.vacancy_title}
+              </Typography>
+              {best_match.location && (
+                <Typography variant="body2" color="text.secondary">
+                  📍 {best_match.location}
+                </Typography>
+              )}
+            </Box>
+
+            <Box sx={{ flex: 1, minWidth: 200 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Matched Skills
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {best_match.matched_skills.slice(0, 8).map((skill) => (
+                  <Chip
+                    key={skill}
+                    label={skill}
+                    size="small"
+                    color="success"
+                    sx={{ fontSize: '0.75rem' }}
+                  />
+                ))}
+                {best_match.matched_skills.length > 8 && (
+                  <Chip
+                    label={`+${best_match.matched_skills.length - 8}`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+              </Box>
+            </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                size="large"
+                href={`/compare/${data.resume_id}/${best_match.vacancy_id}`}
+                sx={{ minWidth: 180 }}
+              >
+                View Details
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+      )}
+
+      {/* Resume Text Section */}
+      {raw_text && (
+        <Paper elevation={1} sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight={600}>
+              Resume Content: {filename}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {raw_text.length} characters
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <Box
+            sx={{
+              bgcolor: 'grey.50',
+              p: 2,
+              borderRadius: 1,
+              maxHeight: 500,
+              overflow: 'auto',
+              fontFamily: 'monospace',
+              fontSize: '0.875rem',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {raw_text}
+          </Box>
+        </Paper>
+      )}
+
+      {/* Candidate Match Visualization */}
+      {technical_skills && technical_skills.length > 0 && (
+        <CandidateMatchVisualization resumeId={resumeId} skills={technical_skills} />
+      )}
+
       {/* Errors and Issues Section */}
       {errors.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
@@ -339,7 +456,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Stack spacing={2}>
-            {errors.map((errorItem, index) => {
+            {(errors || []).map((errorItem, index) => {
               const config = getSeverityConfig(errorItem.severity);
               return (
                 <Alert key={index} severity={config.color} icon={config.icon}>
@@ -374,12 +491,12 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="body1" fontWeight={500}>
-                {t('results.grammar.viewIssues', { count: grammar_errors.length })}
+                {t('results.grammar.viewIssues', { count: (grammar_errors || []).length })}
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <List>
-                {grammar_errors.map((error, index) => {
+                {(grammar_errors || []).map((error, index) => {
                   const config = getSeverityConfig(error.severity);
                   return (
                     <ListItem key={index} alignItems="flex-start" sx={{ px: 0 }}>
@@ -469,7 +586,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 {t('results.skills.title')}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {technical_skills.map((skill, index) => (
+                {(technical_skills || []).map((skill, index) => (
                   <Chip key={index} label={skill} size="small" color="primary" variant="filled" />
                 ))}
               </Box>

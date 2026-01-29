@@ -43,10 +43,19 @@
     "results": "Результаты",
     "compare": "Сравнение",
     "adminSynonyms": "Синонимы",
-    "adminAnalytics": "Аналитика"
+    "adminAnalytics": "Аналитика",
+    "findJobs": "Найти работу",
+    "findEmployees": "Найти сотрудника",
+    "browseJobs": "Смотреть вакансии",
+    "uploadResumeNav": "Загрузить резюме",
+    "myApplications": "Мои заявки",
+    "dashboard": "Панель",
+    "manageVacancies": "Управление вакансиями",
+    "resumeDatabase": "База резюме",
+    "searchCandidates": "Поиск кандидатов"
   },
   "footer": {
-    "copyright": "{{year}} Iconicompany. Платформа анализа резюме на основе ИИ."
+    "copyright": "{{year}} TEAM7. Платформа анализа резюме на основе ИИ."
   },
   "home": {
     "hero": {
@@ -389,5 +398,180 @@
     "invalidUrl": "Неверный URL",
     "invalidNumber": "Неверное число",
     "invalidDate": "Неверная дата"
+  },
+  "recruiterDashboard": {
+    "title": "Панель рекрутера",
+    "welcome": "Добро пожаловать! Выберите действие ниже или используйте меню навигации.",
+    "stats": {
+      "vacancies": "Вакансии",
+      "activeJobPostings": "Активные вакансии",
+      "resumes": "Резюме",
+      "inDatabase": "В базе данных"
+    },
+    "quickActions": "Быстрые действия",
+    "modules": {
+      "resumeDatabase": {
+        "title": "База резюме",
+        "description": "Просматривайте и ищите резюме кандидатов"
+      },
+      "manageVacancies": {
+        "title": "Управление вакансиями",
+        "description": "Создавайте и управляйте вакансиями"
+      },
+      "candidateSearch": {
+        "title": "Поиск кандидатов",
+        "description": "Ищите кандидатов по навыкам и опыту"
+      },
+      "analytics": {
+        "title": "Аналитика",
+        "description": "Просмотр метрик найма и отчетов"
+      }
+    },
+    "tip": "Совет: Нажмите на любое резюме в базе резюме, чтобы посмотреть подробный анализ и результаты сопоставления."
+  },
+  "resumeDatabase": {
+    "title": "База резюме",
+    "subtitle": "Просматривайте и ищите среди {{count}} резюме кандидатов.",
+    "searchPlaceholder": "Поиск по навыкам (например, React, Python, Agile)...",
+    "noResumes": "Резюме не найдено в базе данных.",
+    "noResumesSearch": "Резюме, соответствующие вашему поиску, не найдены.",
+    "noSkills": "Навыки не извлечены",
+    "moreSkills": "+{{count}} еще",
+    "candidate": "Кандидат #{{number}}",
+    "deleteDialog": {
+      "title": "Подтвердите удаление",
+      "message": "Вы уверены, что хотите удалить это резюме? Это действие нельзя отменить."
+    }
+  },
+  "candidateSearch": {
+    "title": "Поиск кандидатов",
+    "subtitle": "Найдите лучших кандидатов для ваших вакансий на основе сопоставления навыков.",
+    "selectVacancy": "Выберите вакансию",
+    "filterBySkills": "Фильтр по навыкам",
+    "filterPlaceholder": "например, React, Python, Agile",
+    "minMatchPercentage": "Минимальный процент совпадения: {{percentage}}%",
+    "findCandidates": "Найти кандидатов",
+    "searching": "Поиск...",
+    "selectVacancyFirst": "Пожалуйста, сначала выберите вакансию",
+    "startMessage": "Выберите вакансию и нажмите \"Найти кандидатов\" для начала",
+    "resumesAvailable": "{{count}} резюме доступно в базе данных",
+    "noCandidates": "Кандидатов, соответствующих вашим критериям, не найдено",
+    "tryDifferent": "Попробуйте снизить минимальный процент совпадения или использовать другие условия поиска",
+    "stats": {
+      "candidatesFound": "Найдено кандидатов",
+      "highMatch": "Высокое совпадение (70%+)",
+      "mediumMatch": "Среднее совпадение (50-70%)",
+      "avgMatch": "Средн. совпадение"
+    },
+    "matched": "Найдено ({{count}})",
+    "missing": "Отсутствует ({{count}})"
+  },
+  "analyticsDashboard": {
+    "title": "Аналитика найма",
+    "subtitle": "Метрики в реальном времени и аналитика по кандидатам",
+    "stats": {
+      "totalResumes": "Всего резюме",
+      "activeVacancies": "Активных вакансий",
+      "highMatches": "Высоких совпадений (70%+)",
+      "mediumMatches": "Средних совпадений (50%+)"
+    }
+  },
+  "vacancyList": {
+    "title": "Запросы на сотрудников",
+    "subtitle": "Управляйте вакансиями и требованиями к кандидатам",
+    "createRequest": "Создать запрос",
+    "noActiveRequests": "Нет активных запросов",
+    "createFirstRequest": "Создайте первый запрос на сотрудника",
+    "experience": "Опыт",
+    "requiredSkills": "Обязательные навыки ({{count}}):",
+    "more": "+{{count}}",
+    "moreDetails": "Подробнее",
+    "deleteDialog": {
+      "title": "Подтвердите удаление",
+      "message": "Вы уверены, что хотите удалить этот запрос на сотрудника? Это действие нельзя отменить."
+    },
+    "salary": {
+      "from": "от ${{amount}}",
+      "to": "до ${{amount}}",
+      "range": "${{min}} - ${{max}}",
+      "notSpecified": "Не указана"
+    }
+  },
+  "funnel": {
+    "title": "Воронка найма",
+    "pipelineOverview": "Обзор воронки кандидатов",
+    "allResumes": "Все резюме",
+    "activeVacancies": "Активные вакансии",
+    "lowMatch": "Низкое совпадение (0-50%)",
+    "mediumMatch": "Среднее совпадение (50-70%)",
+    "highMatch": "Высокое совпадение (70%+)",
+    "avgMatchRate": "Средн. процент совпадения",
+    "highQualityMatches": "Качественные совпадения",
+    "potentialCandidates": "Потенциальные кандидаты",
+    "topVacancies": "Лучшие вакансии по совпадениям",
+    "loading": "Загрузка данных...",
+    "noData": "Нет данных"
+  },
+  "landing": {
+    "hero": {
+      "title": "Анализ резюме на основе ИИ",
+      "subtitle": "Умное сопоставление кандидатов и вакансий"
+    },
+    "stats": {
+      "resumes": "Резюме",
+      "vacancies": "Вакансии",
+      "active": "Активных"
+    },
+    "uploadResume": "Загрузить резюме",
+    "browseJobs": "Смотреть вакансии",
+    "forJobSeekers": "Для соискателей",
+    "forRecruiters": "Для рекрутеров",
+    "howItWorks": "Как это работает",
+    "actions": {
+      "uploadResume": {
+        "title": "Загрузить резюме",
+        "description": "Загрузите свое резюме и получите мгновенный анализ ИИ"
+      },
+      "findJobs": {
+        "title": "Найти работу",
+        "description": "Просматривайте вакансии и находите идеальное совпадение"
+      },
+      "myApplications": {
+        "title": "Мои заявки",
+        "description": "Отслеживайте ваши заявки на работу"
+      },
+      "resumeDatabase": {
+        "title": "База резюме",
+        "description": "{{count}} резюме в базе"
+      },
+      "candidateSearch": {
+        "title": "Поиск кандидатов",
+        "description": "Найти кандидатов по навыкам"
+      },
+      "manageVacancies": {
+        "title": "Управление вакансиями",
+        "description": "{{count}} активных вакансий"
+      },
+      "analytics": {
+        "title": "Аналитика",
+        "description": "Метрики найма и воронка"
+      }
+    },
+    "getStarted": "Начать",
+    "open": "Открыть",
+    "steps": {
+      "step1": {
+        "title": "Загрузить резюме",
+        "description": "Загрузите резюме в формате PDF или DOCX"
+      },
+      "step2": {
+        "title": "Анализ ИИ",
+        "description": "Извлечение навыков, проверка ошибок, сопоставление с вакансиями"
+      },
+      "step3": {
+        "title": "Получить совпадения",
+        "description": "Узнайте, какие вакансии лучше всего подходят вашему профилю"
+      }
+    }
   }
 }

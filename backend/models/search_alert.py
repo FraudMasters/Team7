@@ -2,6 +2,7 @@
 SearchAlert model for notifications when new resumes match saved searches
 """
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, Boolean, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -26,10 +27,10 @@ class SearchAlert(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "search_alerts"
 
-    saved_search_id: Mapped[UUIDMixin] = mapped_column(
+    saved_search_id: Mapped[UUID] = mapped_column(
         ForeignKey("saved_searches.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     is_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", index=True)

@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,13 +8,15 @@ import {
   Container,
   Box,
   Button,
-  IconButton,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Description as ResumeIcon,
-  CloudUpload as UploadIcon,
-  Analytics as AnalysisIcon,
-  Compare as CompareIcon,
+  Work as WorkIcon,
+  Person as PersonIcon,
+  BusinessCenter as RecruiterIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -31,13 +33,25 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const [jobSeekerAnchorEl, setJobSeekerAnchorEl] = useState<null | HTMLElement>(null);
+  const [recruiterAnchorEl, setRecruiterAnchorEl] = useState<null | HTMLElement>(null);
 
-  // Navigation items configuration
-  const navItems = [
-    { label: t('nav.home'), path: '/', icon: <ResumeIcon /> },
-    { label: t('nav.uploadResume'), path: '/upload', icon: <UploadIcon /> },
-    { label: t('nav.results'), path: '/results', icon: <AnalysisIcon /> },
-    { label: t('nav.compare'), path: '/compare', icon: <CompareIcon /> },
+  const jobSeekerMenuOpen = Boolean(jobSeekerAnchorEl);
+  const recruiterMenuOpen = Boolean(recruiterAnchorEl);
+
+  // Job Seeker Module menu items
+  const jobSeekerItems = [
+    { labelKey: 'nav.browseJobs', path: '/jobs', icon: <WorkIcon fontSize="small" /> },
+    { labelKey: 'nav.uploadResumeNav', path: '/jobs/upload', icon: <ResumeIcon fontSize="small" /> },
+    { labelKey: 'nav.myApplications', path: '/jobs/applications', icon: <PersonIcon fontSize="small" /> },
+  ];
+
+  // Recruiter Module menu items
+  const recruiterItems = [
+    { labelKey: 'nav.dashboard', path: '/recruiter', icon: <RecruiterIcon fontSize="small" /> },
+    { labelKey: 'nav.manageVacancies', path: '/recruiter/vacancies', icon: <WorkIcon fontSize="small" /> },
+    { labelKey: 'nav.resumeDatabase', path: '/recruiter/resumes', icon: <PersonIcon fontSize="small" /> },
+    { labelKey: 'nav.searchCandidates', path: '/recruiter/search', icon: <RecruiterIcon fontSize="small" /> },
   ];
 
   return (
@@ -64,35 +78,95 @@ const Layout: React.FC<LayoutProps> = () => {
               </Typography>
             </Box>
 
-            {/* Navigation Links */}
+            {/* Navigation Links - Module Based */}
             <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
-              {navItems.map((item) => {
-                const isActive = location.pathname === item.path ||
-                  (item.path !== '/' && location.pathname.startsWith(item.path));
-
-                return (
-                  <Button
+              {/* Job Seeker Module */}
+              <Button
+                color="inherit"
+                startIcon={<WorkIcon />}
+                endIcon={<ExpandMoreIcon />}
+                onClick={(e) => setJobSeekerAnchorEl(e.currentTarget)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  borderRadius: 1,
+                  px: 2,
+                }}
+              >
+                {t('nav.findJobs')}
+              </Button>
+              <Menu
+                anchorEl={jobSeekerAnchorEl}
+                open={jobSeekerMenuOpen}
+                onClose={() => setJobSeekerAnchorEl(null)}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'left',
+                }}
+              >
+                {jobSeekerItems.map((item) => (
+                  <MenuItem
                     key={item.path}
                     component={Link}
                     to={item.path}
-                    startIcon={item.icon}
-                    sx={{
-                      color: isActive ? 'inherit' : 'rgba(255, 255, 255, 0.7)',
-                      bgcolor: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                      fontWeight: isActive ? 600 : 400,
-                      textTransform: 'none',
-                      borderRadius: 1,
-                      px: 2,
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 255, 255, 0.15)',
-                        color: 'inherit',
-                      },
-                    }}
+                    onClick={() => setJobSeekerAnchorEl(null)}
+                    selected={location.pathname === item.path}
                   >
-                    {item.label}
-                  </Button>
-                );
-              })}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 180 }}>
+                      {item.icon}
+                      <Typography variant="body2">{t(item.labelKey)}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Menu>
+
+              {/* Recruiter Module */}
+              <Button
+                color="inherit"
+                startIcon={<RecruiterIcon />}
+                endIcon={<ExpandMoreIcon />}
+                onClick={(e) => setRecruiterAnchorEl(e.currentTarget)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  borderRadius: 1,
+                  px: 2,
+                }}
+              >
+                {t('nav.findEmployees')}
+              </Button>
+              <Menu
+                anchorEl={recruiterAnchorEl}
+                open={recruiterMenuOpen}
+                onClose={() => setRecruiterAnchorEl(null)}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'left',
+                }}
+              >
+                {recruiterItems.map((item) => (
+                  <MenuItem
+                    key={item.path}
+                    component={Link}
+                    to={item.path}
+                    onClick={() => setRecruiterAnchorEl(null)}
+                    selected={location.pathname === item.path}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 180 }}>
+                      {item.icon}
+                      <Typography variant="body2">{t(item.labelKey)}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Menu>
             </Box>
 
             {/* Language Switcher */}

@@ -89,9 +89,9 @@ class Settings(BaseSettings):
         description="Maximum file upload size in megabytes",
     )
 
-    allowed_file_types: List[str] = Field(
-        default=[".pdf", ".docx"],
-        description="Allowed file extensions for upload",
+    allowed_file_types: str = Field(
+        default=".pdf,.docx",
+        description="Allowed file extensions for upload (comma-separated)",
     )
 
     # Analysis Configuration
@@ -118,14 +118,6 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         description="Celery result backend URL",
     )
-
-    @field_validator("allowed_file_types", mode="before")
-    @classmethod
-    def parse_allowed_file_types(cls, v: str | List[str]) -> List[str]:
-        """Parse allowed file types from comma-separated string or list."""
-        if isinstance(v, str):
-            return [ext.strip() for ext in v.split(",")]
-        return v
 
     @field_validator("database_url")
     @classmethod

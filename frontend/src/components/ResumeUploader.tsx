@@ -248,7 +248,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
       setIsDragging(false);
 
       const files = e.dataTransfer.files;
-      if (files.length > 0) {
+      if (files.length > 0 && files[0]) {
         handleFileSelect(files[0]);
       }
     },
@@ -261,7 +261,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
-      if (files && files.length > 0) {
+      if (files && files.length > 0 && files[0]) {
         handleFileSelect(files[0]);
       }
     },

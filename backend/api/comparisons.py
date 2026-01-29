@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
 
-from ..analyzers import (
-    extract_resume_keywords,
+from analyzers import (
+    extract_resume_keywords_hf as extract_resume_keywords,
     extract_resume_entities,
     calculate_skill_experience,
     format_experience_summary,
@@ -147,7 +147,7 @@ def compare_multiple_resumes(
 
                 # Step 2: Extract text from file
                 try:
-                    from extract import extract_text_from_pdf, extract_text_from_docx
+                    from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
 
                     file_ext = file_path.suffix.lower()
                     if file_ext == ".pdf":

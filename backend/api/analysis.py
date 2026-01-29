@@ -17,14 +17,14 @@ from pydantic import BaseModel, Field
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
 
-from ..analyzers import (
-    extract_resume_keywords,
+from analyzers import (
+    extract_resume_keywords_hf as extract_resume_keywords,
     extract_resume_entities,
     check_grammar_resume,
     calculate_total_experience,
     format_experience_summary,
 )
-from ..i18n.backend_translations import get_error_message, get_success_message
+from i18n.backend_translations import get_error_message, get_success_message
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,7 @@ def extract_text_from_file(file_path: Path, locale: str = "en") -> str:
     """
     try:
         # Import extraction functions
-        from extract import extract_text_from_pdf, extract_text_from_docx
+        from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
 
         file_ext = file_path.suffix.lower()
 
@@ -313,23 +313,42 @@ async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSO
         # Step 4: Perform keyword extraction
         logger.info("Performing keyword extraction...")
         keywords_result = extract_resume_keywords(
-            resume_text, language=language, top_n=20
+            resume_text, language=language
         )
-        keyword_analysis = KeywordAnalysis(
-            keywords=keywords_result.get("keywords", []),
-            keyphrases=keywords_result.get("keyphrases", []),
-            scores=keywords_result.get("scores", []),
-        )
+
+        # Handle different return formats from extractors
+        # HF extractor returns: single_words, keyphrases, all_keywords
+        # Old format returns: keywords, keyphrases, scores
+        if "single_words" in keywords_result:
+            # HF format - convert to expected format
+            single_words = keywords_result.get("single_words", [])
+            keywords_list = [word[0] if isinstance(word, list) else word for word in single_words]
+            keyword_analysis = KeywordAnalysis(
+                keywords=keywords_list,
+                keyphrases=keywords_result.get("keyphrases", []),
+                scores=[],  # Scores not available in this format
+            )
+        else:
+            # Old format
+            keyword_analysis = KeywordAnalysis(
+                keywords=keywords_result.get("keywords", []),
+                keyphrases=keywords_result.get("keyphrases", []),
+                scores=keywords_result.get("scores", []),
+            )
 
         # Step 5: Perform named entity recognition
         logger.info("Performing named entity recognition...")
         entities_result = extract_resume_entities(resume_text, language=language)
+
+        # Handle both 'skills' and 'technical_skills' field names from different extractors
+        skills = entities_result.get("technical_skills") or entities_result.get("skills") or []
+
         entity_analysis = EntityAnalysis(
-            organizations=entities_result.get("organizations", []),
-            dates=entities_result.get("dates", []),
-            persons=entities_result.get("persons", []),
-            locations=entities_result.get("locations", []),
-            technical_skills=entities_result.get("technical_skills", []),
+            organizations=entities_result.get("organizations") or [],
+            dates=entities_result.get("dates") or [],
+            persons=entities_result.get("persons") or [],
+            locations=entities_result.get("locations") or [],
+            technical_skills=skills,
         )
 
         # Step 6: Grammar checking (optional)
@@ -419,3 +438,64 @@ async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSO
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg,
         ) from e
+
+
+@router.get(
+    "/{resume_id}",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    tags=["Analysis"],
+)
+async def get_analysis_result(
+    http_request: Request, resume_id: str
+) -> JSONResponse:
+    """
+    Get analysis result for a specific resume.
+
+    This endpoint returns the analysis results for a resume.
+    Currently returns placeholder data as full DB integration is pending.
+
+    Args:
+        http_request: FastAPI request object (for Accept-Language header)
+        resume_id: Resume ID to fetch analysis for
+
+    Returns:
+        JSON response with analysis results
+
+    Raises:
+        HTTPException(404): If resume is not found
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/resumes/abc123")
+        >>> response.json()
+        {
+            "resume_id": "abc123",
+            "status": "pending",
+            "errors": [],
+            "grammar_errors": [],
+            "keywords": [],
+            "technical_skills": []
+        }
+    """
+    locale = _extract_locale(http_request)
+    logger.info(f"Fetching analysis for resume_id: {resume_id}")
+
+    # TODO: Implement database lookup in a later subtask
+    # For now, return a placeholder response with proper structure
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "resume_id": resume_id,
+            "status": "pending",
+            "message": "Analysis not found - please run analysis first",
+            "errors": [],
+            "grammar_errors": [],
+            "keywords": [],
+            "technical_skills": [],
+            "total_experience_months": 0,
+            "matched_skills": [],
+            "missing_skills": [],
+            "match_percentage": 0,
+        },
+    )

@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '@components/Layout';
 import HomePage from '@pages/Home';
@@ -9,6 +8,12 @@ import CompareVacancyPage from '@pages/CompareVacancy';
 import AdminSynonymsPage from '@pages/AdminSynonyms';
 import AdminAnalyticsPage from '@pages/AdminAnalytics';
 import AnalyticsDashboardPage from '@pages/AnalyticsDashboard';
+import VacancyListPage from '@pages/VacancyList';
+import CreateVacancyPage from '@pages/CreateVacancy';
+import ApplicationsPage from '@pages/Applications';
+import ResumeDatabasePage from '@pages/ResumeDatabase';
+import CandidateSearchPage from '@pages/CandidateSearch';
+import RecruiterDashboardPage from '@pages/RecruiterDashboard';
 
 /**
  * Main App Component
@@ -25,17 +30,31 @@ function App() {
           {/* Default home page */}
           <Route index element={<HomePage />} />
 
-          {/* Resume upload page */}
+          {/* Legacy routes - kept for compatibility */}
           <Route path="upload" element={<UploadPage />} />
-
-          {/* Analysis results page with dynamic ID parameter */}
           <Route path="results/:id" element={<ResultsPage />} />
-
-          {/* Job comparison page with dynamic resume and vacancy ID parameters */}
           <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
-
-          {/* Multi-resume comparison page for a specific vacancy */}
           <Route path="compare-vacancy/:vacancyId" element={<CompareVacancyPage />} />
+
+          {/* Job Seeker Module Routes */}
+          <Route path="jobs">
+            <Route index element={<VacancyListPage />} />
+            <Route path="upload" element={<UploadPage />} />
+            <Route path="results/:id" element={<ResultsPage />} />
+            <Route path="applications" element={<ApplicationsPage />} />
+          </Route>
+
+          {/* Recruiter Module Routes */}
+          <Route path="recruiter">
+            <Route index element={<RecruiterDashboardPage />} />
+            <Route path="vacancies">
+              <Route index element={<VacancyListPage />} />
+              <Route path="create" element={<CreateVacancyPage />} />
+            </Route>
+            <Route path="resumes" element={<ResumeDatabasePage />} />
+            <Route path="search" element={<CandidateSearchPage />} />
+            <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          </Route>
 
           {/* Admin pages */}
           <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />

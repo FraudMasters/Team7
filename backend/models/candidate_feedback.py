@@ -2,6 +2,7 @@
 CandidateFeedback model for storing constructive feedback for candidates
 """
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, JSON, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
@@ -29,23 +30,23 @@ class CandidateFeedback(Base, UUIDMixin, TimestampMixin):
         feedback_source: Source of feedback (automated, manual)
         viewed_by_candidate: Whether candidate has viewed the feedback
         downloaded: Whether feedback was downloaded
-        metadata: Additional metadata in JSON format
+        extra_metadata: Additional metadata in JSON format
         created_at: Timestamp when feedback was created (inherited)
         updated_at: Timestamp when feedback was last updated (inherited)
     """
 
     __tablename__ = "candidate_feedback"
 
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    vacancy_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    vacancy_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    match_result_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    match_result_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("match_results.id", ondelete="SET NULL"), nullable=True
     )
-    template_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    template_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("feedback_templates.id", ondelete="SET NULL"), nullable=True
     )
     language: Mapped[str] = mapped_column(String(10), nullable=False, server_default="en")
@@ -60,7 +61,7 @@ class CandidateFeedback(Base, UUIDMixin, TimestampMixin):
     )
     viewed_by_candidate: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     downloaded: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     def __repr__(self) -> str:
         return f"<CandidateFeedback(id={self.id}, resume_id={self.resume_id}, language={self.language})>"

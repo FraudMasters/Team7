@@ -16,9 +16,9 @@ from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import Session
 
-from ..models.skill_feedback import SkillFeedback
-from ..models.custom_synonyms import CustomSynonym
-from ..config import get_settings
+from models.skill_feedback import SkillFeedback
+from models.custom_synonyms import CustomSynonym
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

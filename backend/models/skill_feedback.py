@@ -2,6 +2,7 @@
 SkillFeedback model for storing recruiter feedback on skill matches
 """
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,20 +26,20 @@ class SkillFeedback(Base, UUIDMixin, TimestampMixin):
         actual_skill: The actual skill found by the recruiter
         feedback_source: Source of feedback (api, frontend, bulk_import)
         processed: Whether this feedback has been processed by ML pipeline
-        metadata: JSON object with additional feedback metadata
+        extra_metadata: JSON object with additional feedback metadata
         created_at: Timestamp when feedback was submitted (inherited)
         updated_at: Timestamp when feedback was last updated (inherited)
     """
 
     __tablename__ = "skill_feedback"
 
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    vacancy_id: Mapped[UUIDMixin] = mapped_column(
+    vacancy_id: Mapped[UUID] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    match_result_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    match_result_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("match_results.id", ondelete="SET NULL"), nullable=True
     )
     skill: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -50,7 +51,7 @@ class SkillFeedback(Base, UUIDMixin, TimestampMixin):
         String(50), nullable=False, default="api"
     )
     processed: Mapped[bool] = mapped_column(nullable=False, default=False)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     def __repr__(self) -> str:
         return f"<SkillFeedback(id={self.id}, skill={self.skill}, correct={self.was_correct})>"

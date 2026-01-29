@@ -276,7 +276,9 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const handleMoveUp = (index: number) => {
     if (index === 0) return;
     const newMetrics = [...selectedMetrics];
-    [newMetrics[index - 1], newMetrics[index]] = [newMetrics[index], newMetrics[index - 1]];
+    const temp = newMetrics[index];
+    newMetrics[index] = newMetrics[index - 1]!;
+    newMetrics[index - 1] = temp!;
     setSelectedMetrics(newMetrics);
   };
 
@@ -286,7 +288,9 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const handleMoveDown = (index: number) => {
     if (index === selectedMetrics.length - 1) return;
     const newMetrics = [...selectedMetrics];
-    [newMetrics[index], newMetrics[index + 1]] = [newMetrics[index + 1], newMetrics[index]];
+    const temp = newMetrics[index];
+    newMetrics[index] = newMetrics[index + 1]!;
+    newMetrics[index + 1] = temp!;
     setSelectedMetrics(newMetrics);
   };
 
@@ -306,6 +310,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
 
     const newMetrics = [...selectedMetrics];
     const draggedItem = newMetrics[draggedIndex];
+    if (!draggedItem) return;
     newMetrics.splice(draggedIndex, 1);
     newMetrics.splice(index, 0, draggedItem);
     setSelectedMetrics(newMetrics);
@@ -668,7 +673,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
                             </Typography>
                             <Chip
                               label={metric.category}
-                              size="tiny"
+                              size="small"
                               color={getCategoryColor(metric.category)}
                               variant="filled"
                               sx={{ height: 20, fontSize: '0.7rem', '& .MuiChip-label': { px: 0.5 } }}
@@ -742,7 +747,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
                               </Typography>
                               <Chip
                                 label={metric.category}
-                                size="tiny"
+                                size="small"
                                 color={getCategoryColor(metric.category)}
                                 variant="filled"
                                 sx={{ height: 20, fontSize: '0.7rem', '& .MuiChip-label': { px: 0.5 } }}

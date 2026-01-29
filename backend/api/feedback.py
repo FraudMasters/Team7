@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..models.skill_feedback import SkillFeedback
+from models.skill_feedback import SkillFeedback
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class FeedbackEntry(BaseModel):
     recruiter_correction: Optional[str] = Field(None, description="What the recruiter corrected it to (if incorrect)")
     actual_skill: Optional[str] = Field(None, description="The actual skill found by the recruiter")
     feedback_source: str = Field("api", description="Source of feedback (api, frontend, bulk_import)")
-    metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
 
 
 class FeedbackCreate(BaseModel):
@@ -49,7 +49,7 @@ class FeedbackUpdate(BaseModel):
     recruiter_correction: Optional[str] = Field(None, description="What the recruiter corrected it to")
     actual_skill: Optional[str] = Field(None, description="The actual skill found by the recruiter")
     processed: Optional[bool] = Field(None, description="Whether this feedback has been processed by ML pipeline")
-    metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
 
 
 class FeedbackResponse(BaseModel):
@@ -66,7 +66,7 @@ class FeedbackResponse(BaseModel):
     actual_skill: Optional[str] = Field(None, description="The actual skill identified by recruiter")
     feedback_source: str = Field(..., description="Source of feedback")
     processed: bool = Field(..., description="Whether feedback has been processed by ML pipeline")
-    metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
 
@@ -158,7 +158,7 @@ async def create_feedback(request: FeedbackCreate) -> JSONResponse:
                 "actual_skill": entry.actual_skill,
                 "feedback_source": entry.feedback_source,
                 "processed": False,
-                "metadata": entry.metadata,
+                "extra_metadata": entry.extra_metadata,
                 "created_at": "2024-01-25T00:00:00Z",
                 "updated_at": "2024-01-25T00:00:00Z",
             }
@@ -283,7 +283,7 @@ async def get_feedback(feedback_id: str) -> JSONResponse:
                 "actual_skill": "ReactJS",
                 "feedback_source": "api",
                 "processed": False,
-                "metadata": None,
+                "extra_metadata": None,
                 "created_at": "2024-01-25T00:00:00Z",
                 "updated_at": "2024-01-25T00:00:00Z",
             },
@@ -351,7 +351,7 @@ async def update_feedback(
                 "actual_skill": request.actual_skill,
                 "feedback_source": "api",
                 "processed": request.processed if request.processed is not None else False,
-                "metadata": request.metadata,
+                "extra_metadata": request.extra_metadata,
                 "created_at": "2024-01-25T00:00:00Z",
                 "updated_at": "2024-01-25T00:00:00Z",
             },

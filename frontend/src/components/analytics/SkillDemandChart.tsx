@@ -227,7 +227,7 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" fontWeight={700}>
-                  {(skillData.skills[0]?.demand_percentage * 100).toFixed(1)}%
+                  {((skillData.skills[0]?.demand_percentage || 0) * 100).toFixed(1)}%
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Highest Demand

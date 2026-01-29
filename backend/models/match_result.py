@@ -2,6 +2,7 @@
 MatchResult model for storing resume-vacancy matching results
 """
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, JSON, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
@@ -28,10 +29,10 @@ class MatchResult(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "match_results"
 
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    vacancy_id: Mapped[UUIDMixin] = mapped_column(
+    vacancy_id: Mapped[UUID] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     match_percentage: Mapped[float] = mapped_column(

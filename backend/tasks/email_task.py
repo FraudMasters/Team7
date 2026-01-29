@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 
-from ..config import get_settings
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

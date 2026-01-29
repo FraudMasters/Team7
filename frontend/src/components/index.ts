@@ -13,6 +13,7 @@ export { default as ResumeComparisonMatrix } from './ResumeComparisonMatrix';
 export { default as CustomSynonymsManager } from './CustomSynonymsManager';
 export { default as FeedbackAnalytics } from './FeedbackAnalytics';
 export { default as LanguageSwitcher } from './LanguageSwitcher';
+export { default as VacancyMatchResults } from './VacancyMatchResults';
 export { default as DateRangeFilter } from './analytics/DateRangeFilter';
 export { default as FunnelVisualization } from './analytics/FunnelVisualization';
 export { default as KeyMetrics } from './analytics/KeyMetrics';

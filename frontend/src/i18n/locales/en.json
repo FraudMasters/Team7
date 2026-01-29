@@ -43,10 +43,19 @@
     "results": "Results",
     "compare": "Compare",
     "adminSynonyms": "Admin Synonyms",
-    "adminAnalytics": "Admin Analytics"
+    "adminAnalytics": "Admin Analytics",
+    "findJobs": "Find Jobs",
+    "findEmployees": "Find Employees",
+    "browseJobs": "Browse Jobs",
+    "uploadResumeNav": "Upload Resume",
+    "myApplications": "My Applications",
+    "dashboard": "Dashboard",
+    "manageVacancies": "Manage Vacancies",
+    "resumeDatabase": "Resume Database",
+    "searchCandidates": "Search Candidates"
   },
   "footer": {
-    "copyright": "{{year}} Iconicompany. AI-powered resume analysis platform."
+    "copyright": "{{year}} TEAM7. AI-powered resume analysis platform."
   },
   "home": {
     "hero": {
@@ -384,5 +393,180 @@
     "invalidUrl": "Invalid URL",
     "invalidNumber": "Invalid number",
     "invalidDate": "Invalid date"
+  },
+  "recruiterDashboard": {
+    "title": "Recruiter Dashboard",
+    "welcome": "Welcome! Choose an action below or use the navigation menu.",
+    "stats": {
+      "vacancies": "Vacancies",
+      "activeJobPostings": "Active job postings",
+      "resumes": "Resumes",
+      "inDatabase": "In database"
+    },
+    "quickActions": "Quick Actions",
+    "modules": {
+      "resumeDatabase": {
+        "title": "Resume Database",
+        "description": "Browse and search through candidate resumes"
+      },
+      "manageVacancies": {
+        "title": "Manage Vacancies",
+        "description": "Create and manage job postings"
+      },
+      "candidateSearch": {
+        "title": "Candidate Search",
+        "description": "Search candidates by skills and experience"
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "View hiring metrics and reports"
+      }
+    },
+    "tip": "Tip: Click on any resume in the Resume Database to view detailed analysis and match results."
+  },
+  "resumeDatabase": {
+    "title": "Resume Database",
+    "subtitle": "Browse and search through {{count}} candidate resumes.",
+    "searchPlaceholder": "Search by skills (e.g., React, Python, Agile)...",
+    "noResumes": "No resumes found in the database.",
+    "noResumesSearch": "No resumes found matching your search.",
+    "noSkills": "No skills extracted",
+    "moreSkills": "+{{count}} more",
+    "candidate": "Candidate #{{number}}",
+    "deleteDialog": {
+      "title": "Confirm Delete",
+      "message": "Are you sure you want to delete this resume? This action cannot be undone."
+    }
+  },
+  "candidateSearch": {
+    "title": "Candidate Search",
+    "subtitle": "Find the best candidates for your vacancies based on skill matching.",
+    "selectVacancy": "Select Vacancy",
+    "filterBySkills": "Filter by skills",
+    "filterPlaceholder": "e.g., React, Python, Agile",
+    "minMatchPercentage": "Minimum Match Percentage: {{percentage}}%",
+    "findCandidates": "Find Candidates",
+    "searching": "Searching...",
+    "selectVacancyFirst": "Please select a vacancy first",
+    "startMessage": "Select a vacancy and click \"Find Candidates\" to start",
+    "resumesAvailable": "{{count}} resumes available in database",
+    "noCandidates": "No candidates found matching your criteria",
+    "tryDifferent": "Try lowering the minimum match percentage or different search terms",
+    "stats": {
+      "candidatesFound": "Candidates Found",
+      "highMatch": "High Match (70%+)",
+      "mediumMatch": "Medium Match (50-70%)",
+      "avgMatch": "Avg Match"
+    },
+    "matched": "Matched ({{count}})",
+    "missing": "Missing ({{count}})"
+  },
+  "analyticsDashboard": {
+    "title": "Hiring Analytics",
+    "subtitle": "Real-time metrics and candidate progression insights",
+    "stats": {
+      "totalResumes": "Total Resumes",
+      "activeVacancies": "Active Vacancies",
+      "highMatches": "High Matches (70%+)",
+      "mediumMatches": "Medium Matches (50%+)"
+    }
+  },
+  "vacancyList": {
+    "title": "Job Requests",
+    "subtitle": "Manage vacancies and candidate requirements",
+    "createRequest": "Create Request",
+    "noActiveRequests": "No active requests",
+    "createFirstRequest": "Create the first employee request",
+    "experience": "Experience",
+    "requiredSkills": "Required skills ({{count}}):",
+    "more": "+{{count}}",
+    "moreDetails": "More details",
+    "deleteDialog": {
+      "title": "Confirm Delete",
+      "message": "Are you sure you want to delete this job request? This action cannot be undone."
+    },
+    "salary": {
+      "from": "from ${{amount}}",
+      "to": "to ${{amount}}",
+      "range": "${{min}} - ${{max}}",
+      "notSpecified": "Not specified"
+    }
+  },
+  "funnel": {
+    "title": "Hiring Funnel",
+    "pipelineOverview": "Candidate Pipeline Overview",
+    "allResumes": "All Resumes",
+    "activeVacancies": "Active Vacancies",
+    "lowMatch": "Low Match (0-50%)",
+    "mediumMatch": "Medium Match (50-70%)",
+    "highMatch": "High Match (70%+)",
+    "avgMatchRate": "Avg Match Rate",
+    "highQualityMatches": "High Quality Matches",
+    "potentialCandidates": "Potential Candidates",
+    "topVacancies": "Top Vacancies by Candidate Match",
+    "loading": "Loading funnel data...",
+    "noData": "No data available"
+  },
+  "landing": {
+    "hero": {
+      "title": "AI-Powered Resume Analysis",
+      "subtitle": "Smart matching between candidates and job vacancies"
+    },
+    "stats": {
+      "resumes": "Resumes",
+      "vacancies": "Vacancies",
+      "active": "Active"
+    },
+    "uploadResume": "Upload Resume",
+    "browseJobs": "Browse Jobs",
+    "forJobSeekers": "For Job Seekers",
+    "forRecruiters": "For Recruiters",
+    "howItWorks": "How It Works",
+    "actions": {
+      "uploadResume": {
+        "title": "Upload Resume",
+        "description": "Upload your CV and get instant AI analysis"
+      },
+      "findJobs": {
+        "title": "Find Jobs",
+        "description": "Browse vacancies and find your perfect match"
+      },
+      "myApplications": {
+        "title": "My Applications",
+        "description": "Track your job applications"
+      },
+      "resumeDatabase": {
+        "title": "Resume Database",
+        "description": "{{count}} resumes in database"
+      },
+      "candidateSearch": {
+        "title": "Candidate Search",
+        "description": "Find candidates by skills"
+      },
+      "manageVacancies": {
+        "title": "Manage Vacancies",
+        "description": "{{count}} active vacancies"
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Hiring metrics and funnel"
+      }
+    },
+    "getStarted": "Get Started",
+    "open": "Open",
+    "steps": {
+      "step1": {
+        "title": "Upload Resume",
+        "description": "Upload your CV in PDF or DOCX format"
+      },
+      "step2": {
+        "title": "AI Analysis",
+        "description": "Extract skills, check errors, match with vacancies"
+      },
+      "step3": {
+        "title": "Get Matched",
+        "description": "See which vacancies fit your profile best"
+      }
+    }
   }
 }

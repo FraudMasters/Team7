@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..models.ml_model_version import MLModelVersion
+from models.ml_model_version import MLModelVersion
 
 logger = logging.getLogger(__name__)
 

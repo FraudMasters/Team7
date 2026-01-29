@@ -7,7 +7,7 @@ config module. It configures the broker, result backend, and task behavior.
 import logging
 from typing import Dict, Any
 
-from .config import get_settings
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

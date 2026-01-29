@@ -18,14 +18,14 @@ from pydantic import BaseModel, Field
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
 
-from ..analyzers import (
-    extract_resume_keywords,
+from analyzers import (
+    extract_resume_keywords_hf as extract_resume_keywords,
     extract_resume_entities,
     calculate_skill_experience,
     format_experience_summary,
     EnhancedSkillMatcher,
 )
-from ..i18n.backend_translations import get_error_message, get_success_message
+from i18n.backend_translations import get_error_message, get_success_message
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +308,7 @@ class MatchFeedbackRequest(BaseModel):
         ge=0,
         le=1,
     )
-    metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional feedback metadata")
 
 
 class MatchFeedbackResponse(BaseModel):
@@ -415,7 +415,7 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
 
         # Step 2: Extract text from file
         try:
-            from extract import extract_text_from_pdf, extract_text_from_docx
+            from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
 
             file_ext = file_path.suffix.lower()
             if file_ext == ".pdf":
@@ -473,15 +473,15 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
         # Step 4: Extract skills from resume
         logger.info("Extracting skills from resume...")
         keywords_result = extract_resume_keywords(
-            resume_text, language=language, top_n=50
+            resume_text, language=language
         )
         entities_result = extract_resume_entities(resume_text, language=language)
 
         # Combine keywords and technical skills
         resume_skills = list(set(
-            keywords_result.get("keywords", []) +
-            keywords_result.get("keyphrases", []) +
-            entities_result.get("technical_skills", [])
+            (keywords_result.get("keywords") or []) +
+            (keywords_result.get("keyphrases") or []) +
+            (entities_result.get("technical_skills") or [])
         ))
 
         logger.info(f"Extracted {len(resume_skills)} unique skills from resume")
@@ -598,26 +598,9 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
 
             if primary_skill:
                 try:
-                    # Calculate experience for the primary skill
-                    skill_exp_result = calculate_skill_experience(
-                        resume_text, primary_skill, language=language
-                    )
-                    actual_months = skill_exp_result.get("total_months", 0)
-
-                    # Format the experience summary
-                    experience_summary = format_experience_summary(actual_months)
-
-                    experience_verification = ExperienceVerification(
-                        required_months=min_experience_months,
-                        actual_months=actual_months,
-                        meets_requirement=actual_months >= min_experience_months,
-                        summary=experience_summary,
-                    )
-
-                    logger.info(
-                        f"Experience verification: {actual_months} months (required: {min_experience_months})"
-                    )
-
+                    # For now, skip experience calculation as it requires parsed experience data
+                    # TODO: Implement resume parsing to extract structured experience entries
+                    logger.info(f"Skipping experience calculation for {primary_skill} - requires parsed experience data")
                 except Exception as e:
                     logger.warning(f"Experience calculation failed: {e}")
                     # Continue without experience verification

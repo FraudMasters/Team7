@@ -444,19 +444,111 @@ export interface MatchFeedbackResponse {
 }
 
 /**
- * Language preference response
+ * Skill match result for comparison
  */
-export interface LanguagePreferenceResponse {
-  /** Current language preference (en or ru) */
-  language: 'en' | 'ru';
+export interface ComparisonSkillMatch {
+  skill: string;
+  status: 'matched' | 'missing';
+  matched_as: string | null;
+  highlight: 'green' | 'red';
+  confidence: number;
+  match_type: string;
 }
 
 /**
- * Language preference update request
+ * Experience verification for comparison
  */
-export interface LanguagePreferenceUpdate {
-  /** Language preference to set (en or ru) */
-  language: 'en' | 'ru';
+export interface ComparisonExperienceVerification {
+  required_months: number;
+  actual_months: number;
+  meets_requirement: boolean;
+  summary: string;
+}
+
+/**
+ * Resume comparison result
+ */
+export interface ResumeComparisonResult {
+  rank: number;
+  resume_id: string;
+  vacancy_title: string;
+  match_percentage: number;
+  required_skills_match: ComparisonSkillMatch[];
+  additional_skills_match: ComparisonSkillMatch[];
+  experience_verification: ComparisonExperienceVerification | null;
+  processing_time_ms: number;
+  error?: string;
+}
+
+/**
+ * Comparison matrix data response
+ */
+export interface ComparisonMatrixData {
+  vacancy_title: string;
+  comparison_results: ResumeComparisonResult[];
+  total_resumes: number;
+  processing_time_ms: number;
+}
+
+/**
+ * Comparison create request
+ */
+export interface ComparisonCreate {
+  vacancy_id: string;
+  resume_ids: string[];
+  name?: string;
+  filters?: Record<string, unknown>;
+  created_by?: string;
+  shared_with?: string[];
+}
+
+/**
+ * Comparison update request
+ */
+export interface ComparisonUpdate {
+  name?: string;
+  filters?: Record<string, unknown>;
+  shared_with?: string[];
+}
+
+/**
+ * Comparison response
+ */
+export interface ComparisonResponse {
+  id: string;
+  vacancy_id: string;
+  resume_ids: string[];
+  name?: string;
+  filters?: Record<string, unknown>;
+  created_by?: string;
+  shared_with?: string[];
+  comparison_results?: ResumeComparisonResult[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Comparison list response
+ */
+export interface ComparisonListResponse {
+  comparisons: ComparisonResponse[];
+  total_count: number;
+  filters_applied?: {
+    vacancy_id?: string;
+    created_by?: string;
+    min_match_percentage?: number;
+    max_match_percentage?: number;
+    sort_by?: string;
+    order?: string;
+  };
+}
+
+/**
+ * Compare multiple resumes request
+ */
+export interface CompareMultipleRequest {
+  vacancy_id: string;
+  resume_ids: string[];
 }
 
 // ==================== Analytics Types ====================
@@ -578,4 +670,19 @@ export interface RecruiterPerformanceResponse {
   total_recruiters: number;
   period_start_date: string;
   period_end_date: string;
+}
+
+/**
+ * Language preference update request
+ */
+export interface LanguagePreferenceUpdate {
+  language: string;
+}
+
+/**
+ * Language preference response
+ */
+export interface LanguagePreferenceResponse {
+  language: string;
+  updated_at: string;
 }

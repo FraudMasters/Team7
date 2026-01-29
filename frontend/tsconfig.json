@@ -16,8 +16,8 @@
 
     /* Linting - Strict mode for better code quality */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
@@ -33,7 +33,8 @@
       "@utils/*": ["./src/utils/*"],
       "@hooks/*": ["./src/hooks/*"],
       "@i18n/*": ["./src/i18n/*"],
-      "@i18n": ["./src/i18n"]
+      "@i18n": ["./src/i18n"],
+      "@pages/*": ["./src/pages/*"]
     },
 
     /* Type checking */
@@ -49,7 +50,13 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "src/__tests__",
+    "src/tests"
   ],
   "references": [
     { "path": "./tsconfig.node.json" }

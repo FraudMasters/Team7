@@ -3,6 +3,7 @@ HiringStage model for tracking resume progression through hiring pipeline
 """
 import enum
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -42,10 +43,10 @@ class HiringStage(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "hiring_stages"
 
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    vacancy_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    vacancy_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     stage_name: Mapped[HiringStageName] = mapped_column(

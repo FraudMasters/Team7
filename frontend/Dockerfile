@@ -1,11 +1,8 @@
 # Frontend Dockerfile for AI-Powered Resume Analysis System
 # Multi-stage build for optimized production image
 
-# Stage 1: Dependencies
-FROM node:20-alpine AS deps
-
-# Install dependencies based on package manager
-RUN apk add --no-cache libc6-compat
+# Stage 1: Builder
+FROM node:20 AS builder
 
 WORKDIR /app
 
@@ -15,13 +12,13 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Stage 2: Builder
-FROM node:20-alpine AS builder
+# Workaround for rollup ARM64 bug - install missing binary manually
+RUN npm install @rollup/rollup-linux-arm64-gnu --no-save || \
+    npm install @rollup/rollup-linux-arm64-musl --no-save || \
+    npm install @rollup/rollup-darwin-arm64 --no-save || \
+    true
 
-WORKDIR /app
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source code
 COPY . .
 
 # Build arguments for environment variables
@@ -31,28 +28,33 @@ ENV VITE_API_URL=${VITE_API_URL}
 # Build application
 RUN npm run build
 
-# Stage 3: Runner (Production)
-FROM node:20-alpine AS runner
+# Stage 2: Production Runner (uses nginx to serve static files)
+FROM nginx:alpine AS production
+
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+# Stage 3: Development Runner
+FROM node:20 AS development
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apk add --no-cache curl
+# Copy package files
+COPY package.json ./
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Install all dependencies (including platform-specific binaries)
+RUN npm install --legacy-peer-deps
 
-# Copy built application from builder
-COPY --from=builder /app/dist /app/dist
-COPY --from=builder /app/node_modules/.vite /app/node_modules/.vite
-COPY --from=builder /app/package.json /app/package.json
+# Copy source code
+COPY . .
 
-# Set permissions
-RUN chown -R nodejs:nodejs /app
-
-# Switch to non-root user
-USER nodejs
+# Install curl for health check
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Expose port
 EXPOSE 5173
@@ -61,8 +63,5 @@ EXPOSE 5173
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:5173/ || exit 1
 
-# Development mode command (for docker-compose)
+# Development mode command
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
-
-# Production command (use with nginx or serve)
-# CMD ["npx", "serve", "-s", "dist", "-l", "5173"]

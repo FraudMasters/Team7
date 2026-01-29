@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Box, Container, Typography, Paper, Alert, Stack, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, CircularProgress, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon, Check as CheckIcon } from '@mui/icons-material';
-import { ResumeComparisonMatrix } from '@components/ResumeComparisonMatrix';
-import { ComparisonControls } from '@components/ComparisonControls';
+import ResumeComparisonMatrix from '@components/ResumeComparisonMatrix';
+import ComparisonControls from '@components/ComparisonControls';
 import { apiClient } from '@/api/client';
 import type { ComparisonCreate } from '@/types/api';
 

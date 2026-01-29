@@ -13,7 +13,7 @@ import hashlib
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..models.ml_model_version import MLModelVersion
+from models.ml_model_version import MLModelVersion
 
 logger = logging.getLogger(__name__)
 

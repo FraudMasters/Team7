@@ -2,6 +2,7 @@
 ResumeComparison model for storing saved resume comparison views
 """
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -26,7 +27,7 @@ class ResumeComparison(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "resume_comparisons"
 
-    vacancy_id: Mapped[UUIDMixin] = mapped_column(
+    vacancy_id: Mapped[UUID] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     resume_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)

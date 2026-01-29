@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..models.custom_synonyms import CustomSynonym
+from models.custom_synonyms import CustomSynonym
 
 logger = logging.getLogger(__name__)
 

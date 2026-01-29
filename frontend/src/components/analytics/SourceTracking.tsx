@@ -54,7 +54,7 @@ interface SourceTrackingProps {
  * Get color for source based on index
  */
 const getSourceColor = (index: number): string => {
-  const colors = [
+  const colors: string[] = [
     '#3b82f6', // blue
     '#10b981', // green
     '#f59e0b', // amber
@@ -64,7 +64,7 @@ const getSourceColor = (index: number): string => {
     '#06b6d4', // cyan
     '#84cc16', // lime
   ];
-  return colors[index % colors.length];
+  return colors[Math.abs(index) % colors.length]!;
 };
 
 /**
@@ -252,7 +252,7 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" fontWeight={700}>
-                  {(sourceData.sources[0]?.percentage * 100).toFixed(1)}%
+                  {((sourceData.sources[0]?.percentage || 0) * 100).toFixed(1)}%
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Highest Share

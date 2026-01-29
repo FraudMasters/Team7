@@ -190,7 +190,6 @@ def extract_keywords(
             keyphrase_ngram_range=keyphrase_ngram_range,
             stop_words=stop_words,
             top_n=top_n,
-            min_score=min_score,
             use_maxsum=use_maxsum,
             use_mmr=use_mmr,
             diversity=diversity,
@@ -346,7 +345,7 @@ def extract_resume_keywords(
                 "error": single_result["error"],
             }
 
-        single_words = single_result.get("keywords_with_scores", [])
+        single_words = single_result.get("keywords_with_scores") or []
 
         keyphrases = []
         if include_keyphrases:
@@ -364,7 +363,7 @@ def extract_resume_keywords(
             if phrase_result.get("error"):
                 logger.warning(f"Phrase extraction failed: {phrase_result['error']}")
             else:
-                keyphrases = phrase_result.get("keywords_with_scores", [])
+                keyphrases = phrase_result.get("keywords_with_scores") or []
 
         # Combine and deduplicate
         all_keywords = [kw for kw, _ in single_words] + [

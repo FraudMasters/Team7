@@ -1,13 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, createTheme } from '@mui/material';
 import { LanguageProvider } from './contexts/LanguageContext';
 import App from './App';
 import './index.css';
 import './i18n'; // Initialize i18n
 
 // Create a Material-UI theme
-const theme = {
+const theme = createTheme({
   palette: {
     primary: {
       main: '#1976d2',
@@ -24,6 +24,10 @@ const theme = {
     background: {
       default: '#f5f5f5',
       paper: '#ffffff',
+    },
+    grey: {
+      200: '#eeeeee',
+      800: '#424242',
     },
   },
   typography: {
@@ -47,7 +51,7 @@ const theme = {
       },
     },
   },
-};
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

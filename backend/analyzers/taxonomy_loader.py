@@ -18,8 +18,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..models.skill_taxonomy import SkillTaxonomy
-from ..models.custom_synonyms import CustomSynonym
+from models.skill_taxonomy import SkillTaxonomy
+from models.custom_synonyms import CustomSynonym
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..models.skill_taxonomy import SkillTaxonomy
+from models.skill_taxonomy import SkillTaxonomy
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class SkillVariant(BaseModel):
     name: str = Field(..., description="Canonical name of the skill")
     context: Optional[str] = Field(None, description="Context category (e.g., web_framework, language, database)")
     variants: List[str] = Field(default_factory=list, description="Alternative names/spellings for this skill")
-    metadata: Optional[dict] = Field(None, description="Additional skill metadata (description, category, etc.)")
+    extra_metadata: Optional[dict] = Field(None, description="Additional skill metadata (description, category, etc.)")
     is_active: bool = Field(True, description="Whether this taxonomy entry is currently active")
 
 
@@ -43,7 +43,7 @@ class SkillTaxonomyUpdate(BaseModel):
     skill_name: Optional[str] = Field(None, description="Canonical name of the skill")
     context: Optional[str] = Field(None, description="Context category")
     variants: Optional[List[str]] = Field(None, description="Alternative names/spellings")
-    metadata: Optional[dict] = Field(None, description="Additional skill metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional skill metadata")
     is_active: Optional[bool] = Field(None, description="Whether this entry is active")
 
 
@@ -55,7 +55,7 @@ class SkillTaxonomyResponse(BaseModel):
     skill_name: str = Field(..., description="Canonical name of the skill")
     context: Optional[str] = Field(None, description="Context category")
     variants: List[str] = Field(default_factory=list, description="Alternative names/spellings")
-    metadata: Optional[dict] = Field(None, description="Additional skill metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional skill metadata")
     is_active: bool = Field(..., description="Whether this entry is active")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
@@ -142,7 +142,7 @@ async def create_skill_taxonomies(request: SkillTaxonomyCreate) -> JSONResponse:
                 "skill_name": skill.name,
                 "context": skill.context,
                 "variants": skill.variants,
-                "metadata": skill.metadata,
+                "extra_metadata": skill.extra_metadata,
                 "is_active": skill.is_active,
                 "created_at": "2024-01-25T00:00:00Z",
                 "updated_at": "2024-01-25T00:00:00Z",
@@ -252,7 +252,7 @@ async def get_skill_taxonomy(taxonomy_id: str) -> JSONResponse:
                 "skill_name": "React",
                 "context": "web_framework",
                 "variants": ["React", "ReactJS", "React.js"],
-                "metadata": None,
+                "extra_metadata": None,
                 "is_active": True,
                 "created_at": "2024-01-25T00:00:00Z",
                 "updated_at": "2024-01-25T00:00:00Z",
@@ -308,7 +308,7 @@ async def update_skill_taxonomy(
                 "skill_name": request.skill_name or "React",
                 "context": request.context,
                 "variants": request.variants or ["React", "ReactJS"],
-                "metadata": request.metadata,
+                "extra_metadata": request.extra_metadata,
                 "is_active": request.is_active if request.is_active is not None else True,
                 "created_at": "2024-01-25T00:00:00Z",
                 "updated_at": "2024-01-25T00:00:00Z",

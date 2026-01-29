@@ -9,6 +9,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  SelectChangeEvent,
   MenuItem,
   Chip,
   Stack,
@@ -181,7 +182,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
    * Handle sort field change
    */
   const handleSortFieldChange = useCallback(
-    (event: React.ChangeEvent<{ value: unknown }>) => {
+    (event: SelectChangeEvent<ComparisonSort['field']>) => {
       const field = event.target.value as ComparisonSort['field'];
       const newSort = { ...sort, field };
       setSort(newSort);
@@ -194,7 +195,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
    * Handle sort order change
    */
   const handleSortOrderChange = useCallback(
-    (event: React.ChangeEvent<{ value: unknown }>) => {
+    (event: SelectChangeEvent<ComparisonSort['order']>) => {
       const order = event.target.value as ComparisonSort['order'];
       const newSort = { ...sort, order };
       setSort(newSort);
@@ -491,8 +492,8 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
               value={[filters.min_match_percentage, filters.max_match_percentage]}
               onChange={(_event, newValue) => {
                 const value = newValue as number[];
-                handleFilterChange('min_match_percentage', value[0]);
-                handleFilterChange('max_match_percentage', value[1]);
+                if (value[0] !== undefined) handleFilterChange('min_match_percentage', value[0]);
+                if (value[1] !== undefined) handleFilterChange('max_match_percentage', value[1]);
               }}
               valueLabelDisplay="auto"
               valueLabelFormat={(value) => `${value}%`}

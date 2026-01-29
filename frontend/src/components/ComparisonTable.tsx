@@ -168,7 +168,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
   const getMatchConfig = (percentage: number) => {
     if (percentage >= 70) {
       return {
-        color: 'success' as const;
+        color: 'success' as const,
         label: 'Excellent',
         bgColor: 'success.main',
         textColor: 'success.contrastText',
@@ -185,7 +185,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
     return {
       color: 'error' as const,
       label: 'Poor',
-        bgColor: 'error.main',
+      bgColor: 'error.main',
       textColor: 'error.contrastText',
     };
   };

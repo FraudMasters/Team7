@@ -42,6 +42,14 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
     industry: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     work_format: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    salary_min: Mapped[Optional[int]] = mapped_column(
+        nullable=True, default=None
+    )
+    salary_max: Mapped[Optional[int]] = mapped_column(
+        nullable=True, default=None
+    )
+    english_level: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    employment_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 

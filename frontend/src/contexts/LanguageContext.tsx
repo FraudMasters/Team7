@@ -59,7 +59,7 @@ interface LanguageState {
   /** Get language configuration */
   getLanguageConfig: (language: SupportedLanguage) => LanguageConfig;
   /** Check if language is supported */
-  isLanguageSupported: (language: string): language is SupportedLanguage;
+  isLanguageSupported: (language: string) => language is SupportedLanguage;
 }
 
 /**

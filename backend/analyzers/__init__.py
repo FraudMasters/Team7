@@ -8,8 +8,20 @@ and experience calculation.
 
 from .keyword_extractor import (
     extract_keywords,
-    extract_resume_keywords,
+    extract_resume_keywords as extract_resume_keywords_old,
     extract_top_skills,
+)
+from .hf_skill_extractor import (
+    extract_skills_ner,
+    extract_skills_zero_shot,
+    extract_resume_skills,
+    extract_top_skills as extract_top_skills_hf,
+    extract_resume_keywords,
+    extract_resume_keywords as extract_resume_keywords_hf,
+)
+from .skill_extractor_fallback import (
+    extract_skills_with_fallback,
+    extract_top_skills_auto,
 )
 from .ner_extractor import (
     extract_entities,
@@ -50,6 +62,13 @@ __all__ = [
     "extract_keywords",
     "extract_top_skills",
     "extract_resume_keywords",
+    "extract_skills_ner",
+    "extract_skills_zero_shot",
+    "extract_resume_skills",
+    "extract_top_skills_hf",
+    "extract_resume_keywords_hf",
+    "extract_skills_with_fallback",
+    "extract_top_skills_auto",
     "extract_entities",
     "extract_organizations",
     "extract_dates",

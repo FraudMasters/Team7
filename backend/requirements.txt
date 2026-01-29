@@ -12,12 +12,13 @@ asyncpg==0.29.0
 alembic==1.13.2
 
 # ML/NLP Libraries
-keybert==0.8.4
+# keybert==0.8.4  # Replaced with Hugging Face models (see hf_skill_extractor.py)
 sentence-transformers==3.0.1
 spacy==3.8.2
 language-tool-python==2.7.1
 langdetect==1.0.9
-tensorflow==2.17.0
+tensorflow>=2.20.0  # Updated for Keras 3 compatibility with Transformers
+tf-keras>=2.20.0  # Backwards-compatible Keras for Transformers library
 
 # File Extraction (PDF/DOCX)
 PyPDF2==3.0.1

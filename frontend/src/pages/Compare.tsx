@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Container } from '@mui/material';
 import { useParams } from 'react-router-dom';
-import { JobComparison } from '@components/JobComparison';
+import JobComparison from '@components/JobComparison';
 
 /**
  * Compare Page Component

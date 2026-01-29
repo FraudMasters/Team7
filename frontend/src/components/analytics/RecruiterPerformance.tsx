@@ -139,20 +139,20 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   const getTimeToHireConfig = (days: number) => {
     if (days <= 30) {
       return {
-        color: 'success' as const;
+        color: 'success' as const,
         label: 'Fast',
         bgColor: 'success.main',
       };
     }
     if (days <= 45) {
       return {
-        color: 'warning' as const;
+        color: 'warning' as const,
         label: 'Moderate',
         bgColor: 'warning.main',
       };
     }
     return {
-      color: 'error' as const;
+      color: 'error' as const,
       label: 'Slow',
       bgColor: 'error.main',
     };
@@ -165,18 +165,18 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
     const percentage = rate * 100;
     if (percentage >= 90) {
       return {
-        color: 'success' as const;
+        color: 'success' as const,
         label: 'Excellent',
       };
     }
     if (percentage >= 80) {
       return {
-        color: 'warning' as const;
+        color: 'warning' as const,
         label: 'Good',
       };
     }
     return {
-      color: 'error' as const;
+      color: 'error' as const,
       label: 'Low',
     };
   };
@@ -314,7 +314,7 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
                 Top Performer
               </Typography>
               <Typography variant="body2" fontWeight={600}>
-                {topPerformer.recruiter_name}
+                {topPerformer?.recruiter_name || 'N/A'}
               </Typography>
             </Box>
           </Box>

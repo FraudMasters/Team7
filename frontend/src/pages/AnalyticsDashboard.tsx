@@ -1,129 +1,212 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Paper, Typography, Box, Tabs, Tab, Stack } from '@mui/material';
-import { useSearchParams } from 'react-router-dom';
-import KeyMetrics from '../components/analytics/KeyMetrics';
-import FunnelVisualization from '../components/analytics/FunnelVisualization';
-import SkillDemandChart from '../components/analytics/SkillDemandChart';
-import SourceTracking from '../components/analytics/SourceTracking';
-import RecruiterPerformance from '../components/analytics/RecruiterPerformance';
-import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '../components/analytics/DateRangeFilter';
-import ReportBuilder from '../components/analytics/ReportBuilder';
+import {
+  Container,
+  Typography,
+  Box,
+  Grid,
+  Paper,
+  Card,
+  CardContent,
+  CircularProgress,
+  Stack,
+} from '@mui/material';
+import {
+  TrendingUp as TrendingIcon,
+  Description as ResumeIcon,
+  Work as WorkIcon,
+  CheckCircle as CheckIcon,
+} from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import axios from 'axios';
+import RecruitingFunnel from '@components/RecruitingFunnel';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`analytics-tabpanel-${index}`}
-      aria-labelledby={`analytics-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box>{children}</Box>}
-    </div>
-  );
-}
-
-function a11yProps(index: number) {
-  return {
-    id: `analytics-tab-${index}`,
-    'aria-controls': `analytics-tabpanel-${index}`,
-  };
+interface SummaryStats {
+  totalResumes: number;
+  totalVacancies: number;
+  highMatchCount: number;
+  mediumMatchCount: number;
 }
 
 /**
- * AnalyticsDashboardPage Component
+ * Analytics Dashboard Page (Recruiter Module)
  *
- * Main analytics dashboard for viewing hiring metrics, funnel visualization,
- * skill demand analytics, recruiter performance, source tracking, and custom reports.
+ * Shows hiring metrics and funnel visualization using real data from existing APIs.
  */
 const AnalyticsDashboardPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [dateRange, setDateRange] = useState<DateRangeFilterType>({
-    startDate: '',
-    endDate: '',
-    preset: 'last_30_days',
-  });
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<SummaryStats | null>(null);
 
-  // Get tab from URL query parameter
-  const tabParam = searchParams.get('tab');
-  const tabValue = tabParam === 'reports' ? 1 : 0;
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
 
-  /**
-   * Handle tab change
-   */
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    const tab = newValue === 1 ? 'reports' : 'dashboard';
-    setSearchParams({ tab });
-  };
+        // Fetch resumes and vacancies
+        const [resumesResponse, vacanciesResponse] = await Promise.all([
+          axios.get('/api/resumes/?limit=200'),
+          axios.get('/api/vacancies/?limit=50'),
+        ]);
 
-  /**
-   * Handle date range change
-   */
-  const handleDateRangeChange = (newDateRange: DateRangeFilterType) => {
-    setDateRange(newDateRange);
-  };
+        const resumes = resumesResponse.data;
+        const vacancies = vacanciesResponse.data;
+
+        // Calculate match statistics
+        let highMatch = 0;
+        let mediumMatch = 0;
+
+        // Sample first 20 resumes for speed
+        const sampleSize = Math.min(resumes.length, 20);
+
+        for (let i = 0; i < sampleSize; i++) {
+          const resume = resumes[i];
+          for (const vacancy of vacancies) {
+            try {
+              const matchResponse = await axios.get(
+                `/api/vacancies/match/${vacancy.id}?resume_id=${resume.id}`
+              );
+              const pct = matchResponse.data.match_percentage || 0;
+              if (pct >= 70) highMatch++;
+              if (pct >= 50) mediumMatch++;
+            } catch (e) {
+              // Skip errors
+            }
+          }
+        }
+
+        setStats({
+          totalResumes: resumes.length,
+          totalVacancies: vacancies.length,
+          highMatchCount: highMatch,
+          mediumMatchCount: mediumMatch,
+        });
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          Hiring Analytics Dashboard
+        <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+          {t('analyticsDashboard.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Monitor key hiring metrics, track candidate progression, analyze skill demand,
-          compare recruiter performance, and build custom reports
+          {t('analyticsDashboard.subtitle')}
         </Typography>
       </Box>
 
-      {/* Tabs */}
-      <Paper elevation={1} sx={{ mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          aria-label="Analytics tabs"
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab label="Dashboard" {...a11yProps(0)} />
-          <Tab label="Reports" {...a11yProps(1)} />
-        </Tabs>
+      {/* Summary Stats Cards */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              borderTop: 4,
+              borderColor: 'primary.main',
+              boxShadow: 2,
+            }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <ResumeIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {t('analyticsDashboard.stats.totalResumes')}
+                </Typography>
+              </Box>
+              <Typography variant="h4" fontWeight={700} color="primary.main">
+                {stats?.totalResumes || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              borderTop: 4,
+              borderColor: 'success.main',
+              boxShadow: 2,
+            }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <WorkIcon sx={{ mr: 1, color: 'success.main' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {t('analyticsDashboard.stats.activeVacancies')}
+                </Typography>
+              </Box>
+              <Typography variant="h4" fontWeight={700} color="success.main">
+                {stats?.totalVacancies || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              borderTop: 4,
+              borderColor: 'warning.main',
+              boxShadow: 2,
+            }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <CheckIcon sx={{ mr: 1, color: 'warning.main' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {t('analyticsDashboard.stats.highMatches')}
+                </Typography>
+              </Box>
+              <Typography variant="h4" fontWeight={700} color="warning.main">
+                {stats?.highMatchCount || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              borderTop: 4,
+              borderColor: 'info.main',
+              boxShadow: 2,
+            }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <TrendingIcon sx={{ mr: 1, color: 'info.main' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {t('analyticsDashboard.stats.mediumMatches')}
+                </Typography>
+              </Box>
+              <Typography variant="h4" fontWeight={700} color="info.main">
+                {stats?.mediumMatchCount || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Recruiting Funnel */}
+      <Paper sx={{ p: 3 }}>
+        <RecruitingFunnel />
       </Paper>
-
-      {/* Dashboard Tab */}
-      <TabPanel value={tabValue} index={0}>
-        <Stack spacing={3}>
-          {/* Date Range Filter Section */}
-          <DateRangeFilter onDateRangeChange={handleDateRangeChange} />
-
-          {/* Key Metrics Section */}
-          <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Funnel Visualization Section */}
-          <FunnelVisualization startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Skill Demand Analytics Section */}
-          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Source Tracking Section */}
-          <SourceTracking startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Recruiter Performance Section */}
-          <RecruiterPerformance startDate={dateRange.startDate} endDate={dateRange.endDate} />
-        </Stack>
-      </TabPanel>
-
-      {/* Reports Tab */}
-      <TabPanel value={tabValue} index={1}>
-        <ReportBuilder />
-      </TabPanel>
     </Container>
   );
 };

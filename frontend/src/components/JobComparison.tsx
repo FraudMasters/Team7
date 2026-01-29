@@ -95,7 +95,7 @@ interface JobComparisonProps {
 const JobComparison: React.FC<JobComparisonProps> = ({
   resumeId,
   vacancyId,
-  apiUrl = 'http://localhost:8000/api/matching',
+  apiUrl = '/api/vacancies',
 }) => {
   const { t } = useTranslation();
   const { language } = useLanguageContext();
@@ -111,14 +111,25 @@ const JobComparison: React.FC<JobComparisonProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`${apiUrl}/${resumeId}/${vacancyId}`);
+      const response = await fetch(`${apiUrl}/match/${vacancyId}?resume_id=${resumeId}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch comparison: ${response.statusText}`);
       }
 
-      const result: JobComparisonData = await response.json();
-      setData(result);
+      const result = await response.json();
+
+      // Transform API response to match our interface
+      const comparisonData: JobComparisonData = {
+        resume_id: result.resume_id,
+        vacancy_id: result.vacancy_id,
+        match_percentage: result.match_percentage,
+        matched_skills: result.matched_skills || [],
+        missing_skills: result.missing_skills || [],
+        overall_match: result.overall_match,
+        processing_time: result.processing_time,
+      };
+      setData(comparisonData);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : t('compare.errors.failedToLoad');
@@ -331,7 +342,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                   />
                 ))
               ) : (
-                <Typography variant="body2" color="text.secondary" italic>
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                   {t('compare.noMatchedSkills')}
                 </Typography>
               )}
