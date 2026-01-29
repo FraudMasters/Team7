@@ -153,12 +153,6 @@ Debug E2E tests:
 npm run test:e2e:debug
 ```
 
-Verify E2E test setup:
-
-```bash
-./e2e/verify-setup.sh
-```
-
 For detailed E2E testing documentation, see [e2e/README.md](e2e/README.md).
 
 ## Building for Production
