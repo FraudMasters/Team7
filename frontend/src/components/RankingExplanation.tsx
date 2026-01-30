@@ -123,7 +123,7 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
         <LinearProgress
           variant="determinate"
           value={Math.min(absContribution, 100)}
-          color={getContributionColor(contribution) as 'success' | 'error' | 'default'}
+          color={getContributionColor(contribution) === 'default' ? 'primary' : (getContributionColor(contribution) as 'success' | 'error')}
           sx={{
             height: 8,
             borderRadius: 4,
