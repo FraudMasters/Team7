@@ -253,7 +253,7 @@ async def list_resumes(
     db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
     """
-    List all resumes in the database.
+    List all resumes in the database with their pre-analyzed skills.
 
     Returns a paginated list of all resumes with their basic information.
 
@@ -271,7 +271,9 @@ async def list_resumes(
         >>> resumes = response.json()
     """
     try:
-        # Query resumes from database
+        from models.resume_analysis import ResumeAnalysis
+
+        # Query resumes with their analysis
         query = select(Resume).order_by(Resume.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
         resumes = result.scalars().all()
@@ -279,44 +281,28 @@ async def list_resumes(
         # Convert to response format
         resumes_list = []
         for resume in resumes:
-            # Extract technical skills
             skills = []
 
-            # Try to get from raw_text first
-            if resume.raw_text:
+            # Try to get skills from saved analysis
+            analysis = await db.execute(
+                select(ResumeAnalysis).where(ResumeAnalysis.resume_id == resume.id)
+            )
+            analysis_obj = analysis.scalar_one_or_none()
+
+            if analysis_obj and analysis_obj.skills:
+                skills = analysis_obj.skills[:30]  # Use saved skills
+            elif resume.raw_text:
+                # Fallback: extract from raw_text if no analysis saved
                 try:
-                    from analyzers import extract_resume_entities
-                    entities = extract_resume_entities(resume.raw_text[:5000])
-                    skills = entities.get("technical_skills") or entities.get("skills") or []
+                    from analyzers.hf_skill_extractor import extract_resume_skills
+                    result = extract_resume_skills(
+                        resume.raw_text[:5000],
+                        method='pattern',
+                        top_n=30
+                    )
+                    skills = result.get("skills") or []
                 except Exception as e:
                     logger.warning(f"Failed to extract skills from raw_text for resume {resume.id}: {e}")
-
-            # If no skills and raw_text is empty, try extracting from file
-            if not skills and resume.file_path:
-                try:
-                    from pathlib import Path
-                    from services.data_extractor.extract import extract_text_from_docx, extract_text_from_pdf
-
-                    file_path = Path(resume.file_path)
-                    if file_path.exists():
-                        if file_path.suffix == ".docx":
-                            result = extract_text_from_docx(str(file_path))
-                            text = result.get("text", "")
-                        elif file_path.suffix == ".pdf":
-                            result = extract_text_from_pdf(str(file_path))
-                            text = result.get("text", "")
-                        else:
-                            text = ""
-
-                        if text and len(text) > 100:
-                            try:
-                                from analyzers import extract_resume_entities
-                                entities = extract_resume_entities(text[:5000])
-                                skills = entities.get("technical_skills") or entities.get("skills") or []
-                            except Exception as e:
-                                logger.warning(f"Failed to extract skills from file for resume {resume.id}: {e}")
-                except Exception as e:
-                    logger.warning(f"Failed to extract skills from file for resume {resume.id}: {e}")
 
             resumes_list.append({
                 "id": str(resume.id),
@@ -324,7 +310,7 @@ async def list_resumes(
                 "status": resume.status.value,
                 "created_at": resume.created_at.isoformat() if resume.created_at else None,
                 "language": resume.language,
-                "skills": skills[:15],  # Include skills for display
+                "technical_skills": skills,
             })
 
         return JSONResponse(
@@ -461,13 +447,28 @@ async def get_resume(request: Request, resume_id: str, db: AsyncSession = Depend
         # Run analysis
         logger.info(f"Running analysis for resume: {resume_id}")
 
-        # Extract keywords
-        keywords_data = extract_resume_keywords(text[:3000])
-        keywords = keywords_data.get("keywords", [])
+        # Detect language for model selection
+        from langdetect import detect
+        try:
+            lang_code = detect(text[:1000])
+            # Map to our language format
+            if lang_code == 'ru':
+                detected_language = 'ru'
+            elif lang_code == 'en':
+                detected_language = 'en'
+            else:
+                detected_language = lang_code
+        except:
+            detected_language = "en"
 
-        # Extract entities (technical skills)
-        entities_data = extract_resume_entities(text[:5000])
-        entities = entities_data.get("technical_skills") or entities_data.get("skills") or []
+        # Extract keywords with language-aware model selection
+        keywords_data = extract_resume_keywords(text[:3000], language=detected_language)
+        keywords = keywords_data.get("all_keywords") or keywords_data.get("keywords", [])
+
+        # Extract technical skills using pattern matching for cleaner results
+        from analyzers.hf_skill_extractor import extract_resume_skills
+        skills_data = extract_resume_skills(text[:5000], method='pattern', top_n=30)
+        entities = skills_data.get("skills") or []
 
         # Grammar check
         grammar_data = check_grammar_resume(text[:2000])

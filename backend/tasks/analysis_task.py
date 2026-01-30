@@ -225,14 +225,30 @@ def analyze_resume_async(
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Keyword extraction")
 
         try:
-            # Extract keywords
-            keywords_result = extract_resume_keywords(resume_text)
+            # Detect language first for model selection
+            from langdetect import detect
+            try:
+                lang_code = detect(resume_text[:1000])
+                # Map to our language format
+                if lang_code == 'ru':
+                    detected_language = 'ru'
+                elif lang_code == 'en':
+                    detected_language = 'en'
+                else:
+                    detected_language = lang_code
+            except:
+                detected_language = "en"
+
+            logger.info(f"Detected language: {detected_language}")
+
+            # Extract keywords with language-aware model selection
+            keywords_result = extract_resume_keywords(resume_text, language=detected_language)
 
             # Extract named entities
             entities_result = extract_resume_entities(resume_text)
 
-            # Detect language (already done in analyzers)
-            language = entities_result.get("language", "unknown")
+            # Use detected language for entities result
+            language = entities_result.get("language", detected_language)
 
         except Exception as e:
             logger.error(f"Keyword/entity extraction failed: {e}", exc_info=True)

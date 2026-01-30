@@ -10,13 +10,19 @@ import logging
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
+
+from database import get_db
+from models.match_result import MatchResult
 
 from analyzers import (
     extract_resume_keywords_hf as extract_resume_keywords,
@@ -24,6 +30,8 @@ from analyzers import (
     calculate_skill_experience,
     format_experience_summary,
     EnhancedSkillMatcher,
+    UnifiedSkillMatcher,
+    get_unified_matcher,
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
@@ -741,4 +749,349 @@ async def submit_match_feedback(http_request: Request, request: MatchFeedbackReq
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg,
+        ) from e
+
+
+class UnifiedMatchRequest(BaseModel):
+    """Request model for unified job matching endpoint."""
+
+    resume_id: str = Field(..., description="Unique identifier of the resume to match")
+    vacancy_data: Dict[str, Any] = Field(
+        ..., description="Job vacancy data with required skills and experience"
+    )
+    use_unified: bool = Field(True, description="Use unified matcher (TF-IDF + Vector + Keyword)")
+
+
+@router.post(
+    "/compare-unified",
+    status_code=status.HTTP_200_OK,
+    tags=["Matching"],
+)
+async def compare_resume_to_vacancy_unified(
+    http_request: Request,
+    request: UnifiedMatchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Compare a resume to a job vacancy using unified matching (TF-IDF + Vector + Keyword).
+
+    This endpoint provides comprehensive matching using three complementary approaches:
+    1. Enhanced keyword matching (synonyms, fuzzy, compound skills)
+    2. TF-IDF weighted matching (importance-based scoring)
+    3. Vector semantic similarity (sentence-transformers)
+
+    The overall score is a weighted combination of all three methods for the most
+    accurate matching results.
+
+    Args:
+        http_request: FastAPI request object (for Accept-Language header)
+        request: Match request with resume_id and vacancy_data
+
+    Returns:
+        JSON response with comprehensive match results including:
+        - overall_score: Weighted combination of all methods (0-1)
+        - keyword_score: Enhanced keyword matching score
+        - tfidf_score: TF-IDF weighted score
+        - vector_score: Semantic similarity score
+        - matched_skills: List of matched skills
+        - missing_skills: List of missing skills (ranked by importance)
+        - recommendation: Hiring recommendation (excellent/good/maybe/poor)
+
+    Raises:
+        HTTPException(404): If resume file is not found
+        HTTPException(500): If matching processing fails
+
+    Examples:
+        >>> import requests
+        >>> vacancy = {
+        ...     "title": "React Developer",
+        ...     "description": "Looking for React expert with TypeScript",
+        ...     "required_skills": ["React", "TypeScript", "JavaScript"]
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/matching/compare-unified",
+        ...     json={"resume_id": "abc123", "vacancy_data": vacancy}
+        ... )
+        >>> response.json()
+        {
+            "resume_id": "abc123",
+            "vacancy_title": "React Developer",
+            "overall_score": 0.75,
+            "keyword_score": 0.67,
+            "tfidf_score": 0.80,
+            "vector_score": 0.72,
+            "passed": true,
+            "recommendation": "good",
+            "matched_skills": ["React", "JavaScript"],
+            "missing_skills": ["TypeScript"],
+            "processing_time_ms": 250.5
+        }
+    """
+    import time
+
+    locale = _extract_locale(http_request)
+    start_time = time.time()
+
+    try:
+        logger.info(f"Starting unified matching for resume_id: {request.resume_id}")
+
+        # Step 1: Try to find resume file OR use database data
+        resume_text = None
+        file_path = None
+
+        # First, try to find the file
+        for ext in [".pdf", ".docx", ".PDF", ".DOCX"]:
+            potential_path = UPLOAD_DIR / f"{request.resume_id}{ext}"
+            if potential_path.exists():
+                file_path = potential_path
+                break
+
+        # Step 2: Extract text from file or use database fallback
+        if file_path:
+            # Extract from file
+            try:
+                from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
+
+                file_ext = file_path.suffix.lower()
+                if file_ext == ".pdf":
+                    result = extract_text_from_pdf(str(file_path))
+                elif file_ext == ".docx":
+                    result = extract_text_from_docx(str(file_path))
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail="Unsupported file type",
+                    )
+
+                resume_text = result.get("text", "")
+                if not resume_text or len(resume_text.strip()) < 10:
+                    resume_text = None
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error extracting text from file: {e}")
+                resume_text = None
+
+        # Fallback: Try to get text from database
+        if not resume_text:
+            try:
+                from models.resume import Resume as ResumeModel
+                from models.resume_analysis import ResumeAnalysis
+
+                resume_uuid = UUID(request.resume_id)
+                resume_query = select(ResumeModel).where(ResumeModel.id == resume_uuid)
+                resume_result = await db.execute(resume_query)
+                resume_record = resume_result.scalar_one_or_none()
+
+                if resume_record and resume_record.raw_text:
+                    resume_text = resume_record.raw_text
+                    logger.info(f"Using raw_text from database for resume {request.resume_id}")
+                elif resume_record:
+                    # Try to get from ResumeAnalysis
+                    analysis_query = select(ResumeAnalysis).where(
+                        ResumeAnalysis.resume_id == resume_uuid
+                    )
+                    analysis_result = await db.execute(analysis_query)
+                    analysis_record = analysis_result.scalar_one_or_none()
+
+                    if analysis_record and analysis_record.raw_text:
+                        resume_text = analysis_record.raw_text
+                        logger.info(f"Using raw_text from ResumeAnalysis for resume {request.resume_id}")
+                    else:
+                        logger.warning(f"No text found for resume {request.resume_id}")
+                else:
+                    logger.warning(f"Resume {request.resume_id} not found in database")
+
+            except Exception as e:
+                logger.error(f"Error getting resume from database: {e}")
+
+        if not resume_text or len(resume_text.strip()) < 10:
+            # Return default response with zeros
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "resume_id": request.resume_id,
+                    "vacancy_title": request.vacancy_data.get("title", "Unknown"),
+                    "overall_score": 0.0,
+                    "passed": False,
+                    "recommendation": "poor",
+                    "keyword_score": 0.0,
+                    "keyword_passed": False,
+                    "tfidf_score": 0.0,
+                    "tfidf_passed": False,
+                    "tfidf_matched": [],
+                    "tfidf_missing": request.vacancy_data.get("required_skills", [])[:5],
+                    "vector_score": 0.0,
+                    "vector_passed": False,
+                    "vector_similarity": 0.0,
+                    "matched_skills": [],
+                    "missing_skills": request.vacancy_data.get("required_skills", []),
+                    "processing_time_ms": 0.0,
+                },
+            )
+
+        # Step 3: Extract skills using pattern matching
+        from analyzers.hf_skill_extractor import extract_resume_skills
+
+        skills_result = extract_resume_skills(
+            resume_text, method="pattern", top_n=30
+        )
+        resume_skills = skills_result.get("skills", [])
+
+        logger.info(f"Extracted {len(resume_skills)} skills from resume")
+
+        # Step 4: Get vacancy data
+        vacancy_title = request.vacancy_data.get(
+            "title", request.vacancy_data.get("position", "Unknown Position")
+        )
+        vacancy_description = request.vacancy_data.get("description", "")
+        required_skills = request.vacancy_data.get("required_skills", [])
+
+        if isinstance(required_skills, str):
+            required_skills = [required_skills]
+
+        # Step 5: Use unified matcher
+        unified_matcher = get_unified_matcher()
+
+        # DEBUG: Log what's being passed to matcher
+        logger.info(f"[DEBUG] resume_skills (len={len(resume_skills)}): {resume_skills[:10]}...")
+        logger.info(f"[DEBUG] required_skills: {required_skills}")
+        logger.info(f"[DEBUG] 'python' in resume_skills: {'python' in resume_skills}")
+
+        match_result = unified_matcher.match(
+            resume_text=resume_text,
+            resume_skills=resume_skills,
+            job_title=vacancy_title,
+            job_description=vacancy_description,
+            required_skills=required_skills,
+            context=vacancy_title.lower(),
+        )
+
+        # DEBUG: Log what matcher returned
+        logger.info(f"[DEBUG] match_result.matched_skills: {match_result.matched_skills}")
+        logger.info(f"[DEBUG] match_result.missing_skills: {match_result.missing_skills}")
+
+        processing_time_ms = (time.time() - start_time) * 1000
+
+        # Step 6: Save match results to database
+        try:
+            # Parse resume_id as UUID
+            resume_uuid = UUID(request.resume_id)
+
+            # Get vacancy_id from vacancy_data if provided
+            vacancy_id = request.vacancy_data.get("id")
+            vacancy_uuid = UUID(vacancy_id) if vacancy_id else None
+
+            # Check if match result already exists
+            existing_match = None
+            if vacancy_uuid:
+                existing_query = select(MatchResult).where(
+                    MatchResult.resume_id == resume_uuid,
+                    MatchResult.vacancy_id == vacancy_uuid
+                )
+                existing_result = await db.execute(existing_query)
+                existing_match = existing_result.scalar_one_or_none()
+
+            # Prepare match data for storage
+            match_percentage = round(match_result.overall_score * 100, 2)
+            matched_skills_detailed = [
+                {"skill": s, "matched": True}
+                for s in match_result.matched_skills
+            ]
+            missing_skills_detailed = [
+                {"skill": s, "matched": False}
+                for s in match_result.missing_skills
+            ]
+
+            if existing_match:
+                # Update existing record
+                existing_match.match_percentage = match_percentage
+                existing_match.matched_skills = matched_skills_detailed
+                existing_match.missing_skills = missing_skills_detailed
+                existing_match.overall_score = match_result.overall_score
+                existing_match.keyword_score = match_result.keyword_score
+                existing_match.tfidf_score = match_result.tfidf_score
+                existing_match.vector_score = match_result.vector_score
+                existing_match.vector_similarity = match_result.vector_similarity
+                existing_match.recommendation = match_result.recommendation
+                existing_match.keyword_passed = match_result.keyword_passed
+                existing_match.tfidf_passed = match_result.tfidf_passed
+                existing_match.vector_passed = match_result.vector_passed
+                existing_match.tfidf_matched = match_result.tfidf_matched
+                existing_match.tfidf_missing = match_result.tfidf_missing
+                existing_match.matcher_version = "unified-v1"
+                logger.info(f"Updated existing match result: {existing_match.id}")
+            else:
+                # Create new match result record (only if we have a vacancy_id)
+                if vacancy_uuid:
+                    new_match = MatchResult(
+                        resume_id=resume_uuid,
+                        vacancy_id=vacancy_uuid,
+                        match_percentage=match_percentage,
+                        matched_skills=matched_skills_detailed,
+                        missing_skills=missing_skills_detailed,
+                        overall_score=match_result.overall_score,
+                        keyword_score=match_result.keyword_score,
+                        tfidf_score=match_result.tfidf_score,
+                        vector_score=match_result.vector_score,
+                        vector_similarity=match_result.vector_similarity,
+                        recommendation=match_result.recommendation,
+                        keyword_passed=match_result.keyword_passed,
+                        tfidf_passed=match_result.tfidf_passed,
+                        vector_passed=match_result.vector_passed,
+                        tfidf_matched=match_result.tfidf_matched,
+                        tfidf_missing=match_result.tfidf_missing,
+                        matcher_version="unified-v1",
+                    )
+                    db.add(new_match)
+                    logger.info(f"Created new match result for resume {resume_uuid} and vacancy {vacancy_uuid}")
+
+            await db.commit()
+
+        except ValueError as e:
+            logger.warning(f"Invalid UUID format, skipping database save: {e}")
+        except Exception as e:
+            logger.error(f"Failed to save match result to database: {e}")
+            await db.rollback()
+
+        # Build response
+        response_data = {
+            "resume_id": request.resume_id,
+            "vacancy_title": vacancy_title,
+            "overall_score": match_result.overall_score,
+            "passed": match_result.passed,
+            "recommendation": match_result.recommendation,
+            "keyword_score": match_result.keyword_score,
+            "keyword_passed": match_result.keyword_passed,
+            "tfidf_score": match_result.tfidf_score,
+            "tfidf_passed": match_result.tfidf_passed,
+            "tfidf_matched": match_result.tfidf_matched,
+            "tfidf_missing": match_result.tfidf_missing,
+            "vector_score": match_result.vector_score,
+            "vector_passed": match_result.vector_passed,
+            "vector_similarity": match_result.vector_similarity,
+            "matched_skills": match_result.matched_skills,
+            "missing_skills": match_result.missing_skills,
+            "processing_time_ms": round(processing_time_ms, 2),
+        }
+
+        logger.info(
+            f"Unified matching completed for resume_id {request.resume_id}: "
+            f"score={match_result.overall_score:.2f}, "
+            f"recommendation={match_result.recommendation}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in unified matching: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unified matching failed: {str(e)}",
         ) from e
