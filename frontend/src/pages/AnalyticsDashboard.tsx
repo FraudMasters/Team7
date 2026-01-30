@@ -19,6 +19,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import RecruitingFunnel from '@components/RecruitingFunnel';
+import ModelQualityMetrics from '@components/ModelQualityMetrics';
 
 interface SummaryStats {
   totalResumes: number;
@@ -204,8 +205,13 @@ const AnalyticsDashboardPage: React.FC = () => {
       </Grid>
 
       {/* Recruiting Funnel */}
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: 3, mb: 3 }}>
         <RecruitingFunnel />
+      </Paper>
+
+      {/* ML/NLP Quality Metrics */}
+      <Paper sx={{ p: 3 }}>
+        <ModelQualityMetrics />
       </Paper>
     </Container>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Typography, Box } from '@mui/material';
 import { AutoAwesome as AutoAwesomeIcon } from '@mui/icons-material';
-import SmartVacancyWizard from '@/components/SmartVacancyWizard';
+import SmartVacancyWizard from '../components/SmartVacancyWizard';
 
 const CreateVacancy: React.FC = () => {
   return (

@@ -55,8 +55,13 @@ const ResumeDatabasePage: React.FC = () => {
     try {
       setLoading(true);
       const response = await axios.get('/api/resumes/?limit=100');
-      setResumes(response.data);
-      setFilteredResumes(response.data);
+      // Map technical_skills to skills for compatibility
+      const resumesWithSkills = response.data.map((r: any) => ({
+        ...r,
+        skills: r.technical_skills || [],
+      }));
+      setResumes(resumesWithSkills);
+      setFilteredResumes(resumesWithSkills);
     } catch (error) {
       console.error('Error fetching resumes:', error);
     } finally {

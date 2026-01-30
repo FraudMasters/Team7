@@ -507,6 +507,30 @@
     "loading": "Loading funnel data...",
     "noData": "No data available"
   },
+  "metrics": {
+    "loading": "Loading metrics...",
+    "noData": "No metrics data available",
+    "title": "ML/NLP Model Quality Metrics",
+    "modelPerformance": "Model Performance",
+    "extractionSuccess": "Text Extraction Success",
+    "nerAccuracy": "NER Accuracy",
+    "matchingPrecision": "Matching Precision",
+    "matchingRecall": "Matching Recall",
+    "textProcessing": "Text Processing",
+    "avgExtractionTime": "Avg Extraction Time",
+    "avgAnalysisTime": "Avg Analysis Time",
+    "avgKeywords": "Avg Keywords per Resume",
+    "avgEntities": "Avg Entities per Resume",
+    "qualityIssues": "Quality Indicators",
+    "grammarErrorRate": "Grammar Error Rate",
+    "keywordRelevance": "Keyword Relevance",
+    "matchingConfidence": "Matching Confidence",
+    "lowerIsBetter": "Lower is better",
+    "averageRelevance": "Average relevance score",
+    "avgConfidence": "Average confidence score",
+    "systemHealth": "System Health",
+    "totalAnalyzed": "Total Resumes Analyzed"
+  },
   "landing": {
     "hero": {
       "title": "AI-Powered Resume Analysis",

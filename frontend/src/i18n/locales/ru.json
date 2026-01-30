@@ -512,6 +512,30 @@
     "loading": "Загрузка данных...",
     "noData": "Нет данных"
   },
+  "metrics": {
+    "loading": "Загрузка метрик...",
+    "noData": "Данные метрик недоступны",
+    "title": "Метрики качества ML/NLP моделей",
+    "modelPerformance": "Производительность модели",
+    "extractionSuccess": "Успешность извлечения текста",
+    "nerAccuracy": "Точность NER",
+    "matchingPrecision": "Точность подбора",
+    "matchingRecall": "Полнота подбора",
+    "textProcessing": "Обработка текста",
+    "avgExtractionTime": "Ср. время извлечения",
+    "avgAnalysisTime": "Ср. время анализа",
+    "avgKeywords": "Ср. кол-во ключевых слов",
+    "avgEntities": "Ср. кол-во сущностей",
+    "qualityIssues": "Показатели качества",
+    "grammarErrorRate": "Уровень грамматических ошибок",
+    "keywordRelevance": "Релевантность ключевых слов",
+    "matchingConfidence": "Уверенность подбора",
+    "lowerIsBetter": "Меньше — лучше",
+    "averageRelevance": "Средний показатель релевантности",
+    "avgConfidence": "Средний показатель уверенности",
+    "systemHealth": "Состояние системы",
+    "totalAnalyzed": "Всего проанализировано резюме"
+  },
   "landing": {
     "hero": {
       "title": "Анализ резюме на основе ИИ",

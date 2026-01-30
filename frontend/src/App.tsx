@@ -10,6 +10,7 @@ import AdminAnalyticsPage from '@pages/AdminAnalytics';
 import AnalyticsDashboardPage from '@pages/AnalyticsDashboard';
 import VacancyListPage from '@pages/VacancyList';
 import CreateVacancyPage from '@pages/CreateVacancy';
+import VacancyDetailsPage from '@pages/VacancyDetails';
 import ApplicationsPage from '@pages/Applications';
 import ResumeDatabasePage from '@pages/ResumeDatabase';
 import CandidateSearchPage from '@pages/CandidateSearch';
@@ -50,6 +51,7 @@ function App() {
             <Route path="vacancies">
               <Route index element={<VacancyListPage />} />
               <Route path="create" element={<CreateVacancyPage />} />
+              <Route path=":id" element={<VacancyDetailsPage />} />
             </Route>
             <Route path="resumes" element={<ResumeDatabasePage />} />
             <Route path="search" element={<CandidateSearchPage />} />

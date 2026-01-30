@@ -13,6 +13,7 @@ export { default as AdminAnalyticsPage } from './AdminAnalytics';
 export { default as AnalyticsDashboardPage } from './AnalyticsDashboard';
 export { default as VacancyListPage } from './VacancyList';
 export { default as CreateVacancyPage } from './CreateVacancy';
+export { default as VacancyDetailsPage } from './VacancyDetails';
 export { default as ApplicationsPage } from './Applications';
 export { default as ResumeDatabasePage } from './ResumeDatabase';
 export { default as CandidateSearchPage } from './CandidateSearch';

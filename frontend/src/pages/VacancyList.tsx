@@ -274,14 +274,14 @@ const VacancyList: React.FC = () => {
                 <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
                   <Button
                     size="small"
-                    onClick={() => navigate(`/vacancies/${vacancy.id}`)}
+                    onClick={() => navigate(`${vacancy.id}`)}
                   >
                     {t('vacancyList.moreDetails')}
                   </Button>
                   <Box>
                     <IconButton
                       size="small"
-                      onClick={() => navigate(`/vacancies/${vacancy.id}/edit`)}
+                      onClick={() => navigate(`${vacancy.id}/edit`)}
                     >
                       <EditIcon />
                     </IconButton>
