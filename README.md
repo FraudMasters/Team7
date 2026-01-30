@@ -5,9 +5,10 @@ AI-powered resume analysis system with intelligent job matching, multi-language 
 ## Features
 
 - **Resume Upload & Analysis**: Support for PDF and DOCX formats
-- **Intelligent Matching**: Skill-based job matching with synonym handling
+- **Unified Matching System**: Three-method matching combining Keyword, TF-IDF, and Vector similarity
+- **AI-Powered Insights**: Semantic understanding with sentence-transformers
 - **Multi-language**: English and Russian support
-- **Analytics Dashboard**: Hiring funnels, skill demand, recruiter performance
+- **Analytics Dashboard**: Hiring funnels, skill demand, recruiter performance, model quality metrics
 - **Async Processing**: Celery + Redis for background tasks
 - **Modern UI**: React 18 + Material-UI with responsive design
 
@@ -31,7 +32,7 @@ cd Team7
 .\setup.ps1
 ```
 
-Then open http://localhost:5173
+Then open http://localhost:3000
 
 ### Load Test Data (Optional)
 
@@ -55,9 +56,10 @@ This uploads 65 sample resumes and 5 job vacancies.
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Frontend | http://localhost:5173 | React UI |
+| Frontend | http://localhost:3000 | React UI |
 | Backend API | http://localhost:8000 | FastAPI backend |
 | API Docs | http://localhost:8000/docs | Interactive documentation |
+| Analytics | http://localhost:3000/recruiter/analytics | Hiring metrics dashboard |
 | Flower | http://localhost:5555 | Celery monitoring |
 
 ## Architecture
@@ -128,38 +130,45 @@ This uploads 65 sample resumes and 5 job vacancies.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 3. Job Matching Algorithm
+### 3. Unified Job Matching Algorithm
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    JOB MATCHING ALGORITHM                       │
+│                 UNIFIED MATCHING SYSTEM                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  VACANCY REQUIREMENTS                                           │
+│  VACANCY REQUIREMENTS + RESUME                                   │
 │        │                                                        │
 │        ▼                                                        │
-│  ┌─────────────────────┐                                       │
-│  │ NORMALIZE SKILLS     │                                       │
-│  │ • PostgreSQL → SQL   │                                       │
-│  │ • ReactJS → React    │                                       │
-│  │ • Java 8 → Java      │                                       │
-│  └──────────┬──────────┘                                       │
-│             │                                                   │
-│             ▼                                                   │
-│  ┌─────────────────────┐                                       │
-│  │ COMPARE WITH RESUME │                                       │
-│  │ • Direct match       │                                       │
-│  │ • Synonym match      │                                       │
-│  │ • Related skills     │                                       │
-│  └──────────┬──────────┘                                       │
-│             │                                                   │
-│             ▼                                                   │
-│  ┌─────────────────────┐       ┌─────────────────────┐        │
-│  │ EXPERIENCE VERIFY   │──────▶│ MATCH PERCENTAGE    │        │
-│  │ • Has X years with   │       │ • Matched: 75%       │        │
-│  │   skill Y?           │       │ • Missing: 25%       │        │
-│  └─────────────────────┘       │ • Status: matched    │        │
-│                                └─────────────────────┘        │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              1. KEYWORD MATCHING (50%)                   │   │
+│  │  • Direct match (python → Python)                       │   │
+│  │  • Synonym match (unix → Linux, bash)                   │   │
+│  │  • Fuzzy matching (ReactJS → React)                      │   │
+│  │  • Compound skills (machine learning → ML)               │   │
+│  └────────────────────┬────────────────────────────────────┘   │
+│                       │                                          │
+│  ┌────────────────────┴────────────────────────────────────┐   │
+│  │              2. TF-IDF MATCHING (30%)                    │   │
+│  │  • Term Frequency-Inverse Document Frequency            │   │
+│  │  • Ranks skills by importance in vacancy                │   │
+│  │  • Weighted scoring based on keyword relevance          │   │
+│  └────────────────────┬────────────────────────────────────┘   │
+│                       │                                          │
+│  ┌────────────────────┴────────────────────────────────────┐   │
+│  │              3. VECTOR SEMANTIC (20%)                   │   │
+│  │  • sentence-transformers (all-MiniLM-L6-v2)            │   │
+│  │  • Semantic similarity of resume vs vacancy            │   │
+│  │  • Cosine similarity: -1 to 1 (normalized to 0-1)      │   │
+│  └────────────────────┬────────────────────────────────────┘   │
+│                       │                                          │
+│                       ▼                                          │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              OVERALL SCORE + RECOMMENDATION              │   │
+│  │  • 0-100% match percentage                               │   │
+│  │  • excellent (≥80%), good (≥60%), maybe (≥40%), poor   │   │
+│  │  • Matched/missing skills with detailed breakdown      │   │
+│  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -200,7 +209,8 @@ docker compose down -v
 ### Backend
 - **Framework**: FastAPI with Python 3.11+
 - **Database**: PostgreSQL 14 with SQLAlchemy 2.0
-- **ML/NLP**: KeyBERT, SpaCy, LanguageTool
+- **ML/NLP**: KeyBERT, SpaCy, LanguageTool, sentence-transformers
+- **Matching**: TF-IDF (scikit-learn), Vector similarity (all-MiniLM-L6-v2)
 - **Async**: Celery + Redis
 
 ### Frontend
@@ -214,6 +224,11 @@ docker compose down -v
 ```
 ├── backend/               # FastAPI backend
 │   ├── analyzers/         # ML/NLP analyzers
+│   │   ├── enhanced_matcher.py    # Keyword + synonym matching
+│   │   ├── tfidf_matcher.py       # TF-IDF weighted matching
+│   │   ├── vector_matcher.py      # Semantic similarity
+│   │   ├── unified_matcher.py     # Combined 3-method matcher
+│   │   └── hf_skill_extractor.py  # HuggingFace skill extraction
 │   ├── api/               # API endpoints
 │   ├── tasks/             # Celery tasks
 │   ├── models/            # SQLAlchemy models
@@ -222,12 +237,13 @@ docker compose down -v
 │   ├── src/
 │   │   ├── api/           # API client
 │   │   ├── components/    # React components
+│   │   │   └── UnifiedMatchMetrics.tsx  # Unified metrics display
 │   │   ├── pages/         # Page components
 │   │   └── i18n/          # Translations (EN/RU)
 │   └── nginx.conf         # nginx config for production
 ├── scripts/               # Setup and utility scripts
-│   ├── load_test_data.sh  # Test data loader
-│   └── load-test-data.ps1 # Windows version
+│   ├── reset_and_reload.py    # Database reset script
+│   └── load_test_data.sh       # Test data loader
 ├── services/              # Shared services
 │   └── data_extractor/    # PDF/DOCX extraction
 ├── docker-compose.yml     # Docker services
@@ -255,7 +271,7 @@ curl -X POST http://localhost:8000/api/resumes/analyze \
   -d '{"resume_id": "uuid", "extract_keywords": true}'
 ```
 
-### Job Matching
+### Job Matching (Simple)
 
 ```bash
 curl -X POST http://localhost:8000/api/matching/compare \
@@ -269,13 +285,46 @@ curl -X POST http://localhost:8000/api/matching/compare \
   }'
 ```
 
+### Job Matching (Unified - AI-Powered)
+
+```bash
+curl -X POST http://localhost:8000/api/matching/compare-unified \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resume_id": "uuid",
+    "vacancy_data": {
+      "id": "vacancy_uuid",
+      "title": "Python Developer",
+      "description": "We are looking for...",
+      "required_skills": ["python", "django", "postgresql"]
+    }
+  }'
+```
+
+**Response:**
+```json
+{
+  "overall_score": 0.75,
+  "recommendation": "good",
+  "keyword_score": 0.80,
+  "tfidf_score": 0.65,
+  "vector_score": 0.72,
+  "vector_similarity": 0.51,
+  "matched_skills": ["python", "django"],
+  "missing_skills": ["postgresql"],
+  "tfidf_matched": ["python", "developer", "api"],
+  "tfidf_missing": ["postgresql", "database"]
+}
+```
+
 ## Documentation
 
 - [Setup Guide](SETUP.md) - Detailed installation instructions
 - [Russian README](README_RU.md) - Версия на русском языке
 - [ML Pipeline Details](ML_PIPELINE.md) - How the ML/NLP analysis works
 - [Database Setup](backend/DATABASE_SETUP.md) - Database configuration
-- [Matching Implementation](backend/MATCHING_IMPLEMENTATION.md) - Job matching details
+- [Matching System Guide](backend/analyzers/MATCHERS_GUIDE.md) - Unified matching system details
+- [HF Extractor README](backend/analyzers/HF_EXTRACTOR_README.md) - Skill extraction documentation
 
 ## Troubleshooting
 
