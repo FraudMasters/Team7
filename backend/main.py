@@ -243,6 +243,7 @@ from api import (
     analytics,
     reports,
     vacancies,
+    ranking,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -256,6 +257,7 @@ app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Compari
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
+app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
 
 
 if __name__ == "__main__":

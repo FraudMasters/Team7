@@ -17,6 +17,7 @@ from .hiring_stage import HiringStage
 from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
+from .candidate_rank import CandidateRank, RankingFeedback
 
 __all__ = [
     "Base",
@@ -36,4 +37,6 @@ __all__ = [
     "Recruiter",
     "Report",
     "ScheduledReport",
+    "CandidateRank",
+    "RankingFeedback",
 ]
