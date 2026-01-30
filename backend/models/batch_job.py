@@ -2,9 +2,10 @@
 BatchJob model for tracking batch resume processing operations
 """
 import enum
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Enum, String, Text
+from sqlalchemy import Enum, String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -13,10 +14,10 @@ from .base import Base, TimestampMixin, UUIDMixin
 class BatchJobStatus(str, enum.Enum):
     """Status of batch job processing"""
 
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    pending = "pending"
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
 
 
 class BatchJob(Base, UUIDMixin, TimestampMixin):
@@ -43,14 +44,14 @@ class BatchJob(Base, UUIDMixin, TimestampMixin):
     processed_files: Mapped[int] = mapped_column(server_default="0", nullable=False)
     failed_files: Mapped[int] = mapped_column(server_default="0", nullable=False)
     status: Mapped[BatchJobStatus] = mapped_column(
-        Enum(BatchJobStatus), default=BatchJobStatus.PENDING, nullable=False, index=True
+        Enum(BatchJobStatus), default=BatchJobStatus.pending, nullable=False, index=True
     )
     notification_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     celery_task_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    completed_at: Mapped[Optional[object]] = mapped_column(
-        nullable=True
-    )  # DateTime timezone=True type
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     def __repr__(self) -> str:
         return f"<BatchJob(id={self.id}, status={self.status.value}, processed={self.processed_files}/{self.total_files})>"

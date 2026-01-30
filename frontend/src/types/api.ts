@@ -786,3 +786,65 @@ export interface RankingFeedbackResponse {
   processed: boolean;
   created_at: string;
 }
+
+// ==================== Industry Classifier Types ====================
+
+/**
+ * Industry classification request
+ */
+export interface IndustryClassificationRequest {
+  title: string;
+  description: string;
+}
+
+/**
+ * Industry match result
+ */
+export interface IndustryMatch {
+  industry: string;
+  confidence: number;
+}
+
+/**
+ * Industry classification response
+ */
+export interface IndustryClassificationResponse {
+  industry: string;
+  confidence: number;
+  all_matches: IndustryMatch[];
+  keywords_matched: Record<string, string[]>;
+}
+
+// ==================== Skill Suggestions Types ====================
+
+/**
+ * Skill suggestion request
+ */
+export interface SkillSuggestionRequest {
+  industry: string;
+  title: string;
+  description?: string;
+  limit?: number;
+}
+
+/**
+ * Suggested skill item
+ */
+export interface SkillSuggestionItem {
+  skill_name: string;
+  context?: string;
+  variants: string[];
+  relevance_score: number;
+  category?: string;
+  is_industry_specific?: boolean;
+}
+
+/**
+ * Skill suggestion response
+ */
+export interface SkillSuggestionResponse {
+  industry: string;
+  job_title: string;
+  suggestions: SkillSuggestionItem[];
+  total_count: number;
+}

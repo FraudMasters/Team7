@@ -1,0 +1,2496 @@
+{
+  "metadata": {
+    "industry": "it",
+    "industry_name": "Information Technology",
+    "version": "2.0.0",
+    "last_updated": "2025-01-31",
+    "description": "Comprehensive IT skill taxonomy with hard/soft skills classification and dual-track grade system",
+    "grade_systems": {
+      "note": "Two-track grade system: IC (Individual Contributor) and Manager tracks",
+      "general_grades": [
+        {"grade": "J1", "name": "Junior 1", "experience": "0-1 year", "description": "Entry level, learning fundamentals", "track": "IC"},
+        {"grade": "J2", "name": "Junior 2", "experience": "1-2 years", "description": "Can work with supervision", "track": "IC"},
+        {"grade": "M1", "name": "Middle 1", "experience": "2-3 years", "description": "Independent contributor", "track": "IC"},
+        {"grade": "M2", "name": "Middle 2", "experience": "3-5 years", "description": "Experienced contributor", "track": "IC"},
+        {"grade": "S1", "name": "Senior 1", "experience": "5-7 years", "description": "Senior contributor, mentor", "track": "IC"},
+        {"grade": "S2", "name": "Senior 2", "experience": "7-10 years", "description": "Expert, technical leader", "track": "IC"},
+        {"grade": "L1", "name": "Lead", "experience": "10+ years", "description": "Team lead, architect", "track": "IC/Manager"},
+        {"grade": "P1", "name": "Principal", "experience": "12+ years", "description": "Principal engineer, domain expert", "track": "IC"}
+      ],
+      "ml_specialist_grades": {
+        "description": "ML Engineer dual-track system with IC (Individual Contributor) and Manager tracks",
+        "ic_track": {
+          "name": "ML Engineer - IC Track (Individual Contributor)",
+          "description": "Specialist track for hands-on ML practitioners",
+          "grades": [
+            {
+              "grade": "ML1",
+              "name": "ML Engineer 1",
+              "experience": "0-1 year",
+              "description": "Entry level ML engineer, learning fundamentals of ML, data preprocessing, basic model training",
+              "track": "IC",
+              "typical_skills": ["Python", "Pandas", "Scikit-learn", "Basic ML", "SQL"]
+            },
+            {
+              "grade": "ML2",
+              "name": "ML Engineer 2",
+              "experience": "1-2 years",
+              "description": "Can independently develop and deploy ML models with supervision",
+              "track": "IC",
+              "typical_skills": ["Python", "Pandas", "NumPy", "Scikit-learn", "TensorFlow/PyTorch", "SQL", "Git"]
+            },
+            {
+              "grade": "ML3",
+              "name": "ML Engineer 3",
+              "experience": "2-3 years",
+              "description": "Independent contributor, owns ML features end-to-end",
+              "track": "IC",
+              "typical_skills": ["Deep Learning", "NLP/Computer Vision", "MLOps basics", "API Design", "Docker"]
+            },
+            {
+              "grade": "ML4",
+              "name": "ML Engineer 4",
+              "experience": "3-4 years",
+              "description": "Experienced ML engineer, mentors juniors, handles complex projects",
+              "track": "IC",
+              "typical_skills": ["Advanced ML", "Model Optimization", "Kubernetes", "CI/CD", "System Design"]
+            },
+            {
+              "grade": "ML5",
+              "name": "ML Engineer 5",
+              "experience": "4+ years",
+              "description": "Senior ML engineer, can transition to TL1 or continue IC track to ML6",
+              "track": "IC",
+              "can_transition_to": ["TL1", "ML6"],
+              "typical_skills": ["ML Architecture", "Research-to-Production", "Team Mentoring", "Business Impact"]
+            },
+            {
+              "grade": "ML6",
+              "name": "Staff ML Engineer",
+              "experience": "5+ years",
+              "description": "Exceptional IC expertise, technical leader across multiple ML domains",
+              "track": "IC",
+              "requires_ml5": true,
+              "typical_skills": ["ML Strategy", "Cross-team Influence", "Advanced Research", "Platform Design"]
+            },
+            {
+              "grade": "ML7",
+              "name": "Senior Staff ML Engineer",
+              "experience": "7+ years",
+              "description": "Domain expert, influences technical direction across org",
+              "track": "IC",
+              "typical_skills": ["Technical Vision", "Org-wide Impact", "Research Leadership", "Industry Recognition"]
+            },
+            {
+              "grade": "ML8",
+              "name": "Principal ML Engineer",
+              "experience": "10+ years",
+              "description": "Highest IC level, industry-recognized expert, defines ML standards",
+              "track": "IC",
+              "typical_skills": ["Industry Authority", "Technical Strategy", "Innovation Leadership", "Thought Leadership"]
+            }
+          ]
+        },
+        "manager_track": {
+          "name": "ML Manager Track",
+          "description": "Leadership track for ML team and cluster management",
+          "grades": [
+            {
+              "grade": "TL1",
+              "name": "Team Lead 1",
+              "experience": "4+ years (requires ML5)",
+              "description": "First-level ML team lead, manages 3-7 engineers",
+              "track": "Manager",
+              "requires_ml5": true,
+              "team_size": "3-7",
+              "typical_skills": ["People Management", "Project Planning", "Performance Reviews", "Technical Guidance"]
+            },
+            {
+              "grade": "TL2",
+              "name": "Team Lead 2",
+              "experience": "6+ years",
+              "description": "Experienced ML team lead, manages complex ML projects and team growth",
+              "track": "Manager",
+              "team_size": "5-10",
+              "typical_skills": ["Hiring", "Career Development", "Strategic Planning", "Cross-team Collaboration"]
+            },
+            {
+              "grade": "TL3",
+              "name": "Team Lead 3",
+              "experience": "8+ years",
+              "description": "Senior team lead, can transition to CL1 or continue as TL",
+              "track": "Manager",
+              "can_transition_to": ["CL1"],
+              "team_size": "8-15",
+              "typical_skills": ["Team Strategy", "Org Design", "Budget Management", "Stakeholder Management"]
+            },
+            {
+              "grade": "CL1",
+              "name": "Cluster Lead 1",
+              "experience": "10+ years (requires TL3 + 4 years)",
+              "description": "Leads a cluster of multiple ML teams (2-4 teams)",
+              "track": "Manager",
+              "requires_tl3": true,
+              "teams_managed": "2-4 teams",
+              "typical_skills": ["Multi-team Coordination", "Resource Allocation", "Technical Roadmap", "Leadership Development"]
+            },
+            {
+              "grade": "CL2",
+              "name": "Cluster Lead 2",
+              "experience": "12+ years",
+              "description": "Senior cluster lead, manages larger ML organizations",
+              "track": "Manager",
+              "teams_managed": "4-8 teams",
+              "typical_skills": ["Org Building", "Strategic Vision", "Executive Communication", "Business Partnership"]
+            },
+            {
+              "grade": "CL3",
+              "name": "Cluster Lead 3 / ML Head",
+              "experience": "15+ years",
+              "description": "Head of ML, leads entire ML organization",
+              "track": "Manager",
+              "teams_managed": "8+ teams",
+              "typical_skills": ["ML Strategy", "Org Leadership", "Executive Presence", "Industry Influence"]
+            }
+          ]
+        },
+        "progression_rules": {
+          "ic_to_manager": {
+            "ml5_to_tl1": "ML5 engineers can transition to TL1 (Team Lead 1) - first management role",
+            "tl3_to_cl1": "TL3 Team Leads can transition to CL1 (Cluster Lead 1) after ~4 years in TL role",
+            "description": "Transition points from IC track to Manager track"
+          },
+          "ic_advancement": {
+            "ml1_to_ml5": "Typical progression: ML1 (0-1y) → ML2 (1-2y) → ML3 (2-3y) → ML4 (3-4y) → ML5 (4+y)",
+            "ml5_to_ml6": "ML5 → ML6 transition requires exceptional technical impact and no management interest",
+            "ml6_to_ml8": "ML6 → ML7 → ML8 progression based on increasing scope and industry recognition",
+            "description": "IC track advancement within ML engineering"
+          },
+          "manager_advancement": {
+            "tl1_to_tl3": "Typical progression: TL1 → TL2 → TL3 (4-6 years total)",
+            "tl3_to_cl1": "TL3 → CL1 requires demonstrating multi-team leadership capability",
+            "cl1_to_cl3": "CL1 → CL2 → CL3 progression based on organizational scope and impact",
+            "description": "Manager track advancement"
+          }
+        },
+        "competencies_matrix": {
+          "description": "Detailed competency matrix for ML engineers by grade",
+          "competency_groups": {
+            "autonomy_management": {
+              "name": "Автономность и менеджмент",
+              "description": "Умение планировать, организовывать и контролировать свою работу"
+            },
+            "communication": {
+              "name": "Коммуникация",
+              "description": "Умение эффективно общаться с коллегами, руководителем и заказчиками"
+            },
+            "research_culture": {
+              "name": "Культура исследований и разработки",
+              "description": "Инженерные практики, качество кода, эксперименты"
+            },
+            "business_orientation": {
+              "name": "Ориентация на бизнес",
+              "description": "Понимание бизнес-целей, продуктовых метрик и ценности для бизнеса"
+            },
+            "self_development": {
+              "name": "Развитие себя и обучение других",
+              "description": "Самообразование и менторство"
+            },
+            "ds_expertise": {
+              "name": "DS экспертиза",
+              "description": "Технические навыки в области Data Science и Machine Learning"
+            }
+          },
+          "by_grade": {
+            "ML1": {
+              "autonomy_management": [
+                "Я вместе с руководителем анализирую результат выполнения задач",
+                "Оценку рисков и сроки проекта делает за меня руководитель, но я понимаю, когда не укладываюсь в срок и сообщаю об этом руководителю",
+                "Я выполняю задачи сроком на 1-2 дня",
+                "Я выполняю уже декомпозированные руководителем или более опытными коллегами задачи",
+                "Делаю задачи, для которых заранее определен способ оценки результата (руководитель приносит метрики, их интерпретацию и ожидания как они изменятся в результате решения задачи)",
+                "Я решаю задачу по алгоритму, который мне дает руководитель",
+                "Я синхронизирую план работы и конечную цель. Срок выполнения и ожидаемый результат обсуждаю с наставником или командой",
+                "Я самостоятельно собираю данные для обучения моделей"
+              ],
+              "communication": [
+                "В случае возникающих сложностей я привлекаю к коммуникации руководителя"
+              ],
+              "research_culture": [
+                "Под присмотром руководителя или наставника добавляю метрики в свой код",
+                "Я работаю с готовыми данными, и могу написать простой запрос в хранилище, узнав у коллег структуру хранения",
+                "Я пишу код и юнит-тесты на свой код с ревью руководителя или наставника",
+                "Я сохраняю код и данные по выводам и экспериментам так, чтобы их можно было перепроверить. Я прикрепляю описание эксперимента и его результаты в виде публично доступного артефакта"
+              ],
+              "business_orientation": [
+                "Я могу назвать бизнес-цели и задачи проекта, которым занимаюсь, знаю какую ценность приносит моя работа",
+                "Я слежу за графиками метрик после выкатки"
+              ],
+              "self_development": [
+                "Я придерживаюсь составленного руководителем плана развития"
+              ],
+              "ds_expertise": [
+                "Я могу проверять гипотезы на исторических и продовых данных (работа с лоссом, метрикой, фичами, гиперпараметрами) в рамках одной задачи",
+                "Я собираю данные для моделей по уже готовому шаблону",
+                "Я умею обучать ML модели и качественно валидировать их. Я знаю основные подходы в ML и умею выбирать нужный под задачу"
+              ]
+            },
+            "ML2": {
+              "autonomy_management": [
+                "Я выполняю задачи сроком 1-2 недели",
+                "Я самостоятельно изучаю и предлагаю руководителю способ выполнения задачи",
+                "Я декомпозирую свои задачи на подзадачи/майлостоуны (сбор данных, чистка данных, генерация фичей, обучение модельки, приемка оффлайн/онлайн) и согласую с руководителем"
+              ],
+              "communication": [
+                "Если у меня возникает идея, я заношу ее в команду, отвечающую за эту область, самостоятельно или через руководителя. Не замалчиваю проблемы",
+                "Я принимаю конструктивную обратную связь от коллег",
+                "Я участвую во встречах с коллегами из смежных отделов с более опытными коллегами",
+                "Я фиксирую договоренности после обсуждения (в фоллоу апах, тикетах и тд)"
+              ],
+              "research_culture": [
+                "Я пишу код и тесты на свой код самостоятельно с активным ревью руководителя",
+                "Я пишу production-ready код, который не требует переписывания",
+                "Я участвую в код-ревью и учусь лучшим практикам",
+                "Я делаю стандартные метрики для сервиса и модели (тайминги, rps)",
+                "Я понимаю структуру данных своей команды в БД и могу сделать простые запросы",
+                "Я анализирую свои ошибки и исправляю их. Я не повторяю ошибок, ранее разобранных с руководителем",
+                "Я делюсь с командой важными результатами своих исследований",
+                "Я веду логи экспериментов, включая неудачные"
+              ],
+              "business_orientation": [
+                "Я разбираю результаты экспериментов с более опытными коллегами",
+                "Я запускаю онлайн/оффлайн эксперименты и оцениваю их под присмотром руководителя",
+                "Я знаю и могу назвать целевые метрики для моих экспериментов"
+              ],
+              "self_development": [
+                "Если я сталкиваюсь с чем-то непонятным в рабочих задачах, то не отмалчиваюсь и не копаюсь, затягивая решение, а спрашиваю коллег и пытаюсь разобраться вместе с ними",
+                "Я принимаю участие в составлении моего плана развития и придерживаюсь его"
+              ],
+              "ds_expertise": [
+                "Я умею анализировать данные, делать EDA, обосновывать на данных выводы и решения"
+              ]
+            },
+            "ML3": {
+              "autonomy_management": [
+                "Я самостоятельно выбираю алгоритм работы над задачей",
+                "Я выполняю задачи сроком 2-4 недели",
+                "Я проактивно говорю о проблемах и обращаюсь за помощью, если не могу справиться с трудностями",
+                "Я декомпозирую проекты в своей зоне ответственности под присмотром руководителя",
+                "У проекта, за который я отвечаю, ясный целевой результат (с низким уровнем неопределенности)",
+                "Я самостоятельно проверяю результаты выполнения задач (проверка метрик, работы сервисов, посмотреть глазами) и сообщаю о них публично",
+                "Я самостоятельно формулирую критерии успешно выполненного проекта до начала работ и согласую их с руководителем"
+              ],
+              "communication": [
+                "Если дискуссия не привела к соглашению, я руководствуюсь мнением руководителя и более опытных коллег",
+                "Как заказчик я контролирую качество исполнения тасков, при необходимости прошу о доработке",
+                "Как исполнитель я регулярно и публично отчитываюсь о прогрессе по таскам перед заказчиком (при наличии такого процесса и потребности от заказчика)",
+                "Как исполнитель я проактивно предупреждаю заказчиков и заинтересованных лиц, если сдвигаются сроки или что-то идет не по плану"
+              ],
+              "research_culture": [
+                "Я самостоятельно продумываю архитектуру небольших частей сервисов, либо могу сделать сервис уровня 'обернуть модель' по готовому шаблону/инструкции",
+                "Я слежу за производительностью своего кода, и оптимизирую узкие места с помощью коллег",
+                "Я делаю задачи техдолга, которые мне дает руководитель",
+                "Я оцениваю объем данных, которые нужно разметить для решения задачи, и объем нагрузки на свой сервис",
+                "Я автоматизирую сбор данных и их обновления для расчета production модели",
+                "Я настраиваю элементы мониторинга в своей зоне ответственности и слежу за ними (метрики, алерты, nfr, логи)",
+                "Я знаю узкие места в своем проекте и проактивно предлагаю улучшения",
+                "Я участвую в код-ревью (только в своих сервисах) и оставляю конструктивные комментарии",
+                "Я самостоятельно пишу код и обращаюсь за помощью при необходимости; также я понимаю когда нужно писать тесты и пишу их самостоятельно",
+                "Я знаю в каком направлении развиваются инструменты команды и помогаю этому развитию",
+                "Я делаю mvp для конкретных задач, прежде чем начинать долгую разработку"
+              ],
+              "business_orientation": [
+                "Я использую специфику продукта при решении своих задач и выясняю, как продукт будет влиять на задачу",
+                "Я завожу новые продуктовые метрики в рамках готовой инфраструктуры, если это необходимо",
+                "Я самостоятельно откатываю эксперимент, если вижу что что-то пошло не так",
+                "Я самостоятельно запускаю эксперимент (качу сервис/модель), согласую метрики и анализирую результаты с руководителем",
+                "Я предсказываю степень эффекта на онлайн-метрики для своего эксперимента",
+                "Если мой проект затронул чужую зону ответственности (проверяю это), обсуждаю это с коллегами, которые за нее отвечают"
+              ],
+              "self_development": [
+                "Я самостоятельно нахожу мотивацию. Двигаюсь по плану развития без напоминаний со стороны менеджера/наставника.",
+                "Я слежу за трендами в индустрии, прикладываю их на свои задачи, думаю о развитии проектов в своей зоне ответственности и предлагаю конструктивные идеи",
+                "Я выступаю на внутренних митапах и делюсь ценными знаниями с коллегами"
+              ],
+              "ds_expertise": [
+                "Я провожу эксперименты в рамках своих задач; я понимаю, когда мне надо остановиться в исследовании",
+                "Я придумываю и оцениваю задачи в рамках части уже готовой и работающей системы. Отвечаю за выделенную часть (модель) этой системы"
+              ]
+            },
+            "ML4": {
+              "autonomy_management": [
+                "Я самостоятельно формулирую критерий успешно выполненного проекта",
+                "Я декомпозирую и оцениваю сроки реализации проекта",
+                "Я учитываю в планировании возможные риски в своей зоне ответственности (внешние интеграции, логгирование, чистка данных), обсуждаю их с коллегами",
+                "Я критически подхожу к предлагаемым руководителем решениям и если считаю нужным, я запускаю дискуссию и предлагаю альтернативное решение",
+                "Я формализую и декомпозирую ресерч на основании бизнес запроса и оцениваю время его выполнения",
+                "Я выполняю задачи сроком в 1-2 месяца"
+              ],
+              "communication": [
+                "В случае возникающих сложностей придумываю решение самостоятельно и согласую с руководителем"
+              ],
+              "research_culture": [
+                "В случае если я создал тех долг, то самостоятельно фиксирую его (в виде тикета)",
+                "В своих проектах я самостоятельно слежу за покрытием кода тестами, чтобы непротестированный код не шел в прод",
+                "При необходимости я делаю изменения в сервисах коллег по команде (к примеру, сделать новую ручку)",
+                "Я оцениваю baseline и потолок качества для датасета и подхода",
+                "Я погружаюсь в задачи команды вне своей зоны ответствености",
+                "Я активно работаю с данными, нахожу в них проблемы, слежу за изменениями в данных со временем",
+                "Я активный участник код-ревью (не только в своих сервисах), помогаю младшим коллегам",
+                "Я самостоятельно продумываю архитектуру более сложного сервиса (появляются внешние походы, базы, кэши и т.д.), при этом полученную архитектуру согласую с руководителем",
+                "При необходимости я выхожу за рамки своих инструментов (писать на go, front, udf, базы, сделать витрины и т.д.)",
+                "Я провожу нагрузочное тестирование нового функционала по готовому шаблону, оцениваю заранее количество ресурсов, которое потребуется для его работы, слежу за тем, чтобы оно было заложено в план",
+                "Я проактивно делюсь результатами исследований с коллегами по команде и стейкхолдерами",
+                "Я контролирую основные факторы, которые влияют на потребление ресурсов моего сервиса",
+                "Я вношу изменения в чужой код под контролем (ревью) хозяина кода",
+                "В моем production коде всегда применяются лучшие практики, код простой и поддерживаемый",
+                "Я документирую разработанный функционал"
+              ],
+              "business_orientation": [
+                "Я самостоятельно придумываю схему приемки эксперимента в своей области ответственности, используя стандартные подходы",
+                "Я интерпретирую неожиданные изменения в онлайн-метриках, ищу что мог задеть (в рамках своей и соседних команд)",
+                "До того как запустить проект, я самостоятельно продумываю набор метрик, по которым его принимать (технические, положительные, отрицательные)",
+                "Я покрываю сервис не только техническими метриками, но и метриками которые позволяют быстро ловить аномалию в продукте (доля/количество банов, входящий поток, etc), настраиваю алерты",
+                "Если заказчик приходит без предварительной оценки, помогаю ему оценить"
+              ],
+              "ds_expertise": [
+                "В случае несовпадения оценки эксперимента с действительностью я самостоятельно разбираюсь, почему произошло несовпадение",
+                "Я строю модели и соответствующий им пайплайн обработки данных и валидации с нуля, я автоматизирую этот процесс"
+              ]
+            },
+            "ML5": {
+              "autonomy_management": [
+                "При общении с другими командами я декомпозирую и оцениваю сроки реализации проекта, согласую с заинтересованными лицами и исполнителями; я ставлю задачи с понятными критериями приемки; я контролирую сроки выполнения задач",
+                "Я учитываю в планировании возможные риски вне своей зоны ответственности (внешние факторы, работа внешних команд)",
+                "Я выполняю задачи со средним уровнем неопределенности (понятно что болит, непонятно как решить проблему)",
+                "В своем направлении я веду беклог с инициативами и техдолгом (в письменном общедоступном виде)",
+                "Я выполняю сложные задачи (требующих работы со стейкхолдерами, с значительным количеством компонентов и взаимозависимостей) сроком до квартала",
+                "В рамках своего проекта я организую работу инженеров из своей команды",
+                "Я отвечаю за составляющую важного направления (метрика, сервис, стратегическая инициатива, etc) совместно с руководителем, или являюсь фичлидом",
+                "Я проактивно управляю рисками проекта"
+              ],
+              "communication": [
+                "Как исполнитель я рассказываю внешним заказчикам про устройство систем, за которые отвечает моя команда, убеждаюсь, что коллега понял(а) мои объяснения.",
+                "Я признаю свои ошибки, проактивно доношу это до вовлеченных сторон",
+                "Как исполнитель я узнаю истинную мотивацию заказчика, ищу оптимальное решение его болей и объясняю, как это сделать правильно",
+                "Я доношу как позитивный, так и негативный фидбек до коллег в конструктивной форме"
+              ],
+              "research_culture": [
+                "Я слежу за количеством техдолга на своем проекте и не даю ему выходить за уровень, мешающий быстро развивать функционал",
+                "Я самостоятельно проектирую и реализую архитектуру сервиса с моделью",
+                "Я проектирую архитектуру сложных сервисов, согласую требования с другими командами",
+                "Я легко ориентируюсь в том, как устроено большинство сервисов команды (фича-тимы) и могу в них при необходимости что-то изменить",
+                "При необходимости я согласую и делаю изменения в сервисах другой команды",
+                "Я оцениваю требования для поступающей задачи с точки зрения ресурсов, формулирую sla для своих внутренних сервисов и всевозможных ограничений (железо и sla)",
+                "Я обеспечиваю ревью разработанных DS и ML инженерами систем старшими коллегами и/или backend разработчиками",
+                "Я умею создавать сервисы с нуля и конфигурировать их (k8s, CI/CD, etc) по готовому шаблону. Я делаю это с ревью более опытных коллег"
+              ],
+              "business_orientation": [
+                "Я убеждаюсь что бизнес-задача решена, анализируя продуктовые метрики",
+                "Я слежу за продуктовыми метриками своей команды. Организую их мониторинг, реагирую в случае непредвиденных колебаний. Добавляю новые метрики, если чего-то не хватает.",
+                "Я самостоятельно оцениваю входящую бизнес-инициативу и предлагаю решение/mvp",
+                "Я понимаю взаимосвязь между своими проектами и метриками других команд",
+                "Я заранее прикидываю масштаб проблемы в своей области ответственности, не начинаю проектов, которые не окупят затраченных усилий",
+                "Я приоритизирую задачи/проекты, исходя из предварительных оценок полезности",
+                "Я создаю инструменты для мониторинга; слежу за тем, что модель не стала работать хуже спустя какое-то время",
+                "Я могу приземлить боль (нечетко высказанное мнение о том, что всё плохо) заказчика на измеряемые рельсы и оформить из нее проект"
+              ],
+              "self_development": [
+                "Я помогаю расти менее опытным коллегам"
+              ],
+              "ds_expertise": [
+                "Я беру на себя ml-проекты и формирую план работ (гипотезы, метрики и и т.д.)",
+                "Я систематически предлагаю проработанные улучшения для существующих решений или частей продукта",
+                "Я интересуюсь, что делают другие ds-команды и переиспользую их опыт/решения"
+              ]
+            },
+            "ML6": {
+              "autonomy_management": [
+                "Я активно выявляю точки роста в рамках своего кластера, составляю план улучшений",
+                "Я решаю задачи с высоким уровнем неопределенности, в которых нет образа результата и непонятно, что нужно сделать. Я исследую, анализирую, сравниваю альтернативы и предлагаю решение.",
+                "Я отвечаю за DS-составляющую большого направления (метрика, стратегическая инициатива, etc), занимаюсь планированием, контролирую прогресс",
+                "Я выполняю задачи сроком до полугода",
+                "Я участвую в приоритизации и формулировании OKR, оцениваю проекты большой сложности по профиту, стоимости и целесообразности",
+                "В моем направлении составлен прозрачный роадмап на 1-2 квартала вперед"
+              ],
+              "research_culture": [
+                "Я проактивно добиваюсь выделения ресурсов на свои проекты",
+                "Я приношу неиспользованные ранее в команде технологии с пользой для бизнеса",
+                "Я правильно рассчитываю, сколько ресурсов нужно на решение моей задачи на старте проекта",
+                "Я проактивно нахожу новые направления для исследований, основываясь на данных, разбираюсь с аномалиями в работе сервисов/метриках команды"
+              ],
+              "business_orientation": [
+                "Я формирую видение и цели по метрикам в рамках своего направления"
+              ],
+              "self_development": [
+                "Я менторю менее опытных коллег и выдаю им задачи"
+              ]
+            },
+            "ML7": {
+              "autonomy_management": [
+                "Я выполняю задачи с неограниченным сроком (более полугода)",
+                "Я отвечаю за большое направление (метрика, стратегическая инициатива, etc), занимаюсь планированием, контролирую прогресс",
+                "В рамках своего проекта/направления координирую работу инженеров из разных команд",
+                "Мои проекты приносят существенную пользу бизнесу (ключевые метрики от уровня кластера, стратегические инициативы и т.п.)",
+                "Я отвечаю за нагрузку и мотивацию сотрудников, задействованных на моем проекте"
+              ],
+              "research_culture": [
+                "Я планирую железо для своей команды на год вперед, учитываю рост и новые инициативы",
+                "Я изучаю новые технологии в своей сфере, подходы к задачам в других компаниях, понимаю, как моя команда влияет на бизнес и другие команды",
+                "Я отвечаю за организацию инфраструктуры для работы коллег.",
+                "Я долгосрочно планирую архитектуру сервисов команды с учетом роста и внешних требований",
+                "Я слежу за тем, чтобы логика работы системы/продукта фиксировалась в письменном виде в рамках всего коллектива"
+              ],
+              "business_orientation": [
+                "Я отстаиваю метрики своей команды в публичном поле",
+                "Если я вижу аномалию в ключевых метриках компании, то я привлекаю внимание ответственных людей до устранения проблем",
+                "Я доношу до владельца продукта наличие проблем в моей области ответственности, добиваюсь выделения ресурсов на их исправление"
+              ],
+              "ds_expertise": [
+                "Я делю не инкрементальные изменения в проекте (пример, добавил sota)",
+                "Я формирую потребность в данных в любом проекте; я знаю, откуда можно добыть данные, применяю это знание",
+                "Я анализирую планы продукта и предсказываю его долгосрочную потребность в ML",
+                "Я успешно вношу предложения и формирую потребность в том, что можно оптимизировать с точки зрения ML у смежных (не ML) команд",
+                "Я отвечаю за критически важный проект"
+              ]
+            },
+            "ML8": {
+              "business_orientation": [
+                "Я выполняю задачи, которые на рынке ещё никто не делал. Могу сформулировать обоснование и технологическое видение этих решений",
+                "Я знаю техническую стратегию компании. В работе руководствуюсь долгосрочными целями",
+                "Нахожу технические проблемы, которые мешают бизнесу развиваться сейчас или грозят в будущем"
+              ],
+              "ds_expertise": [
+                "Я создаю и внедряю принципиально новые для компании технологии.",
+                "Я отвечаю за технологию или технологическую метрику, которая важна для всей компании. Вижу, куда она должна развиваться. Понимаю цели, стратегию и роадмап развития компании на год и больше"
+              ]
+            }
+          }
+        },
+        "swe_specialist_grades": {
+          "description": "Software Engineer dual-track system (Backend/Frontend/Fullstack)",
+          "ic_track": {
+            "name": "Software Engineer - IC Track",
+            "grades": [
+              {"grade": "SWE1", "name": "Junior Software Engineer", "experience": "0-1 year", "track": "IC", "typical_skills": ["Programming Basics", "Git", "Debugging", "Code Review"]},
+              {"grade": "SWE2", "name": "Software Engineer 2", "experience": "1-2 years", "track": "IC", "typical_skills": ["Unit Testing", "REST APIs", "Databases", "Agile"]},
+              {"grade": "SWE3", "name": "Software Engineer 3", "experience": "2-3 years", "track": "IC", "typical_skills": ["System Design", "CI/CD", "Code Review", "Mentoring"]},
+              {"grade": "SWE4", "name": "Senior Software Engineer", "experience": "4-5 years", "track": "IC", "can_transition_to": ["TL1", "SWE5"], "typical_skills": ["Architecture", "Performance", "Security", "Tech Leadership"]},
+              {"grade": "SWE5", "name": "Staff Software Engineer", "experience": "6-8 years", "track": "IC", "typical_skills": ["Cross-team Projects", "Technical Strategy", "Org Impact"]},
+              {"grade": "SWE6", "name": "Senior Staff Software Engineer", "experience": "8-10 years", "track": "IC", "typical_skills": ["Principal Engineering", "Industry Recognition", "Technical Vision"]},
+              {"grade": "SWE7", "name": "Principal Software Engineer", "experience": "10+ years", "track": "IC", "typical_skills": ["Domain Authority", "Technical Roadmap", "Innovation"]}
+            ]
+          },
+          "manager_track": {
+            "name": "SWE Manager Track",
+            "grades": [
+              {"grade": "TL1", "name": "Engineering Team Lead 1", "experience": "5+ years", "track": "Manager", "team_size": "3-7"},
+              {"grade": "TL2", "name": "Engineering Team Lead 2", "experience": "7+ years", "track": "Manager", "team_size": "5-10"},
+              {"grade": "TL3", "name": "Engineering Team Lead 3", "experience": "9+ years", "track": "Manager", "can_transition_to": ["CL1"], "team_size": "8-15"},
+              {"grade": "CL1", "name": "Engineering Manager 1", "experience": "12+ years", "track": "Manager", "teams_managed": "2-4 teams"},
+              {"grade": "CL2", "name": "Engineering Manager 2", "experience": "15+ years", "track": "Manager", "teams_managed": "5-8 teams"},
+              {"grade": "CL3", "name": "Director of Engineering", "experience": "18+ years", "track": "Manager", "teams_managed": "8+ teams"}
+            ]
+          }
+        },
+        "devops_specialist_grades": {
+          "description": "DevOps/SRE Engineer dual-track system",
+          "ic_track": {
+            "name": "DevOps/SRE - IC Track",
+            "grades": [
+              {"grade": "DOPS1", "name": "Junior DevOps Engineer", "experience": "0-1 year", "track": "IC", "typical_skills": ["Linux", "Docker", "Git", "Basic Scripting"]},
+              {"grade": "DOPS2", "name": "DevOps Engineer 2", "experience": "1-2 years", "track": "IC", "typical_skills": ["CI/CD", "Kubernetes", "Monitoring", "Cloud Platforms"]},
+              {"grade": "DOPS3", "name": "DevOps Engineer 3", "experience": "2-4 years", "track": "IC", "typical_skills": ["Infrastructure as Code", "Terraform", "Ansible", "Incident Response"]},
+              {"grade": "DOPS4", "name": "Senior DevOps Engineer", "experience": "4-6 years", "track": "IC", "can_transition_to": ["TL1", "DOPS5"], "typical_skills": ["SRE Practices", "SLIs/SLOs", "Capacity Planning", "Architecture"]},
+              {"grade": "DOPS5", "name": "Staff SRE", "experience": "6-8 years", "track": "IC", "typical_skills": ["Reliability Engineering", "Large Scale Systems", "Cross-team Influence"]},
+              {"grade": "DOPS6", "name": "Senior Staff SRE", "experience": "8-10 years", "track": "IC", "typical_skills": ["Platform Strategy", "Disaster Recovery", "Business Continuity"]}
+            ]
+          },
+          "manager_track": {
+            "name": "DevOps Manager Track",
+            "grades": [
+              {"grade": "TL1", "name": "DevOps Team Lead 1", "experience": "5+ years", "track": "Manager", "team_size": "3-7"},
+              {"grade": "TL2", "name": "DevOps Team Lead 2", "experience": "7+ years", "track": "Manager", "team_size": "5-10"},
+              {"grade": "TL3", "name": "DevOps Team Lead 3", "experience": "9+ years", "track": "Manager", "team_size": "8-15"},
+              {"grade": "CL1", "name": "Infrastructure Manager 1", "experience": "12+ years", "track": "Manager", "teams_managed": "2-4 teams"},
+              {"grade": "CL2", "name": "Infrastructure Manager 2", "experience": "15+ years", "track": "Manager", "teams_managed": "4-8 teams"},
+              {"grade": "CL3", "name": "Head of Infrastructure", "experience": "18+ years", "track": "Manager", "teams_managed": "8+ teams"}
+            ]
+          }
+        },
+        "data_engineering_grades": {
+          "description": "Data Engineer dual-track system",
+          "ic_track": {
+            "name": "Data Engineer - IC Track",
+            "grades": [
+              {"grade": "DE1", "name": "Junior Data Engineer", "experience": "0-1 year", "track": "IC", "typical_skills": ["SQL", "Python", "ETL Basics", "Data Modeling"]},
+              {"grade": "DE2", "name": "Data Engineer 2", "experience": "1-2 years", "track": "IC", "typical_skills": ["Spark", "Airflow", "Data Warehousing", "Pipeline Development"]},
+              {"grade": "DE3", "name": "Data Engineer 3", "experience": "2-4 years", "track": "IC", "typical_skills": ["Streaming", "Kafka", "Data Quality", "Optimization"]},
+              {"grade": "DE4", "name": "Senior Data Engineer", "experience": "4-6 years", "track": "IC", "can_transition_to": ["TL1", "DE5"], "typical_skills": ["Platform Design", "Data Governance", "Architecture", "Mentoring"]},
+              {"grade": "DE5", "name": "Staff Data Engineer", "experience": "6-8 years", "track": "IC", "typical_skills": ["Data Strategy", "Large Scale Pipelines", "Org Impact"]},
+              {"grade": "DE6", "name": "Principal Data Engineer", "experience": "10+ years", "track": "IC", "typical_skills": ["Data Platform Vision", "Industry Recognition", "Technical Leadership"]}
+            ]
+          }
+        },
+        "qa_sdet_grades": {
+          "description": "QA/SDET dual-track system",
+          "ic_track": {
+            "name": "QA/SDET - IC Track",
+            "grades": [
+              {"grade": "QA1", "name": "Junior QA Engineer", "experience": "0-1 year", "track": "IC", "typical_skills": ["Manual Testing", "Test Cases", "Bug Reporting", "Basic SQL"]},
+              {"grade": "QA2", "name": "QA Engineer 2", "experience": "1-2 years", "track": "IC", "typical_skills": ["Test Automation", "Selenium", "API Testing", "Performance Testing"]},
+              {"grade": "QA3", "name": "SDET 3", "experience": "2-4 years", "track": "IC", "typical_skills": ["Framework Design", "CI/CD Integration", "Mobile Testing", "Load Testing"]},
+              {"grade": "QA4", "name": "Senior SDET", "experience": "4-6 years", "track": "IC", "can_transition_to": ["TL1", "QA5"], "typical_skills": ["Test Strategy", "Quality Architecture", "Mentoring", "Tool Development"]},
+              {"grade": "QA5", "name": "Staff SDET", "experience": "6-8 years", "track": "IC", "typical_skills": ["Quality Engineering Standards", "Cross-team Projects", "Automation Strategy"]}
+            ]
+          }
+        },
+        "mobile_development_grades": {
+          "description": "Mobile Developer dual-track system (iOS/Android)",
+          "ic_track": {
+            "name": "Mobile Developer - IC Track",
+            "grades": [
+              {"grade": "MB1", "name": "Junior Mobile Developer", "experience": "0-1 year", "track": "IC", "typical_skills": ["Swift/Kotlin", "Mobile UI", "REST APIs", "Git"]},
+              {"grade": "MB2", "name": "Mobile Developer 2", "experience": "1-2 years", "track": "IC", "typical_skills": ["MVVM/MVI", "Persistence", "Maps", "Push Notifications"]},
+              {"grade": "MB3", "name": "Mobile Developer 3", "experience": "2-4 years", "track": "IC", "typical_skills": ["Architecture", "Performance", "CI/CD", "Testing"]},
+              {"grade": "MB4", "name": "Senior Mobile Developer", "experience": "4-6 years", "track": "IC", "can_transition_to": ["TL1", "MB5"], "typitional_skills": ["App Store Optimization", "Security", "Cross-platform", "Mentoring"]},
+              {"grade": "MB5", "name": "Staff Mobile Developer", "experience": "6-8 years", "track": "IC", "typical_skills": ["Mobile Strategy", "Platform Leadership", "App Architecture"]}
+            ]
+          }
+        },
+        "security_grades": {
+          "description": "Security Engineer dual-track system",
+          "ic_track": {
+            "name": "Security Engineer - IC Track",
+            "grades": [
+              {"grade": "SEC1", "name": "Junior Security Engineer", "experience": "0-1 year", "track": "IC", "typical_skills": ["Security Basics", "Penetration Testing", "Network Security", "Linux"]},
+              {"grade": "SEC2", "name": "Security Engineer 2", "experience": "1-2 years", "track": "IC", "typical_skills": ["Vulnerability Assessment", "Security Auditing", "OWASP", "Incident Response"]},
+              {"grade": "SEC3", "name": "Security Engineer 3", "experience": "2-4 years", "track": "IC", "typical_skills": ["Threat Modeling", "Security Architecture", "Compliance", "SIEM"]},
+              {"grade": "SEC4", "name": "Senior Security Engineer", "experience": "4-6 years", "track": "IC", "can_transition_to": ["TL1", "SEC5"], "typical_skills": ["Security Strategy", "Red Teaming", "Forensics", "Mentoring"]},
+              {"grade": "SEC5", "name": "Staff Security Engineer", "experience": "6-8 years", "track": "IC", "typical_skills": ["Security Program Management", "Risk Assessment", "Executive Communication"]}
+            ]
+          }
+        }
+      }
+    }
+  },
+  "hard_skills": {
+    "programming_languages": {
+      "javascript": {
+        "name": "JavaScript",
+        "variants": ["JS", "ECMAScript", "ES6+", "TypeScript (subset)"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "typescript": {
+        "name": "TypeScript",
+        "variants": ["TS"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "python": {
+        "name": "Python",
+        "variants": ["Python3", "Py3"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "java": {
+        "name": "Java",
+        "variants": ["Java SE", "Java EE", "JDK"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "c_sharp": {
+        "name": "C#",
+        "variants": ["CSharp", "C Sharp"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "cpp": {
+        "name": "C++",
+        "variants": ["CPP", "C Plus Plus"],
+        "context": "programming_language",
+        "grade_min": "M1"
+      },
+      "c": {
+        "name": "C",
+        "variants": ["C Language"],
+        "context": "programming_language",
+        "grade_min": "M1"
+      },
+      "go": {
+        "name": "Go",
+        "variants": ["Golang", "Go Language"],
+        "context": "programming_language",
+        "grade_min": "M1"
+      },
+      "rust": {
+        "name": "Rust",
+        "variants": ["Rust Language"],
+        "context": "programming_language",
+        "grade_min": "M2"
+      },
+      "php": {
+        "name": "PHP",
+        "variants": ["PHP8", "Hypertext Preprocessor"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "ruby": {
+        "name": "Ruby",
+        "variants": ["Ruby on Rails", "Rails"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "swift": {
+        "name": "Swift",
+        "variants": ["Swift5", "Swift Language"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "kotlin": {
+        "name": "Kotlin",
+        "variants": ["Kotlin JVM", "Kotlin Multiplatform"],
+        "context": "programming_language",
+        "grade_min": "J1"
+      },
+      "scala": {
+        "name": "Scala",
+        "variants": ["Scala3"],
+        "context": "programming_language",
+        "grade_min": "M2"
+      },
+      "r": {
+        "name": "R",
+        "variants": ["R Language", "R Statistical"],
+        "context": "programming_language",
+        "grade_min": "M1"
+      },
+      "sql": {
+        "name": "SQL",
+        "variants": ["Structured Query Language", "T-SQL", "PL/SQL"],
+        "context": "query_language",
+        "grade_min": "J1"
+      },
+      "shell": {
+        "name": "Shell",
+        "variants": ["Bash", "Zsh", "Shell Scripting"],
+        "context": "scripting_language",
+        "grade_min": "J1"
+      }
+    },
+    "frontend": {
+      "frameworks_libraries": {
+        "react": {
+          "name": "React",
+          "variants": ["React.js", "ReactJS", "React Fiber"],
+          "context": "frontend_framework",
+          "related_skills": ["JavaScript", "TypeScript", "JSX"],
+          "grade_min": "J1"
+        },
+        "next_js": {
+          "name": "Next.js",
+          "variants": ["NextJS", "Next14"],
+          "context": "frontend_framework",
+          "related_skills": ["React", "TypeScript"],
+          "grade_min": "M1"
+        },
+        "vue": {
+          "name": "Vue.js",
+          "variants": ["Vue3", "VueJS", "Nuxt"],
+          "context": "frontend_framework",
+          "related_skills": ["JavaScript", "TypeScript"],
+          "grade_min": "J1"
+        },
+        "angular": {
+          "name": "Angular",
+          "variants": ["Angular2+", "Angular17", "NgRx"],
+          "context": "frontend_framework",
+          "related_skills": ["TypeScript", "RxJS"],
+          "grade_min": "M1"
+        },
+        "svelte": {
+          "name": "Svelte",
+          "variants": ["SvelteKit"],
+          "context": "frontend_framework",
+          "grade_min": "M1"
+        },
+        "solid_js": {
+          "name": "Solid.js",
+          "variants": ["SolidJS"],
+          "context": "frontend_framework",
+          "grade_min": "M2"
+        }
+      },
+      "state_management": {
+        "redux": {
+          "name": "Redux",
+          "variants": ["Redux Toolkit", "RTK"],
+          "context": "state_management",
+          "grade_min": "M1"
+        },
+        "mobx": {
+          "name": "MobX",
+          "variants": ["MobX State Tree"],
+          "context": "state_management",
+          "grade_min": "M1"
+        },
+        "recoil": {
+          "name": "Recoil",
+          "variants": [],
+          "context": "state_management",
+          "grade_min": "M1"
+        },
+        "zustand": {
+          "name": "Zustand",
+          "variants": [],
+          "context": "state_management",
+          "grade_min": "J2"
+        },
+        "context_api": {
+          "name": "Context API",
+          "variants": ["React Context"],
+          "context": "state_management",
+          "grade_min": "J1"
+        },
+        "pinia": {
+          "name": "Pinia",
+          "variants": ["Vue Pinia"],
+          "context": "state_management",
+          "grade_min": "J2"
+        },
+        "ngrx": {
+          "name": "NgRx",
+          "variants": ["Angular RxJS"],
+          "context": "state_management",
+          "grade_min": "M2"
+        }
+      },
+      "styling": {
+        "css": {
+          "name": "CSS",
+          "variants": ["Cascading Style Sheets", "CSS3"],
+          "context": "styling",
+          "grade_min": "J1"
+        },
+        "sass": {
+          "name": "Sass/SCSS",
+          "variants": ["SASS", "SCSS"],
+          "context": "styling",
+          "grade_min": "J1"
+        },
+        "tailwind": {
+          "name": "Tailwind CSS",
+          "variants": ["Tailwind"],
+          "context": "styling",
+          "grade_min": "J1"
+        },
+        "material_ui": {
+          "name": "Material-UI",
+          "variants": ["MUI", "Material Design"],
+          "context": "ui_library",
+          "grade_min": "J1"
+        },
+        "chakra_ui": {
+          "name": "Chakra UI",
+          "variants": ["Chakra"],
+          "context": "ui_library",
+          "grade_min": "J2"
+        },
+        "ant_design": {
+          "name": "Ant Design",
+          "variants": ["AntD"],
+          "context": "ui_library",
+          "grade_min": "J1"
+        },
+        "styled_components": {
+          "name": "Styled Components",
+          "variants": ["styled-components", "CSS-in-JS"],
+          "context": "styling",
+          "grade_min": "J2"
+        },
+        "emotion": {
+          "name": "Emotion",
+          "variants": [],
+          "context": "styling",
+          "grade_min": "J2"
+        },
+        "css_modules": {
+          "name": "CSS Modules",
+          "variants": [],
+          "context": "styling",
+          "grade_min": "J1"
+        }
+      },
+      "build_tools": {
+        "webpack": {
+          "name": "Webpack",
+          "variants": ["Webpack5"],
+          "context": "build_tool",
+          "grade_min": "M1"
+        },
+        "vite": {
+          "name": "Vite",
+          "variants": [],
+          "context": "build_tool",
+          "grade_min": "J1"
+        },
+        "rollup": {
+          "name": "Rollup",
+          "variants": [],
+          "context": "build_tool",
+          "grade_min": "M2"
+        },
+        "parcel": {
+          "name": "Parcel",
+          "variants": [],
+          "context": "build_tool",
+          "grade_min": "J2"
+        },
+        "esbuild": {
+          "name": "esbuild",
+          "variants": [],
+          "context": "build_tool",
+          "grade_min": "M2"
+        },
+        "babel": {
+          "name": "Babel",
+          "variants": ["Babel7"],
+          "context": "transpiler",
+          "grade_min": "M1"
+        }
+      },
+      "testing": {
+        "jest": {
+          "name": "Jest",
+          "variants": ["React Testing Library"],
+          "context": "testing_framework",
+          "grade_min": "J1"
+        },
+        "vitest": {
+          "name": "Vitest",
+          "variants": [],
+          "context": "testing_framework",
+          "grade_min": "J1"
+        },
+        "cypress": {
+          "name": "Cypress",
+          "variants": ["E2E Testing"],
+          "context": "testing_framework",
+          "grade_min": "J2"
+        },
+        "playwright": {
+          "name": "Playwright",
+          "variants": [],
+          "context": "testing_framework",
+          "grade_min": "J2"
+        },
+        "selenium": {
+          "name": "Selenium",
+          "variants": ["WebDriver"],
+          "context": "testing_framework",
+          "grade_min": "M1"
+        },
+        "msw": {
+          "name": "MSW",
+          "variants": ["Mock Service Worker"],
+          "context": "testing_tool",
+          "grade_min": "M2"
+        }
+      }
+    },
+    "backend": {
+      "frameworks": {
+        "django": {
+          "name": "Django",
+          "variants": ["Django REST Framework", "DRF"],
+          "context": "backend_framework",
+          "related_skills": ["Python"],
+          "grade_min": "J1"
+        },
+        "flask": {
+          "name": "Flask",
+          "variants": ["Flask API"],
+          "context": "backend_framework",
+          "related_skills": ["Python"],
+          "grade_min": "J1"
+        },
+        "fastapi": {
+          "name": "FastAPI",
+          "variants": [],
+          "context": "backend_framework",
+          "related_skills": ["Python", "AsyncIO"],
+          "grade_min": "M1"
+        },
+        "spring": {
+          "name": "Spring Boot",
+          "variants": ["Spring Framework", "Spring MVC"],
+          "context": "backend_framework",
+          "related_skills": ["Java"],
+          "grade_min": "M1"
+        },
+        "express": {
+          "name": "Express.js",
+          "variants": ["Express"],
+          "context": "backend_framework",
+          "related_skills": ["Node.js", "JavaScript"],
+          "grade_min": "J1"
+        },
+        "nest_js": {
+          "name": "NestJS",
+          "variants": ["Nest"],
+          "context": "backend_framework",
+          "related_skills": ["TypeScript", "Node.js"],
+          "grade_min": "M1"
+        },
+        "asp_net": {
+          "name": "ASP.NET Core",
+          "variants": ["ASP.NET", "dotnet"],
+          "context": "backend_framework",
+          "related_skills": ["C#"],
+          "grade_min": "M1"
+        },
+        "rails": {
+          "name": "Ruby on Rails",
+          "variants": ["Rails"],
+          "context": "backend_framework",
+          "related_skills": ["Ruby"],
+          "grade_min": "J1"
+        },
+        "laravel": {
+          "name": "Laravel",
+          "variants": [],
+          "context": "backend_framework",
+          "related_skills": ["PHP"],
+          "grade_min": "J1"
+        },
+        "fiber": {
+          "name": "Gin/Fiber",
+          "variants": ["Gin", "Echo"],
+          "context": "backend_framework",
+          "related_skills": ["Go"],
+          "grade_min": "M1"
+        },
+        "actix": {
+          "name": "Actix-web",
+          "variants": ["Actix"],
+          "context": "backend_framework",
+          "related_skills": ["Rust"],
+          "grade_min": "M2"
+        }
+      },
+      "api_design": {
+        "rest": {
+          "name": "REST API",
+          "variants": ["RESTful", "RESTful API"],
+          "context": "api_style",
+          "grade_min": "J1"
+        },
+        "graphql": {
+          "name": "GraphQL",
+          "variants": ["GQL", "Apollo GraphQL"],
+          "context": "api_style",
+          "grade_min": "M1"
+        },
+        "grpc": {
+          "name": "gRPC",
+          "variants": ["Google RPC"],
+          "context": "api_style",
+          "grade_min": "M2"
+        },
+        "soap": {
+          "name": "SOAP",
+          "variants": ["Simple Object Access Protocol"],
+          "context": "api_style",
+          "grade_min": "S1"
+        },
+        "websockets": {
+          "name": "WebSockets",
+          "variants": ["WS", "Socket.io", "SignalR"],
+          "context": "api_protocol",
+          "grade_min": "M1"
+        },
+        "openapi": {
+          "name": "OpenAPI/Swagger",
+          "variants": ["Swagger", "OpenAPI Specification"],
+          "context": "api_documentation",
+          "grade_min": "J2"
+        }
+      },
+      "databases": {
+        "postgresql": {
+          "name": "PostgreSQL",
+          "variants": ["Postgres"],
+          "context": "relational_database",
+          "grade_min": "J1"
+        },
+        "mysql": {
+          "name": "MySQL",
+          "variants": ["MariaDB"],
+          "context": "relational_database",
+          "grade_min": "J1"
+        },
+        "sqlite": {
+          "name": "SQLite",
+          "variants": [],
+          "context": "relational_database",
+          "grade_min": "J1"
+        },
+        "mssql": {
+          "name": "Microsoft SQL Server",
+          "variants": ["MSSQL", "SQL Server"],
+          "context": "relational_database",
+          "grade_min": "M1"
+        },
+        "oracle": {
+          "name": "Oracle Database",
+          "variants": ["Oracle DB", "PL/SQL"],
+          "context": "relational_database",
+          "grade_min": "M2"
+        },
+        "mongodb": {
+          "name": "MongoDB",
+          "variants": ["Mongo", "NoSQL"],
+          "context": "document_database",
+          "grade_min": "J1"
+        },
+        "redis": {
+          "name": "Redis",
+          "variants": ["Redis Cache", "Redis Cluster"],
+          "context": "cache_database",
+          "grade_min": "J2"
+        },
+        "elasticsearch": {
+          "name": "Elasticsearch",
+          "variants": ["ELK", "Elastic"],
+          "context": "search_engine",
+          "grade_min": "M1"
+        },
+        "cassandra": {
+          "name": "Cassandra",
+          "variants": ["Apache Cassandra"],
+          "context": "distributed_database",
+          "grade_min": "S1"
+        },
+        "dynamodb": {
+          "name": "DynamoDB",
+          "variants": ["AWS DynamoDB"],
+          "context": "nosql_database",
+          "grade_min": "M1"
+        },
+        "firebase": {
+          "name": "Firebase",
+          "variants": ["Firestore"],
+          "context": "nosql_database",
+          "grade_min": "J1"
+        },
+        "neo4j": {
+          "name": "Neo4j",
+          "variants": ["Graph Database"],
+          "context": "graph_database",
+          "grade_min": "S1"
+        },
+        "timescaledb": {
+          "name": "TimescaleDB",
+          "variants": ["Time Series DB"],
+          "context": "time_series_database",
+          "grade_min": "M2"
+        }
+      },
+      "orm": {
+        "sqlalchemy": {
+          "name": "SQLAlchemy",
+          "variants": ["SQLAlchemy Core", "SQLAlchemy ORM"],
+          "context": "orm",
+          "related_skills": ["Python"],
+          "grade_min": "M1"
+        },
+        "typeorm": {
+          "name": "TypeORM",
+          "variants": [],
+          "context": "orm",
+          "related_skills": ["TypeScript"],
+          "grade_min": "M1"
+        },
+        "prisma": {
+          "name": "Prisma",
+          "variants": [],
+          "context": "orm",
+          "grade_min": "J1"
+        },
+        "sequelize": {
+          "name": "Sequelize",
+          "variants": [],
+          "context": "orm",
+          "related_skills": ["JavaScript"],
+          "grade_min": "J1"
+        },
+        "mongoose": {
+          "name": "Mongoose",
+          "variants": [],
+          "context": "odm",
+          "related_skills": ["MongoDB", "JavaScript"],
+          "grade_min": "J1"
+        },
+        "hibernate": {
+          "name": "Hibernate",
+          "variants": ["JPA", "Java Persistence API"],
+          "context": "orm",
+          "related_skills": ["Java"],
+          "grade_min": "M1"
+        },
+        "entity_framework": {
+          "name": "Entity Framework",
+          "variants": ["EF Core"],
+          "context": "orm",
+          "related_skills": ["C#"],
+          "grade_min": "M1"
+        },
+        "diesel": {
+          "name": "Diesel",
+          "variants": [],
+          "context": "orm",
+          "related_skills": ["Rust"],
+          "grade_min": "M2"
+        },
+        "gorm": {
+          "name": "GORM",
+          "variants": ["Go ORM"],
+          "context": "orm",
+          "related_skills": ["Go"],
+          "grade_min": "M1"
+        }
+      },
+      "authentication": {
+        "jwt": {
+          "name": "JWT",
+          "variants": ["JSON Web Token", "OAuth2"],
+          "context": "authentication",
+          "grade_min": "J2"
+        },
+        "oauth": {
+          "name": "OAuth/OpenID Connect",
+          "variants": ["OAuth2.0", "OIDC", "SSO"],
+          "context": "authentication",
+          "grade_min": "M1"
+        },
+        "passport": {
+          "name": "Passport.js",
+          "variants": [],
+          "context": "authentication_library",
+          "grade_min": "J2"
+        },
+        "auth0": {
+          "name": "Auth0",
+          "variants": [],
+          "context": "auth_provider",
+          "grade_min": "J1"
+        },
+        "keycloak": {
+          "name": "Keycloak",
+          "variants": [],
+          "context": "auth_provider",
+          "grade_min": "M1"
+        }
+      }
+    },
+    "devops_cloud": {
+      "containers": {
+        "docker": {
+          "name": "Docker",
+          "variants": ["Docker Compose", "Dockerfile", "Container"],
+          "context": "containerization",
+          "grade_min": "J1"
+        },
+        "kubernetes": {
+          "name": "Kubernetes",
+          "variants": ["K8s", "K8s", "Kubectl"],
+          "context": "orchestration",
+          "grade_min": "M1"
+        },
+        "helm": {
+          "name": "Helm",
+          "variants": ["Helm Charts"],
+          "context": "kubernetes_management",
+          "grade_min": "M2"
+        },
+        "podman": {
+          "name": "Podman",
+          "variants": [],
+          "context": "containerization",
+          "grade_min": "M1"
+        }
+      },
+      "cicd": {
+        "jenkins": {
+          "name": "Jenkins",
+          "variants": [],
+          "context": "cicd_tool",
+          "grade_min": "M1"
+        },
+        "gitlab_ci": {
+          "name": "GitLab CI",
+          "variants": ["GitLab CI/CD", ".gitlab-ci.yml"],
+          "context": "cicd_tool",
+          "grade_min": "J2"
+        },
+        "github_actions": {
+          "name": "GitHub Actions",
+          "variants": ["GHA", "Workflows"],
+          "context": "cicd_tool",
+          "grade_min": "J1"
+        },
+        "azure_pipelines": {
+          "name": "Azure Pipelines",
+          "variants": ["Azure DevOps"],
+          "context": "cicd_tool",
+          "grade_min": "M1"
+        },
+        "circle_ci": {
+          "name": "CircleCI",
+          "variants": [],
+          "context": "cicd_tool",
+          "grade_min": "J2"
+        },
+        "terraform": {
+          "name": "Terraform",
+          "variants": ["IaC", "HCL"],
+          "context": "infrastructure_as_code",
+          "grade_min": "M1"
+        },
+        "ansible": {
+          "name": "Ansible",
+          "variants": ["Ansible Playbooks"],
+          "context": "configuration_management",
+          "grade_min": "M1"
+        },
+        "puppet": {
+          "name": "Puppet",
+          "variants": [],
+          "context": "configuration_management",
+          "grade_min": "M2"
+        },
+        "chef": {
+          "name": "Chef",
+          "variants": ["Chef Infra"],
+          "context": "configuration_management",
+          "grade_min": "M2"
+        },
+        "vagrant": {
+          "name": "Vagrant",
+          "variants": [],
+          "context": "virtualization",
+          "grade_min": "J2"
+        }
+      },
+      "cloud_providers": {
+        "aws": {
+          "name": "Amazon Web Services",
+          "variants": ["AWS", "Amazon EC2", "S3", "Lambda"],
+          "context": "cloud_provider",
+          "grade_min": "M1"
+        },
+        "azure": {
+          "name": "Microsoft Azure",
+          "variants": ["Azure Cloud", "Azure DevOps"],
+          "context": "cloud_provider",
+          "grade_min": "M1"
+        },
+        "gcp": {
+          "name": "Google Cloud Platform",
+          "variants": ["GCP", "Google Cloud"],
+          "context": "cloud_provider",
+          "grade_min": "M1"
+        },
+        "digitalocean": {
+          "name": "DigitalOcean",
+          "variants": ["DO"],
+          "context": "cloud_provider",
+          "grade_min": "J1"
+        },
+        "heroku": {
+          "name": "Heroku",
+          "variants": [],
+          "context": "paas",
+          "grade_min": "J1"
+        },
+        "vercel": {
+          "name": "Vercel",
+          "variants": [],
+          "context": "paas",
+          "grade_min": "J1"
+        },
+        "netlify": {
+          "name": "Netlify",
+          "variants": [],
+          "context": "paas",
+          "grade_min": "J1"
+        }
+      },
+      "monitoring": {
+        "prometheus": {
+          "name": "Prometheus",
+          "variants": ["PromQL"],
+          "context": "monitoring",
+          "grade_min": "M1"
+        },
+        "grafana": {
+          "name": "Grafana",
+          "variants": ["Grafana Dashboards"],
+          "context": "visualization",
+          "grade_min": "J1"
+        },
+        "elk_stack": {
+          "name": "ELK Stack",
+          "variants": ["Elasticsearch", "Logstash", "Kibana"],
+          "context": "logging",
+          "grade_min": "M1"
+        },
+        "fluentd": {
+          "name": "Fluentd/Fluent Bit",
+          "variants": [],
+          "context": "log_collector",
+          "grade_min": "M2"
+        },
+        "datadog": {
+          "name": "Datadog",
+          "variants": [],
+          "context": "monitoring_service",
+          "grade_min": "J1"
+        },
+        "new_relic": {
+          "name": "New Relic",
+          "variants": [],
+          "context": "monitoring_service",
+          "grade_min": "J1"
+        },
+        "splunk": {
+          "name": "Splunk",
+          "variants": [],
+          "context": "log_analysis",
+          "grade_min": "M2"
+        },
+        "jaeger": {
+          "name": "Jaeger",
+          "variants": ["Distributed Tracing"],
+          "context": "tracing",
+          "grade_min": "M2"
+        },
+        "zipkin": {
+          "name": "Zipkin",
+          "variants": [],
+          "context": "tracing",
+          "grade_min": "M2"
+        }
+      },
+      "linux_system": {
+        "linux": {
+          "name": "Linux",
+          "variants": ["Linux Administration", "Unix", "bash"],
+          "context": "operating_system",
+          "grade_min": "J1"
+        },
+        "networking": {
+          "name": "Networking",
+          "variants": ["TCP/IP", "DNS", "HTTP/HTTPS", "Network Security"],
+          "context": "networking",
+          "grade_min": "M1"
+        },
+        "nginx": {
+          "name": "Nginx",
+          "variants": ["Reverse Proxy", "Web Server"],
+          "context": "web_server",
+          "grade_min": "J2"
+        },
+        "apache": {
+          "name": "Apache",
+          "variants": ["HTTP Server"],
+          "context": "web_server",
+          "grade_min": "M1"
+        }
+      }
+    },
+    "data_science": {
+      "ml_frameworks": {
+        "tensorflow": {
+          "name": "TensorFlow",
+          "variants": ["TF", "Keras"],
+          "context": "ml_framework",
+          "related_skills": ["Python"],
+          "grade_min": "M1"
+        },
+        "pytorch": {
+          "name": "PyTorch",
+          "variants": ["Torch"],
+          "context": "ml_framework",
+          "related_skills": ["Python"],
+          "grade_min": "M1"
+        },
+        "scikit_learn": {
+          "name": "Scikit-learn",
+          "variants": ["sklearn"],
+          "context": "ml_library",
+          "related_skills": ["Python"],
+          "grade_min": "J1"
+        },
+        "xgboost": {
+          "name": "XGBoost",
+          "variants": ["Gradient Boosting"],
+          "context": "ml_library",
+          "grade_min": "M1"
+        },
+        "lightgbm": {
+          "name": "LightGBM",
+          "variants": [],
+          "context": "ml_library",
+          "grade_min": "M1"
+        },
+        "catboost": {
+          "name": "CatBoost",
+          "variants": [],
+          "context": "ml_library",
+          "grade_min": "M2"
+        },
+        "hugging_face": {
+          "name": "Hugging Face",
+          "variants": ["Transformers", "Diffusers", "PEFT"],
+          "context": "nlp_library",
+          "grade_min": "M1"
+        },
+        "langchain": {
+          "name": "LangChain",
+          "variants": ["LLM", "RAG"],
+          "context": "llm_framework",
+          "grade_min": "M2"
+        },
+        "openai_api": {
+          "name": "OpenAI API",
+          "variants": ["GPT API", "ChatGPT API"],
+          "context": "llm_api",
+          "grade_min": "J1"
+        }
+      },
+      "data_processing": {
+        "pandas": {
+          "name": "Pandas",
+          "variants": ["DataFrames"],
+          "context": "data_manipulation",
+          "related_skills": ["Python"],
+          "grade_min": "J1"
+        },
+        "numpy": {
+          "name": "NumPy",
+          "variants": ["Numerical Computing"],
+          "context": "numerical_computing",
+          "grade_min": "J1"
+        },
+        "spark": {
+          "name": "Apache Spark",
+          "variants": ["PySpark", "Spark SQL"],
+          "context": "big_data",
+          "grade_min": "M1"
+        },
+        "hadoop": {
+          "name": "Hadoop",
+          "variants": ["HDFS", "MapReduce"],
+          "context": "big_data",
+          "grade_min": "M2"
+        },
+        "kafka": {
+          "name": "Apache Kafka",
+          "variants": ["Event Streaming", "Message Queue"],
+          "context": "streaming",
+          "grade_min": "M1"
+        },
+        "airflow": {
+          "name": "Apache Airflow",
+          "variants": ["Workflow Orchestration", "DAG"],
+          "context": "orchestration",
+          "grade_min": "M1"
+        },
+        "dbt": {
+          "name": "dbt",
+          "variants": ["data build tool"],
+          "context": "transformation",
+          "grade_min": "M1"
+        },
+        "snowflake": {
+          "name": "Snowflake",
+          "variants": ["Data Cloud"],
+          "context": "data_warehouse",
+          "grade_min": "M1"
+        },
+        "bigquery": {
+          "name": "Google BigQuery",
+          "variants": ["BigQuery"],
+          "context": "data_warehouse",
+          "grade_min": "M1"
+        },
+        "databricks": {
+          "name": "Databricks",
+          "variants": ["Spark Platform"],
+          "context": "big_data_platform",
+          "grade_min": "M1"
+        }
+      },
+      "visualization": {
+        "matplotlib": {
+          "name": "Matplotlib",
+          "variants": ["Plotting"],
+          "context": "visualization",
+          "grade_min": "J1"
+        },
+        "seaborn": {
+          "name": "Seaborn",
+          "variants": [],
+          "context": "visualization",
+          "grade_min": "J1"
+        },
+        "plotly": {
+          "name": "Plotly",
+          "variants": ["Interactive Plots"],
+          "context": "visualization",
+          "grade_min": "J1"
+        },
+        "tableau": {
+          "name": "Tableau",
+          "variants": ["Business Intelligence"],
+          "context": "bi_tool",
+          "grade_min": "J1"
+        },
+        "power_bi": {
+          "name": "Power BI",
+          "variants": ["Microsoft BI"],
+          "context": "bi_tool",
+          "grade_min": "J1"
+        },
+        "looker": {
+          "name": "Looker",
+          "variants": ["LookML"],
+          "context": "bi_tool",
+          "grade_min": "M1"
+        }
+      },
+      "statistics": {
+        "statistics": {
+          "name": "Statistics",
+          "variants": ["Statistical Analysis", "Hypothesis Testing", "A/B Testing"],
+          "context": "statistics",
+          "grade_min": "J1"
+        },
+        "machine_learning": {
+          "name": "Machine Learning",
+          "variants": ["ML", "Supervised Learning", "Unsupervised Learning"],
+          "context": "ml",
+          "grade_min": "M1"
+        },
+        "deep_learning": {
+          "name": "Deep Learning",
+          "variants": ["Neural Networks", "CNN", "RNN", "Transformer"],
+          "context": "dl",
+          "grade_min": "M2"
+        },
+        "nlp": {
+          "name": "NLP",
+          "variants": ["Natural Language Processing", "Text Mining"],
+          "context": "nlp",
+          "grade_min": "M2"
+        },
+        "computer_vision": {
+          "name": "Computer Vision",
+          "variants": ["Image Processing", "Object Detection"],
+          "context": "cv",
+          "grade_min": "M2"
+        },
+        "reinforcement_learning": {
+          "name": "Reinforcement Learning",
+          "variants": ["RL"],
+          "context": "rl",
+          "grade_min": "S1"
+        },
+        "mlops": {
+          "name": "MLOps",
+          "variants": ["ML Engineering", "Model Deployment"],
+          "context": "mlops",
+          "grade_min": "M2"
+        }
+      }
+    },
+    "mobile": {
+      "ios": {
+        "swift": {
+          "name": "Swift",
+          "variants": ["SwiftUI", "UIKit"],
+          "context": "mobile_language",
+          "grade_min": "J1"
+        },
+        "objective_c": {
+          "name": "Objective-C",
+          "variants": ["ObjC"],
+          "context": "mobile_language",
+          "grade_min": "M2"
+        },
+        "xcode": {
+          "name": "Xcode",
+          "variants": ["iOS Development"],
+          "context": "ide",
+          "grade_min": "J1"
+        },
+        "cocoapods": {
+          "name": "CocoaPods",
+          "variants": [],
+          "context": "dependency_manager",
+          "grade_min": "J1"
+        },
+        "swift_pm": {
+          "name": "Swift Package Manager",
+          "variants": ["SPM"],
+          "context": "dependency_manager",
+          "grade_min": "J1"
+        }
+      },
+      "android": {
+        "kotlin": {
+          "name": "Kotlin",
+          "variants": ["Kotlin Android"],
+          "context": "mobile_language",
+          "grade_min": "J1"
+        },
+        "java_android": {
+          "name": "Java (Android)",
+          "variants": ["Android SDK"],
+          "context": "mobile_language",
+          "grade_min": "M1"
+        },
+        "android_studio": {
+          "name": "Android Studio",
+          "variants": [],
+          "context": "ide",
+          "grade_min": "J1"
+        },
+        "gradle": {
+          "name": "Gradle",
+          "variants": ["Build System"],
+          "context": "build_tool",
+          "grade_min": "J1"
+        },
+        "jetpack_compose": {
+          "name": "Jetpack Compose",
+          "variants": ["Compose UI"],
+          "context": "ui_framework",
+          "grade_min": "M1"
+        }
+      },
+      "cross_platform": {
+        "react_native": {
+          "name": "React Native",
+          "variants": ["RN"],
+          "context": "cross_platform_framework",
+          "grade_min": "J1"
+        },
+        "flutter": {
+          "name": "Flutter",
+          "variants": ["Dart"],
+          "context": "cross_platform_framework",
+          "grade_min": "J1"
+        },
+        "ionic": {
+          "name": "Ionic",
+          "variants": ["Ionic Framework"],
+          "context": "cross_platform_framework",
+          "grade_min": "J2"
+        },
+        "xamarin": {
+          "name": "Xamarin",
+          "variants": [],
+          "context": "cross_platform_framework",
+          "grade_min": "M1"
+        }
+      }
+    },
+    "quality_assurance": {
+      "automation": {
+        "selenium": {
+          "name": "Selenium",
+          "variants": ["WebDriver"],
+          "context": "test_automation",
+          "grade_min": "J1"
+        },
+        "cypress": {
+          "name": "Cypress",
+          "variants": ["E2E Testing"],
+          "context": "test_automation",
+          "grade_min": "J1"
+        },
+        "playwright": {
+          "name": "Playwright",
+          "variants": [],
+          "context": "test_automation",
+          "grade_min": "J1"
+        },
+        "appium": {
+          "name": "Appium",
+          "variants": ["Mobile Testing"],
+          "context": "test_automation",
+          "grade_min": "M1"
+        },
+        "junit": {
+          "name": "JUnit",
+          "variants": ["Java Testing"],
+          "context": "testing_framework",
+          "grade_min": "J1"
+        },
+        "testng": {
+          "name": "TestNG",
+          "variants": [],
+          "context": "testing_framework",
+          "grade_min": "J2"
+        },
+        "pytest": {
+          "name": "Pytest",
+          "variants": ["Python Testing"],
+          "context": "testing_framework",
+          "grade_min": "J1"
+        },
+        "junit5": {
+          "name": "JUnit 5",
+          "variants": ["Jupiter"],
+          "context": "testing_framework",
+          "grade_min": "J1"
+        }
+      },
+      "manual_testing": {
+        "exploratory_testing": {
+          "name": "Exploratory Testing",
+          "variants": [],
+          "context": "testing_method",
+          "grade_min": "J1"
+        },
+        "usability_testing": {
+          "name": "Usability Testing",
+          "variants": [],
+          "context": "testing_method",
+          "grade_min": "J1"
+        },
+        "api_testing": {
+          "name": "API Testing",
+          "variants": ["Postman", "REST Client"],
+          "context": "testing_type",
+          "grade_min": "J1"
+        },
+        "performance_testing": {
+          "name": "Performance Testing",
+          "variants": ["Load Testing", "Stress Testing"],
+          "context": "testing_type",
+          "grade_min": "M1"
+        },
+        "jmeter": {
+          "name": "JMeter",
+          "variants": ["Apache JMeter"],
+          "context": "performance_tool",
+          "grade_min": "M1"
+        },
+        "k6": {
+          "name": "k6",
+          "variants": ["Grafana k6"],
+          "context": "performance_tool",
+          "grade_min": "M1"
+        },
+        "security_testing": {
+          "name": "Security Testing",
+          "variants": ["Penetration Testing", "Vulnerability Assessment"],
+          "context": "testing_type",
+          "grade_min": "M2"
+        }
+      }
+    },
+    "security": {
+      "application_security": {
+        "owasp": {
+          "name": "OWASP",
+          "variants": ["OWASP Top 10", "Security Standards"],
+          "context": "security_standard",
+          "grade_min": "M1"
+        },
+        "web_security": {
+          "name": "Web Security",
+          "variants": ["XSS", "CSRF", "SQL Injection"],
+          "context": "security_area",
+          "grade_min": "M1"
+        },
+        "secure_coding": {
+          "name": "Secure Coding",
+          "variants": ["Security Best Practices"],
+          "context": "security_practice",
+          "grade_min": "M1"
+        }
+      },
+      "network_security": {
+        "penetration_testing": {
+          "name": "Penetration Testing",
+          "variants": ["Pen Testing", "Ethical Hacking"],
+          "context": "security_practice",
+          "grade_min": "M2"
+        },
+        "vulnerability_assessment": {
+          "name": "Vulnerability Assessment",
+          "variants": ["VA", "Security Assessment"],
+          "context": "security_practice",
+          "grade_min": "M1"
+        },
+        "siem": {
+          "name": "SIEM",
+          "variants": ["Security Information and Event Management", "Splunk"],
+          "context": "security_tool",
+          "grade_min": "M2"
+        },
+        "incident_response": {
+          "name": "Incident Response",
+          "variants": ["IR", "Security Incident Handling"],
+          "context": "security_practice",
+          "grade_min": "S1"
+        }
+      },
+      "tools": {
+        "burp_suite": {
+          "name": "Burp Suite",
+          "variants": [],
+          "context": "security_tool",
+          "grade_min": "M1"
+        },
+        "metasploit": {
+          "name": "Metasploit",
+          "variants": [],
+          "context": "security_tool",
+          "grade_min": "M2"
+        },
+        "nessus": {
+          "name": "Nessus",
+          "variants": [],
+          "context": "security_tool",
+          "grade_min": "M1"
+        }
+      }
+    },
+    "architecture": {
+      "patterns": {
+        "microservices": {
+          "name": "Microservices",
+          "variants": ["Microservices Architecture", "Distributed Systems"],
+          "context": "architecture_pattern",
+          "grade_min": "M2"
+        },
+        "monolith": {
+          "name": "Monolithic Architecture",
+          "variants": ["Monolith"],
+          "context": "architecture_pattern",
+          "grade_min": "J2"
+        },
+        "event_driven": {
+          "name": "Event-Driven Architecture",
+          "variants": ["EDA", "Event Sourcing"],
+          "context": "architecture_pattern",
+          "grade_min": "M2"
+        },
+        "cqrs": {
+          "name": "CQRS",
+          "variants": ["Command Query Responsibility Segregation"],
+          "context": "architecture_pattern",
+          "grade_min": "S1"
+        },
+        "domain_driven_design": {
+          "name": "Domain-Driven Design",
+          "variants": ["DDD"],
+          "context": "design_methodology",
+          "grade_min": "S1"
+        },
+        "soa": {
+          "name": "Service-Oriented Architecture",
+          "variants": ["SOA"],
+          "context": "architecture_pattern",
+          "grade_min": "S1"
+        },
+        "serverless": {
+          "name": "Serverless",
+          "variants": ["FaaS", "Lambda Functions"],
+          "context": "architecture_pattern",
+          "grade_min": "M2"
+        }
+      },
+      "design": {
+        "system_design": {
+          "name": "System Design",
+          "variants": ["Software Architecture", "Scalability"],
+          "context": "design_skill",
+          "grade_min": "M2"
+        },
+        "api_design": {
+          "name": "API Design",
+          "variants": ["RESTful Design", "API Architecture"],
+          "context": "design_skill",
+          "grade_min": "M1"
+        },
+        "database_design": {
+          "name": "Database Design",
+          "variants": ["Data Modeling", "Schema Design"],
+          "context": "design_skill",
+          "grade_min": "M1"
+        },
+        "cloud_architecture": {
+          "name": "Cloud Architecture",
+          "variants": ["Cloud Design", "AWS Solutions Architect"],
+          "context": "design_skill",
+          "grade_min": "M2"
+        },
+        "high_availability": {
+          "name": "High Availability",
+          "variants": ["HA", "Disaster Recovery"],
+          "context": "design_principle",
+          "grade_min": "S1"
+        },
+        "load_balancing": {
+          "name": "Load Balancing",
+          "variants": ["Scaling", "CDN"],
+          "context": "design_principle",
+          "grade_min": "M2"
+        }
+      }
+    },
+    "tools": {
+      "version_control": {
+        "git": {
+          "name": "Git",
+          "variants": ["GitHub", "GitLab", "Bitbucket"],
+          "context": "vcs",
+          "grade_min": "J1"
+        },
+        "svn": {
+          "name": "SVN",
+          "variants": ["Subversion"],
+          "context": "vcs",
+          "grade_min": "M2"
+        },
+        "mercurial": {
+          "name": "Mercurial",
+          "variants": ["Hg"],
+          "context": "vcs",
+          "grade_min": "S1"
+        },
+        "git_actions": {
+          "name": "Git Workflows",
+          "variants": ["Git Flow", "Trunk-Based Development", "PR"],
+          "context": "vcs_workflow",
+          "grade_min": "J2"
+        }
+      },
+      "project_management": {
+        "jira": {
+          "name": "JIRA",
+          "variants": ["Atlassian Jira"],
+          "context": "project_management_tool",
+          "grade_min": "J1"
+        },
+        "confluence": {
+          "name": "Confluence",
+          "variants": ["Documentation"],
+          "context": "documentation_tool",
+          "grade_min": "J1"
+        },
+        "trello": {
+          "name": "Trello",
+          "variants": ["Kanban Boards"],
+          "context": "project_management_tool",
+          "grade_min": "J1"
+        },
+        "notion": {
+          "name": "Notion",
+          "variants": [],
+          "context": "documentation_tool",
+          "grade_min": "J1"
+        },
+        "linear": {
+          "name": "Linear",
+          "variants": [],
+          "context": "project_management_tool",
+          "grade_min": "J1"
+        }
+      },
+      "communication": {
+        "slack": {
+          "name": "Slack",
+          "variants": [],
+          "context": "communication_tool",
+          "grade_min": "J1"
+        },
+        "teams": {
+          "name": "Microsoft Teams",
+          "variants": [],
+          "context": "communication_tool",
+          "grade_min": "J1"
+        },
+        "discord": {
+          "name": "Discord",
+          "variants": [],
+          "context": "communication_tool",
+          "grade_min": "J1"
+        }
+      },
+      "ide": {
+        "vscode": {
+          "name": "VS Code",
+          "variants": ["Visual Studio Code"],
+          "context": "ide",
+          "grade_min": "J1"
+        },
+        "intellij": {
+          "name": "IntelliJ IDEA",
+          "variants": ["JetBrains IDE", "PyCharm", "WebStorm", "GoLand"],
+          "context": "ide",
+          "grade_min": "J1"
+        },
+        "visual_studio": {
+          "name": "Visual Studio",
+          "variants": ["VS", "VS Code"],
+          "context": "ide",
+          "grade_min": "J1"
+        },
+        "vim": {
+          "name": "Vim/Neovim",
+          "variants": [],
+          "context": "editor",
+          "grade_min": "M2"
+        },
+        "emacs": {
+          "name": "Emacs",
+          "variants": [],
+          "context": "editor",
+          "grade_min": "S1"
+        }
+      }
+    }
+  },
+  "soft_skills": {
+    "communication": {
+      "verbal_communication": {
+        "name": "Verbal Communication",
+        "variants": ["Presentation Skills", "Public Speaking"],
+        "context": "communication",
+        "grade_min": "J1"
+      },
+      "written_communication": {
+        "name": "Written Communication",
+        "variants": ["Technical Writing", "Documentation"],
+        "context": "communication",
+        "grade_min": "J1"
+      },
+      "active_listening": {
+        "name": "Active Listening",
+        "variants": [],
+        "context": "communication",
+        "grade_min": "J1"
+      },
+      "negotiation": {
+        "name": "Negotiation",
+        "variants": ["Conflict Resolution"],
+        "context": "communication",
+        "grade_min": "M2"
+      },
+      "english_language": {
+        "name": "English Language",
+        "variants": ["Business English", "Technical English"],
+        "context": "language",
+        "grade_min": "J1"
+      }
+    },
+    "teamwork": {
+      "collaboration": {
+        "name": "Collaboration",
+        "variants": ["Team Collaboration", "Cross-functional Teamwork"],
+        "context": "teamwork",
+        "grade_min": "J1"
+      },
+      "mentoring": {
+        "name": "Mentoring",
+        "variants": ["Coaching", "Knowledge Sharing"],
+        "context": "teamwork",
+        "grade_min": "M2"
+      },
+      "leadership": {
+        "name": "Leadership",
+        "variants": ["Team Leadership", "People Management"],
+        "context": "leadership",
+        "grade_min": "S1"
+      },
+      "conflict_resolution": {
+        "name": "Conflict Resolution",
+        "variants": ["Mediation"],
+        "context": "teamwork",
+        "grade_min": "M2"
+      },
+      "emotional_intelligence": {
+        "name": "Emotional Intelligence",
+        "variants": ["EQ", "Empathy"],
+        "context": "interpersonal",
+        "grade_min": "M1"
+      }
+    },
+    "problem_solving": {
+      "critical_thinking": {
+        "name": "Critical Thinking",
+        "variants": ["Analytical Thinking"],
+        "context": "cognitive",
+        "grade_min": "J1"
+      },
+      "problem_solving": {
+        "name": "Problem Solving",
+        "variants": ["Troubleshooting", "Debugging"],
+        "context": "cognitive",
+        "grade_min": "J1"
+      },
+      "decision_making": {
+        "name": "Decision Making",
+        "variants": ["Data-Driven Decisions"],
+        "context": "cognitive",
+        "grade_min": "M1"
+      },
+      "root_cause_analysis": {
+        "name": "Root Cause Analysis",
+        "variants": ["RCA", "5 Whys"],
+        "context": "problem_solving_method",
+        "grade_min": "M1"
+      }
+    },
+    "adaptability": {
+      "adaptability": {
+        "name": "Adaptability",
+        "variants": ["Flexibility"],
+        "context": "adaptability",
+        "grade_min": "J1"
+      },
+      "continuous_learning": {
+        "name": "Continuous Learning",
+        "variants": ["Self-Learning", "Research Skills"],
+        "context": "learning",
+        "grade_min": "J1"
+      },
+      "growth Mindset": {
+        "name": "Growth Mindset",
+        "variants": ["Growth Orientation"],
+        "context": "mindset",
+        "grade_min": "J1"
+      },
+      "change_management": {
+        "name": "Change Management",
+        "variants": ["Adapting to Change"],
+        "context": "management",
+        "grade_min": "S1"
+      }
+    },
+    "time_management": {
+      "time_management": {
+        "name": "Time Management",
+        "variants": ["Prioritization", "Planning"],
+        "context": "productivity",
+        "grade_min": "J1"
+      },
+      "deadline_management": {
+        "name": "Deadline Management",
+        "variants": ["Delivery Focus"],
+        "context": "productivity",
+        "grade_min": "J1"
+      },
+      "multitasking": {
+        "name": "Multitasking",
+        "variants": ["Context Switching"],
+        "context": "productivity",
+        "grade_min": "J1"
+      }
+    },
+    "agile_methodology": {
+      "scrum": {
+        "name": "Scrum",
+        "variants": ["Sprint Planning", "Daily Standup", "Retrospective"],
+        "context": "agile_framework",
+        "grade_min": "J1"
+      },
+      "kanban": {
+        "name": "Kanban",
+        "variants": ["Flow Management"],
+        "context": "agile_framework",
+        "grade_min": "J1"
+      },
+      "agile": {
+        "name": "Agile",
+        "variants": ["Agile Methodology", "Iterative Development"],
+        "context": "development_methodology",
+        "grade_min": "J1"
+      },
+      "user_stories": {
+        "name": "User Stories",
+        "variants": ["Backlog Management", "Story Points"],
+        "context": "agile_practice",
+        "grade_min": "J1"
+      },
+      "estimation": {
+        "name": "Estimation",
+        "variants": ["Story Pointing", "Planning Poker"],
+        "context": "agile_practice",
+        "grade_min": "M1"
+      }
+    },
+    "product_awareness": {
+      "product_thinking": {
+        "name": "Product Thinking",
+        "variants": ["Product Sense", "Business Value"],
+        "context": "product",
+        "grade_min": "M1"
+      },
+      "user_centricity": {
+        "name": "User-Centricity",
+        "variants": ["User Focus", "Customer Experience"],
+        "context": "product",
+        "grade_min": "J1"
+      },
+      "business_acumen": {
+        "name": "Business Acumen",
+        "variants": ["Business Understanding", "Domain Knowledge"],
+        "context": "business",
+        "grade_min": "M2"
+      },
+      "data_driven": {
+        "name": "Data-Driven Approach",
+        "variants": ["Analytics", "Metrics"],
+        "context": "decision_making",
+        "grade_min": "M1"
+      }
+    },
+    "ownership": {
+      "ownership": {
+        "name": "Ownership",
+        "variants": ["Accountability", "Responsibility"],
+        "context": "work_ethic",
+        "grade_min": "J1"
+      },
+      "initiative": {
+        "name": "Initiative",
+        "variants": ["Proactiveness", "Self-Starter"],
+        "context": "work_ethic",
+        "grade_min": "J1"
+      },
+      "attention_to_detail": {
+        "name": "Attention to Detail",
+        "variants": ["Detail-Oriented", "Thoroughness"],
+        "context": "work_quality",
+        "grade_min": "J1"
+      }
+    },
+    "creativity": {
+      "creativity": {
+        "name": "Creativity",
+        "variants": ["Innovation", "Creative Problem Solving"],
+        "context": "innovation",
+        "grade_min": "J1"
+      },
+      "innovative_thinking": {
+        "name": "Innovative Thinking",
+        "variants": ["Out of the Box Thinking"],
+        "context": "innovation",
+        "grade_min": "M2"
+      }
+    }
+  },
+  "roles": {
+    "frontend_developer": {
+      "name": "Frontend Developer",
+      "variants": ["Front-End Developer", "UI Developer", "Web Developer", "Client-Side Developer"],
+      "primary_skills": ["javascript", "typescript", "html", "css", "react", "next_js"],
+      "secondary_skills": ["vue", "angular", "webpack", "vite", "tailwind", "jest"],
+      "soft_skills": ["communication", "collaboration", "problem_solving"],
+      "grade_range": ["J1", "S2"]
+    },
+    "backend_developer": {
+      "name": "Backend Developer",
+      "variants": ["Back-End Developer", "Server-Side Developer", "API Developer"],
+      "primary_skills": ["javascript", "python", "java", "go", "sql", "rest"],
+      "secondary_skills": ["django", "express", "nest_js", "spring", "postgresql", "redis"],
+      "soft_skills": ["communication", "problem_solving", "ownership"],
+      "grade_range": ["J1", "S2"]
+    },
+    "fullstack_developer": {
+      "name": "Fullstack Developer",
+      "variants": ["Full Stack Developer", "Full-Stack Engineer", "Software Engineer"],
+      "primary_skills": ["javascript", "typescript", "python", "react", "sql", "rest"],
+      "secondary_skills": ["next_js", "django", "express", "postgresql", "docker", "git"],
+      "soft_skills": ["communication", "adaptability", "problem_solving"],
+      "grade_range": ["J1", "S2"]
+    },
+    "devops_engineer": {
+      "name": "DevOps Engineer",
+      "variants": ["DevOps", "SRE", "Site Reliability Engineer", "Platform Engineer"],
+      "primary_skills": ["docker", "kubernetes", "ci/cd", "linux", "terraform", "aws"],
+      "secondary_skills": ["jenkins", "github_actions", "ansible", "prometheus", "grafana"],
+      "soft_skills": ["communication", "problem_solving", "ownership"],
+      "grade_range": ["M1", "S2"]
+    },
+    "data_scientist": {
+      "name": "Data Scientist",
+      "variants": ["ML Engineer", "Machine Learning Engineer", "Data Analyst"],
+      "primary_skills": ["python", "sql", "statistics", "machine_learning", "pandas", "numpy"],
+      "secondary_skills": ["tensorflow", "pytorch", "scikit_learn", "spark", "jupyter"],
+      "soft_skills": ["critical_thinking", "communication", "continuous_learning"],
+      "grade_range": ["M1", "S2"]
+    },
+    "data_engineer": {
+      "name": "Data Engineer",
+      "variants": ["Data Pipeline Engineer", "ETL Developer", "Big Data Engineer"],
+      "primary_skills": ["python", "sql", "etl", "spark", "airflow"],
+      "secondary_skills": ["kafka", "dbt", "snowflake", "bigquery", "aws"],
+      "soft_skills": ["problem_solving", "ownership", "communication"],
+      "grade_range": ["M1", "S2"]
+    },
+    "ml_engineer": {
+      "name": "ML Engineer",
+      "variants": ["Machine Learning Engineer", "Applied Scientist"],
+      "primary_skills": ["python", "machine_learning", "tensorflow", "pytorch", "mlops"],
+      "secondary_skills": ["deep_learning", "nlp", "computer_vision", "kubernetes", "docker"],
+      "soft_skills": ["critical_thinking", "continuous_learning", "problem_solving"],
+      "grade_range": ["M1", "S2"]
+    },
+    "mobile_developer": {
+      "name": "Mobile Developer",
+      "variants": ["iOS Developer", "Android Developer", "Mobile Engineer"],
+      "primary_skills": ["swift", "kotlin", "react_native", "flutter", "mobile_development"],
+      "secondary_skills": ["xcode", "android_studio", "swiftui", "jetpack_compose", "rest"],
+      "soft_skills": ["communication", "adaptability", "attention_to_detail"],
+      "grade_range": ["J1", "S2"]
+    },
+    "ios_developer": {
+      "name": "iOS Developer",
+      "variants": ["iOS Engineer", "Swift Developer"],
+      "primary_skills": ["swift", "swiftui", "xcode", "cocoapods"],
+      "secondary_skills": ["objective_c", "combine", "core_data", "alamofire"],
+      "soft_skills": ["communication", "attention_to_detail"],
+      "grade_range": ["J1", "S2"]
+    },
+    "android_developer": {
+      "name": "Android Developer",
+      "variants": ["Android Engineer", "Kotlin Developer"],
+      "primary_skills": ["kotlin", "android_studio", "gradle", "jetpack_compose"],
+      "secondary_skills": ["java_android", "coroutines", "retrofit", "room"],
+      "soft_skills": ["communication", "attention_to_detail"],
+      "grade_range": ["J1", "S2"]
+    },
+    "qa_engineer": {
+      "name": "QA Engineer",
+      "variants": ["Quality Assurance Engineer", "Software Tester", "Test Engineer", "SDET"],
+      "primary_skills": ["testing", "test_automation", "selenium", "cypress", "junit"],
+      "secondary_skills": ["playwright", "pytest", "api_testing", "performance_testing", "jmeter"],
+      "soft_skills": ["attention_to_detail", "communication", "critical_thinking"],
+      "grade_range": ["J1", "S2"]
+    },
+    "sdet": {
+      "name": "SDET",
+      "variants": ["Software Development Engineer in Test", "Test Automation Engineer"],
+      "primary_skills": ["test_automation", "programming", "selenium", "cypress"],
+      "secondary_skills": ["java", "python", "javascript", "api_testing", "ci/cd"],
+      "soft_skills": ["problem_solving", "communication", "ownership"],
+      "grade_range": ["M1", "S2"]
+    },
+    "security_engineer": {
+      "name": "Security Engineer",
+      "variants": ["Cybersecurity Engineer", "Information Security Engineer", "DevSecOps"],
+      "primary_skills": ["cybersecurity", "network_security", "owasp", "penetration_testing"],
+      "secondary_skills": ["linux", "python", "siem", "incident_response", "burp_suite"],
+      "soft_skills": ["critical_thinking", "continuous_learning", "problem_solving"],
+      "grade_range": ["M1", "S2"]
+    },
+    "product_manager": {
+      "name": "Product Manager",
+      "variants": ["PM", "Product Owner", "Senior Product Manager"],
+      "primary_skills": ["product_management", "agile", "scrum", "user_stories"],
+      "secondary_skills": ["data_analysis", "sql", "a_b_testing", "product_thinking", "jira"],
+      "soft_skills": ["communication", "leadership", "stakeholder_management", "business_acumen"],
+      "grade_range": ["M1", "L1"]
+    },
+    "technical_product_manager": {
+      "name": "Technical Product Manager",
+      "variants": ["TPM", "Technical PM"],
+      "primary_skills": ["product_management", "technical_background", "api_design", "system_design"],
+      "secondary_skills": ["agile", "data_analysis", "sql", "business_acumen"],
+      "soft_skills": ["communication", "leadership", "stakeholder_management"],
+      "grade_range": ["M2", "L1"]
+    },
+    "project_manager": {
+      "name": "Project Manager",
+      "variants": ["PM", "Technical Project Manager", "IT Project Manager"],
+      "primary_skills": ["project_management", "agile", "scrum", "kanban"],
+      "secondary_skills": ["jira", "risk_management", "stakeholder_management", "budgeting"],
+      "soft_skills": ["communication", "leadership", "organization", "adaptability"],
+      "grade_range": ["M1", "L1"]
+    },
+    "tech_lead": {
+      "name": "Tech Lead",
+      "variants": ["Technical Lead", "Team Lead", "Engineering Lead"],
+      "primary_skills": ["system_design", "architecture", "mentoring", "code_review"],
+      "secondary_skills": ["agile", "ci/cd", "devops", "security", "performance"],
+      "soft_skills": ["leadership", "communication", "mentoring", "decision_making"],
+      "grade_range": ["S1", "L1"]
+    },
+    "software_architect": {
+      "name": "Software Architect",
+      "variants": ["Solutions Architect", "Technical Architect", "System Architect"],
+      "primary_skills": ["system_design", "microservices", "cloud_architecture", "architecture_patterns"],
+      "secondary_skills": ["domain_driven_design", "event_driven", "high_availability", "security"],
+      "soft_skills": ["communication", "leadership", "decision_making", "mentoring"],
+      "grade_range": ["S2", "P1"]
+    },
+    "engineering_manager": {
+      "name": "Engineering Manager",
+      "variants": ["EM", "Development Manager", "R&D Manager"],
+      "primary_skills": ["leadership", "people_management", "performance_management", "hiring"],
+      "secondary_skills": ["technical_background", "project_management", "agile", "budgeting"],
+      "soft_skills": ["communication", "emotional_intelligence", "mentoring", "conflict_resolution"],
+      "grade_range": ["S2", "P1"]
+    },
+    "cto": {
+      "name": "CTO",
+      "variants": ["Chief Technology Officer", "VP of Engineering", "Head of Engineering"],
+      "primary_skills": ["executive_leadership", "strategic_planning", "technology_strategy"],
+      "secondary_skills": ["business_acumen", "budgeting", "hiring", "vendor_management"],
+      "soft_skills": ["communication", "leadership", "negotiation", "vision"],
+      "grade_range": ["L1", "P1"]
+    },
+    "ui_ux_designer": {
+      "name": "UI/UX Designer",
+      "variants": ["Product Designer", "UX Designer", "UI Designer", "Interaction Designer"],
+      "primary_skills": ["ui_design", "ux_design", "figma", "prototyping", "wireframing"],
+      "secondary_skills": ["user_research", "design_systems", "adobe_xd", "sketch", "responsive_design"],
+      "soft_skills": ["creativity", "communication", "empathy", "user_centricity"],
+      "grade_range": ["J1", "S2"]
+    },
+    "data_analyst": {
+      "name": "Data Analyst",
+      "variants": ["Business Analyst", "Business Intelligence Analyst"],
+      "primary_skills": ["sql", "excel", "data_analysis", "statistics"],
+      "secondary_skills": ["python", "tableau", "power_bi", "looker"],
+      "soft_skills": ["critical_thinking", "communication", "business_acumen"],
+      "grade_range": ["J1", "M2"]
+    },
+    "business_analyst": {
+      "name": "Business Analyst",
+      "variants": ["BA", "Systems Analyst", "Process Analyst"],
+      "primary_skills": ["requirements_analysis", "business_analysis", "sql"],
+      "secondary_skills": ["data_analysis", "agile", "jira", "confluence"],
+      "soft_skills": ["communication", "stakeholder_management", "problem_solving"],
+      "grade_range": ["J1", "M2"]
+    },
+    "technical_writer": {
+      "name": "Technical Writer",
+      "variants": ["Technical Communicator", "Documentation Specialist"],
+      "primary_skills": ["technical_writing", "documentation", "english_language"],
+      "secondary_skills": ["markdown", "api_documentation", "tools"],
+      "soft_skills": ["communication", "attention_to_detail", "continuous_learning"],
+      "grade_range": ["J1", "S1"]
+    }
+  }
+}

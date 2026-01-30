@@ -244,6 +244,12 @@ from api import (
     reports,
     vacancies,
     ranking,
+    industry_classifier,
+    skill_suggestions,
+    taxonomy_import_export,
+    taxonomy_sharing,
+    taxonomy_versions,
+    batch,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -258,6 +264,12 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
+app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
+app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
+app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
+app.include_router(taxonomy_sharing.router, prefix="/api/taxonomy-sharing", tags=["Taxonomy Sharing"])
+app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", tags=["Taxonomy Versions"])
+app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 
 
 if __name__ == "__main__":

@@ -17,6 +17,8 @@ import {
   Person as PersonIcon,
   BusinessCenter as RecruiterIcon,
   ExpandMore as ExpandMoreIcon,
+  Settings as SettingsIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -35,14 +37,17 @@ const Layout: React.FC<LayoutProps> = () => {
   const location = useLocation();
   const [jobSeekerAnchorEl, setJobSeekerAnchorEl] = useState<null | HTMLElement>(null);
   const [recruiterAnchorEl, setRecruiterAnchorEl] = useState<null | HTMLElement>(null);
+  const [adminAnchorEl, setAdminAnchorEl] = useState<null | HTMLElement>(null);
 
   const jobSeekerMenuOpen = Boolean(jobSeekerAnchorEl);
   const recruiterMenuOpen = Boolean(recruiterAnchorEl);
+  const adminMenuOpen = Boolean(adminAnchorEl);
 
   // Job Seeker Module menu items
   const jobSeekerItems = [
     { labelKey: 'nav.browseJobs', path: '/jobs', icon: <WorkIcon fontSize="small" /> },
     { labelKey: 'nav.uploadResumeNav', path: '/jobs/upload', icon: <ResumeIcon fontSize="small" /> },
+    { labelKey: 'nav.batchUpload', path: '/jobs/batch-upload', icon: <UploadIcon fontSize="small" /> },
     { labelKey: 'nav.myApplications', path: '/jobs/applications', icon: <PersonIcon fontSize="small" /> },
   ];
 
@@ -52,6 +57,14 @@ const Layout: React.FC<LayoutProps> = () => {
     { labelKey: 'nav.manageVacancies', path: '/recruiter/vacancies', icon: <WorkIcon fontSize="small" /> },
     { labelKey: 'nav.resumeDatabase', path: '/recruiter/resumes', icon: <PersonIcon fontSize="small" /> },
     { labelKey: 'nav.searchCandidates', path: '/recruiter/search', icon: <RecruiterIcon fontSize="small" /> },
+  ];
+
+  // Admin Module menu items
+  const adminItems = [
+    { labelKey: 'nav.adminSynonyms', path: '/admin/synonyms', icon: <SettingsIcon fontSize="small" /> },
+    { labelKey: 'nav.adminTaxonomies', path: '/admin/taxonomies', icon: <SettingsIcon fontSize="small" /> },
+    { labelKey: 'nav.adminTaxonomyAnalytics', path: '/admin/taxonomy-analytics', icon: <SettingsIcon fontSize="small" /> },
+    { labelKey: 'nav.adminPublicTaxonomies', path: '/admin/public-taxonomies', icon: <SettingsIcon fontSize="small" /> },
   ];
 
   return (
@@ -161,6 +174,50 @@ const Layout: React.FC<LayoutProps> = () => {
                     selected={location.pathname === item.path}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 180 }}>
+                      {item.icon}
+                      <Typography variant="body2">{t(item.labelKey)}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Menu>
+
+              {/* Admin Module */}
+              <Button
+                color="inherit"
+                startIcon={<SettingsIcon />}
+                endIcon={<ExpandMoreIcon />}
+                onClick={(e) => setAdminAnchorEl(e.currentTarget)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  borderRadius: 1,
+                  px: 2,
+                }}
+              >
+                {t('nav.admin')}
+              </Button>
+              <Menu
+                anchorEl={adminAnchorEl}
+                open={adminMenuOpen}
+                onClose={() => setAdminAnchorEl(null)}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'left',
+                }}
+              >
+                {adminItems.map((item) => (
+                  <MenuItem
+                    key={item.path}
+                    component={Link}
+                    to={item.path}
+                    onClick={() => setAdminAnchorEl(null)}
+                    selected={location.pathname === item.path}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
                       {item.icon}
                       <Typography variant="body2">{t(item.labelKey)}</Typography>
                     </Box>

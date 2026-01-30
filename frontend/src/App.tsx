@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '@components/Layout';
 import HomePage from '@pages/Home';
 import UploadPage from '@pages/Upload';
+import BatchUploadPage from '@pages/BatchUpload';
 import ResultsPage from '@pages/Results';
 import ComparePage from '@pages/Compare';
 import CompareVacancyPage from '@pages/CompareVacancy';
@@ -15,6 +16,9 @@ import ApplicationsPage from '@pages/Applications';
 import ResumeDatabasePage from '@pages/ResumeDatabase';
 import CandidateSearchPage from '@pages/CandidateSearch';
 import RecruiterDashboardPage from '@pages/RecruiterDashboard';
+import IndustryTaxonomyManager from '@components/IndustryTaxonomyManager';
+import TaxonomyAnalytics from '@components/TaxonomyAnalytics';
+import PublicTaxonomyBrowser from '@components/PublicTaxonomyBrowser';
 
 /**
  * Main App Component
@@ -41,6 +45,7 @@ function App() {
           <Route path="jobs">
             <Route index element={<VacancyListPage />} />
             <Route path="upload" element={<UploadPage />} />
+            <Route path="batch-upload" element={<BatchUploadPage />} />
             <Route path="results/:id" element={<ResultsPage />} />
             <Route path="applications" element={<ApplicationsPage />} />
           </Route>
@@ -62,6 +67,9 @@ function App() {
           <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
           <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
           <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
+          <Route path="admin/taxonomies" element={<IndustryTaxonomyManager />} />
+          <Route path="admin/taxonomy-analytics" element={<TaxonomyAnalytics />} />
+          <Route path="admin/public-taxonomies" element={<PublicTaxonomyBrowser />} />
 
           {/* Analytics dashboard */}
           <Route path="analytics" element={<AnalyticsDashboardPage />} />

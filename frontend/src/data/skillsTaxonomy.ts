@@ -276,3 +276,80 @@ export function getAllCategories(): { id: string; name: string }[] {
     name: c.name,
   }));
 }
+
+/**
+ * Merged taxonomy search options
+ */
+export interface MergedSearchOptions {
+  industry?: string;
+  organizationId?: string;
+  limit?: number;
+}
+
+/**
+ * Search skills across all taxonomy sources (static + industry + custom)
+ *
+ * This function uses the taxonomies API client to fetch merged taxonomies
+ * including static skills, industry-specific skills, and custom organization
+ * synonyms. Falls back to static-only search if API is unavailable.
+ *
+ * @param query - Search query string
+ * @param options - Search options including industry and organization ID
+ * @returns Matching skills sorted by relevance
+ */
+export async function searchSkillsMerged(
+  query: string,
+  options: MergedSearchOptions = {}
+): Promise<SkillDefinition[]> {
+  // Dynamic import to avoid circular dependencies
+  const { taxonomiesClient } = await import('@/api/taxonomies');
+
+  try {
+    return await taxonomiesClient.searchSkills(query, options);
+  } catch (error) {
+    // Fallback to static-only search if API fails
+    return searchSkills(query, options.limit);
+  }
+}
+
+/**
+ * Get canonical skill name from merged taxonomies
+ *
+ * This function checks all taxonomy sources (static, industry, custom)
+ * to find the canonical name for a given skill or synonym.
+ *
+ * @param input - User input skill name
+ * @param options - Search options including industry and organization ID
+ * @returns Canonical skill name or null if not found
+ */
+export async function getCanonicalSkillNameMerged(
+  input: string,
+  options: MergedSearchOptions = {}
+): Promise<string | null> {
+  if (!input) return null;
+
+  // Dynamic import to avoid circular dependencies
+  const { taxonomiesClient } = await import('@/api/taxonomies');
+
+  try {
+    return await taxonomiesClient.getCanonicalSkillName(input, options);
+  } catch (error) {
+    // Fallback to static-only canonical lookup
+    return getCanonicalSkillName(input);
+  }
+}
+
+/**
+ * Get skill suggestions from merged taxonomies
+ *
+ * @param input - Partial skill input
+ * @param options - Search options
+ * @returns Array of suggested skill names
+ */
+export async function getSkillSuggestionsMerged(
+  input: string,
+  options: MergedSearchOptions = {}
+): Promise<string[]> {
+  const matches = await searchSkillsMerged(input, options);
+  return matches.map((m) => m.name);
+}
