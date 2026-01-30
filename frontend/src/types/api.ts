@@ -686,3 +686,103 @@ export interface LanguagePreferenceResponse {
   language: string;
   updated_at: string;
 }
+
+// ==================== Ranking Types ====================
+
+/**
+ * Feature explanation for AI ranking
+ */
+export interface FeatureExplanation {
+  feature_name: string;
+  contribution: number;
+  contribution_percentage: number;
+  direction: 'positive' | 'negative';
+  description: string;
+  value?: number;
+}
+
+/**
+ * Ranked candidate from AI ranking
+ */
+export interface RankedCandidate {
+  resume_id: string;
+  candidate_name: string;
+  ranking_score: number;
+  hire_probability: number;
+  match_score: number;
+  overall_score: number;
+  recommendation: 'excellent' | 'good' | 'fair';
+  explanation: {
+    summary: string;
+    top_positive_factors: FeatureExplanation[];
+    top_negative_factors: FeatureExplanation[];
+    feature_contributions: Record<string, number>;
+  };
+  is_top_recommendation: boolean;
+  is_experiment?: boolean;
+  experiment_group?: 'control' | 'treatment';
+  model_version?: string;
+}
+
+/**
+ * Ranking request
+ */
+export interface RankingRequest {
+  vacancy_id: string;
+  limit?: number;
+}
+
+/**
+ * Ranking response
+ */
+export interface RankingResponse {
+  vacancy_id: string;
+  ranked_candidates: RankedCandidate[];
+  total_candidates: number;
+  model_version: string;
+  processing_time_ms: number;
+}
+
+/**
+ * Recommendations response (top 3 candidates)
+ */
+export interface RecommendationsResponse {
+  vacancy_id: string;
+  top_candidates: RankedCandidate[];
+  total_candidates_considered: number;
+  model_version: string;
+  generated_at: string;
+}
+
+/**
+ * Ranking feedback request
+ */
+export interface RankingFeedbackRequest {
+  rank_id?: string;
+  resume_id: string;
+  vacancy_id: string;
+  was_correct: boolean;
+  recruiter_corrected_score?: number;
+  recruiter_corrected_position?: number;
+  feedback_reason?: string;
+  recruiter_comments?: string;
+}
+
+/**
+ * Ranking feedback response
+ */
+export interface RankingFeedbackResponse {
+  id: string;
+  resume_id: string;
+  vacancy_id: string;
+  candidate_rank_id?: string;
+  was_correct: boolean;
+  original_score: number;
+  recruiter_corrected_score?: number;
+  original_position: number;
+  corrected_position?: number;
+  feedback_reason?: string;
+  feedback_source: string;
+  processed: boolean;
+  created_at: string;
+}

@@ -14,10 +14,22 @@ import {
   Slider,
   FormControlLabel,
   Checkbox,
+  ToggleButtonGroup,
+  ToggleButton,
+  Stack,
+  LinearProgress,
+  Tooltip,
 } from '@mui/material';
-import { Search as SearchIcon, Work as WorkIcon, TrendingUp as TrendingUpIcon } from '@mui/icons-material';
+import {
+  Search as SearchIcon,
+  Work as WorkIcon,
+  TrendingUp as TrendingUpIcon,
+  Psychology as AIIcon,
+  Star as StarIcon,
+} from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { RankedCandidate } from '../types/api';
 
 interface Resume {
   id: string;
@@ -39,6 +51,10 @@ interface CandidateWithMatch extends Resume {
   matchedSkills: string[];
   missingSkills: string[];
   vacancyTitle: string;
+  rankingScore?: number;
+  hireProbability?: number;
+  isTopRecommendation?: boolean;
+  modelVersion?: string;
 }
 
 /**
@@ -46,6 +62,8 @@ interface CandidateWithMatch extends Resume {
  *
  * Allows recruiters to search for candidates by skills and find the best matches for their vacancies.
  */
+type SortBy = 'match' | 'ranking';
+
 const CandidateSearchPage: React.FC = () => {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +75,9 @@ const CandidateSearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [sortBy, setSortBy] = useState<SortBy>('ranking');
+  const [usingAIRanking, setUsingAIRanking] = useState(true);
+  const [rankingData, setRankingData] = useState<Record<string, RankedCandidate>>({});
 
   // Load vacancies on mount
   useEffect(() => {
@@ -98,6 +119,7 @@ const CandidateSearchPage: React.FC = () => {
 
     setSearching(true);
     setSearched(true);
+    setRankingData({});
 
     try {
       // Get match results for the selected vacancy
@@ -106,6 +128,26 @@ const CandidateSearchPage: React.FC = () => {
 
       const results: CandidateWithMatch[] = [];
 
+      // Fetch AI ranking if enabled
+      let aiRankings: Record<string, RankedCandidate> = {};
+      if (usingAIRanking) {
+        try {
+          const rankingResponse = await axios.post<{
+            ranked_candidates: RankedCandidate[];
+          }>('/api/ranking/rank', {
+            vacancy_id: selectedVacancy,
+            limit: 100,
+          });
+          rankingResponse.data.ranked_candidates.forEach((candidate) => {
+            aiRankings[candidate.resume_id] = candidate;
+          });
+          setRankingData(aiRankings);
+        } catch (rankingError) {
+          console.warn('AI ranking not available, falling back to match percentage:', rankingError);
+          setUsingAIRanking(false);
+        }
+      }
+
       for (const resume of resumes) {
         try {
           const response = await axios.get(
@@ -113,6 +155,7 @@ const CandidateSearchPage: React.FC = () => {
           );
 
           if (response.data && response.data.match_percentage >= minMatchPercentage) {
+            const aiRanking = aiRankings[resume.id];
             results.push({
               ...resume,
               matchPercentage: response.data.match_percentage,
@@ -123,6 +166,10 @@ const CandidateSearchPage: React.FC = () => {
                 typeof s === 'string' ? s : s.skill
               ) || [],
               vacancyTitle: response.data.vacancy_title || vacancy.title,
+              rankingScore: aiRanking?.ranking_score,
+              hireProbability: aiRanking?.hire_probability,
+              isTopRecommendation: aiRanking?.is_top_recommendation,
+              modelVersion: aiRanking ? 'AI' : undefined,
             });
           }
         } catch (e) {
@@ -130,9 +177,19 @@ const CandidateSearchPage: React.FC = () => {
         }
       }
 
-      // Sort by match percentage
-      results.sort((a, b) => b.matchPercentage - a.matchPercentage);
-      setCandidates(results);
+      // Sort by selected criteria
+      const sortedResults = [...results].sort((a, b) => {
+        if (sortBy === 'ranking') {
+          // Sort by AI ranking score if available, otherwise fall back to match percentage
+          const aScore = a.rankingScore ?? a.matchPercentage;
+          const bScore = b.rankingScore ?? b.matchPercentage;
+          return bScore - aScore;
+        } else {
+          return b.matchPercentage - a.matchPercentage;
+        }
+      });
+
+      setCandidates(sortedResults);
     } catch (error) {
       console.error('Error searching:', error);
     } finally {
@@ -221,6 +278,48 @@ const CandidateSearchPage: React.FC = () => {
                   valueLabelDisplay="auto"
                 />
               </Box>
+            </Grid>
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                <ToggleButtonGroup
+                  value={sortBy}
+                  exclusive
+                  onChange={(_, value) => value && setSortBy(value)}
+                  size="small"
+                >
+                  <ToggleButton value="ranking" aria-label="sort by AI ranking">
+                    <Tooltip title={t('candidateSearch.sortByRanking')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <AIIcon fontSize="small" />
+                        <Typography variant="body2">{t('candidateSearch.aiRanking')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="match" aria-label="sort by match percentage">
+                    <Tooltip title={t('candidateSearch.sortByMatch')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <TrendingUpIcon fontSize="small" />
+                        <Typography variant="body2">{t('candidateSearch.matchPercent')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={usingAIRanking}
+                      onChange={(e) => setUsingAIRanking(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <AIIcon fontSize="small" />
+                      <Typography variant="body2">{t('candidateSearch.useAIRanking')}</Typography>
+                    </Box>
+                  }
+                />
+              </Stack>
             </Grid>
             <Grid item xs={12}>
               <Button
@@ -316,73 +415,159 @@ const CandidateSearchPage: React.FC = () => {
                       transition: 'transform 0.2s, box-shadow 0.2s',
                       '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
                       borderLeft: 4,
-                      borderColor: `${getMatchColor(candidate.matchPercentage)}.main`,
+                      borderColor: candidate.rankingScore
+                        ? `${candidate.rankingScore >= 70 ? 'success' : candidate.rankingScore >= 40 ? 'warning' : 'error'}.main`
+                        : `${getMatchColor(candidate.matchPercentage)}.main`,
+                      position: 'relative',
                     }}
                     onClick={() => (window.location.href = `/results/${candidate.id}`)}
                   >
+                    {/* Top Recommendation Badge */}
+                    {candidate.isTopRecommendation && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: -8,
+                          right: -8,
+                          bgcolor: 'warning.main',
+                          color: 'warning.contrastText',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: '0 12px 0 12px',
+                          zIndex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          boxShadow: 2,
+                        }}
+                      >
+                        <StarIcon sx={{ fontSize: 14 }} />
+                        <Typography variant="caption" fontWeight={700}>
+                          TOP
+                        </Typography>
+                      </Box>
+                    )}
+
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            #{index + 1} • {candidate.filename}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary">
+                              #{index + 1}
+                            </Typography>
+                            {candidate.modelVersion === 'AI' && (
+                              <Chip
+                                icon={<AIIcon sx={{ fontSize: 12 }} />}
+                                label="AI"
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }}
+                              />
+                            )}
+                            <Typography variant="caption" color="text.secondary">
+                              • {candidate.filename}
+                            </Typography>
+                          </Box>
                           <Typography variant="h6" fontWeight={600}>
                             {candidate.vacancyTitle}
                           </Typography>
                         </Box>
-                        <Chip
-                          label={`${candidate.matchPercentage}%`}
-                          color={getMatchColor(candidate.matchPercentage) as any}
-                          sx={{ fontWeight: 700, fontSize: '1rem' }}
-                        />
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {/* AI Ranking Score */}
+                          {candidate.rankingScore !== undefined && (
+                            <Tooltip title={t('candidateSearch.aiRankingScore')}>
+                              <Box sx={{ textAlign: 'center' }}>
+                                <Chip
+                              label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <AIIcon sx={{ fontSize: 14 }} />
+                                  <Typography variant="body2" fontWeight={700}>
+                                    {Math.round(candidate.rankingScore)}
+                                  </Typography>
+                                </Box>
+                              }
+                              color={
+                                candidate.rankingScore >= 70
+                                  ? 'success'
+                                  : candidate.rankingScore >= 40
+                                    ? 'warning'
+                                    : 'error'
+                              }
+                              sx={{ fontWeight: 700, fontSize: '1rem' }}
+                            />
+                            {candidate.hireProbability !== undefined && (
+                              <LinearProgress
+                                variant="determinate"
+                                value={candidate.hireProbability * 100}
+                                sx={{
+                                  height: 3,
+                                  borderRadius: 1.5,
+                                  mt: 0.5,
+                                  width: 40,
+                                  mx: 'auto',
+                                }}
+                                color={candidate.rankingScore >= 70 ? 'success' : 'warning'}
+                              />
+                            )}
+                          </Box>
+                        </Tooltip>
+                      )}
+                      {/* Match Percentage */}
+                      <Chip
+                        label={`${candidate.matchPercentage}%`}
+                        color={getMatchColor(candidate.matchPercentage) as any}
+                        sx={{ fontWeight: 700, fontSize: '1rem' }}
+                      />
+                    </Stack>
+                  </Box>
+
+                  {/* Matched Skills */}
+                  {candidate.matchedSkills.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="success.main" fontWeight={600}>
+                        ✓ {t('candidateSearch.matched', { count: candidate.matchedSkills.length })}
+                      </Typography>
+                      <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {candidate.matchedSkills.slice(0, 6).map((skill) => (
+                          <Chip key={skill} label={skill} size="small" color="success" variant="outlined" />
+                        ))}
+                        {candidate.matchedSkills.length > 6 && (
+                          <Chip
+                            label={t('vacancyList.more', { count: candidate.matchedSkills.length - 6 })}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
                       </Box>
+                    </Box>
+                  )}
 
-                      {/* Matched Skills */}
-                      {candidate.matchedSkills.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="caption" color="success.main" fontWeight={600}>
-                            ✓ {t('candidateSearch.matched', { count: candidate.matchedSkills.length })}
-                          </Typography>
-                          <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {candidate.matchedSkills.slice(0, 6).map((skill) => (
-                              <Chip key={skill} label={skill} size="small" color="success" variant="outlined" />
-                            ))}
-                            {candidate.matchedSkills.length > 6 && (
-                              <Chip
-                                label={t('vacancyList.more', { count: candidate.matchedSkills.length - 6 })}
-                                size="small"
-                                variant="outlined"
-                              />
-                            )}
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Missing Skills */}
-                      {candidate.missingSkills.length > 0 && (
-                        <Box>
-                          <Typography variant="caption" color="error.main" fontWeight={600}>
-                            ✗ {t('candidateSearch.missing', { count: candidate.missingSkills.length })}
-                          </Typography>
-                          <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {candidate.missingSkills.slice(0, 4).map((skill) => (
-                              <Chip key={skill} label={skill} size="small" color="error" variant="outlined" />
-                            ))}
-                            {candidate.missingSkills.length > 4 && (
-                              <Chip
-                                label={t('vacancyList.more', { count: candidate.missingSkills.length - 4 })}
-                                size="small"
-                                variant="outlined"
-                              />
-                            )}
-                          </Box>
-                        </Box>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
+                  {/* Missing Skills */}
+                  {candidate.missingSkills.length > 0 && (
+                    <Box>
+                      <Typography variant="caption" color="error.main" fontWeight={600}>
+                        ✗ {t('candidateSearch.missing', { count: candidate.missingSkills.length })}
+                      </Typography>
+                      <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {candidate.missingSkills.slice(0, 4).map((skill) => (
+                          <Chip key={skill} label={skill} size="small" color="error" variant="outlined" />
+                        ))}
+                        {candidate.missingSkills.length > 4 && (
+                          <Chip
+                            label={t('vacancyList.more', { count: candidate.missingSkills.length - 4 })}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
             </Grid>
+          ))}
+        </Grid>
           </>
         )}
       </Box>
