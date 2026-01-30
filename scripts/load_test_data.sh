@@ -72,7 +72,7 @@ for resume in "$RESUME_DIR"/*.{docx,pdf,DOCX,PDF}; do
         -w "\n%{http_code}" 2>/dev/null)
 
     http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | head -n-1)
+    body=$(echo "$response" | sed '$d')
 
     if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
         echo -e "${GREEN}OK${NC}"
