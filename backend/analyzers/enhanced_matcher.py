@@ -332,6 +332,43 @@ class EnhancedSkillMatcher:
 
         return best_match
 
+    def _split_compound_skill(self, skill: str) -> List[str]:
+        """
+        Split compound skills like "C/C++", "Python, Django", "SQL & NoSQL"
+        into individual skills.
+
+        Args:
+            skill: The skill name that might be compound
+
+        Returns:
+            List of individual skill names
+
+        Example:
+            >>> EnhancedSkillMatcher()._split_compound_skill("C/C++")
+            ['c', 'c++']
+            >>> EnhancedSkillMatcher()._split_compound_skill("Python, Django")
+            ['python', 'django']
+        """
+        # Split by common separators: /, &, +, comma
+        parts = []
+        for separator in ['/', '&', '+', ',']:
+            if separator in skill:
+                parts = [p.strip() for p in skill.split(separator)]
+                break
+
+        if not parts:
+            return [skill]
+
+        # Further split by comma if needed
+        result = []
+        for part in parts:
+            if ',' in part:
+                result.extend([p.strip() for p in part.split(',')])
+            else:
+                result.append(part)
+
+        return [p for p in result if p]
+
     def match_with_context(
         self,
         resume_skills: List[str],
@@ -345,9 +382,10 @@ class EnhancedSkillMatcher:
 
         This is the main matching method that combines multiple matching strategies:
         1. Direct match (highest confidence)
-        2. Context-aware match (high confidence)
-        3. Synonym match (medium-high confidence)
-        4. Fuzzy match (medium confidence)
+        2. Compound skill match (e.g., "C/C++" contains "C")
+        3. Context-aware match (high confidence)
+        4. Synonym match (medium-high confidence)
+        5. Fuzzy match (medium confidence)
 
         Args:
             resume_skills: List of skills extracted from the resume
@@ -396,6 +434,55 @@ class EnhancedSkillMatcher:
                     "match_type": "direct"
                 })
                 return result
+
+        # Strategy 1.5: Compound skill match (e.g., "C/C++" contains "C")
+        for resume_skill in resume_skills:
+            parts = self._split_compound_skill(resume_skill)
+            if len(parts) > 1:
+                for part in parts:
+                    if self.normalize_skill_name(part) == normalized_required:
+                        result.update({
+                            "matched": True,
+                            "confidence": 0.9,
+                            "matched_as": resume_skill,
+                            "match_type": "compound"
+                        })
+                        return result
+
+        # Strategy 1.75: C/C++ language hierarchy match
+        # C++ implies C knowledge, C# doesn't imply C
+        c_related = {
+            'c': ['c', 'c++', 'c/c++'],
+            'c++': ['c++', 'c/c++'],
+            'c#': ['c#', 'c sharp'],
+        }
+        if normalized_required in c_related:
+            for resume_skill in resume_skills:
+                normalized_resume = self.normalize_skill_name(resume_skill)
+                # Check if resume skill is in the list of acceptable variants
+                if normalized_resume in [self.normalize_skill_name(v) for v in c_related[normalized_required]]:
+                    # Special case: if required is 'c', match 'c++' but NOT 'c#'
+                    if normalized_required == 'c':
+                        if 'c#' in normalized_resume or 'csharp' in normalized_resume or 'c sharp' in normalized_resume:
+                            continue
+                        # Match 'c++' or 'c/c++' as 'c'
+                        if normalized_resume in ['c++', 'c/c++']:
+                            result.update({
+                                "matched": True,
+                                "confidence": 0.85,
+                                "matched_as": resume_skill,
+                                "match_type": "language_hierarchy"
+                            })
+                            return result
+                    # Match exact variants
+                    if normalized_resume in c_related[normalized_required]:
+                        result.update({
+                            "matched": True,
+                            "confidence": 0.95,
+                            "matched_as": resume_skill,
+                            "match_type": "language_hierarchy"
+                        })
+                        return result
 
         # Strategy 2: Context-aware match
         if context:

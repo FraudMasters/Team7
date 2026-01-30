@@ -14,6 +14,7 @@ from .keyword_extractor import (
 from .hf_skill_extractor import (
     extract_skills_ner,
     extract_skills_zero_shot,
+    extract_skills_pattern_matching,
     extract_resume_skills,
     extract_top_skills as extract_top_skills_hf,
     extract_resume_keywords,
@@ -48,6 +49,21 @@ from .error_detector import (
 from .enhanced_matcher import (
     EnhancedSkillMatcher,
 )
+from .tfidf_matcher import (
+    TfidfSkillMatcher,
+    TfidfMatchResult,
+    get_tfidf_matcher,
+)
+from .vector_matcher import (
+    VectorSimilarityMatcher,
+    VectorMatchResult,
+    get_vector_matcher,
+)
+from .unified_matcher import (
+    UnifiedSkillMatcher,
+    UnifiedMatchResult,
+    get_unified_matcher,
+)
 from .taxonomy_loader import (
     TaxonomyLoader,
 )
@@ -57,6 +73,12 @@ from .model_versioning import (
 from .accuracy_benchmark import (
     AccuracyBenchmark,
 )
+from .analysis_saver import (
+    save_resume_analysis,
+    get_resume_analysis,
+    delete_resume_analysis,
+    calculate_quality_score,
+)
 
 __all__ = [
     "extract_keywords",
@@ -64,6 +86,7 @@ __all__ = [
     "extract_resume_keywords",
     "extract_skills_ner",
     "extract_skills_zero_shot",
+    "extract_skills_pattern_matching",
     "extract_resume_skills",
     "extract_top_skills_hf",
     "extract_resume_keywords_hf",
@@ -84,7 +107,20 @@ __all__ = [
     "get_error_summary",
     "format_errors_for_display",
     "EnhancedSkillMatcher",
+    "TfidfSkillMatcher",
+    "TfidfMatchResult",
+    "get_tfidf_matcher",
+    "VectorSimilarityMatcher",
+    "VectorMatchResult",
+    "get_vector_matcher",
+    "UnifiedSkillMatcher",
+    "UnifiedMatchResult",
+    "get_unified_matcher",
     "TaxonomyLoader",
     "ModelVersionManager",
     "AccuracyBenchmark",
+    "save_resume_analysis",
+    "get_resume_analysis",
+    "delete_resume_analysis",
+    "calculate_quality_score",
 ]
