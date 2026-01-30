@@ -20,16 +20,21 @@ from models.resume import Resume, ResumeStatus
 from models.resume_analysis import ResumeAnalysis
 from models.match_result import MatchResult
 from models.job_vacancy import JobVacancy
+from models.candidate_rank import CandidateRank, RankingFeedback
 from sqlalchemy import delete, select, text
 from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
 from analyzers.hf_skill_extractor import extract_resume_skills, extract_resume_keywords
 from analyzers.ner_extractor import extract_resume_entities
-from analyzers.analysis_saver import save_resume_analysis
 from langdetect import detect
+from datetime import datetime
 
 # Configuration
 TEST_DATA_DIR = "./testdata/vacancy-resume-matching-dataset"
-# Alternative path if running inside container
+# Alternative paths if running inside container or different location
+if not os.path.exists(TEST_DATA_DIR):
+    TEST_DATA_DIR = "./testdata/vacancy-resume-matching-dataset-main"
+if not os.path.exists(TEST_DATA_DIR):
+    TEST_DATA_DIR = "/app/testdata/vacancy-resume-matching-dataset-main"
 if not os.path.exists(TEST_DATA_DIR):
     TEST_DATA_DIR = "./testdata"
 
@@ -39,6 +44,9 @@ async def clear_database():
     print("Clearing database...")
 
     async with async_session_maker() as db:
+        # Delete ranking data first (due to foreign keys)
+        await db.execute(delete(RankingFeedback))
+        await db.execute(delete(CandidateRank))
         # Delete match results
         await db.execute(delete(MatchResult))
         # Delete resume analyses
@@ -131,9 +139,9 @@ async def load_resumes(resume_dir: str):
                 # Simulate processing time (1-3 seconds)
                 processing_time = 1.0 + random.random() * 2.0
 
-                # Save analysis
-                await save_resume_analysis(
-                    db=db,
+                # Create resume analysis directly
+                now = datetime.utcnow()
+                analysis = ResumeAnalysis(
                     resume_id=resume.id,
                     raw_text=text[:50000],
                     language=language,
@@ -142,8 +150,11 @@ async def load_resumes(resume_dir: str):
                     entities=entities,
                     quality_score=75,  # Default good score
                     processing_time_seconds=processing_time,
-                    analyzer_version="2.0.0"
+                    analyzer_version="2.0.0",
+                    created_at=now,
+                    updated_at=now,
                 )
+                db.add(analysis)
 
                 loaded += 1
                 print(f"  Loaded: {filename} ({len(skills_list)} skills, lang={language})")
