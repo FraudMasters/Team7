@@ -105,3 +105,4 @@ verify_*.sh
 *.temp
 *.bak
 *.backup
+testdata/
