@@ -3,6 +3,7 @@ SQLAlchemy database models for Resume Analysis System
 """
 from .base import Base
 from .resume import Resume
+from .resume_analysis import ResumeAnalysis
 from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
 from .job_vacancy import JobVacancy
@@ -20,6 +21,7 @@ from .report import Report, ScheduledReport
 __all__ = [
     "Base",
     "Resume",
+    "ResumeAnalysis",
     "AnalysisResult",
     "ResumeComparison",
     "JobVacancy",
