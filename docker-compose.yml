@@ -174,7 +174,7 @@ services:
       - redis
     networks:
       - resume_network
-    command: celery -A celery_app.celery_app flower --port=5555 --basic_auth=""
+    command: celery -A celery_app.celery_app flower --port=5555
 
 volumes:
   postgres_data:

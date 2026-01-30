@@ -148,7 +148,13 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         """Get list of allowed CORS origins."""
-        return [self.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"]
+        return [
+            self.frontend_url,
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
 
     def get_db_url_async(self) -> str:
         """
