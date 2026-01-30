@@ -21,3 +21,5 @@ export { default as RecruiterPerformance } from './analytics/RecruiterPerformanc
 export { default as ReportBuilder } from './analytics/ReportBuilder';
 export { default as SkillDemandChart } from './analytics/SkillDemandChart';
 export { default as SourceTracking } from './analytics/SourceTracking';
+export { default as ModelQualityMetrics } from './ModelQualityMetrics';
+export { default as UnifiedMatchMetrics } from './UnifiedMatchMetrics';

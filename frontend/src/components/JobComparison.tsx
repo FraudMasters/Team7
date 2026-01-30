@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useLanguageContext } from '@/contexts/LanguageContext';
 import { formatNumber, formatDate } from '@/utils/localeFormatters';
 import {
@@ -15,6 +16,10 @@ import {
   CircularProgress,
   Button,
   Alert,
+  IconButton,
+  Tooltip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -23,7 +28,13 @@ import {
   Work as WorkIcon,
   School as SchoolIcon,
   Business as BusinessIcon,
+  Description as ResumeIcon,
+  BusinessCenter as VacancyIcon,
+  ArrowBack as ArrowBackIcon,
+  Analytics as AnalyticsIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
+import UnifiedMatchMetrics from './UnifiedMatchMetrics';
 
 /**
  * Skill match interface for comparison display
@@ -66,6 +77,29 @@ interface JobComparisonData {
 }
 
 /**
+ * Unified match data structure with all metrics
+ */
+interface UnifiedMatchData {
+  resume_id: string;
+  vacancy_title: string;
+  overall_score: number;
+  passed: boolean;
+  recommendation: 'excellent' | 'good' | 'maybe' | 'poor';
+  keyword_score: number;
+  keyword_passed: boolean;
+  tfidf_score: number;
+  tfidf_passed: boolean;
+  tfidf_matched: string[];
+  tfidf_missing: string[];
+  vector_score: number;
+  vector_passed: boolean;
+  vector_similarity: number;
+  matched_skills: string[];
+  missing_skills: string[];
+  processing_time_ms: number;
+}
+
+/**
  * JobComparison Component Props
  */
 interface JobComparisonProps {
@@ -98,13 +132,73 @@ const JobComparison: React.FC<JobComparisonProps> = ({
   apiUrl = '/api/vacancies',
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { language } = useLanguageContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<JobComparisonData | null>(null);
+  const [unifiedData, setUnifiedData] = useState<UnifiedMatchData | null>(null);
+  const [viewMode, setViewMode] = useState<'simple' | 'unified'>('unified');
 
   /**
-   * Fetch job comparison data from backend
+   * Fetch unified match data with all metrics
+   */
+  const fetchUnifiedComparison = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // First, fetch vacancy data from database
+      let vacancyData = {
+        id: vacancyId,
+        title: 'Vacancy',
+        description: '',
+        required_skills: [],
+      };
+
+      try {
+        const vacResponse = await fetch(`/api/vacancies/${vacancyId}`);
+        if (vacResponse.ok) {
+          const vac = await vacResponse.json();
+          vacancyData = {
+            id: vacancyId,
+            title: vac.title || vac.name || 'Vacancy',
+            description: vac.description || '',
+            required_skills: vac.required_skills || [],
+          };
+        }
+      } catch (e) {
+        console.warn('Failed to fetch vacancy data, using defaults', e);
+      }
+
+      // Now call unified matching with actual vacancy data
+      const response = await fetch('/api/matching/compare-unified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resume_id: resumeId,
+          vacancy_data: vacancyData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch unified comparison: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setUnifiedData(result);
+      setData(null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to load unified comparison';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Fetch job comparison data from backend (legacy)
    */
   const fetchComparison = async () => {
     setLoading(true);
@@ -141,9 +235,23 @@ const JobComparison: React.FC<JobComparisonProps> = ({
 
   useEffect(() => {
     if (resumeId && vacancyId) {
-      fetchComparison();
+      if (viewMode === 'unified') {
+        fetchUnifiedComparison();
+      } else {
+        fetchComparison();
+      }
     }
-  }, [resumeId, vacancyId]);
+  }, [resumeId, vacancyId, viewMode]);
+
+  // Handle view mode change
+  const handleViewModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newMode: 'simple' | 'unified' | null,
+  ) => {
+    if (newMode) {
+      setViewMode(newMode);
+    }
+  };
 
   /**
    * Get match percentage color and label
@@ -222,7 +330,11 @@ const JobComparison: React.FC<JobComparisonProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchComparison} startIcon={<RefreshIcon />}>
+          <Button
+            color="inherit"
+            onClick={viewMode === 'unified' ? fetchUnifiedComparison : fetchComparison}
+            startIcon={<RefreshIcon />}
+          >
             {t('common.tryAgain')}
           </Button>
         }
@@ -238,7 +350,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
   /**
    * Render no data state
    */
-  if (!data) {
+  if (!data && !unifiedData) {
     return (
       <Alert severity="info">
         <Typography variant="subtitle1" fontWeight={600}>
@@ -257,6 +369,106 @@ const JobComparison: React.FC<JobComparisonProps> = ({
     );
   }
 
+  // If using unified view, render unified metrics
+  if (unifiedData) {
+    return (
+      <Stack spacing={3}>
+        {/* Header with View Toggle */}
+        <Paper elevation={2} sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Tooltip title="Назад">
+                  <IconButton onClick={() => navigate(-1)} size="small">
+                    <ArrowBackIcon />
+                  </IconButton>
+                </Tooltip>
+                <AnalyticsIcon color="primary" />
+                <Typography variant="h5" fontWeight={600}>
+                  AI Анализ совпадения
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {t('compare.resumeLabel')}: <strong>{resumeId.slice(0, 8)}...</strong> • {t('compare.vacancyLabel')}: <strong>{vacancyId.slice(0, 8)}...</strong>
+              </Typography>
+            </Box>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                size="small"
+              >
+                <ToggleButton value="unified" aria-label="unified view">
+                  <AnalyticsIcon fontSize="small" />
+                  <Box component="span" sx={{ ml: 0.5 }}>AI Метрики</Box>
+                </ToggleButton>
+                <ToggleButton value="simple" aria-label="simple view">
+                  <VisibilityIcon fontSize="small" />
+                  <Box component="span" sx={{ ml: 0.5 }}>Простой</Box>
+                </ToggleButton>
+              </ToggleButtonGroup>
+
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={fetchUnifiedComparison}
+                size="small"
+              >
+                Обновить
+              </Button>
+
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<ResumeIcon />}
+                onClick={() => navigate(`/results/${resumeId}`)}
+              >
+                Резюме
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<VacancyIcon />}
+                onClick={() => navigate(`/recruiter/vacancies/${vacancyId}`)}
+              >
+                Вакансия
+              </Button>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {/* Unified Metrics Display */}
+        <UnifiedMatchMetrics
+          overallScore={unifiedData.overall_score}
+          keywordScore={unifiedData.keyword_score}
+          tfidfScore={unifiedData.tfidf_score}
+          vectorScore={unifiedData.vector_score}
+          vectorSimilarity={unifiedData.vector_similarity}
+          recommendation={unifiedData.recommendation}
+          keywordPassed={unifiedData.keyword_passed}
+          tfidfPassed={unifiedData.tfidf_passed}
+          vectorPassed={unifiedData.vector_passed}
+          tfidfMatched={unifiedData.tfidf_matched}
+          tfidfMissing={unifiedData.tfidf_missing}
+          matchedSkills={unifiedData.matched_skills}
+          missingSkills={unifiedData.missing_skills}
+        />
+
+        {/* Processing time */}
+        <Typography variant="caption" color="text.secondary" align="center" display="block">
+          Время обработки: {unifiedData.processing_time_ms?.toFixed(2)}ms • Метод: Unified Matcher v1
+        </Typography>
+      </Stack>
+    );
+  }
+
+  // For simple view, data must exist (checked earlier)
+  if (!data) {
+    return null;
+  }
+
   const matchConfig = getMatchConfig(data.match_percentage);
   const { matched_skills, missing_skills, experience_verification } = data;
 
@@ -264,18 +476,71 @@ const JobComparison: React.FC<JobComparisonProps> = ({
     <Stack spacing={3}>
       {/* Header Section with Match Percentage */}
       <Paper elevation={2} sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Box>
-            <Typography variant="h5" fontWeight={600}>
-              {t('compare.title')}
-            </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          {/* Left: Title and IDs */}
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Tooltip title="Назад">
+                <IconButton onClick={() => navigate(-1)} size="small">
+                  <ArrowBackIcon />
+                </IconButton>
+              </Tooltip>
+              <Typography variant="h5" fontWeight={600}>
+                {t('compare.title')}
+              </Typography>
+            </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {t('compare.resumeLabel')}: <strong>{resumeId}</strong> • {t('compare.vacancyLabel')}: <strong>{vacancyId}</strong>
+              {t('compare.resumeLabel')}: <strong>{resumeId.slice(0, 8)}...</strong> • {t('compare.vacancyLabel')}: <strong>{vacancyId.slice(0, 8)}...</strong>
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
-            {t('compare.refreshButton')}
-          </Button>
+
+          {/* Right: Action buttons */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={handleViewModeChange}
+              size="small"
+            >
+              <ToggleButton value="unified" aria-label="unified view">
+                <AnalyticsIcon fontSize="small" />
+                <Box component="span" sx={{ ml: 0.5 }}>AI</Box>
+              </ToggleButton>
+              <ToggleButton value="simple" aria-label="simple view">
+                <VisibilityIcon fontSize="small" />
+                <Box component="span" sx={{ ml: 0.5 }}>Простой</Box>
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            <Tooltip title="Открыть резюме">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<ResumeIcon />}
+                onClick={() => navigate(`/results/${resumeId}`)}
+              >
+                Резюме
+              </Button>
+            </Tooltip>
+            <Tooltip title="Открыть вакансию">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<VacancyIcon />}
+                onClick={() => navigate(`/recruiter/vacancies/${vacancyId}`)}
+              >
+                Вакансия
+              </Button>
+            </Tooltip>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={fetchComparison}
+              size="small"
+            >
+              {t('compare.refreshButton')}
+            </Button>
+          </Stack>
         </Box>
 
         {/* Match Percentage Display */}

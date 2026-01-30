@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -49,6 +50,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
   resumeId,
   skills,
 }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [vacancies, setVacancies] = useState<VacancyMatch[]>([]);
   const [skillCategories, setSkillCategories] = useState<SkillCategory[]>([]);
@@ -112,35 +114,46 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
     const categories: SkillCategory[] = [
       { category: 'Programming Languages', skills: [], color: '#1976d2' },
       { category: 'Frameworks & Libraries', skills: [], color: '#7b1fa2' },
-      { category: 'Databases', skills: [], color: '#388e3c' },
+      { category: 'Databases & Storage', skills: [], color: '#388e3c' },
       { category: 'Tools & DevOps', skills: [], color: '#f57c00' },
       { category: 'Soft Skills', skills: [], color: '#d32f2f' },
       { category: 'Other', skills: [], color: '#616161' },
     ];
 
     const programmingLangs = [
-      'Java', 'Python', 'JavaScript', 'TypeScript', 'C#', 'C++', 'Go', 'Rust',
-      'Ruby', 'PHP', 'Swift', 'Kotlin', 'Scala', 'R', 'MATLAB', 'Perl', 'HTML', 'CSS'
+      'Java', 'Python', 'JavaScript', 'TypeScript', 'C#', 'C++', 'Go', 'Golang', 'Rust',
+      'Ruby', 'PHP', 'Swift', 'Kotlin', 'Scala', 'R', 'MATLAB', 'Perl', 'HTML', 'CSS',
+      'SQL', 'Bash', 'Shell', 'PowerShell', 'Lua', 'Dart', 'Haskell', 'Clojure', 'Elixir',
+      'Groovy', 'F#', 'Julia', 'SAS', 'Stata', 'Objective-C', 'Assembly'
     ];
 
     const frameworks = [
-      'React', 'Angular', 'Vue', 'Node.js', 'Django', 'Flask', 'Spring', 'Express',
-      'Rails', 'Laravel', 'jQuery', 'Bootstrap', 'Tailwind', 'Next.js', 'Nuxt.js'
+      'React', 'Angular', 'Vue', 'Node.js', 'Django', 'Flask', 'Spring', 'Spring Boot',
+      'Express', 'Express.js', 'Rails', 'Ruby on Rails', 'Laravel', 'Symfony', 'jQuery',
+      'Bootstrap', 'Tailwind', 'Next.js', 'Nuxt.js', 'Nuxt', 'Svelte', 'Ember', 'Backbone',
+      'Hibernate', 'Entity Framework', 'ASP.NET', 'ASP.NET MVC', 'Webpack', 'Vite', 'Babel',
+      'Redux', 'MobX', 'RxJS', 'jQuery', 'MUI', 'Material-UI', 'Chakra', 'Ant Design',
+      'REST', 'REST API', 'RESTful', 'GraphQL', 'gRPC', 'WebSocket', 'Socket.io'
     ];
 
     const databases = [
-      'SQL', 'PostgreSQL', 'MySQL', 'MongoDB', 'Oracle', 'SQLite', 'Redis',
-      'Elasticsearch', 'DynamoDB', 'Cassandra', 'GraphQL'
+      'PostgreSQL', 'MySQL', 'MongoDB', 'Oracle', 'SQLite', 'Redis',
+      'Elasticsearch', 'DynamoDB', 'Cassandra', 'MariaDB', 'CouchDB', 'Neo4j',
+      'InfluxDB', 'Prometheus', 'Cassandra', 'Couchbase', 'Firebase'
     ];
 
     const devOps = [
       'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP', 'CI/CD', 'Git', 'Jenkins',
-      'Terraform', 'Ansible', 'Linux', 'Unix', 'Nginx', 'Apache'
+      'Terraform', 'Ansible', 'Linux', 'Unix', 'Nginx', 'Apache', 'Heroku',
+      'Kafka', 'RabbitMQ', 'GitLab', 'GitHub', 'Bitbucket', 'Jira', 'Confluence',
+      'Swagger', 'OpenAPI', 'Postman', 'GitOps', 'Vagrant', 'Puppet', 'Chef',
+      'Maven', 'Gradle', 'npm', 'yarn', 'pnpm', 'pip', 'Composer', 'NuGet'
     ];
 
     const softSkills = [
       'Leadership', 'Communication', 'Agile', 'Scrum', 'Teamwork', 'Problem-solving',
-      'Analytical', 'Management', 'Presentation', 'English', 'Negotiation'
+      'Analytical', 'Management', 'Presentation', 'English', 'Negotiation', 'Mentoring',
+      'Collaboration', 'Critical thinking', 'Time management', 'Adaptability'
     ];
 
     for (const skill of skillList) {
@@ -158,7 +171,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
         categorized = true;
       }
       if (databases.some((db) => normalizedSkill.toLowerCase().includes(db.toLowerCase()))) {
-        const cat = categories.find((c) => c.category === 'Databases');
+        const cat = categories.find((c) => c.category === 'Databases & Storage');
         if (cat) cat.skills.push(normalizedSkill);
         categorized = true;
       }
@@ -222,7 +235,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
                     transition: 'all 0.2s',
                     '&:hover': { boxShadow: 2, transform: 'translateY(-2px)' },
                   }}
-                  onClick={() => (window.location.href = `/compare/${resumeId}/${match.vacancyId}`)}
+                  onClick={() => navigate(`/compare/${resumeId}/${match.vacancyId}`)}
                 >
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

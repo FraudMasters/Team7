@@ -228,7 +228,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
       if (onComplete) {
         onComplete(vacancy);
       } else {
-        navigate('/vacancies');
+        navigate('/recruiter/vacancies');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create vacancy');
@@ -697,7 +697,7 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
       <Paper elevation={3} sx={{ p: 4 }}>
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={() => navigate('/vacancies')} disabled={isSubmitting}>
+          <IconButton onClick={() => navigate('/recruiter/vacancies')} disabled={isSubmitting}>
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h4" component="h1" fontWeight={600}>

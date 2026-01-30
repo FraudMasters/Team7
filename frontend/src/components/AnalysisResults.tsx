@@ -74,7 +74,7 @@ interface SkillMatch {
  * Analysis result data structure
  */
 interface AnalysisResult {
-  resume_id: string;
+  id: string;
   filename: string;
   status: string;
   raw_text: string;
@@ -127,7 +127,7 @@ interface AnalysisResultsProps {
  */
 const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   resumeId,
-  apiUrl = 'http://localhost:8000/api/resumes',
+  apiUrl = '/api/resumes',
 }) => {
   const { t } = useTranslation();
   const { language } = useLanguageContext();
@@ -403,7 +403,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               <Button
                 variant="contained"
                 size="large"
-                href={`/compare/${data.resume_id}/${best_match.vacancy_id}`}
+                href={`/compare/${resumeId}/${best_match.vacancy_id}`}
                 sx={{ minWidth: 180 }}
               >
                 View Details
