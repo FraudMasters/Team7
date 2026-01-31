@@ -66,6 +66,29 @@ class ModelPerformanceSummary(BaseModel):
     best_f1_score: Optional[float] = Field(None, description="Best F1 score achieved")
 
 
+class PerformanceHistoryDataPoint(BaseModel):
+    """Single data point in performance history timeline."""
+
+    date: str = Field(..., description="Date of the measurement (ISO 8601 format)")
+    version: str = Field(..., description="Model version at the time of measurement")
+    accuracy: Optional[float] = Field(None, description="Accuracy metric (0-1)")
+    precision: Optional[float] = Field(None, description="Precision metric (0-1)")
+    recall: Optional[float] = Field(None, description="Recall metric (0-1)")
+    f1_score: Optional[float] = Field(None, description="F1 score metric (0-1)")
+    auc_score: Optional[float] = Field(None, description="AUC-ROC score (0-1)")
+    sample_size: Optional[int] = Field(None, description="Number of samples evaluated")
+
+
+class PerformanceHistoryResponse(BaseModel):
+    """Response model for performance history timeline."""
+
+    model_name: str = Field(..., description="Name of the model")
+    period_days: int = Field(..., description="Number of days covered by the history")
+    dataset_type: str = Field(..., description="Dataset type for the history data")
+    history: List[PerformanceHistoryDataPoint] = Field(..., description="Timeline of performance data points")
+    total_entries: int = Field(..., description="Total number of history entries")
+
+
 @router.get(
     "/metrics",
     response_model=PerformanceMetricsListResponse,
@@ -337,4 +360,119 @@ async def get_performance_trends(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to analyze performance trends: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/history",
+    response_model=PerformanceHistoryResponse,
+    tags=["Performance Monitoring"],
+)
+async def get_performance_history(
+    model_name: str = Query(..., description="Model name to retrieve history for"),
+    days: int = Query(30, ge=1, le=365, description="Number of days of history to retrieve (default: 30, max: 365)"),
+    dataset_type: Optional[str] = Query("production", description="Dataset type filter (default: production)"),
+) -> JSONResponse:
+    """
+    Get performance history timeline for a model.
+
+    This endpoint retrieves a chronological timeline of performance metrics for a specific model
+    over a specified time period. Useful for visualizing model performance trends and identifying
+    patterns or degradation over time.
+
+    Args:
+        model_name: Name of the model to retrieve history for
+        days: Number of days of history to retrieve (default: 30, max: 365)
+        dataset_type: Optional filter for dataset type (default: production)
+
+    Returns:
+        JSON response with performance history timeline
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/performance/history?model_name=ranking&days=30"
+        ... )
+        >>> response.json()
+        {
+            "model_name": "ranking",
+            "period_days": 30,
+            "dataset_type": "production",
+            "history": [
+                {
+                    "date": "2024-01-01T00:00:00Z",
+                    "version": "v2.1.0",
+                    "accuracy": 0.85,
+                    "precision": 0.87,
+                    "recall": 0.83,
+                    "f1_score": 0.85,
+                    "auc_score": 0.92,
+                    "sample_size": 1000
+                },
+                {
+                    "date": "2024-01-02T00:00:00Z",
+                    "version": "v2.1.0",
+                    "accuracy": 0.86,
+                    "precision": 0.88,
+                    "recall": 0.84,
+                    "f1_score": 0.86,
+                    "auc_score": 0.93,
+                    "sample_size": 1050
+                }
+            ],
+            "total_entries": 30
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching performance history - model_name: {model_name}, "
+            f"days: {days}, dataset_type: {dataset_type}"
+        )
+
+        # Validate model name
+        if not model_name or len(model_name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Model name cannot be empty",
+            )
+
+        # Calculate the date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+
+        logger.info(
+            f"History date range: {start_date.isoformat()} to {end_date.isoformat()}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        response_data = {
+            "model_name": model_name,
+            "period_days": days,
+            "dataset_type": dataset_type,
+            "history": [],
+            "total_entries": 0,
+        }
+
+        logger.info(
+            f"Retrieved {response_data['total_entries']} history entries "
+            f"for model {model_name} over {days} days"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching performance history: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch performance history: {str(e)}",
         ) from e
