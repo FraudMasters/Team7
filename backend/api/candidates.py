@@ -24,6 +24,9 @@ from models.resume import Resume
 from models.hiring_stage import HiringStage, HiringStageName
 from models.workflow_stage_config import WorkflowStageConfig
 from models.analytics_event import AnalyticsEvent, AnalyticsEventType
+from models.candidate_tag import CandidateTag
+from models.candidate_note import CandidateNote
+from models.candidate_activity import CandidateActivity, CandidateActivityType
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,21 @@ router = APIRouter()
 
 
 # Response Models
+class TagInfo(BaseModel):
+    """Information about a tag assigned to a candidate."""
+
+    id: str = Field(..., description="Tag ID")
+    tag_name: str = Field(..., description="Tag name")
+    color: Optional[str] = Field(None, description="Tag color code")
+
+
+class LatestActivityInfo(BaseModel):
+    """Information about the latest activity for a candidate."""
+
+    activity_type: str = Field(..., description="Type of activity")
+    created_at: str = Field(..., description="When the activity occurred")
+
+
 class CandidateListItem(BaseModel):
     """Response model for a candidate in list view."""
 
@@ -42,6 +60,9 @@ class CandidateListItem(BaseModel):
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
     notes: Optional[str] = Field(None, description="Stage notes")
+    tags: List[TagInfo] = Field(default_factory=list, description="Tags assigned to this candidate")
+    notes_count: int = Field(0, description="Number of notes for this candidate")
+    latest_activity: Optional[LatestActivityInfo] = Field(None, description="Latest activity for this candidate")
 
 
 class MoveCandidateRequest(BaseModel):
@@ -199,6 +220,100 @@ async def list_candidates(
         result = await db.execute(query)
         rows = result.all()
 
+        # Collect all resume IDs for bulk queries
+        resume_ids = [str(row[0].id) for row in rows]
+
+        # Bulk fetch: tags assigned to each resume
+        tags_by_resume = {}
+        if resume_ids:
+            # Get all TAG_ADDED and TAG_REMOVED activities for these resumes
+            all_tag_activities_result = await db.execute(
+                select(CandidateActivity, CandidateTag)
+                .outerjoin(
+                    CandidateTag,
+                    CandidateActivity.tag_id == CandidateTag.id
+                )
+                .where(
+                    CandidateActivity.candidate_id.in_(resume_ids),
+                    CandidateActivity.activity_type.in_([
+                        CandidateActivityType.TAG_ADDED,
+                        CandidateActivityType.TAG_REMOVED
+                    ]),
+                )
+                .order_by(CandidateActivity.candidate_id, CandidateActivity.created_at)
+            )
+            all_tag_activity_rows = all_tag_activities_result.all()
+
+            # Build a map of (resume_id, tag_id) -> latest activity timestamp
+            tag_activity_map = {}  # (resume_id, tag_id) -> [(activity_type, timestamp)]
+            for activity, tag in all_tag_activity_rows:
+                if tag:
+                    key = (str(activity.candidate_id), str(tag.id))
+                    if key not in tag_activity_map:
+                        tag_activity_map[key] = []
+                    tag_activity_map[key].append({
+                        "activity_type": activity.activity_type,
+                        "timestamp": activity.created_at,
+                        "tag_name": tag.tag_name,
+                        "tag_color": tag.color,
+                        "tag_id": str(tag.id),
+                    })
+
+            # For each (resume, tag) pair, check if the latest activity is TAG_ADDED
+            for (resume_id, tag_id), activities in tag_activity_map.items():
+                latest = max(activities, key=lambda x: x["timestamp"])
+                if latest["activity_type"] == CandidateActivityType.TAG_ADDED:
+                    if resume_id not in tags_by_resume:
+                        tags_by_resume[resume_id] = []
+                    tags_by_resume[resume_id].append({
+                        "id": tag_id,
+                        "tag_name": latest["tag_name"],
+                        "color": latest["tag_color"],
+                    })
+
+        # Bulk fetch: notes count for each resume
+        notes_count_by_resume = {}
+        if resume_ids:
+            notes_count_result = await db.execute(
+                select(CandidateNote.resume_id, func.count(CandidateNote.id))
+                .where(CandidateNote.resume_id.in_(resume_ids))
+                .group_by(CandidateNote.resume_id)
+            )
+            for resume_id, count in notes_count_result.all():
+                notes_count_by_resume[str(resume_id)] = count
+
+        # Bulk fetch: latest activity for each resume
+        latest_activity_by_resume = {}
+        if resume_ids:
+            # Use a subquery to get the max created_at for each resume
+            latest_activity_subq = (
+                select(
+                    CandidateActivity.candidate_id,
+                    func.max(CandidateActivity.created_at).label("max_created_at")
+                )
+                .where(CandidateActivity.candidate_id.in_(resume_ids))
+                .group_by(CandidateActivity.candidate_id)
+                .subquery()
+            )
+
+            # Get the latest activity for each resume
+            latest_activity_result = await db.execute(
+                select(CandidateActivity)
+                .join(
+                    latest_activity_subq,
+                    and_(
+                        CandidateActivity.candidate_id == latest_activity_subq.c.candidate_id,
+                        CandidateActivity.created_at == latest_activity_subq.c.max_created_at
+                    )
+                )
+            )
+            latest_activities = latest_activity_result.scalars().all()
+            for activity in latest_activities:
+                latest_activity_by_resume[str(activity.candidate_id)] = {
+                    "activity_type": activity.activity_type.value,
+                    "created_at": activity.created_at.isoformat(),
+                }
+
         # Convert to response format
         candidates_list = []
         for row in rows:
@@ -206,6 +321,7 @@ async def list_candidates(
             hiring_stage = row[1]
             custom_stage_name = row[2]
             display_name = row[3]
+            resume_id_str = str(resume.id)
 
             # Determine display stage name
             if display_name:
@@ -217,8 +333,17 @@ async def list_candidates(
             else:
                 stage_display = HiringStageName.APPLIED.value
 
+            # Get tags for this resume
+            tags = tags_by_resume.get(resume_id_str, [])
+
+            # Get notes count
+            notes_count = notes_count_by_resume.get(resume_id_str, 0)
+
+            # Get latest activity
+            latest_activity = latest_activity_by_resume.get(resume_id_str)
+
             candidates_list.append({
-                "id": str(resume.id),
+                "id": resume_id_str,
                 "filename": resume.filename,
                 "current_stage": hiring_stage.stage_name if hiring_stage else HiringStageName.APPLIED.value,
                 "stage_name": stage_display,
@@ -226,6 +351,9 @@ async def list_candidates(
                 "created_at": resume.created_at.isoformat() if resume.created_at else None,
                 "updated_at": hiring_stage.updated_at.isoformat() if hiring_stage and hiring_stage.updated_at else resume.created_at.isoformat() if resume.created_at else None,
                 "notes": hiring_stage.notes if hiring_stage else None,
+                "tags": tags,
+                "notes_count": notes_count,
+                "latest_activity": latest_activity,
             })
 
         logger.info(f"Retrieved {len(candidates_list)} candidates")
@@ -318,6 +446,74 @@ async def get_candidate(
         else:
             stage_display = HiringStageName.APPLIED.value
 
+        # Fetch tags for this resume
+        tags = []
+        # Get all TAG_ADDED and TAG_REMOVED activities for this resume
+        all_tag_activities_result = await db.execute(
+            select(CandidateActivity, CandidateTag)
+            .outerjoin(
+                CandidateTag,
+                CandidateActivity.tag_id == CandidateTag.id
+            )
+            .where(
+                CandidateActivity.candidate_id == candidate_uuid,
+                CandidateActivity.activity_type.in_([
+                    CandidateActivityType.TAG_ADDED,
+                    CandidateActivityType.TAG_REMOVED
+                ]),
+            )
+            .order_by(CandidateActivity.created_at)
+        )
+        all_tag_activity_rows = all_tag_activities_result.all()
+
+        # Build a map of tag_id -> [(activity_type, timestamp)]
+        tag_activity_map = {}  # tag_id -> [(activity_type, timestamp, tag_name, tag_color)]
+        for activity, tag in all_tag_activity_rows:
+            if tag:
+                tag_id_str = str(tag.id)
+                if tag_id_str not in tag_activity_map:
+                    tag_activity_map[tag_id_str] = []
+                tag_activity_map[tag_id_str].append({
+                    "activity_type": activity.activity_type,
+                    "timestamp": activity.created_at,
+                    "tag_name": tag.tag_name,
+                    "tag_color": tag.color,
+                })
+
+        # For each tag, check if the latest activity is TAG_ADDED
+        for tag_id, activities in tag_activity_map.items():
+            latest = max(activities, key=lambda x: x["timestamp"])
+            if latest["activity_type"] == CandidateActivityType.TAG_ADDED:
+                tags.append({
+                    "id": tag_id,
+                    "tag_name": latest["tag_name"],
+                    "color": latest["tag_color"],
+                })
+
+        # Count notes for this resume
+        notes_count_result = await db.execute(
+            select(func.count(CandidateNote.id)).where(
+                CandidateNote.resume_id == candidate_uuid
+            )
+        )
+        notes_count = notes_count_result.scalar() or 0
+
+        # Get latest activity for this resume
+        latest_activity_result = await db.execute(
+            select(CandidateActivity)
+            .where(CandidateActivity.candidate_id == candidate_uuid)
+            .order_by(CandidateActivity.created_at.desc())
+            .limit(1)
+        )
+        latest_activity_rec = latest_activity_result.scalar_one_or_none()
+
+        latest_activity = None
+        if latest_activity_rec:
+            latest_activity = {
+                "activity_type": latest_activity_rec.activity_type.value,
+                "created_at": latest_activity_rec.created_at.isoformat(),
+            }
+
         candidate_data = {
             "id": str(resume.id),
             "filename": resume.filename,
@@ -327,6 +523,9 @@ async def get_candidate(
             "created_at": resume.created_at.isoformat() if resume.created_at else None,
             "updated_at": hiring_stage.updated_at.isoformat() if hiring_stage and hiring_stage.updated_at else resume.created_at.isoformat() if resume.created_at else None,
             "notes": hiring_stage.notes if hiring_stage else None,
+            "tags": tags,
+            "notes_count": notes_count,
+            "latest_activity": latest_activity,
         }
 
         return JSONResponse(
