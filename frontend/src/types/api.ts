@@ -1458,6 +1458,22 @@ export interface WorkflowStageListResponse {
 // ==================== Candidate Tags Types ====================
 
 /**
+ * Candidate tag (base interface for frontend usage)
+ */
+export interface CandidateTag {
+  id: string;
+  organization_id: string;
+  tag_name: string;
+  tag_order: number;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * Candidate tag create request
  */
 export interface CandidateTagCreate {
@@ -1582,6 +1598,19 @@ export interface StageDurationResponse {
 // ==================== Candidate Notes Types ====================
 
 /**
+ * Candidate note (base interface for frontend usage)
+ */
+export interface CandidateNote {
+  id: string;
+  resume_id: string;
+  recruiter_id: string | null;
+  content: string;
+  is_private: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * Candidate note create request
  */
 export interface CandidateNoteCreate {
@@ -1622,6 +1651,24 @@ export interface CandidateNoteListResponse {
 }
 
 // ==================== Candidate Activities Types ====================
+
+/**
+ * Candidate activity (base interface for frontend usage)
+ */
+export interface CandidateActivity {
+  id: string;
+  activity_type: string;
+  candidate_id: string;
+  vacancy_id: string | null;
+  from_stage: string | null;
+  to_stage: string | null;
+  note_id: string | null;
+  tag_id: string | null;
+  recruiter_id: string | null;
+  activity_data: Record<string, unknown> | null;
+  reason: string | null;
+  created_at: string;
+}
 
 /**
  * Single activity item in the timeline
