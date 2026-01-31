@@ -1725,3 +1725,43 @@ export interface ActivityTypesResponse {
   activity_types: string[];
 }
 
+// ==================== Saved Searches Types ====================
+
+/**
+ * Saved search create request
+ */
+export interface SavedSearchCreate {
+  name: string;
+  query: string;
+  filters?: Record<string, unknown>;
+}
+
+/**
+ * Saved search update request
+ */
+export interface SavedSearchUpdate {
+  name?: string;
+  query?: string;
+  filters?: Record<string, unknown>;
+}
+
+/**
+ * Saved search response
+ */
+export interface SavedSearchResponse {
+  id: string;
+  name: string;
+  query: string;
+  filters: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Saved search list response
+ */
+export interface SavedSearchListResponse {
+  total: number;
+  saved_searches: SavedSearchResponse[];
+}
+
