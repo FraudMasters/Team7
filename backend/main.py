@@ -263,6 +263,7 @@ from api import (
     performance_monitoring,
     workflow_stages,
     candidate_tags,
+    candidate_notes,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -292,6 +293,7 @@ app.include_router(ats_simulation.router, prefix="/api/ats", tags=["ATS Simulati
 app.include_router(performance_monitoring.router, prefix="/api/performance", tags=["Performance Monitoring"])
 app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=["Workflow Stages"])
 app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["Candidate Tags"])
+app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 
 
 if __name__ == "__main__":
