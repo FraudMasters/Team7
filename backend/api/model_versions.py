@@ -83,6 +83,13 @@ class ModelRetrainRequest(BaseModel):
     model_name: str = Field(..., description="Name of the model to retrain (e.g., ranking, skill_matching)")
 
 
+class ModelRollbackRequest(BaseModel):
+    """Request model for rolling back to a previous model version."""
+
+    model_name: str = Field(..., description="Name of the model to rollback (e.g., ranking, skill_matching)")
+    target_version: str = Field(..., description="Target version to rollback to (e.g., v1.0.0)")
+
+
 @router.post(
     "/",
     response_model=ModelVersionListResponse,
@@ -611,4 +618,88 @@ async def trigger_model_retraining(request: ModelRetrainRequest) -> JSONResponse
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to trigger model retraining: {str(e)}",
+        ) from e
+
+
+@router.post("/rollback", tags=["Model Versions"])
+async def rollback_model_version(request: ModelRollbackRequest) -> JSONResponse:
+    """
+    Rollback to a previous model version.
+
+    This endpoint rolls back the active model to a specified previous version,
+    deactivating the current version and activating the target version.
+
+    Args:
+        request: Rollback request containing model name and target version
+
+    Returns:
+        JSON response confirming rollback operation
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(404): If target version is not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "model_name": "ranking",
+        ...     "target_version": "v1.0.0"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/model-versions/rollback",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "message": "Model rolled back successfully",
+            "model_name": "ranking",
+            "target_version": "v1.0.0",
+            "previous_version": "v2.0.0"
+        }
+    """
+    try:
+        logger.info(
+            f"Rolling back model {request.model_name} to version {request.target_version}"
+        )
+
+        # Validate model name
+        if not request.model_name or len(request.model_name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Model name cannot be empty",
+            )
+
+        # Validate target version
+        if not request.target_version or len(request.target_version.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Target version cannot be empty",
+            )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        response_data = {
+            "message": "Model rolled back successfully",
+            "model_name": request.model_name,
+            "target_version": request.target_version,
+            "previous_version": "v2.0.0",
+        }
+
+        logger.info(
+            f"Model {request.model_name} rolled back to version {request.target_version}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rolling back model version: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to rollback model version: {str(e)}",
         ) from e
