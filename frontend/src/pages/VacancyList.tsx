@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  CircularProgress,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -29,6 +28,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useBreakpoints } from '../hooks/useBreakpoints';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface Vacancy {
   id: string;
@@ -160,7 +160,7 @@ const VacancyList: React.FC = () => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress size={60} />
+        <LoadingSpinner size={60} />
       </Box>
     );
   }

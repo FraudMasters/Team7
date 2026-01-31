@@ -9,7 +9,6 @@ import {
   CardContent,
   CardActions,
   Chip,
-  CircularProgress,
   TextField,
   InputAdornment,
   IconButton,
@@ -28,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface Resume {
   id: string;
@@ -159,7 +159,7 @@ const ResumeDatabasePage: React.FC = () => {
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: { xs: 2, sm: 4 } }}>
-            <CircularProgress size={isMobile ? 40 : 50} />
+            <LoadingSpinner size={isMobile ? 40 : 50} />
           </Box>
         ) : filteredResumes.length === 0 ? (
           <Paper sx={{ p: { xs: 2, sm: 3, md: 4 }, textAlign: 'center' }}>

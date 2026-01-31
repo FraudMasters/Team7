@@ -10,7 +10,6 @@ import {
   Card,
   CardContent,
   Chip,
-  CircularProgress,
   Slider,
   FormControlLabel,
   Checkbox,
@@ -37,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { RankedCandidate } from '../types/api';
 import ErrorMessage, { ErrorMessageConfig } from '../components/ErrorMessage';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface Resume {
   id: string;
@@ -240,7 +240,7 @@ const CandidateSearchPage: React.FC = () => {
     return (
       <Container maxWidth="lg">
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
+          <LoadingSpinner size={40} />
         </Box>
       </Container>
     );
@@ -378,7 +378,7 @@ const CandidateSearchPage: React.FC = () => {
                   <Button
                     variant="contained"
                     size="large"
-                    startIcon={searching ? <CircularProgress size={20} /> : <SearchIcon />}
+                    startIcon={searching ? <LoadingSpinner size={20} /> : <SearchIcon />}
                     onClick={handleSearch}
                     disabled={searching || !selectedVacancy}
                     fullWidth

@@ -11,7 +11,6 @@ import {
   Stack,
   Paper,
   Chip,
-  CircularProgress,
 } from '@mui/material';
 import {
   Upload as UploadIcon,
@@ -27,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface Stats {
   totalResumes: number;
@@ -177,7 +177,11 @@ const HomePage: React.FC = () => {
             </Typography>
 
             {/* Quick Stats */}
-            {!loading && (
+            {loading ? (
+              <Box sx={{ py: 4 }}>
+                <LoadingSpinner size={40} />
+              </Box>
+            ) : (
               <Stack
                 direction="row"
                 spacing={{ xs: 2, sm: 3 }}
