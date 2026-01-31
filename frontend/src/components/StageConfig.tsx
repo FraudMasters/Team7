@@ -199,7 +199,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
           stage_order: formData.stage_order,
           is_active: formData.is_active,
           color: formData.color,
-          description: formData.description || null,
+          description: formData.description || undefined,
         };
 
         const updated = await workflowStagesClient.updateStage(editingStage.id, updateData);
@@ -212,7 +212,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
           stage_order: formData.stage_order,
           is_active: formData.is_active,
           color: formData.color,
-          description: formData.description || null,
+          description: formData.description || undefined,
         };
 
         const created = await workflowStagesClient.createStage(createData);

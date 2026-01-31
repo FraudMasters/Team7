@@ -175,6 +175,60 @@ services:
       - resume_network
     command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=4 --prefetch-multiplier=2 --queues=celery,analysis,learning,reporting
 
+  # Celery Beat (for scheduled tasks like daily backups)
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: resume_analysis_celery_beat
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MODELS_CACHE_PATH: /app/models_cache
+      PYTHONPATH: /app:/app/services
+      # Logging to Loki
+      LOKI_URL: http://loki:3100
+      # Backup Configuration
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_DIR: /app/data/backups
+      BACKUP_S3_ENABLED: ${BACKUP_S3_ENABLED:-false}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      BACKUP_NOTIFICATION_EMAIL: ${BACKUP_NOTIFICATION_EMAIL:-}
+      # PostgreSQL connection for pg_dump
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-resume_analysis}
+    volumes:
+      - ./backend:/app
+      - ./services:/app/services
+      - backend_backups:/app/data/backups
+      - celerybeat_data:/app/celerybeat
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - resume_network
+    command: celery -A celery_app.celery_app beat --loglevel=info
+
   # Frontend (React + Vite) - Production build with nginx
   frontend:
     build:
@@ -299,6 +353,7 @@ volumes:
   backend_logs:
   backend_backups:
   backend_uploads:
+  celerybeat_data:
   grafana_data:
   loki_data:
   prometheus_data:

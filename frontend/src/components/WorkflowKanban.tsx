@@ -90,7 +90,7 @@ const WorkflowKanban: React.FC = () => {
       // Build candidatesByStage object
       const candidatesMap: Record<string, CandidateListItem[]> = {};
       sortedStages.forEach((stage, index) => {
-        candidatesMap[stage.id] = candidatesResponses[index].data;
+        candidatesMap[stage.id] = candidatesResponses[index]?.data || [];
       });
       setCandidatesByStage(candidatesMap);
     } catch (err) {
@@ -126,10 +126,10 @@ const WorkflowKanban: React.FC = () => {
     const newCandidatesByStage = { ...candidatesByStage };
 
     // Remove from source
-    newCandidatesByStage[sourceStageId] = newCandidatesByStage[sourceStageId].filter(c => c.id !== candidateId);
+    newCandidatesByStage[sourceStageId] = (newCandidatesByStage[sourceStageId] || []).filter(c => c.id !== candidateId);
 
     // Add to destination
-    const destCandidates = [...newCandidatesByStage[destStageId]];
+    const destCandidates = [...(newCandidatesByStage[destStageId] || [])];
     destCandidates.splice(destination.index, 0, candidateToMove);
     newCandidatesByStage[destStageId] = destCandidates;
 
@@ -186,7 +186,7 @@ const WorkflowKanban: React.FC = () => {
     if (stage.color) return stage.color;
     // Default colors based on stage order
     const defaultColors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6B7280'];
-    return defaultColors[stage.stage_order % defaultColors.length];
+    return defaultColors[Math.max(0, stage.stage_order) % defaultColors.length] || '#3B82F6';
   };
 
   const toggleCardExpanded = useCallback((candidateId: string) => {
@@ -314,7 +314,7 @@ const WorkflowKanban: React.FC = () => {
                             sx={{
                               mb: 1,
                               opacity: snapshot.isDragging ? 0.8 : 1,
-                              transform: snapshot.isDragging ? provided.draggableProps.style.transform : undefined,
+                              transform: snapshot.isDragging ? (provided.draggableProps.style?.transform || undefined) : undefined,
                               cursor: 'grab',
                               '&:hover': {
                                 boxShadow: 2,
@@ -428,7 +428,7 @@ const WorkflowKanban: React.FC = () => {
                       </Draggable>
                     ))}
                     {provided.placeholder}
-                    {(!candidatesByStage[stage.id] || candidatesByStage[stage.id].length === 0) && (
+                    {((!candidatesByStage[stage.id] || candidatesByStage[stage.id]!.length === 0)) && (
                       <Box
                         sx={{
                           textAlign: 'center',
