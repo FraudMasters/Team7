@@ -19,6 +19,8 @@ import {
   Divider,
   Tabs,
   Tab,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   DragDropContext,
@@ -53,6 +55,8 @@ import type {
  */
 const WorkflowKanban: React.FC = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
   const [stages, setStages] = useState<WorkflowStageResponse[]>([]);
   const [candidatesByStage, setCandidatesByStage] = useState<Record<string, CandidateListItem[]>>({});
@@ -214,8 +218,8 @@ const WorkflowKanban: React.FC = () => {
   return (
     <Box>
       {/* Kanban Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h5" fontWeight={600}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="h5" fontWeight={600} sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
           {t('workflow.title')}
         </Typography>
         <TextField
@@ -230,26 +234,26 @@ const WorkflowKanban: React.FC = () => {
               </InputAdornment>
             ),
           }}
-          sx={{ minWidth: 250 }}
+          sx={{ minWidth: { xs: 200, sm: 250 } }}
         />
       </Box>
 
       {/* Kanban Board */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 2 }}>
+        <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, overflowX: 'auto', pb: 2, WebkitOverflowScrolling: 'touch' }}>
           {stages.map((stage) => (
             <Box
               key={stage.id}
               sx={{
-                minWidth: 300,
-                maxWidth: 300,
+                minWidth: { xs: 280, sm: 300 },
+                maxWidth: { xs: 280, sm: 300 },
                 flexShrink: 0,
               }}
             >
               {/* Stage Column Header */}
               <Paper
                 sx={{
-                  p: 2,
+                  p: { xs: 1.5, sm: 2 },
                   mb: 1,
                   borderTop: 4,
                   borderTopColor: getStageColor(stage),
@@ -257,7 +261,7 @@ const WorkflowKanban: React.FC = () => {
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="subtitle1" fontWeight={600}>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: { xs: '0.875rem', sm: '1rem' }, pr: 1 }}>
                     {stage.stage_name}
                   </Typography>
                   <Chip
@@ -267,11 +271,13 @@ const WorkflowKanban: React.FC = () => {
                       backgroundColor: getStageColor(stage),
                       color: 'white',
                       fontWeight: 600,
+                      fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                      height: { xs: 20, sm: 24 },
                     }}
                   />
                 </Box>
                 {stage.description && (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                     {stage.description}
                   </Typography>
                 )}
@@ -285,8 +291,8 @@ const WorkflowKanban: React.FC = () => {
                     {...provided.droppableProps}
                     sx={{
                       p: 1,
-                      minHeight: 400,
-                      maxHeight: 'calc(100vh - 300px)',
+                      minHeight: { xs: 300, sm: 400 },
+                      maxHeight: { xs: 'calc(100vh - 280px)', sm: 'calc(100vh - 300px)' },
                       overflowY: 'auto',
                       backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'background.paper',
                       border: '1px solid',
@@ -316,6 +322,7 @@ const WorkflowKanban: React.FC = () => {
                               opacity: snapshot.isDragging ? 0.8 : 1,
                               transform: snapshot.isDragging ? (provided.draggableProps.style?.transform || undefined) : undefined,
                               cursor: 'grab',
+                              touchAction: 'none',
                               '&:hover': {
                                 boxShadow: 2,
                               },
@@ -325,22 +332,23 @@ const WorkflowKanban: React.FC = () => {
                               }),
                             }}
                           >
-                            <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                            <CardContent sx={{ p: { xs: 1, sm: 1.5 }, '&:last-child': { pb: { xs: 1, sm: 1.5 } } }}>
                               <Box
                                 sx={{
                                   display: 'flex',
                                   justifyContent: 'space-between',
                                   alignItems: 'flex-start',
                                   cursor: 'pointer',
+                                  gap: 0.5,
                                 }}
                                 onClick={() => toggleCardExpanded(candidate.id)}
                               >
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography variant="body2" fontWeight={500} noWrap>
+                                  <Typography variant="body2" fontWeight={500} noWrap sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                     {candidate.filename}
                                   </Typography>
                                   {candidate.notes && (
-                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }} noWrap>
+                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontSize: { xs: '0.65rem', sm: '0.75rem' } }} noWrap>
                                       {candidate.notes}
                                     </Typography>
                                   )}
@@ -354,11 +362,11 @@ const WorkflowKanban: React.FC = () => {
                                       e.stopPropagation();
                                       handleOpenCandidateDetail(candidate);
                                     }}
-                                    sx={{ height: 20, fontSize: '0.65rem' }}
+                                    sx={{ height: { xs: 18, sm: 20 }, fontSize: { xs: '0.6rem', sm: '0.65rem' } }}
                                   />
                                   <ExpandMoreIcon
                                     sx={{
-                                      fontSize: 18,
+                                      fontSize: { xs: 16, sm: 18 },
                                       color: 'text.secondary',
                                       transform: expandedCards[candidate.id] ? 'rotate(180deg)' : 'rotate(0deg)',
                                       transition: 'transform 0.2s',
@@ -371,7 +379,7 @@ const WorkflowKanban: React.FC = () => {
                                 <Chip
                                   label="Linked to vacancy"
                                   size="small"
-                                  sx={{ mt: 1, height: 20, fontSize: '0.65rem' }}
+                                  sx={{ mt: 1, height: { xs: 18, sm: 20 }, fontSize: { xs: '0.6rem', sm: '0.65rem' } }}
                                 />
                               )}
 
@@ -386,8 +394,8 @@ const WorkflowKanban: React.FC = () => {
                                       sx={{
                                         backgroundColor: tag.color || '#6B7280',
                                         color: 'white',
-                                        height: 20,
-                                        fontSize: '0.65rem',
+                                        height: { xs: 18, sm: 20 },
+                                        fontSize: { xs: '0.6rem', sm: '0.65rem' },
                                       }}
                                     />
                                   ))}
@@ -395,7 +403,7 @@ const WorkflowKanban: React.FC = () => {
                                     <Chip
                                       label={`+${candidate.tags.length - 2}`}
                                       size="small"
-                                      sx={{ height: 20, fontSize: '0.65rem' }}
+                                      sx={{ height: { xs: 18, sm: 20 }, fontSize: { xs: '0.6rem', sm: '0.65rem' } }}
                                     />
                                   )}
                                 </Box>
@@ -455,21 +463,25 @@ const WorkflowKanban: React.FC = () => {
         onClose={handleCloseDetailModal}
         maxWidth="lg"
         fullWidth
+        fullScreen={isMobile}
         PaperProps={{
-          sx: { height: '80vh', maxHeight: '80vh' },
+          sx: {
+            height: { xs: '100vh', sm: '80vh' },
+            maxHeight: { xs: '100vh', sm: '80vh' },
+          },
         }}
       >
         {selectedCandidate && (
           <>
             {/* Modal Header */}
             <DialogTitle sx={{ pb: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h6" fontWeight={600}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                     {selectedCandidate.filename}
                   </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                    <Typography variant="body2" color="text.secondary">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
                       Stage: {selectedCandidate.stage_name}
                     </Typography>
                     {selectedCandidate.vacancy_id && (
@@ -478,7 +490,7 @@ const WorkflowKanban: React.FC = () => {
                         size="small"
                         color="primary"
                         variant="outlined"
-                        sx={{ height: 20, fontSize: '0.65rem' }}
+                        sx={{ height: { xs: 18, sm: 20 }, fontSize: { xs: '0.6rem', sm: '0.65rem' } }}
                       />
                     )}
                   </Box>
@@ -487,6 +499,7 @@ const WorkflowKanban: React.FC = () => {
                   startIcon={<CloseIcon />}
                   onClick={handleCloseDetailModal}
                   color="inherit"
+                  size={isMobile ? 'small' : 'medium'}
                 >
                   Close
                 </Button>
@@ -512,9 +525,9 @@ const WorkflowKanban: React.FC = () => {
             </Box>
 
             {/* Modal Content */}
-            <DialogContent sx={{ p: 0, height: 'calc(80vh - 180px)', overflow: 'auto' }}>
+            <DialogContent sx={{ p: 0, height: { xs: 'calc(100vh - 220px)', sm: 'calc(80vh - 180px)' }, overflow: 'auto' }}>
               {modalTabValue === 0 && (
-                <Box sx={{ p: 3 }}>
+                <Box sx={{ p: { xs: 2, sm: 3 } }}>
                   <CandidateNotes
                     resumeId={selectedCandidate.id}
                     onNotesChange={() => {
@@ -526,7 +539,7 @@ const WorkflowKanban: React.FC = () => {
               )}
 
               {modalTabValue === 1 && (
-                <Box sx={{ p: 3 }}>
+                <Box sx={{ p: { xs: 2, sm: 3 } }}>
                   <CandidateActivityTimeline
                     resumeId={selectedCandidate.id}
                     vacancyId={selectedCandidate.vacancy_id || undefined}

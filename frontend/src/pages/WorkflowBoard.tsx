@@ -14,6 +14,8 @@ import {
   Alert,
   Collapse,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   ViewKanban as ViewKanbanIcon,
@@ -89,6 +91,8 @@ interface BulkMoveResult {
  */
 const WorkflowBoardPage: React.FC = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [selectedVacancy, setSelectedVacancy] = useState<string>('');
   const [allStages, setAllStages] = useState<WorkflowStageResponse[]>([]);
@@ -296,58 +300,76 @@ const WorkflowBoardPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+      <Box sx={{ mb: { xs: 2, sm: 3, md: 4 } }}>
+        <Typography
+          variant="h4"
+          component="h1"
+          gutterBottom
+          fontWeight={600}
+          sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.25rem' } }}
+        >
           {t('workflow.board.title')}
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
           {t('workflow.board.subtitle')}
         </Typography>
       </Box>
 
       {/* Statistics Summary */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
+      <Grid container spacing={2} sx={{ mb: { xs: 2, sm: 3, md: 4 } }}>
+        <Grid item xs={6} sm={4} md={3}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <PersonIcon sx={{ mr: 1, color: 'primary.main' }} />
-                <Typography variant="h6">{t('workflow.board.stats.totalCandidates')}</Typography>
+                <PersonIcon sx={{ mr: 1, color: 'primary.main', fontSize: { xs: 20, sm: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '0.875rem', sm: '1rem', md: '1.25rem' } }}>
+                  {t('workflow.board.stats.totalCandidates')}
+                </Typography>
               </Box>
-              <Typography variant="h4" color="primary">{totalCandidates}</Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="h4" color="primary" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
+                {totalCandidates}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                 {t('workflow.board.stats.allStages')}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
+        <Grid item xs={6} sm={4} md={3}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ViewKanbanIcon sx={{ mr: 1, color: 'success.main' }} />
-                <Typography variant="h6">{t('workflow.board.stats.activeStages')}</Typography>
+                <ViewKanbanIcon sx={{ mr: 1, color: 'success.main', fontSize: { xs: 20, sm: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '0.875rem', sm: '1rem', md: '1.25rem' } }}>
+                  {t('workflow.board.stats.activeStages')}
+                </Typography>
               </Box>
-              <Typography variant="h4" color="success.main">{allStages.length}</Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="h4" color="success.main" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
+                {allStages.length}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                 {t('workflow.board.stats.configuredStages')}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
+        <Grid item xs={12} sm={4} md={3}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <WorkIcon sx={{ mr: 1, color: 'info.main' }} />
-                <Typography variant="h6">{t('workflow.board.stats.openVacancies')}</Typography>
+                <WorkIcon sx={{ mr: 1, color: 'info.main', fontSize: { xs: 20, sm: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '0.875rem', sm: '1rem', md: '1.25rem' } }}>
+                  {t('workflow.board.stats.openVacancies')}
+                </Typography>
               </Box>
-              <Typography variant="h4" color="info.main">{vacancies.length}</Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="h4" color="info.main" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
+                {vacancies.length}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                 {t('workflow.board.stats.activeVacancies')}
               </Typography>
             </CardContent>
@@ -356,9 +378,9 @@ const WorkflowBoardPage: React.FC = () => {
       </Grid>
 
       {/* Filters */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={6}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3, md: 4 } }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={6} md={6}>
             <TextField
               fullWidth
               select
@@ -367,6 +389,7 @@ const WorkflowBoardPage: React.FC = () => {
               onChange={(e) => setSelectedVacancy(e.target.value)}
               SelectProps={{ native: true }}
               helperText={t('workflow.board.vacancyHelper')}
+              size={isMobile ? 'small' : 'medium'}
             >
               <option value="">{t('workflow.board.allVacancies')}</option>
               {vacancies.map((v) => (
@@ -376,14 +399,15 @@ const WorkflowBoardPage: React.FC = () => {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Grid item xs={12} sm={6} md={6}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
                 variant="outlined"
                 startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
                 onClick={handleRefresh}
                 disabled={refreshing}
-                sx={{ minWidth: 120 }}
+                size={isMobile ? 'small' : 'medium'}
+                sx={{ minWidth: { xs: 100, sm: 120 } }}
               >
                 {refreshing ? t('workflow.board.refreshing') : t('workflow.board.refresh')}
               </Button>
@@ -392,7 +416,8 @@ const WorkflowBoardPage: React.FC = () => {
                 startIcon={bulkMode ? <CheckCircleIcon /> : <RadioButtonUncheckedIcon />}
                 onClick={handleToggleBulkMode}
                 color={bulkMode ? 'primary' : 'secondary'}
-                sx={{ minWidth: 120 }}
+                size={isMobile ? 'small' : 'medium'}
+                sx={{ minWidth: { xs: 100, sm: 120 } }}
               >
                 {bulkMode ? t('bulkActions.exitBulkMode') : t('bulkActions.enterBulkMode')}
               </Button>
@@ -403,6 +428,7 @@ const WorkflowBoardPage: React.FC = () => {
                   onDelete={() => setSelectedVacancy('')}
                   color="primary"
                   variant="outlined"
+                  size={isMobile ? 'small' : 'medium'}
                 />
               )}
             </Box>
@@ -412,20 +438,20 @@ const WorkflowBoardPage: React.FC = () => {
 
       {/* Bulk Move Success Alert */}
       <Collapse in={!!bulkMoveSuccess}>
-        <Alert severity="success" sx={{ mb: 4 }} onClose={() => setBulkMoveSuccess(null)}>
+        <Alert severity="success" sx={{ mb: { xs: 2, sm: 3, md: 4 } }} onClose={() => setBulkMoveSuccess(null)}>
           <Typography variant="body2">{bulkMoveSuccess}</Typography>
         </Alert>
       </Collapse>
 
       {/* Stage Statistics */}
       {stageStats.length > 0 && (
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3, md: 4 } }}>
+          <Typography variant="h6" gutterBottom sx={{ mb: 2, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
             {t('workflow.board.stageStats')}
           </Typography>
-          <Grid container spacing={2}>
+          <Grid container spacing={1}>
             {stageStats.map((stat) => (
-              <Grid item xs={6} sm={4} md={3} lg={2} key={stat.stageId}>
+              <Grid item xs={4} sm={3} md={2} lg={2} key={stat.stageId}>
                 <Card
                   sx={{
                     textAlign: 'center',
@@ -434,11 +460,11 @@ const WorkflowBoardPage: React.FC = () => {
                     borderColor: stat.candidateCount > 0 ? 'primary.main' : 'grey.300',
                   }}
                 >
-                  <CardContent sx={{ py: 1.5 }}>
-                    <Typography variant="h4" color="primary" fontWeight={700}>
+                  <CardContent sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 0.5, sm: 1 } }}>
+                    <Typography variant="h5" color="primary" fontWeight={700} sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' } }}>
                       {stat.candidateCount}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap>
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                       {stat.stageName}
                     </Typography>
                   </CardContent>
@@ -451,14 +477,16 @@ const WorkflowBoardPage: React.FC = () => {
 
       {/* Stage Metrics */}
       {!loadingMetrics && stageMetrics.length > 0 && (
-        <Paper sx={{ p: 3, mb: 4 }}>
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3, md: 4 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">{t('workflow.board.stageMetrics')}</Typography>
+            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+              {t('workflow.board.stageMetrics')}
+            </Typography>
             <Tooltip title={t('workflow.board.metricsTooltip')}>
-              <ScheduleIcon color="action" sx={{ fontSize: 20 }} />
+              <ScheduleIcon color="action" sx={{ fontSize: { xs: 18, sm: 20 } }} />
             </Tooltip>
           </Box>
-          <Grid container spacing={2}>
+          <Grid container spacing={{ xs: 1, sm: 2 }}>
             {stageMetrics.map((metric) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={metric.stage_name}>
                 <Card
@@ -473,25 +501,25 @@ const WorkflowBoardPage: React.FC = () => {
                     transition: 'all 0.2s ease-in-out',
                   }}
                 >
-                  <CardContent>
+                  <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                     {/* Stage Name */}
-                    <Typography variant="subtitle2" color="primary" fontWeight={600} gutterBottom>
+                    <Typography variant="subtitle2" color="primary" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       {metric.display_name || metric.stage_name}
                     </Typography>
 
                     {/* Time in Stage */}
-                    <Box sx={{ mb: 1.5 }}>
+                    <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                        <ScheduleIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                        <Typography variant="caption" color="text.secondary">
+                        <ScheduleIcon sx={{ fontSize: { xs: 14, sm: 16 }, mr: 0.5, color: 'text.secondary' }} />
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                           {t('workflow.board.timeInStage')}
                         </Typography>
                       </Box>
                       <Box sx={{ ml: 2 }}>
-                        <Typography variant="body2" fontWeight={500}>
+                        <Typography variant="body2" fontWeight={500} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                           {metric.time_metrics.average_days.toFixed(1)} {t('workflow.board.daysAvg')}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           {t('workflow.board.median')}: {metric.time_metrics.median_days.toFixed(1)} {t('workflow.board.days')} •
                           {t('workflow.board.range')}: {metric.time_metrics.min_days.toFixed(1)}-{metric.time_metrics.max_days.toFixed(1)}
                         </Typography>
@@ -501,8 +529,8 @@ const WorkflowBoardPage: React.FC = () => {
                     {/* Drop-off Rate */}
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                        <TrendingDownIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                        <Typography variant="caption" color="text.secondary">
+                        <TrendingDownIcon sx={{ fontSize: { xs: 14, sm: 16 }, mr: 0.5, color: 'text.secondary' }} />
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
                           {t('workflow.board.dropoffRate')}
                         </Typography>
                       </Box>
@@ -511,10 +539,11 @@ const WorkflowBoardPage: React.FC = () => {
                           variant="body2"
                           fontWeight={500}
                           color={metric.dropoff_metrics.dropoff_rate > 0.3 ? 'error.main' : 'success.main'}
+                          sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                         >
                           {(metric.dropoff_metrics.dropoff_rate * 100).toFixed(1)}%
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           {metric.dropoff_metrics.candidates_exited} / {metric.dropoff_metrics.candidates_entered} {t('workflow.board.exited')}
                         </Typography>
                       </Box>
@@ -529,7 +558,7 @@ const WorkflowBoardPage: React.FC = () => {
 
       {/* Bulk Actions Panel */}
       {bulkMode && (
-        <Paper sx={{ p: 3, mb: 4 }}>
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3, md: 4 } }}>
           {loadingBulkCandidates ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
               <CircularProgress />
@@ -555,13 +584,13 @@ const WorkflowBoardPage: React.FC = () => {
       )}
 
       {/* Kanban Board */}
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
         <WorkflowKanban />
       </Paper>
 
       {/* Info Box */}
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="body2" color="text.secondary">
+      <Box sx={{ mt: { xs: 2, sm: 3, md: 4 } }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
           <strong>💡 {t('workflow.board.tip')}</strong>
         </Typography>
       </Box>
