@@ -11,6 +11,7 @@ export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
 export { candidateNotesClient, CandidateNotesClient } from './candidateNotes';
 export { candidateActivitiesClient, CandidateActivitiesClient } from './candidateActivities';
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
+export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -67,4 +68,6 @@ export type {
   SavedSearchUpdate,
   SavedSearchResponse,
   SavedSearchListResponse,
+  SearchHistoryItem,
+  SearchHistoryResponse,
 } from '@/types/api';

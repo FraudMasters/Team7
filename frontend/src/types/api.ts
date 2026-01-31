@@ -1765,3 +1765,28 @@ export interface SavedSearchListResponse {
   saved_searches: SavedSearchResponse[];
 }
 
+// ==================== Search History Types ====================
+
+/**
+ * Search history item
+ */
+export interface SearchHistoryItem {
+  id: string;
+  query: string | null;
+  filters: Record<string, unknown>;
+  results_count: number | null;
+  execution_time_seconds: number | null;
+  created_at: string;
+  recruiter_id: string | null;
+}
+
+/**
+ * Search history response
+ */
+export interface SearchHistoryResponse {
+  total: number;
+  history: SearchHistoryItem[];
+  skip: number;
+  limit: number;
+}
+
