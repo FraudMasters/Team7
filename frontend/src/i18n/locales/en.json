@@ -819,7 +819,31 @@
     "selectStageTip": "Select a target stage to enable the bulk move operation.",
     "enterBulkMode": "Bulk Mode",
     "exitBulkMode": "Exit Bulk Mode",
-    "loadingCandidates": "Loading candidates for bulk operations..."
+    "loadingCandidates": "Loading candidates for bulk operations...",
+    "export": "Export",
+    "addTag": "Add Tag",
+    "exportPartialSuccess": "Exported {{success}} candidates successfully. {{failed}} failed.",
+    "exportError": "Failed to export candidates",
+    "exportSuccess": "Successfully exported {{count}} candidate{{plural}}.",
+    "tagPartialSuccess": "Tagged {{success}} candidates successfully. {{failed}} failed.",
+    "tagError": "Failed to tag candidates",
+    "tagSuccess": "Successfully tagged {{count}} candidate{{plural}}.",
+    "exportDialog": {
+      "title": "Export Candidates",
+      "description": "Export {{count}} selected candidate{{plural}} to a file.",
+      "format": "Export Format",
+      "export": "Export",
+      "exporting": "Exporting..."
+    },
+    "tagDialog": {
+      "title": "Add Tag to Candidates",
+      "description": "Add a tag to {{count}} selected candidate{{plural}}.",
+      "tagName": "Tag Name",
+      "tagNamePlaceholder": "e.g., High Priority",
+      "tagColor": "Tag Color",
+      "tag": "Add Tag",
+      "tagging": "Adding Tag..."
+    }
   },
   "workflow": {
     "loading": "Loading workflow board...",

@@ -19,6 +19,11 @@ import {
   Card,
   CardContent,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import {
@@ -26,6 +31,8 @@ import {
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
   ArrowForward as ArrowForwardIcon,
   Warning as WarningIcon,
+  Download as DownloadIcon,
+  Label as LabelIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '@/api/client';
@@ -53,6 +60,32 @@ interface BulkMoveResult {
   success: boolean;
   error?: string;
   new_stage?: string;
+}
+
+/**
+ * Bulk action result interface
+ */
+interface BulkActionResult {
+  resume_id: string;
+  success: boolean;
+  message: string;
+  data: any;
+}
+
+/**
+ * Bulk action response interface
+ */
+interface BulkActionResponse {
+  action: string;
+  total_requested: number;
+  successful: number;
+  failed: number;
+  results: BulkActionResult[];
+  export_data?: {
+    format: string;
+    data: any;
+    count: number;
+  };
 }
 
 /**
@@ -110,6 +143,18 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
   const [isMoving, setIsMoving] = useState(false);
   const [moveResults, setMoveResults] = useState<BulkMoveResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Export and tag states
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
+  const [exportSuccess, setExportSuccess] = useState(false);
+
+  const [isTagging, setIsTagging] = useState(false);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [tagName, setTagName] = useState('');
+  const [tagColor, setTagColor] = useState('#1976d2');
+  const [tagResults, setTagResults] = useState<BulkActionResult[] | null>(null);
 
   /**
    * Handle selection change
@@ -223,8 +268,127 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
     }
   }, [selectedIds, selectedStageId, vacancyId, isMoving, onBulkMoveComplete, handleSelectionChange, t]);
 
+  /**
+   * Execute bulk export operation
+   */
+  const handleBulkExport = useCallback(async () => {
+    if (selectedIds.length === 0 || isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+    setExportSuccess(false);
+    setTagResults(null);
+
+    try {
+      const response = await apiClient.post<BulkActionResponse>('/api/candidates/bulk-action', {
+        action: 'export',
+        resume_ids: selectedIds,
+        export_format: exportFormat,
+      });
+
+      const data = response.data;
+
+      if (data.export_data) {
+        // Download the file
+        const blob = new Blob(
+          [
+            exportFormat === 'csv'
+              ? data.export_data.data
+              : JSON.stringify(data.export_data.data, null, 2)
+          ],
+          {
+            type: exportFormat === 'csv' ? 'text/csv' : 'application/json',
+          }
+        );
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `candidates_export.${exportFormat}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        setExportSuccess(true);
+      }
+
+      // Show results summary
+      if (data.failed > 0) {
+        setError(
+          t('bulkActions.exportPartialSuccess', {
+            success: data.successful,
+            failed: data.failed,
+          })
+        );
+      } else {
+        setExportSuccess(true);
+      }
+
+      // Clear dialog
+      setExportDialogOpen(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : t('bulkActions.exportError');
+      setError(errorMessage);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [selectedIds, exportFormat, isExporting, t]);
+
+  /**
+   * Execute bulk tag operation
+   */
+  const handleBulkTag = useCallback(async () => {
+    if (selectedIds.length === 0 || !tagName.trim() || isTagging) {
+      return;
+    }
+
+    setIsTagging(true);
+    setError(null);
+    setTagResults(null);
+
+    try {
+      const response = await apiClient.post<BulkActionResponse>('/api/candidates/bulk-action', {
+        action: 'tag',
+        resume_ids: selectedIds,
+        tag_name: tagName.trim(),
+        tag_color: tagColor,
+      });
+
+      const data = response.data;
+      setTagResults(data.results);
+
+      // Count successes and failures
+      const successCount = data.successful;
+      const failCount = data.failed;
+
+      if (failCount > 0) {
+        setError(
+          t('bulkActions.tagPartialSuccess', { success: successCount, failed: failCount })
+        );
+      }
+
+      // Clear selection on full success
+      if (failCount === 0) {
+        handleSelectionChange([]);
+      }
+
+      // Clear dialog
+      setTagDialogOpen(false);
+      setTagName('');
+      setTagColor('#1976d2');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : t('bulkActions.tagError');
+      setError(errorMessage);
+    } finally {
+      setIsTagging(false);
+    }
+  }, [selectedIds, tagName, tagColor, isTagging, handleSelectionChange, t]);
+
   const hasSelection = selectedIds.length > 0;
-  const canMove = hasSelection && selectedStageId && !isMoving;
+  const canMove = hasSelection && selectedStageId && !isMoving && !isExporting && !isTagging;
   const activeStages = stages.filter((s) => s.is_active);
 
   // Sort stages by order
@@ -277,7 +441,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
           <Button
             variant="outlined"
             onClick={handleSelectAll}
-            disabled={disabled || isMoving || candidates.length === 0}
+            disabled={disabled || isMoving || isExporting || isTagging || candidates.length === 0}
             size="small"
           >
             {t('bulkActions.selectAll')} ({candidates.length})
@@ -285,11 +449,33 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
           <Button
             variant="outlined"
             onClick={handleClearAll}
-            disabled={disabled || isMoving || !hasSelection}
+            disabled={disabled || isMoving || isExporting || isTagging || !hasSelection}
             size="small"
             color="secondary"
           >
             {t('bulkActions.clearSelection')}
+          </Button>
+
+          {/* Bulk Action Buttons */}
+          <Button
+            variant="outlined"
+            onClick={() => setExportDialogOpen(true)}
+            disabled={disabled || isMoving || isExporting || isTagging || !hasSelection}
+            size="small"
+            startIcon={<DownloadIcon />}
+            color="info"
+          >
+            {t('bulkActions.export')}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => setTagDialogOpen(true)}
+            disabled={disabled || isMoving || isExporting || isTagging || !hasSelection}
+            size="small"
+            startIcon={<LabelIcon />}
+            color="success"
+          >
+            {t('bulkActions.addTag')}
           </Button>
         </Stack>
       </Paper>
@@ -367,6 +553,30 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
         </Alert>
       </Collapse>
 
+      {/* Export Success Alert */}
+      <Collapse in={exportSuccess}>
+        <Alert severity="success" sx={{ mt: 2 }}>
+          <Typography variant="body2">
+            {t('bulkActions.exportSuccess', {
+              count: selectedIds.length,
+              plural: pluralize(selectedIds.length),
+            })}
+          </Typography>
+        </Alert>
+      </Collapse>
+
+      {/* Tag Success Alert */}
+      <Collapse in={!!tagResults && tagResults.every((r) => r.success)}>
+        <Alert severity="success" sx={{ mt: 2 }}>
+          <Typography variant="body2">
+            {t('bulkActions.tagSuccess', {
+              count: selectedIds.length,
+              plural: pluralize(selectedIds.length),
+            })}
+          </Typography>
+        </Alert>
+      </Collapse>
+
       {/* Candidates List */}
       <Paper elevation={1} sx={{ p: 3 }}>
         {candidates.length === 0 ? (
@@ -385,26 +595,27 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
               {sortedCandidates.map((candidate) => {
                 const isSelected = selectedIds.includes(candidate.resume_id);
                 const result = moveResults?.find((r) => r.resume_id === candidate.resume_id);
+                const tagResult = tagResults?.find((r) => r.resume_id === candidate.resume_id);
 
                 return (
                   <Grid item xs={12} sm={6} md={4} key={candidate.resume_id}>
                     <Card
                       onClick={() => handleToggleCandidate(candidate.resume_id)}
                       sx={{
-                        cursor: disabled || isMoving ? 'not-allowed' : 'pointer',
+                        cursor: disabled || isMoving || isExporting || isTagging ? 'not-allowed' : 'pointer',
                         border: isSelected ? 2 : 1,
-                        borderColor: result?.error
+                        borderColor: result?.error || tagResult?.error
                           ? 'error.main'
                           : isSelected
                             ? 'primary.main'
                             : 'divider',
-                        bgcolor: result?.error
+                        bgcolor: result?.error || tagResult?.error
                           ? 'error.50'
                           : isSelected
                             ? 'primary.50'
                             : 'background.paper',
                         transition: 'all 0.2s ease-in-out',
-                        '&:hover': !disabled && !isMoving
+                        '&:hover': !disabled && !isMoving && !isExporting && !isTagging
                           ? {
                               boxShadow: 3,
                               transform: 'translateY(-2px)',
@@ -417,7 +628,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
                           {/* Checkbox */}
                           <Checkbox
                             checked={isSelected}
-                            disabled={disabled || isMoving}
+                            disabled={disabled || isMoving || isExporting || isTagging}
                             size="small"
                             sx={{ p: 0.5, mt: 0.5 }}
                             icon={<RadioButtonUncheckedIcon />}
@@ -466,13 +677,17 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
                             )}
 
                             {/* Error/Success Indicator */}
-                            {result && (
+                            {(result || tagResult) && (
                               <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                                {result.error ? (
+                                {result?.error ? (
                                   <Tooltip title={result.error}>
                                     <WarningIcon sx={{ fontSize: 16, color: 'error.main' }} />
                                   </Tooltip>
-                                ) : result.new_stage ? (
+                                ) : tagResult?.error ? (
+                                  <Tooltip title={tagResult.error}>
+                                    <WarningIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                                  </Tooltip>
+                                ) : result?.new_stage || tagResult?.success ? (
                                   <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
                                 ) : null}
                               </Box>
@@ -497,6 +712,102 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
           </Typography>
         </Alert>
       )}
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('bulkActions.exportDialog.title')}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {t('bulkActions.exportDialog.description', { count: selectedIds.length })}
+          </Typography>
+
+          <FormControl fullWidth size="small">
+            <InputLabel id="export-format-label">{t('bulkActions.exportDialog.format')}</InputLabel>
+            <Select
+              labelId="export-format-label"
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')}
+              label={t('bulkActions.exportDialog.format')}
+            >
+              <MenuItem value="json">JSON</MenuItem>
+              <MenuItem value="csv">CSV</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExportDialogOpen(false)} disabled={isExporting}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleBulkExport}
+            variant="contained"
+            disabled={isExporting}
+            startIcon={isExporting ? <CircularProgress size={16} /> : <DownloadIcon />}
+          >
+            {isExporting ? t('bulkActions.exportDialog.exporting') : t('bulkActions.exportDialog.export')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Tag Dialog */}
+      <Dialog open={tagDialogOpen} onClose={() => setTagDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('bulkActions.tagDialog.title')}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {t('bulkActions.tagDialog.description', { count: selectedIds.length })}
+          </Typography>
+
+          <Stack spacing={2}>
+            <TextField
+              autoFocus
+              label={t('bulkActions.tagDialog.tagName')}
+              value={tagName}
+              onChange={(e) => setTagName(e.target.value)}
+              fullWidth
+              size="small"
+              disabled={isTagging}
+              placeholder={t('bulkActions.tagDialog.tagNamePlaceholder')}
+            />
+
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                {t('bulkActions.tagDialog.tagColor')}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <input
+                  type="color"
+                  value={tagColor}
+                  onChange={(e) => setTagColor(e.target.value)}
+                  disabled={isTagging}
+                  style={{
+                    width: 50,
+                    height: 36,
+                    border: '1px solid #ccc',
+                    borderRadius: 4,
+                    cursor: isTagging ? 'not-allowed' : 'pointer',
+                  }}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {tagColor}
+                </Typography>
+              </Stack>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTagDialogOpen(false)} disabled={isTagging}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleBulkTag}
+            variant="contained"
+            disabled={!tagName.trim() || isTagging}
+            startIcon={isTagging ? <CircularProgress size={16} /> : <LabelIcon />}
+          >
+            {isTagging ? t('bulkActions.tagDialog.tagging') : t('bulkActions.tagDialog.tag')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 };
