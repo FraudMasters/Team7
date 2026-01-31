@@ -1,0 +1,415 @@
+{
+  "databases": {
+    "SQL": [
+      "SQL",
+      "PostgreSQL",
+      "MySQL",
+      "SQLite",
+      "MS SQL",
+      "T-SQL",
+      "PL/SQL",
+      "MariaDB"
+    ],
+    "PostgreSQL": [
+      "PostgreSQL",
+      "Postgres",
+      "Postgres SQL"
+    ],
+    "MySQL": [
+      "MySQL",
+      "My SQL"
+    ],
+    "MongoDB": [
+      "MongoDB",
+      "Mongo",
+      "Mongoose"
+    ],
+    "Redis": [
+      "Redis",
+      "Redis Cache"
+    ],
+    "Oracle": [
+      "Oracle",
+      "Oracle DB",
+      "Oracle Database"
+    ]
+  },
+  "programming_languages": {
+    "Java": [
+      "Java",
+      "Java SE",
+      "Java EE"
+    ],
+    "JavaScript": [
+      "JavaScript",
+      "JS",
+      "ECMAScript",
+      "ES6",
+      "ES6+"
+    ],
+    "Python": [
+      "Python",
+      "Python 3",
+      "Python3"
+    ],
+    "TypeScript": [
+      "TypeScript",
+      "TS"
+    ],
+    "C#": [
+      "C#",
+      "C Sharp",
+      "CSharp"
+    ],
+    "C++": [
+      "C++",
+      "CPlusPlus"
+    ],
+    "Go": [
+      "Go",
+      "Golang",
+      "Go lang"
+    ],
+    "Kotlin": [
+      "Kotlin",
+      "Kotlin JVM"
+    ],
+    "Swift": [
+      "Swift",
+      "Swift iOS"
+    ],
+    "Ruby": [
+      "Ruby",
+      "Ruby on Rails",
+      "Rails"
+    ],
+    "PHP": [
+      "PHP",
+      "PHP 7",
+      "PHP 8"
+    ],
+    "Rust": [
+      "Rust",
+      "Rust lang"
+    ]
+  },
+  "web_frameworks": {
+    "React": [
+      "React",
+      "ReactJS",
+      "React.js",
+      "React JS"
+    ],
+    "Angular": [
+      "Angular",
+      "AngularJS",
+      "Angular 2+",
+      "AngularJS 2+"
+    ],
+    "Vue": [
+      "Vue",
+      "Vue.js",
+      "VueJS",
+      "Vue.js"
+    ],
+    "Spring": [
+      "Spring",
+      "Spring Framework",
+      "Spring Boot",
+      "Spring MVC"
+    ],
+    "Django": [
+      "Django",
+      "Django Framework"
+    ],
+    "Flask": [
+      "Flask",
+      "Flask Framework"
+    ],
+    "Express": [
+      "Express",
+      "Express.js",
+      "ExpressJS"
+    ],
+    "Next.js": [
+      "Next.js",
+      "NextJS",
+      "Next JS"
+    ],
+    "Nuxt": [
+      "Nuxt",
+      "Nuxt.js",
+      "NuxtJS"
+    ]
+  },
+  "frontend": {
+    "HTML": [
+      "HTML",
+      "HTML5",
+      "HyperText Markup Language"
+    ],
+    "CSS": [
+      "CSS",
+      "CSS3",
+      "Cascading Style Sheets",
+      "SCSS",
+      "SASS",
+      "Less"
+    ],
+    "REST": [
+      "REST",
+      "REST API",
+      "RESTful",
+      "RESTful API"
+    ],
+    "GraphQL": [
+      "GraphQL",
+      "GQL"
+    ]
+  },
+  "devops": {
+    "Docker": [
+      "Docker",
+      "Docker Container",
+      "Docker Compose"
+    ],
+    "Kubernetes": [
+      "Kubernetes",
+      "K8s",
+      "K8s cluster"
+    ],
+    "CI/CD": [
+      "CI/CD",
+      "CI CD",
+      "Continuous Integration",
+      "Continuous Deployment",
+      "Jenkins",
+      "GitLab CI",
+      "GitHub Actions"
+    ],
+    "Git": [
+      "Git",
+      "Git version control",
+      "Git versioning"
+    ],
+    "GitLab": [
+      "GitLab",
+      "GitLab CI"
+    ],
+    "AWS": [
+      "AWS",
+      "Amazon Web Services",
+      "Amazon AWS"
+    ],
+    "Azure": [
+      "Azure",
+      "Microsoft Azure"
+    ],
+    "GCP": [
+      "GCP",
+      "Google Cloud Platform",
+      "Google Cloud"
+    ],
+    "Terraform": [
+      "Terraform",
+      "IaC",
+      "Infrastructure as Code"
+    ],
+    "Ansible": [
+      "Ansible",
+      "Ansible automation"
+    ]
+  },
+  "data_tools": {
+    "Kafka": [
+      "Kafka",
+      "Apache Kafka",
+      "Kafka messaging"
+    ],
+    "ELK": [
+      "ELK",
+      "ELK Stack",
+      "Elasticsearch",
+      "Logstash",
+      "Kibana"
+    ],
+    "Airflow": [
+      "Airflow",
+      "Apache Airflow"
+    ],
+    "Spark": [
+      "Spark",
+      "Apache Spark"
+    ],
+    "Hadoop": [
+      "Hadoop",
+      "Apache Hadoop"
+    ],
+    "Hive": [
+      "Hive",
+      "Apache Hive"
+    ]
+  },
+  "testing": {
+    "JUnit": [
+      "JUnit",
+      "JUnit testing"
+    ],
+    "Jest": [
+      "Jest",
+      "Jest testing",
+      "Jest framework"
+    ],
+    "pytest": [
+      "pytest",
+      "py.test"
+    ],
+    "Selenium": [
+      "Selenium",
+      "Selenium WebDriver"
+    ],
+    "Cypress": [
+      "Cypress",
+      "Cypress.io"
+    ],
+    "TestNG": [
+      "TestNG",
+      "Test NG"
+    ],
+    "Mocha": [
+      "Mocha",
+      "Mocha testing"
+    ],
+    "Enzyme": [
+      "Enzyme",
+      "Enzyme testing"
+    ]
+  },
+  "orms": {
+    "Hibernate": [
+      "Hibernate",
+      "Hibernate ORM",
+      "JPA",
+      "Java Persistence API"
+    ],
+    "Entity Framework": [
+      "Entity Framework",
+      "EF",
+      "EF Core"
+    ],
+    "SQLAlchemy": [
+      "SQLAlchemy",
+      "SQL Alchemy"
+    ],
+    "Sequelize": [
+      "Sequelize",
+      "Sequelize ORM"
+    ],
+    "TypeORM": [
+      "TypeORM",
+      "Type ORM"
+    ]
+  },
+  "build_tools": {
+    "Maven": [
+      "Maven",
+      "Apache Maven"
+    ],
+    "Gradle": [
+      "Gradle",
+      "Gradle build"
+    ],
+    "npm": [
+      "npm",
+      "npm package manager"
+    ],
+    "yarn": [
+      "yarn",
+      "Yarn package manager"
+    ],
+    "webpack": [
+      "webpack",
+      "Webpack bundler"
+    ],
+    "Vite": [
+      "Vite",
+      "Vite bundler"
+    ]
+  },
+  "other_tools": {
+    "Linux": [
+      "Linux",
+      "Unix",
+      "Linux OS"
+    ],
+    "JIRA": [
+      "JIRA",
+      "Jira",
+      "Atlassian JIRA"
+    ],
+    "Confluence": [
+      "Confluence",
+      "Atlassian Confluence"
+    ],
+    "Postman": [
+      "Postman",
+      "Postman API"
+    ],
+    "Swagger": [
+      "Swagger",
+      "OpenAPI",
+      "Swagger UI"
+    ],
+    "IntelliJ IDEA": [
+      "IntelliJ IDEA",
+      "IntelliJ",
+      "IDEA"
+    ],
+    "VS Code": [
+      "VS Code",
+      "Visual Studio Code",
+      "VSCode"
+    ],
+    "Eclipse": [
+      "Eclipse",
+      "Eclipse IDE"
+    ]
+  },
+  "concepts": {
+    "Microservices": [
+      "Microservices",
+      "Microservice architecture",
+      "Microservice",
+      "Micro-services"
+    ],
+    "Agile": [
+      "Agile",
+      "Agile methodology",
+      "Scrum",
+      "Kanban"
+    ],
+    "OOP": [
+      "OOP",
+      "Object Oriented Programming",
+      "Object-Oriented Programming",
+      "ООП"
+    ],
+    "API": [
+      "API",
+      "Application Programming Interface",
+      "REST API",
+      "GraphQL API"
+    ],
+    "MVC": [
+      "MVC",
+      "Model View Controller",
+      "Model-View-Controller"
+    ],
+    "REST": [
+      "REST",
+      "RESTful",
+      "REST API",
+      "RESTful API"
+    ]
+  }
+}

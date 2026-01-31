@@ -1,0 +1,572 @@
+"""
+Resume analysis endpoints integrating all analyzers.
+
+This module provides endpoints for analyzing uploaded resumes using
+multiple ML/NLP analyzers including keyword extraction, named entity
+recognition, grammar checking, and experience calculation.
+"""
+import logging
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+# Add parent directory to path to import from data_extractor service
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
+
+from analyzers import (
+    extract_resume_keywords_hf as extract_resume_keywords,
+    extract_resume_entities,
+    check_grammar_resume,
+    calculate_total_experience,
+    format_experience_summary,
+    extract_work_experience,
+)
+from i18n.backend_translations import get_error_message, get_success_message
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Directory where uploaded resumes are stored
+UPLOAD_DIR = Path("data/uploads")
+
+
+def _extract_locale(request: Optional[Request]) -> str:
+    """
+    Extract Accept-Language header from request.
+
+    Args:
+        request: The incoming FastAPI request (optional)
+
+    Returns:
+        Language code (e.g., 'en', 'ru')
+    """
+    if request is None:
+        return "en"
+    accept_language = request.headers.get("Accept-Language", "en")
+    lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
+    return lang_code
+
+
+class AnalysisRequest(BaseModel):
+    """Request model for resume analysis endpoint."""
+
+    resume_id: str = Field(..., description="Unique identifier of the resume to analyze")
+    extract_experience: bool = Field(
+        default=True, description="Whether to extract and calculate experience information"
+    )
+    check_grammar: bool = Field(
+        default=True, description="Whether to perform grammar and spelling checking"
+    )
+
+
+class KeywordAnalysis(BaseModel):
+    """Keyword extraction results."""
+
+    keywords: List[str] = Field(..., description="Extracted keywords")
+    keyphrases: List[str] = Field(..., description="Extracted key phrases")
+    scores: List[float] = Field(..., description="Confidence scores for each keyword")
+
+
+class EntityAnalysis(BaseModel):
+    """Named entity recognition results."""
+
+    organizations: List[str] = Field(..., description="Extracted organization names")
+    dates: List[str] = Field(..., description="Extracted date expressions")
+    persons: List[str] = Field(default=[], description="Extracted person names")
+    locations: List[str] = Field(default=[], description="Extracted location names")
+    technical_skills: List[str] = Field(..., description="Extracted technical skills")
+
+
+class GrammarError(BaseModel):
+    """Individual grammar/spelling error."""
+
+    type: str = Field(..., description="Type of error (grammar, spelling, punctuation, style)")
+    severity: str = Field(..., description="Severity level (error, warning)")
+    message: str = Field(..., description="Error message")
+    context: str = Field(..., description="Text context where error occurs")
+    suggestions: List[str] = Field(..., description="Suggested corrections")
+    position: Dict[str, int] = Field(..., description="Character position of error")
+
+
+class GrammarAnalysis(BaseModel):
+    """Grammar checking results."""
+
+    total_errors: int = Field(..., description="Total number of errors found")
+    errors_by_category: Dict[str, int] = Field(
+        ..., description="Breakdown of errors by type"
+    )
+    errors_by_severity: Dict[str, int] = Field(
+        ..., description="Breakdown of errors by severity"
+    )
+    errors: List[GrammarError] = Field(..., description="List of individual errors")
+
+
+class ExperienceEntry(BaseModel):
+    """Individual work experience entry."""
+
+    company: str = Field(..., description="Company name")
+    position: str = Field(..., description="Job position/title")
+    start_date: str = Field(..., description="Start date (ISO format)")
+    end_date: Optional[str] = Field(..., description="End date (ISO format) or None if current")
+    duration_months: int = Field(..., description="Duration in months")
+
+
+class ExperienceAnalysis(BaseModel):
+    """Experience calculation results."""
+
+    total_months: int = Field(..., description="Total experience in months")
+    total_years: float = Field(..., description="Total experience in years")
+    total_years_formatted: str = Field(..., description="Human-readable experience summary")
+    entries: List[ExperienceEntry] = Field(..., description="Individual experience entries")
+
+
+class AnalysisResponse(BaseModel):
+    """Complete analysis response."""
+
+    resume_id: str = Field(..., description="Resume identifier")
+    status: str = Field(..., description="Analysis status")
+    language: str = Field(..., description="Detected language (en, ru)")
+    keywords: KeywordAnalysis = Field(..., description="Keyword extraction results")
+    entities: EntityAnalysis = Field(..., description="Named entity recognition results")
+    grammar: Optional[GrammarAnalysis] = Field(
+        None, description="Grammar checking results (if enabled)"
+    )
+    experience: Optional[ExperienceAnalysis] = Field(
+        None, description="Experience calculation results (if enabled)"
+    )
+    processing_time_ms: float = Field(..., description="Analysis processing time in milliseconds")
+
+
+def find_resume_file(resume_id: str, locale: str = "en") -> Path:
+    """
+    Find the resume file by ID.
+
+    Args:
+        resume_id: Unique identifier of the resume
+        locale: Language code for translated error messages
+
+    Returns:
+        Path to the resume file
+
+    Raises:
+        HTTPException: If resume file is not found
+    """
+    # Try common file extensions
+    for ext in [".pdf", ".docx", ".PDF", ".DOCX"]:
+        file_path = UPLOAD_DIR / f"{resume_id}{ext}"
+        if file_path.exists():
+            return file_path
+
+    # If not found, raise error
+    error_msg = get_error_message("file_not_found", locale)
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=error_msg,
+    )
+
+
+def extract_text_from_file(file_path: Path, locale: str = "en") -> str:
+    """
+    Extract text from resume file (PDF or DOCX).
+
+    Args:
+        file_path: Path to the resume file
+        locale: Language code for translated error messages
+
+    Returns:
+        Extracted text content
+
+    Raises:
+        HTTPException: If text extraction fails
+    """
+    try:
+        # Import extraction functions
+        from services.data_extractor.extract import extract_text_from_pdf, extract_text_from_docx
+
+        file_ext = file_path.suffix.lower()
+
+        if file_ext == ".pdf":
+            result = extract_text_from_pdf(file_path)
+        elif file_ext == ".docx":
+            result = extract_text_from_docx(file_path)
+        else:
+            error_msg = get_error_message("invalid_file_type", locale, file_ext=file_ext, allowed=".pdf, .docx")
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=error_msg,
+            )
+
+        # Check for extraction errors
+        if result.get("error"):
+            error_msg = get_error_message("extraction_failed", locale)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error_msg,
+            )
+
+        text = result.get("text", "")
+        if not text or len(text.strip()) < 10:
+            error_msg = get_error_message("file_corrupted", locale)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error_msg,
+            )
+
+        logger.info(f"Extracted {len(text)} characters from {file_path.name}")
+        return text
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting text from {file_path}: {e}", exc_info=True)
+        error_msg = get_error_message("extraction_failed", locale)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_msg,
+        ) from e
+
+
+@router.post(
+    "/analyze",
+    response_model=AnalysisResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Analysis"],
+)
+async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSONResponse:
+    """
+    Analyze a resume using integrated ML/NLP analyzers.
+
+    This endpoint performs comprehensive resume analysis including:
+    - Keyword extraction (KeyBERT)
+    - Named entity recognition (SpaCy)
+    - Grammar and spelling checking (LanguageTool)
+    - Experience calculation
+
+    Args:
+        http_request: FastAPI request object (for Accept-Language header)
+        request: Analysis request with resume_id and analysis options
+
+    Returns:
+        JSON response with complete analysis results
+
+    Raises:
+        HTTPException(404): If resume file is not found
+        HTTPException(422): If text extraction fails
+        HTTPException(500): If analysis processing fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/resumes/analyze",
+        ...     json={"resume_id": "abc123", "check_grammar": True, "extract_experience": True}
+        ... )
+        >>> response.json()
+        {
+            "resume_id": "abc123",
+            "status": "completed",
+            "language": "en",
+            "keywords": {...},
+            "entities": {...},
+            "grammar": {...},
+            "experience": {...},
+            "processing_time_ms": 1234.56
+        }
+    """
+    import time
+
+    # Extract locale from Accept-Language header
+    locale = _extract_locale(http_request)
+
+    start_time = time.time()
+
+    try:
+        logger.info(f"Starting analysis for resume_id: {request.resume_id}")
+
+        # Step 1: Find the resume file
+        file_path = find_resume_file(request.resume_id, locale)
+        logger.info(f"Found resume file: {file_path}")
+
+        # Step 2: Extract text from file
+        resume_text = extract_text_from_file(file_path, locale)
+
+        # Step 3: Detect language from text
+        try:
+            from langdetect import detect, LangDetectException
+
+            try:
+                detected_lang = detect(resume_text)
+                # Normalize to supported languages
+                language = "ru" if detected_lang == "ru" else "en"
+            except LangDetectException:
+                logger.warning("Language detection failed, defaulting to English")
+                language = "en"
+        except ImportError:
+            logger.warning("langdetect not installed, defaulting to English")
+            language = "en"
+
+        logger.info(f"Detected language: {language}")
+
+        # Step 4: Perform keyword extraction
+        logger.info("Performing keyword extraction...")
+        keywords_result = extract_resume_keywords(
+            resume_text, language=language
+        )
+
+        # Handle different return formats from extractors
+        # HF extractor returns: single_words, keyphrases, all_keywords (as tuples with scores)
+        # Old format returns: keywords, keyphrases, scores
+        if "single_words" in keywords_result:
+            # HF format - convert to expected format
+            single_words = keywords_result.get("single_words", [])
+            keywords_list = [word[0] if isinstance(word, (list, tuple)) else word for word in single_words]
+
+            # Keyphrases are also tuples (phrase, score) - extract just the phrases
+            keyphrases_raw = keywords_result.get("keyphrases", [])
+            keyphrases_list = [kp[0] if isinstance(kp, (list, tuple)) else kp for kp in keyphrases_raw]
+
+            keyword_analysis = KeywordAnalysis(
+                keywords=keywords_list,
+                keyphrases=keyphrases_list,
+                scores=[],  # Scores not available in this format
+            )
+        else:
+            # Old format
+            keyword_analysis = KeywordAnalysis(
+                keywords=keywords_result.get("keywords", []),
+                keyphrases=keywords_result.get("keyphrases", []),
+                scores=keywords_result.get("scores", []),
+            )
+
+        # Step 5: Perform named entity recognition
+        logger.info("Performing named entity recognition...")
+        entities_result = extract_resume_entities(resume_text, language=language)
+
+        # Handle both 'skills' and 'technical_skills' field names from different extractors
+        skills = entities_result.get("technical_skills") or entities_result.get("skills") or []
+
+        entity_analysis = EntityAnalysis(
+            organizations=entities_result.get("organizations") or [],
+            dates=entities_result.get("dates") or [],
+            persons=entities_result.get("persons") or [],
+            locations=entities_result.get("locations") or [],
+            technical_skills=skills,
+        )
+
+        # Step 6: Grammar checking (optional)
+        grammar_analysis = None
+        if request.check_grammar:
+            logger.info("Performing grammar checking...")
+            try:
+                grammar_result = check_grammar_resume(resume_text, language=language)
+
+                # Convert grammar errors to response models
+                error_models = []
+                for error in grammar_result.get("errors", []):
+                    error_models.append(
+                        GrammarError(
+                            type=error.get("type", "unknown"),
+                            severity=error.get("severity", "warning"),
+                            message=error.get("message", ""),
+                            context=error.get("context", ""),
+                            suggestions=error.get("suggestions", []),
+                            position=error.get("position", {}),
+                        )
+                    )
+
+                grammar_analysis = GrammarAnalysis(
+                    total_errors=grammar_result.get("total_errors", 0),
+                    errors_by_category=grammar_result.get("errors_by_category", {}),
+                    errors_by_severity=grammar_result.get("errors_by_severity", {}),
+                    errors=error_models,
+                )
+
+                logger.info(
+                    f"Found {grammar_analysis.total_errors} grammar/spelling errors"
+                )
+            except Exception as e:
+                logger.warning(f"Grammar checking failed: {e}")
+                # Continue without grammar results rather than failing the entire analysis
+
+        # Step 7: Experience extraction (optional)
+        experience_analysis = None
+        if request.extract_experience:
+            logger.info("Extracting work experience...")
+            try:
+                # Use the experience extractor to parse structured experience from resume text
+                experience_result = extract_work_experience(
+                    resume_text, language=language, min_confidence=0.2
+                )
+
+                if experience_result.get("experiences"):
+                    # Convert extracted experiences to response format
+                    experience_entries = []
+                    for exp in experience_result.get("experiences", []):
+                        # Calculate duration in months
+                        start_str = exp.get("start")
+                        end_str = exp.get("end")
+                        duration_months = 0
+
+                        if start_str:
+                            from datetime import datetime
+                            try:
+                                start_date = datetime.fromisoformat(start_str)
+                                end_date = datetime.fromisoformat(end_str) if end_str else datetime.now()
+                                # Calculate months difference
+                                months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+                                duration_months = max(0, months)
+                            except:
+                                pass
+
+                        experience_entries.append(
+                            ExperienceEntry(
+                                company=exp.get("company") or "Unknown",
+                                position=exp.get("title") or "Unknown",
+                                start_date=exp.get("start") or "",
+                                end_date=exp.get("end"),
+                                duration_months=duration_months,
+                            )
+                        )
+
+                    # Calculate totals
+                    total_months = sum(e.duration_months for e in experience_entries)
+                    total_years = round(total_months / 12, 1) if total_months > 0 else 0
+
+                    # Format summary
+                    years = int(total_months // 12)
+                    months = total_months % 12
+                    if years > 0 and months > 0:
+                        formatted = f"{years} years {months} months"
+                    elif years > 0:
+                        formatted = f"{years} years"
+                    elif months > 0:
+                        formatted = f"{months} months"
+                    else:
+                        formatted = "No experience data"
+
+                    experience_analysis = ExperienceAnalysis(
+                        total_months=total_months,
+                        total_years=total_years,
+                        total_years_formatted=formatted,
+                        entries=experience_entries,
+                    )
+
+                    logger.info(f"Extracted {len(experience_entries)} work experience entries")
+                else:
+                    # No experiences found
+                    experience_analysis = ExperienceAnalysis(
+                        total_months=0,
+                        total_years=0.0,
+                        total_years_formatted="No work experience found",
+                        entries=[],
+                    )
+
+            except Exception as e:
+                logger.warning(f"Experience extraction failed: {e}", exc_info=True)
+                # Return empty experience analysis on failure
+                experience_analysis = ExperienceAnalysis(
+                    total_months=0,
+                    total_years=0.0,
+                    total_years_formatted="Experience extraction failed",
+                    entries=[],
+                )
+
+        # Calculate processing time
+        processing_time_ms = (time.time() - start_time) * 1000
+
+        # Build response
+        response_data = {
+            "resume_id": request.resume_id,
+            "status": "completed",
+            "language": language,
+            "keywords": keyword_analysis.model_dump(),
+            "entities": entity_analysis.model_dump(),
+            "grammar": grammar_analysis.model_dump() if grammar_analysis else None,
+            "experience": experience_analysis.model_dump() if experience_analysis else None,
+            "processing_time_ms": round(processing_time_ms, 2),
+        }
+
+        logger.info(
+            f"Analysis completed for resume_id {request.resume_id} in {processing_time_ms:.2f}ms"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing resume: {e}", exc_info=True)
+        error_msg = get_error_message("analysis_failed", locale)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_msg,
+        ) from e
+
+
+@router.get(
+    "/{resume_id}",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    tags=["Analysis"],
+)
+async def get_analysis_result(
+    http_request: Request, resume_id: str
+) -> JSONResponse:
+    """
+    Get analysis result for a specific resume.
+
+    This endpoint returns the analysis results for a resume.
+    Currently returns placeholder data as full DB integration is pending.
+
+    Args:
+        http_request: FastAPI request object (for Accept-Language header)
+        resume_id: Resume ID to fetch analysis for
+
+    Returns:
+        JSON response with analysis results
+
+    Raises:
+        HTTPException(404): If resume is not found
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/resumes/abc123")
+        >>> response.json()
+        {
+            "resume_id": "abc123",
+            "status": "pending",
+            "errors": [],
+            "grammar_errors": [],
+            "keywords": [],
+            "technical_skills": []
+        }
+    """
+    locale = _extract_locale(http_request)
+    logger.info(f"Fetching analysis for resume_id: {resume_id}")
+
+    # TODO: Implement database lookup in a later subtask
+    # For now, return a placeholder response with proper structure
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "resume_id": resume_id,
+            "status": "pending",
+            "message": "Analysis not found - please run analysis first",
+            "errors": [],
+            "grammar_errors": [],
+            "keywords": [],
+            "technical_skills": [],
+            "total_experience_months": 0,
+            "matched_skills": [],
+            "missing_skills": [],
+            "match_percentage": 0,
+        },
+    )

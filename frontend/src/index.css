@@ -1,0 +1,48 @@
+/* Global styles */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* RTL (Right-to-Left) Support
+ *
+ * These CSS rules prepare the application for future RTL language support
+ * (Arabic, Hebrew, etc.) by using CSS logical properties and RTL-specific
+ * selectors where needed.
+ *
+ * Logical Properties:
+ * - margin-inline-start/end instead of margin-left/right
+ * - padding-inline-start/end instead of padding-left/right
+ * - text-align: start/end instead of left/right
+ *
+ * This ensures proper layout flipping for RTL languages without
+ * maintaining separate CSS files.
+ */
+
+/* Example RTL hooks for future use:
+ *
+ * .element {
+ *   margin-inline-start: 1rem;  /* left in LTR, right in RTL */
+ *   margin-inline-end: 1rem;    /* right in LTR, left in RTL */
+ *   padding-inline-start: 0.5rem;
+ *   text-align: start;          /* left in LTR, right in RTL */
+ * }
+ *
+ * /* RTL-specific overrides when needed */
+ * [dir="rtl"] .special-element {
+ *   transform: scaleX(-1);  /* Mirror icons/images for RTL */
+ * }
+ */

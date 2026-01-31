@@ -1,0 +1,63 @@
+{
+  "resume_id": "test-resume-123",
+  "filename": "example_resume.pdf",
+  "processing_time_seconds": 5.2,
+  "keywords": {
+    "keywords": ["Java", "Spring", "PostgreSQL", "Microservices", "Docker"],
+    "keyphrases": ["Spring Boot", "REST API", "Microservices architecture"],
+    "scores": [0.85, 0.78, 0.72, 0.68, 0.65]
+  },
+  "entities": {
+    "organizations": ["Tech Corp", "Financial Solutions Ltd"],
+    "dates": ["2020-2023", "2018-2020"],
+    "persons": ["John Doe"],
+    "locations": ["New York", "San Francisco"],
+    "technical_skills": ["Java", "Python", "React", "PostgreSQL", "MongoDB"]
+  },
+  "grammar": {
+    "total_errors": 3,
+    "errors_by_category": {
+      "grammar": 1,
+      "spelling": 2,
+      "punctuation": 0
+    },
+    "errors_by_severity": {
+      "error": 0,
+      "warning": 3
+    },
+    "errors": [
+      {
+        "type": "spelling",
+        "severity": "warning",
+        "message": "Possible spelling mistake",
+        "context": "developement experience",
+        "suggestions": ["development"],
+        "position": {
+          "start": 150,
+          "end": 164
+        }
+      }
+    ]
+  },
+  "experience": {
+    "total_experience_months": 60,
+    "total_experience_summary": "5 years",
+    "experiences": [
+      {
+        "company": "Tech Corp",
+        "position": "Senior Java Developer",
+        "start_date": "2020-01-01",
+        "end_date": null,
+        "duration_months": 48
+      },
+      {
+        "company": "Financial Solutions Ltd",
+        "position": "Java Developer",
+        "start_date": "2018-06-01",
+        "end_date": "2019-12-31",
+        "duration_months": 18
+      }
+    ]
+  },
+  "language_detected": "en"
+}
