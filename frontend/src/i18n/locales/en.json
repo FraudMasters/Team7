@@ -820,5 +820,37 @@
     "enterBulkMode": "Bulk Mode",
     "exitBulkMode": "Exit Bulk Mode",
     "loadingCandidates": "Loading candidates for bulk operations..."
+  },
+  "workflow": {
+    "loading": "Loading workflow board...",
+    "board": {
+      "title": "Workflow Board",
+      "subtitle": "Track candidates through hiring stages with drag-and-drop",
+      "stats": {
+        "totalCandidates": "Total Candidates",
+        "allStages": "across all stages",
+        "activeStages": "Active Stages",
+        "configuredStages": "configured stages",
+        "openVacancies": "Open Vacancies",
+        "activeVacancies": "active vacancies"
+      },
+      "filterByVacancy": "Filter by Vacancy",
+      "allVacancies": "All Vacancies",
+      "vacancyHelper": "Show candidates for a specific vacancy",
+      "filteredByVacancy": "Filtered by vacancy",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing...",
+      "stageStats": "Stage Statistics",
+      "stageMetrics": "Stage Metrics",
+      "metricsTooltip": "Average time candidates spend in each stage and drop-off rates",
+      "timeInStage": "Time in Stage",
+      "daysAvg": "days avg",
+      "median": "Median",
+      "days": "days",
+      "range": "Range",
+      "dropoffRate": "Drop-off Rate",
+      "exited": "exited",
+      "tip": "💡 Drag and drop candidate cards to move them between stages. Click on candidates to view details, notes, and activity history."
+    }
   }
 }

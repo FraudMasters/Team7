@@ -13,6 +13,7 @@ import {
   Chip,
   Alert,
   Collapse,
+  Tooltip,
 } from '@mui/material';
 import {
   ViewKanban as ViewKanbanIcon,
@@ -22,6 +23,8 @@ import {
   Person as PersonIcon,
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
+  Schedule as ScheduleIcon,
+  TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -39,6 +42,35 @@ interface StageStats {
   stageId: string;
   stageName: string;
   candidateCount: number;
+}
+
+interface StageTimeMetrics {
+  average_days: number;
+  median_days: number;
+  min_days: number;
+  max_days: number;
+  candidate_count: number;
+}
+
+interface StageDropoffMetrics {
+  candidates_entered: number;
+  candidates_exited: number;
+  candidates_current: number;
+  dropoff_rate: number;
+}
+
+interface StageMetrics {
+  stage_id: string | null;
+  stage_name: string;
+  display_name: string | null;
+  time_metrics: StageTimeMetrics;
+  dropoff_metrics: StageDropoffMetrics;
+}
+
+interface StageMetricsResponse {
+  stage_id: string | null;
+  metrics: StageMetrics[];
+  total_stages: number;
 }
 
 interface BulkMoveResult {
@@ -61,6 +93,8 @@ const WorkflowBoardPage: React.FC = () => {
   const [selectedVacancy, setSelectedVacancy] = useState<string>('');
   const [allStages, setAllStages] = useState<WorkflowStageResponse[]>([]);
   const [stageStats, setStageStats] = useState<StageStats[]>([]);
+  const [stageMetrics, setStageMetrics] = useState<StageMetrics[]>([]);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
@@ -79,6 +113,22 @@ const WorkflowBoardPage: React.FC = () => {
       }
     };
     fetchVacancies();
+  }, []);
+
+  /**
+   * Fetch stage metrics (time in stage, drop-off rates)
+   */
+  const fetchStageMetrics = useCallback(async () => {
+    try {
+      setLoadingMetrics(true);
+      const response = await axios.get<StageMetricsResponse>('/api/candidates/metrics');
+      setStageMetrics(response.data.metrics);
+    } catch (error) {
+      console.error('Error fetching stage metrics:', error);
+      setStageMetrics([]);
+    } finally {
+      setLoadingMetrics(false);
+    }
   }, []);
 
   // Load stages and stats on mount or vacancy change
@@ -116,6 +166,9 @@ const WorkflowBoardPage: React.FC = () => {
 
         const stats = await Promise.all(statsPromises);
         setStageStats(stats);
+
+        // Fetch stage metrics
+        await fetchStageMetrics();
       } catch (error) {
         console.error('Error fetching workflow data:', error);
       } finally {
@@ -153,6 +206,9 @@ const WorkflowBoardPage: React.FC = () => {
 
       const stats = await Promise.all(statsPromises);
       setStageStats(stats);
+
+      // Refresh metrics
+      await fetchStageMetrics();
     } catch (error) {
       console.error('Error refreshing stats:', error);
     } finally {
@@ -385,6 +441,84 @@ const WorkflowBoardPage: React.FC = () => {
                     <Typography variant="caption" color="text.secondary" noWrap>
                       {stat.stageName}
                     </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+      )}
+
+      {/* Stage Metrics */}
+      {!loadingMetrics && stageMetrics.length > 0 && (
+        <Paper sx={{ p: 3, mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">{t('workflow.board.stageMetrics')}</Typography>
+            <Tooltip title={t('workflow.board.metricsTooltip')}>
+              <ScheduleIcon color="action" sx={{ fontSize: 20 }} />
+            </Tooltip>
+          </Box>
+          <Grid container spacing={2}>
+            {stageMetrics.map((metric) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={metric.stage_name}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    border: 1,
+                    borderColor: 'divider',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      boxShadow: 2,
+                    },
+                    transition: 'all 0.2s ease-in-out',
+                  }}
+                >
+                  <CardContent>
+                    {/* Stage Name */}
+                    <Typography variant="subtitle2" color="primary" fontWeight={600} gutterBottom>
+                      {metric.display_name || metric.stage_name}
+                    </Typography>
+
+                    {/* Time in Stage */}
+                    <Box sx={{ mb: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                        <ScheduleIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {t('workflow.board.timeInStage')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ ml: 2 }}>
+                        <Typography variant="body2" fontWeight={500}>
+                          {metric.time_metrics.average_days.toFixed(1)} {t('workflow.board.daysAvg')}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {t('workflow.board.median')}: {metric.time_metrics.median_days.toFixed(1)} {t('workflow.board.days')} •
+                          {t('workflow.board.range')}: {metric.time_metrics.min_days.toFixed(1)}-{metric.time_metrics.max_days.toFixed(1)}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Drop-off Rate */}
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                        <TrendingDownIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {t('workflow.board.dropoffRate')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ ml: 2 }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={500}
+                          color={metric.dropoff_metrics.dropoff_rate > 0.3 ? 'error.main' : 'success.main'}
+                        >
+                          {(metric.dropoff_metrics.dropoff_rate * 100).toFixed(1)}%
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {metric.dropoff_metrics.candidates_exited} / {metric.dropoff_metrics.candidates_entered} {t('workflow.board.exited')}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
