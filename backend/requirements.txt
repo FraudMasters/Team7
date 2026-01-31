@@ -20,6 +20,7 @@ langdetect==1.0.9
 # TensorFlow/Keras removed - using PyTorch-only models for better compatibility
 # If TensorFlow is needed for specific features, install separately with:
 # pip install "tensorflow>=2.16" "tf-keras>=2.16" --upgrade
+rapidfuzz==3.6.1
 
 # File Extraction (PDF/DOCX)
 PyPDF2==3.0.1
@@ -35,6 +36,7 @@ redis==5.2.0
 httpx==0.27.2
 aiofiles==24.1.0
 python-dotenv==1.0.1
+dateparser==1.2.0
 
 # LLM Integration (for ATS Simulation with z.ai, OpenAI, etc.)
 openai==1.54.0
