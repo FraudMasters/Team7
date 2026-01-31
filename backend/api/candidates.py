@@ -18,6 +18,7 @@ from database import get_db
 from models.resume import Resume
 from models.hiring_stage import HiringStage, HiringStageName
 from models.workflow_stage_config import WorkflowStageConfig
+from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 
 logger = logging.getLogger(__name__)
 
@@ -439,6 +440,22 @@ async def move_candidate(
         db.add(new_hiring_stage)
         await db.commit()
         await db.refresh(new_hiring_stage)
+
+        # Create analytics event for stage change
+        analytics_event = AnalyticsEvent(
+            event_type=AnalyticsEventType.STAGE_CHANGED,
+            entity_type="resume",
+            entity_id=candidate_uuid,
+            event_data={
+                "previous_stage": previous_stage,
+                "new_stage": new_stage_name,
+                "vacancy_id": str(vacancy_uuid) if vacancy_uuid else None,
+                "notes": stage_data.notes,
+                "workflow_stage_config_id": str(workflow_stage_config_id) if workflow_stage_config_id else None,
+            },
+        )
+        db.add(analytics_event)
+        await db.commit()
 
         logger.info(
             f"Candidate {candidate_id} moved from {previous_stage} to {new_stage_name}"
