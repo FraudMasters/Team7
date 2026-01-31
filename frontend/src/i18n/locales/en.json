@@ -783,5 +783,13 @@
     "empty": "Click to add a note about this candidate...",
     "expand": "Expand note",
     "words": "words"
+  },
+  "tags": {
+    "loading": "Loading tags...",
+    "noTags": "No tags assigned",
+    "add": "Add Tag",
+    "available": "Available Tags",
+    "noAvailable": "No available tags",
+    "maxReached": "Maximum {{max}} tags reached"
   }
 }
