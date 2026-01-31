@@ -488,7 +488,8 @@
       "avgMatch": "Средн. совпадение"
     },
     "matched": "Найдено ({{count}})",
-    "missing": "Отсутствует ({{count}})"
+    "missing": "Отсутствует ({{count}})",
+    "keyboardHint": "Используйте стрелки для навигации, Enter для просмотра"
   },
   "analyticsDashboard": {
     "title": "Аналитика найма",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Typography,
   Box,
@@ -31,6 +31,8 @@ import {
   Star as StarIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -94,6 +96,9 @@ const CandidateSearchPage: React.FC = () => {
     message: '',
     severity: 'error',
   });
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const candidateListRef = useRef<HTMLDivElement>(null);
+  const candidateRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Load vacancies on mount
   useEffect(() => {
@@ -126,6 +131,85 @@ const CandidateSearchPage: React.FC = () => {
     };
     fetchResumes();
   }, []);
+
+  // Keyboard navigation for candidate list
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard navigation when candidates are displayed
+      if (displayedCandidates.length === 0) {
+        return;
+      }
+
+      // Ignore if typing in an input field
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      switch (event.key) {
+        case 'ArrowDown':
+        case 'j':
+          event.preventDefault();
+          setFocusedIndex((prev) => {
+            const next = prev + 1;
+            return next < displayedCandidates.length ? next : prev;
+          });
+          break;
+
+        case 'ArrowUp':
+        case 'k':
+          event.preventDefault();
+          setFocusedIndex((prev) => {
+            if (prev <= 0) {
+              return prev;
+            }
+            return prev - 1;
+          });
+          break;
+
+        case 'Enter':
+          if (focusedIndex >= 0 && focusedIndex < displayedCandidates.length) {
+            event.preventDefault();
+            const candidate = displayedCandidates[focusedIndex];
+            window.location.href = `/results/${candidate.id}`;
+          }
+          break;
+
+        case 'Escape':
+          event.preventDefault();
+          setFocusedIndex(-1);
+          break;
+
+        case 'Home':
+          event.preventDefault();
+          setFocusedIndex(0);
+          break;
+
+        case 'End':
+          event.preventDefault();
+          setFocusedIndex(displayedCandidates.length - 1);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [displayedCandidates.length, focusedIndex]);
+
+  // Reset focused index when candidates change
+  useEffect(() => {
+    setFocusedIndex(-1);
+  }, [candidates]);
+
+  // Scroll focused candidate into view
+  useEffect(() => {
+    if (focusedIndex >= 0 && candidateRefs.current[focusedIndex]) {
+      candidateRefs.current[focusedIndex]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [focusedIndex]);
 
   const handleSearch = async () => {
     if (!selectedVacancy) {
@@ -460,25 +544,59 @@ const CandidateSearchPage: React.FC = () => {
             </Paper>
 
             {/* Candidate List */}
-            <Grid container spacing={{ xs: 2, md: 3 }}>
-              {displayedCandidates.map((candidate, index) => (
-                <Grid item xs={12} md={6} key={candidate.id}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
-                      borderLeft: 4,
-                      borderColor: candidate.rankingScore
-                        ? `${candidate.rankingScore >= 70 ? 'success' : candidate.rankingScore >= 40 ? 'warning' : 'error'}.main`
-                        : `${getMatchColor(candidate.matchPercentage)}.main`,
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                    onClick={() => (window.location.href = `/results/${candidate.id}`)}
-                  >
+            <Box ref={candidateListRef}>
+              {/* Keyboard Navigation Hint */}
+              {displayedCandidates.length > 0 && focusedIndex === -1 && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1,
+                    mb: 2,
+                    py: 1,
+                    px: 2,
+                    bgcolor: 'action.hover',
+                    borderRadius: 1,
+                  }}
+                >
+                  <KeyboardArrowDownIcon fontSize="small" color="action" />
+                  <Typography variant="caption" color="text.secondary">
+                    {t('candidateSearch.keyboardHint', 'Use arrow keys to navigate, Enter to view details')}
+                  </Typography>
+                  <KeyboardArrowUpIcon fontSize="small" color="action" />
+                </Box>
+              )}
+
+              <Grid container spacing={{ xs: 2, md: 3 }}>
+                {displayedCandidates.map((candidate, index) => (
+                  <Grid item xs={12} md={6} key={candidate.id}>
+                    <Card
+                      ref={(el) => (candidateRefs.current[index] = el)}
+                      sx={{
+                        height: '100%',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s, outline-color 0.2s',
+                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
+                        borderLeft: 4,
+                        borderColor: candidate.rankingScore
+                          ? `${candidate.rankingScore >= 70 ? 'success' : candidate.rankingScore >= 40 ? 'warning' : 'error'}.main`
+                          : `${getMatchColor(candidate.matchPercentage)}.main`,
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        outline: focusedIndex === index ? '3px solid' : 'none',
+                        outlineColor: 'primary.main',
+                        outlineOffset: '2px',
+                        boxShadow: focusedIndex === index ? 8 : 1,
+                      }}
+                      onClick={() => {
+                        setFocusedIndex(index);
+                        window.location.href = `/results/${candidate.id}`;
+                      }}
+                      onMouseEnter={() => setFocusedIndex(index)}
+                      tabIndex={0}
+                    >
                     {/* Top Recommendation Badge */}
                     {candidate.isTopRecommendation && (
                       <Box
@@ -687,6 +805,7 @@ const CandidateSearchPage: React.FC = () => {
                 </Grid>
               ))}
             </Grid>
+          </Box>
           </>
         )}
       </Box>

@@ -483,7 +483,8 @@
       "avgMatch": "Avg Match"
     },
     "matched": "Matched ({{count}})",
-    "missing": "Missing ({{count}})"
+    "missing": "Missing ({{count}})",
+    "keyboardHint": "Use arrow keys to navigate, Enter to view details"
   },
   "analyticsDashboard": {
     "title": "Hiring Analytics",
