@@ -92,7 +92,7 @@ export default function WeightSliderCard({
   const config = METHOD_CONFIG[type];
 
   const handleSliderChange = (_: Event, newValue: number | number[]) => {
-    onChange(typeof newValue === 'number' ? newValue : newValue[0]);
+    onChange(typeof newValue === 'number' ? newValue : (newValue[0] ?? 0));
   };
 
   const handleIncrement = () => {

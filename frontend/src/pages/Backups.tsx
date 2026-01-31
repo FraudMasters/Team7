@@ -62,7 +62,8 @@ import {
   Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import backupApi, { Backup, BackupStatus as BackupStatusType } from '@services/backupApi';
+import backupApi from '../services/backupApi';
+import type { Backup, BackupStatus as BackupStatusType } from '@/types/api';
 
 const BackupsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -103,7 +104,7 @@ const BackupsPage: React.FC = () => {
   });
 
   // Refresh interval
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -126,7 +127,19 @@ const BackupsPage: React.FC = () => {
   const fetchConfig = useCallback(async () => {
     try {
       const configData = await backupApi.getBackupConfig();
-      setConfig(configData);
+      setConfig((prev) => ({
+        ...prev,
+        retention_days: configData.retention_days,
+        backup_schedule: configData.backup_schedule,
+        s3_enabled: configData.s3_enabled,
+        s3_bucket: configData.s3_bucket ?? '',
+        s3_endpoint: configData.s3_endpoint ?? '',
+        s3_region: configData.s3_region ?? 'us-east-1',
+        notification_email: configData.notification_email ?? '',
+        enabled: configData.enabled,
+        incremental_enabled: configData.incremental_enabled,
+        compression_enabled: configData.compression_enabled,
+      }));
     } catch (err) {
       console.error('Failed to fetch config:', err);
     }
@@ -254,7 +267,8 @@ const BackupsPage: React.FC = () => {
   };
 
   const getStatusChip = (status: string) => {
-    const statusConfig: Record<string, { color: any; icon: React.ReactNode; label: string }> = {
+    type StatusConfig = { color: 'success' | 'info' | 'default' | 'error' | 'warning'; icon: React.ReactNode; label: string };
+    const statusConfig: Record<string, StatusConfig> = {
       completed: { color: 'success', icon: <CheckCircleIcon />, label: 'Completed' },
       in_progress: { color: 'info', icon: <ScheduleIcon />, label: 'In Progress' },
       pending: { color: 'default', icon: <ScheduleIcon />, label: 'Pending' },
@@ -263,10 +277,11 @@ const BackupsPage: React.FC = () => {
       expired: { color: 'error', icon: <ErrorIcon />, label: 'Expired' },
     };
 
-    const config = statusConfig[status] || statusConfig.pending;
+    const config = statusConfig[status] ?? statusConfig.pending;
+    if (!config) return null;
     return (
       <Chip
-        icon={config.icon}
+        icon={config.icon as React.ReactElement}
         label={config.label}
         color={config.color}
         size="small"
@@ -313,7 +328,7 @@ const BackupsPage: React.FC = () => {
             variant="outlined"
             startIcon={<CloudUploadIcon />}
             onClick={handleSyncS3}
-            disabled={!backupStatus?.enabled || !backupStatus?.recent_backups.some((b) => !b.s3_uploaded)}
+            disabled={!backupStatus?.enabled || !backupStatus?.recent_backups.some((b: Backup) => !b.s3_uploaded)}
           >
             Sync to S3
           </Button>
@@ -407,7 +422,7 @@ const BackupsPage: React.FC = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                {backupStatus?.recent_backups.some((b) => b.s3_uploaded) ? (
+                {backupStatus?.recent_backups.some((b: Backup) => b.s3_uploaded) ? (
                   <CloudDoneIcon color="info" sx={{ mr: 1 }} />
                 ) : (
                   <CloudOffIcon color="disabled" sx={{ mr: 1 }} />
@@ -417,7 +432,7 @@ const BackupsPage: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="body1" fontWeight={500}>
-                {backupStatus?.recent_backups.some((b) => b.s3_uploaded)
+                {backupStatus?.recent_backups.some((b: Backup) => b.s3_uploaded)
                   ? 'Synced'
                   : 'Not Synced'}
               </Typography>

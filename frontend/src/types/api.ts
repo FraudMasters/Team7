@@ -1273,3 +1273,133 @@ export interface S3Config {
   region: string;
 }
 
+// ==================== ATS Simulation Types ====================
+
+/**
+ * ATS evaluation request
+ */
+export interface ATSEvaluationRequest {
+  resume_id: string;
+  vacancy_id: string;
+  use_llm?: boolean;
+}
+
+/**
+ * ATS evaluation response
+ */
+export interface ATSEvaluationResponse {
+  resume_id: string;
+  vacancy_id: string;
+  passed: boolean;
+  overall_score: number;
+  keyword_score: number;
+  experience_score: number;
+  education_score: number;
+  fit_score: number;
+  looks_professional: boolean;
+  disqualified: boolean;
+  visual_issues: string[];
+  ats_issues: string[];
+  missing_keywords: string[];
+  suggestions: string[];
+  feedback: string;
+  provider: string;
+  model: string;
+  processing_time_ms: number;
+}
+
+/**
+ * Batch ATS evaluation request
+ */
+export interface BatchATSEvaluationRequest {
+  vacancy_id: string;
+  resume_ids: string[];
+  use_llm?: boolean;
+}
+
+/**
+ * Batch ATS evaluation result for a single resume
+ */
+export interface BatchATSResult {
+  resume_id: string;
+  passed?: boolean;
+  overall_score?: number;
+  keyword_score?: number;
+  experience_score?: number;
+  education_score?: number;
+  fit_score?: number;
+  looks_professional?: boolean;
+  disqualified?: boolean;
+  visual_issues?: string[];
+  ats_issues?: string[];
+  missing_keywords?: string[];
+  suggestions?: string[];
+  feedback?: string;
+  provider?: string;
+  model?: string;
+  error?: string;
+}
+
+/**
+ * Batch ATS evaluation response
+ */
+export interface BatchATSEvaluationResponse {
+  vacancy_id: string;
+  results: BatchATSResult[];
+  total_count: number;
+  passed_count: number;
+  processing_time_ms: number;
+}
+
+/**
+ * ATS configuration response
+ */
+export interface ATSConfigResponse {
+  llm_configured: boolean;
+  provider: string;
+  model: string;
+  threshold: number;
+  weights: {
+    keyword: number;
+    experience: number;
+    education: number;
+    fit: number;
+  };
+  visual_check_enabled: boolean;
+}
+
+/**
+ * Cached ATS result from database
+ */
+export interface ATSResult {
+  id: string;
+  resume_id: string;
+  vacancy_id: string;
+  passed: boolean;
+  overall_score: number;
+  keyword_score: number | null;
+  experience_score: number | null;
+  education_score: number | null;
+  fit_score: number | null;
+  looks_professional: boolean;
+  disqualified: boolean;
+  visual_issues: Record<string, unknown> | null;
+  ats_issues: Record<string, unknown> | null;
+  missing_keywords: Record<string, unknown> | null;
+  suggestions: Record<string, unknown> | null;
+  feedback: string | null;
+  provider: string | null;
+  model: string | null;
+  raw_response: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * ATS result list response
+ */
+export interface ATSResultListResponse {
+  results: ATSResult[];
+  total_count: number;
+}
+

@@ -188,6 +188,89 @@ class Settings(BaseSettings):
         description="Enable backup compression",
     )
 
+    # ==============================================
+    # LLM API Configuration for ATS Simulation
+    # ==============================================
+    llm_provider: str = Field(
+        default="openai",
+        description="LLM provider to use (openai, anthropic, google)",
+    )
+
+    openai_api_key: Optional[str] = Field(
+        default=None,
+        description="OpenAI API key for ATS simulation",
+    )
+
+    anthropic_api_key: Optional[str] = Field(
+        default=None,
+        description="Anthropic API key for ATS simulation",
+    )
+
+    google_api_key: Optional[str] = Field(
+        default=None,
+        description="Google API key for Gemini models",
+    )
+
+    llm_model: str = Field(
+        default="gpt-4o-mini",
+        description="Default LLM model for ATS simulation",
+    )
+
+    llm_temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Temperature for LLM calls (lower = more deterministic)",
+    )
+
+    llm_max_tokens: int = Field(
+        default=4096,
+        ge=256,
+        le=32768,
+        description="Maximum tokens for LLM responses",
+    )
+
+    # ATS Simulation Configuration
+    ats_threshold: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Minimum ATS score to pass (0.0-1.0)",
+    )
+
+    ats_visual_check_enabled: bool = Field(
+        default=True,
+        description="Enable visual format checking in ATS",
+    )
+
+    ats_keyword_weight: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Weight for keyword matching in ATS score",
+    )
+
+    ats_experience_weight: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Weight for experience matching in ATS score",
+    )
+
+    ats_education_weight: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="Weight for education matching in ATS score",
+    )
+
+    ats_fit_weight: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="Weight for overall fit assessment in ATS score",
+    )
+
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

@@ -23,3 +23,4 @@ export { default as SkillDemandChart } from './analytics/SkillDemandChart';
 export { default as SourceTracking } from './analytics/SourceTracking';
 export { default as ModelQualityMetrics } from './ModelQualityMetrics';
 export { default as UnifiedMatchMetrics } from './UnifiedMatchMetrics';
+export { ATSEvaluation, ATSScoreBadge } from './ATSEvaluation';

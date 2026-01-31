@@ -23,6 +23,7 @@ from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
+from .ats_result import ATSResult
 
 __all__ = [
     "Base",
@@ -55,4 +56,5 @@ __all__ = [
     "BackupConfig",
     "BackupType",
     "BackupStatus",
+    "ATSResult",
 ]

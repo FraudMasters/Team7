@@ -86,6 +86,15 @@ from .learning_recommendation_engine import (
     LearningRecommendationEngine,
     get_learning_recommendation_engine,
 )
+from .ats_simulation import (
+    ATSSimulator,
+    ATSScoreResult,
+    SimpleATSChecker,
+    LLMProvider,
+    get_ats_simulator,
+    get_simple_ats_checker,
+    evaluate_resume_ats,
+)
 
 __all__ = [
     "extract_keywords",
@@ -133,6 +142,13 @@ __all__ = [
     "get_skill_gap_analyzer",
     "LearningRecommendationEngine",
     "get_learning_recommendation_engine",
+    "ATSSimulator",
+    "ATSScoreResult",
+    "SimpleATSChecker",
+    "LLMProvider",
+    "get_ats_simulator",
+    "get_simple_ats_checker",
+    "evaluate_resume_ats",
     "save_resume_analysis",
     "get_resume_analysis",
     "delete_resume_analysis",

@@ -94,6 +94,12 @@ import type {
   NormalizedWeightsResponse,
   ApplyWeightsRequest,
   ApplyWeightsResponse,
+  ATSEvaluationRequest,
+  ATSEvaluationResponse,
+  BatchATSEvaluationRequest,
+  BatchATSEvaluationResponse,
+  ATSConfigResponse,
+  ATSResultListResponse,
 } from '@/types/api';
 
 /**
@@ -1619,6 +1625,163 @@ export class ApiClient {
       const response: AxiosResponse<ApplyWeightsResponse> = await this.client.post(
         '/api/matching-weights/apply',
         request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== ATS Simulation ====================
+
+  /**
+   * Evaluate a resume against a job posting using ATS simulation
+   *
+   * @param request - ATS evaluation request with resume_id, vacancy_id, and optional use_llm flag
+   * @returns Comprehensive ATS evaluation results
+   * @throws ApiError if evaluation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.evaluateATS({
+   *   resume_id: 'resume-123',
+   *   vacancy_id: 'vacancy-456',
+   *   use_llm: true,
+   * });
+   * console.log(result.passed); // true/false
+   * console.log(result.overall_score); // 0-1
+   * console.log(result.missing_keywords); // ["Docker", "Kubernetes"]
+   * ```
+   */
+  async evaluateATS(request: ATSEvaluationRequest): Promise<ATSEvaluationResponse> {
+    try {
+      const response: AxiosResponse<ATSEvaluationResponse> = await this.client.post(
+        '/api/ats/evaluate',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get cached ATS evaluation result for a resume-vacancy pair
+   *
+   * @param resumeId - Resume ID
+   * @param vacancyId - Job Vacancy ID
+   * @returns Cached ATS evaluation result
+   * @throws ApiError if result not found
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.getATSResult('resume-123', 'vacancy-456');
+   * console.log(result.passed, result.overall_score);
+   * ```
+   */
+  async getATSResult(resumeId: string, vacancyId: string): Promise<ATSEvaluationResponse> {
+    try {
+      const response: AxiosResponse<ATSEvaluationResponse> = await this.client.get(
+        `/api/ats/results/${resumeId}/${vacancyId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Evaluate multiple resumes against a single job posting
+   *
+   * @param request - Batch evaluation request with vacancy_id and list of resume_ids
+   * @returns Batch evaluation results with summary statistics
+   * @throws ApiError if evaluation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.batchEvaluateATS({
+   *   vacancy_id: 'vacancy-456',
+   *   resume_ids: ['resume-1', 'resume-2', 'resume-3'],
+   *   use_llm: true,
+   * });
+   * console.log(`${result.passed_count}/${result.total_count} passed`);
+   * ```
+   */
+  async batchEvaluateATS(request: BatchATSEvaluationRequest): Promise<BatchATSEvaluationResponse> {
+    try {
+      const response: AxiosResponse<BatchATSEvaluationResponse> = await this.client.post(
+        '/api/ats/batch-evaluate',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get current ATS simulation configuration
+   *
+   * @returns ATS configuration including provider, model, threshold, and weights
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const config = await apiClient.getATSConfig();
+   * console.log(config.llm_configured); // true/false
+   * console.log(config.provider); // "openai"
+   * console.log(config.threshold); // 0.6
+   * ```
+   */
+  async getATSConfig(): Promise<ATSConfigResponse> {
+    try {
+      const response: AxiosResponse<ATSConfigResponse> = await this.client.get(
+        '/api/ats/config'
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * List ATS results with optional filters
+   *
+   * @param resumeId - Optional resume ID filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param passed - Optional passed status filter
+   * @param minScore - Optional minimum overall score filter
+   * @param limit - Maximum number of results to return
+   * @param offset - Number of results to skip
+   * @returns List of ATS results with total count
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * const results = await apiClient.listATSResults('vacancy-456');
+   * console.log(`${results.total_count} results found`);
+   * ```
+   */
+  async listATSResults(
+    resumeId?: string,
+    vacancyId?: string,
+    passed?: boolean,
+    minScore?: number,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<ATSResultListResponse> {
+    try {
+      const params: Record<string, string | number | boolean> = {};
+      if (resumeId) params.resume_id = resumeId;
+      if (vacancyId) params.vacancy_id = vacancyId;
+      if (passed !== undefined) params.passed = passed;
+      if (minScore !== undefined) params.min_score = minScore;
+      params.limit = limit;
+      params.offset = offset;
+
+      const response: AxiosResponse<ATSResultListResponse> = await this.client.get(
+        '/api/ats/results',
+        { params }
       );
       return response.data;
     } catch (error) {

@@ -4,7 +4,7 @@
  * Provides methods for interacting with the backup and restore endpoints.
  */
 import axios, { AxiosInstance } from 'axios';
-import {
+import type {
   Backup,
   BackupCreate,
   BackupRestoreRequest,
@@ -12,7 +12,7 @@ import {
   BackupConfigUpdate,
   BackupStatus,
   BackupVerifyResponse,
-} from '@types/api';
+} from '@/types/api';
 
 class BackupApiService {
   private client: AxiosInstance;

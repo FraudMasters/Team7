@@ -30,4 +30,12 @@ export type {
   LearningRecommendationsResponse,
   LearningResource,
   MissingSkillDetail,
+  ATSEvaluationRequest,
+  ATSEvaluationResponse,
+  BatchATSEvaluationRequest,
+  BatchATSEvaluationResponse,
+  BatchATSResult,
+  ATSConfigResponse,
+  ATSResult,
+  ATSResultListResponse,
 } from '@/types/api';
