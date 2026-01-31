@@ -799,5 +799,23 @@
     "refresh": "Refresh",
     "noActivitiesTitle": "No Activity Recorded",
     "noActivities": "No activities found for this candidate. Activities will appear here as the candidate moves through the hiring pipeline."
+  },
+  "bulkActions": {
+    "title": "Bulk Candidate Actions",
+    "selected": "{{count}} selected",
+    "selectCount": "Select candidates to move them to a different stage in bulk.",
+    "selectAll": "Select All",
+    "clearSelection": "Clear Selection",
+    "moveCandidates": "Move {{count}} candidate{{plural}} to:",
+    "targetStage": "Target Stage",
+    "moveToStage": "Move to Stage",
+    "moving": "Moving...",
+    "current": "Current: {{stage}}",
+    "moveSuccess": "Successfully moved {{count}} candidate{{plural}} to new stage.",
+    "movePartialSuccess": "Moved {{success}} candidates successfully. {{failed}} failed.",
+    "moveError": "Failed to move candidates",
+    "noCandidates": "No candidates available for bulk operations.",
+    "tip": "Tip:",
+    "selectStageTip": "Select a target stage to enable the bulk move operation."
   }
 }

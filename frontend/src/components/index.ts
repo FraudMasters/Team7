@@ -27,3 +27,4 @@ export { ATSEvaluation, ATSScoreBadge } from './ATSEvaluation';
 export { default as CandidateTags } from './CandidateTags';
 export { default as CandidateNotes } from './CandidateNotes';
 export { default as CandidateActivityTimeline } from './CandidateActivityTimeline';
+export { default as BulkCandidateActions } from './BulkCandidateActions';
