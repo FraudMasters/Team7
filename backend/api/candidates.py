@@ -4,6 +4,7 @@ Candidates and workflow stage management endpoints.
 This module provides endpoints for:
 - Listing candidates (resumes) with their current workflow stages
 - Moving candidates through customizable workflow stages (kanban-style board)
+- Bulk moving multiple candidates to a stage at once
 - Getting ranked candidates for vacancies with AI-powered matching
 
 Supports both kanban-style board management and intelligent candidate ranking.
@@ -81,6 +82,34 @@ class MoveCandidateResponse(BaseModel):
     previous_stage: str = Field(..., description="Previous stage name")
     new_stage: str = Field(..., description="New stage name")
     message: str = Field(..., description="Success message")
+
+
+class BulkMoveCandidatesRequest(BaseModel):
+    """Request model for bulk moving candidates to a different stage."""
+
+    resume_ids: List[str] = Field(..., description="List of resume IDs to move", min_length=1)
+    stage_id: str = Field(..., description="Target stage ID (workflow_stage_config UUID or stage name)")
+    vacancy_id: Optional[str] = Field(None, description="Optional vacancy ID to associate")
+    notes: Optional[str] = Field(None, description="Optional notes about the stage change")
+
+
+class BulkMoveCandidateResult(BaseModel):
+    """Result of moving a single candidate in a bulk operation."""
+
+    resume_id: str = Field(..., description="Resume ID")
+    success: bool = Field(..., description="Whether the move was successful")
+    previous_stage: Optional[str] = Field(None, description="Previous stage name")
+    new_stage: Optional[str] = Field(None, description="New stage name")
+    message: str = Field(..., description="Success or error message")
+
+
+class BulkMoveCandidatesResponse(BaseModel):
+    """Response model for bulk candidate stage movement."""
+
+    total_requested: int = Field(..., description="Total number of candidates requested to move")
+    successful: int = Field(..., description="Number of successfully moved candidates")
+    failed: int = Field(..., description="Number of candidates that failed to move")
+    results: List[BulkMoveCandidateResult] = Field(..., description="Individual results for each candidate")
 
 
 # Ranked candidates models
@@ -719,6 +748,229 @@ async def move_candidate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to move candidate: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/bulk-move",
+    response_model=BulkMoveCandidatesResponse,
+    tags=["Candidates"],
+)
+async def bulk_move_candidates(
+    request: Request,
+    bulk_data: BulkMoveCandidatesRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Bulk move multiple candidates to a different workflow stage.
+
+    Creates new HiringStage records for each candidate to track stage transitions.
+    This allows maintaining a complete history of candidate progression for multiple
+    candidates at once.
+
+    Args:
+        request: FastAPI request object
+        bulk_data: Bulk movement details (resume_ids, stage_id, optional vacancy_id, optional notes)
+        db: Database session
+
+    Returns:
+        JSON response with bulk operation results including success/failure counts
+
+    Raises:
+        HTTPException(400): Invalid resume_ids or stage_id format
+        HTTPException(404): Candidates or stage not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "resume_ids": ["id1", "id2", "id3"],
+        ...     "stage_id": "interview",
+        ...     "notes": "Bulk moved to screening"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/candidates/bulk-move",
+        ...     json=data
+        ... )
+    """
+    try:
+        logger.info(
+            f"Bulk moving {len(bulk_data.resume_ids)} candidates to stage {bulk_data.stage_id}"
+        )
+
+        results = []
+        successful_count = 0
+        failed_count = 0
+
+        # Determine if stage_id is a custom stage UUID or stage name
+        workflow_stage_config_id = None
+        new_stage_name = bulk_data.stage_id
+
+        try:
+            # Try parsing as UUID (custom stage)
+            stage_uuid = UUID(bulk_data.stage_id)
+
+            # Verify the custom stage exists
+            config_query = select(WorkflowStageConfig).where(WorkflowStageConfig.id == stage_uuid)
+            config_result = await db.execute(config_query)
+            workflow_config = config_result.scalar_one_or_none()
+
+            if workflow_config:
+                workflow_stage_config_id = stage_uuid
+                new_stage_name = workflow_config.stage_name
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Custom stage not found: {bulk_data.stage_id}",
+                )
+        except ValueError:
+            # It's a stage name, validate it's a valid enum or allowed value
+            try:
+                # Check if it's a valid enum value
+                HiringStageName(bulk_data.stage_id)
+            except ValueError:
+                # Not a default stage, check if it's a custom stage name
+                config_query = select(WorkflowStageConfig).where(
+                    WorkflowStageConfig.stage_name == bulk_data.stage_id
+                )
+                config_result = await db.execute(config_query)
+                workflow_config = config_result.scalar_one_or_none()
+
+                if not workflow_config:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid stage name: {bulk_data.stage_id}",
+                    )
+
+                workflow_stage_config_id = workflow_config.id
+
+        # Parse vacancy_id if provided
+        vacancy_uuid = None
+        if bulk_data.vacancy_id:
+            try:
+                vacancy_uuid = UUID(bulk_data.vacancy_id)
+            except ValueError:
+                logger.warning(f"Invalid vacancy_id format: {bulk_data.vacancy_id}")
+
+        # Process each resume_id
+        for resume_id in bulk_data.resume_ids:
+            try:
+                # Parse candidate_id as UUID
+                try:
+                    candidate_uuid = UUID(resume_id)
+                except ValueError:
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "previous_stage": None,
+                        "new_stage": None,
+                        "message": f"Invalid candidate ID format: {resume_id}",
+                    })
+                    failed_count += 1
+                    continue
+
+                # Verify resume exists
+                resume_query = select(Resume).where(Resume.id == candidate_uuid)
+                resume_result = await db.execute(resume_query)
+                resume = resume_result.scalar_one_or_none()
+
+                if not resume:
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "previous_stage": None,
+                        "new_stage": None,
+                        "message": f"Candidate not found: {resume_id}",
+                    })
+                    failed_count += 1
+                    continue
+
+                # Get current/latest stage
+                current_stage_query = (
+                    select(HiringStage)
+                    .where(HiringStage.resume_id == candidate_uuid)
+                    .order_by(HiringStage.created_at.desc())
+                    .limit(1)
+                )
+                current_stage_result = await db.execute(current_stage_query)
+                current_stage = current_stage_result.scalar_one_or_none()
+
+                previous_stage = current_stage.stage_name if current_stage else HiringStageName.APPLIED.value
+
+                # Create new hiring stage record
+                new_hiring_stage = HiringStage(
+                    resume_id=candidate_uuid,
+                    vacancy_id=vacancy_uuid,
+                    workflow_stage_config_id=workflow_stage_config_id,
+                    stage_name=new_stage_name,
+                    notes=bulk_data.notes,
+                )
+
+                db.add(new_hiring_stage)
+                await db.commit()
+                await db.refresh(new_hiring_stage)
+
+                # Create analytics event for stage change
+                analytics_event = AnalyticsEvent(
+                    event_type=AnalyticsEventType.STAGE_CHANGED,
+                    entity_type="resume",
+                    entity_id=candidate_uuid,
+                    event_data={
+                        "previous_stage": previous_stage,
+                        "new_stage": new_stage_name,
+                        "vacancy_id": str(vacancy_uuid) if vacancy_uuid else None,
+                        "notes": bulk_data.notes,
+                        "workflow_stage_config_id": str(workflow_stage_config_id) if workflow_stage_config_id else None,
+                        "bulk_operation": True,
+                    },
+                )
+                db.add(analytics_event)
+                await db.commit()
+
+                results.append({
+                    "resume_id": resume_id,
+                    "success": True,
+                    "previous_stage": previous_stage,
+                    "new_stage": new_stage_name,
+                    "message": f"Candidate moved to {new_stage_name} stage",
+                })
+                successful_count += 1
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error moving candidate {resume_id}: {e}", exc_info=True)
+                results.append({
+                    "resume_id": resume_id,
+                    "success": False,
+                    "previous_stage": None,
+                    "new_stage": None,
+                    "message": f"Failed to move candidate: {str(e)}",
+                })
+                failed_count += 1
+
+        logger.info(
+            f"Bulk move completed: {successful_count} successful, {failed_count} failed"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total_requested": len(bulk_data.resume_ids),
+                "successful": successful_count,
+                "failed": failed_count,
+                "results": results,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk move operation: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to perform bulk move: {str(e)}",
         ) from e
 
 
