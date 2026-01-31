@@ -17,6 +17,91 @@ code {
   min-height: 100vh;
 }
 
+/* Dark Mode Support
+ *
+ * This application supports both light and dark themes through Material-UI's
+ * theming system. The global CSS is designed to work seamlessly with both themes
+ * by avoiding hardcoded colors and letting MUI's theme provider handle colors.
+ *
+ * Theme-aware elements:
+ * - Backgrounds and text colors are managed by MUI CssBaseline
+ * - Components automatically adapt to theme changes
+ * - Custom styles use CSS custom properties that respond to theme
+ *
+ * When adding custom CSS:
+ * - Use MUI theme colors via CSS custom properties (var(--mui-palette-...))
+ * - Avoid hardcoded colors (use 'inherit', 'currentColor', or theme vars)
+ * - Test styles in both light and dark modes
+ *
+ * Dark mode is controlled by ThemeContext (frontend/src/contexts/ThemeContext.tsx)
+ * and persists across sessions via localStorage.
+ */
+
+/* Smooth transitions for theme changes */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-in-out;
+}
+
+/* Skip transition for theme toggle button to prevent lag */
+.theme-toggle-button * {
+  transition: none !important;
+}
+
+/* Scrollbar styling for dark mode */
+@media (prefers-color-scheme: dark) {
+  /* Firefox */
+  * {
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.3);
+  }
+
+  /* WebKit browsers (Chrome, Safari, Edge) */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  /* Firefox */
+  * {
+    scrollbar-color: rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.05);
+  }
+
+  /* WebKit browsers (Chrome, Safari, Edge) */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+}
+
 /* RTL (Right-to-Left) Support
  *
  * These CSS rules prepare the application for future RTL language support
@@ -54,6 +139,11 @@ code {
  * all comparison data is clearly visible in the exported document.
  */
 @media print {
+  /* Disable transitions for printing to prevent artifacts */
+  * {
+    transition: none !important;
+  }
+
   /* Hide interactive elements that don't belong in print */
   .no-print,
   button,
