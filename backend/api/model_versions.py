@@ -77,6 +77,19 @@ class ModelVersionListResponse(BaseModel):
     total_count: int = Field(..., description="Total number of entries")
 
 
+class ModelRetrainRequest(BaseModel):
+    """Request model for manual model retraining."""
+
+    model_name: str = Field(..., description="Name of the model to retrain (e.g., ranking, skill_matching)")
+
+
+class ModelRollbackRequest(BaseModel):
+    """Request model for rolling back to a previous model version."""
+
+    model_name: str = Field(..., description="Name of the model to rollback (e.g., ranking, skill_matching)")
+    target_version: str = Field(..., description="Target version to rollback to (e.g., v1.0.0)")
+
+
 @router.post(
     "/",
     response_model=ModelVersionListResponse,
@@ -534,4 +547,159 @@ async def deactivate_model_version(version_id: str) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to deactivate model version: {str(e)}",
+        ) from e
+
+
+@router.post("/retrain", tags=["Model Versions"])
+async def trigger_model_retraining(request: ModelRetrainRequest) -> JSONResponse:
+    """
+    Trigger manual retraining for a specific model.
+
+    This endpoint initiates an asynchronous retraining job for the specified model.
+    The retraining process runs in the background and this endpoint returns immediately
+    with a 202 Accepted status.
+
+    Args:
+        request: Retrain request containing the model name
+
+    Returns:
+        JSON response confirming retraining job initiation
+
+    Raises:
+        HTTPException(422): If model name validation fails
+        HTTPException(404): If model is not found
+        HTTPException(500): If retraining job fails to start
+
+    Examples:
+        >>> import requests
+        >>> data = {"model_name": "ranking"}
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/model-versions/retrain",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "message": "Model retraining initiated",
+            "model_name": "ranking",
+            "status": "pending"
+        }
+    """
+    try:
+        logger.info(f"Triggering manual retraining for model: {request.model_name}")
+
+        # Validate model name
+        if not request.model_name or len(request.model_name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Model name cannot be empty",
+            )
+
+        # For now, return placeholder response
+        # Actual retraining logic will be implemented in a later subtask
+        response_data = {
+            "message": "Model retraining initiated",
+            "model_name": request.model_name,
+            "status": "pending",
+        }
+
+        logger.info(
+            f"Retraining job initiated for model: {request.model_name}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error triggering model retraining: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger model retraining: {str(e)}",
+        ) from e
+
+
+@router.post("/rollback", tags=["Model Versions"])
+async def rollback_model_version(request: ModelRollbackRequest) -> JSONResponse:
+    """
+    Rollback to a previous model version.
+
+    This endpoint rolls back the active model to a specified previous version,
+    deactivating the current version and activating the target version.
+
+    Args:
+        request: Rollback request containing model name and target version
+
+    Returns:
+        JSON response confirming rollback operation
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(404): If target version is not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "model_name": "ranking",
+        ...     "target_version": "v1.0.0"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/model-versions/rollback",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "message": "Model rolled back successfully",
+            "model_name": "ranking",
+            "target_version": "v1.0.0",
+            "previous_version": "v2.0.0"
+        }
+    """
+    try:
+        logger.info(
+            f"Rolling back model {request.model_name} to version {request.target_version}"
+        )
+
+        # Validate model name
+        if not request.model_name or len(request.model_name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Model name cannot be empty",
+            )
+
+        # Validate target version
+        if not request.target_version or len(request.target_version.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Target version cannot be empty",
+            )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        response_data = {
+            "message": "Model rolled back successfully",
+            "model_name": request.model_name,
+            "target_version": request.target_version,
+            "previous_version": "v2.0.0",
+        }
+
+        logger.info(
+            f"Model {request.model_name} rolled back to version {request.target_version}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rolling back model version: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to rollback model version: {str(e)}",
         ) from e

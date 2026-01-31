@@ -14,6 +14,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from models.ml_model_version import MLModelVersion
+from models.model_performance_history import ModelPerformanceHistory
 
 logger = logging.getLogger(__name__)
 
@@ -523,3 +524,264 @@ class ModelVersionManager:
             "reason": "No experiment meets performance criteria",
             "best_improvement_pct": round(best_improvement, 2),
         }
+
+    def record_performance_metrics(
+        self,
+        model_version_id: str,
+        metrics: Dict[str, Any],
+        dataset_type: str = "production",
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Record performance metrics for a model version in the performance history.
+
+        Creates a new ModelPerformanceHistory record with the provided metrics
+        and updates the model version's current performance score and accuracy metrics.
+
+        Args:
+            model_version_id: UUID of the model version to record metrics for
+            metrics: Dictionary containing performance metrics:
+                - accuracy: Overall accuracy (0-1)
+                - precision: Precision score (0-1)
+                - recall: Recall score (0-1)
+                - f1_score: F1 score (0-1)
+                - auc_score: AUC-ROC score (0-1, optional)
+                - sample_size: Number of samples evaluated
+                - confusion_matrix: Confusion matrix data (optional)
+                - custom_metrics: Additional model-specific metrics (optional)
+                - evaluation_metadata: Evaluation details (optional)
+            dataset_type: Type of dataset (training, validation, test, production)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with recorded performance history information or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> metrics = {
+            ...     "accuracy": 0.85,
+            ...     "precision": 0.82,
+            ...     "recall": 0.88,
+            ...     "f1_score": 0.85,
+            ...     "sample_size": 1000
+            ... }
+            >>> result = manager.record_performance_metrics(
+            ...     model_version_id='uuid-here',
+            ...     metrics=metrics,
+            ...     dataset_type='production'
+            ... )
+            >>> print(result['f1_score'])
+            0.85
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for record_performance_metrics({model_version_id}), returning None"
+            )
+            return None
+
+        try:
+            # Get the model version
+            model_version = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == model_version_id)
+                .first()
+            )
+
+            if not model_version:
+                logger.error(f"Model version {model_version_id} not found")
+                return None
+
+            # Get previous performance to calculate delta
+            previous_history = (
+                db_session.query(ModelPerformanceHistory)
+                .filter(
+                    ModelPerformanceHistory.model_version_id == model_version_id,
+                    ModelPerformanceHistory.dataset_type == dataset_type,
+                )
+                .order_by(ModelPerformanceHistory.created_at.desc())
+                .first()
+            )
+
+            previous_score = (
+                float(previous_history.f1_score)
+                if previous_history and previous_history.f1_score
+                else None
+            )
+
+            # Calculate performance delta
+            current_f1 = metrics.get("f1_score", 0)
+            performance_delta = None
+            if previous_score is not None:
+                performance_delta = current_f1 - previous_score
+
+            # Create performance history record
+            performance_record = ModelPerformanceHistory(
+                model_version_id=model_version_id,
+                dataset_type=dataset_type,
+                accuracy=metrics.get("accuracy"),
+                precision=metrics.get("precision"),
+                recall=metrics.get("recall"),
+                f1_score=metrics.get("f1_score"),
+                auc_score=metrics.get("auc_score"),
+                sample_size=metrics.get("sample_size"),
+                confusion_matrix=metrics.get("confusion_matrix"),
+                custom_metrics=metrics.get("custom_metrics"),
+                performance_delta=performance_delta,
+                evaluation_metadata=metrics.get("evaluation_metadata"),
+            )
+
+            db_session.add(performance_record)
+            db_session.flush()  # Flush to get the ID without committing
+
+            # Update model version's current performance metrics
+            # Use F1 score as the primary performance score
+            model_version.performance_score = current_f1 * 100  # Convert to 0-100 scale
+
+            # Update accuracy metrics
+            accuracy_metrics = {
+                "accuracy": metrics.get("accuracy"),
+                "precision": metrics.get("precision"),
+                "recall": metrics.get("recall"),
+                "f1_score": metrics.get("f1_score"),
+                "auc_score": metrics.get("auc_score"),
+                "sample_size": metrics.get("sample_size"),
+                "last_updated": performance_record.created_at.isoformat()
+                if performance_record.created_at
+                else None,
+            }
+            model_version.accuracy_metrics = accuracy_metrics
+
+            db_session.commit()
+
+            logger.info(
+                f"Recorded performance metrics for model {model_version.model_name}:"
+                f"{model_version.version} (F1: {current_f1:.4f}, "
+                f"delta: {performance_delta:.4f if performance_delta else 'N/A'})"
+            )
+
+            return {
+                "id": str(performance_record.id),
+                "model_version_id": str(performance_record.model_version_id),
+                "dataset_type": performance_record.dataset_type,
+                "accuracy": float(performance_record.accuracy)
+                if performance_record.accuracy
+                else None,
+                "precision": float(performance_record.precision)
+                if performance_record.precision
+                else None,
+                "recall": float(performance_record.recall)
+                if performance_record.recall
+                else None,
+                "f1_score": float(performance_record.f1_score)
+                if performance_record.f1_score
+                else None,
+                "auc_score": float(performance_record.auc_score)
+                if performance_record.auc_score
+                else None,
+                "sample_size": performance_record.sample_size,
+                "performance_delta": float(performance_record.performance_delta)
+                if performance_record.performance_delta
+                else None,
+                "created_at": performance_record.created_at.isoformat()
+                if performance_record.created_at
+                else None,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error recording performance metrics for model version {model_version_id}: {e}",
+                exc_info=True,
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def get_performance_history(
+        self,
+        model_version_id: str,
+        dataset_type: Optional[str] = None,
+        limit: int = 100,
+        db_session: Optional[Any] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get performance history for a model version.
+
+        Retrieves historical performance records for a model version,
+        optionally filtered by dataset type.
+
+        Args:
+            model_version_id: UUID of the model version
+            dataset_type: Optional dataset type filter (training, validation, test, production)
+            limit: Maximum number of records to return
+            db_session: Optional database session for querying
+
+        Returns:
+            List of dictionaries with performance history data
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> history = manager.get_performance_history(
+            ...     model_version_id='uuid-here',
+            ...     dataset_type='production',
+            ...     limit=10
+            ... )
+            >>> for record in history:
+            ...     print(f"{record['created_at']}: F1={record['f1_score']}")
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for get_performance_history({model_version_id}), returning []"
+            )
+            return []
+
+        try:
+            query = db_session.query(ModelPerformanceHistory).filter(
+                ModelPerformanceHistory.model_version_id == model_version_id
+            )
+
+            if dataset_type:
+                query = query.filter(
+                    ModelPerformanceHistory.dataset_type == dataset_type
+                )
+
+            history_records = (
+                query.order_by(ModelPerformanceHistory.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+
+            history = []
+            for record in history_records:
+                history_info = {
+                    "id": str(record.id),
+                    "model_version_id": str(record.model_version_id),
+                    "dataset_type": record.dataset_type,
+                    "accuracy": float(record.accuracy) if record.accuracy else None,
+                    "precision": float(record.precision) if record.precision else None,
+                    "recall": float(record.recall) if record.recall else None,
+                    "f1_score": float(record.f1_score) if record.f1_score else None,
+                    "auc_score": float(record.auc_score) if record.auc_score else None,
+                    "sample_size": record.sample_size,
+                    "performance_delta": float(record.performance_delta)
+                    if record.performance_delta
+                    else None,
+                    "confusion_matrix": record.confusion_matrix or {},
+                    "custom_metrics": record.custom_metrics or {},
+                    "evaluation_metadata": record.evaluation_metadata or {},
+                    "created_at": record.created_at.isoformat()
+                    if record.created_at
+                    else None,
+                }
+                history.append(history_info)
+
+            logger.info(
+                f"Retrieved {len(history)} performance history records for model version {model_version_id}"
+            )
+            return history
+
+        except Exception as e:
+            logger.error(
+                f"Error getting performance history for model version {model_version_id}: {e}",
+                exc_info=True,
+            )
+            return []
