@@ -22,6 +22,7 @@ from models.skill_feedback import SkillFeedback
 from analyzers.performance_tracker import PerformanceTracker
 from analyzers.model_versioning import ModelVersionManager
 from config import get_settings
+from tasks.notifications import send_model_retraining_notification
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -519,13 +520,29 @@ def automated_retraining_task(
             logger.info(
                 f"Retraining not triggered for {model_name}: {trigger_decision['reasons']}"
             )
-            return {
+            result = {
                 "should_retrain": False,
                 "training_triggered": False,
                 "reasons": trigger_decision["reasons"],
                 "processing_time_ms": round((time.time() - start_time) * 1000, 2),
                 "status": "skipped",
             }
+
+            # Send notification if requested (optional for skipped retraining)
+            if notify:
+                try:
+                    logger.info(f"Sending skipped notification for {model_name}")
+                    notification_result = send_model_retraining_notification(
+                        model_name=model_name,
+                        training_result=result,
+                    )
+                    result["notification_sent"] = notification_result.get("status") == "sent"
+                    result["notification_result"] = notification_result
+                except Exception as e:
+                    logger.error(f"Failed to send skipped notification: {e}", exc_info=True)
+                    result["notification_sent"] = False
+
+            return result
 
         logger.info(
             f"Retraining triggered for {model_name}: {', '.join(trigger_decision['reasons'])}"
@@ -702,11 +719,29 @@ def automated_retraining_task(
             f"activated={is_active}, improvement={improvement:+.3f}"
         )
 
+        # Send notification if requested
+        if notify:
+            try:
+                logger.info(f"Sending retraining notification for {model_name}")
+                notification_result = send_model_retraining_notification(
+                    model_name=model_name,
+                    training_result=result,
+                )
+                result["notification_sent"] = notification_result.get("status") == "sent"
+                result["notification_result"] = notification_result
+                logger.info(
+                    f"Retraining notification sent: {notification_result.get('status')}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to send retraining notification: {e}", exc_info=True)
+                result["notification_sent"] = False
+                result["notification_error"] = str(e)
+
         return result
 
     except SoftTimeLimitExceeded:
         logger.error(f"Task {self.request.id} exceeded time limit")
-        return {
+        error_result = {
             "should_retrain": True,
             "training_triggered": False,
             "status": "failed",
@@ -714,15 +749,47 @@ def automated_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
+        # Send notification if requested
+        if notify:
+            try:
+                logger.info(f"Sending failure notification for {model_name}")
+                notification_result = send_model_retraining_notification(
+                    model_name=model_name,
+                    training_result=error_result,
+                )
+                error_result["notification_sent"] = notification_result.get("status") == "sent"
+                error_result["notification_result"] = notification_result
+            except Exception as notify_error:
+                logger.error(f"Failed to send failure notification: {notify_error}", exc_info=True)
+                error_result["notification_sent"] = False
+
+        return error_result
+
     except Exception as e:
         logger.error(f"Error in automated retraining: {e}", exc_info=True)
-        return {
+        error_result = {
             "should_retrain": True,
             "training_triggered": False,
             "status": "failed",
             "error": str(e),
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
+
+        # Send notification if requested
+        if notify:
+            try:
+                logger.info(f"Sending failure notification for {model_name}")
+                notification_result = send_model_retraining_notification(
+                    model_name=model_name,
+                    training_result=error_result,
+                )
+                error_result["notification_sent"] = notification_result.get("status") == "sent"
+                error_result["notification_result"] = notification_result
+            except Exception as notify_error:
+                logger.error(f"Failed to send failure notification: {notify_error}", exc_info=True)
+                error_result["notification_sent"] = False
+
+        return error_result
 
 
 @shared_task(
