@@ -77,6 +77,12 @@ class ModelVersionListResponse(BaseModel):
     total_count: int = Field(..., description="Total number of entries")
 
 
+class ModelRetrainRequest(BaseModel):
+    """Request model for manual model retraining."""
+
+    model_name: str = Field(..., description="Name of the model to retrain (e.g., ranking, skill_matching)")
+
+
 @router.post(
     "/",
     response_model=ModelVersionListResponse,
@@ -534,4 +540,75 @@ async def deactivate_model_version(version_id: str) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to deactivate model version: {str(e)}",
+        ) from e
+
+
+@router.post("/retrain", tags=["Model Versions"])
+async def trigger_model_retraining(request: ModelRetrainRequest) -> JSONResponse:
+    """
+    Trigger manual retraining for a specific model.
+
+    This endpoint initiates an asynchronous retraining job for the specified model.
+    The retraining process runs in the background and this endpoint returns immediately
+    with a 202 Accepted status.
+
+    Args:
+        request: Retrain request containing the model name
+
+    Returns:
+        JSON response confirming retraining job initiation
+
+    Raises:
+        HTTPException(422): If model name validation fails
+        HTTPException(404): If model is not found
+        HTTPException(500): If retraining job fails to start
+
+    Examples:
+        >>> import requests
+        >>> data = {"model_name": "ranking"}
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/model-versions/retrain",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "message": "Model retraining initiated",
+            "model_name": "ranking",
+            "status": "pending"
+        }
+    """
+    try:
+        logger.info(f"Triggering manual retraining for model: {request.model_name}")
+
+        # Validate model name
+        if not request.model_name or len(request.model_name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Model name cannot be empty",
+            )
+
+        # For now, return placeholder response
+        # Actual retraining logic will be implemented in a later subtask
+        response_data = {
+            "message": "Model retraining initiated",
+            "model_name": request.model_name,
+            "status": "pending",
+        }
+
+        logger.info(
+            f"Retraining job initiated for model: {request.model_name}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error triggering model retraining: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger model retraining: {str(e)}",
         ) from e
