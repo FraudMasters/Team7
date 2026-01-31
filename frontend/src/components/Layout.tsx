@@ -36,6 +36,7 @@ import {
   ExpandMore as ExpandMoreArrow,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
+import ThemeSwitcher from './ThemeSwitcher';
 import ResponsiveWrapper from './ResponsiveWrapper';
 
 /**
@@ -209,8 +210,9 @@ const Layout: React.FC<LayoutProps> = () => {
         </Collapse>
       </List>
       <Divider />
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
         <LanguageSwitcher />
+        <ThemeSwitcher />
       </Box>
     </Box>
   );
@@ -404,6 +406,8 @@ const Layout: React.FC<LayoutProps> = () => {
 
                 {/* Language Switcher - Desktop */}
                 <LanguageSwitcher />
+                {/* Theme Switcher - Desktop */}
+                <ThemeSwitcher />
                   </>
                 )}
               </Toolbar>

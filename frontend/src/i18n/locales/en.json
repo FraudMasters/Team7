@@ -4,6 +4,10 @@
   "languageSwitcher": {
     "ariaLabel": "Select language"
   },
+  "theme": {
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode"
+  },
   "common": {
     "loading": "Loading...",
     "error": "Error",
