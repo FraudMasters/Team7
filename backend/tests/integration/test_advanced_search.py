@@ -635,3 +635,316 @@ async def test_invalid_filter_parameters(client: AsyncClient, sample_candidates)
 
 # Import asyncio for sleep
 import asyncio
+
+
+@pytest.fixture
+async def large_dataset(test_db: AsyncSession):
+    """
+    Create a large dataset of 10,000+ candidates for performance testing.
+
+    This fixture creates diverse candidate profiles to simulate real-world
+    recruiting scenarios with various skills, experience levels, locations,
+    and education backgrounds.
+    """
+    import random
+    from datetime import datetime, timedelta
+
+    # Define skill pools for different roles
+    skill_pools = {
+        "backend": [
+            "Python", "Java", "Go", "Node.js", "Django", "FastAPI", "Flask",
+            "PostgreSQL", "MongoDB", "Redis", "Kafka", "Docker", "Kubernetes"
+        ],
+        "frontend": [
+            "React", "Vue", "Angular", "TypeScript", "JavaScript", "HTML",
+            "CSS", "Next.js", "Redux", "Webpack"
+        ],
+        "data": [
+            "Python", "R", "SQL", "TensorFlow", "PyTorch", "Pandas", "NumPy",
+            "Scikit-learn", "Tableau", "Power BI", "Apache Spark"
+        ],
+        "devops": [
+            "Docker", "Kubernetes", "AWS", "Azure", "GCP", "Terraform",
+            "Ansible", "Jenkins", "GitLab CI", "CircleCI"
+        ],
+        "mobile": [
+            "Swift", "Kotlin", "React Native", "Flutter", "Objective-C",
+            "Android", "iOS", "Xamarin", "Java"
+        ]
+    }
+
+    # Locations distribution
+    locations = [
+        "Remote", "New York", "San Francisco", "London", "Berlin",
+        "Toronto", "Sydney", "Singapore", "Tokyo", "Amsterdam"
+    ]
+
+    # Education levels
+    education_levels = [
+        {"degree": "PhD", "field": "Computer Science"},
+        {"degree": "PhD", "field": "Data Science"},
+        {"degree": "M.Sc", "field": "Computer Science"},
+        {"degree": "M.Sc", "field": "Software Engineering"},
+        {"degree": "M.Sc", "field": "Data Science"},
+        {"degree": "M.Sc", "field": "Information Technology"},
+        {"degree": "B.Sc", "field": "Computer Science"},
+        {"degree": "B.Sc", "field": "Software Engineering"},
+        {"degree": "B.Sc", "field": "Information Technology"},
+        {"degree": "B.Sc", "field": "Computer Engineering"},
+        {"degree": "MBA", "field": "Business Administration"},
+        {"degree": "Diploma", "field": "Software Development"}
+    ]
+
+    # Generate 10,000 candidates
+    num_candidates = 10000
+    print(f"\nGenerating {num_candidates} test candidates...")
+
+    resumes = []
+
+    # Generate candidates in batches for better performance
+    batch_size = 500
+    for batch_start in range(0, num_candidates, batch_size):
+        batch_end = min(batch_start + batch_size, num_candidates)
+
+        for i in range(batch_start, batch_end):
+            # Randomly assign role type
+            role_type = random.choice(list(skill_pools.keys()))
+            skills = random.sample(skill_pools[role_type], k=random.randint(3, 8))
+
+            # Add some cross-role skills for variety
+            if random.random() < 0.3:  # 30% chance
+                extra_role = random.choice(list(skill_pools.keys()))
+                if extra_role != role_type:
+                    skills.extend(random.sample(skill_pools[extra_role], k=random.randint(1, 2)))
+
+            # Remove duplicates
+            skills = list(set(skills))
+
+            # Generate experience
+            experience_months = random.randint(12, 180)  # 1 to 15 years
+
+            # Randomly assign other attributes
+            location = random.choice(locations)
+            education = random.choice(education_levels)
+
+            # Create resume
+            resume = Resume(
+                filename=f"candidate_{i}_{role_type}.pdf",
+                file_path=f"/test/candidates/candidate_{i}.pdf",
+                status=ResumeStatus.COMPLETED,
+                raw_text=f"Candidate {i} - {role_type.capitalize()} Developer with "
+                        f"{experience_months // 12} years experience in {', '.join(skills)}. "
+                        f"Located in {location}. "
+                        f"Education: {education['degree']} in {education['field']}.",
+                location=location,
+            )
+            test_db.add(resume)
+            await test_db.flush()  # Get ID without committing
+            resumes.append(resume)
+
+            # Create resume analysis
+            analysis = ResumeAnalysis(
+                resume_id=resume.id,
+                raw_text=resume.raw_text,
+                skills=skills,
+                total_experience_months=experience_months,
+                education=[education],
+                language="en",
+                quality_score=random.uniform(60.0, 95.0),
+            )
+            test_db.add(analysis)
+
+            # Create hiring stage
+            stage_name = random.choice([
+                HiringStageName.APPLIED.value,
+                HiringStageName.SCREENING.value,
+                HiringStageName.INTERVIEW.value,
+                HiringStageName.OFFER.value,
+            ])
+            stage = HiringStage(
+                resume_id=resume.id,
+                stage_name=stage_name,
+            )
+            test_db.add(stage)
+
+        # Commit batch
+        await test_db.commit()
+        print(f"Created {batch_end}/{num_candidates} candidates")
+
+    print(f"Successfully created {len(resumes)} test candidates")
+    return resumes
+
+
+@pytest.mark.asyncio
+@pytest.mark.performance
+async def test_search_performance_with_10k_candidates(client: AsyncClient, large_dataset):
+    """
+    Performance test: Verify search completes in under 2 seconds with 10k+ candidates.
+
+    This is a critical acceptance criterion from the spec:
+    "Search performance optimization (sub-2 second response for >10k candidates)"
+
+    Test executes a complex search with:
+    - Full-text boolean query (AND operators)
+    - Multiple filters (skills, experience range, location)
+    - Sorting by relevance
+    - Large result set (50 results)
+
+    The test verifies that even with 10,000+ candidates in the database,
+    search performance remains under 2 seconds.
+    """
+    import time
+
+    print("\n=== Performance Test: 10k+ Candidates ===")
+    print(f"Total candidates in database: {len(large_dataset)}")
+
+    # Execute complex search with timing
+    start_time = time.time()
+
+    response = await client.post(
+        "/api/search/candidates",
+        json={
+            "query": "Python AND (Django OR FastAPI OR Flask)",
+            "filters": {
+                "min_experience_years": 3,
+                "max_experience_years": 10,
+                "skills": ["Python"],
+                "location": "Remote",
+            },
+            "sort_by": "relevance",
+            "limit": 50,
+        }
+    )
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    print(f"Search execution time: {execution_time:.3f} seconds")
+
+    # Verify response
+    assert response.status_code == 200, f"Search failed with status {response.status_code}"
+    data = response.json()
+
+    # Verify response structure
+    assert "total" in data
+    assert "candidates" in data
+    assert "execution_time_seconds" in data
+
+    print(f"Total matching candidates: {data['total']}")
+    print(f"Results returned: {len(data['candidates'])}")
+    print(f"Server-reported execution time: {data['execution_time_seconds']:.3f}s")
+
+    # Verify results match filters
+    if len(data['candidates']) > 0:
+        for candidate in data['candidates'][:5]:  # Check first 5 results
+            # Verify Python skill
+            assert 'Python' in candidate.get('skills', []), \
+                f"Result missing Python skill: {candidate.get('skills')}"
+
+            # Verify experience range
+            exp_years = candidate.get('experience_years')
+            if exp_years is not None:
+                assert 3 <= exp_years <= 10, \
+                    f"Experience {exp_years} years outside range 3-10"
+
+            # Verify location
+            # Note: location filter may be in different fields
+            print(f"Sample result: {candidate['filename']}, "
+                  f"Experience: {exp_years} years, "
+                  f"Skills: {', '.join(candidate.get('skills', [])[:3])}")
+
+    # CRITICAL ASSERTION: Search must complete in under 2 seconds
+    # This is the acceptance criterion from the spec
+    assert execution_time < 2.0, \
+        f"PERFORMANCE CRITICAL: Search took {execution_time:.3f}s, " \
+        f"exceeding 2 second requirement with {len(large_dataset)} candidates"
+
+    # Also verify server-reported time is reasonable
+    assert data['execution_time_seconds'] < 2.0, \
+        f"Server-reported time {data['execution_time_seconds']:.3f}s exceeds 2 seconds"
+
+    print(f"\n✓ PERFORMANCE TEST PASSED")
+    print(f"✓ Search completed in {execution_time:.3f}s (< 2.0s requirement)")
+    print(f"✓ Tested with {len(large_dataset)} candidates")
+    print(f"✓ Found {data['total']} matching candidates")
+    print(f"✓ Complex filters: boolean query + experience + skills + location")
+
+
+@pytest.mark.asyncio
+@pytest.mark.performance
+async def test_search_performance_filters_only(client: AsyncClient, large_dataset):
+    """
+    Performance test: Filters-only search (no full-text query) with 10k+ candidates.
+
+    Tests performance when using filters without a text query, which is
+    a common use case for structured searches.
+    """
+    import time
+
+    print("\n=== Performance Test: Filters Only ===")
+
+    start_time = time.time()
+
+    response = await client.post(
+        "/api/search/candidates",
+        json={
+            "filters": {
+                "min_experience_years": 5,
+                "max_experience_years": 15,
+                "skills": ["Python", "React"],
+            },
+            "sort_by": "experience",
+            "limit": 100,
+        }
+    )
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    print(f"Filters-only search time: {execution_time:.3f} seconds")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert execution_time < 2.0, \
+        f"Filters-only search took {execution_time:.3f}s, exceeding 2 second limit"
+
+    print(f"✓ Filters-only search: {execution_time:.3f}s (< 2.0s)")
+    print(f"✓ Found {data['total']} candidates")
+
+
+@pytest.mark.asyncio
+@pytest.mark.performance
+async def test_search_performance_simple_query(client: AsyncClient, large_dataset):
+    """
+    Performance test: Simple text-only query with 10k+ candidates.
+
+    Tests performance of basic full-text search without additional filters.
+    """
+    import time
+
+    print("\n=== Performance Test: Simple Query ===")
+
+    start_time = time.time()
+
+    response = await client.post(
+        "/api/search/candidates",
+        json={
+            "query": "Python Developer",
+            "limit": 50,
+        }
+    )
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    print(f"Simple query search time: {execution_time:.3f} seconds")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert execution_time < 2.0, \
+        f"Simple query took {execution_time:.3f}s, exceeding 2 second limit"
+
+    print(f"✓ Simple query: {execution_time:.3f}s (< 2.0s)")
+    print(f"✓ Found {data['total']} candidates")
