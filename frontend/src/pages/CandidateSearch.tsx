@@ -19,6 +19,10 @@ import {
   Stack,
   LinearProgress,
   Tooltip,
+  IconButton,
+  Collapse,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -26,6 +30,8 @@ import {
   TrendingUp as TrendingUpIcon,
   Psychology as AIIcon,
   Star as StarIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -66,6 +72,9 @@ type SortBy = 'match' | 'ranking';
 
 const CandidateSearchPage: React.FC = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const [searchQuery, setSearchQuery] = useState('');
   const [minMatchPercentage, setMinMatchPercentage] = useState<number>(30);
   const [resumes, setResumes] = useState<Resume[]>([]);
@@ -78,6 +87,7 @@ const CandidateSearchPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortBy>('ranking');
   const [usingAIRanking, setUsingAIRanking] = useState(true);
   const [rankingData, setRankingData] = useState<Record<string, RankedCandidate>>({});
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   // Load vacancies on mount
   useEffect(() => {
@@ -228,8 +238,8 @@ const CandidateSearchPage: React.FC = () => {
 
   return (
     <Container maxWidth="lg">
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+      <Box sx={{ mt: { xs: 2, md: 4 } }}>
+        <Typography variant={{ xs: 'h5', md: 'h4' }} component="h1" gutterBottom fontWeight={600}>
           {t('candidateSearch.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
@@ -237,109 +247,144 @@ const CandidateSearchPage: React.FC = () => {
         </Typography>
 
         {/* Search Panel */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                select
-                label={t('candidateSearch.selectVacancy')}
-                value={selectedVacancy}
-                onChange={(e) => setSelectedVacancy(e.target.value)}
-                SelectProps={{ native: true }}
+        <Paper sx={{ mb: 4 }}>
+          {/* Mobile Toggle Header */}
+          {isMobile && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 2,
+                py: 1.5,
+                borderBottom: filtersExpanded ? 1 : 0,
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight={600}>
+                {t('candidateSearch.filters')}
+              </Typography>
+              <IconButton
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                size="small"
+                aria-label={filtersExpanded ? 'collapse filters' : 'expand filters'}
               >
-                {vacancies.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.title} {v.location ? `(${v.location})` : ''}
-                  </option>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label={t('candidateSearch.filterBySkills')}
-                placeholder={t('candidateSearch.filterPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Box sx={{ px: 1 }}>
-                <Typography variant="body2" gutterBottom>
-                  {t('candidateSearch.minMatchPercentage', { percentage: minMatchPercentage })}
-                </Typography>
-                <Slider
-                  value={minMatchPercentage}
-                  onChange={(_, value) => setMinMatchPercentage(value as number)}
-                  min={0}
-                  max={100}
-                  marks
-                  valueLabelDisplay="auto"
-                />
-              </Box>
-            </Grid>
-            <Grid item xs={12}>
-              <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-                <ToggleButtonGroup
-                  value={sortBy}
-                  exclusive
-                  onChange={(_, value) => value && setSortBy(value)}
-                  size="small"
-                >
-                  <ToggleButton value="ranking" aria-label="sort by AI ranking">
-                    <Tooltip title={t('candidateSearch.sortByRanking')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <AIIcon fontSize="small" />
-                        <Typography variant="body2">{t('candidateSearch.aiRanking')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                  <ToggleButton value="match" aria-label="sort by match percentage">
-                    <Tooltip title={t('candidateSearch.sortByMatch')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <TrendingUpIcon fontSize="small" />
-                        <Typography variant="body2">{t('candidateSearch.matchPercent')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                </ToggleButtonGroup>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={usingAIRanking}
-                      onChange={(e) => setUsingAIRanking(e.target.checked)}
-                      color="primary"
+                {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+          )}
+
+          <Collapse in={!isMobile || filtersExpanded}>
+            <Box sx={{ p: { xs: 2, md: 3 } }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    select
+                    label={t('candidateSearch.selectVacancy')}
+                    value={selectedVacancy}
+                    onChange={(e) => setSelectedVacancy(e.target.value)}
+                    SelectProps={{ native: true }}
+                  >
+                    {vacancies.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.title} {v.location ? `(${v.location})` : ''}
+                      </option>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label={t('candidateSearch.filterBySkills')}
+                    placeholder={t('candidateSearch.filterPlaceholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Box sx={{ px: 1 }}>
+                    <Typography variant="body2" gutterBottom>
+                      {t('candidateSearch.minMatchPercentage', { percentage: minMatchPercentage })}
+                    </Typography>
+                    <Slider
+                      value={minMatchPercentage}
+                      onChange={(_, value) => setMinMatchPercentage(value as number)}
+                      min={0}
+                      max={100}
+                      marks
+                      valueLabelDisplay="auto"
                     />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <AIIcon fontSize="small" />
-                      <Typography variant="body2">{t('candidateSearch.useAIRanking')}</Typography>
-                    </Box>
-                  }
-                />
-              </Stack>
-            </Grid>
-            <Grid item xs={12}>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={searching ? <CircularProgress size={20} /> : <SearchIcon />}
-                onClick={handleSearch}
-                disabled={searching || !selectedVacancy}
-                fullWidth
-              >
-                {searching ? t('candidateSearch.searching') : t('candidateSearch.findCandidates')}
-              </Button>
-            </Grid>
-          </Grid>
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                    justifyContent={{ xs: 'flex-start', sm: 'space-between' }}
+                  >
+                    <ToggleButtonGroup
+                      value={sortBy}
+                      exclusive
+                      onChange={(_, value) => value && setSortBy(value)}
+                      size="small"
+                    >
+                      <ToggleButton value="ranking" aria-label="sort by AI ranking">
+                        <Tooltip title={t('candidateSearch.sortByRanking')}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <AIIcon fontSize="small" />
+                            <Typography variant="body2">{t('candidateSearch.aiRanking')}</Typography>
+                          </Box>
+                        </Tooltip>
+                      </ToggleButton>
+                      <ToggleButton value="match" aria-label="sort by match percentage">
+                        <Tooltip title={t('candidateSearch.sortByMatch')}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <TrendingUpIcon fontSize="small" />
+                            <Typography variant="body2">{t('candidateSearch.matchPercent')}</Typography>
+                          </Box>
+                        </Tooltip>
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={usingAIRanking}
+                          onChange={(e) => setUsingAIRanking(e.target.checked)}
+                          color="primary"
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <AIIcon fontSize="small" />
+                          <Typography variant="body2">{t('candidateSearch.useAIRanking')}</Typography>
+                        </Box>
+                      }
+                    />
+                  </Stack>
+                </Grid>
+                <Grid item xs={12}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={searching ? <CircularProgress size={20} /> : <SearchIcon />}
+                    onClick={handleSearch}
+                    disabled={searching || !selectedVacancy}
+                    fullWidth
+                  >
+                    {searching ? t('candidateSearch.searching') : t('candidateSearch.findCandidates')}
+                  </Button>
+                </Grid>
+              </Grid>
+            </Box>
+          </Collapse>
         </Paper>
 
         {/* Results */}
         {!searched ? (
-          <Paper sx={{ p: 6, textAlign: 'center' }}>
-            <WorkIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+          <Paper sx={{ p: { xs: 4, md: 6 }, textAlign: 'center' }}>
+            <WorkIcon sx={{ fontSize: { xs: 48, md: 64 }, color: 'text.disabled', mb: 2 }} />
             <Typography variant="h6" color="text.secondary">
               {t('candidateSearch.startMessage')}
             </Typography>
@@ -348,7 +393,7 @@ const CandidateSearchPage: React.FC = () => {
             </Typography>
           </Paper>
         ) : displayedCandidates.length === 0 ? (
-          <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <Paper sx={{ p: { xs: 4, md: 6 }, textAlign: 'center' }}>
             <Typography variant="h6" color="text.secondary">
               {t('candidateSearch.noCandidates')}
             </Typography>
@@ -359,11 +404,11 @@ const CandidateSearchPage: React.FC = () => {
         ) : (
           <>
             {/* Summary Stats */}
-            <Paper sx={{ p: 3, mb: 3 }}>
+            <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
               <Grid container spacing={2}>
                 <Grid item xs={6} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="primary.main" fontWeight={700}>
+                    <Typography variant={{ xs: 'h5', md: 'h4' }} color="primary.main" fontWeight={700}>
                       {displayedCandidates.length}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -373,7 +418,7 @@ const CandidateSearchPage: React.FC = () => {
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="success.main" fontWeight={700}>
+                    <Typography variant={{ xs: 'h5', md: 'h4' }} color="success.main" fontWeight={700}>
                       {displayedCandidates.filter((c) => c.matchPercentage >= 70).length}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -383,7 +428,7 @@ const CandidateSearchPage: React.FC = () => {
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="warning.main" fontWeight={700}>
+                    <Typography variant={{ xs: 'h5', md: 'h4' }} color="warning.main" fontWeight={700}>
                       {displayedCandidates.filter((c) => c.matchPercentage >= 50 && c.matchPercentage < 70).length}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -393,7 +438,7 @@ const CandidateSearchPage: React.FC = () => {
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="info.main" fontWeight={700}>
+                    <Typography variant={{ xs: 'h5', md: 'h4' }} color="info.main" fontWeight={700}>
                       {Math.round(displayedCandidates.reduce((sum, c) => sum + c.matchPercentage, 0) / displayedCandidates.length)}%
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -405,7 +450,7 @@ const CandidateSearchPage: React.FC = () => {
             </Paper>
 
             {/* Candidate List */}
-            <Grid container spacing={3}>
+            <Grid container spacing={{ xs: 2, md: 3 }}>
               {displayedCandidates.map((candidate, index) => (
                 <Grid item xs={12} md={6} key={candidate.id}>
                   <Card
@@ -419,6 +464,8 @@ const CandidateSearchPage: React.FC = () => {
                         ? `${candidate.rankingScore >= 70 ? 'success' : candidate.rankingScore >= 40 ? 'warning' : 'error'}.main`
                         : `${getMatchColor(candidate.matchPercentage)}.main`,
                       position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
                     onClick={() => (window.location.href = `/results/${candidate.id}`)}
                   >
@@ -431,7 +478,7 @@ const CandidateSearchPage: React.FC = () => {
                           right: -8,
                           bgcolor: 'warning.main',
                           color: 'warning.contrastText',
-                          px: 1.5,
+                          px: { xs: 1, md: 1.5 },
                           py: 0.5,
                           borderRadius: '0 12px 0 12px',
                           zIndex: 1,
@@ -448,10 +495,27 @@ const CandidateSearchPage: React.FC = () => {
                       </Box>
                     )}
 
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          mb: 2,
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          gap: { xs: 1, sm: 0 },
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              mb: 0.5,
+                              flexWrap: 'wrap',
+                            }}
+                          >
                             <Typography variant="caption" color="text.secondary">
                               #{index + 1}
                             </Typography>
@@ -465,11 +529,28 @@ const CandidateSearchPage: React.FC = () => {
                                 sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }}
                               />
                             )}
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: { xs: 150, sm: 200 },
+                              }}
+                            >
                               • {candidate.filename}
                             </Typography>
                           </Box>
-                          <Typography variant="h6" fontWeight={600}>
+                          <Typography
+                            variant="h6"
+                            fontWeight={600}
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {candidate.vacancyTitle}
                           </Typography>
                         </Box>
@@ -479,95 +560,123 @@ const CandidateSearchPage: React.FC = () => {
                             <Tooltip title={t('candidateSearch.aiRankingScore')}>
                               <Box sx={{ textAlign: 'center' }}>
                                 <Chip
-                              label={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <AIIcon sx={{ fontSize: 14 }} />
-                                  <Typography variant="body2" fontWeight={700}>
-                                    {Math.round(candidate.rankingScore)}
-                                  </Typography>
-                                </Box>
-                              }
-                              color={
-                                candidate.rankingScore >= 70
-                                  ? 'success'
-                                  : candidate.rankingScore >= 40
-                                    ? 'warning'
-                                    : 'error'
-                              }
-                              sx={{ fontWeight: 700, fontSize: '1rem' }}
-                            />
-                            {candidate.hireProbability !== undefined && (
-                              <LinearProgress
-                                variant="determinate"
-                                value={candidate.hireProbability * 100}
-                                sx={{
-                                  height: 3,
-                                  borderRadius: 1.5,
-                                  mt: 0.5,
-                                  width: 40,
-                                  mx: 'auto',
-                                }}
-                                color={candidate.rankingScore >= 70 ? 'success' : 'warning'}
+                                  label={
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <AIIcon sx={{ fontSize: 14 }} />
+                                      <Typography variant="body2" fontWeight={700}>
+                                        {Math.round(candidate.rankingScore)}
+                                      </Typography>
+                                    </Box>
+                                  }
+                                  color={
+                                    candidate.rankingScore >= 70
+                                      ? 'success'
+                                      : candidate.rankingScore >= 40
+                                        ? 'warning'
+                                        : 'error'
+                                  }
+                                  sx={{ fontWeight: 700, fontSize: '1rem' }}
+                                />
+                                {candidate.hireProbability !== undefined && (
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={candidate.hireProbability * 100}
+                                    sx={{
+                                      height: 3,
+                                      borderRadius: 1.5,
+                                      mt: 0.5,
+                                      width: 40,
+                                      mx: 'auto',
+                                    }}
+                                    color={candidate.rankingScore >= 70 ? 'success' : 'warning'}
+                                  />
+                                )}
+                              </Box>
+                            </Tooltip>
+                          )}
+                          {/* Match Percentage */}
+                          <Chip
+                            label={`${candidate.matchPercentage}%`}
+                            color={getMatchColor(candidate.matchPercentage) as any}
+                            sx={{ fontWeight: 700, fontSize: '1rem' }}
+                          />
+                        </Stack>
+                      </Box>
+
+                      {/* Matched Skills */}
+                      {candidate.matchedSkills.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="caption" color="success.main" fontWeight={600}>
+                            ✓ {t('candidateSearch.matched', { count: candidate.matchedSkills.length })}
+                          </Typography>
+                          <Box
+                            sx={{
+                              mt: 0.5,
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 0.5,
+                            }}
+                          >
+                            {candidate.matchedSkills.slice(0, 6).map((skill) => (
+                              <Chip
+                                key={skill}
+                                label={skill}
+                                size="small"
+                                color="success"
+                                variant="outlined"
+                                sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                              />
+                            ))}
+                            {candidate.matchedSkills.length > 6 && (
+                              <Chip
+                                label={t('vacancyList.more', { count: candidate.matchedSkills.length - 6 })}
+                                size="small"
+                                variant="outlined"
                               />
                             )}
                           </Box>
-                        </Tooltip>
+                        </Box>
                       )}
-                      {/* Match Percentage */}
-                      <Chip
-                        label={`${candidate.matchPercentage}%`}
-                        color={getMatchColor(candidate.matchPercentage) as any}
-                        sx={{ fontWeight: 700, fontSize: '1rem' }}
-                      />
-                    </Stack>
-                  </Box>
 
-                  {/* Matched Skills */}
-                  {candidate.matchedSkills.length > 0 && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" color="success.main" fontWeight={600}>
-                        ✓ {t('candidateSearch.matched', { count: candidate.matchedSkills.length })}
-                      </Typography>
-                      <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {candidate.matchedSkills.slice(0, 6).map((skill) => (
-                          <Chip key={skill} label={skill} size="small" color="success" variant="outlined" />
-                        ))}
-                        {candidate.matchedSkills.length > 6 && (
-                          <Chip
-                            label={t('vacancyList.more', { count: candidate.matchedSkills.length - 6 })}
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  )}
-
-                  {/* Missing Skills */}
-                  {candidate.missingSkills.length > 0 && (
-                    <Box>
-                      <Typography variant="caption" color="error.main" fontWeight={600}>
-                        ✗ {t('candidateSearch.missing', { count: candidate.missingSkills.length })}
-                      </Typography>
-                      <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {candidate.missingSkills.slice(0, 4).map((skill) => (
-                          <Chip key={skill} label={skill} size="small" color="error" variant="outlined" />
-                        ))}
-                        {candidate.missingSkills.length > 4 && (
-                          <Chip
-                            label={t('vacancyList.more', { count: candidate.missingSkills.length - 4 })}
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
+                      {/* Missing Skills */}
+                      {candidate.missingSkills.length > 0 && (
+                        <Box>
+                          <Typography variant="caption" color="error.main" fontWeight={600}>
+                            ✗ {t('candidateSearch.missing', { count: candidate.missingSkills.length })}
+                          </Typography>
+                          <Box
+                            sx={{
+                              mt: 0.5,
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 0.5,
+                            }}
+                          >
+                            {candidate.missingSkills.slice(0, 4).map((skill) => (
+                              <Chip
+                                key={skill}
+                                label={skill}
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                                sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                              />
+                            ))}
+                            {candidate.missingSkills.length > 4 && (
+                              <Chip
+                                label={t('vacancyList.more', { count: candidate.missingSkills.length - 4 })}
+                                size="small"
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
           </>
         )}
       </Box>
