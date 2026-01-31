@@ -51,6 +51,13 @@ celery_config: Dict[str, Any] = {
         "tasks.learning_tasks.review_and_activate_synonyms": {"queue": "learning"},
         "tasks.learning_tasks.periodic_feedback_aggregation": {"queue": "learning"},
         "tasks.learning_tasks.*": {"queue": "learning"},
+        "tasks.performance_monitoring.monitor_model_performance": {"queue": "learning"},
+        "tasks.performance_monitoring.periodic_performance_monitoring": {"queue": "learning"},
+        "tasks.performance_monitoring.generate_performance_report": {"queue": "learning"},
+        "tasks.performance_monitoring.*": {"queue": "learning"},
+        "tasks.model_retraining.automated_retraining_task": {"queue": "learning"},
+        "tasks.model_retraining.manual_retraining_task": {"queue": "learning"},
+        "tasks.model_retraining.*": {"queue": "learning"},
     },
 
     # Task priority (if needed in future)
@@ -87,6 +94,11 @@ celery_config: Dict[str, Any] = {
         "s3-backup-sync": {
             "task": "tasks.backup.sync_all_to_s3",
             "schedule": 7200.0,  # Run every 2 hours
+        },
+        "daily-performance-monitoring": {
+            "task": "tasks.performance_monitoring.periodic_performance_monitoring",
+            "schedule": 86400.0,  # Run daily (every 24 hours)
+            "options": {"expires": 3600},  # Task expires if not run within 1 hour
         },
     },
 }
