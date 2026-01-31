@@ -19,6 +19,9 @@ import {
   Stack,
   LinearProgress,
   Tooltip,
+  Tabs,
+  Tab,
+  Alert,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -26,10 +29,17 @@ import {
   TrendingUp as TrendingUpIcon,
   Psychology as AIIcon,
   Star as StarIcon,
+  FilterList as FilterIcon,
+  BookmarkBorder as SavedSearchIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { RankedCandidate } from '../types/api';
+import AdvancedSearchFilters from '../components/AdvancedSearchFilters';
+import SavedSearchManager from '../components/SavedSearchManager';
+import SearchHistory from '../components/SearchHistory';
+import type { SavedSearchResponse } from '../types/api';
 
 interface Resume {
   id: string;
@@ -58,11 +68,33 @@ interface CandidateWithMatch extends Resume {
 }
 
 /**
+ * Tab panel type
+ */
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+/**
+ * Tab panel component
+ */
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+  return (
+    <div role="tabpanel" hidden={value !== index}>
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+};
+
+/**
  * Candidate Search Page (Recruiter Module)
  *
  * Allows recruiters to search for candidates by skills and find the best matches for their vacancies.
+ * Now with advanced search filters, saved searches, and search history.
  */
 type SortBy = 'match' | 'ranking';
+type SearchTab = 'search' | 'saved' | 'history';
 
 const CandidateSearchPage: React.FC = () => {
   const { t } = useTranslation();
@@ -78,6 +110,11 @@ const CandidateSearchPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortBy>('ranking');
   const [usingAIRanking, setUsingAIRanking] = useState(true);
   const [rankingData, setRankingData] = useState<Record<string, RankedCandidate>>({});
+
+  // Advanced search state
+  const [currentTab, setCurrentTab] = useState<SearchTab>('search');
+  const [advancedSearchEnabled, setAdvancedSearchEnabled] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   // Load vacancies on mount
   useEffect(() => {
@@ -111,6 +148,60 @@ const CandidateSearchPage: React.FC = () => {
     fetchResumes();
   }, []);
 
+  /**
+   * Handle advanced search from AdvancedSearchFilters component
+   */
+  const handleAdvancedSearch = async (query: string, filters: any) => {
+    setSearching(true);
+    setSearched(true);
+    setSearchError(null);
+    setCurrentTab('search');
+
+    try {
+      // Call the advanced search API
+      const response = await axios.post('/api/search/candidates', {
+        query,
+        filters: {
+          ...filters,
+          vacancy_id: filters.vacancyId || selectedVacancy,
+        },
+        limit: 100,
+      });
+
+      // Transform results to match our candidate format
+      const results: CandidateWithMatch[] = response.data.results.map((result: any) => ({
+        ...result,
+        matchPercentage: result.match_score || result.match_percentage || 0,
+        matchedSkills: result.matched_skills || [],
+        missingSkills: result.missing_skills || [],
+        vacancyTitle: result.vacancy_title || vacancies.find((v) => v.id === selectedVacancy)?.title || '',
+      }));
+
+      setCandidates(results);
+    } catch (error: any) {
+      console.error('Error in advanced search:', error);
+      setSearchError(error.response?.data?.detail || 'Search failed. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  /**
+   * Handle saved search selection
+   */
+  const handleSavedSearchSelect = (search: SavedSearchResponse) => {
+    setAdvancedSearchEnabled(true);
+    handleAdvancedSearch(search.query, search.filters || {});
+  };
+
+  /**
+   * Handle search history repeat
+   */
+  const handleHistoryRepeat = (query: string | null, filters: Record<string, unknown>) => {
+    setAdvancedSearchEnabled(true);
+    handleAdvancedSearch(query || '', filters);
+  };
+
   const handleSearch = async () => {
     if (!selectedVacancy) {
       alert(t('candidateSearch.selectVacancyFirst'));
@@ -120,6 +211,7 @@ const CandidateSearchPage: React.FC = () => {
     setSearching(true);
     setSearched(true);
     setRankingData({});
+    setSearchError(null);
 
     try {
       // Get match results for the selected vacancy
@@ -192,6 +284,7 @@ const CandidateSearchPage: React.FC = () => {
       setCandidates(sortedResults);
     } catch (error) {
       console.error('Error searching:', error);
+      setSearchError('Search failed. Please try again.');
     } finally {
       setSearching(false);
     }
@@ -235,6 +328,85 @@ const CandidateSearchPage: React.FC = () => {
         <Typography variant="body1" color="text.secondary" paragraph>
           {t('candidateSearch.subtitle')}
         </Typography>
+
+        {/* Search Tabs */}
+        <Paper sx={{ mb: 3 }}>
+          <Tabs
+            value={currentTab === 'search' ? 0 : currentTab === 'saved' ? 1 : 2}
+            onChange={(_, newValue) => {
+              setCurrentTab(newValue === 0 ? 'search' : newValue === 1 ? 'saved' : 'history');
+            }}
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab
+              icon={<SearchIcon />}
+              label="Search"
+              sx={{ textTransform: 'none' }}
+            />
+            <Tab
+              icon={<SavedSearchIcon />}
+              label="Saved Searches"
+              sx={{ textTransform: 'none' }}
+            />
+            <Tab
+              icon={<HistoryIcon />}
+              label="Search History"
+              sx={{ textTransform: 'none' }}
+            />
+          </Tabs>
+
+          {/* Search Tab */}
+          <TabPanel value={0} index={currentTab === 'search' ? 0 : -1}>
+            <Box sx={{ px: 2 }}>
+              {/* Toggle Advanced Search */}
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  variant={advancedSearchEnabled ? 'contained' : 'outlined'}
+                  startIcon={<FilterIcon />}
+                  onClick={() => setAdvancedSearchEnabled(!advancedSearchEnabled)}
+                  size="small"
+                >
+                  {advancedSearchEnabled ? 'Advanced Filters Enabled' : 'Enable Advanced Filters'}
+                </Button>
+              </Box>
+
+              {/* Advanced Search Filters */}
+              {advancedSearchEnabled && (
+                <AdvancedSearchFilters
+                  onSearch={handleAdvancedSearch}
+                  loading={searching}
+                  vacancies={vacancies.map((v) => ({ id: v.id, title: v.title }))}
+                  defaultFilters={{
+                    vacancyId: selectedVacancy,
+                    minMatchScore: minMatchPercentage,
+                  }}
+                />
+              )}
+
+              {/* Error Display */}
+              {searchError && (
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setSearchError(null)}>
+                  {searchError}
+                </Alert>
+              )}
+            </Box>
+          </TabPanel>
+
+          {/* Saved Searches Tab */}
+          <TabPanel value={1} index={currentTab === 'saved' ? 1 : -1}>
+            <SavedSearchManager
+              onSearchSelect={handleSavedSearchSelect}
+            />
+          </TabPanel>
+
+          {/* Search History Tab */}
+          <TabPanel value={2} index={currentTab === 'history' ? 2 : -1}>
+            <SearchHistory
+              onRepeatSearch={handleHistoryRepeat}
+              limit={20}
+            />
+          </TabPanel>
+        </Paper>
 
         {/* Search Panel */}
         <Paper sx={{ p: 3, mb: 4 }}>
