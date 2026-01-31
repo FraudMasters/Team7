@@ -22,6 +22,7 @@ from .report import Report, ScheduledReport
 from .candidate_rank import CandidateRank, RankingFeedback
 from .candidate_tag import CandidateTag
 from .candidate_note import CandidateNote
+from .candidate_activity import CandidateActivity
 from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
@@ -52,6 +53,7 @@ __all__ = [
     "CandidateRank",
     "CandidateTag",
     "CandidateNote",
+    "CandidateActivity",
     "RankingFeedback",
     "SkillGapReport",
     "LearningResource",
