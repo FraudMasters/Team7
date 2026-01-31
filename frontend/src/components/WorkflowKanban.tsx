@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -67,6 +67,11 @@ const WorkflowKanban: React.FC = () => {
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateListItem | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [modalTabValue, setModalTabValue] = useState(0);
+
+  // Keyboard navigation state
+  const [focusedStageIndex, setFocusedStageIndex] = useState<number>(-1);
+  const [focusedCardIndex, setFocusedCardIndex] = useState<number>(-1);
+  const cardRefs = useRef<Record<string, HTMLElement>>({});
 
   const fetchData = useCallback(async () => {
     try {
@@ -215,6 +220,173 @@ const WorkflowKanban: React.FC = () => {
     setModalTabValue(newValue);
   }, []);
 
+  /**
+   * Handle keyboard navigation
+   */
+  useEffect(() => {
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Ignore if user is typing in an input field
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        detailModalOpen
+      ) {
+        return;
+      }
+
+      // If no focus is set yet, start with first column
+      if (focusedStageIndex === -1 && event.key !== 'Escape') {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+          event.preventDefault();
+          setFocusedStageIndex(0);
+          setFocusedCardIndex(0);
+        }
+        return;
+      }
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          if (focusedStageIndex > 0) {
+            const newStageIndex = focusedStageIndex - 1;
+            setFocusedStageIndex(newStageIndex);
+            // Set card index to 0 or keep within bounds
+            const stageId = stages[newStageIndex]?.id;
+            const cardCount = candidatesByStage[stageId]?.length || 0;
+            setFocusedCardIndex(Math.min(focusedCardIndex, Math.max(0, cardCount - 1)));
+          }
+          break;
+
+        case 'ArrowRight':
+          event.preventDefault();
+          if (focusedStageIndex < stages.length - 1) {
+            const newStageIndex = focusedStageIndex + 1;
+            setFocusedStageIndex(newStageIndex);
+            // Set card index to 0 or keep within bounds
+            const stageId = stages[newStageIndex]?.id;
+            const cardCount = candidatesByStage[stageId]?.length || 0;
+            setFocusedCardIndex(Math.min(focusedCardIndex, Math.max(0, cardCount - 1)));
+          }
+          break;
+
+        case 'ArrowUp':
+          event.preventDefault();
+          if (focusedCardIndex > 0) {
+            setFocusedCardIndex(focusedCardIndex - 1);
+          }
+          break;
+
+        case 'ArrowDown':
+          event.preventDefault();
+          const currentStageId = stages[focusedStageIndex]?.id;
+          const maxCards = candidatesByStage[currentStageId]?.length || 0;
+          if (focusedCardIndex < maxCards - 1) {
+            setFocusedCardIndex(focusedCardIndex + 1);
+          }
+          break;
+
+        case 'Enter': {
+          event.preventDefault();
+          // Open details for the focused card
+          if (focusedStageIndex >= 0 && focusedCardIndex >= 0) {
+            const stageId = stages[focusedStageIndex]?.id;
+            const candidate = candidatesByStage[stageId]?.[focusedCardIndex];
+            if (candidate) {
+              handleOpenCandidateDetail(candidate);
+            }
+          }
+          break;
+        }
+
+        case 'Escape':
+          event.preventDefault();
+          // Clear focus
+          setFocusedStageIndex(-1);
+          setFocusedCardIndex(-1);
+          break;
+
+        case 'm':
+        case 'M': {
+          // Move focused candidate to next stage (with Shift) or previous stage (without Shift)
+          if (focusedStageIndex >= 0 && focusedCardIndex >= 0) {
+            event.preventDefault();
+            const direction = event.shiftKey ? -1 : 1;
+            const newStageIndex = focusedStageIndex + direction;
+
+            if (newStageIndex >= 0 && newStageIndex < stages.length) {
+              const currentStageId = stages[focusedStageIndex]?.id;
+              const newStageId = stages[newStageIndex]?.id;
+              const candidate = candidatesByStage[currentStageId]?.[focusedCardIndex];
+
+              if (candidate && currentStageId && newStageId) {
+                // Optimistically update UI
+                const newCandidatesByStage = { ...candidatesByStage };
+                newCandidatesByStage[currentStageId] = (newCandidatesByStage[currentStageId] || [])
+                  .filter(c => c.id !== candidate.id);
+                const destCandidates = [...(newCandidatesByStage[newStageId] || [])];
+                destCandidates.push(candidate);
+                newCandidatesByStage[newStageId] = destCandidates;
+                setCandidatesByStage(newCandidatesByStage);
+                setMovingCandidate(candidate.id);
+
+                try {
+                  // Move candidate via API
+                  await axios.put(`/api/candidates/${candidate.id}/stage`, {
+                    stage_id: newStageId,
+                  });
+
+                  // Refresh data to get updated state
+                  await fetchData();
+
+                  // Move focus to the new stage and the last card
+                  setFocusedStageIndex(newStageIndex);
+                  const newCardCount = candidatesByStage[newStageId]?.length || 0;
+                  setFocusedCardIndex(Math.max(0, newCardCount - 1));
+                } catch (err) {
+                  console.error('Error moving candidate:', err);
+                  setError('Failed to move candidate. Please try again.');
+                  // Revert the optimistic update
+                  setCandidatesByStage(candidatesByStage);
+                } finally {
+                  setMovingCandidate(null);
+                }
+              }
+            }
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedStageIndex, focusedCardIndex, stages, candidatesByStage, detailModalOpen, fetchData, handleOpenCandidateDetail]);
+
+  /**
+   * Scroll focused card into view
+   */
+  useEffect(() => {
+    if (focusedStageIndex >= 0 && focusedCardIndex >= 0) {
+      const stageId = stages[focusedStageIndex]?.id;
+      const cardKey = `${stageId}-${focusedCardIndex}`;
+      const cardElement = cardRefs.current[cardKey];
+      if (cardElement) {
+        cardElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [focusedStageIndex, focusedCardIndex, stages]);
+
+  /**
+   * Reset focus when search changes
+   */
+  useEffect(() => {
+    setFocusedStageIndex(-1);
+    setFocusedCardIndex(-1);
+  }, [searchTerm]);
+
   return (
     <Box>
       {/* Kanban Header */}
@@ -222,26 +394,56 @@ const WorkflowKanban: React.FC = () => {
         <Typography variant="h5" fontWeight={600} sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
           {t('workflow.title')}
         </Typography>
-        <TextField
-          size="small"
-          placeholder="Search candidates..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField
+            size="small"
+            placeholder="Search candidates..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ minWidth: { xs: 200, sm: 250 } }}
+          />
+          <Chip
+            label="⌨️ Keyboard: Use arrow keys to navigate"
+            size="small"
+            variant="outlined"
+            sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}
+          />
+        </Box>
+      </Box>
+
+      {/* Keyboard Shortcuts Help */}
+      <Box sx={{ mb: 2 }}>
+        <Paper
+          sx={{
+            p: { xs: 1, sm: 1.5 },
+            bgcolor: 'info.50',
+            border: 1,
+            borderColor: 'info.200',
           }}
-          sx={{ minWidth: { xs: 200, sm: 250 } }}
-        />
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+            <strong>Keyboard Shortcuts:</strong> {' '}
+            <KeyboardArrowUp sx={{ fontSize: 14, verticalAlign: 'middle' }} /> <KeyboardArrowDown sx={{ fontSize: 14, verticalAlign: 'middle' }} /> Navigate cards • {' '}
+            <KeyboardArrowLeft sx={{ fontSize: 14, verticalAlign: 'middle' }} /> <KeyboardArrowRight sx={{ fontSize: 14, verticalAlign: 'middle' }} /> Navigate columns • {' '}
+            <strong>Enter</strong> Open details • {' '}
+            <strong>M</strong> Move to next stage • {' '}
+            <strong>Shift+M</strong> Move to previous stage • {' '}
+            <strong>Esc</strong> Clear focus
+          </Typography>
+        </Paper>
       </Box>
 
       {/* Kanban Board */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, overflowX: 'auto', pb: 2, WebkitOverflowScrolling: 'touch' }}>
-          {stages.map((stage) => (
+          {stages.map((stage, stageIndex) => (
             <Box
               key={stage.id}
               sx={{
@@ -299,7 +501,11 @@ const WorkflowKanban: React.FC = () => {
                       borderColor: snapshot.isDraggingOver ? 'primary.main' : 'divider',
                     }}
                   >
-                    {candidatesByStage[stage.id]?.map((candidate, index) => (
+                    {candidatesByStage[stage.id]?.map((candidate, index) => {
+                      const isFocused = focusedStageIndex === stageIndex && focusedCardIndex === index;
+                      const cardKey = `${stage.id}-${index}`;
+
+                      return (
                       <Draggable
                         key={candidate.id}
                         draggableId={candidate.id}
@@ -314,7 +520,12 @@ const WorkflowKanban: React.FC = () => {
 
                           return (
                           <Card
-                            ref={provided.innerRef}
+                            ref={(el) => {
+                              provided.innerRef(el);
+                              if (el) {
+                                cardRefs.current[cardKey] = el;
+                              }
+                            }}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             sx={{
@@ -326,6 +537,11 @@ const WorkflowKanban: React.FC = () => {
                               '&:hover': {
                                 boxShadow: 2,
                               },
+                              ...(isFocused && {
+                                boxShadow: 4,
+                                border: 2,
+                                borderColor: 'primary.main',
+                              }),
                               ...(movingCandidate === candidate.id && {
                                 opacity: 0.5,
                                 pointerEvents: 'none',
@@ -434,7 +650,8 @@ const WorkflowKanban: React.FC = () => {
                           </Card>
                         )}}
                       </Draggable>
-                    ))}
+                    );
+                    })}
                     {provided.placeholder}
                     {((!candidatesByStage[stage.id] || candidatesByStage[stage.id]!.length === 0)) && (
                       <Box
