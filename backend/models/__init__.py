@@ -20,6 +20,7 @@ from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
 from .candidate_rank import CandidateRank, RankingFeedback
+from .candidate_tag import CandidateTag
 from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
@@ -48,6 +49,7 @@ __all__ = [
     "Report",
     "ScheduledReport",
     "CandidateRank",
+    "CandidateTag",
     "RankingFeedback",
     "SkillGapReport",
     "LearningResource",
