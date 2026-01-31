@@ -77,6 +77,15 @@ from .model_versioning import (
 from .accuracy_benchmark import (
     AccuracyBenchmark,
 )
+from .skill_gap_analyzer import (
+    SkillGapAnalyzer,
+    SkillGapResult,
+    get_skill_gap_analyzer,
+)
+from .learning_recommendation_engine import (
+    LearningRecommendationEngine,
+    get_learning_recommendation_engine,
+)
 
 __all__ = [
     "extract_keywords",
@@ -119,6 +128,11 @@ __all__ = [
     "TaxonomyLoader",
     "ModelVersionManager",
     "AccuracyBenchmark",
+    "SkillGapAnalyzer",
+    "SkillGapResult",
+    "get_skill_gap_analyzer",
+    "LearningRecommendationEngine",
+    "get_learning_recommendation_engine",
     "save_resume_analysis",
     "get_resume_analysis",
     "delete_resume_analysis",

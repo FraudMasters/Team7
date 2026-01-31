@@ -18,6 +18,9 @@ from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
 from .candidate_rank import CandidateRank, RankingFeedback
+from .skill_gap import SkillGapReport
+from .learning_resource import LearningResource
+from .skill_development_plan import SkillDevelopmentPlan
 
 __all__ = [
     "Base",
@@ -39,4 +42,7 @@ __all__ = [
     "ScheduledReport",
     "CandidateRank",
     "RankingFeedback",
+    "SkillGapReport",
+    "LearningResource",
+    "SkillDevelopmentPlan",
 ]
