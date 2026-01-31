@@ -1765,6 +1765,69 @@ export interface SavedSearchListResponse {
   saved_searches: SavedSearchResponse[];
 }
 
+// ==================== Candidate Search Types ====================
+
+/**
+ * Search filter configuration for candidate search
+ */
+export interface SearchFilters {
+  skills?: string[];
+  min_experience_years?: number;
+  max_experience_years?: number;
+  location?: string;
+  education_level?: string;
+  languages?: string[];
+  min_match_score?: number;
+  max_match_score?: number;
+  date_from?: string;
+  date_to?: string;
+  vacancy_id?: string;
+  stage_id?: string;
+}
+
+/**
+ * Candidate search request
+ */
+export interface CandidateSearchRequest {
+  query?: string | null;
+  filters?: SearchFilters | null;
+  skip?: number;
+  limit?: number;
+  sort_by?: string;
+}
+
+/**
+ * Single candidate search result
+ */
+export interface CandidateSearchResult {
+  id: string;
+  filename: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  current_stage: string;
+  vacancy_id: string | null;
+  skills: string[];
+  total_experience_months: number | null;
+  experience_years: number | null;
+  education: Array<Record<string, unknown>>;
+  language: string | null;
+  quality_score: number | null;
+}
+
+/**
+ * Candidate search response
+ */
+export interface CandidateSearchResponse {
+  total: number;
+  candidates: Array<Record<string, unknown>>;
+  query: string;
+  filters_applied: Record<string, unknown>;
+  execution_time_seconds: number;
+  skip: number;
+  limit: number;
+}
+
 // ==================== Search History Types ====================
 
 /**
