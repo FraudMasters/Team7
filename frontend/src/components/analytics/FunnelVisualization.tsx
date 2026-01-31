@@ -18,8 +18,7 @@ import {
   Refresh as RefreshIcon,
   TrendingDown as TrendingDownIcon,
   CheckCircle as CheckIcon,
-  Description as DescriptionIcon,
-  Upload as UploadIcon,
+  Description as UploadIcon,
   Person as PersonIcon,
   Work as WorkIcon,
   School as InterviewIcon,
@@ -77,7 +76,7 @@ const formatStageName = (stageName: string): string => {
 const getStageIcon = (stageName: string) => {
   const iconMap: Record<string, React.ReactElement> = {
     resumes_uploaded: <UploadIcon />,
-    resumes_processed: <DescriptionIcon />,
+    resumes_processed: <Description />,
     candidates_matched: <PersonIcon />,
     candidates_shortlisted: <WorkIcon />,
     candidates_interviewed: <InterviewIcon />,
@@ -382,7 +381,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
                   {index > 0 && previousStage && (
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="caption" color="text.secondary">
-                        {(previousStage.count - stage.count).toLocaleString()} candidates dropped from previous stage
+                        {previousStage.count - stage.count.toLocaleString()} candidates dropped from previous stage
                       </Typography>
                     </Box>
                   )}
@@ -406,7 +405,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
                 const dropOffRate = 1 - stage.conversion_rate;
 
                 return (
-                  dropOffRate > 0.3 && previousStage && (
+                  dropOffRate > 0.3 && (
                     <Typography key={stage.stage_name} variant="body2" color="text.secondary">
                       <strong>{formatStageName(stage.stage_name)}:</strong> {(dropOffRate * 100).toFixed(1)}% drop-off
                       from {formatStageName(previousStage.stage_name)}

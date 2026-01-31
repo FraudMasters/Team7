@@ -3,7 +3,6 @@ HiringStage model for tracking resume progression through hiring pipeline
 """
 import enum
 from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -35,8 +34,7 @@ class HiringStage(Base, UUIDMixin, TimestampMixin):
         id: UUID primary key
         resume_id: Foreign key to Resume
         vacancy_id: Optional foreign key to JobVacancy
-        workflow_stage_config_id: Optional foreign key to WorkflowStageConfig for custom stages
-        stage_name: Current hiring stage (supports custom stages from WorkflowStageConfig)
+        stage_name: Current hiring stage
         notes: Optional notes about this stage transition
         created_at: Timestamp when stage record was created (inherited)
         updated_at: Timestamp when stage record was last updated (inherited)
@@ -44,17 +42,14 @@ class HiringStage(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "hiring_stages"
 
-    resume_id: Mapped[UUID] = mapped_column(
+    resume_id: Mapped[UUIDMixin] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    vacancy_id: Mapped[Optional[UUID]] = mapped_column(
+    vacancy_id: Mapped[Optional[UUIDMixin]] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    workflow_stage_config_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey("workflow_stage_configs.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    stage_name: Mapped[str] = mapped_column(
-        String(100), default=HiringStageName.APPLIED.value, nullable=False, index=True
+    stage_name: Mapped[HiringStageName] = mapped_column(
+        Enum(HiringStageName), default=HiringStageName.APPLIED, nullable=False, index=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

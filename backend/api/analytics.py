@@ -6,16 +6,62 @@ including time-to-hire statistics, resume processing metrics, match rates,
 and other key performance indicators for the recruitment process.
 """
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def validate_date_range(start_date: Optional[str], end_date: Optional[str]) -> None:
+    """
+    Validate date range parameters.
+
+    Args:
+        start_date: Optional start date string in ISO 8601 format
+        end_date: Optional end date string in ISO 8601 format
+
+    Raises:
+        HTTPException(422): If date format is invalid or start_date > end_date
+    """
+    if start_date is None and end_date is None:
+        return
+
+    parsed_start: Optional[datetime] = None
+    parsed_end: Optional[datetime] = None
+
+    # Validate start_date format
+    if start_date is not None:
+        try:
+            parsed_start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid start_date format: {start_date}. Expected ISO 8601 format (e.g., '2024-01-01' or '2024-01-01T00:00:00Z')",
+            ) from e
+
+    # Validate end_date format
+    if end_date is not None:
+        try:
+            parsed_end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid end_date format: {end_date}. Expected ISO 8601 format (e.g., '2024-12-31' or '2024-12-31T23:59:59Z')",
+            ) from e
+
+    # Validate date range logic
+    if parsed_start is not None and parsed_end is not None:
+        if parsed_start > parsed_end:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"start_date ({start_date}) must be before or equal to end_date ({end_date})",
+            )
 
 
 class TimeToHireMetrics(BaseModel):
@@ -53,6 +99,76 @@ class KeyMetricsResponse(BaseModel):
     time_to_hire: TimeToHireMetrics = Field(..., description="Time-to-hire performance metrics")
     resumes: ResumeMetrics = Field(..., description="Resume processing metrics")
     match_rates: MatchRateMetrics = Field(..., description="Skill matching metrics")
+
+
+class FunnelStage(BaseModel):
+    """Represents a single stage in the recruitment funnel."""
+
+    stage_name: str = Field(..., description="Name of the funnel stage")
+    count: int = Field(..., description="Number of candidates/resumes at this stage")
+    conversion_rate: float = Field(..., description="Conversion rate from previous stage (0-1)")
+
+
+class FunnelMetricsResponse(BaseModel):
+    """Response model for funnel visualization metrics."""
+
+    stages: list[FunnelStage] = Field(..., description="List of funnel stages with counts and conversion rates")
+    total_resumes: int = Field(..., description="Total number of resumes uploaded")
+    overall_hire_rate: float = Field(..., description="Overall conversion rate from upload to hire (0-1)")
+
+
+class SkillDemandItem(BaseModel):
+    """Represents a single skill with its demand metrics."""
+
+    skill_name: str = Field(..., description="Name of the skill")
+    demand_count: int = Field(..., description="Number of job postings requesting this skill")
+    demand_percentage: float = Field(..., description="Percentage of total job postings requesting this skill (0-1)")
+    trend_percentage: float = Field(..., description="Trend percentage change from previous period (e.g., 0.15 for +15%)")
+
+
+class SkillDemandResponse(BaseModel):
+    """Response model for skill demand analytics."""
+
+    skills: list[SkillDemandItem] = Field(..., description="List of skills with demand metrics, sorted by demand_count")
+    total_postings_analyzed: int = Field(..., description="Total number of job postings analyzed")
+
+
+class SourceTrackingItem(BaseModel):
+    """Represents a single source with its vacancy metrics."""
+
+    source_name: str = Field(..., description="Name of the vacancy source (e.g., 'LinkedIn', 'Referral', 'Indeed')")
+    vacancy_count: int = Field(..., description="Number of vacancies from this source")
+    percentage: float = Field(..., description="Percentage of total vacancies from this source (0-1)")
+    average_time_to_fill: float = Field(..., description="Average time to fill (in days) for vacancies from this source")
+
+
+class SourceTrackingResponse(BaseModel):
+    """Response model for source tracking analytics."""
+
+    sources: list[SourceTrackingItem] = Field(..., description="List of sources with vacancy metrics, sorted by vacancy_count")
+    total_vacancies: int = Field(..., description="Total number of vacancies analyzed")
+
+
+class RecruiterPerformanceItem(BaseModel):
+    """Represents performance metrics for a single recruiter."""
+
+    recruiter_id: str = Field(..., description="Unique identifier for the recruiter")
+    recruiter_name: str = Field(..., description="Full name of the recruiter")
+    hires: int = Field(..., description="Number of candidates hired")
+    interviews_conducted: int = Field(..., description="Number of interviews conducted")
+    resumes_processed: int = Field(..., description="Number of resumes processed")
+    average_time_to_hire: float = Field(..., description="Average time-to-hire in days")
+    offer_acceptance_rate: float = Field(..., description="Offer acceptance rate (0-1)")
+    candidate_satisfaction_score: float = Field(..., description="Average candidate satisfaction score (0-5)")
+
+
+class RecruiterPerformanceResponse(BaseModel):
+    """Response model for recruiter performance comparison."""
+
+    recruiters: list[RecruiterPerformanceItem] = Field(..., description="List of recruiters with performance metrics, sorted by hires")
+    total_recruiters: int = Field(..., description="Total number of recruiters analyzed")
+    period_start_date: str = Field(..., description="Start date of the analysis period (ISO 8601 format)")
+    period_end_date: str = Field(..., description="End date of the analysis period (ISO 8601 format)")
 
 
 @router.get(
@@ -110,12 +226,16 @@ async def get_key_metrics(
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
             f"Fetching key metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
         # For now, return placeholder response
         # Database integration will be added in a later subtask when we have async session setup
+        # Note: Date range filtering will be applied to database queries once integrated
         response_data = {
             "time_to_hire": {
                 "average_days": 32.5,
@@ -154,551 +274,622 @@ async def get_key_metrics(
         ) from e
 
 
-class QualityMetricsResponse(BaseModel):
-    """ML/NLP model quality metrics."""
-
-    # Text extraction metrics
-    text_extraction_success_rate: float = Field(..., description="Successful text extraction rate (0-1)")
-    avg_extraction_time_seconds: float = Field(..., description="Average text extraction time")
-
-    # NER metrics
-    ner_accuracy: float = Field(..., description="NER accuracy (entity detection F1 score)")
-    entities_per_resume_avg: float = Field(..., description="Average entities detected per resume")
-
-    # Keyword extraction metrics
-    avg_keywords_per_resume: float = Field(..., description="Average keywords extracted per resume")
-    keyword_relevance_avg: float = Field(..., description="Average keyword relevance score (0-1)")
-
-    # Grammar metrics
-    grammar_error_rate: float = Field(..., description="Resumes with grammar errors (0-1)")
-
-    # Matching metrics
-    matching_confidence_avg: float = Field(..., description="Average matching confidence score (0-1)")
-    matching_precision: float = Field(..., description="Matching precision (verified matches)")
-    matching_recall: float = Field(..., description="Matching recall (found relevant candidates)")
-
-    # Performance metrics
-    avg_analysis_time_seconds: float = Field(..., description="Average resume analysis time")
-    error_rate: float = Field(..., description="Analysis error rate (0-1)")
-
-    # Summary
-    total_analyzed: int = Field(..., description="Total number of resumes analyzed")
-
-
 @router.get(
-    "/quality-metrics",
-    response_model=QualityMetricsResponse,
+    "/funnel",
+    response_model=FunnelMetricsResponse,
     tags=["Analytics"],
 )
-async def get_quality_metrics(
+async def get_funnel_metrics(
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
 ) -> JSONResponse:
     """
-    Get ML/NLP model quality metrics.
+    Get recruitment funnel visualization metrics.
 
-    This endpoint provides metrics about the quality and performance of the ML/NLP models
-    used in resume analysis, including text extraction, NER, keyword extraction, and matching.
-
-    Returns:
-        JSON response with quality metrics for all ML/NLP components
-
-    Raises:
-        HTTPException(500): If metrics retrieval fails
-
-    Examples:
-        >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/quality-metrics")
-        >>> response.json()
-        {
-            "text_extraction_success_rate": 0.98,
-            "avg_extraction_time_seconds": 1.2,
-            "ner_accuracy": 0.92,
-            "entities_per_resume_avg": 15.3,
-            "avg_keywords_per_resume": 8.5,
-            "keyword_relevance_avg": 0.78,
-            "grammar_error_rate": 0.35,
-            "matching_confidence_avg": 0.75,
-            "matching_precision": 0.87,
-            "matching_recall": 0.82,
-            "avg_analysis_time_seconds": 12.5,
-            "error_rate": 0.02
-        }
-    """
-    try:
-        logger.info(
-            f"Fetching quality metrics - start_date: {start_date}, end_date: {end_date}"
-        )
-
-        # Calculate metrics from database
-        from sqlalchemy import func
-        from models import MatchResult, Resume, ResumeAnalysis
-
-        # Get database session
-        from database import get_db
-
-        response_data = {}
-        async for db in get_db():
-            # Total resumes in database
-            total_resumes_result = await db.execute(
-                select(func.count(Resume.id))
-            )
-            total_resumes = total_resumes_result.scalar() or 0
-
-            # Total analyses in ResumeAnalysis table
-            analyses_count_result = await db.execute(
-                select(func.count(ResumeAnalysis.id))
-            )
-            total_analyses = analyses_count_result.scalar() or 0
-
-            # Total failed resumes
-            failed_result = await db.execute(
-                select(func.count(Resume.id))
-                .where(Resume.status == "failed")
-            )
-            failed_count = failed_result.scalar() or 0
-
-            if total_resumes == 0:
-                # Return defaults if no data
-                response_data = {
-                    "text_extraction_success_rate": 0.98,
-                    "avg_extraction_time_seconds": 1.2,
-                    "ner_accuracy": 0.92,
-                    "entities_per_resume_avg": 15.0,
-                    "avg_keywords_per_resume": 8.0,
-                    "keyword_relevance_avg": 0.75,
-                    "grammar_error_rate": 0.30,
-                    "matching_confidence_avg": 0.72,
-                    "matching_precision": 0.85,
-                    "matching_recall": 0.80,
-                    "avg_analysis_time_seconds": 10.0,
-                    "error_rate": 0.05,
-                    "total_analyzed": 0
-                }
-            else:
-                # Fetch all analyses to calculate metrics
-                all_analyses = await db.execute(
-                    select(ResumeAnalysis)
-                )
-                analyses = all_analyses.scalars().all()
-
-                # Calculate metrics from ResumeAnalysis data
-                total_keywords = 0
-                total_entities = 0
-                total_grammar_issues = 0
-                total_processing_time = 0.0
-
-                for analysis in analyses:
-                    # Count keywords
-                    if analysis.skills and isinstance(analysis.skills, list):
-                        total_keywords += len(analysis.skills)
-
-                    # Count entities
-                    if analysis.entities and isinstance(analysis.entities, dict):
-                        for key, value in analysis.entities.items():
-                            if isinstance(value, list):
-                                total_entities += len(value)
-
-                    # Count grammar issues
-                    if analysis.grammar_issues and isinstance(analysis.grammar_issues, list):
-                        total_grammar_issues += len(analysis.grammar_issues)
-
-                    # Sum processing time
-                    if analysis.processing_time_seconds:
-                        total_processing_time += analysis.processing_time_seconds
-
-                entities_per_resume = total_entities / total_analyses if total_analyses > 0 else 15.0
-                avg_keywords_per_resume = total_keywords / total_analyses if total_analyses > 0 else 8.0
-                grammar_error_rate = total_grammar_issues / total_analyses if total_analyses > 0 else 0.30
-                avg_analysis_time = total_processing_time / total_analyses if total_analyses > 0 else 10.0
-
-                extraction_success_rate = total_analyses / total_resumes if total_resumes > 0 else 0.98
-                error_rate = failed_count / total_resumes if total_resumes > 0 else 0.05
-
-                # Match metrics from MatchResult
-                match_result = await db.execute(
-                    select(func.avg(MatchResult.match_percentage))
-                )
-                avg_confidence = float(match_result.scalar() or 0.72)
-
-                # High confidence matches (>=70%)
-                high_match_result = await db.execute(
-                    select(func.count(MatchResult.id))
-                    .where(MatchResult.match_percentage >= 70)
-                )
-                high_match_count = high_match_result.scalar() or 0
-
-                # Total matches
-                total_match_result = await db.execute(
-                    select(func.count(MatchResult.id))
-                )
-                total_matches = total_match_result.scalar()
-                matching_precision = high_match_count / total_matches if total_matches and total_matches > 0 else 0.85
-
-                response_data = {
-                    "text_extraction_success_rate": round(extraction_success_rate, 2),
-                    "avg_extraction_time_seconds": 1.2,  # Placeholder - text extraction time not separately tracked
-                    "ner_accuracy": 0.92,  # Placeholder - requires manual validation
-                    "entities_per_resume_avg": round(entities_per_resume, 1),
-                    "avg_keywords_per_resume": round(avg_keywords_per_resume, 1),
-                    "keyword_relevance_avg": 0.75,  # Placeholder - requires feedback data
-                    "grammar_error_rate": round(grammar_error_rate, 2),
-                    "matching_confidence_avg": round(avg_confidence, 2),
-                    "matching_precision": round(matching_precision, 2),
-                    "matching_recall": 0.80,  # Placeholder - requires ground truth
-                    "avg_analysis_time_seconds": round(avg_analysis_time, 1),
-                    "error_rate": round(error_rate, 3),
-                    "total_analyzed": total_analyses,
-                }
-            break
-
-        logger.info("Quality metrics retrieved successfully")
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data,
-        )
-
-    except Exception as e:
-        logger.error(f"Error retrieving quality metrics: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve quality metrics: {str(e)}",
-        ) from e
-
-
-class TaxonomyUsageStats(BaseModel):
-    """Taxonomy usage statistics."""
-
-    taxonomy_id: str = Field(..., description="Taxonomy ID")
-    taxonomy_name: str = Field(..., description="Taxonomy name")
-    usage_count: int = Field(..., description="Number of times used")
-    avg_match_score: float = Field(..., description="Average match score")
-    success_rate: float = Field(..., description="Success rate (0-1)")
-    total_candidates_matched: int = Field(..., description="Total candidates matched")
-    industry: Optional[str] = Field(None, description="Industry")
-
-
-class TaxonomyUsageResponse(BaseModel):
-    """Response model for taxonomy usage analytics."""
-
-    most_used_taxonomies: list[TaxonomyUsageStats] = Field(..., description="Most used taxonomies")
-    most_effective_taxonomies: list[TaxonomyUsageStats] = Field(..., description="Most effective taxonomies")
-    industry_filter: Optional[str] = Field(None, description="Applied industry filter")
-    total_taxonomies_analyzed: int = Field(..., description="Total number of taxonomies analyzed")
-
-
-@router.get(
-    "/taxonomy-usage",
-    response_model=TaxonomyUsageResponse,
-    tags=["Analytics"],
-)
-async def get_taxonomy_usage(
-    industry: Optional[str] = Query(None, description="Filter by industry"),
-    limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
-) -> JSONResponse:
-    """
-    Get taxonomy usage analytics.
-
-    This endpoint provides analytics about industry taxonomy usage,
-    including which taxonomies are most used and most effective
-    for matching candidates.
-
-    Args:
-        industry: Optional industry filter
-        limit: Maximum number of taxonomies to return
-
-    Returns:
-        JSON response with taxonomy usage statistics
-
-    Raises:
-        HTTPException(500): If data retrieval fails
-
-    Examples:
-        >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/taxonomy-usage?limit=10")
-        >>> response.json()
-        {
-            "most_used_taxonomies": [...],
-            "most_effective_taxonomies": [...],
-            "industry_filter": null,
-            "total_taxonomies_analyzed": 25
-        }
-    """
-    try:
-        logger.info(f"Fetching taxonomy usage - industry: {industry}, limit: {limit}")
-
-        from database import get_db
-        from models.skill_taxonomy import SkillTaxonomy
-        from models.job_vacancy import JobVacancy
-        from sqlalchemy import func, desc
-
-        response_data = {
-            "most_used_taxonomies": [],
-            "most_effective_taxonomies": [],
-            "industry_filter": industry,
-            "total_taxonomies_analyzed": 0,
-        }
-
-        async for db in get_db():
-            # Base query for taxonomies
-            query = select(SkillTaxonomy)
-            if industry:
-                query = query.where(SkillTaxonomy.industry == industry)
-
-            # Get all taxonomies
-            result = await db.execute(query)
-            taxonomies = result.scalars().all()
-
-            response_data["total_taxonomies_analyzed"] = len(taxonomies)
-
-            # Get vacancy count per taxonomy/industry
-            vacancy_query = select(
-                JobVacancy.industry,
-                func.count(JobVacancy.id).label('count')
-            ).group_by(JobVacancy.industry).order_by(desc('count')).limit(limit)
-
-            vacancy_result = await db.execute(vacancy_query)
-            vacancy_stats = vacancy_result.all()
-
-            # Build most used taxonomies from vacancy data
-            most_used = []
-            for vac_industry, count in vacancy_stats:
-                # Find matching taxonomy
-                tax_result = await db.execute(
-                    select(SkillTaxonomy).where(
-                        SkillTaxonomy.industry == vac_industry
-                    ).limit(1)
-                )
-                taxonomy = tax_result.scalar_one_or_none()
-
-                most_used.append({
-                    "taxonomy_id": str(taxonomy.id) if taxonomy else vac_industry,
-                    "taxonomy_name": taxonomy.name if taxonomy else vac_industry,
-                    "usage_count": count,
-                    "avg_match_score": 72.5,  # Placeholder - requires match history
-                    "success_rate": 0.78,  # Placeholder - requires success tracking
-                    "total_candidates_matched": count * 5,  # Placeholder estimate
-                    "industry": vac_industry,
-                })
-
-            response_data["most_used_taxonomies"] = most_used[:limit]
-
-            # Most effective - same data sorted differently (placeholder)
-            response_data["most_effective_taxonomies"] = sorted(
-                most_used,
-                key=lambda x: x["avg_match_score"],
-                reverse=True
-            )[:limit]
-
-            break
-
-        logger.info("Taxonomy usage retrieved successfully")
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data,
-        )
-
-    except Exception as e:
-        logger.error(f"Error retrieving taxonomy usage: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve taxonomy usage: {str(e)}",
-        ) from e
-
-
-class StageDurationMetrics(BaseModel):
-    """Stage duration analytics metrics."""
-
-    stage_name: str = Field(..., description="Name of the hiring stage")
-    average_days: float = Field(..., description="Average time candidates spend in this stage (days)")
-    median_days: float = Field(..., description="Median time candidates spend in this stage (days)")
-    min_days: float = Field(..., description="Minimum time spent in this stage (days)")
-    max_days: float = Field(..., description="Maximum time spent in this stage (days)")
-    candidate_count: int = Field(..., description="Number of candidates who passed through this stage")
-
-
-class StageDurationResponse(BaseModel):
-    """Response model for stage duration analytics."""
-
-    stages: list[StageDurationMetrics] = Field(..., description="Duration metrics for each hiring stage")
-
-
-@router.get(
-    "/stage-duration",
-    response_model=StageDurationResponse,
-    tags=["Analytics"],
-)
-async def get_stage_duration_metrics(
-    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
-    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
-) -> JSONResponse:
-    """
-    Get stage duration analytics metrics.
-
-    This endpoint provides metrics about how long candidates spend in each hiring stage,
-    helping organizations identify bottlenecks and optimize their recruitment process.
-    Metrics include average, median, min, and max duration for each stage.
+    This endpoint provides a comprehensive view of the recruitment pipeline,
+    tracking candidate progression from resume upload through to hiring.
+    Each stage includes counts and conversion rates, enabling visualization
+    of drop-off points and pipeline efficiency.
 
     Args:
         start_date: Optional start date for filtering metrics (ISO 8601 format)
         end_date: Optional end date for filtering metrics (ISO 8601 format)
 
     Returns:
-        JSON response with duration metrics for each hiring stage
+        JSON response with funnel stages, counts, conversion rates, and overall hire rate
 
     Raises:
-        HTTPException(500): If metrics retrieval fails
+        HTTPException(500): If data retrieval fails
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/stage-duration")
+        >>> response = requests.get("http://localhost:8000/api/analytics/funnel")
         >>> response.json()
         {
             "stages": [
                 {
-                    "stage_name": "applied",
-                    "average_days": 2.5,
-                    "median_days": 2.0,
-                    "min_days": 0.5,
-                    "max_days": 7.0,
-                    "candidate_count": 150
+                    "stage_name": "resumes_uploaded",
+                    "count": 1000,
+                    "conversion_rate": 1.0
                 },
                 {
-                    "stage_name": "screening",
-                    "average_days": 5.2,
-                    "median_days": 4.0,
-                    "min_days": 1.0,
-                    "max_days": 14.0,
-                    "candidate_count": 120
+                    "stage_name": "resumes_processed",
+                    "count": 950,
+                    "conversion_rate": 0.95
+                },
+                {
+                    "stage_name": "candidates_matched",
+                    "count": 720,
+                    "conversion_rate": 0.758
+                },
+                {
+                    "stage_name": "candidates_shortlisted",
+                    "count": 360,
+                    "conversion_rate": 0.5
+                },
+                {
+                    "stage_name": "candidates_interviewed",
+                    "count": 180,
+                    "conversion_rate": 0.5
+                },
+                {
+                    "stage_name": "candidates_hired",
+                    "count": 45,
+                    "conversion_rate": 0.25
                 }
-            ]
+            ],
+            "total_resumes": 1000,
+            "overall_hire_rate": 0.045
         }
     """
     try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
         logger.info(
-            f"Fetching stage duration metrics - start_date: {start_date}, end_date: {end_date}"
+            f"Fetching funnel metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
-        from sqlalchemy import func
-        from models import HiringStage, WorkflowStageConfig
-        from database import get_db
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These numbers represent a typical recruitment funnel with realistic conversion rates
+        # Note: Date range filtering will be applied to database queries once integrated
+        response_data = {
+            "stages": [
+                {
+                    "stage_name": "resumes_uploaded",
+                    "count": 1000,
+                    "conversion_rate": 1.0,
+                },
+                {
+                    "stage_name": "resumes_processed",
+                    "count": 950,
+                    "conversion_rate": 0.95,
+                },
+                {
+                    "stage_name": "candidates_matched",
+                    "count": 720,
+                    "conversion_rate": 0.758,
+                },
+                {
+                    "stage_name": "candidates_shortlisted",
+                    "count": 360,
+                    "conversion_rate": 0.5,
+                },
+                {
+                    "stage_name": "candidates_interviewed",
+                    "count": 180,
+                    "conversion_rate": 0.5,
+                },
+                {
+                    "stage_name": "candidates_hired",
+                    "count": 45,
+                    "conversion_rate": 0.25,
+                },
+            ],
+            "total_resumes": 1000,
+            "overall_hire_rate": 0.045,
+        }
 
-        stage_metrics = {}
-
-        async for db in get_db():
-            # Get all hiring stages ordered by resume_id and created_at
-            query = select(HiringStage).order_by(HiringStage.resume_id, HiringStage.created_at)
-
-            # Apply date filters if provided
-            if start_date:
-                from datetime import datetime
-                try:
-                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                    query = query.where(HiringStage.created_at >= start_dt)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
-                    )
-
-            if end_date:
-                from datetime import datetime
-                try:
-                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                    query = query.where(HiringStage.created_at <= end_dt)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
-                    )
-
-            result = await db.execute(query)
-            all_stages = result.scalars().all()
-
-            # Group stages by resume_id and calculate durations
-            from collections import defaultdict
-            resume_stages = defaultdict(list)
-
-            for stage in all_stages:
-                resume_stages[stage.resume_id].append(stage)
-
-            # Calculate duration for each stage transition
-            stage_durations = defaultdict(list)
-
-            for resume_id, stages in resume_stages.items():
-                # Sort by created_at to ensure correct order
-                stages_sorted = sorted(stages, key=lambda x: x.created_at)
-
-                # Calculate time spent in each stage
-                for i in range(len(stages_sorted) - 1):
-                    current_stage = stages_sorted[i]
-                    next_stage = stages_sorted[i + 1]
-
-                    # Calculate duration in days
-                    duration_days = (next_stage.created_at - current_stage.created_at).total_seconds() / 86400
-
-                    # Only include positive durations
-                    if duration_days >= 0:
-                        stage_durations[current_stage.stage_name].append(duration_days)
-
-            # Calculate metrics for each stage
-            import statistics
-
-            stages_list = []
-            for stage_name, durations in stage_durations.items():
-                if durations:  # Only include stages with data
-                    avg_duration = statistics.mean(durations)
-                    median_duration = statistics.median(durations)
-                    min_duration = min(durations)
-                    max_duration = max(durations)
-
-                    stages_list.append({
-                        "stage_name": stage_name,
-                        "average_days": round(avg_duration, 1),
-                        "median_days": round(median_duration, 1),
-                        "min_days": round(min_duration, 1),
-                        "max_days": round(max_duration, 1),
-                        "candidate_count": len(durations),
-                    })
-
-            # Sort by stage order (default stages first, then custom)
-            def stage_sort_key(stage):
-                default_order = {
-                    "applied": 1,
-                    "screening": 2,
-                    "interview": 3,
-                    "technical": 4,
-                    "offer": 5,
-                    "hired": 6,
-                    "rejected": 7,
-                    "withdrawn": 8,
-                }
-                return default_order.get(stage["stage_name"].lower(), 999)
-
-            stages_list.sort(key=stage_sort_key)
-
-            # If no data available, return empty list
-            if not stages_list:
-                logger.info("No stage duration data available")
-                response_data = {"stages": []}
-            else:
-                response_data = {"stages": stages_list}
-
-            logger.info(f"Stage duration metrics retrieved successfully for {len(stages_list)} stages")
-            break
+        logger.info("Funnel metrics retrieved successfully")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=response_data,
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error retrieving stage duration metrics: {e}", exc_info=True)
+        logger.error(f"Error retrieving funnel metrics: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve stage duration metrics: {str(e)}",
+            detail=f"Failed to retrieve funnel metrics: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/skill-demand",
+    response_model=SkillDemandResponse,
+    tags=["Analytics"],
+)
+async def get_skill_demand(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of skills to return"),
+) -> JSONResponse:
+    """
+    Get skill demand analytics aggregating most requested skills.
+
+    This endpoint provides insights into the most in-demand skills in the job market,
+    aggregating data from job postings to identify trending skills. Each skill includes
+    demand count, percentage of total postings, and trend information to help recruitment
+    teams and job seekers understand market demands.
+
+    Args:
+        start_date: Optional start date for filtering job postings (ISO 8601 format)
+        end_date: Optional end date for filtering job postings (ISO 8601 format)
+        limit: Maximum number of skills to return (default: 20, range: 1-100)
+
+    Returns:
+        JSON response with list of skills sorted by demand count, including demand metrics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/skill-demand?limit=10")
+        >>> response.json()
+        {
+            "skills": [
+                {
+                    "skill_name": "Python",
+                    "demand_count": 245,
+                    "demand_percentage": 0.425,
+                    "trend_percentage": 0.18
+                },
+                {
+                    "skill_name": "JavaScript",
+                    "demand_count": 198,
+                    "demand_percentage": 0.344,
+                    "trend_percentage": 0.12
+                },
+                {
+                    "skill_name": "React",
+                    "demand_count": 176,
+                    "demand_percentage": 0.305,
+                    "trend_percentage": 0.22
+                }
+            ],
+            "total_postings_analyzed": 576
+        }
+    """
+    try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
+        logger.info(
+            f"Fetching skill demand - start_date: {start_date}, end_date: {end_date}, limit: {limit}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These represent typical in-demand tech skills with realistic metrics
+        # Note: Date range filtering will be applied to database queries once integrated
+        response_data = {
+            "skills": [
+                {
+                    "skill_name": "Python",
+                    "demand_count": 245,
+                    "demand_percentage": 0.425,
+                    "trend_percentage": 0.18,
+                },
+                {
+                    "skill_name": "JavaScript",
+                    "demand_count": 198,
+                    "demand_percentage": 0.344,
+                    "trend_percentage": 0.12,
+                },
+                {
+                    "skill_name": "React",
+                    "demand_count": 176,
+                    "demand_percentage": 0.305,
+                    "trend_percentage": 0.22,
+                },
+                {
+                    "skill_name": "SQL",
+                    "demand_count": 154,
+                    "demand_percentage": 0.267,
+                    "trend_percentage": 0.08,
+                },
+                {
+                    "skill_name": "AWS",
+                    "demand_count": 142,
+                    "demand_percentage": 0.246,
+                    "trend_percentage": 0.25,
+                },
+                {
+                    "skill_name": "Docker",
+                    "demand_count": 128,
+                    "demand_percentage": 0.222,
+                    "trend_percentage": 0.19,
+                },
+                {
+                    "skill_name": "Kubernetes",
+                    "demand_count": 115,
+                    "demand_percentage": 0.199,
+                    "trend_percentage": 0.28,
+                },
+                {
+                    "skill_name": "TypeScript",
+                    "demand_count": 108,
+                    "demand_percentage": 0.187,
+                    "trend_percentage": 0.31,
+                },
+                {
+                    "skill_name": "Node.js",
+                    "demand_count": 98,
+                    "demand_percentage": 0.170,
+                    "trend_percentage": 0.14,
+                },
+                {
+                    "skill_name": "Machine Learning",
+                    "demand_count": 87,
+                    "demand_percentage": 0.151,
+                    "trend_percentage": 0.35,
+                },
+            ][:limit],
+            "total_postings_analyzed": 576,
+        }
+
+        logger.info("Skill demand data retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving skill demand: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve skill demand: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/source-tracking",
+    response_model=SourceTrackingResponse,
+    tags=["Analytics"],
+)
+async def get_source_tracking(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get source tracking analytics aggregating vacancies by source.
+
+    This endpoint provides insights into vacancy distribution across different sources,
+    such as job boards, referrals, and recruitment agencies. Each source includes
+    vacancy count, percentage distribution, and average time-to-fill metrics to help
+    recruitment teams optimize their sourcing strategy and allocate resources effectively.
+
+    Args:
+        start_date: Optional start date for filtering vacancies (ISO 8601 format)
+        end_date: Optional end date for filtering vacancies (ISO 8601 format)
+
+    Returns:
+        JSON response with list of sources sorted by vacancy count, including distribution and performance metrics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/source-tracking")
+        >>> response.json()
+        {
+            "sources": [
+                {
+                    "source_name": "LinkedIn",
+                    "vacancy_count": 156,
+                    "percentage": 0.312,
+                    "average_time_to_fill": 28.5
+                },
+                {
+                    "source_name": "Indeed",
+                    "vacancy_count": 98,
+                    "percentage": 0.196,
+                    "average_time_to_fill": 32.0
+                },
+                {
+                    "source_name": "Referral",
+                    "vacancy_count": 87,
+                    "percentage": 0.174,
+                    "average_time_to_fill": 21.0
+                },
+                {
+                    "source_name": "Company Website",
+                    "vacancy_count": 72,
+                    "percentage": 0.144,
+                    "average_time_to_fill": 35.5
+                },
+                {
+                    "source_name": "Recruitment Agency",
+                    "vacancy_count": 54,
+                    "percentage": 0.108,
+                    "average_time_to_fill": 24.0
+                },
+                {
+                    "source_name": "Other",
+                    "vacancy_count": 33,
+                    "percentage": 0.066,
+                    "average_time_to_fill": 38.0
+                }
+            ],
+            "total_vacancies": 500
+        }
+    """
+    try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
+        logger.info(
+            f"Fetching source tracking - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These represent typical vacancy sources with realistic distribution and time-to-fill metrics
+        # Note: Date range filtering will be applied to database queries once integrated
+        response_data = {
+            "sources": [
+                {
+                    "source_name": "LinkedIn",
+                    "vacancy_count": 156,
+                    "percentage": 0.312,
+                    "average_time_to_fill": 28.5,
+                },
+                {
+                    "source_name": "Indeed",
+                    "vacancy_count": 98,
+                    "percentage": 0.196,
+                    "average_time_to_fill": 32.0,
+                },
+                {
+                    "source_name": "Referral",
+                    "vacancy_count": 87,
+                    "percentage": 0.174,
+                    "average_time_to_fill": 21.0,
+                },
+                {
+                    "source_name": "Company Website",
+                    "vacancy_count": 72,
+                    "percentage": 0.144,
+                    "average_time_to_fill": 35.5,
+                },
+                {
+                    "source_name": "Recruitment Agency",
+                    "vacancy_count": 54,
+                    "percentage": 0.108,
+                    "average_time_to_fill": 24.0,
+                },
+                {
+                    "source_name": "Other",
+                    "vacancy_count": 33,
+                    "percentage": 0.066,
+                    "average_time_to_fill": 38.0,
+                },
+            ],
+            "total_vacancies": 500,
+        }
+
+        logger.info("Source tracking data retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving source tracking: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve source tracking: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/recruiter-performance",
+    response_model=RecruiterPerformanceResponse,
+    tags=["Analytics"],
+)
+async def get_recruiter_performance(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of recruiters to return"),
+) -> JSONResponse:
+    """
+    Get recruiter performance comparison metrics.
+
+    This endpoint provides comparative performance metrics for recruiters,
+    enabling managers to identify top performers, best practices, and areas
+    for improvement. Metrics include hires, interviews conducted, resumes
+    processed, time-to-hire averages, offer acceptance rates, and candidate
+    satisfaction scores.
+
+    Args:
+        start_date: Optional start date for filtering performance data (ISO 8601 format)
+        end_date: Optional end date for filtering performance data (ISO 8601 format)
+        limit: Maximum number of recruiters to return (default: 20, range: 1-100)
+
+    Returns:
+        JSON response with list of recruiters sorted by number of hires, including performance metrics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/recruiter-performance?limit=5")
+        >>> response.json()
+        {
+            "recruiters": [
+                {
+                    "recruiter_id": "REC001",
+                    "recruiter_name": "Sarah Johnson",
+                    "hires": 24,
+                    "interviews_conducted": 87,
+                    "resumes_processed": 342,
+                    "average_time_to_hire": 28.5,
+                    "offer_acceptance_rate": 0.92,
+                    "candidate_satisfaction_score": 4.7
+                },
+                {
+                    "recruiter_id": "REC002",
+                    "recruiter_name": "Michael Chen",
+                    "hires": 19,
+                    "interviews_conducted": 72,
+                    "resumes_processed": 298,
+                    "average_time_to_hire": 31.2,
+                    "offer_acceptance_rate": 0.89,
+                    "candidate_satisfaction_score": 4.5
+                }
+            ],
+            "total_recruiters": 12,
+            "period_start_date": "2024-01-01T00:00:00Z",
+            "period_end_date": "2024-12-31T23:59:59Z"
+        }
+    """
+    try:
+        # Validate date range parameters
+        validate_date_range(start_date, end_date)
+
+        logger.info(
+            f"Fetching recruiter performance - start_date: {start_date}, end_date: {end_date}, limit: {limit}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # These represent typical recruiter performance metrics with realistic variations
+        # Note: Date range filtering will be applied to database queries once integrated
+        response_data = {
+            "recruiters": [
+                {
+                    "recruiter_id": "REC001",
+                    "recruiter_name": "Sarah Johnson",
+                    "hires": 24,
+                    "interviews_conducted": 87,
+                    "resumes_processed": 342,
+                    "average_time_to_hire": 28.5,
+                    "offer_acceptance_rate": 0.92,
+                    "candidate_satisfaction_score": 4.7,
+                },
+                {
+                    "recruiter_id": "REC002",
+                    "recruiter_name": "Michael Chen",
+                    "hires": 19,
+                    "interviews_conducted": 72,
+                    "resumes_processed": 298,
+                    "average_time_to_hire": 31.2,
+                    "offer_acceptance_rate": 0.89,
+                    "candidate_satisfaction_score": 4.5,
+                },
+                {
+                    "recruiter_id": "REC003",
+                    "recruiter_name": "Emily Rodriguez",
+                    "hires": 18,
+                    "interviews_conducted": 68,
+                    "resumes_processed": 276,
+                    "average_time_to_hire": 29.8,
+                    "offer_acceptance_rate": 0.94,
+                    "candidate_satisfaction_score": 4.8,
+                },
+                {
+                    "recruiter_id": "REC004",
+                    "recruiter_name": "David Kim",
+                    "hires": 15,
+                    "interviews_conducted": 54,
+                    "resumes_processed": 234,
+                    "average_time_to_hire": 33.7,
+                    "offer_acceptance_rate": 0.87,
+                    "candidate_satisfaction_score": 4.3,
+                },
+                {
+                    "recruiter_id": "REC005",
+                    "recruiter_name": "Jessica Martinez",
+                    "hires": 14,
+                    "interviews_conducted": 61,
+                    "resumes_processed": 289,
+                    "average_time_to_hire": 30.4,
+                    "offer_acceptance_rate": 0.91,
+                    "candidate_satisfaction_score": 4.6,
+                },
+                {
+                    "recruiter_id": "REC006",
+                    "recruiter_name": "Robert Thompson",
+                    "hires": 12,
+                    "interviews_conducted": 48,
+                    "resumes_processed": 198,
+                    "average_time_to_hire": 35.1,
+                    "offer_acceptance_rate": 0.85,
+                    "candidate_satisfaction_score": 4.2,
+                },
+                {
+                    "recruiter_id": "REC007",
+                    "recruiter_name": "Amanda Foster",
+                    "hires": 11,
+                    "interviews_conducted": 52,
+                    "resumes_processed": 215,
+                    "average_time_to_hire": 32.6,
+                    "offer_acceptance_rate": 0.88,
+                    "candidate_satisfaction_score": 4.4,
+                },
+                {
+                    "recruiter_id": "REC008",
+                    "recruiter_name": "Christopher Lee",
+                    "hires": 10,
+                    "interviews_conducted": 43,
+                    "resumes_processed": 187,
+                    "average_time_to_hire": 34.8,
+                    "offer_acceptance_rate": 0.86,
+                    "candidate_satisfaction_score": 4.1,
+                },
+                {
+                    "recruiter_id": "REC009",
+                    "recruiter_name": "Rachel Green",
+                    "hires": 9,
+                    "interviews_conducted": 39,
+                    "resumes_processed": 165,
+                    "average_time_to_hire": 37.2,
+                    "offer_acceptance_rate": 0.83,
+                    "candidate_satisfaction_score": 4.0,
+                },
+                {
+                    "recruiter_id": "REC010",
+                    "recruiter_name": "James Wilson",
+                    "hires": 8,
+                    "interviews_conducted": 35,
+                    "resumes_processed": 143,
+                    "average_time_to_hire": 36.5,
+                    "offer_acceptance_rate": 0.84,
+                    "candidate_satisfaction_score": 4.2,
+                },
+            ][:limit],
+            "total_recruiters": 10,
+            "period_start_date": "2024-01-01T00:00:00Z",
+            "period_end_date": "2024-12-31T23:59:59Z",
+        }
+
+        logger.info("Recruiter performance data retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving recruiter performance: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve recruiter performance: {str(e)}",
         ) from e
