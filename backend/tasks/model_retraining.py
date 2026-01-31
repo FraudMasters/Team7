@@ -127,6 +127,7 @@ def check_performance_degradation(
     current_metrics: Dict[str, Dict[str, Any]],
     baseline_metrics: Dict[str, Dict[str, Any]],
     threshold: float = MIN_PERFORMANCE_DEGRADATION_THRESHOLD,
+    model_name: str = "model",
 ) -> Tuple[bool, Dict[str, float]]:
     """
     Check if model performance has degraded beyond threshold.
@@ -138,6 +139,7 @@ def check_performance_degradation(
         current_metrics: Current performance metrics by dataset type
         baseline_metrics: Baseline performance metrics to compare against
         threshold: Degradation threshold (default: 0.05 for 5% drop)
+        model_name: Name of the model for logging (default: "model")
 
     Returns:
         Tuple of (is_degraded, degradation_details):
@@ -152,7 +154,7 @@ def check_performance_degradation(
     Example:
         >>> current = {"validation": {"f1_score": 0.85}}
         >>> baseline = {"validation": {"f1_score": 0.92}}
-        >>> is_degraded, details = check_performance_degradation(current, baseline)
+        >>> is_degraded, details = check_performance_degradation(current, baseline, model_name='ranking')
         >>> print(is_degraded)
         True
     """
@@ -325,7 +327,7 @@ def should_trigger_retraining(
 
     if current_metrics and baseline_metrics:
         performance_degraded, degradation_details = check_performance_degradation(
-            current_metrics, baseline_metrics, performance_threshold
+            current_metrics, baseline_metrics, performance_threshold, model_name
         )
 
         if performance_degraded:
