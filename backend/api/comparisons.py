@@ -8,15 +8,22 @@ import json
 import logging
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
+
+from database import get_db
+from models.comparison import ResumeComparison
 
 from analyzers import (
     extract_resume_keywords_hf as extract_resume_keywords,
@@ -408,6 +415,7 @@ class ComparisonUpdate(BaseModel):
     name: Optional[str] = Field(None, description="Updated name for the comparison view")
     filters: Optional[dict] = Field(None, description="Updated filter settings")
     shared_with: Optional[List[str]] = Field(None, description="Updated list of users to share with")
+    notes: Optional[dict] = Field(None, description="Recruiter notes about resumes in this comparison")
 
 
 class ComparisonResponse(BaseModel):
@@ -420,6 +428,7 @@ class ComparisonResponse(BaseModel):
     filters: Optional[dict] = Field(None, description="Filter settings")
     created_by: Optional[str] = Field(None, description="User who created the comparison")
     shared_with: Optional[List[str]] = Field(None, description="List of users shared with")
+    notes: Optional[dict] = Field(None, description="Recruiter notes about resumes in this comparison")
     comparison_results: Optional[List[dict]] = Field(None, description="Match results for each resume")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
@@ -438,7 +447,10 @@ class ComparisonListResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["Comparisons"],
 )
-async def create_comparison(request: ComparisonCreate) -> JSONResponse:
+async def create_comparison(
+    request: ComparisonCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Create a new resume comparison view.
 
@@ -448,6 +460,7 @@ async def create_comparison(request: ComparisonCreate) -> JSONResponse:
 
     Args:
         request: Create request with vacancy_id, resume_ids, and optional settings
+        db: Database session
 
     Returns:
         JSON response with created comparison view details
@@ -496,25 +509,48 @@ async def create_comparison(request: ComparisonCreate) -> JSONResponse:
                 detail="Maximum 5 resumes can be compared at once",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        comparison_response = {
-            "id": "placeholder-comparison-id",
-            "vacancy_id": request.vacancy_id,
-            "resume_ids": request.resume_ids,
-            "name": request.name,
-            "filters": request.filters,
-            "created_by": request.created_by,
-            "shared_with": request.shared_with,
-            "comparison_results": None,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
-        }
+        # Parse vacancy_id as UUID
+        try:
+            vacancy_uuid = UUID(request.vacancy_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid vacancy_id format: {request.vacancy_id}",
+            )
+
+        # Create new comparison record
+        new_comparison = ResumeComparison(
+            vacancy_id=vacancy_uuid,
+            name=request.name,
+            resume_ids=request.resume_ids,
+            filters=request.filters,
+            created_by=request.created_by,
+            shared_with=request.shared_with if request.shared_with else [],
+        )
+
+        db.add(new_comparison)
+        await db.commit()
+        await db.refresh(new_comparison)
 
         logger.info(
-            f"Created comparison for vacancy {request.vacancy_id} "
+            f"Created comparison {new_comparison.id} for vacancy {request.vacancy_id} "
             f"with {len(request.resume_ids)} resumes"
         )
+
+        # Build response
+        comparison_response = {
+            "id": str(new_comparison.id),
+            "vacancy_id": str(new_comparison.vacancy_id),
+            "resume_ids": new_comparison.resume_ids,
+            "name": new_comparison.name,
+            "filters": new_comparison.filters,
+            "created_by": new_comparison.created_by,
+            "shared_with": new_comparison.shared_with,
+            "notes": new_comparison.comparison_notes,
+            "comparison_results": None,
+            "created_at": new_comparison.created_at.isoformat(),
+            "updated_at": new_comparison.updated_at.isoformat(),
+        }
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
@@ -525,6 +561,7 @@ async def create_comparison(request: ComparisonCreate) -> JSONResponse:
         raise
     except Exception as e:
         logger.error(f"Error creating comparison: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create comparison: {str(e)}",
@@ -541,6 +578,7 @@ async def list_comparisons(
     order: Optional[str] = Query("desc", description="Sort order (asc or desc)"),
     limit: int = Query(50, description="Maximum number of comparisons to return", ge=1, le=100),
     offset: int = Query(0, description="Number of comparisons to skip", ge=0),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     List resume comparison views with optional filters and sorting.
@@ -604,23 +642,71 @@ async def list_comparisons(
             f"order: {order}, limit: {limit}, offset: {offset}"
         )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        # When database is integrated, filters and sorting will be applied at the query level:
-        # - Build WHERE clauses based on filter parameters
-        # - Apply ORDER BY with sort_by and order
-        # - Use LIMIT and OFFSET for pagination
+        # Build query
+        query = select(ResumeComparison)
+
+        # Apply filters
+        if vacancy_id:
+            try:
+                vacancy_uuid = UUID(vacancy_id)
+                query = query.where(ResumeComparison.vacancy_id == vacancy_uuid)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid vacancy_id format: {vacancy_id}",
+                )
+
+        if created_by:
+            query = query.where(ResumeComparison.created_by == created_by)
+
+        # Apply sorting
+        sort_column = getattr(ResumeComparison, sort_by, ResumeComparison.created_at)
+        if order == "desc":
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
+
+        # Get total count before pagination
+        count_query = select(ResumeComparison.id)
+        if vacancy_id:
+            try:
+                vacancy_uuid = UUID(vacancy_id)
+                count_query = count_query.where(ResumeComparison.vacancy_id == vacancy_uuid)
+            except ValueError:
+                pass
+        if created_by:
+            count_query = count_query.where(ResumeComparison.created_by == created_by)
+
+        count_result = await db.execute(count_query)
+        total_count = len(count_result.all())
+
+        # Apply pagination
+        query = query.limit(limit).offset(offset)
+
+        # Execute query
+        result = await db.execute(query)
+        comparisons = result.scalars().all()
+
+        # Build response
+        comparison_list = []
+        for comparison in comparisons:
+            comparison_list.append({
+                "id": str(comparison.id),
+                "vacancy_id": str(comparison.vacancy_id),
+                "resume_ids": comparison.resume_ids,
+                "name": comparison.name,
+                "filters": comparison.filters,
+                "created_by": comparison.created_by,
+                "shared_with": comparison.shared_with,
+                "notes": comparison.comparison_notes,
+                "comparison_results": None,
+                "created_at": comparison.created_at.isoformat(),
+                "updated_at": comparison.updated_at.isoformat(),
+            })
+
         response_data = {
-            "comparisons": [],
-            "total_count": 0,
-            "filters_applied": {
-                "vacancy_id": vacancy_id,
-                "created_by": created_by,
-                "min_match_percentage": min_match_percentage,
-                "max_match_percentage": max_match_percentage,
-                "sort_by": sort_by,
-                "order": order,
-            },
+            "comparisons": comparison_list,
+            "total_count": total_count,
         }
 
         return JSONResponse(
@@ -639,12 +725,16 @@ async def list_comparisons(
 
 
 @router.get("/{comparison_id}", tags=["Comparisons"])
-async def get_comparison(comparison_id: str) -> JSONResponse:
+async def get_comparison(
+    comparison_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Get a specific comparison view by ID.
 
     Args:
         comparison_id: Unique identifier of the comparison view
+        db: Database session
 
     Returns:
         JSON response with comparison view details
@@ -663,24 +753,48 @@ async def get_comparison(comparison_id: str) -> JSONResponse:
     try:
         logger.info(f"Getting comparison: {comparison_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Parse comparison_id as UUID
+        try:
+            comparison_uuid = UUID(comparison_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid comparison_id format: {comparison_id}",
+            )
+
+        # Query database
+        query = select(ResumeComparison).where(ResumeComparison.id == comparison_uuid)
+        result = await db.execute(query)
+        comparison = result.scalar_one_or_none()
+
+        if not comparison:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Comparison not found: {comparison_id}",
+            )
+
+        # Build response
+        response_data = {
+            "id": str(comparison.id),
+            "vacancy_id": str(comparison.vacancy_id),
+            "resume_ids": comparison.resume_ids,
+            "name": comparison.name,
+            "filters": comparison.filters,
+            "created_by": comparison.created_by,
+            "shared_with": comparison.shared_with,
+            "notes": comparison.comparison_notes,
+            "comparison_results": None,
+            "created_at": comparison.created_at.isoformat(),
+            "updated_at": comparison.updated_at.isoformat(),
+        }
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": comparison_id,
-                "vacancy_id": "vacancy-123",
-                "resume_ids": ["resume1", "resume2"],
-                "name": "Sample Comparison",
-                "filters": None,
-                "created_by": "user-123",
-                "shared_with": None,
-                "comparison_results": None,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-            },
+            content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting comparison: {e}", exc_info=True)
         raise HTTPException(
@@ -691,17 +805,22 @@ async def get_comparison(comparison_id: str) -> JSONResponse:
 
 @router.put("/{comparison_id}", tags=["Comparisons"])
 async def update_comparison(
-    comparison_id: str, request: ComparisonUpdate
+    comparison_id: str,
+    request: ComparisonUpdate,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Update a comparison view.
 
+    Allows updating comparison name, filters, shared users, and recruiter notes.
+
     Args:
         comparison_id: Unique identifier of the comparison view
-        request: Update request with fields to modify
+        request: Update request with fields to modify (name, filters, shared_with, notes)
+        db: Database session
 
     Returns:
-        JSON response with updated comparison view
+        JSON response with updated comparison view including all fields
 
     Raises:
         HTTPException(404): If comparison view is not found
@@ -710,38 +829,77 @@ async def update_comparison(
 
     Examples:
         >>> import requests
-        >>> data = {"name": "Updated Comparison Name"}
-        >>> response = requests.put(
-        ...     "http://localhost:8000/api/comparisons/123",
-        ...     json=data
-        ... )
+        >>> # Update notes
+        >>> data = {"notes": {"resume-1": "Strong candidate", "resume-2": "Missing skills"}}
+        >>> response = requests.put("http://localhost:8000/api/comparisons/123", json=data)
+        >>> # Update multiple fields
+        >>> data = {"name": "Updated Name", "notes": {"resume-1": "Interview"}}
+        >>> response = requests.put("http://localhost:8000/api/comparisons/123", json=data)
         >>> response.json()
     """
     try:
         logger.info(f"Updating comparison: {comparison_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Parse comparison_id as UUID
+        try:
+            comparison_uuid = UUID(comparison_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid comparison_id format: {comparison_id}",
+            )
+
+        # Query database
+        query = select(ResumeComparison).where(ResumeComparison.id == comparison_uuid)
+        result = await db.execute(query)
+        comparison = result.scalar_one_or_none()
+
+        if not comparison:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Comparison not found: {comparison_id}",
+            )
+
+        # Update fields if provided
+        if request.name is not None:
+            comparison.name = request.name
+        if request.filters is not None:
+            comparison.filters = request.filters
+        if request.shared_with is not None:
+            comparison.shared_with = request.shared_with
+        if request.notes is not None:
+            comparison.comparison_notes = request.notes
+
+        await db.commit()
+        await db.refresh(comparison)
+
+        logger.info(f"Updated comparison {comparison_id}")
+
+        # Build response
+        response_data = {
+            "id": str(comparison.id),
+            "vacancy_id": str(comparison.vacancy_id),
+            "resume_ids": comparison.resume_ids,
+            "name": comparison.name,
+            "filters": comparison.filters,
+            "created_by": comparison.created_by,
+            "shared_with": comparison.shared_with,
+            "notes": comparison.comparison_notes,
+            "comparison_results": None,
+            "created_at": comparison.created_at.isoformat(),
+            "updated_at": comparison.updated_at.isoformat(),
+        }
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": comparison_id,
-                "vacancy_id": "vacancy-123",
-                "resume_ids": ["resume1", "resume2"],
-                "name": request.name if request.name is not None else "Sample Comparison",
-                "filters": request.filters,
-                "created_by": "user-123",
-                "shared_with": request.shared_with,
-                "comparison_results": None,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-            },
+            content=response_data,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating comparison: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update comparison: {str(e)}",
@@ -749,12 +907,16 @@ async def update_comparison(
 
 
 @router.delete("/{comparison_id}", tags=["Comparisons"])
-async def delete_comparison(comparison_id: str) -> JSONResponse:
+async def delete_comparison(
+    comparison_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Delete a comparison view.
 
     Args:
         comparison_id: Unique identifier of the comparison view
+        db: Database session
 
     Returns:
         JSON response confirming deletion
@@ -772,15 +934,42 @@ async def delete_comparison(comparison_id: str) -> JSONResponse:
     try:
         logger.info(f"Deleting comparison: {comparison_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Parse comparison_id as UUID
+        try:
+            comparison_uuid = UUID(comparison_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid comparison_id format: {comparison_id}",
+            )
+
+        # Query database
+        query = select(ResumeComparison).where(ResumeComparison.id == comparison_uuid)
+        result = await db.execute(query)
+        comparison = result.scalar_one_or_none()
+
+        if not comparison:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Comparison not found: {comparison_id}",
+            )
+
+        # Delete the comparison
+        await db.delete(comparison)
+        await db.commit()
+
+        logger.info(f"Deleted comparison {comparison_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={"message": f"Comparison {comparison_id} deleted successfully"},
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting comparison: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete comparison: {str(e)}",
@@ -788,15 +977,22 @@ async def delete_comparison(comparison_id: str) -> JSONResponse:
 
 
 @router.get("/shared/{share_id}", tags=["Comparisons"])
-async def get_shared_comparison(share_id: str) -> JSONResponse:
+async def get_shared_comparison(
+    share_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Get a shared comparison view by share ID.
 
     This endpoint allows accessing a shared comparison view without authentication.
     It's designed for sharing comparison results with team members or external parties.
 
+    Note: This endpoint is a placeholder for future sharing functionality.
+    Currently, sharing is handled via the shared_with field in the comparison model.
+
     Args:
         share_id: Unique share identifier for the comparison view
+        db: Database session
 
     Returns:
         JSON response with comparison view details
@@ -824,29 +1020,15 @@ async def get_shared_comparison(share_id: str) -> JSONResponse:
     try:
         logger.info(f"Getting shared comparison: {share_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        # When integrated, this will:
-        # 1. Query the resume_comparisons table by share_id
-        # 2. Verify the comparison is marked as shared
-        # 3. Return the comparison data without requiring authentication
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "id": "comp-123",
-                "vacancy_id": "vacancy-123",
-                "resume_ids": ["resume1", "resume2", "resume3"],
-                "name": "Shared Comparison View",
-                "filters": None,
-                "created_by": "user-123",
-                "shared_with": None,
-                "comparison_results": None,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-                "share_id": share_id,
-            },
+        # TODO: Implement proper sharing functionality with share_id field
+        # For now, return 404 as sharing is not fully implemented
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shared comparison not found. Sharing functionality will be implemented in a future update.",
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting shared comparison: {e}", exc_info=True)
         raise HTTPException(

@@ -46,3 +46,80 @@ code {
  *   transform: scaleX(-1);  /* Mirror icons/images for RTL */
  * }
  */
+
+/* Print Styles for PDF Export
+ *
+ * These styles optimize the comparison page for printing/exporting to PDF.
+ * They hide interactive elements, adjust layout for paper format, and ensure
+ * all comparison data is clearly visible in the exported document.
+ */
+@media print {
+  /* Hide interactive elements that don't belong in print */
+  .no-print,
+  button,
+  input[type='text'],
+  input[type='search'],
+  .MuiButtonBase-root,
+  .MuiDialog-root,
+  .MuiSnackbar-root {
+    display: none !important;
+  }
+
+  /* Ensure main content is visible */
+  body,
+  #root {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Adjust container for print */
+  .MuiContainer-root {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Ensure papers/sections are clearly separated */
+  .MuiPaper-root {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    margin-bottom: 1rem !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Ensure tables and matrices don't break awkwardly */
+  table,
+  .comparison-matrix {
+    page-break-inside: avoid !important;
+  }
+
+  /* Print-friendly typography */
+  .MuiTypography-root {
+    color: black !important;
+  }
+
+  /* Ensure backgrounds are printed */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Add page break before main sections if needed */
+  .comparison-section {
+    page-break-before: always;
+  }
+
+  .comparison-section:first-child {
+    page-break-before: avoid;
+  }
+
+  /* Ensure chip colors print correctly */
+  .MuiChip-root {
+    border: 1px solid #ccc !important;
+  }
+
+  /* Stack for print layout */
+  .MuiStack-root {
+    display: block !important;
+  }
+}

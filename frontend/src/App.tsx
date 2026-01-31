@@ -6,6 +6,7 @@ import BatchUploadPage from '@pages/BatchUpload';
 import ResultsPage from '@pages/Results';
 import ComparePage from '@pages/Compare';
 import CompareVacancyPage from '@pages/CompareVacancy';
+import CompareCandidatesPage from '@pages/CompareCandidates';
 import AdminSynonymsPage from '@pages/AdminSynonyms';
 import AdminAnalyticsPage from '@pages/AdminAnalytics';
 import AnalyticsDashboardPage from '@pages/AnalyticsDashboard';
@@ -47,6 +48,7 @@ function App() {
           {/* Job Seeker Module Routes */}
           <Route path="jobs">
             <Route index element={<VacancyListPage />} />
+            <Route path="create" element={<CreateVacancyPage />} />
             <Route path="upload" element={<UploadPage />} />
             <Route path="batch-upload" element={<BatchUploadPage />} />
             <Route path="results/:id" element={<ResultsPage />} />
@@ -60,6 +62,7 @@ function App() {
               <Route index element={<VacancyListPage />} />
               <Route path="create" element={<CreateVacancyPage />} />
               <Route path=":id" element={<VacancyDetailsPage />} />
+              <Route path=":id/compare" element={<CompareCandidatesPage />} />
             </Route>
             <Route path="resumes" element={<ResumeDatabasePage />} />
             <Route path="search" element={<CandidateSearchPage />} />

@@ -249,6 +249,7 @@ from api import (
     reports,
     vacancies,
     ranking,
+    candidates,
     industry_classifier,
     skill_suggestions,
     taxonomy_import_export,
@@ -258,7 +259,6 @@ from api import (
     work_experience,
     skill_gap_analysis,
     backups,
-    ats_simulation,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -274,6 +274,7 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
+app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
 app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
 app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
@@ -283,7 +284,6 @@ app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
-app.include_router(ats_simulation.router, prefix="/api/ats", tags=["ATS Simulation"])
 
 
 if __name__ == "__main__":

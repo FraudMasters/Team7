@@ -96,6 +96,8 @@ interface ComparisonControlsProps {
   onShare?: () => void;
   /** Callback when export is clicked */
   onExport?: () => void;
+  /** Callback when PDF export is clicked */
+  onExportPDF?: () => void;
   /** Comparison data for export */
   comparisonData?: ComparisonData | null;
   /** Initial filter values */
@@ -145,6 +147,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
   onSave,
   onShare,
   onExport,
+  onExportPDF,
   comparisonData,
   initialFilters = { min_match_percentage: 0, max_match_percentage: 100 },
   initialSort = { field: 'match_percentage', order: 'desc' },
@@ -270,6 +273,13 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
   const handleShare = useCallback(() => {
     onShare?.();
   }, [onShare]);
+
+  /**
+   * Handle export to PDF
+   */
+  const handleExportPDF = useCallback(() => {
+    onExportPDF?.();
+  }, [onExportPDF]);
 
   /**
    * Handle export to Excel (CSV format)
@@ -585,8 +595,22 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
             Reset All
           </Button>
 
-          {/* Export Button */}
-          {showExport && (
+          {/* Export to PDF Button */}
+          {showExport && onExportPDF && (
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportPDF}
+              disabled={disabled || !isValidRange}
+              color="success"
+            >
+              Export to PDF
+            </Button>
+          )}
+
+          {/* Export to Excel Button */}
+          {showExport && !onExportPDF && (
             <Button
               fullWidth
               variant="outlined"

@@ -28,6 +28,7 @@ import {
   EmojiEvents as TrophyIcon,
   TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
+import ComparisonNotes from './ComparisonNotes';
 
 /**
  * Individual skill match interface
@@ -455,6 +456,12 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
                         </Typography>
                       </Box>
                     </Stack>
+                    <Divider sx={{ my: 1.5 }} />
+                    <ComparisonNotes
+                      candidateId={comparison.resume_id}
+                      vacancyId={vacancyId}
+                      compact={true}
+                    />
                   </CardContent>
                 </Card>
               </Grid>

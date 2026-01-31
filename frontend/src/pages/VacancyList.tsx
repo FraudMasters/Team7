@@ -24,7 +24,7 @@ import {
   Delete as DeleteIcon,
   Work as WorkIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 interface Vacancy {
@@ -48,6 +48,12 @@ interface Vacancy {
 const VacancyList: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine if we're in job seeker or recruiter context
+  const isJobsContext = location.pathname.startsWith('/jobs');
+  const basePath = isJobsContext ? '/jobs' : '/recruiter/vacancies';
+
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +176,7 @@ const VacancyList: React.FC = () => {
           variant="contained"
           size="large"
           startIcon={<AddIcon />}
-          onClick={() => navigate('/vacancies/create')}
+          onClick={() => navigate(`${basePath}/create`)}
         >
           {t('vacancyList.createRequest')}
         </Button>
@@ -196,7 +202,7 @@ const VacancyList: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => navigate('/vacancies/create')}
+            onClick={() => navigate(`${basePath}/create`)}
           >
             {t('vacancyList.createRequest')}
           </Button>
@@ -274,14 +280,14 @@ const VacancyList: React.FC = () => {
                 <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
                   <Button
                     size="small"
-                    onClick={() => navigate(`${vacancy.id}`)}
+                    onClick={() => navigate(`${basePath}/${vacancy.id}`)}
                   >
                     {t('vacancyList.moreDetails')}
                   </Button>
                   <Box>
                     <IconButton
                       size="small"
-                      onClick={() => navigate(`${vacancy.id}/edit`)}
+                      onClick={() => navigate(`${basePath}/${vacancy.id}/edit`)}
                     >
                       <EditIcon />
                     </IconButton>

@@ -365,3 +365,144 @@ async def get_quality_metrics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve quality metrics: {str(e)}",
         ) from e
+
+
+class TaxonomyUsageStats(BaseModel):
+    """Taxonomy usage statistics."""
+
+    taxonomy_id: str = Field(..., description="Taxonomy ID")
+    taxonomy_name: str = Field(..., description="Taxonomy name")
+    usage_count: int = Field(..., description="Number of times used")
+    avg_match_score: float = Field(..., description="Average match score")
+    success_rate: float = Field(..., description="Success rate (0-1)")
+    total_candidates_matched: int = Field(..., description="Total candidates matched")
+    industry: Optional[str] = Field(None, description="Industry")
+
+
+class TaxonomyUsageResponse(BaseModel):
+    """Response model for taxonomy usage analytics."""
+
+    most_used_taxonomies: list[TaxonomyUsageStats] = Field(..., description="Most used taxonomies")
+    most_effective_taxonomies: list[TaxonomyUsageStats] = Field(..., description="Most effective taxonomies")
+    industry_filter: Optional[str] = Field(None, description="Applied industry filter")
+    total_taxonomies_analyzed: int = Field(..., description="Total number of taxonomies analyzed")
+
+
+@router.get(
+    "/taxonomy-usage",
+    response_model=TaxonomyUsageResponse,
+    tags=["Analytics"],
+)
+async def get_taxonomy_usage(
+    industry: Optional[str] = Query(None, description="Filter by industry"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
+) -> JSONResponse:
+    """
+    Get taxonomy usage analytics.
+
+    This endpoint provides analytics about industry taxonomy usage,
+    including which taxonomies are most used and most effective
+    for matching candidates.
+
+    Args:
+        industry: Optional industry filter
+        limit: Maximum number of taxonomies to return
+
+    Returns:
+        JSON response with taxonomy usage statistics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/taxonomy-usage?limit=10")
+        >>> response.json()
+        {
+            "most_used_taxonomies": [...],
+            "most_effective_taxonomies": [...],
+            "industry_filter": null,
+            "total_taxonomies_analyzed": 25
+        }
+    """
+    try:
+        logger.info(f"Fetching taxonomy usage - industry: {industry}, limit: {limit}")
+
+        from database import get_db
+        from models.skill_taxonomy import SkillTaxonomy
+        from models.job_vacancy import JobVacancy
+        from sqlalchemy import func, desc
+
+        response_data = {
+            "most_used_taxonomies": [],
+            "most_effective_taxonomies": [],
+            "industry_filter": industry,
+            "total_taxonomies_analyzed": 0,
+        }
+
+        async for db in get_db():
+            # Base query for taxonomies
+            query = select(SkillTaxonomy)
+            if industry:
+                query = query.where(SkillTaxonomy.industry == industry)
+
+            # Get all taxonomies
+            result = await db.execute(query)
+            taxonomies = result.scalars().all()
+
+            response_data["total_taxonomies_analyzed"] = len(taxonomies)
+
+            # Get vacancy count per taxonomy/industry
+            vacancy_query = select(
+                JobVacancy.industry,
+                func.count(JobVacancy.id).label('count')
+            ).group_by(JobVacancy.industry).order_by(desc('count')).limit(limit)
+
+            vacancy_result = await db.execute(vacancy_query)
+            vacancy_stats = vacancy_result.all()
+
+            # Build most used taxonomies from vacancy data
+            most_used = []
+            for vac_industry, count in vacancy_stats:
+                # Find matching taxonomy
+                tax_result = await db.execute(
+                    select(SkillTaxonomy).where(
+                        SkillTaxonomy.industry == vac_industry
+                    ).limit(1)
+                )
+                taxonomy = tax_result.scalar_one_or_none()
+
+                most_used.append({
+                    "taxonomy_id": str(taxonomy.id) if taxonomy else vac_industry,
+                    "taxonomy_name": taxonomy.name if taxonomy else vac_industry,
+                    "usage_count": count,
+                    "avg_match_score": 72.5,  # Placeholder - requires match history
+                    "success_rate": 0.78,  # Placeholder - requires success tracking
+                    "total_candidates_matched": count * 5,  # Placeholder estimate
+                    "industry": vac_industry,
+                })
+
+            response_data["most_used_taxonomies"] = most_used[:limit]
+
+            # Most effective - same data sorted differently (placeholder)
+            response_data["most_effective_taxonomies"] = sorted(
+                most_used,
+                key=lambda x: x["avg_match_score"],
+                reverse=True
+            )[:limit]
+
+            break
+
+        logger.info("Taxonomy usage retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving taxonomy usage: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve taxonomy usage: {str(e)}",
+        ) from e

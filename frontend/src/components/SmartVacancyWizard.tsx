@@ -38,7 +38,7 @@ import {
   BusinessCenter as BusinessCenterIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   searchSkills,
@@ -124,6 +124,11 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine if we're in job seeker or recruiter context
+  const isJobsContext = location.pathname.startsWith('/jobs');
+  const basePath = isJobsContext ? '/jobs' : '/recruiter/vacancies';
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -145,6 +150,40 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
     employment_type: initialData?.employment_type || '',
     description: initialData?.description || '',
   });
+
+  // Form field change handlers - memoized to prevent re-renders
+  const handleFieldChange = useCallback((field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, title: e.target.value }));
+  }, []);
+
+  const handleSalaryMinChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      salary_min: e.target.value ? parseInt(e.target.value) : null,
+    }));
+  }, []);
+
+  const handleSalaryMaxChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      salary_max: e.target.value ? parseInt(e.target.value) : null,
+    }));
+  }, []);
+
+  const handleExperienceChange = useCallback((_: Event, value: number | number[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      min_experience_months: value as number,
+    }));
+  }, []);
+
+  const handleChange = useCallback((field: string) => (e: any) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+  }, []);
 
   // Debounced preset search
   useEffect(() => {
@@ -228,7 +267,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
       if (onComplete) {
         onComplete(vacancy);
       } else {
-        navigate('/recruiter/vacancies');
+        navigate(basePath);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create vacancy');
@@ -291,31 +330,6 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 
   // Step components
   const PositionSelectionStep = () => {
-    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, title: e.target.value }));
-    };
-
-    const handleSalaryMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({
-        ...prev,
-        salary_min: e.target.value ? parseInt(e.target.value) : null,
-      }));
-    };
-
-    const handleSalaryMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({
-        ...prev,
-        salary_max: e.target.value ? parseInt(e.target.value) : null,
-      }));
-    };
-
-    const handleExperienceChange = (_: Event, value: number | number[]) => {
-      setFormData((prev) => ({
-        ...prev,
-        min_experience_months: value as number,
-      }));
-    };
-
     return (
       <Stack spacing={3}>
         <Typography variant="h6">Выберите или введите позицию</Typography>
@@ -550,10 +564,6 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 
   // Conditions Step
   const ConditionsStep = () => {
-    const handleChange = (field: string) => (e: any) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-    };
-
     return (
       <Stack spacing={3}>
         <Typography variant="h6">Условия работы</Typography>
@@ -637,10 +647,6 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 
   // Description Step
   const DescriptionStep = () => {
-    const handleChange = (field: string) => (e: any) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-    };
-
     const skillsList = formData.required_skills.slice(0, 3).join(', ');
     const experienceText = formData.min_experience_months > 0
       ? `${Math.floor(formData.min_experience_months / 12)}+ лет`
@@ -697,7 +703,7 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
       <Paper elevation={3} sx={{ p: 4 }}>
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={() => navigate('/recruiter/vacancies')} disabled={isSubmitting}>
+          <IconButton onClick={() => navigate(basePath)} disabled={isSubmitting}>
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h4" component="h1" fontWeight={600}>

@@ -1,7 +1,7 @@
 """Add ATS results table
 
-Revision ID: 015_add_ats_results
-Revises: 014_add_matching_weights
+Revision ID: 016_add_ats_results
+Revises: 013_work_experience
 Create Date: 2025-01-31
 
 This migration creates the ats_results table for storing
@@ -16,8 +16,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = '015_add_ats_results'
-down_revision: Union[str, None] = '014_add_matching_weights'
+revision: str = '016_add_ats_results'
+down_revision: Union[str, None] = '013_work_experience'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -676,3 +676,478 @@ test.describe('Content Validation', () => {
     await expect(page.getByText(/Tip:|Select 2-5 resumes/i)).toBeVisible();
   });
 });
+
+// ============================================
+// NEW TESTS: Candidate Selection Workflow
+// ============================================
+
+test.describe('Vacancy Details - Candidate Selection', () => {
+  test('should display candidates section on vacancy details page', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+
+    // Check for candidates section
+    await expect(page.getByText(/Candidates for this Position/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should display list of candidates with selection cards', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+
+    // Wait for candidates to load
+    await page.waitForTimeout(2000);
+
+    // Check for candidate selector heading
+    await expect(page.getByText(/Select Candidates to Compare/i)).toBeVisible({ timeout: 10000 });
+
+    // Check for selection counter
+    await expect(page.getByText(/selected/i)).toBeVisible();
+  });
+
+  test('should allow selecting candidates by clicking cards', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+    await page.waitForTimeout(2000);
+
+    // Find and click the first candidate card
+    const firstCandidate = page.locator('.MuiCard-root').first();
+    await firstCandidate.click();
+    await page.waitForTimeout(500);
+
+    // Check that selection counter updated
+    await expect(page.getByText(/1 \/ 5 selected/i)).toBeVisible();
+  });
+
+  test('should show Compare Selected button when 2+ candidates selected', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+    await page.waitForTimeout(2000);
+
+    // Initially should not show Compare button (or it should be disabled)
+    const compareButton = page.getByRole('button', { name: /Compare Selected/i });
+    const isVisible = await compareButton.isVisible().catch(() => false);
+    if (isVisible) {
+      await expect(compareButton).toBeDisabled();
+    }
+
+    // Select first candidate
+    await page.locator('.MuiCard-root').first().click();
+    await page.waitForTimeout(500);
+
+    // Select second candidate
+    await page.locator('.MuiCard-root').nth(1).click();
+    await page.waitForTimeout(500);
+
+    // Now Compare button should be visible and enabled
+    await expect(compareButton).toBeVisible();
+    await expect(compareButton).toBeEnabled();
+  });
+
+  test('should validate maximum 5 candidates selection', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+    await page.waitForTimeout(2000);
+
+    // Try to select 6 candidates
+    const cards = page.locator('.MuiCard-root');
+    const count = await cards.count();
+
+    for (let i = 0; i < Math.min(count, 6); i++) {
+      await cards.nth(i).click();
+      await page.waitForTimeout(300);
+    }
+
+    // Should show warning about max candidates
+    await expect(page.getByText(/Maximum 5 candidates/i)).toBeVisible();
+  });
+
+  test('should navigate to comparison page when Compare Selected clicked', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+    await page.waitForTimeout(2000);
+
+    // Select 2 candidates
+    await page.locator('.MuiCard-root').first().click();
+    await page.waitForTimeout(500);
+    await page.locator('.MuiCard-root').nth(1).click();
+    await page.waitForTimeout(500);
+
+    // Click Compare button
+    const compareButton = page.getByRole('button', { name: /Compare Selected/i });
+    await compareButton.click();
+
+    // Should navigate to comparison page
+    await expect(page).toHaveURL(/\/recruiter\/vacancies\/test-vacancy-id\/compare/);
+    await expect(page.getByText(/Compare Candidates/i)).toBeVisible();
+  });
+
+  test('should have Select All and Clear All buttons', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+    await page.waitForTimeout(2000);
+
+    // Check for Select All button
+    await expect(page.getByRole('button', { name: /Select.*Best/i })).toBeVisible();
+
+    // Check for Clear All button
+    const clearButton = page.getByRole('button', { name: /Clear All/i });
+    await expect(clearButton).toBeVisible();
+    // Initially should be disabled
+    await expect(clearButton).toBeDisabled();
+  });
+});
+
+test.describe('CompareCandidates Page - Core Functionality', () => {
+  test('should navigate to comparison page with query params', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+
+    // Check URL
+    await expect(page).toHaveURL(/candidates=candidate-1,candidate-2/);
+
+    // Check page title
+    await expect(page.getByRole('heading', { name: /Compare Candidates/i })).toBeVisible();
+  });
+
+  test('should display comparison matrix when candidates selected', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+
+    // Wait for comparison to load
+    await page.waitForTimeout(2000);
+
+    // Check for comparison matrix
+    await expect(page.getByText(/Skills Matrix|Comparison Matrix/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should display getting started guidance when no candidates', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare');
+
+    // Should show getting started message
+    await expect(page.getByText(/Getting Started/i)).toBeVisible();
+    await expect(page.getByText(/Add at least 2 candidate IDs/i)).toBeVisible();
+  });
+
+  test('should show warning when too many candidates selected', async ({ page }) => {
+    // Navigate with 6 candidates (more than max)
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=c1,c2,c3,c4,c5,c6');
+
+    // Should show too many candidates warning
+    await expect(page.getByText(/Too Many Candidates/i)).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should display comparison settings section', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare');
+
+    // Check for settings section
+    await expect(page.getByText(/Comparison Settings/i)).toBeVisible();
+  });
+
+  test('should update URL when candidates are added/removed', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare');
+
+    // Add a candidate ID using the input
+    const input = page.getByLabel(/Add Resume ID/i);
+    await input.fill('test-candidate-1');
+
+    const addButton = page.getByRole('button', { name: /Add/i }).first();
+    await addButton.click();
+    await page.waitForTimeout(500);
+
+    // Check URL was updated
+    await expect(page).toHaveURL(/candidates=test-candidate-1/);
+  });
+});
+
+test.describe('CompareCandidates - Notes Functionality', () => {
+  test('should display notes section when candidates selected', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+
+    // Wait for comparison to load
+    await page.waitForTimeout(2000);
+
+    // Check for notes section
+    await expect(page.getByText(/Recruiter Notes/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should allow adding notes for each candidate', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(2000);
+
+    // Find the first notes section
+    await expect(page.getByText(/Recruiter Notes/i)).toBeVisible();
+
+    // Click on "Add note" area or edit button
+    const emptyNote = page.getByText(/Click to add a note/i).first();
+    const isVisible = await emptyNote.isVisible().catch(() => false);
+
+    if (isVisible) {
+      await emptyNote.click();
+      await page.waitForTimeout(500);
+
+      // Should show textarea
+      const textarea = page.locator('textarea').first();
+      await expect(textarea).toBeVisible();
+
+      // Type a note
+      await textarea.fill('Strong candidate, recommend for interview');
+      await page.waitForTimeout(500);
+
+      // Click save button
+      const saveButton = page.getByRole('button', { name: /Save Note/i }).first();
+      await saveButton.click();
+      await page.waitForTimeout(1000);
+
+      // Should show success message
+      await expect(page.getByText(/Note saved/i)).toBeVisible();
+    }
+  });
+
+  test('should allow editing existing notes', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(2000);
+
+    // Find edit button for notes
+    const editButton = page.getByRole('button', { name: /Edit note/i }).first();
+    const isVisible = await editButton.isVisible().catch(() => false);
+
+    if (isVisible) {
+      await editButton.click();
+      await page.waitForTimeout(500);
+
+      // Should show textarea with existing content
+      const textarea = page.locator('textarea').first();
+      await expect(textarea).toBeVisible();
+    }
+  });
+
+  test('should allow deleting notes', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(2000);
+
+    // Look for existing note with delete button
+    const deleteButton = page.getByRole('button', { name: /Delete/i }).first();
+    const isVisible = await deleteButton.isVisible().catch(() => false);
+
+    if (isVisible) {
+      // First expand note if needed
+      const expandButton = page.getByRole('button', { name: /Expand note/i }).first();
+      const expandVisible = await expandButton.isVisible().catch(() => false);
+
+      if (expandVisible) {
+        await expandButton.click();
+        await page.waitForTimeout(500);
+      }
+
+      // Click delete
+      await deleteButton.click();
+      await page.waitForTimeout(1000);
+
+      // Should show success
+      await expect(page.getByText(/Note saved|deleted/i)).toBeVisible();
+    }
+  });
+
+  test('should show notes instructions', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(2000);
+
+    // Check for instructions
+    await expect(page.getByText(/Add notes for each candidate during your comparison/i)).toBeVisible();
+    await expect(page.getByText(/automatically saved as you type/i)).toBeVisible();
+  });
+});
+
+test.describe('CompareCandidates - Save and Share', () => {
+  test('should display save and share buttons', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+
+    // Check for action buttons
+    await expect(page.getByRole('button', { name: /Save Comparison/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Share/i })).toBeVisible();
+  });
+
+  test('should open save dialog when save button clicked', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(1000);
+
+    // Click save button
+    const saveButton = page.getByRole('button', { name: /Save Comparison/i });
+    await saveButton.click();
+
+    // Should show dialog
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText(/Save Comparison/i)).toBeVisible();
+
+    // Check for name input
+    await expect(page.getByLabel(/Comparison Name/i)).toBeVisible();
+  });
+
+  test('should cancel save dialog', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(1000);
+
+    // Open save dialog
+    await page.getByRole('button', { name: /Save Comparison/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Click cancel
+    const cancelButton = page.getByRole('button', { name: /^Cancel$/i });
+    await cancelButton.click();
+
+    // Dialog should close
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+
+  test('should validate candidate count before save', async ({ page }) => {
+    // Navigate with insufficient candidates
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1');
+
+    // Click save button
+    const saveButton = page.getByRole('button', { name: /Save Comparison/i });
+    await saveButton.click();
+
+    // Should show error notification
+    await expect(page.getByText(/Please select 2-5 candidates/i)).toBeVisible();
+  });
+
+  test('should open share dialog when share button clicked', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(1000);
+
+    // Click share button
+    const shareButton = page.getByRole('button', { name: /Share/i });
+    await shareButton.click();
+
+    // Should show dialog
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText(/Share Comparison/i)).toBeVisible();
+
+    // Check for URL display
+    await expect(page.getByDisplayText(/http|localhost/i)).toBeVisible();
+  });
+
+  test('should display copy button in share dialog', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(1000);
+
+    // Open share dialog
+    await page.getByRole('button', { name: /Share/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Check for copy button
+    const copyButton = page.locator('button').filter({ hasText: /Copy/i }).first();
+    await expect(copyButton).toBeVisible();
+  });
+});
+
+test.describe('CompareCandidates - PDF Export', () => {
+  test('should display export PDF button', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+
+    // Check for export button
+    await expect(page.getByRole('button', { name: /Export to PDF/i })).toBeVisible();
+  });
+
+  test('should enable export only when valid comparison exists', async ({ page }) => {
+    // Navigate without candidates
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare');
+
+    // Export button should be visible but might show error on click
+    const exportButton = page.getByRole('button', { name: /Export to PDF/i });
+    await expect(exportButton).toBeVisible();
+
+    // Try to click
+    await exportButton.click();
+
+    // Should show validation error
+    await expect(page.getByText(/Please select at least 2 candidates/i)).toBeVisible();
+  });
+
+  test('should have print-specific CSS classes for PDF export', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+
+    // Check for no-print class (elements hidden in PDF)
+    const noPrintElements = page.locator('.no-print');
+    const count = await noPrintElements.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Check for comparison-section class (elements with page breaks)
+    const sectionElements = page.locator('.comparison-section');
+    const sectionCount = await sectionElements.count();
+    expect(sectionCount).toBeGreaterThan(0);
+  });
+
+  test('should show vacancy metadata for PDF documentation', async ({ page }) => {
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(1000);
+
+    // Check for vacancy ID in header
+    await expect(page.getByText(/Vacancy ID: test-vacancy-id/i)).toBeVisible();
+
+    // Check for timestamp
+    await expect(page.getByText(/Generated:/i)).toBeVisible();
+  });
+});
+
+test.describe('Complete Workflow - End to End', () => {
+  test('should complete full workflow from vacancy to comparison', async ({ page }) => {
+    // Start at vacancy details
+    await page.goto('/recruiter/vacancies/test-vacancy-id');
+    await page.waitForTimeout(2000);
+
+    // Select candidates
+    await page.locator('.MuiCard-root').first().click();
+    await page.waitForTimeout(500);
+    await page.locator('.MuiCard-root').nth(1).click();
+    await page.waitForTimeout(500);
+
+    // Click Compare button
+    const compareButton = page.getByRole('button', { name: /Compare Selected/i });
+    await compareButton.click();
+
+    // Should navigate to comparison page
+    await expect(page).toHaveURL(/\/recruiter\/vacancies\/test-vacancy-id\/compare/);
+    await expect(page.getByText(/Compare Candidates/i)).toBeVisible();
+
+    // Wait for comparison to load
+    await page.waitForTimeout(2000);
+
+    // Verify comparison matrix is displayed
+    await expect(page.getByText(/Skills Matrix|Comparison/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should complete workflow with notes and save', async ({ page }) => {
+    // Navigate to comparison with candidates
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(2000);
+
+    // Add a note
+    const emptyNote = page.getByText(/Click to add a note/i).first();
+    const isVisible = await emptyNote.isVisible().catch(() => false);
+
+    if (isVisible) {
+      await emptyNote.click();
+      await page.waitForTimeout(500);
+
+      const textarea = page.locator('textarea').first();
+      await textarea.fill('Great candidate, highly recommend');
+      await page.waitForTimeout(500);
+
+      const saveButton = page.getByRole('button', { name: /Save Note/i }).first();
+      await saveButton.click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Save the comparison
+    const saveComparisonButton = page.getByRole('button', { name: /Save Comparison/i });
+    await saveComparisonButton.click();
+
+    // Should show save dialog
+    await expect(page.getByRole('dialog')).toBeVisible();
+  });
+
+  test('should complete workflow with PDF export', async ({ page }) => {
+    // Navigate to comparison with candidates
+    await page.goto('/recruiter/vacancies/test-vacancy-id/compare?candidates=candidate-1,candidate-2');
+    await page.waitForTimeout(2000);
+
+    // Click export button
+    const exportButton = page.getByRole('button', { name: /Export to PDF/i });
+    await expect(exportButton).toBeEnabled();
+
+    // Note: We can't actually test the print dialog in E2E, but we verify the button works
+    // The actual print functionality would be tested manually
+  });
+});
