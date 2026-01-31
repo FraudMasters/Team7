@@ -1543,6 +1543,24 @@ export interface CandidateTagsResponse {
 // ==================== Candidates Types ====================
 
 /**
+ * Tag information assigned to a candidate
+ */
+export interface TagInfo {
+  id: string;
+  tag_name: string;
+  color: string | null;
+  organization_id: string;
+}
+
+/**
+ * Latest activity information for a candidate
+ */
+export interface LatestActivityInfo {
+  activity_type: string;
+  created_at: string;
+}
+
+/**
  * Candidate list item
  */
 export interface CandidateListItem {
@@ -1551,9 +1569,12 @@ export interface CandidateListItem {
   current_stage: string;
   stage_name: string;
   vacancy_id: string | null;
-  created_at: string | null;
-  updated_at: string | null;
+  created_at: string;
+  updated_at: string;
   notes: string | null;
+  tags: TagInfo[];
+  notes_count: number;
+  latest_activity: LatestActivityInfo | null;
 }
 
 /**

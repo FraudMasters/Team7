@@ -41,6 +41,7 @@ class TagInfo(BaseModel):
     id: str = Field(..., description="Tag ID")
     tag_name: str = Field(..., description="Tag name")
     color: Optional[str] = Field(None, description="Tag color code")
+    organization_id: str = Field(..., description="Organization ID that owns this tag")
 
 
 class LatestActivityInfo(BaseModel):
@@ -286,6 +287,7 @@ async def list_candidates(
                         "tag_name": tag.tag_name,
                         "tag_color": tag.color,
                         "tag_id": str(tag.id),
+                        "organization_id": str(tag.organization_id),
                     })
 
             # For each (resume, tag) pair, check if the latest activity is TAG_ADDED
@@ -298,6 +300,7 @@ async def list_candidates(
                         "id": tag_id,
                         "tag_name": latest["tag_name"],
                         "color": latest["tag_color"],
+                        "organization_id": latest["organization_id"],
                     })
 
         # Bulk fetch: notes count for each resume

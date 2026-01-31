@@ -10,6 +10,7 @@ import {
   Alert,
   TextField,
   InputAdornment,
+  Collapse,
 } from '@mui/material';
 import {
   DragDropContext,
@@ -19,7 +20,8 @@ import {
 } from '@hello-pangea/dnd';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { Search as SearchIcon } from '@mui/icons-material';
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
+import CandidateTags from './CandidateTags';
 import type {
   WorkflowStageResponse,
   CandidateListItem,
@@ -41,6 +43,7 @@ const WorkflowKanban: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [movingCandidate, setMovingCandidate] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
     try {
@@ -167,6 +170,13 @@ const WorkflowKanban: React.FC = () => {
     return defaultColors[stage.stage_order % defaultColors.length];
   };
 
+  const toggleCardExpanded = useCallback((candidateId: string) => {
+    setExpandedCards((prev) => ({
+      ...prev,
+      [candidateId]: !prev[candidateId],
+    }));
+  }, []);
+
   return (
     <Box>
       {/* Kanban Header */}
@@ -256,7 +266,13 @@ const WorkflowKanban: React.FC = () => {
                         index={index}
                         isDragDisabled={movingCandidate === candidate.id}
                       >
-                        {(provided, snapshot) => (
+                        {(provided, snapshot) => {
+                          // Get organization_id from tags (use first tag's org_id)
+                          const organizationId = candidate.tags && candidate.tags.length > 0
+                            ? candidate.tags[0].organization_id
+                            : '';
+
+                          return (
                           <Card
                             ref={provided.innerRef}
                             {...provided.draggableProps}
@@ -276,14 +292,36 @@ const WorkflowKanban: React.FC = () => {
                             }}
                           >
                             <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                              <Typography variant="body2" fontWeight={500} noWrap>
-                                {candidate.filename}
-                              </Typography>
-                              {candidate.notes && (
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }} noWrap>
-                                  {candidate.notes}
-                                </Typography>
-                              )}
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => toggleCardExpanded(candidate.id)}
+                              >
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="body2" fontWeight={500} noWrap>
+                                    {candidate.filename}
+                                  </Typography>
+                                  {candidate.notes && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }} noWrap>
+                                      {candidate.notes}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <ExpandMoreIcon
+                                  sx={{
+                                    fontSize: 18,
+                                    color: 'text.secondary',
+                                    transform: expandedCards[candidate.id] ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.2s',
+                                    ml: 1,
+                                  }}
+                                />
+                              </Box>
+
                               {candidate.vacancy_id && (
                                 <Chip
                                   label="Linked to vacancy"
@@ -291,9 +329,57 @@ const WorkflowKanban: React.FC = () => {
                                   sx={{ mt: 1, height: 20, fontSize: '0.65rem' }}
                                 />
                               )}
+
+                              {/* Quick tag preview - show first 2 tags as small chips */}
+                              {candidate.tags && candidate.tags.length > 0 && !expandedCards[candidate.id] && (
+                                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
+                                  {candidate.tags.slice(0, 2).map((tag) => (
+                                    <Chip
+                                      key={tag.id}
+                                      label={tag.tag_name}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: tag.color || '#6B7280',
+                                        color: 'white',
+                                        height: 20,
+                                        fontSize: '0.65rem',
+                                      }}
+                                    />
+                                  ))}
+                                  {candidate.tags.length > 2 && (
+                                    <Chip
+                                      label={`+${candidate.tags.length - 2}`}
+                                      size="small"
+                                      sx={{ height: 20, fontSize: '0.65rem' }}
+                                    />
+                                  )}
+                                </Box>
+                              )}
+
+                              {/* Expanded tags section */}
+                              <Collapse in={expandedCards[candidate.id]} timeout="auto" unmountOnExit>
+                                <Box sx={{ mt: 1 }}>
+                                  {organizationId ? (
+                                    <CandidateTags
+                                      resumeId={candidate.id}
+                                      organizationId={organizationId}
+                                      chipSize="small"
+                                      showCount={false}
+                                      onTagsChange={() => {
+                                        // Refresh data after tags change
+                                        fetchData();
+                                      }}
+                                    />
+                                  ) : (
+                                    <Typography variant="caption" color="text.secondary">
+                                      No organization context available for tags
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Collapse>
                             </CardContent>
                           </Card>
-                        )}
+                        )}}
                       </Draggable>
                     ))}
                     {provided.placeholder}
