@@ -428,6 +428,10 @@
       "analytics": {
         "title": "Analytics",
         "description": "View hiring metrics and reports"
+      },
+      "workflowBoard": {
+        "title": "Workflow Board",
+        "description": "Track candidates through hiring stages"
       }
     },
     "tip": "Tip: Click on any resume in the Resume Database to view detailed analysis and match results."

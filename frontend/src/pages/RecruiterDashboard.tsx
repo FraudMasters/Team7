@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Typography, Box, Grid, Card, CardContent, Button, Paper } from '@mui/material';
-import { Work as WorkIcon, Description as ResumeIcon, Analytics as AnalyticsIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Work as WorkIcon, Description as ResumeIcon, Analytics as AnalyticsIcon, Search as SearchIcon, ViewKanban as ViewKanbanIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import RecruitingFunnel from '@components/RecruitingFunnel';
@@ -42,6 +42,13 @@ const RecruiterDashboardPage: React.FC = () => {
       icon: <AnalyticsIcon />,
       path: '/recruiter/analytics',
       color: '#9c27b0',
+    },
+    {
+      title: t('recruiterDashboard.modules.workflowBoard.title'),
+      description: t('recruiterDashboard.modules.workflowBoard.description'),
+      icon: <ViewKanbanIcon />,
+      path: '/recruiter/workflow',
+      color: '#00bcd4',
     },
   ];
 
