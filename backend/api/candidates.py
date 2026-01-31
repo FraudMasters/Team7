@@ -137,6 +137,44 @@ class CandidatesListResponse(BaseModel):
     candidates: List[Dict[str, Any]] = Field(..., description="List of ranked candidates")
 
 
+# Stage metrics models
+class StageTimeMetrics(BaseModel):
+    """Time-based metrics for candidates in a stage."""
+
+    average_days: float = Field(..., description="Average time candidates spend in this stage (days)")
+    median_days: float = Field(..., description="Median time candidates spend in this stage (days)")
+    min_days: float = Field(..., description="Minimum time spent in this stage (days)")
+    max_days: float = Field(..., description="Maximum time spent in this stage (days)")
+    candidate_count: int = Field(..., description="Number of candidates who passed through this stage")
+
+
+class StageDropoffMetrics(BaseModel):
+    """Drop-off metrics for a stage."""
+
+    candidates_entered: int = Field(..., description="Number of candidates who entered this stage")
+    candidates_exited: int = Field(..., description="Number of candidates who left this stage")
+    candidates_current: int = Field(..., description="Number of candidates currently in this stage")
+    dropoff_rate: float = Field(..., description="Drop-off rate (0-1), percentage who left without progressing")
+
+
+class StageMetrics(BaseModel):
+    """Combined metrics for a single stage."""
+
+    stage_id: Optional[str] = Field(None, description="Stage UUID (for custom stages)")
+    stage_name: str = Field(..., description="Stage name")
+    display_name: Optional[str] = Field(None, description="Display name for custom stages")
+    time_metrics: StageTimeMetrics = Field(..., description="Time-based metrics")
+    dropoff_metrics: StageDropoffMetrics = Field(..., description="Drop-off metrics")
+
+
+class StageMetricsResponse(BaseModel):
+    """Response model for stage metrics."""
+
+    stage_id: Optional[str] = Field(None, description="Requested stage ID filter")
+    metrics: List[StageMetrics] = Field(..., description="List of stage metrics")
+    total_stages: int = Field(..., description="Total number of stages with metrics")
+
+
 @router.get(
     "/",
     response_model=list[CandidateListItem],
@@ -1083,4 +1121,304 @@ async def get_candidates_for_vacancy(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get candidates: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/metrics",
+    response_model=StageMetricsResponse,
+    tags=["Candidates"],
+)
+async def get_stage_metrics(
+    stage_id: Optional[str] = Query(None, description="Filter by specific stage ID or name"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get stage metrics including time in stage and drop-off rates.
+
+    This endpoint provides comprehensive metrics for workflow stages,
+    helping organizations understand their recruitment pipeline efficiency.
+    Metrics include:
+    - Time in stage: average, median, min, max days candidates spend in each stage
+    - Drop-off rates: percentage of candidates who leave from each stage
+
+    Args:
+        stage_id: Optional filter by workflow stage ID or name
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+        db: Database session
+
+    Returns:
+        JSON response with stage metrics including time and drop-off data
+
+    Raises:
+        HTTPException(400): Invalid date format
+        HTTPException(500): If metrics retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> # Get metrics for all stages
+        >>> response = requests.get("http://localhost:8000/api/candidates/metrics")
+        >>> # Get metrics for a specific stage
+        >>> response = requests.get("http://localhost:8000/api/candidates/metrics?stage_id=interview")
+        >>> response.json()
+        {
+            "stage_id": "interview",
+            "metrics": [
+                {
+                    "stage_id": null,
+                    "stage_name": "applied",
+                    "display_name": null,
+                    "time_metrics": {
+                        "average_days": 2.5,
+                        "median_days": 2.0,
+                        "min_days": 0.5,
+                        "max_days": 7.0,
+                        "candidate_count": 150
+                    },
+                    "dropoff_metrics": {
+                        "candidates_entered": 150,
+                        "candidates_exited": 120,
+                        "candidates_current": 30,
+                        "dropoff_rate": 0.20
+                    }
+                }
+            ],
+            "total_stages": 1
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching stage metrics - stage_id: {stage_id}, "
+            f"start_date: {start_date}, end_date: {end_date}"
+        )
+
+        from collections import defaultdict
+        import statistics
+        from datetime import datetime
+
+        # Parse date filters
+        start_dt = None
+        end_dt = None
+
+        if start_date:
+            try:
+                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
+                )
+
+        if end_date:
+            try:
+                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
+                )
+
+        # Get all hiring stages ordered by resume_id and created_at
+        query = select(HiringStage, WorkflowStageConfig).select_from(
+            HiringStage
+        ).outerjoin(
+            WorkflowStageConfig,
+            HiringStage.workflow_stage_config_id == WorkflowStageConfig.id,
+        ).order_by(HiringStage.resume_id, HiringStage.created_at)
+
+        # Apply date filters if provided
+        if start_dt:
+            query = query.where(HiringStage.created_at >= start_dt)
+        if end_dt:
+            query = query.where(HiringStage.created_at <= end_dt)
+
+        # Apply stage filter if provided
+        if stage_id:
+            try:
+                stage_uuid = UUID(stage_id)
+                query = query.where(HiringStage.workflow_stage_config_id == stage_uuid)
+            except ValueError:
+                # It's a stage name
+                query = query.where(HiringStage.stage_name == stage_id)
+
+        result = await db.execute(query)
+        all_stages = result.all()
+
+        if not all_stages:
+            logger.info("No stage data available")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "stage_id": stage_id,
+                    "metrics": [],
+                    "total_stages": 0,
+                },
+            )
+
+        # Group stages by resume_id to track progression
+        resume_stages = defaultdict(list)
+        for hiring_stage, workflow_config in all_stages:
+            resume_stages[hiring_stage.resume_id].append({
+                "hiring_stage": hiring_stage,
+                "workflow_config": workflow_config,
+            })
+
+        # Calculate time durations for each stage transition
+        stage_durations = defaultdict(list)  # stage_name -> [durations in days]
+        stage_entries = defaultdict(int)  # stage_name -> count
+        stage_exits = defaultdict(int)  # stage_name -> count
+        stage_current = defaultdict(int)  # stage_name -> count
+
+        # Get the current stage for each resume (latest hiring_stage)
+        latest_stage_by_resume = {}
+        for resume_id, stages in resume_stages.items():
+            if stages:
+                # Sort by created_at to ensure correct order
+                stages_sorted = sorted(stages, key=lambda x: x["hiring_stage"].created_at)
+                latest_stage_by_resume[resume_id] = stages_sorted[-1]
+
+        # Process each resume's stage history
+        for resume_id, stages in resume_stages.items():
+            # Sort by created_at to ensure correct order
+            stages_sorted = sorted(stages, key=lambda x: x["hiring_stage"].created_at)
+
+            # Track the latest stage for this resume
+            latest = stages_sorted[-1]
+            latest_stage_name = latest["hiring_stage"].stage_name
+            stage_current[latest_stage_name] += 1
+
+            # Calculate time spent in each stage and track exits
+            for i in range(len(stages_sorted) - 1):
+                current = stages_sorted[i]
+                next_stage = stages_sorted[i + 1]
+
+                current_stage_name = current["hiring_stage"].stage_name
+                next_stage_name = next_stage["hiring_stage"].stage_name
+
+                # Count entries to each stage
+                stage_entries[current_stage_name] += 1
+
+                # Calculate duration in days
+                duration_days = (
+                    next_stage["hiring_stage"].created_at - current["hiring_stage"].created_at
+                ).total_seconds() / 86400
+
+                # Only include positive durations
+                if duration_days >= 0:
+                    stage_durations[current_stage_name].append(duration_days)
+
+                # Count exits (moved to a different stage)
+                if current_stage_name != next_stage_name:
+                    stage_exits[current_stage_name] += 1
+
+            # Also count the last stage as an entry
+            if stages_sorted:
+                stage_entries[latest_stage_name] += 1
+
+        # Calculate metrics for each stage
+        metrics_list = []
+
+        # Get all unique stage names
+        all_stage_names = set(stage_durations.keys()) | set(stage_entries.keys())
+
+        for stage_name in all_stage_names:
+            # Get workflow config for display name
+            config_query = select(WorkflowStageConfig).where(
+                WorkflowStageConfig.stage_name == stage_name
+            ).limit(1)
+            config_result = await db.execute(config_query)
+            workflow_config = config_result.scalar_one_or_none()
+
+            # Determine display name
+            if workflow_config and workflow_config.display_name:
+                display_name = workflow_config.display_name
+                stage_uuid_str = str(workflow_config.id)
+            else:
+                display_name = None
+                stage_uuid_str = None
+
+            # Calculate time metrics
+            durations = stage_durations.get(stage_name, [])
+            if durations:
+                avg_duration = statistics.mean(durations)
+                median_duration = statistics.median(durations)
+                min_duration = min(durations)
+                max_duration = max(durations)
+                candidate_count = len(durations)
+            else:
+                avg_duration = 0.0
+                median_duration = 0.0
+                min_duration = 0.0
+                max_duration = 0.0
+                candidate_count = 0
+
+            time_metrics = {
+                "average_days": round(avg_duration, 1),
+                "median_days": round(median_duration, 1),
+                "min_days": round(min_duration, 1),
+                "max_days": round(max_duration, 1),
+                "candidate_count": candidate_count,
+            }
+
+            # Calculate drop-off metrics
+            entered = stage_entries.get(stage_name, 0)
+            exited = stage_exits.get(stage_name, 0)
+            current = stage_current.get(stage_name, 0)
+
+            # Drop-off rate: percentage who exited without progressing forward
+            # (those who left / total who entered)
+            dropoff_rate = exited / entered if entered > 0 else 0.0
+
+            dropoff_metrics = {
+                "candidates_entered": entered,
+                "candidates_exited": exited,
+                "candidates_current": current,
+                "dropoff_rate": round(dropoff_rate, 3),
+            }
+
+            metrics_list.append({
+                "stage_id": stage_uuid_str,
+                "stage_name": stage_name,
+                "display_name": display_name,
+                "time_metrics": time_metrics,
+                "dropoff_metrics": dropoff_metrics,
+            })
+
+        # Sort by stage order (default stages first, then custom)
+        def stage_sort_key(stage):
+            default_order = {
+                "applied": 1,
+                "screening": 2,
+                "interview": 3,
+                "technical": 4,
+                "offer": 5,
+                "hired": 6,
+                "rejected": 7,
+                "withdrawn": 8,
+            }
+            return default_order.get(stage["stage_name"].lower(), 999)
+
+        metrics_list.sort(key=stage_sort_key)
+
+        logger.info(f"Stage metrics retrieved successfully for {len(metrics_list)} stages")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "stage_id": stage_id,
+                "metrics": metrics_list,
+                "total_stages": len(metrics_list),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving stage metrics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve stage metrics: {str(e)}",
         ) from e
