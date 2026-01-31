@@ -133,7 +133,7 @@ const HomePage: React.FC = () => {
         sx={{
           background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
           color: 'white',
-          py: 10,
+          py: { xs: 6, sm: 8, md: 10 },
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -180,31 +180,43 @@ const HomePage: React.FC = () => {
             {!loading && (
               <Stack
                 direction="row"
-                spacing={3}
-                sx={{ justifyContent: { xs: 'center', md: 'flex-start' }, mb: 4 }}
+                spacing={{ xs: 2, sm: 3 }}
+                sx={{ justifyContent: { xs: 'center', md: 'flex-start' }, mb: { xs: 3, md: 4 } }}
                 flexWrap="wrap"
               >
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h3" fontWeight={700}>
+                <Box sx={{ textAlign: 'center', minWidth: { xs: '80px', sm: '100px' } }}>
+                  <Typography
+                    variant="h3"
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' } }}
+                  >
                     {stats.totalResumes}
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {t('landing.stats.resumes')}
                   </Typography>
                 </Box>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h3" fontWeight={700}>
+                <Box sx={{ textAlign: 'center', minWidth: { xs: '80px', sm: '100px' } }}>
+                  <Typography
+                    variant="h3"
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' } }}
+                  >
                     {stats.totalVacancies}
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {t('landing.stats.vacancies')}
                   </Typography>
                 </Box>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h3" fontWeight={700}>
+                <Box sx={{ textAlign: 'center', minWidth: { xs: '80px', sm: '100px' } }}>
+                  <Typography
+                    variant="h3"
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' } }}
+                  >
                     {stats.activeVacancies}
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {t('landing.stats.active')}
                   </Typography>
                 </Box>
@@ -213,10 +225,9 @@ const HomePage: React.FC = () => {
 
             {/* CTA Buttons */}
             <Stack
-              direction="row"
-              spacing={2}
-              sx={{ justifyContent: { xs: 'center', md: 'flex-start' } }}
-              flexWrap="wrap"
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={{ xs: 1.5, sm: 2 }}
+              sx={{ justifyContent: { xs: 'center', md: 'flex-start' }, alignItems: { xs: 'stretch', sm: 'center' } }}
             >
               <Button
                 variant="contained"
@@ -226,8 +237,8 @@ const HomePage: React.FC = () => {
                 sx={{
                   bgcolor: 'white',
                   color: 'primary.main',
-                  px: 3,
-                  py: 1.5,
+                  px: { xs: 2, sm: 3 },
+                  py: { xs: 1, sm: 1.5 },
                   fontWeight: 600,
                   '&:hover': { bgcolor: 'grey.100' },
                 }}
@@ -242,8 +253,8 @@ const HomePage: React.FC = () => {
                 sx={{
                   color: 'white',
                   borderColor: 'white',
-                  px: 3,
-                  py: 1.5,
+                  px: { xs: 2, sm: 3 },
+                  py: { xs: 1, sm: 1.5 },
                   fontWeight: 600,
                   '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' },
                 }}
@@ -255,12 +266,12 @@ const HomePage: React.FC = () => {
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 5, md: 6 } }}>
         {/* For Job Seekers */}
-        <Box sx={{ mb: 8 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-            <SchoolIcon sx={{ mr: 1, color: 'primary.main', fontSize: 28 }} />
-            <Typography variant="h4" fontWeight={600}>
+        <Box sx={{ mb: { xs: 6, md: 8 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: { xs: 2, md: 3 } }}>
+            <SchoolIcon sx={{ mr: 1, color: 'primary.main', fontSize: { xs: 24, md: 28 } }} />
+            <Typography variant="h4" fontWeight={600} sx={{ fontSize: { xs: '1.5rem', md: '2rem' } }}>
               {t('landing.forJobSeekers')}
             </Typography>
           </Box>
@@ -282,24 +293,25 @@ const HomePage: React.FC = () => {
                   }}
                   onClick={() => navigate(action.path)}
                 >
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                    <Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                       <Box
                         sx={{
-                          width: 48,
-                          height: 48,
+                          width: { xs: 40, sm: 48 },
+                          height: { xs: 40, sm: 48 },
                           borderRadius: 2,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          mr: 2,
+                          mr: { xs: 0, sm: 2 },
+                          mb: { xs: 1, sm: 0 },
                           bgcolor: `${action.color}20`,
                           color: action.color,
                         }}
                       >
                         {action.icon}
                       </Box>
-                      <Typography variant="h6" fontWeight={600}>
+                      <Typography variant="h6" fontWeight={600} sx={{ textAlign: { xs: 'center', sm: 'left' }, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                         {action.title}
                       </Typography>
                     </Box>
@@ -325,10 +337,10 @@ const HomePage: React.FC = () => {
         </Box>
 
         {/* For Recruiters */}
-        <Box sx={{ mb: 8 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-            <BusinessIcon sx={{ mr: 1, color: 'success.main', fontSize: 28 }} />
-            <Typography variant="h4" fontWeight={600}>
+        <Box sx={{ mb: { xs: 6, md: 8 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: { xs: 2, md: 3 } }}>
+            <BusinessIcon sx={{ mr: 1, color: 'success.main', fontSize: { xs: 24, md: 28 } }} />
+            <Typography variant="h4" fontWeight={600} sx={{ fontSize: { xs: '1.5rem', md: '2rem' } }}>
               {t('landing.forRecruiters')}
             </Typography>
           </Box>
@@ -350,24 +362,25 @@ const HomePage: React.FC = () => {
                   }}
                   onClick={() => navigate(action.path)}
                 >
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                    <Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                       <Box
                         sx={{
-                          width: 48,
-                          height: 48,
+                          width: { xs: 40, sm: 48 },
+                          height: { xs: 40, sm: 48 },
                           borderRadius: 2,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          mr: 2,
+                          mr: { xs: 0, sm: 2 },
+                          mb: { xs: 1, sm: 0 },
                           bgcolor: `${action.color}20`,
                           color: action.color,
                         }}
                       >
                         {action.icon}
                       </Box>
-                      <Typography variant="h6" fontWeight={600} sx={{ fontSize: '1rem' }}>
+                      <Typography variant="h6" fontWeight={600} sx={{ textAlign: { xs: 'center', sm: 'left' }, fontSize: { xs: '0.95rem', sm: '1rem' } }}>
                         {action.title}
                       </Typography>
                     </Box>
@@ -394,20 +407,20 @@ const HomePage: React.FC = () => {
 
         {/* How It Works */}
         <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4 }}>
-            <TrendingIcon sx={{ mr: 1, color: 'info.main', fontSize: 28 }} />
-            <Typography variant="h4" fontWeight={600}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: { xs: 3, md: 4 } }}>
+            <TrendingIcon sx={{ mr: 1, color: 'info.main', fontSize: { xs: 24, md: 28 } }} />
+            <Typography variant="h4" fontWeight={600} sx={{ fontSize: { xs: '1.5rem', md: '2rem' } }}>
               {t('landing.howItWorks')}
             </Typography>
           </Box>
 
-          <Paper elevation={1} sx={{ p: 4 }}>
-            <Grid container spacing={4}>
+          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+            <Grid container spacing={{ xs: 3, sm: 4 }}>
               <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 48, sm: 56 },
+                    height: { xs: 48, sm: 56 },
                     borderRadius: '50%',
                     bgcolor: 'primary.main',
                     color: 'white',
@@ -415,12 +428,14 @@ const HomePage: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2,
+                    mb: { xs: 1.5, sm: 2 },
+                    fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                    fontWeight: 700,
                   }}
                 >
                   1
                 </Box>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
+                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {t('landing.steps.step1.title')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -431,8 +446,8 @@ const HomePage: React.FC = () => {
               <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 48, sm: 56 },
+                    height: { xs: 48, sm: 56 },
                     borderRadius: '50%',
                     bgcolor: 'info.main',
                     color: 'white',
@@ -440,12 +455,14 @@ const HomePage: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2,
+                    mb: { xs: 1.5, sm: 2 },
+                    fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                    fontWeight: 700,
                   }}
                 >
                   2
                 </Box>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
+                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {t('landing.steps.step2.title')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -456,8 +473,8 @@ const HomePage: React.FC = () => {
               <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 48, sm: 56 },
+                    height: { xs: 48, sm: 56 },
                     borderRadius: '50%',
                     bgcolor: 'success.main',
                     color: 'white',
@@ -465,12 +482,14 @@ const HomePage: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2,
+                    mb: { xs: 1.5, sm: 2 },
+                    fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                    fontWeight: 700,
                   }}
                 >
                   3
                 </Box>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
+                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {t('landing.steps.step3.title')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
