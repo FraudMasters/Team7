@@ -36,6 +36,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { RankedCandidate } from '../types/api';
+import ErrorMessage, { ErrorMessageConfig } from '../components/ErrorMessage';
 
 interface Resume {
   id: string;
@@ -88,6 +89,11 @@ const CandidateSearchPage: React.FC = () => {
   const [usingAIRanking, setUsingAIRanking] = useState(true);
   const [rankingData, setRankingData] = useState<Record<string, RankedCandidate>>({});
   const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<ErrorMessageConfig>({
+    open: false,
+    message: '',
+    severity: 'error',
+  });
 
   // Load vacancies on mount
   useEffect(() => {
@@ -123,7 +129,11 @@ const CandidateSearchPage: React.FC = () => {
 
   const handleSearch = async () => {
     if (!selectedVacancy) {
-      alert(t('candidateSearch.selectVacancyFirst'));
+      setErrorMessage({
+        open: true,
+        message: t('candidateSearch.selectVacancyFirst'),
+        severity: 'warning',
+      });
       return;
     }
 
@@ -680,6 +690,11 @@ const CandidateSearchPage: React.FC = () => {
           </>
         )}
       </Box>
+
+      <ErrorMessage
+        errorState={errorMessage}
+        onErrorStateChange={setErrorMessage}
+      />
     </Container>
   );
 };
