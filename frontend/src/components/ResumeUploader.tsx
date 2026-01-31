@@ -44,6 +44,8 @@ interface ResumeUploaderProps {
   onUploadComplete?: (resumeId: string) => void;
   /** Callback when upload fails */
   onUploadError?: (error: string) => void;
+  /** Callback when upload starts */
+  onUploadStart?: () => void;
 }
 
 /**
@@ -70,6 +72,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
   acceptedFileTypes = ['.pdf', '.docx'],
   onUploadComplete,
   onUploadError,
+  onUploadStart,
 }) => {
   const { t } = useTranslation();
 
@@ -143,6 +146,7 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
   const uploadFile = useCallback(
     async (file: File) => {
       setUploadState((prev) => ({ ...prev, uploading: true, progress: 0 }));
+      onUploadStart?.();
 
       const formData = new FormData();
       formData.append('file', file);

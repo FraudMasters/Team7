@@ -127,6 +127,17 @@
   "upload": {
     "title": "Upload Resume",
     "subtitle": "Upload your resume (PDF or DOCX) for AI-powered analysis and job matching.",
+    "steps": {
+      "upload": "Upload Resume",
+      "processing": "Processing",
+      "results": "View Results"
+    },
+    "info": {
+      "acceptedFormats": "Accepted Formats",
+      "processingTime": "Processing Time",
+      "whatsNext": "What's Next",
+      "viewResults": "View your analysis results"
+    },
     "uploader": {
       "dragDrop": "Drop Your Resume Here",
       "clickToBrowse": "Drag and drop your resume here, or click to browse",
