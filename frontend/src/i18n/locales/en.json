@@ -58,7 +58,8 @@
     "manageVacancies": "Manage Vacancies",
     "resumeDatabase": "Resume Database",
     "searchCandidates": "Search Candidates",
-    "skillGapAnalysis": "Skill Gap Analysis"
+    "skillGapAnalysis": "Skill Gap Analysis",
+    "matchingWeights": "Matching Weights"
   },
   "footer": {
     "copyright": "{{year}} TEAM7. AI-powered resume analysis platform."
@@ -681,5 +682,83 @@
     "relevance": "Relevance",
     "quality": "Quality",
     "viewResource": "View"
+  },
+  "matchingWeights": {
+    "title": "Matching Algorithm Weights",
+    "subtitle": "Customize how the matching algorithm scores candidates by adjusting the relative importance of each matching method.",
+    "currentDistribution": "Current Weight Distribution",
+    "totalWeight": "Total Weight",
+    "normalize": "Normalize to 100%",
+    "saveProfile": "Save as Profile",
+    "saving": "Saving...",
+    "preset": "Preset",
+    "showDetails": "Show Details",
+    "level": {
+      "success": "High",
+      "warning": "Medium",
+      "error": "Low"
+    },
+    "tabs": {
+      "presets": "Presets",
+      "custom": "Custom",
+      "saved": "Saved Profiles"
+    },
+    "presets": {
+      "technical": {
+        "name": "Technical",
+        "description": "Keyword-heavy matching for technical roles requiring exact skill matching (e.g., developers, engineers)"
+      },
+      "creative": {
+        "name": "Creative",
+        "description": "Vector-heavy matching for creative roles requiring conceptual understanding (e.g., designers, copywriters)"
+      },
+      "executive": {
+        "name": "Executive",
+        "description": "Balanced matching for executive roles requiring comprehensive evaluation"
+      },
+      "balanced": {
+        "name": "Balanced",
+        "description": "Even distribution across all matching methods for generalist roles"
+      }
+    },
+    "keyword": {
+      "label": "Keyword Matching",
+      "description": "Direct skill matching including synonyms, fuzzy matching, and compound skills",
+      "explanation": "Performs direct matching of skills with support for synonyms (e.g., PostgreSQL ≈ SQL), fuzzy matching for typos, and compound skills (e.g., C/C++). Best for technical roles where exact skills matter.",
+      "examples": "Use for: Software developers, engineers, data scientists, DevOps"
+    },
+    "tfidf": {
+      "label": "TF-IDF Matching",
+      "description": "Weighted scoring based on keyword importance in the job description",
+      "explanation": "Uses TF-IDF to calculate the importance of keywords in the job posting. Important keywords count more toward the score. Helps identify critical requirements.",
+      "examples": "Use for: Role-specific requirements, niche technologies, senior positions"
+    },
+    "vector": {
+      "label": "Vector Similarity",
+      "description": "Semantic similarity using AI embeddings for contextual understanding",
+      "explanation": "Uses sentence-transformers to calculate semantic similarity between resume and job posting. Captures conceptual understanding and transferability of skills.",
+      "examples": "Use for: Creative roles, leadership positions, career changers, conceptual roles"
+    },
+    "explanation": {
+      "title": "Understanding the Weights",
+      "keyword": "Keyword Matching",
+      "tfidf": "TF-IDF Matching",
+      "vector": "Vector Similarity"
+    },
+    "saveDialog": {
+      "title": "Save as Custom Profile",
+      "name": "Profile Name",
+      "namePlaceholder": "e.g., My Technical Role Profile",
+      "description": "Description (Optional)",
+      "descriptionPlaceholder": "When should this profile be used?",
+      "preview": "Weights to save:"
+    },
+    "errors": {
+      "not100": "Weights must sum to 100%",
+      "nameRequired": "Profile name is required"
+    },
+    "success": {
+      "saved": "Weights saved successfully!"
+    }
   }
 }

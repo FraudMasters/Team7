@@ -21,6 +21,7 @@ from .candidate_rank import CandidateRank, RankingFeedback
 from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
+from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
 
 __all__ = [
     "Base",
@@ -45,4 +46,8 @@ __all__ = [
     "SkillGapReport",
     "LearningResource",
     "SkillDevelopmentPlan",
+    "MatchingWeightProfile",
+    "MatchingWeightVersion",
+    "PRESET_PROFILES",
+    "create_preset_profiles",
 ]

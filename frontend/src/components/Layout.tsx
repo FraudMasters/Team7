@@ -20,6 +20,7 @@ import {
   Settings as SettingsIcon,
   Upload as UploadIcon,
   School as SchoolIcon,
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -59,6 +60,7 @@ const Layout: React.FC<LayoutProps> = () => {
     { labelKey: 'nav.resumeDatabase', path: '/recruiter/resumes', icon: <PersonIcon fontSize="small" /> },
     { labelKey: 'nav.searchCandidates', path: '/recruiter/search', icon: <RecruiterIcon fontSize="small" /> },
     { labelKey: 'nav.skillGapAnalysis', path: '/recruiter/skill-gap', icon: <SchoolIcon fontSize="small" /> },
+    { labelKey: 'nav.matchingWeights', path: '/recruiter/weights', icon: <TuneIcon fontSize="small" /> },
   ];
 
   // Admin Module menu items

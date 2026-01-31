@@ -82,6 +82,18 @@ import type {
   RecruiterPerformanceResponse,
   LanguagePreferenceUpdate,
   LanguagePreferenceResponse,
+  MatchingWeightsProfile,
+  MatchingWeightsCreate,
+  MatchingWeightsUpdate,
+  MatchingWeightsListResponse,
+  PresetProfile,
+  PresetsResponse,
+  WeightVersionEntry,
+  VersionHistoryResponse,
+  NormalizeWeightsRequest,
+  NormalizedWeightsResponse,
+  ApplyWeightsRequest,
+  ApplyWeightsResponse,
 } from '@/types/api';
 
 /**
@@ -1352,6 +1364,261 @@ export class ApiClient {
       const response: AxiosResponse<LanguagePreferenceResponse> = await this.client.post(
         '/api/preferences/language',
         { language }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Matching Weights ====================
+
+  /**
+   * List all matching weight profiles
+   *
+   * @param organizationId - Optional organization ID filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param isPreset - Optional preset status filter
+   * @param isActive - Optional active status filter (default: true)
+   * @returns List of weight profiles
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.listWeightProfiles();
+   * console.log(result.profiles.length); // Total profiles
+   * ```
+   */
+  async listWeightProfiles(
+    organizationId?: string,
+    vacancyId?: string,
+    isPreset?: boolean,
+    isActive: boolean = true,
+  ): Promise<MatchingWeightsListResponse> {
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (organizationId) params.organization_id = organizationId;
+      if (vacancyId) params.vacancy_id = vacancyId;
+      if (isPreset !== undefined) params.is_preset = isPreset;
+      params.is_active = isActive;
+
+      const response: AxiosResponse<MatchingWeightsListResponse> = await this.client.get(
+        '/api/matching-weights/profiles',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get preset weight profiles
+   *
+   * Returns system-defined preset profiles (Technical, Creative, Executive, Balanced).
+   *
+   * @returns Preset profiles
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const presets = await apiClient.getPresetProfiles();
+   * presets.presets.forEach(p => {
+   *   console.log(`${p.name}: ${p.use_case}`);
+   * });
+   * ```
+   */
+  async getPresetProfiles(): Promise<PresetsResponse> {
+    try {
+      const response: AxiosResponse<PresetsResponse> = await this.client.get(
+        '/api/matching-weights/profiles/presets'
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific weight profile by ID
+   *
+   * @param id - Profile ID
+   * @returns Weight profile details
+   * @throws ApiError if not found
+   *
+   * @example
+   * ```ts
+   * const profile = await apiClient.getWeightProfile('profile-123');
+   * console.log(profile.weights_percentage);
+   * ```
+   */
+  async getWeightProfile(id: string): Promise<MatchingWeightsProfile> {
+    try {
+      const response: AxiosResponse<MatchingWeightsProfile> = await this.client.get(
+        `/api/matching-weights/profiles/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Create a custom weight profile
+   *
+   * @param request - Create request with weights and metadata
+   * @returns Created weight profile
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const profile = await apiClient.createWeightProfile({
+   *   name: 'My Technical Profile',
+   *   description: 'High keyword weight for technical roles',
+   *   keyword_weight: 0.6,
+   *   tfidf_weight: 0.25,
+   *   vector_weight: 0.15,
+   * });
+   * ```
+   */
+  async createWeightProfile(request: MatchingWeightsCreate): Promise<MatchingWeightsProfile> {
+    try {
+      const response: AxiosResponse<MatchingWeightsProfile> = await this.client.post(
+        '/api/matching-weights/profiles',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update a weight profile
+   *
+   * @param id - Profile ID
+   * @param request - Update request with fields to modify
+   * @returns Updated weight profile
+   * @throws ApiError if update fails
+   *
+   * @example
+   * ```ts
+   * const updated = await apiClient.updateWeightProfile('profile-123', {
+   *   keyword_weight: 0.7,
+   *   change_reason: 'Increased keyword weight for senior roles',
+   * });
+   * ```
+   */
+  async updateWeightProfile(
+    id: string,
+    request: MatchingWeightsUpdate,
+  ): Promise<MatchingWeightsProfile> {
+    try {
+      const response: AxiosResponse<MatchingWeightsProfile> = await this.client.put(
+        `/api/matching-weights/profiles/${id}`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a custom weight profile
+   *
+   * @param id - Profile ID
+   * @throws ApiError if deletion fails
+   *
+   * @example
+   * ```ts
+   * await apiClient.deleteWeightProfile('profile-123');
+   * ```
+   */
+  async deleteWeightProfile(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/matching-weights/profiles/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get version history for a weight profile
+   *
+   * @param id - Profile ID
+   * @returns Version history entries
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const history = await apiClient.getWeightProfileHistory('profile-123');
+   * history.versions.forEach(v => {
+   *   console.log(`Version ${v.version}: ${v.change_reason}`);
+   * });
+   * ```
+   */
+  async getWeightProfileHistory(id: string): Promise<VersionHistoryResponse> {
+    try {
+      const response: AxiosResponse<VersionHistoryResponse> = await this.client.get(
+        `/api/matching-weights/profiles/${id}/history`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Normalize weights so they sum to 1.0
+   *
+   * @param request - Weights to normalize
+   * @returns Normalized weights
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const normalized = await apiClient.normalizeWeights({
+   *   keyword_weight: 0.5,
+   *   tfidf_weight: 0.3,
+   *   vector_weight: 0.3, // Sum = 1.1
+   * });
+   * // Returns normalized values that sum to 1.0
+   * ```
+   */
+  async normalizeWeights(request: NormalizeWeightsRequest): Promise<NormalizedWeightsResponse> {
+    try {
+      const response: AxiosResponse<NormalizedWeightsResponse> = await this.client.post(
+        '/api/matching-weights/normalize',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Apply custom weights to a vacancy
+   *
+   * @param request - Apply request with vacancy ID and weights
+   * @returns Application result
+   * @throws ApiError if application fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.applyWeights({
+   *   vacancy_id: 'vacancy-123',
+   *   profile_id: 'profile-456',
+   *   re_match_candidates: true,
+   * });
+   * ```
+   */
+  async applyWeights(request: ApplyWeightsRequest): Promise<ApplyWeightsResponse> {
+    try {
+      const response: AxiosResponse<ApplyWeightsResponse> = await this.client.post(
+        '/api/matching-weights/apply',
+        request
       );
       return response.data;
     } catch (error) {

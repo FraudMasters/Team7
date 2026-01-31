@@ -994,3 +994,159 @@ export interface LearningResourcesListResponse {
   total_count: number;
   filters_applied: Record<string, unknown>;
 }
+
+// ==================== Matching Weights Types ====================
+
+/**
+ * Matching weight profile response
+ */
+export interface MatchingWeightsProfile {
+  id: string;
+  name: string;
+  description: string | null;
+  organization_id: string | null;
+  vacancy_id: string | null;
+  is_preset: boolean;
+  is_active: boolean;
+  keyword_weight: number;
+  tfidf_weight: number;
+  vector_weight: number;
+  weights_percentage: {
+    keyword: number;
+    tfidf: number;
+    vector: number;
+  };
+  version: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+/**
+ * Create matching weight profile request
+ */
+export interface MatchingWeightsCreate {
+  name: string;
+  description?: string;
+  keyword_weight: number;
+  tfidf_weight: number;
+  vector_weight: number;
+  organization_id?: string;
+  vacancy_id?: string;
+  change_reason?: string;
+}
+
+/**
+ * Update matching weight profile request
+ */
+export interface MatchingWeightsUpdate {
+  name?: string;
+  description?: string;
+  keyword_weight?: number;
+  tfidf_weight?: number;
+  vector_weight?: number;
+  is_active?: boolean;
+  change_reason?: string;
+}
+
+/**
+ * List matching weight profiles response
+ */
+export interface MatchingWeightsListResponse {
+  profiles: MatchingWeightsProfile[];
+  total_count: number;
+  preset_count: number;
+  custom_count: number;
+}
+
+/**
+ * Preset profile response
+ */
+export interface PresetProfile {
+  name: string;
+  description: string;
+  keyword_weight: number;
+  tfidf_weight: number;
+  vector_weight: number;
+  weights_percentage: {
+    keyword: number;
+    tfidf: number;
+    vector: number;
+  };
+  use_case: string;
+}
+
+/**
+ * Preset profiles response
+ */
+export interface PresetsResponse {
+  presets: PresetProfile[];
+}
+
+/**
+ * Version history entry
+ */
+export interface WeightVersionEntry {
+  id: string;
+  version: string;
+  keyword_weight: number;
+  tfidf_weight: number;
+  vector_weight: number;
+  changed_by: string | null;
+  change_reason: string | null;
+  created_at: string;
+}
+
+/**
+ * Version history response
+ */
+export interface VersionHistoryResponse {
+  versions: WeightVersionEntry[];
+  total_count: number;
+}
+
+/**
+ * Normalize weights request
+ */
+export interface NormalizeWeightsRequest {
+  keyword_weight: number;
+  tfidf_weight: number;
+  vector_weight: number;
+}
+
+/**
+ * Normalized weights response
+ */
+export interface NormalizedWeightsResponse {
+  keyword_weight: number;
+  tfidf_weight: number;
+  vector_weight: number;
+  original_sum: number;
+  normalized: boolean;
+}
+
+/**
+ * Apply weights request
+ */
+export interface ApplyWeightsRequest {
+  vacancy_id: string;
+  profile_id?: string;
+  weights?: MatchingWeightsUpdate;
+  re_match_candidates: boolean;
+}
+
+/**
+ * Apply weights response
+ */
+export interface ApplyWeightsResponse {
+  vacancy_id: string;
+  weights_applied: {
+    keyword_weight: number;
+    tfidf_weight: number;
+    vector_weight: number;
+  };
+  profile_used: string | null;
+  candidates_affected: number;
+  processing_time_ms: number;
+}

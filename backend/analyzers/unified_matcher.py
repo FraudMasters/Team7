@@ -166,6 +166,7 @@ class UnifiedSkillMatcher:
         job_description: str,
         required_skills: List[str],
         context: Optional[str] = None,
+        weights: Optional[Dict[str, float]] = None,
     ) -> UnifiedMatchResult:
         """
         Perform unified matching using all three methods.
@@ -177,10 +178,22 @@ class UnifiedSkillMatcher:
             job_description: Job posting description
             required_skills: List of required skills from job posting
             context: Optional context hint for keyword matching
+            weights: Optional custom weights dict with 'keyword_weight', 'tfidf_weight', 'vector_weight'
 
         Returns:
             UnifiedMatchResult with comprehensive match information
         """
+        # Use custom weights if provided, otherwise use instance weights
+        if weights:
+            total = weights.get('keyword_weight', 0) + weights.get('tfidf_weight', 0) + weights.get('vector_weight', 0)
+            kw = weights.get('keyword_weight', self.keyword_weight) / total if total > 0 else self.keyword_weight
+            tw = weights.get('tfidf_weight', self.tfidf_weight) / total if total > 0 else self.tfidf_weight
+            vw = weights.get('vector_weight', self.vector_weight) / total if total > 0 else self.vector_weight
+        else:
+            kw = self.keyword_weight
+            tw = self.tfidf_weight
+            vw = self.vector_weight
+
         # 1. Enhanced keyword matching
         keyword_results = self.keyword_matcher.match_multiple(
             resume_skills=resume_skills,
@@ -227,9 +240,9 @@ class UnifiedSkillMatcher:
 
         # Calculate overall score (weighted combination)
         overall_score = (
-            self.keyword_weight * keyword_score +
-            self.tfidf_weight * tfidf_result.score +
-            self.vector_weight * vector_score
+            kw * keyword_score +
+            tw * tfidf_result.score +
+            vw * vector_score
         )
 
         overall_passed = overall_score >= self.overall_threshold
@@ -256,6 +269,59 @@ class UnifiedSkillMatcher:
             missing_skills=missing_skills,
             recommendation=recommendation,
         )
+
+    def update_weights(
+        self,
+        keyword_weight: Optional[float] = None,
+        tfidf_weight: Optional[float] = None,
+        vector_weight: Optional[float] = None,
+    ) -> None:
+        """
+        Update the matching weights dynamically.
+
+        Args:
+            keyword_weight: New keyword weight (0-1)
+            tfidf_weight: New TF-IDF weight (0-1)
+            vector_weight: New vector weight (0-1)
+
+        Note:
+            If all three are provided, they will be normalized to sum to 1.0.
+            If only some are provided, only those will be updated (may not sum to 1.0).
+        """
+        # If all weights provided, normalize them
+        if all(w is not None for w in [keyword_weight, tfidf_weight, vector_weight]):
+            total = keyword_weight + tfidf_weight + vector_weight  # type: ignore
+            self.keyword_weight = round(keyword_weight / total, 3)  # type: ignore
+            self.tfidf_weight = round(tfidf_weight / total, 3)  # type: ignore
+            self.vector_weight = round(vector_weight / total, 3)  # type: ignore
+        else:
+            # Update only provided weights
+            if keyword_weight is not None:
+                self.keyword_weight = round(keyword_weight, 3)
+            if tfidf_weight is not None:
+                self.tfidf_weight = round(tfidf_weight, 3)
+            if vector_weight is not None:
+                self.vector_weight = round(vector_weight, 3)
+
+        logger.info(
+            f"UnifiedSkillMatcher weights updated: "
+            f"keyword={self.keyword_weight:.2f}, "
+            f"tfidf={self.tfidf_weight:.2f}, "
+            f"vector={self.vector_weight:.2f}"
+        )
+
+    def get_weights(self) -> Dict[str, float]:
+        """
+        Get current matching weights.
+
+        Returns:
+            Dict with 'keyword_weight', 'tfidf_weight', 'vector_weight'
+        """
+        return {
+            "keyword_weight": self.keyword_weight,
+            "tfidf_weight": self.tfidf_weight,
+            "vector_weight": self.vector_weight,
+        }
 
     def _generate_recommendation(
         self,
@@ -361,9 +427,36 @@ class UnifiedSkillMatcher:
 _default_matcher: Optional[UnifiedSkillMatcher] = None
 
 
-def get_unified_matcher() -> UnifiedSkillMatcher:
-    """Get or create default unified matcher instance."""
+def get_unified_matcher(
+    keyword_weight: Optional[float] = None,
+    tfidf_weight: Optional[float] = None,
+    vector_weight: Optional[float] = None,
+) -> UnifiedSkillMatcher:
+    """
+    Get or create default unified matcher instance.
+
+    Args:
+        keyword_weight: Optional keyword weight for new instance
+        tfidf_weight: Optional TF-IDF weight for new instance
+        vector_weight: Optional vector weight for new instance
+
+    Returns:
+        UnifiedSkillMatcher instance
+
+    Note:
+        If weights are provided, a new matcher is created with those weights.
+        Otherwise, returns the default singleton instance.
+    """
     global _default_matcher
+
+    # If custom weights requested, create a new matcher
+    if any(w is not None for w in [keyword_weight, tfidf_weight, vector_weight]):
+        kw = keyword_weight if keyword_weight is not None else 0.5
+        tw = tfidf_weight if tfidf_weight is not None else 0.3
+        vw = vector_weight if vector_weight is not None else 0.2
+        return UnifiedSkillMatcher(keyword_weight=kw, tfidf_weight=tw, vector_weight=vw)
+
+    # Return default singleton
     if _default_matcher is None:
         _default_matcher = UnifiedSkillMatcher()
     return _default_matcher

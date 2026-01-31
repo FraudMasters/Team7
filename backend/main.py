@@ -235,6 +235,7 @@ from api import (
     resumes,
     analysis,
     matching,
+    matching_weights,
     skill_taxonomies,
     custom_synonyms,
     feedback,
@@ -257,6 +258,7 @@ from api import (
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(analysis.router, prefix="/api/resumes", tags=["Analysis"])
 app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
+app.include_router(matching_weights.router, prefix="/api/matching-weights", tags=["Matching Weights"])
 app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags=["Skill Taxonomies"])
 app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=["Custom Synonyms"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])

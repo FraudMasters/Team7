@@ -4,7 +4,7 @@ JobVacancy model for storing job vacancy descriptions
 from typing import Optional
 
 from sqlalchemy import JSON, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, UUIDMixin
 
@@ -52,6 +52,13 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
     employment_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Relationships
+    weight_profiles: Mapped[list["MatchingWeightProfile"]] = relationship(
+        "MatchingWeightProfile",
+        back_populates="vacancy",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<JobVacancy(id={self.id}, title={self.title})>"
