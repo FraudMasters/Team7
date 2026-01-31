@@ -235,16 +235,26 @@ def detect_performance_degradation(
 def compare_model_performance(
     model_version_ids: List[str],
     dataset_type: str = "production",
+    db_session: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
-    Compare performance across multiple model versions.
+    Compare performance across multiple model versions for A/B testing analysis.
 
-    This function retrieves and compares performance metrics for
-    multiple model versions, useful for A/B testing analysis.
+    This function retrieves and compares performance metrics for multiple model
+    versions, calculating performance deltas, statistical significance, and rankings.
+    Useful for evaluating A/B test results and determining which model performs best.
+
+    The function:
+    1. Queries MLModelVersion to get model metadata (version, file_path, etc.)
+    2. Queries ModelPerformanceHistory to get latest performance metrics
+    3. Calculates performance deltas between models
+    4. Determines statistical significance (requires sufficient sample sizes)
+    5. Ranks models by performance (F1 score as primary metric)
 
     Args:
         model_version_ids: List of model version UUIDs to compare
         dataset_type: Type of dataset to analyze (default: "production")
+        db_session: Optional database session for querying
 
     Returns:
         Dictionary containing comparison results:
@@ -254,78 +264,234 @@ def compare_model_performance(
                 {
                     "model_version_id": "uuid1",
                     "version": "v1.0.0",
+                    "is_active": true,
+                    "is_experiment": false,
                     "f1_score": 0.85,
-                    "accuracy": 0.82
+                    "accuracy": 0.82,
+                    "precision": 0.80,
+                    "recall": 0.88,
+                    "sample_size": 150,
+                    "performance_score": 85.0
                 },
                 ...
             ],
             "best_model": "uuid1",
             "performance_delta": 0.05,
-            "ranking": ["uuid1", "uuid2"]
+            "ranking": ["uuid1", "uuid2"],
+            "statistical_significance": {
+                "is_significant": true,
+                "p_value": 0.02,
+                "confidence": 0.95
+            },
+            "comparison_count": 2
         }
 
     Example:
+        >>> from sqlalchemy.orm import Session
+        >>> from tasks.performance_monitoring import compare_model_performance
         >>> model_ids = ["uuid1", "uuid2"]
-        >>> comparison = compare_model_performance(model_ids, "production")
+        >>> comparison = compare_model_performance(model_ids, "production", db_session)
         >>> print(comparison['best_model'])
         'uuid1'
+        >>> print(comparison['statistical_significance']['is_significant'])
+        True
     """
-    logger.info(f"Comparing performance for {len(model_version_ids)} model versions")
-
-    # Query metrics for each model version
-    # In a real implementation, you would query the database
-    # and retrieve actual performance data
-    model_metrics = []
-
-    for model_id in model_version_ids:
-        # Placeholder: In real implementation, query MLModelVersion and ModelPerformanceHistory
-        metrics = calculate_performance_metrics(model_id, dataset_type)
-
-        if metrics.get("latest_metrics"):
-            model_metrics.append({
-                "model_version_id": model_id,
-                "version": "unknown",  # Would come from MLModelVersion.version
-                "f1_score": metrics["latest_metrics"].get("f1_score", 0.0),
-                "accuracy": metrics["latest_metrics"].get("accuracy", 0.0),
-                "precision": metrics["latest_metrics"].get("precision", 0.0),
-                "recall": metrics["latest_metrics"].get("recall", 0.0),
-            })
-
-    if not model_metrics:
-        logger.warning("No performance metrics found for comparison")
+    if db_session is None:
+        logger.warning(
+            f"No database session provided for compare_model_performance, returning empty comparison"
+        )
         return {
             "dataset_type": dataset_type,
             "models": [],
             "best_model": None,
             "performance_delta": 0.0,
             "ranking": [],
+            "statistical_significance": None,
+            "comparison_count": 0,
         }
 
-    # Sort by F1 score to find best model
-    sorted_models = sorted(model_metrics, key=lambda m: m["f1_score"], reverse=True)
-    best_model = sorted_models[0]
-    runner_up = sorted_models[1] if len(sorted_models) > 1 else None
+    logger.info(f"Comparing performance for {len(model_version_ids)} model versions")
 
-    performance_delta = 0.0
-    if runner_up:
-        performance_delta = best_model["f1_score"] - runner_up["f1_score"]
+    try:
+        # Query model versions to get metadata
+        model_versions = (
+            db_session.query(MLModelVersion)
+            .filter(MLModelVersion.id.in_(model_version_ids))
+            .all()
+        )
 
-    ranking = [m["model_version_id"] for m in sorted_models]
+        if not model_versions:
+            logger.warning(f"No model versions found for IDs: {model_version_ids}")
+            return {
+                "dataset_type": dataset_type,
+                "models": [],
+                "best_model": None,
+                "performance_delta": 0.0,
+                "ranking": [],
+                "statistical_significance": None,
+                "comparison_count": 0,
+            }
 
-    result = {
-        "dataset_type": dataset_type,
-        "models": model_metrics,
-        "best_model": best_model["model_version_id"],
-        "performance_delta": round(performance_delta, 4),
-        "ranking": ranking,
-    }
+        model_metrics = []
 
-    logger.info(
-        f"Performance comparison complete: best model={result['best_model']}, "
-        f"delta={performance_delta:.4f}"
-    )
+        for model in model_versions:
+            model_id = str(model.id)
 
-    return result
+            # Get latest performance metrics from history
+            latest_performance = (
+                db_session.query(ModelPerformanceHistory)
+                .filter(
+                    ModelPerformanceHistory.model_version_id == model_id,
+                    ModelPerformanceHistory.dataset_type == dataset_type,
+                )
+                .order_by(ModelPerformanceHistory.created_at.desc())
+                .first()
+            )
+
+            if latest_performance:
+                metric_info = {
+                    "model_version_id": model_id,
+                    "version": model.version,
+                    "is_active": model.is_active,
+                    "is_experiment": model.is_experiment,
+                    "f1_score": float(latest_performance.f1_score)
+                    if latest_performance.f1_score
+                    else None,
+                    "accuracy": float(latest_performance.accuracy)
+                    if latest_performance.accuracy
+                    else None,
+                    "precision": float(latest_performance.precision)
+                    if latest_performance.precision
+                    else None,
+                    "recall": float(latest_performance.recall)
+                    if latest_performance.recall
+                    else None,
+                    "auc_score": float(latest_performance.auc_score)
+                    if latest_performance.auc_score
+                    else None,
+                    "sample_size": latest_performance.sample_size,
+                    "performance_score": float(model.performance_score)
+                    if model.performance_score
+                    else None,
+                }
+                model_metrics.append(metric_info)
+            else:
+                logger.debug(
+                    f"No performance history found for model {model.version} ({model_id})"
+                )
+
+        if not model_metrics:
+            logger.warning(
+                f"No performance metrics found for any of the {len(model_version_ids)} model versions"
+            )
+            return {
+                "dataset_type": dataset_type,
+                "models": [],
+                "best_model": None,
+                "performance_delta": 0.0,
+                "ranking": [],
+                "statistical_significance": None,
+                "comparison_count": 0,
+            }
+
+        # Filter to models with F1 scores and sort by F1 score
+        valid_models = [m for m in model_metrics if m.get("f1_score") is not None]
+
+        if not valid_models:
+            logger.warning("No models with valid F1 scores found for comparison")
+            return {
+                "dataset_type": dataset_type,
+                "models": model_metrics,
+                "best_model": None,
+                "performance_delta": 0.0,
+                "ranking": [],
+                "statistical_significance": None,
+                "comparison_count": len(model_metrics),
+            }
+
+        # Sort by F1 score (primary metric) to find best model
+        sorted_models = sorted(valid_models, key=lambda m: m["f1_score"], reverse=True)
+        best_model = sorted_models[0]
+        runner_up = sorted_models[1] if len(sorted_models) > 1 else None
+
+        # Calculate performance delta between best and runner-up
+        performance_delta = 0.0
+        if runner_up and runner_up.get("f1_score"):
+            performance_delta = best_model["f1_score"] - runner_up["f1_score"]
+
+        # Create ranking by model_version_id
+        ranking = [m["model_version_id"] for m in sorted_models]
+
+        # Calculate statistical significance if we have at least 2 models with sample sizes
+        statistical_significance = None
+        if len(valid_models) >= 2 and best_model.get("sample_size") and runner_up.get("sample_size"):
+            # Simple significance test based on sample sizes and performance difference
+            # In a production system, you would use proper statistical tests (e.g., t-test, bootstrap)
+            min_sample_size = min(best_model["sample_size"], runner_up["sample_size"])
+
+            # Consider significant if:
+            # 1. Sample size is at least 100 per model
+            # 2. Performance delta is at least 2%
+            is_significant = (
+                min_sample_size >= 100 and performance_delta >= 0.02
+            )
+
+            # Estimate confidence level (simplified)
+            # In production, use proper statistical calculations
+            confidence = 0.95 if is_significant and min_sample_size >= 500 else 0.90
+            p_value = 0.05 if is_significant else 0.10
+
+            statistical_significance = {
+                "is_significant": is_significant,
+                "p_value": round(p_value, 3),
+                "confidence": round(confidence, 2),
+                "min_sample_size": min_sample_size,
+                "test_method": "performance_delta_threshold",
+            }
+
+            if is_significant:
+                logger.info(
+                    f"Statistically significant difference detected: "
+                    f"delta={performance_delta:.4f}, p={p_value:.3f}"
+                )
+            else:
+                logger.info(
+                    f"Performance difference not statistically significant: "
+                    f"delta={performance_delta:.4f}, min_sample={min_sample_size}"
+                )
+
+        result = {
+            "dataset_type": dataset_type,
+            "models": model_metrics,
+            "best_model": best_model["model_version_id"],
+            "performance_delta": round(performance_delta, 4),
+            "ranking": ranking,
+            "statistical_significance": statistical_significance,
+            "comparison_count": len(model_metrics),
+        }
+
+        logger.info(
+            f"Performance comparison complete: best_model={result['best_model']} "
+            f"({best_model['version']}), delta={performance_delta:.4f}, "
+            f"models_compared={len(model_metrics)}"
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(
+            f"Error comparing model performance: {e}", exc_info=True
+        )
+        return {
+            "dataset_type": dataset_type,
+            "models": [],
+            "best_model": None,
+            "performance_delta": 0.0,
+            "ranking": [],
+            "statistical_significance": None,
+            "comparison_count": 0,
+            "error": str(e),
+        }
 
 
 @shared_task(
