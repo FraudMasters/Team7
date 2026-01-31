@@ -24,6 +24,12 @@ import {
   Collapse,
   useMediaQuery,
   useTheme,
+  Snackbar,
+  Alert,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Work as WorkIcon,
@@ -32,6 +38,9 @@ import {
   Sort as SortIcon,
   AccessTime as RecentIcon,
   Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  Email as EmailIcon,
+  Event as EventIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
@@ -71,6 +80,17 @@ const ResumeDatabasePage: React.FC = () => {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [resumeToDelete, setResumeToDelete] = useState<string | null>(null);
+  const [interviewDialogOpen, setInterviewDialogOpen] = useState(false);
+  const [resumeForInterview, setResumeForInterview] = useState<Resume | null>(null);
+  const [interviewDate, setInterviewDate] = useState('');
+  const [interviewTime, setInterviewTime] = useState('');
+  const [interviewType, setInterviewType] = useState('screening');
+  const [interviewNotes, setInterviewNotes] = useState('');
+  const [actionFeedback, setActionFeedback] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   const fetchResumes = async () => {
     try {
@@ -158,6 +178,81 @@ const ResumeDatabasePage: React.FC = () => {
     } catch (error) {
       console.error('Error deleting resume:', error);
       alert('Failed to delete resume');
+    }
+  };
+
+  const handleToggleStar = async (resume: Resume) => {
+    try {
+      const newStarredValue = !resume.starred;
+      await axios.patch(`/api/resumes/${resume.id}`, { starred: newStarredValue });
+      // Update local state
+      setResumes(resumes.map((r) => (r.id === resume.id ? { ...r, starred: newStarredValue } : r)));
+      setFilteredResumes(filteredResumes.map((r) => (r.id === resume.id ? { ...r, starred: newStarredValue } : r)));
+      setActionFeedback({
+        open: true,
+        message: newStarredValue ? t('resumeDatabase.starredSuccess') : t('resumeDatabase.unstarredSuccess'),
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Error toggling star:', error);
+      setActionFeedback({
+        open: true,
+        message: t('errors.somethingWentWrong'),
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleEmail = (resume: Resume) => {
+    const subject = encodeURIComponent(t('resumeDatabase.emailSubject'));
+    const body = encodeURIComponent(t('resumeDatabase.emailBody'));
+    const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
+    window.location.href = mailtoLink;
+    setActionFeedback({
+      open: true,
+      message: t('resumeDatabase.emailSent'),
+      severity: 'success',
+    });
+  };
+
+  const handleOpenInterviewDialog = (resume: Resume) => {
+    setResumeForInterview(resume);
+    setInterviewDate('');
+    setInterviewTime('');
+    setInterviewType('screening');
+    setInterviewNotes('');
+    setInterviewDialogOpen(true);
+  };
+
+  const handleCloseInterviewDialog = () => {
+    setInterviewDialogOpen(false);
+    setResumeForInterview(null);
+  };
+
+  const handleScheduleInterview = async () => {
+    if (!resumeForInterview) return;
+
+    // Placeholder for backend integration
+    // TODO: Integrate with backend API when available
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setActionFeedback({
+        open: true,
+        message: t('resumeDatabase.interviewDialog.success', {
+          date: interviewDate || 'TBD',
+          time: interviewTime || 'TBD',
+        }),
+        severity: 'success',
+      });
+      setInterviewDialogOpen(false);
+    } catch (error) {
+      console.error('Error scheduling interview:', error);
+      setActionFeedback({
+        open: true,
+        message: t('resumeDatabase.interviewDialog.error'),
+        severity: 'error',
+      });
     }
   };
 
@@ -386,18 +481,73 @@ const ResumeDatabasePage: React.FC = () => {
                       </Typography>
                     )}
                   </CardContent>
-                  <CardActions sx={{ justifyContent: 'flex-end', px: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 } }}>
+                  <CardActions sx={{ justifyContent: 'space-between', px: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 } }}>
+                    {/* Quick Actions */}
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title={resume.starred ? t('resumeDatabase.unstar') : t('resumeDatabase.star')}>
+                        <IconButton
+                          color={resume.starred ? 'primary' : 'default'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleStar(resume);
+                          }}
+                          size="small"
+                          sx={{
+                            minWidth: 36,
+                            minHeight: 36,
+                          }}
+                          aria-label={resume.starred ? t('resumeDatabase.unstar') : t('resumeDatabase.star')}
+                        >
+                          {resume.starred ? <StarIcon /> : <StarBorderIcon />}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('resumeDatabase.email')}>
+                        <IconButton
+                          color="primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEmail(resume);
+                          }}
+                          size="small"
+                          sx={{
+                            minWidth: 36,
+                            minHeight: 36,
+                          }}
+                          aria-label={t('resumeDatabase.email')}
+                        >
+                          <EmailIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('resumeDatabase.scheduleInterview')}>
+                        <IconButton
+                          color="success"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenInterviewDialog(resume);
+                          }}
+                          size="small"
+                          sx={{
+                            minWidth: 36,
+                            minHeight: 36,
+                          }}
+                          aria-label={t('resumeDatabase.scheduleInterview')}
+                        >
+                          <EventIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+
+                    {/* Delete Action */}
                     <IconButton
                       color="error"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteClick(resume.id);
                       }}
+                      size="small"
                       sx={{
-                        // Ensure minimum touch target size of 44x44px
-                        minWidth: 44,
-                        minHeight: 44,
-                        padding: 1,
+                        minWidth: 36,
+                        minHeight: 36,
                       }}
                       aria-label={t('resumeDatabase.delete')}
                     >
@@ -447,6 +597,106 @@ const ResumeDatabasePage: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Interview Scheduling Dialog */}
+        <Dialog
+          open={interviewDialogOpen}
+          onClose={handleCloseInterviewDialog}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              mx: { xs: 1, sm: 2 },
+            }
+          }}
+        >
+          <DialogTitle>{t('resumeDatabase.interviewDialog.title')}</DialogTitle>
+          <DialogContent>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                {t('resumeDatabase.interviewDialog.candidate')}: {resumeForInterview?.getTitleFromFilename?.(resumeForInterview.filename) || getTitleFromFilename(resumeForInterview?.filename || '')}
+              </Typography>
+            </Box>
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                type="date"
+                label={t('resumeDatabase.interviewDialog.date')}
+                value={interviewDate}
+                onChange={(e) => setInterviewDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size={isMobile ? 'small' : 'medium'}
+              />
+              <TextField
+                fullWidth
+                type="time"
+                label={t('resumeDatabase.interviewDialog.time')}
+                value={interviewTime}
+                onChange={(e) => setInterviewTime(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size={isMobile ? 'small' : 'medium'}
+              />
+              <FormControl fullWidth size={isMobile ? 'small' : 'medium'}>
+                <InputLabel id="interview-type-label">{t('resumeDatabase.interviewDialog.type')}</InputLabel>
+                <Select
+                  labelId="interview-type-label"
+                  value={interviewType}
+                  label={t('resumeDatabase.interviewDialog.type')}
+                  onChange={(e) => setInterviewType(e.target.value)}
+                >
+                  <MenuItem value="screening">{t('resumeDatabase.interviewDialog.types.screening')}</MenuItem>
+                  <MenuItem value="technical">{t('resumeDatabase.interviewDialog.types.technical')}</MenuItem>
+                  <MenuItem value="onsite">{t('resumeDatabase.interviewDialog.types.onsite')}</MenuItem>
+                  <MenuItem value="panel">{t('resumeDatabase.interviewDialog.types.panel')}</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label={t('resumeDatabase.interviewDialog.notes')}
+                value={interviewNotes}
+                onChange={(e) => setInterviewNotes(e.target.value)}
+                placeholder={t('resumeDatabase.interviewDialog.notes')}
+                size={isMobile ? 'small' : 'medium'}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: 1, px: 2, pb: 2 }}>
+            <Button
+              onClick={handleCloseInterviewDialog}
+              fullWidth={isMobile}
+              sx={{ minWidth: isMobile ? '100%' : 100 }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={handleScheduleInterview}
+              color="success"
+              variant="contained"
+              fullWidth={isMobile}
+              sx={{ minWidth: isMobile ? '100%' : 100 }}
+            >
+              {t('resumeDatabase.interviewDialog.confirm')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Action Feedback Snackbar */}
+        <Snackbar
+          open={actionFeedback.open}
+          autoHideDuration={4000}
+          onClose={() => setActionFeedback({ ...actionFeedback, open: false })}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={() => setActionFeedback({ ...actionFeedback, open: false })}
+            severity={actionFeedback.severity}
+            sx={{ width: '100%' }}
+          >
+            {actionFeedback.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Container>
   );

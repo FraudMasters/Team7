@@ -9,6 +9,7 @@ import {
   Grid,
   Card,
   CardContent,
+  CardActions,
   Chip,
   Slider,
   FormControlLabel,
@@ -22,6 +23,16 @@ import {
   Collapse,
   useTheme,
   useMediaQuery,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -29,6 +40,9 @@ import {
   TrendingUp as TrendingUpIcon,
   Psychology as AIIcon,
   Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  Email as EmailIcon,
+  Event as EventIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
@@ -64,6 +78,7 @@ interface CandidateWithMatch extends Resume {
   hireProbability?: number;
   isTopRecommendation?: boolean;
   modelVersion?: string;
+  starred?: boolean;
 }
 
 /**
@@ -99,6 +114,17 @@ const CandidateSearchPage: React.FC = () => {
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const candidateListRef = useRef<HTMLDivElement>(null);
   const candidateRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [interviewDialogOpen, setInterviewDialogOpen] = useState(false);
+  const [candidateForInterview, setCandidateForInterview] = useState<CandidateWithMatch | null>(null);
+  const [interviewDate, setInterviewDate] = useState('');
+  const [interviewTime, setInterviewTime] = useState('');
+  const [interviewType, setInterviewType] = useState('screening');
+  const [interviewNotes, setInterviewNotes] = useState('');
+  const [actionFeedback, setActionFeedback] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   // Load vacancies on mount
   useEffect(() => {
@@ -318,6 +344,80 @@ const CandidateSearchPage: React.FC = () => {
     if (percentage >= 70) return 'success';
     if (percentage >= 50) return 'warning';
     return 'error';
+  };
+
+  const handleToggleStar = async (candidate: CandidateWithMatch) => {
+    try {
+      const newStarredValue = !candidate.starred;
+      await axios.patch(`/api/resumes/${candidate.id}`, { starred: newStarredValue });
+      // Update local state
+      setCandidates(candidates.map((c) => (c.id === candidate.id ? { ...c, starred: newStarredValue } : c)));
+      setActionFeedback({
+        open: true,
+        message: newStarredValue ? t('candidateSearch.starredSuccess') : t('candidateSearch.unstarredSuccess'),
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Error toggling star:', error);
+      setActionFeedback({
+        open: true,
+        message: t('errors.somethingWentWrong'),
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleEmail = (candidate: CandidateWithMatch) => {
+    const subject = encodeURIComponent(t('candidateSearch.emailSubject', { vacancy: candidate.vacancyTitle }));
+    const body = encodeURIComponent(t('candidateSearch.emailBody', { vacancy: candidate.vacancyTitle }));
+    const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
+    window.location.href = mailtoLink;
+    setActionFeedback({
+      open: true,
+      message: t('candidateSearch.emailSent'),
+      severity: 'success',
+    });
+  };
+
+  const handleOpenInterviewDialog = (candidate: CandidateWithMatch) => {
+    setCandidateForInterview(candidate);
+    setInterviewDate('');
+    setInterviewTime('');
+    setInterviewType('screening');
+    setInterviewNotes('');
+    setInterviewDialogOpen(true);
+  };
+
+  const handleCloseInterviewDialog = () => {
+    setInterviewDialogOpen(false);
+    setCandidateForInterview(null);
+  };
+
+  const handleScheduleInterview = async () => {
+    if (!candidateForInterview) return;
+
+    // Placeholder for backend integration
+    // TODO: Integrate with backend API when available
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setActionFeedback({
+        open: true,
+        message: t('candidateSearch.interviewDialog.success', {
+          date: interviewDate || 'TBD',
+          time: interviewTime || 'TBD',
+        }),
+        severity: 'success',
+      });
+      setInterviewDialogOpen(false);
+    } catch (error) {
+      console.error('Error scheduling interview:', error);
+      setActionFeedback({
+        open: true,
+        message: t('candidateSearch.interviewDialog.error'),
+        severity: 'error',
+      });
+    }
   };
 
   if (loading) {
@@ -801,6 +901,62 @@ const CandidateSearchPage: React.FC = () => {
                         </Box>
                       )}
                     </CardContent>
+                    <CardActions sx={{ justifyContent: 'space-between', px: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 } }}>
+                      {/* Quick Actions */}
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title={candidate.starred ? t('candidateSearch.unstar') : t('candidateSearch.star')}>
+                          <IconButton
+                            color={candidate.starred ? 'primary' : 'default'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStar(candidate);
+                            }}
+                            size="small"
+                            sx={{
+                              minWidth: 36,
+                              minHeight: 36,
+                            }}
+                            aria-label={candidate.starred ? t('candidateSearch.unstar') : t('candidateSearch.star')}
+                          >
+                            {candidate.starred ? <StarIcon /> : <StarBorderIcon />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={t('candidateSearch.email')}>
+                          <IconButton
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEmail(candidate);
+                            }}
+                            size="small"
+                            sx={{
+                              minWidth: 36,
+                              minHeight: 36,
+                            }}
+                            aria-label={t('candidateSearch.email')}
+                          >
+                            <EmailIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={t('candidateSearch.scheduleInterview')}>
+                          <IconButton
+                            color="success"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenInterviewDialog(candidate);
+                            }}
+                            size="small"
+                            sx={{
+                              minWidth: 36,
+                              minHeight: 36,
+                            }}
+                            aria-label={t('candidateSearch.scheduleInterview')}
+                          >
+                            <EventIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </CardActions>
                   </Card>
                 </Grid>
               ))}
@@ -814,6 +970,109 @@ const CandidateSearchPage: React.FC = () => {
         errorState={errorMessage}
         onErrorStateChange={setErrorMessage}
       />
+
+      {/* Interview Scheduling Dialog */}
+      <Dialog
+        open={interviewDialogOpen}
+        onClose={handleCloseInterviewDialog}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            mx: { xs: 1, sm: 2 },
+          }
+        }}
+      >
+        <DialogTitle>{t('candidateSearch.interviewDialog.title')}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary">
+              {t('candidateSearch.interviewDialog.candidate')}: {candidateForInterview?.filename}
+            </Typography>
+            <Typography variant="subtitle2" color="text.secondary">
+              {t('candidateSearch.interviewDialog.vacancy')}: {candidateForInterview?.vacancyTitle}
+            </Typography>
+          </Box>
+          <Stack spacing={2}>
+            <TextField
+              fullWidth
+              type="date"
+              label={t('candidateSearch.interviewDialog.date')}
+              value={interviewDate}
+              onChange={(e) => setInterviewDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size={isMobile ? 'small' : 'medium'}
+            />
+            <TextField
+              fullWidth
+              type="time"
+              label={t('candidateSearch.interviewDialog.time')}
+              value={interviewTime}
+              onChange={(e) => setInterviewTime(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size={isMobile ? 'small' : 'medium'}
+            />
+            <FormControl fullWidth size={isMobile ? 'small' : 'medium'}>
+              <InputLabel id="interview-type-label">{t('candidateSearch.interviewDialog.type')}</InputLabel>
+              <Select
+                labelId="interview-type-label"
+                value={interviewType}
+                label={t('candidateSearch.interviewDialog.type')}
+                onChange={(e) => setInterviewType(e.target.value)}
+              >
+                <MenuItem value="screening">{t('candidateSearch.interviewDialog.types.screening')}</MenuItem>
+                <MenuItem value="technical">{t('candidateSearch.interviewDialog.types.technical')}</MenuItem>
+                <MenuItem value="onsite">{t('candidateSearch.interviewDialog.types.onsite')}</MenuItem>
+                <MenuItem value="panel">{t('candidateSearch.interviewDialog.types.panel')}</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label={t('candidateSearch.interviewDialog.notes')}
+              value={interviewNotes}
+              onChange={(e) => setInterviewNotes(e.target.value)}
+              placeholder={t('candidateSearch.interviewDialog.notes')}
+              size={isMobile ? 'small' : 'medium'}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: 1, px: 2, pb: 2 }}>
+          <Button
+            onClick={handleCloseInterviewDialog}
+            fullWidth={isMobile}
+            sx={{ minWidth: isMobile ? '100%' : 100 }}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleScheduleInterview}
+            color="success"
+            variant="contained"
+            fullWidth={isMobile}
+            sx={{ minWidth: isMobile ? '100%' : 100 }}
+          >
+            {t('candidateSearch.interviewDialog.confirm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Action Feedback Snackbar */}
+      <Snackbar
+        open={actionFeedback.open}
+        autoHideDuration={4000}
+        onClose={() => setActionFeedback({ ...actionFeedback, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setActionFeedback({ ...actionFeedback, open: false })}
+          severity={actionFeedback.severity}
+          sx={{ width: '100%' }}
+        >
+          {actionFeedback.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

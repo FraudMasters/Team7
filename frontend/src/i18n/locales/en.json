@@ -485,6 +485,37 @@
     "deleteDialog": {
       "title": "Confirm Delete",
       "message": "Are you sure you want to delete this resume? This action cannot be undone."
+    },
+    "quickActions": "Quick Actions",
+    "star": "Star",
+    "unstar": "Unstar",
+    "starredSuccess": "Resume starred successfully",
+    "unstarredSuccess": "Resume unstarred successfully",
+    "email": "Email",
+    "scheduleInterview": "Schedule Interview",
+    "emailSubject": "Regarding your application",
+    "emailBody": "Dear Candidate,\\n\\nWe have reviewed your resume and would like to discuss potential opportunities.\\n\\nBest regards",
+    "emailSent": "Email client opened",
+    "emailError": "Could not open email client",
+    "interviewScheduled": "Interview scheduled successfully",
+    "interviewDialog": {
+      "title": "Schedule Interview",
+      "candidate": "Candidate",
+      "date": "Date",
+      "time": "Time",
+      "type": "Interview Type",
+      "notes": "Notes",
+      "types": {
+        "screening": "Screening Call",
+        "technical": "Technical Interview",
+        "onsite": "On-site Interview",
+        "panel": "Panel Interview"
+      },
+      "confirm": "Schedule",
+      "cancel": "Cancel",
+      "scheduling": "Scheduling...",
+      "success": "Interview scheduled successfully for {{date}} at {{time}}",
+      "error": "Failed to schedule interview"
     }
   },
   "candidateSearch": {
@@ -509,7 +540,39 @@
     },
     "matched": "Matched ({{count}})",
     "missing": "Missing ({{count}})",
-    "keyboardHint": "Use arrow keys to navigate, Enter to view details"
+    "keyboardHint": "Use arrow keys to navigate, Enter to view details",
+    "quickActions": "Quick Actions",
+    "star": "Star",
+    "unstar": "Unstar",
+    "starredSuccess": "Candidate starred successfully",
+    "unstarredSuccess": "Candidate unstarred successfully",
+    "email": "Email",
+    "scheduleInterview": "Schedule Interview",
+    "emailSubject": "Regarding your application for {{vacancy}}",
+    "emailBody": "Dear Candidate,\\n\\nWe have reviewed your resume for the {{vacancy}} position and would like to discuss next steps.\\n\\nBest regards",
+    "emailSent": "Email client opened",
+    "emailError": "Could not open email client",
+    "interviewScheduled": "Interview scheduled successfully",
+    "interviewDialog": {
+      "title": "Schedule Interview",
+      "candidate": "Candidate",
+      "vacancy": "Vacancy",
+      "date": "Date",
+      "time": "Time",
+      "type": "Interview Type",
+      "notes": "Notes",
+      "types": {
+        "screening": "Screening Call",
+        "technical": "Technical Interview",
+        "onsite": "On-site Interview",
+        "panel": "Panel Interview"
+      },
+      "confirm": "Schedule",
+      "cancel": "Cancel",
+      "scheduling": "Scheduling...",
+      "success": "Interview scheduled successfully for {{date}} at {{time}}",
+      "error": "Failed to schedule interview"
+    }
   },
   "analyticsDashboard": {
     "title": "Hiring Analytics",
