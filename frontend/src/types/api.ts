@@ -1579,3 +1579,45 @@ export interface StageDurationResponse {
   stages: StageDurationMetrics[];
 }
 
+// ==================== Candidate Notes Types ====================
+
+/**
+ * Candidate note create request
+ */
+export interface CandidateNoteCreate {
+  resume_id: string;
+  recruiter_id?: string;
+  content: string;
+  is_private?: boolean;
+}
+
+/**
+ * Candidate note update request
+ */
+export interface CandidateNoteUpdate {
+  content?: string;
+  is_private?: boolean;
+}
+
+/**
+ * Candidate note response
+ */
+export interface CandidateNoteResponse {
+  id: string;
+  resume_id: string;
+  recruiter_id: string | null;
+  content: string;
+  is_private: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Candidate note list response
+ */
+export interface CandidateNoteListResponse {
+  resume_id: string;
+  notes: CandidateNoteResponse[];
+  total_count: number;
+}
+
