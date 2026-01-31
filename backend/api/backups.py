@@ -33,10 +33,35 @@ from schemas.backup import (
     BackupVerifyResponse,
     S3Config,
 )
-from services.backup_service import (
-    get_backup_service,
-    format_size,
-)
+
+# Import backup_service - handle both container and local environments
+import sys
+import os
+
+IN_CONTAINER = os.path.exists('/app/backend/services')
+if IN_CONTAINER:
+    if '/app/backend' not in sys.path:
+        sys.path.insert(0, '/app/backend')
+    if '/app' not in sys.path:
+        sys.path.insert(0, '/app')
+
+try:
+    from services.backup_service import (
+        get_backup_service,
+        format_size,
+    )
+except (ImportError, ModuleNotFoundError):
+    try:
+        from backend.services.backup_service import (
+            get_backup_service,
+            format_size,
+        )
+    except (ImportError, ModuleNotFoundError):
+        # Define stubs if service not available
+        def get_backup_service(*args, **kwargs):
+            raise NotImplementedError("backup_service not available")
+        def format_size(size_bytes):
+            return f"{size_bytes} bytes"
 from tasks.backup_tasks import (
     create_backup_task,
     restore_from_backup_task,

@@ -20,7 +20,43 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import get_settings
 from database import async_session_maker
 from models.backup import Backup, BackupConfig, BackupType, BackupStatus
-from services.backup_service import get_backup_service, ensure_backup_dirs
+
+# Import backup_service - handle both container and local environments
+import sys
+import os
+
+# Detect if we're in container environment
+IN_CONTAINER = os.path.exists('/app/backend/services')
+
+if IN_CONTAINER:
+    # In container: /app/backend needs to be in path for "from services." to work
+    if '/app/backend' not in sys.path:
+        sys.path.insert(0, '/app/backend')
+    # Also ensure /app is available for absolute imports
+    if '/app' not in sys.path:
+        sys.path.insert(0, '/app')
+
+try:
+    # Try relative import first (works with /app/backend in path)
+    from services.backup_service import get_backup_service, ensure_backup_dirs
+except (ImportError, ModuleNotFoundError):
+    try:
+        # Try absolute import (works with /app in path)
+        from backend.services.backup_service import get_backup_service, ensure_backup_dirs
+    except (ImportError, ModuleNotFoundError):
+        # Last resort - try without backend prefix
+        try:
+            from tasks.backup_service import get_backup_service, ensure_backup_dirs
+        except (ImportError, ModuleNotFoundError):
+            # Define stubs to allow module to load for testing
+            logger = logging.getLogger(__name__)
+            logger.warning("backup_service not available, backup tasks will be disabled")
+
+            def get_backup_service(*args, **kwargs):
+                raise NotImplementedError("backup_service not available")
+
+            def ensure_backup_dirs():
+                raise NotImplementedError("backup_service not available")
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

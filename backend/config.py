@@ -192,8 +192,18 @@ class Settings(BaseSettings):
     # LLM API Configuration for ATS Simulation
     # ==============================================
     llm_provider: str = Field(
-        default="openai",
-        description="LLM provider to use (openai, anthropic, google)",
+        default="zai",
+        description="LLM provider to use (openai, anthropic, google, zai)",
+    )
+
+    zai_api_key: Optional[str] = Field(
+        default=None,
+        description="Z.ai API key for ATS simulation",
+    )
+
+    zai_base_url: str = Field(
+        default="https://api.z.ai/api/paas/v4",
+        description="Z.ai API base URL",
     )
 
     openai_api_key: Optional[str] = Field(
@@ -212,7 +222,7 @@ class Settings(BaseSettings):
     )
 
     llm_model: str = Field(
-        default="gpt-4o-mini",
+        default="glm-4.7",
         description="Default LLM model for ATS simulation",
     )
 

@@ -33,6 +33,7 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
+    ZAI = "zai"
 
 
 @dataclass
@@ -147,6 +148,8 @@ class ATSSimulator:
         self.max_tokens = settings.llm_max_tokens
 
         # API keys
+        self.zai_api_key = settings.zai_api_key
+        self.zai_base_url = settings.zai_base_url
         self.openai_api_key = settings.openai_api_key
         self.anthropic_api_key = settings.anthropic_api_key
         self.google_api_key = settings.google_api_key
@@ -331,9 +334,60 @@ Important scoring guidelines:
             logger.error(f"Google API call failed: {e}")
             raise
 
+    async def _call_zai(self, prompt: str) -> Dict[str, Any]:
+        """Call Z.ai API for ATS evaluation (OpenAI-compatible)."""
+        try:
+            from openai import AsyncOpenAI
+
+            if not self.zai_api_key:
+                raise ValueError("Z.ai API key not configured")
+
+            client = AsyncOpenAI(
+                api_key=self.zai_api_key,
+                base_url=self.zai_base_url,
+            )
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+
+            content = response.choices[0].message.content
+            logger.info(f"Z.ai API call successful, response length: {len(content)}")
+
+            # Try to extract JSON from response
+            if "```json" in content:
+                json_start = content.find("```json") + 7
+                json_end = content.find("```", json_start)
+                content = content[json_start:json_end].strip()
+            elif "```" in content:
+                json_start = content.find("```") + 3
+                json_end = content.find("```", json_start)
+                content = content[json_start:json_end].strip()
+
+            return json.loads(content)
+
+        except ImportError:
+            logger.error("OpenAI package not installed. Install with: pip install openai")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Z.ai JSON response: {e}")
+            logger.error(f"Response content: {content[:500]}...")
+            raise ValueError(f"Invalid JSON response from Z.ai API: {e}")
+        except Exception as e:
+            logger.error(f"Z.ai API call failed: {e}")
+            raise
+
     async def _call_llm(self, prompt: str) -> Dict[str, Any]:
         """Call the appropriate LLM provider."""
-        if self.provider == LLMProvider.OPENAI:
+        if self.provider == LLMProvider.ZAI:
+            return await self._call_zai(prompt)
+        elif self.provider == LLMProvider.OPENAI:
             return await self._call_openai(prompt)
         elif self.provider == LLMProvider.ANTHROPIC:
             return await self._call_anthropic(prompt)
@@ -705,6 +759,7 @@ def get_ats_simulator() -> Optional[ATSSimulator]:
 
     # Check if any LLM API key is configured
     has_api_key = bool(
+        settings.zai_api_key or
         settings.openai_api_key or
         settings.anthropic_api_key or
         settings.google_api_key

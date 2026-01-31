@@ -12,7 +12,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +50,7 @@ class MatchingWeightsBase(BaseModel):
 
     @field_validator('vector_weight')
     @classmethod
-    def validate_total(cls, v: float, info: Field.ValidationInfo) -> float:
+    def validate_total(cls, v: float, info: ValidationInfo) -> float:
         """Validate that weights sum to approximately 1.0."""
         if info.data:
             keyword = info.data.get('keyword_weight', 0)
