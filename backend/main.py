@@ -261,6 +261,7 @@ from api import (
     backups,
     ats_simulation,
     performance_monitoring,
+    workflow_stages,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -288,6 +289,7 @@ app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Sk
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 app.include_router(ats_simulation.router, prefix="/api/ats", tags=["ATS Simulation"])
 app.include_router(performance_monitoring.router, prefix="/api/performance", tags=["Performance Monitoring"])
+app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=["Workflow Stages"])
 
 
 if __name__ == "__main__":

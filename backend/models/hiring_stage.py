@@ -35,7 +35,8 @@ class HiringStage(Base, UUIDMixin, TimestampMixin):
         id: UUID primary key
         resume_id: Foreign key to Resume
         vacancy_id: Optional foreign key to JobVacancy
-        stage_name: Current hiring stage
+        workflow_stage_config_id: Optional foreign key to WorkflowStageConfig for custom stages
+        stage_name: Current hiring stage (supports custom stages from WorkflowStageConfig)
         notes: Optional notes about this stage transition
         created_at: Timestamp when stage record was created (inherited)
         updated_at: Timestamp when stage record was last updated (inherited)
@@ -49,8 +50,11 @@ class HiringStage(Base, UUIDMixin, TimestampMixin):
     vacancy_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    stage_name: Mapped[HiringStageName] = mapped_column(
-        Enum(HiringStageName), default=HiringStageName.APPLIED, nullable=False, index=True
+    workflow_stage_config_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("workflow_stage_configs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    stage_name: Mapped[str] = mapped_column(
+        String(100), default=HiringStageName.APPLIED.value, nullable=False, index=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

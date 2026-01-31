@@ -100,6 +100,13 @@ import type {
   BatchATSEvaluationResponse,
   ATSConfigResponse,
   ATSResultListResponse,
+  WorkflowStageCreate,
+  WorkflowStageUpdate,
+  WorkflowStageResponse,
+  WorkflowStageListResponse,
+  CandidateListItem,
+  MoveCandidateRequest,
+  MoveCandidateResponse,
 } from '@/types/api';
 
 /**
@@ -1784,6 +1791,258 @@ export class ApiClient {
         { params }
       );
       return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Candidates ====================
+
+  /**
+   * List all candidates (resumes) with their current workflow stages
+   *
+   * @param stageId - Optional filter by workflow stage ID or name
+   * @param vacancyId - Optional filter by vacancy ID
+   * @param skip - Number of records to skip (pagination)
+   * @param limit - Maximum number of records to return
+   * @returns List of candidates with their current stages
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * // Get all candidates
+   * const candidates = await apiClient.listCandidates();
+   *
+   * // Filter by stage
+   * const interviewCandidates = await apiClient.listCandidates('interview');
+   *
+   * // Filter by vacancy
+   * const vacancyCandidates = await apiClient.listCandidates(undefined, 'vacancy-123');
+   * ```
+   */
+  async listCandidates(
+    stageId?: string,
+    vacancyId?: string,
+    skip: number = 0,
+    limit: number = 100
+  ): Promise<CandidateListItem[]> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (stageId) params.stage_id = stageId;
+      if (vacancyId) params.vacancy_id = vacancyId;
+      params.skip = skip;
+      params.limit = limit;
+
+      const response: AxiosResponse<CandidateListItem[]> = await this.client.get(
+        '/api/candidates/',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific candidate's current stage information
+   *
+   * @param candidateId - Resume UUID
+   * @returns Candidate details with current stage
+   * @throws ApiError if not found
+   *
+   * @example
+   * ```ts
+   * const candidate = await apiClient.getCandidate('resume-uuid');
+   * console.log(candidate.current_stage, candidate.stage_name);
+   * ```
+   */
+  async getCandidate(candidateId: string): Promise<CandidateListItem> {
+    try {
+      const response: AxiosResponse<CandidateListItem> = await this.client.get(
+        `/api/candidates/${candidateId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Move a candidate to a different workflow stage
+   *
+   * Creates a new hiring stage record to track the stage transition.
+   * This allows maintaining a complete history of candidate progression.
+   *
+   * @param candidateId - Resume UUID
+   * @param request - Stage movement details (stage_id, optional vacancy_id, optional notes)
+   * @returns New stage information
+   * @throws ApiError if movement fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.moveCandidate('resume-uuid', {
+   *   stage_id: 'interview',
+   *   vacancy_id: 'vacancy-123',
+   *   notes: 'Passed screening'
+   * });
+   * console.log(result.previous_stage, result.new_stage);
+   * ```
+   */
+  async moveCandidate(
+    candidateId: string,
+    request: MoveCandidateRequest
+  ): Promise<MoveCandidateResponse> {
+    try {
+      const response: AxiosResponse<MoveCandidateResponse> = await this.client.put(
+        `/api/candidates/${candidateId}/stage`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Workflow Stages ====================
+
+  /**
+   * Create a workflow stage for an organization
+   *
+   * @param request - Create request with workflow stage details
+   * @returns Created workflow stage
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const stage = await apiClient.createWorkflowStage({
+   *   organization_id: 'org-123',
+   *   stage_name: 'Technical Interview',
+   *   stage_order: 3,
+   *   is_active: true,
+   *   color: '#3B82F6',
+   *   description: 'Technical assessment with engineering team'
+   * });
+   * ```
+   */
+  async createWorkflowStage(request: WorkflowStageCreate): Promise<WorkflowStageResponse> {
+    try {
+      const response: AxiosResponse<WorkflowStageResponse> = await this.client.post(
+        '/api/workflow-stages/',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * List workflow stages with optional filters
+   *
+   * @param organizationId - Optional organization ID filter
+   * @param isActive - Optional active status filter
+   * @param isDefault - Optional default status filter
+   * @returns List of workflow stages
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * // Get all stages for an organization
+   * const stages = await apiClient.listWorkflowStages('org-123');
+   *
+   * // Get only active stages
+   * const activeStages = await apiClient.listWorkflowStages('org-123', true);
+   * ```
+   */
+  async listWorkflowStages(
+    organizationId?: string,
+    isActive?: boolean,
+    isDefault?: boolean
+  ): Promise<WorkflowStageListResponse> {
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (organizationId) params.organization_id = organizationId;
+      if (isActive !== undefined) params.is_active = isActive;
+      if (isDefault !== undefined) params.is_default = isDefault;
+
+      const response: AxiosResponse<WorkflowStageListResponse> = await this.client.get(
+        '/api/workflow-stages/',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a specific workflow stage by ID
+   *
+   * @param stageId - Workflow stage ID
+   * @returns Workflow stage details
+   * @throws ApiError if not found
+   *
+   * @example
+   * ```ts
+   * const stage = await apiClient.getWorkflowStage('stage-uuid');
+   * ```
+   */
+  async getWorkflowStage(stageId: string): Promise<WorkflowStageResponse> {
+    try {
+      const response: AxiosResponse<WorkflowStageResponse> = await this.client.get(
+        `/api/workflow-stages/${stageId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update a workflow stage
+   *
+   * @param stageId - Workflow stage ID
+   * @param request - Update request with fields to modify
+   * @returns Updated workflow stage
+   * @throws ApiError if update fails
+   *
+   * @example
+   * ```ts
+   * const updated = await apiClient.updateWorkflowStage('stage-uuid', {
+   *   stage_name: 'Updated Technical Interview',
+   *   is_active: false
+   * });
+   * ```
+   */
+  async updateWorkflowStage(
+    stageId: string,
+    request: WorkflowStageUpdate
+  ): Promise<WorkflowStageResponse> {
+    try {
+      const response: AxiosResponse<WorkflowStageResponse> = await this.client.put(
+        `/api/workflow-stages/${stageId}`,
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a workflow stage
+   *
+   * @param stageId - Workflow stage ID
+   * @throws ApiError if deletion fails
+   *
+   * @example
+   * ```ts
+   * await apiClient.deleteWorkflowStage('stage-uuid');
+   * ```
+   */
+  async deleteWorkflowStage(stageId: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/workflow-stages/${stageId}`);
     } catch (error) {
       throw this.transformError(error);
     }

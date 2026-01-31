@@ -1403,3 +1403,110 @@ export interface ATSResultListResponse {
   total_count: number;
 }
 
+// ==================== Workflow Stages Types ====================
+
+/**
+ * Workflow stage create request
+ */
+export interface WorkflowStageCreate {
+  organization_id: string;
+  stage_name: string;
+  stage_order: number;
+  is_default?: boolean;
+  is_active?: boolean;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Workflow stage update request
+ */
+export interface WorkflowStageUpdate {
+  stage_name?: string;
+  stage_order?: number;
+  is_default?: boolean;
+  is_active?: boolean;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Workflow stage response
+ */
+export interface WorkflowStageResponse {
+  id: string;
+  organization_id: string;
+  stage_name: string;
+  stage_order: number;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Workflow stage list response
+ */
+export interface WorkflowStageListResponse {
+  organization_id: string;
+  stages: WorkflowStageResponse[];
+  total_count: number;
+}
+
+// ==================== Candidates Types ====================
+
+/**
+ * Candidate list item
+ */
+export interface CandidateListItem {
+  id: string;
+  filename: string;
+  current_stage: string;
+  stage_name: string;
+  vacancy_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  notes: string | null;
+}
+
+/**
+ * Move candidate request
+ */
+export interface MoveCandidateRequest {
+  stage_id: string;
+  vacancy_id?: string;
+  notes?: string;
+}
+
+/**
+ * Move candidate response
+ */
+export interface MoveCandidateResponse {
+  id: string;
+  resume_id: string;
+  previous_stage: string;
+  new_stage: string;
+  message: string;
+}
+
+/**
+ * Stage duration analytics metrics
+ */
+export interface StageDurationMetrics {
+  stage_name: string;
+  average_days: number;
+  median_days: number;
+  min_days: number;
+  max_days: number;
+  candidate_count: number;
+}
+
+/**
+ * Stage duration analytics response
+ */
+export interface StageDurationResponse {
+  stages: StageDurationMetrics[];
+}
+

@@ -6,6 +6,7 @@
 
 export { ApiClient, apiClient } from './client';
 export { skillGap } from './skillGap';
+export { workflowStagesClient, WorkflowStagesClient } from './workflowStages';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -38,4 +39,11 @@ export type {
   ATSConfigResponse,
   ATSResult,
   ATSResultListResponse,
+  WorkflowStageCreate,
+  WorkflowStageUpdate,
+  WorkflowStageResponse,
+  WorkflowStageListResponse,
+  CandidateListItem,
+  MoveCandidateRequest,
+  MoveCandidateResponse,
 } from '@/types/api';

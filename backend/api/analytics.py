@@ -506,3 +506,199 @@ async def get_taxonomy_usage(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve taxonomy usage: {str(e)}",
         ) from e
+
+
+class StageDurationMetrics(BaseModel):
+    """Stage duration analytics metrics."""
+
+    stage_name: str = Field(..., description="Name of the hiring stage")
+    average_days: float = Field(..., description="Average time candidates spend in this stage (days)")
+    median_days: float = Field(..., description="Median time candidates spend in this stage (days)")
+    min_days: float = Field(..., description="Minimum time spent in this stage (days)")
+    max_days: float = Field(..., description="Maximum time spent in this stage (days)")
+    candidate_count: int = Field(..., description="Number of candidates who passed through this stage")
+
+
+class StageDurationResponse(BaseModel):
+    """Response model for stage duration analytics."""
+
+    stages: list[StageDurationMetrics] = Field(..., description="Duration metrics for each hiring stage")
+
+
+@router.get(
+    "/stage-duration",
+    response_model=StageDurationResponse,
+    tags=["Analytics"],
+)
+async def get_stage_duration_metrics(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get stage duration analytics metrics.
+
+    This endpoint provides metrics about how long candidates spend in each hiring stage,
+    helping organizations identify bottlenecks and optimize their recruitment process.
+    Metrics include average, median, min, and max duration for each stage.
+
+    Args:
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with duration metrics for each hiring stage
+
+    Raises:
+        HTTPException(500): If metrics retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/stage-duration")
+        >>> response.json()
+        {
+            "stages": [
+                {
+                    "stage_name": "applied",
+                    "average_days": 2.5,
+                    "median_days": 2.0,
+                    "min_days": 0.5,
+                    "max_days": 7.0,
+                    "candidate_count": 150
+                },
+                {
+                    "stage_name": "screening",
+                    "average_days": 5.2,
+                    "median_days": 4.0,
+                    "min_days": 1.0,
+                    "max_days": 14.0,
+                    "candidate_count": 120
+                }
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching stage duration metrics - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        from sqlalchemy import func
+        from models import HiringStage, WorkflowStageConfig
+        from database import get_db
+
+        stage_metrics = {}
+
+        async for db in get_db():
+            # Get all hiring stages ordered by resume_id and created_at
+            query = select(HiringStage).order_by(HiringStage.resume_id, HiringStage.created_at)
+
+            # Apply date filters if provided
+            if start_date:
+                from datetime import datetime
+                try:
+                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    query = query.where(HiringStage.created_at >= start_dt)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
+                    )
+
+            if end_date:
+                from datetime import datetime
+                try:
+                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    query = query.where(HiringStage.created_at <= end_dt)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
+                    )
+
+            result = await db.execute(query)
+            all_stages = result.scalars().all()
+
+            # Group stages by resume_id and calculate durations
+            from collections import defaultdict
+            resume_stages = defaultdict(list)
+
+            for stage in all_stages:
+                resume_stages[stage.resume_id].append(stage)
+
+            # Calculate duration for each stage transition
+            stage_durations = defaultdict(list)
+
+            for resume_id, stages in resume_stages.items():
+                # Sort by created_at to ensure correct order
+                stages_sorted = sorted(stages, key=lambda x: x.created_at)
+
+                # Calculate time spent in each stage
+                for i in range(len(stages_sorted) - 1):
+                    current_stage = stages_sorted[i]
+                    next_stage = stages_sorted[i + 1]
+
+                    # Calculate duration in days
+                    duration_days = (next_stage.created_at - current_stage.created_at).total_seconds() / 86400
+
+                    # Only include positive durations
+                    if duration_days >= 0:
+                        stage_durations[current_stage.stage_name].append(duration_days)
+
+            # Calculate metrics for each stage
+            import statistics
+
+            stages_list = []
+            for stage_name, durations in stage_durations.items():
+                if durations:  # Only include stages with data
+                    avg_duration = statistics.mean(durations)
+                    median_duration = statistics.median(durations)
+                    min_duration = min(durations)
+                    max_duration = max(durations)
+
+                    stages_list.append({
+                        "stage_name": stage_name,
+                        "average_days": round(avg_duration, 1),
+                        "median_days": round(median_duration, 1),
+                        "min_days": round(min_duration, 1),
+                        "max_days": round(max_duration, 1),
+                        "candidate_count": len(durations),
+                    })
+
+            # Sort by stage order (default stages first, then custom)
+            def stage_sort_key(stage):
+                default_order = {
+                    "applied": 1,
+                    "screening": 2,
+                    "interview": 3,
+                    "technical": 4,
+                    "offer": 5,
+                    "hired": 6,
+                    "rejected": 7,
+                    "withdrawn": 8,
+                }
+                return default_order.get(stage["stage_name"].lower(), 999)
+
+            stages_list.sort(key=stage_sort_key)
+
+            # If no data available, return empty list
+            if not stages_list:
+                logger.info("No stage duration data available")
+                response_data = {"stages": []}
+            else:
+                response_data = {"stages": stages_list}
+
+            logger.info(f"Stage duration metrics retrieved successfully for {len(stages_list)} stages")
+            break
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving stage duration metrics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve stage duration metrics: {str(e)}",
+        ) from e
