@@ -1491,3 +1491,22 @@ export interface MoveCandidateResponse {
   message: string;
 }
 
+/**
+ * Stage duration analytics metrics
+ */
+export interface StageDurationMetrics {
+  stage_name: string;
+  average_days: number;
+  median_days: number;
+  min_days: number;
+  max_days: number;
+  candidate_count: number;
+}
+
+/**
+ * Stage duration analytics response
+ */
+export interface StageDurationResponse {
+  stages: StageDurationMetrics[];
+}
+
