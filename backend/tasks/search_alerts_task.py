@@ -8,11 +8,17 @@ delivery, and alert status tracking.
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from uuid import UUID
 
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
+from database import async_session_maker
+from models import SavedSearch, SearchAlert, Resume, ResumeAnalysis
+from analyzers.unified_matcher import UnifiedSkillMatcher, get_unified_matcher
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -37,8 +43,8 @@ def check_resume_against_saved_searches(
     record for notification.
 
     Task Workflow:
-    1. Retrieve all active saved searches from database
-    2. Compare resume data against each search's criteria
+    1. Retrieve all saved searches from database
+    2. Compare resume data against each search's criteria using UnifiedSkillMatcher
     3. Create SearchAlert records for matching searches
     4. Trigger notification tasks for each alert
 
@@ -76,63 +82,32 @@ def check_resume_against_saved_searches(
         {'resume_id': 'abc-123', 'matches_found': 2, 'alerts_created': 2}
     """
     import time
+    import asyncio
     start_time = time.time()
 
     logger.info(f"Checking resume {resume_id} against saved searches")
 
     try:
-        # In a real implementation, you would:
-        # 1. Query database for all active SavedSearch records
-        # 2. For each saved search, check if resume matches criteria
-        # 3. Create SearchAlert records for matches
-        # 4. Trigger email/notification tasks
-
-        # Placeholder: Simulate checking against saved searches
-        saved_searches = []  # Would query: SavedSearch.query.filter_by(is_active=True).all()
-
-        matches_found = 0
-        alerts_created = []
-        match_details = []
-
-        for search in saved_searches:
-            # Check if resume matches search criteria
-            if _resume_matches_search(resume_data, search.search_criteria):
-                matches_found += 1
-
-                # Create alert (in real implementation, save to database)
-                alert_id = f"alert-{resume_id}-{search.id}"
-                alerts_created.append({
-                    "alert_id": alert_id,
-                    "saved_search_id": str(search.id),
-                    "saved_search_name": search.name,
-                })
-
-                match_details.append({
-                    "saved_search_name": search.name,
-                    "match_score": _calculate_match_score(resume_data, search.search_criteria),
-                    "matched_criteria": _get_matched_criteria(resume_data, search.search_criteria),
-                })
-
-                logger.info(f"Match found: saved search '{search.name}' matches resume {resume_id}")
+        # Run async database operations in a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                _process_saved_searches(resume_id, resume_data)
+            )
+        finally:
+            loop.close()
 
         processing_time = int((time.time() - start_time) * 1000)
 
         logger.info(
-            f"Resume {resume_id} checked against {len(saved_searches)} saved searches: "
-            f"{matches_found} matches found, {len(alerts_created)} alerts created "
+            f"Resume {resume_id} checked against {result['total_searches_checked']} saved searches: "
+            f"{result['matches_found']} matches found, {result['alerts_created']} alerts created "
             f"in {processing_time}ms"
         )
 
-        return {
-            "resume_id": resume_id,
-            "status": "completed",
-            "total_searches_checked": len(saved_searches),
-            "matches_found": matches_found,
-            "alerts_created": len(alerts_created),
-            "alert_ids": [a["alert_id"] for a in alerts_created],
-            "processing_time_ms": processing_time,
-            "match_details": match_details,
-        }
+        result["processing_time_ms"] = processing_time
+        return result
 
     except SoftTimeLimitExceeded:
         logger.error(f"Search alert check timed out for resume_id={resume_id}")
@@ -384,39 +359,317 @@ def process_pending_alerts(
         }
 
 
-# Helper functions (would be implemented with actual matching logic)
+async def _process_saved_searches(
+    resume_id: str,
+    resume_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Process saved searches and create alerts for matches (async).
+
+    Args:
+        resume_id: UUID of the resume to check
+        resume_data: Dictionary containing resume information
+
+    Returns:
+        Dictionary with processing results
+    """
+    async with async_session_maker() as db:
+        # Query all saved searches
+        stmt = select(SavedSearch)
+        result = await db.execute(stmt)
+        saved_searches = result.scalars().all()
+
+        matches_found = 0
+        alerts_created = []
+        match_details = []
+
+        # Get unified matcher instance
+        matcher = get_unified_matcher()
+
+        # Check resume against each saved search
+        for search in saved_searches:
+            match_result = await _check_resume_against_search(
+                db=db,
+                resume_id=resume_id,
+                resume_data=resume_data,
+                saved_search=search,
+                matcher=matcher,
+            )
+
+            if match_result["matched"]:
+                matches_found += 1
+
+                # Create SearchAlert record
+                alert = SearchAlert(
+                    saved_search_id=search.id,
+                    resume_id=UUID(resume_id),
+                    is_sent=False,
+                )
+                db.add(alert)
+                await db.flush()
+
+                alerts_created.append({
+                    "alert_id": str(alert.id),
+                    "saved_search_id": str(search.id),
+                    "saved_search_name": search.name,
+                })
+
+                match_details.append({
+                    "saved_search_name": search.name,
+                    "match_score": match_result["match_score"],
+                    "matched_criteria": match_result["matched_criteria"],
+                })
+
+                logger.info(
+                    f"Match found: saved search '{search.name}' matches resume {resume_id} "
+                    f"with score {match_result['match_score']}"
+                )
+
+        # Commit all alerts to database
+        await db.commit()
+
+        return {
+            "resume_id": resume_id,
+            "status": "completed",
+            "total_searches_checked": len(saved_searches),
+            "matches_found": matches_found,
+            "alerts_created": len(alerts_created),
+            "alert_ids": [a["alert_id"] for a in alerts_created],
+            "match_details": match_details,
+        }
+
+
+async def _check_resume_against_search(
+    db: AsyncSession,
+    resume_id: str,
+    resume_data: Dict[str, Any],
+    saved_search: SavedSearch,
+    matcher: UnifiedSkillMatcher,
+) -> Dict[str, Any]:
+    """
+    Check if a resume matches a specific saved search.
+
+    Args:
+        db: Database session
+        resume_id: UUID of the resume
+        resume_data: Dictionary containing resume information
+        saved_search: SavedSearch instance
+        matcher: UnifiedSkillMatcher instance
+
+    Returns:
+        Dictionary with:
+        - matched: bool indicating if resume matches search
+        - match_score: int 0-100 indicating match strength
+        - matched_criteria: list of criteria that matched
+    """
+    filters = saved_search.filters or {}
+    matched_criteria = []
+    total_score = 0
+    max_score = 0
+
+    # 1. Skills matching (highest priority - 60% of score)
+    required_skills = filters.get("skills", [])
+    if required_skills:
+        max_score += 60
+        resume_skills = resume_data.get("skills", [])
+
+        if resume_skills:
+            # Use unified matcher for skill matching
+            match_result = matcher.match(
+                resume_text=resume_data.get("raw_text", ""),
+                resume_skills=resume_skills,
+                job_title="Saved Search: " + saved_search.name,
+                job_description=saved_search.query,
+                required_skills=required_skills,
+            )
+
+            skills_score = int(match_result.overall_score * 60)
+            total_score += skills_score
+
+            if skills_score >= 30:  # At least 50% of skills portion
+                matched_criteria.append("skills")
+
+    # 2. Experience years matching (medium priority - 20% of score)
+    min_experience = filters.get("min_experience_years")
+    max_experience = filters.get("max_experience_years")
+    resume_experience = resume_data.get("experience_years", 0)
+
+    if min_experience is not None or max_experience is not None:
+        max_score += 20
+        experience_match = True
+
+        if min_experience is not None and resume_experience < min_experience:
+            experience_match = False
+        if max_experience is not None and resume_experience > max_experience:
+            experience_match = False
+
+        if experience_match:
+            total_score += 20
+            matched_criteria.append("experience")
+
+    # 3. Location matching (low priority - 10% of score)
+    location_filter = filters.get("location")
+    if location_filter:
+        max_score += 10
+        resume_location = resume_data.get("location", "")
+
+        if resume_location and location_filter.lower() in resume_location.lower():
+            total_score += 10
+            matched_criteria.append("location")
+
+    # 4. Education level matching (low priority - 10% of score)
+    education_filter = filters.get("education_level")
+    if education_filter:
+        max_score += 10
+        resume_education = resume_data.get("education", "")
+
+        if resume_education:
+            # Simple matching - could be enhanced with education level hierarchy
+            if education_filter.lower() in str(resume_education).lower():
+                total_score += 10
+                matched_criteria.append("education")
+
+    # Normalize score to 0-100
+    final_score = int((total_score / max_score * 100) if max_score > 0 else 0)
+
+    # Consider it a match if score >= 50% and at least one criterion matched
+    matched = final_score >= 50 and len(matched_criteria) > 0
+
+    return {
+        "matched": matched,
+        "match_score": final_score,
+        "matched_criteria": matched_criteria,
+    }
+
+
+# Legacy helper functions kept for compatibility
 
 def _resume_matches_search(resume_data: Dict[str, Any], search_criteria: Dict[str, Any]) -> bool:
     """
-    Check if a resume matches saved search criteria.
+    Check if a resume matches saved search criteria (legacy sync version).
 
-    This is a placeholder function. In a real implementation, this would
-    compare resume data against search criteria with proper matching logic.
+    Note: This is a simplified sync version for backward compatibility.
+    The actual matching is done by async _check_resume_against_search.
     """
-    # Placeholder: Always return False
-    # Real implementation would compare skills, experience, location, etc.
-    return False
+    # Check skills
+    required_skills = search_criteria.get("skills", [])
+    resume_skills = resume_data.get("skills", [])
+
+    if required_skills:
+        skill_match = any(
+            skill.lower() in [rs.lower() for rs in resume_skills]
+            for skill in required_skills
+        )
+        if not skill_match:
+            return False
+
+    # Check experience
+    min_experience = search_criteria.get("min_experience_years")
+    max_experience = search_criteria.get("max_experience_years")
+    resume_experience = resume_data.get("experience_years", 0)
+
+    if min_experience is not None and resume_experience < min_experience:
+        return False
+    if max_experience is not None and resume_experience > max_experience:
+        return False
+
+    return True
 
 
 def _calculate_match_score(resume_data: Dict[str, Any], search_criteria: Dict[str, Any]) -> int:
     """
-    Calculate match score between resume and search criteria.
+    Calculate match score between resume and search criteria (legacy sync version).
 
-    This is a placeholder function. In a real implementation, this would
-    return a score from 0-100 indicating how well the resume matches.
+    Returns a score from 0-100 indicating how well the resume matches.
     """
-    # Placeholder: Return 0
-    # Real implementation would calculate based on matching skills, experience, etc.
-    return 0
+    score = 0
+    max_score = 100
+
+    # Skills (60 points)
+    required_skills = search_criteria.get("skills", [])
+    resume_skills = resume_data.get("skills", [])
+
+    if required_skills and resume_skills:
+        matched_skills = sum(
+            1 for skill in required_skills
+            if skill.lower() in [rs.lower() for rs in resume_skills]
+        )
+        score += int((matched_skills / len(required_skills)) * 60)
+
+    # Experience (20 points)
+    min_experience = search_criteria.get("min_experience_years")
+    max_experience = search_criteria.get("max_experience_years")
+    resume_experience = resume_data.get("experience_years", 0)
+
+    if min_experience is not None or max_experience is not None:
+        experience_match = True
+        if min_experience is not None and resume_experience < min_experience:
+            experience_match = False
+        if max_experience is not None and resume_experience > max_experience:
+            experience_match = False
+
+        if experience_match:
+            score += 20
+
+    # Location (10 points)
+    location_filter = search_criteria.get("location")
+    if location_filter and resume_data.get("location"):
+        if location_filter.lower() in resume_data.get("location", "").lower():
+            score += 10
+
+    # Education (10 points)
+    education_filter = search_criteria.get("education_level")
+    if education_filter and resume_data.get("education"):
+        if education_filter.lower() in str(resume_data.get("education", "")).lower():
+            score += 10
+
+    return min(score, max_score)
 
 
 def _get_matched_criteria(resume_data: Dict[str, Any], search_criteria: Dict[str, Any]) -> List[str]:
     """
-    Get list of criteria that matched between resume and search.
+    Get list of criteria that matched between resume and search (legacy sync version).
 
-    This is a placeholder function. In a real implementation, this would
-    return a list of specific criteria that matched (e.g., ['skills', 'location']).
+    Returns a list of specific criteria that matched (e.g., ['skills', 'location']).
     """
-    # Placeholder: Return empty list
-    # Real implementation would return list of matched field names
-    return []
+    matched = []
+
+    # Check skills
+    required_skills = search_criteria.get("skills", [])
+    resume_skills = resume_data.get("skills", [])
+
+    if required_skills and resume_skills:
+        if any(
+            skill.lower() in [rs.lower() for rs in resume_skills]
+            for skill in required_skills
+        ):
+            matched.append("skills")
+
+    # Check experience
+    min_experience = search_criteria.get("min_experience_years")
+    max_experience = search_criteria.get("max_experience_years")
+    resume_experience = resume_data.get("experience_years", 0)
+
+    if min_experience is not None or max_experience is not None:
+        experience_match = True
+        if min_experience is not None and resume_experience < min_experience:
+            experience_match = False
+        if max_experience is not None and resume_experience > max_experience:
+            experience_match = False
+
+        if experience_match:
+            matched.append("experience")
+
+    # Check location
+    location_filter = search_criteria.get("location")
+    if location_filter and resume_data.get("location"):
+        if location_filter.lower() in resume_data.get("location", "").lower():
+            matched.append("location")
+
+    # Check education
+    education_filter = search_criteria.get("education_level")
+    if education_filter and resume_data.get("education"):
+        if education_filter.lower() in str(resume_data.get("education", "")).lower():
+            matched.append("education")
+
+    return matched
