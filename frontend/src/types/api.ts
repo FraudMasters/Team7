@@ -1455,6 +1455,75 @@ export interface WorkflowStageListResponse {
   total_count: number;
 }
 
+// ==================== Candidate Tags Types ====================
+
+/**
+ * Candidate tag create request
+ */
+export interface CandidateTagCreate {
+  organization_id: string;
+  tag_name: string;
+  tag_order?: number;
+  is_default?: boolean;
+  is_active?: boolean;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Candidate tag update request
+ */
+export interface CandidateTagUpdate {
+  tag_name?: string;
+  tag_order?: number;
+  is_default?: boolean;
+  is_active?: boolean;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Candidate tag response
+ */
+export interface CandidateTagResponse {
+  id: string;
+  organization_id: string;
+  tag_name: string;
+  tag_order: number;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Candidate tag list response
+ */
+export interface CandidateTagListResponse {
+  organization_id: string;
+  tags: CandidateTagResponse[];
+  total_count: number;
+}
+
+/**
+ * Assign tag request
+ */
+export interface AssignTagRequest {
+  tag_id: string;
+  recruiter_id?: string;
+}
+
+/**
+ * Candidate tags response (tags assigned to a resume)
+ */
+export interface CandidateTagsResponse {
+  resume_id: string;
+  tags: CandidateTagResponse[];
+  total_count: number;
+}
+
 // ==================== Candidates Types ====================
 
 /**

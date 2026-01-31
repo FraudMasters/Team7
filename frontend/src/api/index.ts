@@ -7,6 +7,7 @@
 export { ApiClient, apiClient } from './client';
 export { skillGap } from './skillGap';
 export { workflowStagesClient, WorkflowStagesClient } from './workflowStages';
+export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -43,6 +44,12 @@ export type {
   WorkflowStageUpdate,
   WorkflowStageResponse,
   WorkflowStageListResponse,
+  CandidateTagCreate,
+  CandidateTagUpdate,
+  CandidateTagResponse,
+  CandidateTagListResponse,
+  AssignTagRequest,
+  CandidateTagsResponse,
   CandidateListItem,
   MoveCandidateRequest,
   MoveCandidateResponse,
