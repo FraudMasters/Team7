@@ -57,7 +57,8 @@
     "dashboard": "Dashboard",
     "manageVacancies": "Manage Vacancies",
     "resumeDatabase": "Resume Database",
-    "searchCandidates": "Search Candidates"
+    "searchCandidates": "Search Candidates",
+    "skillGapAnalysis": "Skill Gap Analysis"
   },
   "footer": {
     "copyright": "{{year}} TEAM7. AI-powered resume analysis platform."
@@ -597,5 +598,88 @@
         "description": "See which vacancies fit your profile best"
       }
     }
+  },
+  "skillGap": {
+    "title": "Skill Gap Analysis",
+    "subtitle": "Analyze skill gaps between candidates and job requirements with personalized learning recommendations",
+    "resumeId": "Resume ID",
+    "vacancyTitle": "Job Title",
+    "description": "Job Description",
+    "descriptionPlaceholder": "Describe the role, responsibilities, and requirements...",
+    "requiredSkills": "Required Skills",
+    "skillsPlaceholder": "Type a skill and press Enter...",
+    "skillLevels": "Required Skill Levels (optional)",
+    "experienceYears": "Required Experience (Years)",
+    "analyze": "Analyze Skill Gaps",
+    "analyzing": "Analyzing...",
+    "reset": "Reset",
+    "loadSample": "Load Sample Data",
+    "matchedSkills": "Matched Skills",
+    "missingSkills": "Missing Skills",
+    "partialSkills": "Partial Match Skills",
+    "recommendedOrder": "Recommended Learning Order",
+    "severityTitle": "Skill Gap: {{severity}}",
+    "summaryMessage": "{{match}}% of required skills matched. {{missing}} skills missing.",
+    "matchPercentage": "Skill Match",
+    "bridgeability": "Bridgeability",
+    "timeToBridge": "Time to Bridge",
+    "gapSeverity": "Gap Severity",
+    "processingTime": "Analysis completed in {{ms}}ms",
+    "severity": {
+      "critical": "Critical",
+      "moderate": "Moderate",
+      "minimal": "Minimal",
+      "none": "None"
+    },
+    "level": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced",
+      "expert": "Expert"
+    },
+    "daysCount": "{{count}} days",
+    "weeksCount": "{{count}} weeks",
+    "monthsCount": "{{count}} months",
+    "errors": {
+      "incomplete": "Please fill in all required fields.",
+      "analysisFailed": "Analysis failed. Please try again."
+    },
+    "tabs": {
+      "analysis": "Analysis",
+      "recommendations": "Recommendations"
+    },
+    "recommendationsTitle": "Learning Recommendations",
+    "filter": {
+      "all": "All",
+      "freeOnly": "Free Only",
+      "paid": "Paid"
+    },
+    "sort": {
+      "priority": "Priority",
+      "duration": "Duration",
+      "cost": "Cost"
+    },
+    "totalResources": "Total Resources",
+    "freeResources": "Free Resources",
+    "totalCost": "Total Cost (Paid)",
+    "totalDuration": "Total Duration",
+    "certificationsAvailable": "Certifications available for: {{skills}}",
+    "noRecommendations": "No recommendations match the current filters.",
+    "resourceType": {
+      "course": "Course",
+      "certification": "Certification",
+      "book": "Book",
+      "tutorial": "Tutorial",
+      "video": "Video",
+      "bootcamp": "Bootcamp",
+      "workshop": "Workshop",
+      "other": "Other"
+    },
+    "offersCertificate": "Offers Certificate",
+    "provider": "Provider",
+    "free": "Free",
+    "relevance": "Relevance",
+    "quality": "Quality",
+    "viewResource": "View"
   }
 }

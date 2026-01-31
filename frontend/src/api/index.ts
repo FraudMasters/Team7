@@ -5,6 +5,7 @@
  */
 
 export { ApiClient, apiClient } from './client';
+export { skillGap } from './skillGap';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -23,4 +24,10 @@ export type {
   HealthResponse,
   UploadProgressCallback,
   ApiClientConfig,
+  SkillGapAnalysisRequest,
+  SkillGapAnalysisResponse,
+  LearningRecommendationsRequest,
+  LearningRecommendationsResponse,
+  LearningResource,
+  MissingSkillDetail,
 } from '@/types/api';

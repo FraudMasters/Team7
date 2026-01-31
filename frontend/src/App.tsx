@@ -16,6 +16,7 @@ import ApplicationsPage from '@pages/Applications';
 import ResumeDatabasePage from '@pages/ResumeDatabase';
 import CandidateSearchPage from '@pages/CandidateSearch';
 import RecruiterDashboardPage from '@pages/RecruiterDashboard';
+import SkillGapAnalysisPage from '@pages/SkillGapAnalysis';
 import IndustryTaxonomyManager from '@components/IndustryTaxonomyManager';
 import TaxonomyAnalytics from '@components/TaxonomyAnalytics';
 import PublicTaxonomyBrowser from '@components/PublicTaxonomyBrowser';
@@ -61,6 +62,7 @@ function App() {
             <Route path="resumes" element={<ResumeDatabasePage />} />
             <Route path="search" element={<CandidateSearchPage />} />
             <Route path="analytics" element={<AnalyticsDashboardPage />} />
+            <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
           </Route>
 
           {/* Admin pages */}

@@ -848,3 +848,149 @@ export interface SkillSuggestionResponse {
   suggestions: SkillSuggestionItem[];
   total_count: number;
 }
+
+// ==================== Skill Gap Analysis Types ====================
+
+/**
+ * Missing skill detail
+ */
+export interface MissingSkillDetail {
+  status: 'missing' | 'partial';
+  required_level: string;
+  importance: 'high' | 'medium' | 'low';
+  category: string;
+}
+
+/**
+ * Skill gap analysis request
+ */
+export interface SkillGapAnalysisRequest {
+  resume_id: string;
+  vacancy_data: {
+    id: string;
+    title: string;
+    description?: string;
+    required_skills: string[];
+    required_skill_levels?: Record<string, string>;
+    required_experience_years?: number;
+    required_education?: string[];
+  };
+}
+
+/**
+ * Skill gap analysis response
+ */
+export interface SkillGapAnalysisResponse {
+  report_id: string;
+  resume_id: string;
+  vacancy_id: string | null;
+  vacancy_title: string;
+  candidate_skills: string[];
+  required_skills: string[];
+  matched_skills: string[];
+  missing_skills: string[];
+  partial_match_skills: string[];
+  missing_skill_details: Record<string, MissingSkillDetail>;
+  gap_severity: 'critical' | 'moderate' | 'minimal' | 'none';
+  gap_percentage: number;
+  bridgeability_score: number;
+  estimated_time_to_bridge: number;
+  priority_ordering: string[];
+  processing_time_ms: number;
+}
+
+/**
+ * Learning resource item
+ */
+export interface LearningResource {
+  id?: string;
+  skill: string;
+  resource_type: 'course' | 'certification' | 'book' | 'tutorial' | 'video' | 'bootcamp' | 'workshop' | 'other';
+  title: string;
+  description: string;
+  provider?: string;
+  url?: string;
+  skill_level?: string;
+  topics_covered?: string[];
+  prerequisites?: string[];
+  language?: string;
+  is_self_paced: boolean;
+  duration_hours?: number;
+  duration_weeks?: number;
+  cost_amount?: number;
+  currency?: string;
+  access_type: 'free' | 'paid' | 'subscription' | 'freemium';
+  rating?: number;
+  rating_count?: number;
+  certificate_offered: boolean;
+  difficulty_level?: number;
+  relevance_score: number;
+  quality_score: number;
+  priority_score: number;
+}
+
+/**
+ * Learning recommendations request
+ */
+export interface LearningRecommendationsRequest {
+  skills: string[];
+  skill_levels?: Record<string, string>;
+  max_recommendations_per_skill?: number;
+  max_cost_per_resource?: number | null;
+  include_free_resources?: boolean;
+  min_rating?: number;
+  preferred_languages?: string[];
+}
+
+/**
+ * Learning recommendations response
+ */
+export interface LearningRecommendationsResponse {
+  target_skills: string[];
+  recommendations: Record<string, LearningResource[]>;
+  total_recommendations: number;
+  total_cost: number;
+  total_duration_hours: number;
+  alternative_free_resources: number;
+  skills_with_certifications: string[];
+  priority_ordering: string[];
+  summary: string;
+}
+
+/**
+ * Skill gap report list response
+ */
+export interface SkillGapReportListResponse {
+  reports: Array<{
+    id: string;
+    resume_id: string;
+    vacancy_id: string;
+    created_at: string;
+    gap_severity: string;
+    gap_percentage: number;
+  }>;
+  total_count: number;
+}
+
+/**
+ * Learning resources query params
+ */
+export interface LearningResourcesQuery {
+  skill?: string;
+  resource_type?: string;
+  skill_level?: string;
+  access_type?: string;
+  min_rating?: number;
+  max_cost?: number;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Learning resources list response
+ */
+export interface LearningResourcesListResponse {
+  resources: LearningResource[];
+  total_count: number;
+  filters_applied: Record<string, unknown>;
+}

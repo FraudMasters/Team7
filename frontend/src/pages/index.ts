@@ -18,3 +18,4 @@ export { default as ApplicationsPage } from './Applications';
 export { default as ResumeDatabasePage } from './ResumeDatabase';
 export { default as CandidateSearchPage } from './CandidateSearch';
 export { default as RecruiterDashboardPage } from './RecruiterDashboard';
+export { default as SkillGapAnalysisPage } from './SkillGapAnalysis';
