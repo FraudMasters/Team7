@@ -6,18 +6,22 @@ This module provides endpoints for:
 - Filtering candidates by skills, experience, education, location, languages
 - Range filters for experience years, match score, and date ranges
 - Sorting by relevance, date, or experience
+- Search history tracking and retrieval
 
 Leverages PostgreSQL full-text search for fast, flexible queries.
 """
 import logging
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from models import SearchHistory
 from services.search_service import SearchService, SearchFilters, get_search_service
 
 logger = logging.getLogger(__name__)
@@ -82,6 +86,27 @@ class SearchResponse(BaseModel):
     execution_time_seconds: float = Field(..., description="Time taken to execute search")
     skip: int = Field(..., description="Number of results skipped")
     limit: int = Field(..., description="Maximum number of results returned")
+
+
+class SearchHistoryItem(BaseModel):
+    """Single search history item."""
+
+    id: str = Field(..., description="Search history UUID")
+    query: Optional[str] = Field(None, description="Search query that was executed")
+    filters: Dict[str, Any] = Field(default_factory=dict, description="Filters that were applied")
+    results_count: Optional[int] = Field(None, description="Number of results returned")
+    execution_time_seconds: Optional[float] = Field(None, description="Time taken to execute search")
+    created_at: str = Field(..., description="Timestamp when search was performed")
+    recruiter_id: Optional[str] = Field(None, description="ID of recruiter who performed the search")
+
+
+class SearchHistoryResponse(BaseModel):
+    """Response model for search history."""
+
+    total: int = Field(..., description="Total number of search history records")
+    history: List[SearchHistoryItem] = Field(..., description="List of search history items")
+    skip: int = Field(..., description="Number of records skipped")
+    limit: int = Field(..., description="Maximum number of records returned")
 
 
 @router.post(
@@ -379,4 +404,117 @@ async def search_candidates_get(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/history",
+    response_model=SearchHistoryResponse,
+    tags=["Search"],
+)
+async def get_search_history(
+    request: Request,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of records to return"),
+    recruiter_id: Optional[str] = Query(None, description="Filter by recruiter ID"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Retrieve search history with pagination.
+
+    This endpoint returns a paginated list of previously executed searches,
+    including the query, filters, results count, and execution time.
+    Useful for reviewing and repeating previous searches.
+
+    Args:
+        request: FastAPI request object
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        recruiter_id: Optional filter to show only searches by a specific recruiter
+        db: Database session
+
+    Returns:
+        JSON response with search history records and pagination metadata
+
+    Raises:
+        HTTPException(400): If recruiter_id format is invalid
+        HTTPException(500): If history retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> # Get recent search history
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/search/history",
+        ...     params={"limit": 20}
+        ... )
+        >>> # Get history for a specific recruiter
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/search/history",
+        ...     params={
+        ...         "recruiter_id": "recruiter-uuid",
+        ...         "limit": 50
+        ...     }
+        ... )
+    """
+    try:
+        logger.info(f"Fetching search history - skip: {skip}, limit: {limit}, recruiter_id: {recruiter_id}")
+
+        # Build query
+        query = select(SearchHistory).order_by(desc(SearchHistory.created_at))
+
+        # Apply recruiter filter if provided
+        if recruiter_id:
+            try:
+                recruiter_uuid = UUID(recruiter_id)
+                query = query.where(SearchHistory.recruiter_id == recruiter_uuid)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid recruiter_id format",
+                )
+
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar_one() or 0
+
+        # Apply pagination
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        history_items = result.scalars().all()
+
+        # Convert to response format
+        history_data = []
+        for item in history_items:
+            history_data.append(
+                {
+                    "id": str(item.id),
+                    "query": item.query,
+                    "filters": item.filters or {},
+                    "results_count": item.results_count,
+                    "execution_time_seconds": item.execution_time_seconds,
+                    "created_at": item.created_at.isoformat(),
+                    "recruiter_id": str(item.recruiter_id) if item.recruiter_id else None,
+                }
+            )
+
+        logger.info(f"Retrieved {len(history_data)} search history records (total: {total})")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total": total,
+                "history": history_data,
+                "skip": skip,
+                "limit": limit,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching search history: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch search history: {str(e)}",
         ) from e

@@ -29,6 +29,9 @@ from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
 from .ats_result import ATSResult
+from .saved_search import SavedSearch
+from .search_alert import SearchAlert
+from .search_history import SearchHistory
 
 __all__ = [
     "Base",
@@ -67,4 +70,7 @@ __all__ = [
     "BackupType",
     "BackupStatus",
     "ATSResult",
+    "SavedSearch",
+    "SearchAlert",
+    "SearchHistory",
 ]
