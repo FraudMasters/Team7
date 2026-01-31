@@ -11,6 +11,14 @@ import {
   TextField,
   InputAdornment,
   Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Divider,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   DragDropContext,
@@ -20,8 +28,16 @@ import {
 } from '@hello-pangea/dnd';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
+import {
+  Search as SearchIcon,
+  ExpandMore as ExpandMoreIcon,
+  Close as CloseIcon,
+  Notes as NotesIcon,
+  History as HistoryIcon,
+} from '@mui/icons-material';
 import CandidateTags from './CandidateTags';
+import CandidateNotes from './CandidateNotes';
+import CandidateActivityTimeline from './CandidateActivityTimeline';
 import type {
   WorkflowStageResponse,
   CandidateListItem,
@@ -44,6 +60,9 @@ const WorkflowKanban: React.FC = () => {
   const [movingCandidate, setMovingCandidate] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateListItem | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [modalTabValue, setModalTabValue] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -175,6 +194,21 @@ const WorkflowKanban: React.FC = () => {
       ...prev,
       [candidateId]: !prev[candidateId],
     }));
+  }, []);
+
+  const handleOpenCandidateDetail = useCallback((candidate: CandidateListItem) => {
+    setSelectedCandidate(candidate);
+    setDetailModalOpen(true);
+    setModalTabValue(0);
+  }, []);
+
+  const handleCloseDetailModal = useCallback(() => {
+    setDetailModalOpen(false);
+    setSelectedCandidate(null);
+  }, []);
+
+  const handleModalTabChange = useCallback((_event: React.SyntheticEvent, newValue: number) => {
+    setModalTabValue(newValue);
   }, []);
 
   return (
@@ -311,15 +345,26 @@ const WorkflowKanban: React.FC = () => {
                                     </Typography>
                                   )}
                                 </Box>
-                                <ExpandMoreIcon
-                                  sx={{
-                                    fontSize: 18,
-                                    color: 'text.secondary',
-                                    transform: expandedCards[candidate.id] ? 'rotate(180deg)' : 'rotate(0deg)',
-                                    transition: 'transform 0.2s',
-                                    ml: 1,
-                                  }}
-                                />
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Chip
+                                    label="Details"
+                                    size="small"
+                                    clickable
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenCandidateDetail(candidate);
+                                    }}
+                                    sx={{ height: 20, fontSize: '0.65rem' }}
+                                  />
+                                  <ExpandMoreIcon
+                                    sx={{
+                                      fontSize: 18,
+                                      color: 'text.secondary',
+                                      transform: expandedCards[candidate.id] ? 'rotate(180deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.2s',
+                                    }}
+                                  />
+                                </Box>
                               </Box>
 
                               {candidate.vacancy_id && (
@@ -403,6 +448,110 @@ const WorkflowKanban: React.FC = () => {
           ))}
         </Box>
       </DragDropContext>
+
+      {/* Candidate Detail Modal */}
+      <Dialog
+        open={detailModalOpen}
+        onClose={handleCloseDetailModal}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: { height: '80vh', maxHeight: '80vh' },
+        }}
+      >
+        {selectedCandidate && (
+          <>
+            {/* Modal Header */}
+            <DialogTitle sx={{ pb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    {selectedCandidate.filename}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Stage: {selectedCandidate.stage_name}
+                    </Typography>
+                    {selectedCandidate.vacancy_id && (
+                      <Chip
+                        label="Linked to vacancy"
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: '0.65rem' }}
+                      />
+                    )}
+                  </Box>
+                </Box>
+                <Button
+                  startIcon={<CloseIcon />}
+                  onClick={handleCloseDetailModal}
+                  color="inherit"
+                >
+                  Close
+                </Button>
+              </Box>
+            </DialogTitle>
+
+            <Divider />
+
+            {/* Modal Tabs */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs value={modalTabValue} onChange={handleModalTabChange}>
+                <Tab
+                  icon={<NotesIcon />}
+                  label="Notes"
+                  iconPosition="start"
+                />
+                <Tab
+                  icon={<HistoryIcon />}
+                  label="Activity Timeline"
+                  iconPosition="start"
+                />
+              </Tabs>
+            </Box>
+
+            {/* Modal Content */}
+            <DialogContent sx={{ p: 0, height: 'calc(80vh - 180px)', overflow: 'auto' }}>
+              {modalTabValue === 0 && (
+                <Box sx={{ p: 3 }}>
+                  <CandidateNotes
+                    resumeId={selectedCandidate.id}
+                    onNotesChange={() => {
+                      // Refresh data after notes change
+                      fetchData();
+                    }}
+                  />
+                </Box>
+              )}
+
+              {modalTabValue === 1 && (
+                <Box sx={{ p: 3 }}>
+                  <CandidateActivityTimeline
+                    resumeId={selectedCandidate.id}
+                    vacancyId={selectedCandidate.vacancy_id || undefined}
+                    limit={50}
+                  />
+                </Box>
+              )}
+            </DialogContent>
+
+            <Divider />
+
+            {/* Modal Footer */}
+            <DialogActions sx={{ p: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                {selectedCandidate.tags.length > 0 && (
+                  <>
+                    Tags:{' '}
+                    {selectedCandidate.tags.map((tag) => tag.tag_name).join(', ')}
+                  </>
+                )}
+              </Typography>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 };
