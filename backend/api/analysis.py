@@ -23,6 +23,7 @@ from analyzers import (
     check_grammar_resume,
     calculate_total_experience,
     format_experience_summary,
+    extract_work_experience,
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
@@ -317,15 +318,20 @@ async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSO
         )
 
         # Handle different return formats from extractors
-        # HF extractor returns: single_words, keyphrases, all_keywords
+        # HF extractor returns: single_words, keyphrases, all_keywords (as tuples with scores)
         # Old format returns: keywords, keyphrases, scores
         if "single_words" in keywords_result:
             # HF format - convert to expected format
             single_words = keywords_result.get("single_words", [])
-            keywords_list = [word[0] if isinstance(word, list) else word for word in single_words]
+            keywords_list = [word[0] if isinstance(word, (list, tuple)) else word for word in single_words]
+
+            # Keyphrases are also tuples (phrase, score) - extract just the phrases
+            keyphrases_raw = keywords_result.get("keyphrases", [])
+            keyphrases_list = [kp[0] if isinstance(kp, (list, tuple)) else kp for kp in keyphrases_raw]
+
             keyword_analysis = KeywordAnalysis(
                 keywords=keywords_list,
-                keyphrases=keywords_result.get("keyphrases", []),
+                keyphrases=keyphrases_list,
                 scores=[],  # Scores not available in this format
             )
         else:
@@ -386,23 +392,88 @@ async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSO
                 logger.warning(f"Grammar checking failed: {e}")
                 # Continue without grammar results rather than failing the entire analysis
 
-        # Step 7: Experience calculation (optional, requires structured data)
+        # Step 7: Experience extraction (optional)
         experience_analysis = None
         if request.extract_experience:
-            logger.info("Calculating experience...")
+            logger.info("Extracting work experience...")
             try:
-                # Note: Experience calculation requires structured experience data
-                # For now, we'll return a placeholder since we don't have parsed experience
-                # This will be implemented when we have resume parsing logic
+                # Use the experience extractor to parse structured experience from resume text
+                experience_result = extract_work_experience(
+                    resume_text, language=language, min_confidence=0.2
+                )
+
+                if experience_result.get("experiences"):
+                    # Convert extracted experiences to response format
+                    experience_entries = []
+                    for exp in experience_result.get("experiences", []):
+                        # Calculate duration in months
+                        start_str = exp.get("start")
+                        end_str = exp.get("end")
+                        duration_months = 0
+
+                        if start_str:
+                            from datetime import datetime
+                            try:
+                                start_date = datetime.fromisoformat(start_str)
+                                end_date = datetime.fromisoformat(end_str) if end_str else datetime.now()
+                                # Calculate months difference
+                                months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+                                duration_months = max(0, months)
+                            except:
+                                pass
+
+                        experience_entries.append(
+                            ExperienceEntry(
+                                company=exp.get("company") or "Unknown",
+                                position=exp.get("title") or "Unknown",
+                                start_date=exp.get("start") or "",
+                                end_date=exp.get("end"),
+                                duration_months=duration_months,
+                            )
+                        )
+
+                    # Calculate totals
+                    total_months = sum(e.duration_months for e in experience_entries)
+                    total_years = round(total_months / 12, 1) if total_months > 0 else 0
+
+                    # Format summary
+                    years = int(total_months // 12)
+                    months = total_months % 12
+                    if years > 0 and months > 0:
+                        formatted = f"{years} years {months} months"
+                    elif years > 0:
+                        formatted = f"{years} years"
+                    elif months > 0:
+                        formatted = f"{months} months"
+                    else:
+                        formatted = "No experience data"
+
+                    experience_analysis = ExperienceAnalysis(
+                        total_months=total_months,
+                        total_years=total_years,
+                        total_years_formatted=formatted,
+                        entries=experience_entries,
+                    )
+
+                    logger.info(f"Extracted {len(experience_entries)} work experience entries")
+                else:
+                    # No experiences found
+                    experience_analysis = ExperienceAnalysis(
+                        total_months=0,
+                        total_years=0.0,
+                        total_years_formatted="No work experience found",
+                        entries=[],
+                    )
+
+            except Exception as e:
+                logger.warning(f"Experience extraction failed: {e}", exc_info=True)
+                # Return empty experience analysis on failure
                 experience_analysis = ExperienceAnalysis(
                     total_months=0,
                     total_years=0.0,
-                    total_years_formatted="Experience calculation requires parsed resume data",
+                    total_years_formatted="Experience extraction failed",
                     entries=[],
                 )
-            except Exception as e:
-                logger.warning(f"Experience calculation failed: {e}")
-                # Continue without experience results
 
         # Calculate processing time
         processing_time_ms = (time.time() - start_time) * 1000

@@ -35,18 +35,52 @@ _EXPERIENCE_SECTION_REGEX = re.compile(
 )
 
 # Patterns for date ranges in experience entries
+# IMPORTANT: More specific patterns must come BEFORE less specific ones
+# e.g., MM/YYYY before YYYY to avoid matching just the year
 _DATE_RANGE_PATTERNS = [
-    r"(\d{4})\s+(?:–|-|to|—)\s+(\d{4}|present|current|now)",  # YYYY - YYYY
-    r"(\d{4})\s{2,}(\d{4}|present|current|now)",  # YYYY  YYYY (space-separated)
-    r"(\d{4})\s+(?:–|-|to|—)\s+(\d{4}|present|current|now)",  # YYYY - YYYY
-    r"(\d{1,2}/\d{4})\s*(?:–|-|to|—)\s*(\d{1,2}/\d{4}|present|current|now)",  # MM/YYYY - MM/YYYY
-    r"(\d{4}-\d{2})\s*(?:–|-|to|—)\s*(\d{4}-\d{2}|present|current|now)",  # YYYY-MM - YYYY-MM
+    # English formats - more specific first
     r"(\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4})\s*(?:–|-|to|—)\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}|present|current|now)",
     r"(\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})\s*(?:–|-|to|—)\s*((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}|present|current|now)",
+    r"(\d{4}-\d{2})\s*(?:–|-|to|—)\s*(\d{4}-\d{2}|present|current|now)",  # YYYY-MM - YYYY-MM
+    r"(\d{1,2}/\d{4})\s*(?:–|-|to|—)\s*(\d{1,2}/\d{4}|present|current|now)",  # MM/YYYY - MM/YYYY
+    r"(\d{4})\s{2,}(\d{4}|present|current|now)",  # YYYY  YYYY (double space, no dash)
+    r"(\d{4})\s*(?:–|-|to|—)\s*(\d{4}|present|current|now)",  # YYYY - YYYY
+
+    # Russian formats - more specific first
+    r"(\d{1,2}\.\d{4})\s*(?:–|-|—)\s*(\d{1,2}\.\d{4}|по настоящее время|настоящее|сейчас)",  # MM.YYYY - MM.YYYY (Russian)
+    r"(?:с|по)\s+(\d{1,2})\s+(?:мес\.|месяцев)\.?\s*(\d{4})",  # с 5 мес. 2021 (since X months YYYY)
+    r"(\d{4})\s{2,}(\d{4}|по настоящее время|настоящее|сейчас)",  # YYYY  YYYY (Russian)
+    r"(\d{4})\s*(?:–|-|—)\s*(\d{4}|по настоящее время|настоящее|сейчас)",  # YYYY - YYYY (Russian)
 ]
 
 _DATE_RANGE_REGEX = re.compile(
     "|".join(_DATE_RANGE_PATTERNS),
+    re.IGNORECASE
+)
+
+# Patterns for detecting inline experience lines (date + title + company on same line)
+_INLINE_EXPERIENCE_PATTERNS = [
+    # YYYY  now/present/current Title, Company (location)
+    r"^(\d{4})\s{2,}(now|present|current|настоящ|сейчас)\s+(.+?),\s*([^,(]+?)(?:\s*\(|$)",
+    # YYYY - YYYY/present/current Title, Company (location)
+    r"^(\d{4})\s*(?:–|-|—)\s*(\d{4}|now|present|current|настоящ)\s+(.+?),\s*([^,(]+?)(?:\s*\(|$)",
+    # MM/YYYY - MM/YYYY Title, Company
+    r"^(\d{1,2}/\d{4})\s*(?:–|-|—)\s*(\d{1,2}/\d{4}|now|present|current)\s+(.+?),\s*([^,(]+?)(?:\s*\(|$)",
+    # Russian: MM.YYYY - MM.YYYY Title, Company
+    r"^(\d{1,2}\.\d{4})\s*(?:–|-|—)\s*(\d{1,2}\.\d{4}|по настоящее время|настоящее|сейчас)\s+(.+?),\s*([^,(]+?)(?:\s*\(|$)",
+    # YYYY  YYYY (double space) Title, Company
+    r"^(\d{4})\s{2,}(\d{4})\s+(.+?),\s*([^,(]+?)(?:\s*\(|$)",
+]
+
+_INLINE_EXPERIENCE_REGEX = re.compile(
+    "|".join(_INLINE_EXPERIENCE_PATTERNS),
+    re.IGNORECASE
+)
+
+# Pattern to extract title and company from a line after date
+# Matches: "Title, Company (location)" or "Title, Company"
+_TITLE_COMPANY_PATTERN = re.compile(
+    r"^(.+?),\s*([^,(]+?)(?:\s*\(|$)",
     re.IGNORECASE
 )
 
@@ -150,11 +184,12 @@ def _parse_experience_date(date_str: Optional[str]) -> Optional[str]:
     Parse various date formats into ISO format (YYYY-MM-DD).
 
     Supports formats:
-    - MM/YYYY
-    - YYYY-MM
-    - Month YYYY (e.g., "May 2020")
+    - MM/YYYY, MM.YYYY (Russian)
+    - YYYY-MM, YYYY
+    - Month YYYY (e.g., "May 2020", "Май 2020")
     - YYYY
-    - "Present", "Current" (returns None)
+    - "Present", "Current", "Now" (returns None)
+    - Russian: "по настоящее время", "настоящее", "сейчас"
 
     Args:
         date_str: Date string to parse
@@ -169,25 +204,52 @@ def _parse_experience_date(date_str: Optional[str]) -> Optional[str]:
         '2020-05-01'
         >>> _parse_experience_date("present")
         None
+        >>> _parse_experience_date("сейчас")
+        None
     """
     if not date_str or not isinstance(date_str, str):
         return None
 
     date_str = date_str.strip()
 
-    # Check for current/present indicators
-    if re.match(r"^(present|current|now|сейчас|настоящее|по настоящее время)$", date_str, re.IGNORECASE):
+    # Check for current/present indicators (English and Russian)
+    current_indicators = [
+        "present", "current", "now",
+        "сейчас", "настоящее", "по настоящее время",  # Russian
+        "по сей день",  # Russian alternative
+    ]
+    current_regex = "|".join(map(re.escape, current_indicators))
+    if re.match(f"^({current_regex})$", date_str, re.IGNORECASE):
         return None
 
-    # List of date formats to try
+    # Remove common Russian suffixes
+    date_str = re.sub(r"\s+г\.$", "", date_str)  # Remove " г." at end
+
+    # List of date formats to try (English and Russian)
     formats = [
         "%Y-%m-%d",  # 2023-02-01
-        "%Y-%m",  # 2023-02
-        "%m/%Y",  # 02/2023
-        "%m.%Y",  # 02.2023
-        "%b %Y",  # Feb 2023
-        "%B %Y",  # February 2023
-        "%Y",  # 2023
+        "%Y-%m",    # 2023-02
+        "%m/%Y",    # 02/2023
+        "%m.%Y",    # 02.2023 (Russian)
+        "%b %Y",    # Feb 2023
+        "%B %Y",    # February 2023
+        "%Y",        # 2023
+    ]
+
+    # Russian month names (all lowercase prefixes for matching)
+    ru_months = [
+        ("январ", "January"),
+        ("феврал", "February"),
+        ("март", "March"),
+        ("апрел", "April"),
+        ("май", "May"),
+        ("июн", "June"),
+        ("июл", "July"),
+        ("август", "August"),
+        ("сентяб", "September"),
+        ("октяб", "October"),
+        ("нояб", "November"),
+        ("декаб", "December"),
     ]
 
     for fmt in formats:
@@ -195,6 +257,15 @@ def _parse_experience_date(date_str: Optional[str]) -> Optional[str]:
             parsed_date = datetime.strptime(date_str, fmt)
             return parsed_date.strftime("%Y-%m-%d")
         except ValueError:
+            # Try Russian month names
+            for ru_month, en_month in ru_months:
+                if ru_month.lower() in date_str.lower():
+                    try:
+                        translated = date_str.lower().replace(ru_month.lower(), en_month.lower())
+                        parsed_date = datetime.strptime(translated, fmt)
+                        return parsed_date.strftime("%Y-%m-%d")
+                    except ValueError:
+                        continue
             continue
 
     logger.warning(f"Unable to parse date: {date_str}")
@@ -216,7 +287,10 @@ def _extract_date_range(text: str) -> Optional[Dict[str, Optional[str]]]:
         return None
 
     # Extract the two date groups
-    groups = match.groups()
+    # Since we have multiple patterns combined with |, groups are at different positions
+    # We need to filter out None values to get the actual captured groups
+    groups = [g for g in match.groups() if g is not None]
+
     if len(groups) >= 2:
         start_date = _parse_experience_date(groups[0])
         end_date = _parse_experience_date(groups[1])
@@ -320,6 +394,11 @@ def _extract_experience_entries(
     """
     Extract individual experience entries from an experience section.
 
+    Handles multiple resume formats:
+    - Inline: "2021  now Full-Stack Developer, Inetex (Rehovot, Israel)"
+    - Multi-line: Date on one line, title/company on next lines
+    - Russian formats: "2019  2021 Java Developer, Company"
+
     Args:
         section_text: Text of a work experience section
         nlp: SpaCy NLP model
@@ -339,19 +418,51 @@ def _extract_experience_entries(
         if not line:
             # Empty line might indicate end of an entry
             if current_entry:
-                # Finalize description
                 if description_lines:
                     current_entry["description"] = " ".join(description_lines).strip()
-
-                # Only add if we have some basic info
                 if current_entry.get("company") or current_entry.get("title"):
                     entries.append(current_entry)
-
                 current_entry = {}
                 description_lines = []
             continue
 
-        # Check for date range (likely start of new entry)
+        # First, try to match inline experience patterns (date + title + company on same line)
+        inline_match = _INLINE_EXPERIENCE_REGEX.search(line)
+        if inline_match:
+            # Save previous entry if exists
+            if current_entry:
+                if description_lines:
+                    current_entry["description"] = " ".join(description_lines).strip()
+                if current_entry.get("company") or current_entry.get("title"):
+                    entries.append(current_entry)
+
+            # Extract groups from the match
+            # Since we have multiple patterns combined with |, groups are at different positions
+            # We need to filter out None values to get the actual captured groups
+            groups = [g for g in inline_match.groups() if g is not None]
+
+            start_date = None
+            end_date = None
+            title = None
+            company = None
+
+            if len(groups) >= 4:
+                # First two groups are dates, third is title, fourth is company
+                start_date = _parse_experience_date(groups[0])
+                end_date = _parse_experience_date(groups[1])
+                title = groups[2].strip() if groups[2] else None
+                company = groups[3].strip() if groups[3] else None
+
+            current_entry = {
+                "start": start_date,
+                "end": end_date,
+                "title": title,
+                "company": company,
+            }
+            description_lines = []
+            continue
+
+        # Check for date range (might be start of new entry)
         date_range = _extract_date_range(line)
 
         if date_range:
@@ -362,15 +473,30 @@ def _extract_experience_entries(
                 if current_entry.get("company") or current_entry.get("title"):
                     entries.append(current_entry)
 
-            # Start new entry
+            # Start new entry with dates
             current_entry = {
                 "start": date_range["start"],
                 "end": date_range["end"],
             }
             description_lines = []
 
-            # Try to extract company/title from this line
-            # Use NER to identify organizations
+            # Try to extract title/company from the same line after dates
+            # Remove the date part from the line
+            date_match = _DATE_RANGE_REGEX.search(line)
+            if date_match:
+                after_date = line[date_match.end():].strip()
+
+                # Try title/company pattern
+                title_company_match = _TITLE_COMPANY_PATTERN.search(after_date)
+                if title_company_match:
+                    potential_title = title_company_match.group(1).strip()
+                    potential_company = title_company_match.group(2).strip()
+                    if len(potential_title) > 2 and len(potential_company) > 2:
+                        current_entry["title"] = potential_title
+                        current_entry["company"] = potential_company
+                        continue
+
+            # Use NER to identify organizations if inline pattern failed
             doc = nlp(line)
             orgs = [ent.text for ent in doc.ents if ent.label_ == "ORG"]
             if orgs:
@@ -392,6 +518,17 @@ def _extract_experience_entries(
                         # Continue to next line (don't process as ORG/description)
                         continue
 
+            # Check for "Title, Company" pattern
+            if ", " in line and not current_entry.get("company") and not current_entry.get("title"):
+                title_company_match = _TITLE_COMPANY_PATTERN.search(line)
+                if title_company_match:
+                    potential_title = title_company_match.group(1).strip()
+                    potential_company = title_company_match.group(2).strip()
+                    if len(potential_title) > 2 and len(potential_company) > 2:
+                        current_entry["title"] = potential_title
+                        current_entry["company"] = potential_company
+                        continue
+
             # Check for organization entities
             orgs = [ent.text for ent in doc.ents if ent.label_ == "ORG"]
 
@@ -405,8 +542,14 @@ def _extract_experience_entries(
                     current_entry["title"] = line_without_org
             elif not current_entry.get("title") and not current_entry.get("company"):
                 # No company yet, this might be a title line
-                # Look for common title patterns
-                if any(word in line.lower() for word in ["senior", "junior", "lead", "manager", "engineer", "developer", "director", "analyst", "specialist"]):
+                # Look for common title patterns (English and Russian)
+                title_keywords = [
+                    "senior", "junior", "lead", "manager", "engineer", "developer",
+                    "director", "analyst", "specialist", "consultant", "architect",
+                    "старший", "младший", "руководитель", "менеджер", "разработчик",
+                    "директор", "аналитик", "специалист", "консультант", "архитектор",
+                ]
+                if any(word in line.lower() for word in title_keywords):
                     current_entry["title"] = line
                 else:
                     # Treat as description or company/title combo
