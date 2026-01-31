@@ -65,6 +65,7 @@ async def list_candidates(
     request: Request,
     stage_id: Optional[str] = None,
     vacancy_id: Optional[str] = None,
+    search: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
@@ -73,12 +74,13 @@ async def list_candidates(
     List all candidates (resumes) with their current workflow stages.
 
     Returns a paginated list of candidates with their current hiring stage.
-    Can be filtered by stage and vacancy for kanban board views.
+    Can be filtered by stage, vacancy, and search term for kanban board views.
 
     Args:
         request: FastAPI request object
         stage_id: Optional filter by workflow stage ID or name
         vacancy_id: Optional filter by vacancy ID
+        search: Optional search term to filter candidates by filename (case-insensitive)
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
         db: Database session
@@ -95,12 +97,16 @@ async def list_candidates(
         >>> response = requests.get("http://localhost:8000/api/candidates/")
         >>> # Filter by stage
         >>> response = requests.get("http://localhost:8000/api/candidates/?stage_id=interview")
+        >>> # Search by name
+        >>> response = requests.get("http://localhost:8000/api/candidates/?search=john")
+        >>> # Combine filters
+        >>> response = requests.get("http://localhost:8000/api/candidates/?stage_id=interview&search=smith")
         >>> candidates = response.json()
     """
     try:
         logger.info(
             f"Fetching candidates - stage_id: {stage_id}, vacancy_id: {vacancy_id}, "
-            f"skip: {skip}, limit: {limit}"
+            f"search: {search}, skip: {skip}, limit: {limit}"
         )
 
         # Build base query joining resumes with their latest hiring stage
@@ -151,6 +157,10 @@ async def list_candidates(
                 query = query.where(HiringStage.vacancy_id == vacancy_uuid)
             except ValueError:
                 logger.warning(f"Invalid vacancy_id format: {vacancy_id}")
+
+        if search:
+            # Case-insensitive search on filename
+            query = query.where(Resume.filename.ilike(f"%{search}%"))
 
         # Order by most recently updated
         query = query.order_by(HiringStage.updated_at.desc()).offset(skip).limit(limit)

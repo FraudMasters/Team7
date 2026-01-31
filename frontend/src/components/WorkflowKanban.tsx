@@ -8,6 +8,8 @@ import {
   CardContent,
   Chip,
   Alert,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
   DragDropContext,
@@ -17,6 +19,7 @@ import {
 } from '@hello-pangea/dnd';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { Search as SearchIcon } from '@mui/icons-material';
 import type {
   WorkflowStageResponse,
   CandidateListItem,
@@ -37,6 +40,7 @@ const WorkflowKanban: React.FC = () => {
   const [candidatesByStage, setCandidatesByStage] = useState<Record<string, CandidateListItem[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [movingCandidate, setMovingCandidate] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -52,9 +56,12 @@ const WorkflowKanban: React.FC = () => {
       setStages(sortedStages);
 
       // Fetch candidates for each stage in parallel
-      const candidatesPromises = sortedStages.map((stage) =>
-        axios.get<CandidateListItem[]>(`/api/candidates/?stage_id=${stage.id}`)
-      );
+      const candidatesPromises = sortedStages.map((stage) => {
+        const url = searchTerm
+          ? `/api/candidates/?stage_id=${stage.id}&search=${encodeURIComponent(searchTerm)}`
+          : `/api/candidates/?stage_id=${stage.id}`;
+        return axios.get<CandidateListItem[]>(url);
+      });
 
       const candidatesResponses = await Promise.all(candidatesPromises);
 
@@ -74,7 +81,7 @@ const WorkflowKanban: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, searchTerm]);
 
   const handleDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -163,10 +170,24 @@ const WorkflowKanban: React.FC = () => {
   return (
     <Box>
       {/* Kanban Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5" fontWeight={600}>
           {t('workflow.title')}
         </Typography>
+        <TextField
+          size="small"
+          placeholder="Search candidates..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ minWidth: 250 }}
+        />
       </Box>
 
       {/* Kanban Board */}
