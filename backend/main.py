@@ -264,6 +264,7 @@ from api import (
     workflow_stages,
     candidate_tags,
     candidate_notes,
+    candidate_activities,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -294,6 +295,7 @@ app.include_router(performance_monitoring.router, prefix="/api/performance", tag
 app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=["Workflow Stages"])
 app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["Candidate Tags"])
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
+app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 
 
 if __name__ == "__main__":
