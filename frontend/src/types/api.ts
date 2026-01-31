@@ -1621,3 +1621,39 @@ export interface CandidateNoteListResponse {
   total_count: number;
 }
 
+// ==================== Candidate Activities Types ====================
+
+/**
+ * Single activity item in the timeline
+ */
+export interface ActivityItem {
+  id: string;
+  activity_type: string;
+  candidate_id: string;
+  vacancy_id: string | null;
+  from_stage: string | null;
+  to_stage: string | null;
+  note_id: string | null;
+  tag_id: string | null;
+  recruiter_id: string | null;
+  activity_data: Record<string, unknown> | null;
+  reason: string | null;
+  created_at: string;
+}
+
+/**
+ * Response model for candidate activity timeline
+ */
+export interface ActivityTimelineResponse {
+  resume_id: string;
+  activities: ActivityItem[];
+  total_count: number;
+}
+
+/**
+ * Response model for available activity types
+ */
+export interface ActivityTypesResponse {
+  activity_types: string[];
+}
+

@@ -9,6 +9,7 @@ export { skillGap } from './skillGap';
 export { workflowStagesClient, WorkflowStagesClient } from './workflowStages';
 export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
 export { candidateNotesClient, CandidateNotesClient } from './candidateNotes';
+export { candidateActivitiesClient, CandidateActivitiesClient } from './candidateActivities';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -58,4 +59,7 @@ export type {
   CandidateListItem,
   MoveCandidateRequest,
   MoveCandidateResponse,
+  ActivityItem,
+  ActivityTimelineResponse,
+  ActivityTypesResponse,
 } from '@/types/api';
