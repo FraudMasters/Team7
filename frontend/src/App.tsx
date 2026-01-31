@@ -16,6 +16,7 @@ import ApplicationsPage from '@pages/Applications';
 import ResumeDatabasePage from '@pages/ResumeDatabase';
 import CandidateSearchPage from '@pages/CandidateSearch';
 import RecruiterDashboardPage from '@pages/RecruiterDashboard';
+import WorkflowBoardPage from '@pages/WorkflowBoard';
 import SkillGapAnalysisPage from '@pages/SkillGapAnalysis';
 import WeightCustomizationPage from '@pages/WeightCustomization';
 import IndustryTaxonomyManager from '@components/IndustryTaxonomyManager';
@@ -63,6 +64,7 @@ function App() {
             </Route>
             <Route path="resumes" element={<ResumeDatabasePage />} />
             <Route path="search" element={<CandidateSearchPage />} />
+            <Route path="workflow" element={<WorkflowBoardPage />} />
             <Route path="analytics" element={<AnalyticsDashboardPage />} />
             <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
             <Route path="weights" element={<WeightCustomizationPage />} />
