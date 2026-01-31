@@ -1,5 +1,5 @@
-import React, { ReactNode, useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import React, { ReactNode, useState, useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AppBar,
@@ -18,6 +18,13 @@ import {
   ListItemIcon,
   Divider,
   Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
 } from '@mui/material';
 import {
   Description as ResumeIcon,
@@ -34,6 +41,9 @@ import {
   Close as CloseIcon,
   ExpandLess,
   ExpandMore as ExpandMoreArrow,
+  Keyboard as KeyboardIcon,
+  Search as SearchIcon,
+  Home as HomeIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
@@ -52,6 +62,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [jobSeekerAnchorEl, setJobSeekerAnchorEl] = useState<null | HTMLElement>(null);
   const [recruiterAnchorEl, setRecruiterAnchorEl] = useState<null | HTMLElement>(null);
   const [adminAnchorEl, setAdminAnchorEl] = useState<null | HTMLElement>(null);
@@ -59,10 +70,42 @@ const Layout: React.FC<LayoutProps> = () => {
   const [mobileJobSeekerOpen, setMobileJobSeekerOpen] = useState(false);
   const [mobileRecruiterOpen, setMobileRecruiterOpen] = useState(false);
   const [mobileAdminOpen, setMobileAdminOpen] = useState(false);
+  const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false);
 
   const jobSeekerMenuOpen = Boolean(jobSeekerAnchorEl);
   const recruiterMenuOpen = Boolean(recruiterAnchorEl);
   const adminMenuOpen = Boolean(adminAnchorEl);
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+K or Cmd+K - Focus search or navigate to search page
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault();
+        navigate('/recruiter/search');
+      }
+
+      // Ctrl+/ or Cmd+/ - Show keyboard shortcuts
+      if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+        event.preventDefault();
+        setShortcutsDialogOpen(true);
+      }
+
+      // Alt+Home - Navigate to home
+      if (event.altKey && event.key === 'Home') {
+        event.preventDefault();
+        navigate('/');
+      }
+
+      // Escape - Close shortcuts dialog
+      if (event.key === 'Escape' && shortcutsDialogOpen) {
+        setShortcutsDialogOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate, shortcutsDialogOpen]);
 
   // Job Seeker Module menu items
   const jobSeekerItems = [
@@ -215,6 +258,76 @@ const Layout: React.FC<LayoutProps> = () => {
         <ThemeSwitcher />
       </Box>
     </Box>
+  );
+
+  // Keyboard shortcuts dialog
+  const shortcutsDialog = (
+    <Dialog
+      open={shortcutsDialogOpen}
+      onClose={() => setShortcutsDialogOpen(false)}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <KeyboardIcon />
+          <Typography variant="h6">{t('keyboardShortcuts.title')}</Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell component="th" scope="row">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <kbd>Ctrl</kbd> + <kbd>K</kbd>
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SearchIcon fontSize="small" />
+                  <Typography variant="body2">{t('keyboardShortcuts.search')}</Typography>
+                </Box>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell component="th" scope="row">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <kbd>Ctrl</kbd> + <kbd>/</kbd>
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <KeyboardIcon fontSize="small" />
+                  <Typography variant="body2">{t('keyboardShortcuts.showShortcuts')}</Typography>
+                </Box>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell component="th" scope="row">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <kbd>Alt</kbd> + <kbd>Home</kbd>
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <HomeIcon fontSize="small" />
+                  <Typography variant="body2">{t('keyboardShortcuts.goHome')}</Typography>
+                </Box>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell component="th" scope="row">
+                <kbd>Esc</kbd>
+              </TableCell>
+              <TableCell>
+                <Typography variant="body2">{t('keyboardShortcuts.closeDialog')}</Typography>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </DialogContent>
+    </Dialog>
   );
 
   return (
@@ -442,6 +555,7 @@ const Layout: React.FC<LayoutProps> = () => {
       </Box>
     </Box>
       )}
+      {shortcutsDialog}
     </ResponsiveWrapper>
   );
 };

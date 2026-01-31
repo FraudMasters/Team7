@@ -864,5 +864,12 @@
       "exited": "exited",
       "tip": "💡 Drag and drop candidate cards to move them between stages. Click on candidates to view details, notes, and activity history."
     }
+  },
+  "keyboardShortcuts": {
+    "title": "Keyboard Shortcuts",
+    "search": "Focus search or navigate to search",
+    "showShortcuts": "Show this dialog",
+    "goHome": "Go to home page",
+    "closeDialog": "Close dialog"
   }
 }
