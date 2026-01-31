@@ -18,13 +18,6 @@ import {
   ListItemIcon,
   Divider,
   Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
 } from '@mui/material';
 import {
   Description as ResumeIcon,
@@ -41,13 +34,11 @@ import {
   Close as CloseIcon,
   ExpandLess,
   ExpandMore as ExpandMoreArrow,
-  Keyboard as KeyboardIcon,
-  Search as SearchIcon,
-  Home as HomeIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 import ResponsiveWrapper from './ResponsiveWrapper';
+import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 
 /**
  * Layout Component
@@ -258,76 +249,6 @@ const Layout: React.FC<LayoutProps> = () => {
         <ThemeSwitcher />
       </Box>
     </Box>
-  );
-
-  // Keyboard shortcuts dialog
-  const shortcutsDialog = (
-    <Dialog
-      open={shortcutsDialogOpen}
-      onClose={() => setShortcutsDialogOpen(false)}
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <KeyboardIcon />
-          <Typography variant="h6">{t('keyboardShortcuts.title')}</Typography>
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell component="th" scope="row">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <kbd>Ctrl</kbd> + <kbd>K</kbd>
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <SearchIcon fontSize="small" />
-                  <Typography variant="body2">{t('keyboardShortcuts.search')}</Typography>
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <kbd>Ctrl</kbd> + <kbd>/</kbd>
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <KeyboardIcon fontSize="small" />
-                  <Typography variant="body2">{t('keyboardShortcuts.showShortcuts')}</Typography>
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <kbd>Alt</kbd> + <kbd>Home</kbd>
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <HomeIcon fontSize="small" />
-                  <Typography variant="body2">{t('keyboardShortcuts.goHome')}</Typography>
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row">
-                <kbd>Esc</kbd>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">{t('keyboardShortcuts.closeDialog')}</Typography>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </DialogContent>
-    </Dialog>
   );
 
   return (
@@ -555,7 +476,10 @@ const Layout: React.FC<LayoutProps> = () => {
       </Box>
     </Box>
       )}
-      {shortcutsDialog}
+      <KeyboardShortcutsHelp
+        open={shortcutsDialogOpen}
+        onClose={() => setShortcutsDialogOpen(false)}
+      />
     </ResponsiveWrapper>
   );
 };
