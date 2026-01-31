@@ -786,5 +786,18 @@
     "available": "Available Tags",
     "noAvailable": "No available tags",
     "maxReached": "Maximum {{max}} tags reached"
+  },
+  "activityTimeline": {
+    "title": "Activity Timeline",
+    "subtitle": "{{count}} activities recorded",
+    "forVacancy": "for vacancy",
+    "filteredBy": "• Filtered by: {{type}}",
+    "loading": "Loading activity timeline...",
+    "loadingHint": "This may take a few moments",
+    "errorTitle": "Failed to Load Activity Timeline",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "noActivitiesTitle": "No Activity Recorded",
+    "noActivities": "No activities found for this candidate. Activities will appear here as the candidate moves through the hiring pipeline."
   }
 }

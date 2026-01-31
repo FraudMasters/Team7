@@ -26,3 +26,4 @@ export { default as UnifiedMatchMetrics } from './UnifiedMatchMetrics';
 export { ATSEvaluation, ATSScoreBadge } from './ATSEvaluation';
 export { default as CandidateTags } from './CandidateTags';
 export { default as CandidateNotes } from './CandidateNotes';
+export { default as CandidateActivityTimeline } from './CandidateActivityTimeline';
