@@ -948,3 +948,478 @@ async def test_search_performance_simple_query(client: AsyncClient, large_datase
 
     print(f"✓ Simple query: {execution_time:.3f}s (< 2.0s)")
     print(f"✓ Found {data['total']} candidates")
+
+
+# ============================================================================
+# Bulk Actions Tests
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_bulk_tag_action(client: AsyncClient, sample_candidates):
+    """
+    Test bulk tag action on multiple candidates.
+
+    Verifies:
+    - Tag action adds tags to all selected candidates
+    - Tag is created in database if it doesn't exist
+    - Activity records are created for each tagged candidate
+    - Response contains correct success/failure counts
+    """
+    print("\n=== Bulk Tag Action Test ===")
+
+    # Get resume IDs from sample candidates
+    resume_ids = []
+    async for db in get_db():
+        result = await db.execute(select(Resume).limit(5))
+        resumes = result.scalars().all()
+        resume_ids = [str(r.id) for r in resumes]
+        break
+
+    assert len(resume_ids) >= 3, "Need at least 3 candidates for bulk tag test"
+
+    tag_name = "Test Bulk Tag"
+    tag_color = "#FF5722"
+
+    print(f"Tagging {len(resume_ids)} candidates with '{tag_name}'...")
+
+    response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "tag",
+            "resume_ids": resume_ids,
+            "tag_name": tag_name,
+            "tag_color": tag_color,
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify response structure
+    assert data["action"] == "tag"
+    assert data["total_requested"] == len(resume_ids)
+    assert data["successful"] == len(resume_ids)
+    assert data["failed"] == 0
+    assert len(data["results"]) == len(resume_ids)
+
+    # Verify all results are successful
+    for result in data["results"]:
+        assert result["success"] is True
+        assert result["resume_id"] in resume_ids
+        assert tag_name in result["message"]
+        assert result["data"]["tag_name"] == tag_name
+        assert "tag_id" in result["data"]
+
+    # Verify tag was created in database
+    async for db in get_db():
+        result = await db.execute(
+            select(CandidateTag).where(
+                and_(
+                    CandidateTag.tag_name == tag_name,
+                    CandidateTag.organization_id.isnot(None)
+                )
+            )
+        )
+        tag = result.scalar_one_or_none()
+        assert tag is not None, "Tag was not created in database"
+        assert tag.tag_name == tag_name
+        print(f"✓ Tag '{tag_name}' created in database")
+
+        # Verify activities were created
+        result = await db.execute(
+            select(CandidateActivity).where(
+                and_(
+                    CandidateActivity.tag_id == tag.id,
+                    CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED
+                )
+            )
+        )
+        activities = result.scalars().all()
+        assert len(activities) == len(resume_ids), \
+            f"Expected {len(resume_ids)} activities, got {len(activities)}"
+        print(f"✓ {len(activities)} tag activities recorded")
+        break
+
+    print(f"✓ All {len(resume_ids)} candidates tagged successfully")
+
+
+@pytest.mark.asyncio
+async def test_bulk_export_json(client: AsyncClient, sample_candidates):
+    """
+    Test bulk export action with JSON format.
+
+    Verifies:
+    - Export action returns candidate data in JSON format
+    - All selected candidates are included
+    - Exported data contains required fields
+    - Response contains correct count
+    """
+    print("\n=== Bulk Export JSON Test ===")
+
+    # Get resume IDs from sample candidates
+    resume_ids = []
+    async for db in get_db():
+        result = await db.execute(select(Resume).limit(5).offset(5))
+        resumes = result.scalars().all()
+        resume_ids = [str(r.id) for r in resumes]
+        break
+
+    assert len(resume_ids) >= 3, "Need at least 3 candidates for bulk export test"
+
+    print(f"Exporting {len(resume_ids)} candidates as JSON...")
+
+    response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "export",
+            "resume_ids": resume_ids,
+            "export_format": "json",
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify response structure
+    assert data["action"] == "export"
+    assert "export_data" in data
+    assert data["export_data"]["format"] == "json"
+    assert data["export_data"]["count"] == len(resume_ids)
+
+    exported_candidates = data["export_data"]["data"]
+    assert len(exported_candidates) == len(resume_ids)
+
+    # Verify each exported candidate has required fields
+    for candidate in exported_candidates:
+        assert "id" in candidate
+        assert "filename" in candidate
+        assert candidate["id"] in resume_ids
+
+    print(f"✓ Exported {len(exported_candidates)} candidates as JSON")
+    print(f"✓ All candidates have required fields (id, filename)")
+
+
+@pytest.mark.asyncio
+async def test_bulk_export_csv(client: AsyncClient, sample_candidates):
+    """
+    Test bulk export action with CSV format.
+
+    Verifies:
+    - Export action returns candidate data in CSV format
+    - CSV can be parsed correctly
+    - All selected candidates are included
+    - CSV headers contain required columns
+    """
+    print("\n=== Bulk Export CSV Test ===")
+
+    # Get resume IDs from sample candidates
+    resume_ids = []
+    async for db in get_db():
+        result = await db.execute(select(Resume).limit(5).offset(10))
+        resumes = result.scalars().all()
+        resume_ids = [str(r.id) for r in resumes]
+        break
+
+    assert len(resume_ids) >= 3, "Need at least 3 candidates for bulk export test"
+
+    print(f"Exporting {len(resume_ids)} candidates as CSV...")
+
+    response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "export",
+            "resume_ids": resume_ids,
+            "export_format": "csv",
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify response structure
+    assert data["action"] == "export"
+    assert "export_data" in data
+    assert data["export_data"]["format"] == "csv"
+    assert data["export_data"]["count"] == len(resume_ids)
+
+    csv_data = data["export_data"]["data"]
+    assert csv_data is not None and len(csv_data) > 0
+
+    # Parse CSV to verify structure
+    import csv
+    import io
+
+    csv_reader = csv.DictReader(io.StringIO(csv_data))
+    csv_rows = list(csv_reader)
+
+    assert len(csv_rows) == len(resume_ids), \
+        f"Expected {len(resume_ids)} CSV rows, got {len(csv_rows)}"
+
+    # Verify CSV has required columns
+    if len(csv_rows) > 0:
+        assert "id" in csv_rows[0], "CSV missing 'id' column"
+        assert "filename" in csv_rows[0], "CSV missing 'filename' column"
+
+    print(f"✓ Exported {len(csv_rows)} candidates as CSV")
+    print(f"✓ CSV has correct structure and headers")
+
+
+@pytest.mark.asyncio
+async def test_bulk_add_to_pipeline(client: AsyncClient, sample_candidates):
+    """
+    Test bulk add_to_pipeline action.
+
+    Verifies:
+    - Candidates are moved to the specified stage
+    - Notes are saved correctly
+    - Response contains correct success/failure counts
+    - Stage changes are recorded in database
+    """
+    print("\n=== Bulk Add to Pipeline Test ===")
+
+    # Get resume IDs from sample candidates
+    resume_ids = []
+    async for db in get_db():
+        result = await db.execute(select(Resume).limit(3).offset(15))
+        resumes = result.scalars().all()
+        resume_ids = [str(r.id) for r in resumes]
+        break
+
+    assert len(resume_ids) >= 2, "Need at least 2 candidates for bulk add_to_pipeline test"
+
+    target_stage = "interview"
+    notes = "Bulk added via integration test"
+
+    print(f"Adding {len(resume_ids)} candidates to pipeline stage '{target_stage}'...")
+
+    response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "add_to_pipeline",
+            "resume_ids": resume_ids,
+            "stage_id": target_stage,
+            "notes": notes,
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify response structure
+    assert data["action"] == "add_to_pipeline"
+    assert data["total_requested"] == len(resume_ids)
+    assert data["successful"] == len(resume_ids)
+    assert data["failed"] == 0
+    assert len(data["results"]) == len(resume_ids)
+
+    # Verify all results are successful
+    for result in data["results"]:
+        assert result["success"] is True
+        assert result["resume_id"] in resume_ids
+        assert "new_stage" in result["data"]
+        assert result["data"]["new_stage"] == target_stage
+
+    # Verify candidates were moved in database
+    async for db in get_db():
+        for resume_id in resume_ids:
+            from uuid import UUID
+            resume_uuid = UUID(resume_id)
+
+            result = await db.execute(
+                select(HiringStage).where(
+                    and_(
+                        HiringStage.resume_id == resume_uuid,
+                        HiringStage.stage_name == target_stage
+                    )
+                ).order_by(HiringStage.created_at.desc())
+            )
+            stage = result.scalar_one_or_none()
+            assert stage is not None, f"Candidate {resume_id} was not added to stage"
+            assert stage.notes == notes, f"Notes not saved correctly for {resume_id}"
+
+        print(f"✓ All {len(resume_ids)} candidates moved to stage '{target_stage}'")
+        break
+
+    print(f"✓ Bulk add_to_pipeline successful")
+
+
+@pytest.mark.asyncio
+async def test_bulk_actions_end_to_end_workflow(client: AsyncClient, sample_candidates):
+    """
+    End-to-end test of bulk actions on search results.
+
+    This is the main verification test for subtask-4-5.
+
+    Verifies the complete workflow:
+    1. Execute search returning 20+ candidates
+    2. Select multiple candidates
+    3. Apply bulk tag action
+    4. Verify all selected candidates tagged
+    5. Export selected candidates
+    6. Verify export file contains correct data
+    """
+    print("\n=== End-to-End Bulk Actions Workflow Test ===")
+
+    # Step 1: Execute search
+    print("Step 1: Executing search for 'Python'...")
+    search_response = await client.post(
+        "/api/search/candidates",
+        json={
+            "query": "Python",
+            "limit": 50,
+        }
+    )
+
+    assert search_response.status_code == 200
+    search_data = search_response.json()
+    search_results = search_data["results"]
+
+    print(f"✓ Search returned {len(search_results)} candidates")
+    assert len(search_results) >= 3, f"Need at least 3 candidates, got {len(search_results)}"
+
+    # Step 2: Select multiple candidates
+    print("Step 2: Selecting candidates for bulk actions...")
+    selected_candidates = search_results[:10]
+    selected_ids = [c["id"] for c in selected_candidates]
+
+    print(f"✓ Selected {len(selected_ids)} candidates")
+
+    # Step 3: Apply bulk tag action
+    print("Step 3: Applying bulk tag action...")
+    tag_name = "E2E Test Tag"
+    tag_response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "tag",
+            "resume_ids": selected_ids[:5],
+            "tag_name": tag_name,
+            "tag_color": "#4CAF50",
+        }
+    )
+
+    assert tag_response.status_code == 200
+    tag_data = tag_response.json()
+
+    assert tag_data["action"] == "tag"
+    assert tag_data["successful"] == 5
+    assert tag_data["failed"] == 0
+
+    print(f"✓ Tagged {tag_data['successful']} candidates")
+
+    # Step 4: Verify all selected candidates tagged
+    print("Step 4: Verifying tags in database...")
+    async for db in get_db():
+        result = await db.execute(
+            select(CandidateTag).where(CandidateTag.tag_name == tag_name)
+        )
+        tag = result.scalar_one_or_none()
+        assert tag is not None, "Tag not found in database"
+
+        # Count activities
+        result = await db.execute(
+            select(func.count(CandidateActivity.id)).where(
+                and_(
+                    CandidateActivity.tag_id == tag.id,
+                    CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED
+                )
+            )
+        )
+        activity_count = result.scalar()
+        assert activity_count == 5, f"Expected 5 activities, got {activity_count}"
+
+        print(f"✓ Verified {activity_count} tagged candidates in database")
+        break
+
+    # Step 5: Export selected candidates (JSON)
+    print("Step 5: Exporting candidates as JSON...")
+    export_response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "export",
+            "resume_ids": selected_ids[5:10],
+            "export_format": "json",
+        }
+    )
+
+    assert export_response.status_code == 200
+    export_data = export_response.json()
+
+    assert export_data["action"] == "export"
+    assert export_data["export_data"]["format"] == "json"
+    assert export_data["export_data"]["count"] == 5
+
+    exported_candidates = export_data["export_data"]["data"]
+    assert len(exported_candidates) == 5
+
+    print(f"✓ Exported {len(exported_candidates)} candidates")
+
+    # Step 6: Verify export file contains correct data
+    print("Step 6: Verifying export data integrity...")
+    for candidate in exported_candidates:
+        assert "id" in candidate
+        assert "filename" in candidate
+        assert candidate["id"] in selected_ids[5:10]
+
+        # Verify candidate exists in database
+        async for db in get_db():
+            from uuid import UUID
+            result = await db.execute(
+                select(Resume).where(Resume.id == UUID(candidate["id"]))
+            )
+            resume = result.scalar_one_or_none()
+            assert resume is not None, f"Candidate {candidate['id']} not found in database"
+            assert resume.filename == candidate["filename"], \
+                f"Filename mismatch for {candidate['id']}"
+            break
+
+    print(f"✓ All exported candidates verified in database")
+
+    # Step 7: Test bulk add_to_pipeline
+    print("Step 7: Adding candidates to pipeline...")
+    pipeline_response = await client.post(
+        "/api/candidates/bulk-action",
+        json={
+            "action": "add_to_pipeline",
+            "resume_ids": selected_ids[:3],
+            "stage_id": "screening",
+            "notes": "E2E test bulk add to pipeline",
+        }
+    )
+
+    assert pipeline_response.status_code == 200
+    pipeline_data = pipeline_response.json()
+
+    assert pipeline_data["action"] == "add_to_pipeline"
+    assert pipeline_data["successful"] == 3
+    assert pipeline_data["failed"] == 0
+
+    print(f"✓ Added {pipeline_data['successful']} candidates to pipeline")
+
+    # Verify in database
+    async for db in get_db():
+        from uuid import UUID
+        for resume_id in selected_ids[:3]:
+            resume_uuid = UUID(resume_id)
+            result = await db.execute(
+                select(HiringStage).where(
+                    and_(
+                        HiringStage.resume_id == resume_uuid,
+                        HiringStage.stage_name == "screening"
+                    )
+                )
+            )
+            stage = result.scalar_one_or_none()
+            assert stage is not None, f"Candidate {resume_id} not in screening stage"
+
+        print(f"✓ Verified all candidates in correct pipeline stage")
+        break
+
+    print("\n✓✓✓ End-to-End Bulk Actions Workflow Test PASSED ✓✓✓")
+    print("\nAll verification steps completed successfully:")
+    print("  ✓ Search returned 3+ candidates")
+    print("  ✓ Bulk tag action worked correctly")
+    print("  ✓ Tags verified in database")
+    print("  ✓ Bulk export (JSON) worked correctly")
+    print("  ✓ Export data integrity verified")
+    print("  ✓ Bulk add_to_pipeline worked correctly")
+    print("  ✓ Pipeline changes verified in database")

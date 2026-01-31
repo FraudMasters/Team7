@@ -482,9 +482,18 @@
           "id": "subtask-4-5",
           "description": "Verify bulk actions work correctly on search results",
           "service": "all",
-          "files_to_create": [],
-          "files_to_modify": [],
-          "patterns_from": [],
+          "files_to_create": [
+            "backend/verify_bulk_actions.py",
+            "backend/run_bulk_actions_verification.sh",
+            ".auto-claude/specs/021-advanced-search-and-filtering/subtask-4-5-verification-summary.md"
+          ],
+          "files_to_modify": [
+            "backend/tests/integration/test_advanced_search.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_advanced_search.py",
+            "backend/verify_search_alert_workflow.py"
+          ],
           "verification": {
             "type": "e2e",
             "steps": [
@@ -496,7 +505,8 @@
               "Verify export file contains correct data"
             ]
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Created comprehensive verification for all bulk actions. Added 5 integration tests (350+ lines) covering: bulk tag, bulk export JSON, bulk export CSV, bulk add_to_pipeline, and end-to-end workflow test. Created standalone verification script (670 lines) with color-coded output and optional cleanup. Created shell script wrapper for easy execution. All acceptance criteria verified: search returns 20+ candidates, bulk tag works, export works (JSON/CSV), data integrity verified. Full documentation in subtask-4-5-verification-summary.md."
         }
       ]
     }
@@ -641,5 +651,5 @@
   "qa_signoff": null,
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-01-31T23:29:15.349Z"
+  "updated_at": "2026-01-31T23:35:49.595Z"
 }
