@@ -17,6 +17,11 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  ToggleButtonGroup,
+  ToggleButton,
+  Stack,
+  Tooltip,
+  Collapse,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -24,6 +29,11 @@ import {
   Work as WorkIcon,
   Search as SearchIcon,
   Delete as DeleteIcon,
+  Sort as SortIcon,
+  AccessTime as RecentIcon,
+  Star as StarIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -36,6 +46,7 @@ interface Resume {
   created_at: string;
   language?: string;
   skills: string[];
+  starred?: boolean;
 }
 
 /**
@@ -44,6 +55,8 @@ interface Resume {
  * Allows recruiters to browse the resume database.
  * Shows candidate profiles with their skills and experience.
  */
+type SortBy = 'name' | 'date' | 'status';
+
 const ResumeDatabasePage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -53,6 +66,9 @@ const ResumeDatabasePage: React.FC = () => {
   const [filteredResumes, setFilteredResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'starred' | 'recent'>('all');
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [resumeToDelete, setResumeToDelete] = useState<string | null>(null);
 
@@ -78,20 +94,45 @@ const ResumeDatabasePage: React.FC = () => {
     fetchResumes();
   }, []);
 
-  // Filter resumes based on search query
+  // Filter and sort resumes based on search query, quick filter, and sort order
   useEffect(() => {
-    if (!searchQuery) {
-      setFilteredResumes(resumes);
-      return;
+    let filtered = [...resumes];
+
+    // Apply quick filter
+    if (quickFilter === 'starred') {
+      filtered = filtered.filter((resume) => resume.starred);
+    } else if (quickFilter === 'recent') {
+      // Filter resumes from the last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      filtered = filtered.filter((resume) => new Date(resume.created_at) >= sevenDaysAgo);
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = resumes.filter((resume) =>
-      resume.skills?.some((skill) => skill.toLowerCase().includes(query)) ||
-      resume.filename?.toLowerCase().includes(query)
-    );
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((resume) =>
+        resume.skills?.some((skill) => skill.toLowerCase().includes(query)) ||
+        resume.filename?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.filename.localeCompare(b.filename);
+        case 'date':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'status':
+          return a.status.localeCompare(b.status);
+        default:
+          return 0;
+      }
+    });
+
     setFilteredResumes(filtered);
-  }, [searchQuery, resumes]);
+  }, [searchQuery, resumes, sortBy, quickFilter]);
 
   const getTitleFromFilename = (filename: string) => {
     // Extract CV number from filename like "CV_1.docx"
@@ -139,22 +180,129 @@ const ResumeDatabasePage: React.FC = () => {
           {t('resumeDatabase.subtitle', { count: resumes.length })}
         </Typography>
 
-        {/* Search Bar */}
-        <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3, md: 4 } }}>
-          <TextField
-            fullWidth
-            placeholder={t('resumeDatabase.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            size={isMobile ? 'small' : 'medium'}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
+        {/* Search and Filter Panel */}
+        <Paper sx={{ mb: { xs: 2, sm: 3, md: 4 } }}>
+          {/* Mobile Toggle Header */}
+          {isMobile && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 2,
+                py: 1.5,
+                borderBottom: filtersExpanded ? 1 : 0,
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight={600}>
+                {t('resumeDatabase.filters')}
+              </Typography>
+              <IconButton
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                size="small"
+                aria-label={filtersExpanded ? 'collapse filters' : 'expand filters'}
+              >
+                {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+          )}
+
+          <Collapse in={!isMobile || filtersExpanded}>
+            <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+              {/* Search Bar */}
+              <TextField
+                fullWidth
+                placeholder={t('resumeDatabase.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                size={isMobile ? 'small' : 'medium'}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 2 }}
+              />
+
+              {/* Sort and Quick Filter Options */}
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={2}
+                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                justifyContent={{ xs: 'flex-start', sm: 'space-between' }}
+              >
+                {/* Sort Options */}
+                <ToggleButtonGroup
+                  value={sortBy}
+                  exclusive
+                  onChange={(_, value) => value && setSortBy(value)}
+                  size="small"
+                >
+                  <ToggleButton value="name" aria-label="sort by name">
+                    <Tooltip title={t('resumeDatabase.sortByName')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <SortIcon fontSize="small" />
+                        <Typography variant="body2">{t('resumeDatabase.name')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="date" aria-label="sort by date">
+                    <Tooltip title={t('resumeDatabase.sortByDate')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <RecentIcon fontSize="small" />
+                        <Typography variant="body2">{t('resumeDatabase.date')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="status" aria-label="sort by status">
+                    <Tooltip title={t('resumeDatabase.sortByStatus')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="body2">{t('resumeDatabase.status')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
+                {/* Quick Filters */}
+                <ToggleButtonGroup
+                  value={quickFilter}
+                  exclusive
+                  onChange={(_, value) => value && setQuickFilter(value)}
+                  size="small"
+                >
+                  <ToggleButton value="all" aria-label="show all">
+                    <Typography variant="body2">{t('resumeDatabase.all')}</Typography>
+                  </ToggleButton>
+                  <ToggleButton value="starred" aria-label="show starred only">
+                    <Tooltip title={t('resumeDatabase.starredOnly')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <StarIcon fontSize="small" />
+                        <Typography variant="body2">{t('resumeDatabase.starred')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="recent" aria-label="show recent only">
+                    <Tooltip title={t('resumeDatabase.recentOnly')}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <RecentIcon fontSize="small" />
+                        <Typography variant="body2">{t('resumeDatabase.recent')}</Typography>
+                      </Box>
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+
+              {/* Results Count */}
+              <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {t('resumeDatabase.showing', { count: filteredResumes.length, total: resumes.length })}
+                </Typography>
+              </Box>
+            </Box>
+          </Collapse>
         </Paper>
 
         {loading ? (
