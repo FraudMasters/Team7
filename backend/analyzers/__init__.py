@@ -41,6 +41,10 @@ from .experience_calculator import (
     calculate_multiple_skills_experience,
     format_experience_summary,
 )
+from .experience_extractor import (
+    extract_work_experience,
+    detect_overlaps,
+)
 from .error_detector import (
     detect_resume_errors,
     get_error_summary,
@@ -97,6 +101,8 @@ __all__ = [
     "calculate_skill_experience",
     "calculate_multiple_skills_experience",
     "format_experience_summary",
+    "extract_work_experience",
+    "detect_overlaps",
     "detect_resume_errors",
     "get_error_summary",
     "format_errors_for_display",

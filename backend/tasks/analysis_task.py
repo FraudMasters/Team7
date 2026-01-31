@@ -54,6 +54,7 @@ from analyzers import (
     calculate_total_experience,
     format_experience_summary,
     detect_resume_errors,
+    extract_work_experience,
 )
 from config import get_settings
 
@@ -207,14 +208,54 @@ def analyze_resume_core(
 
         if extract_experience:
             try:
-                experience_months = calculate_total_experience(resume_text)
-                experience_result = {
-                    "total_months": experience_months,
-                    "total_years": round(experience_months / 12, 1),
-                    "total_years_formatted": format_experience_summary(experience_months),
-                }
+                # First extract structured experience entries from resume text
+                extracted = extract_work_experience(resume_text, language=detected_language, min_confidence=0.2)
+
+                if extracted.get("experiences"):
+                    # Convert extracted experiences to format expected by calculator
+                    experience_entries = []
+                    for exp in extracted["experiences"]:
+                        entry = {
+                            "start": exp.get("start"),
+                            "end": exp.get("end"),
+                            "company": exp.get("company"),
+                            "position": exp.get("title"),
+                            "description": exp.get("description"),
+                        }
+                        experience_entries.append(entry)
+
+                    # Calculate total experience from structured entries
+                    calc_result = calculate_total_experience(experience_entries)
+                    experience_months = calc_result.get("total_months", 0)
+
+                    experience_result = {
+                        "total_months": experience_months,
+                        "total_years": round(experience_months / 12, 1) if experience_months else 0,
+                        "total_years_formatted": format_experience_summary(calc_result),
+                        "entries": extracted["experiences"],
+                        "entry_count": extracted["total_count"],
+                    }
+                else:
+                    # No structured experiences found, return zero
+                    experience_result = {
+                        "total_months": 0,
+                        "total_years": 0,
+                        "total_years_formatted": "No experience data found",
+                        "entries": None,
+                        "entry_count": 0,
+                    }
+                    if extracted.get("error"):
+                        logger.warning(f"Experience extraction error: {extracted['error']}")
+
             except Exception as e:
                 logger.warning(f"Experience calculation failed: {e}")
+                experience_result = {
+                    "total_months": 0,
+                    "total_years": 0,
+                    "total_years_formatted": "Experience calculation failed",
+                    "entries": None,
+                    "entry_count": 0,
+                }
 
         if detect_errors:
             try:
