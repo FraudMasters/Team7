@@ -22,6 +22,7 @@ from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
+from .backup import Backup, BackupConfig, BackupType, BackupStatus
 
 __all__ = [
     "Base",
@@ -50,4 +51,8 @@ __all__ = [
     "MatchingWeightVersion",
     "PRESET_PROFILES",
     "create_preset_profiles",
+    "Backup",
+    "BackupConfig",
+    "BackupType",
+    "BackupStatus",
 ]

@@ -119,6 +119,75 @@ class Settings(BaseSettings):
         description="Celery result backend URL",
     )
 
+    # Backup Configuration
+    backup_enabled: bool = Field(
+        default=True,
+        description="Enable automated backups",
+    )
+
+    backup_retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        description="Default backup retention period in days",
+    )
+
+    backup_schedule: str = Field(
+        default="0 2 * * *",
+        description="Cron expression for scheduled backups (default: daily at 2 AM)",
+    )
+
+    backup_dir: Path = Field(
+        default=Path("./data/backups"),
+        description="Directory for storing backup files",
+    )
+
+    # S3 Backup Configuration
+    backup_s3_enabled: bool = Field(
+        default=False,
+        description="Enable S3 off-site backup",
+    )
+
+    backup_s3_bucket: Optional[str] = Field(
+        default=None,
+        description="S3 bucket name for backups",
+    )
+
+    backup_s3_endpoint: Optional[str] = Field(
+        default=None,
+        description="S3-compatible endpoint URL",
+    )
+
+    backup_s3_access_key: Optional[str] = Field(
+        default=None,
+        description="S3 access key ID",
+    )
+
+    backup_s3_secret_key: Optional[str] = Field(
+        default=None,
+        description="S3 secret access key",
+    )
+
+    backup_s3_region: str = Field(
+        default="us-east-1",
+        description="S3 region",
+    )
+
+    backup_notification_email: Optional[str] = Field(
+        default=None,
+        description="Email for backup failure notifications",
+    )
+
+    backup_incremental_enabled: bool = Field(
+        default=True,
+        description="Enable incremental backups",
+    )
+
+    backup_compression_enabled: bool = Field(
+        default=True,
+        description="Enable backup compression",
+    )
+
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

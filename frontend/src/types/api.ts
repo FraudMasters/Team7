@@ -1150,3 +1150,126 @@ export interface ApplyWeightsResponse {
   candidates_affected: number;
   processing_time_ms: number;
 }
+
+// ==================== Backup Types ====================
+
+/**
+ * Backup entry
+ */
+export interface Backup {
+  id: string;
+  name: string;
+  type: 'database' | 'files' | 'models' | 'full';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'expired' | 'restoring';
+  size_bytes: number | null;
+  size_human: string | null;
+  backup_path: string;
+  created_at: string;
+  completed_at: string | null;
+  retention_days: number;
+  expires_at: string | null;
+  checksum: string | null;
+  is_incremental: boolean;
+  parent_backup_id: string | null;
+  s3_uploaded: boolean;
+  s3_key: string | null;
+  error_message: string | null;
+  files_count: number | null;
+  tables_count: number | null;
+}
+
+/**
+ * Backup create request
+ */
+export interface BackupCreate {
+  name: string;
+  type: 'database' | 'files' | 'models' | 'full';
+  retention_days: number;
+  is_incremental: boolean;
+  upload_to_s3: boolean;
+}
+
+/**
+ * Backup restore request
+ */
+export interface BackupRestoreRequest {
+  restore_type: 'full' | 'database' | 'files' | 'models' | null;
+  confirm: boolean;
+  create_backup_before: boolean;
+}
+
+/**
+ * Backup configuration
+ */
+export interface BackupConfig {
+  retention_days: number;
+  backup_schedule: string;
+  s3_enabled: boolean;
+  s3_bucket: string | null;
+  s3_endpoint: string | null;
+  s3_region: string | null;
+  notification_email: string | null;
+  enabled: boolean;
+  incremental_enabled: boolean;
+  compression_enabled: boolean;
+  last_backup_at: string | null;
+  last_backup_status: string | null;
+}
+
+/**
+ * Backup configuration update request
+ */
+export interface BackupConfigUpdate {
+  retention_days?: number;
+  backup_schedule?: string;
+  s3_enabled?: boolean;
+  s3_bucket?: string;
+  s3_endpoint?: string;
+  s3_access_key?: string;
+  s3_secret_key?: string;
+  s3_region?: string;
+  notification_email?: string;
+  enabled?: boolean;
+  incremental_enabled?: boolean;
+  compression_enabled?: boolean;
+}
+
+/**
+ * Backup status response
+ */
+export interface BackupStatus {
+  enabled: boolean;
+  last_backup_at: string | null;
+  last_backup_status: string | null;
+  total_backups: number;
+  total_size_bytes: number;
+  total_size_human: string;
+  next_scheduled_backup: string | null;
+  recent_backups: Backup[];
+  disk_usage_bytes: number | null;
+  disk_usage_human: string | null;
+}
+
+/**
+ * Backup verification response
+ */
+export interface BackupVerifyResponse {
+  backup_id: string;
+  valid: boolean;
+  checksum_match: boolean;
+  files_intact: boolean;
+  details: string | null;
+}
+
+/**
+ * S3 configuration
+ */
+export interface S3Config {
+  enabled: boolean;
+  bucket: string | null;
+  endpoint: string | null;
+  access_key: string | null;
+  secret_key: string | null;
+  region: string;
+}
+

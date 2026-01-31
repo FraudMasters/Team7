@@ -21,6 +21,7 @@ import WeightCustomizationPage from '@pages/WeightCustomization';
 import IndustryTaxonomyManager from '@components/IndustryTaxonomyManager';
 import TaxonomyAnalytics from '@components/TaxonomyAnalytics';
 import PublicTaxonomyBrowser from '@components/PublicTaxonomyBrowser';
+import BackupsPage from '@pages/Backups';
 
 /**
  * Main App Component
@@ -74,6 +75,7 @@ function App() {
           <Route path="admin/taxonomies" element={<IndustryTaxonomyManager />} />
           <Route path="admin/taxonomy-analytics" element={<TaxonomyAnalytics />} />
           <Route path="admin/public-taxonomies" element={<PublicTaxonomyBrowser />} />
+          <Route path="admin/backups" element={<BackupsPage />} />
 
           {/* Analytics dashboard */}
           <Route path="analytics" element={<AnalyticsDashboardPage />} />

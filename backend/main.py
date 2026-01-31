@@ -43,6 +43,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     settings.models_cache_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Models cache directory: {settings.models_cache_path}")
 
+    # Initialize backup directories
+    settings.backup_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Backup directory: {settings.backup_dir}")
+
     yield
 
     # Shutdown
@@ -253,6 +257,7 @@ from api import (
     batch,
     work_experience,
     skill_gap_analysis,
+    backups,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -276,6 +281,7 @@ app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", ta
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
+app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 
 
 if __name__ == "__main__":

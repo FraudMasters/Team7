@@ -68,6 +68,27 @@ celery_config: Dict[str, Any] = {
     # Performance optimization
     "broker_connection_retry": True,
     "broker_connection_max_retries": 10,
+
+    # Celery Beat schedule for automated tasks
+    "beat_schedule": {
+        "daily-backup": {
+            "task": "tasks.backup.daily_backup",
+            "schedule": 86400.0,  # Run daily (every 24 hours)
+            "options": {"expires": 3600},  # Task expires if not run within 1 hour
+        },
+        "backup-cleanup": {
+            "task": "tasks.backup.cleanup_old_backups",
+            "schedule": 3600.0,  # Run hourly to check for expired backups
+        },
+        "backup-health-check": {
+            "task": "tasks.backup.backup_health_check",
+            "schedule": 1800.0,  # Run every 30 minutes
+        },
+        "s3-backup-sync": {
+            "task": "tasks.backup.sync_all_to_s3",
+            "schedule": 7200.0,  # Run every 2 hours
+        },
+    },
 }
 
 

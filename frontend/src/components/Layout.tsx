@@ -21,6 +21,7 @@ import {
   Upload as UploadIcon,
   School as SchoolIcon,
   Tune as TuneIcon,
+  Backup as BackupIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -69,6 +70,7 @@ const Layout: React.FC<LayoutProps> = () => {
     { labelKey: 'nav.adminTaxonomies', path: '/admin/taxonomies', icon: <SettingsIcon fontSize="small" /> },
     { labelKey: 'nav.adminTaxonomyAnalytics', path: '/admin/taxonomy-analytics', icon: <SettingsIcon fontSize="small" /> },
     { labelKey: 'nav.adminPublicTaxonomies', path: '/admin/public-taxonomies', icon: <SettingsIcon fontSize="small" /> },
+    { labelKey: 'nav.adminBackups', path: '/admin/backups', icon: <BackupIcon fontSize="small" /> },
   ];
 
   return (
