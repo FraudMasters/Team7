@@ -227,7 +227,7 @@ This is an automated email from AgentHR.
             "alert_id": alert_id,
             "status": "sent",
             "recipient": recipient_email,
-            "sent_at": datetime.utcnow().isoformat(),
+            "sent_at": time.time(),
             "processing_time_ms": processing_time,
         }
 
