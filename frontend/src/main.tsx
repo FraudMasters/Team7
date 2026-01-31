@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider as MuiThemeProvider, CssBaseline } from '@mui/material';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider, useThemeContext } from './contexts/ThemeContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
 import './index.css';
 import './i18n'; // Initialize i18n
@@ -23,11 +24,24 @@ const AppWithTheme: React.FC = () => {
 };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <LanguageProvider>
-      <ThemeProvider>
-        <AppWithTheme />
-      </ThemeProvider>
-    </LanguageProvider>
-  </React.StrictMode>
+  <ErrorBoundary
+    onError={(error, errorInfo) => {
+      // Log error details for debugging
+      console.error('Application error caught by ErrorBoundary:', {
+        error: error.toString(),
+        componentStack: errorInfo.componentStack,
+      });
+
+      // In production, you could send this to an error tracking service
+      // Example: Sentry.captureException(error, { extra: errorInfo });
+    }}
+  >
+    <React.StrictMode>
+      <LanguageProvider>
+        <ThemeProvider>
+          <AppWithTheme />
+        </ThemeProvider>
+      </LanguageProvider>
+    </React.StrictMode>
+  </ErrorBoundary>
 );

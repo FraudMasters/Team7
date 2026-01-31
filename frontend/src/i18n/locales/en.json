@@ -37,6 +37,14 @@
     "or": "or",
     "and": "and"
   },
+  "errorBoundary": {
+    "defaultTitle": "Something went wrong",
+    "message": "An unexpected error occurred. Don't worry, your data is safe. You can try reloading the page or go back to the home page.",
+    "reload": "Reload Page",
+    "goHome": "Go to Home",
+    "support": "If this problem persists, please contact our support team.",
+    "errorDetails": "Error Details (Development Mode)"
+  },
   "nav": {
     "home": "Home",
     "uploadResume": "Upload Resume",
