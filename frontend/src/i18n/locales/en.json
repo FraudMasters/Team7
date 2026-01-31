@@ -816,6 +816,9 @@
     "moveError": "Failed to move candidates",
     "noCandidates": "No candidates available for bulk operations.",
     "tip": "Tip:",
-    "selectStageTip": "Select a target stage to enable the bulk move operation."
+    "selectStageTip": "Select a target stage to enable the bulk move operation.",
+    "enterBulkMode": "Bulk Mode",
+    "exitBulkMode": "Exit Bulk Mode",
+    "loadingCandidates": "Loading candidates for bulk operations..."
   }
 }

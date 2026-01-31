@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -11,6 +11,8 @@ import {
   Button,
   CircularProgress,
   Chip,
+  Alert,
+  Collapse,
 } from '@mui/material';
 import {
   ViewKanban as ViewKanbanIcon,
@@ -18,10 +20,13 @@ import {
   Refresh as RefreshIcon,
   Work as WorkIcon,
   Person as PersonIcon,
+  CheckCircle as CheckCircleIcon,
+  RadioButtonUnchecked as RadioButtonUncheckedIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import WorkflowKanban from '@components/WorkflowKanban';
+import BulkCandidateActions from '@components/BulkCandidateActions';
 import type { WorkflowStageResponse, CandidateListItem } from '../types/api';
 
 interface Vacancy {
@@ -35,6 +40,14 @@ interface StageStats {
   stageName: string;
   candidateCount: number;
 }
+
+interface BulkMoveResult {
+  resume_id: string;
+  success: boolean;
+  error?: string;
+  new_stage?: string;
+}
+
 
 /**
  * Workflow Board Page (Recruiter Module)
@@ -50,6 +63,10 @@ const WorkflowBoardPage: React.FC = () => {
   const [stageStats, setStageStats] = useState<StageStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [allCandidates, setAllCandidates] = useState<CandidateListItem[]>([]);
+  const [loadingBulkCandidates, setLoadingBulkCandidates] = useState(false);
+  const [bulkMoveSuccess, setBulkMoveSuccess] = useState<string | null>(null);
 
   // Load vacancies on mount
   useEffect(() => {
@@ -145,6 +162,72 @@ const WorkflowBoardPage: React.FC = () => {
 
   const totalCandidates = stageStats.reduce((sum, stat) => sum + stat.candidateCount, 0);
 
+  /**
+   * Fetch all candidates for bulk operations
+   */
+  const fetchAllCandidates = useCallback(async () => {
+    if (allStages.length === 0) return;
+
+    setLoadingBulkCandidates(true);
+    try {
+      const candidatesPromises = allStages.map(async (stage) => {
+        const url = selectedVacancy
+          ? `/api/candidates/?stage_id=${stage.id}&vacancy_id=${selectedVacancy}`
+          : `/api/candidates/?stage_id=${stage.id}`;
+        const response = await axios.get<CandidateListItem[]>(url);
+        return response.data;
+      });
+
+      const candidatesArrays = await Promise.all(candidatesPromises);
+      const allCandidatesData = candidatesArrays.flat();
+
+      setAllCandidates(allCandidatesData);
+    } catch (error) {
+      console.error('Error fetching candidates for bulk mode:', error);
+    } finally {
+      setLoadingBulkCandidates(false);
+    }
+  }, [allStages, selectedVacancy]);
+
+  /**
+   * Toggle bulk selection mode
+   */
+  const handleToggleBulkMode = useCallback(() => {
+    const newMode = !bulkMode;
+    setBulkMode(newMode);
+
+    if (newMode) {
+      fetchAllCandidates();
+    } else {
+      setAllCandidates([]);
+      setBulkMoveSuccess(null);
+    }
+  }, [bulkMode, fetchAllCandidates]);
+
+  /**
+   * Handle bulk move completion
+   */
+  const handleBulkMoveComplete = useCallback((results: BulkMoveResult[]) => {
+    const successCount = results.filter((r) => r.success).length;
+
+    if (successCount > 0) {
+      setBulkMoveSuccess(
+        t('bulkActions.moveSuccess', {
+          count: successCount,
+          plural: successCount === 1 ? '' : 's',
+        })
+      );
+
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => {
+        setBulkMoveSuccess(null);
+      }, 5000);
+
+      // Refresh data to reflect changes
+      handleRefresh();
+    }
+  }, [t]);
+
   if (loading) {
     return (
       <Container maxWidth="xl">
@@ -238,7 +321,7 @@ const WorkflowBoardPage: React.FC = () => {
             </TextField>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
                 variant="outlined"
                 startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
@@ -247,6 +330,15 @@ const WorkflowBoardPage: React.FC = () => {
                 sx={{ minWidth: 120 }}
               >
                 {refreshing ? t('workflow.board.refreshing') : t('workflow.board.refresh')}
+              </Button>
+              <Button
+                variant={bulkMode ? 'contained' : 'outlined'}
+                startIcon={bulkMode ? <CheckCircleIcon /> : <RadioButtonUncheckedIcon />}
+                onClick={handleToggleBulkMode}
+                color={bulkMode ? 'primary' : 'secondary'}
+                sx={{ minWidth: 120 }}
+              >
+                {bulkMode ? t('bulkActions.exitBulkMode') : t('bulkActions.enterBulkMode')}
               </Button>
               {selectedVacancy && (
                 <Chip
@@ -261,6 +353,13 @@ const WorkflowBoardPage: React.FC = () => {
           </Grid>
         </Grid>
       </Paper>
+
+      {/* Bulk Move Success Alert */}
+      <Collapse in={!!bulkMoveSuccess}>
+        <Alert severity="success" sx={{ mb: 4 }} onClose={() => setBulkMoveSuccess(null)}>
+          <Typography variant="body2">{bulkMoveSuccess}</Typography>
+        </Alert>
+      </Collapse>
 
       {/* Stage Statistics */}
       {stageStats.length > 0 && (
@@ -291,6 +390,33 @@ const WorkflowBoardPage: React.FC = () => {
               </Grid>
             ))}
           </Grid>
+        </Paper>
+      )}
+
+      {/* Bulk Actions Panel */}
+      {bulkMode && (
+        <Paper sx={{ p: 3, mb: 4 }}>
+          {loadingBulkCandidates ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography variant="body2" sx={{ ml: 2 }}>
+                {t('bulkActions.loadingCandidates')}
+              </Typography>
+            </Box>
+          ) : (
+            <BulkCandidateActions
+              candidates={allCandidates.map((c) => ({
+                resume_id: c.id,
+                name: c.filename,
+                current_stage: c.stage_name,
+                match_percentage: undefined,
+              }))}
+              stages={allStages}
+              onBulkMoveComplete={handleBulkMoveComplete}
+              vacancyId={selectedVacancy || undefined}
+              containerHeight={500}
+            />
+          )}
         </Paper>
       )}
 
