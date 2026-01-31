@@ -135,7 +135,7 @@ services:
         condition: service_healthy
     networks:
       - resume_network
-    command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=4 --prefetch-multiplier=2
+    command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=4 --prefetch-multiplier=2 --queues=celery,analysis,learning,reporting
 
   # Frontend (React + Vite) - Production build with nginx
   frontend:

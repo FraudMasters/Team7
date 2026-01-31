@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -124,8 +124,8 @@ class BatchResultsResponse(BaseModel):
 async def upload_batch(
     request: Request,
     files: list[UploadFile] = File(...),
-    notification_email: Optional[str] = None,
-    analyze: bool = True,
+    notification_email: Optional[str] = Form(None),
+    analyze: bool = Form(True),
     db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
     """
@@ -163,7 +163,7 @@ async def upload_batch(
             detail="Maximum 100 files allowed per batch",
         )
 
-    logger.info(f"Received batch upload request with {len(files)} files")
+    logger.info(f"Received batch upload request with {len(files)} files, analyze={analyze}, notification_email={notification_email}")
 
     try:
         # Create batch job record
@@ -245,18 +245,25 @@ async def upload_batch(
 
         # Initiate batch analysis if requested
         if analyze and resume_ids:
+            logger.info(f"Initiating batch analysis for {len(resume_ids)} resumes")
             batch_job.status = BatchJobStatus.processing
             await db.commit()
 
             # Trigger Celery task
-            celery_task = batch_analyze_resumes.delay(resume_ids)
+            try:
+                celery_task = batch_analyze_resumes.delay(resume_ids)
+                logger.info(f"Celery task dispatched: {celery_task.id}")
 
-            # Store Celery task ID
-            batch_job.celery_task_id = celery_task.id
-            await db.commit()
+                # Store Celery task ID
+                batch_job.celery_task_id = celery_task.id
+                await db.commit()
 
-            logger.info(f"Started Celery task {celery_task.id} for batch {batch_id}")
+                logger.info(f"Started Celery task {celery_task.id} for batch {batch_id}")
+            except Exception as task_error:
+                logger.error(f"Error dispatching Celery task: {task_error}", exc_info=True)
+                raise
         else:
+            logger.info(f"Batch analysis not requested. analyze={analyze}, resume_ids count={len(resume_ids) if resume_ids else 0}")
             await db.commit()
 
         return JSONResponse(
@@ -327,12 +334,17 @@ async def get_batch_status(
         try:
             celery_result = celery_app.AsyncResult(batch.celery_task_id)
             if celery_result.state == "SUCCESS":
-                batch.status = BatchJobStatus.COMPLETED
+                batch.status = BatchJobStatus.completed
                 batch.processed_files = batch.total_files
                 batch.failed_files = 0
+                # Set completion time
+                from datetime import datetime, timezone
+                batch.completed_at = datetime.now(timezone.utc)
             elif celery_result.state == "FAILURE":
                 batch.status = BatchJobStatus.failed
                 batch.error_message = "Celery task failed"
+                from datetime import datetime, timezone
+                batch.completed_at = datetime.now(timezone.utc)
             await db.commit()
         except Exception as e:
             logger.warning(f"Failed to check Celery task status: {e}")

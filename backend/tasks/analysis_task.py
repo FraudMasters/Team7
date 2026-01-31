@@ -11,8 +11,38 @@ import time
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
+import numpy as np
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
+
+
+def convert_numpy_types(obj: Any) -> Any:
+    """
+    Convert numpy types to Python native types for JSON serialization.
+
+    This recursively converts numpy arrays, scalars, and other numpy types
+    to their Python equivalents.
+
+    Args:
+        obj: Object to convert
+
+    Returns:
+        JSON-serializable version of the object
+    """
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    else:
+        return obj
 
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
@@ -101,6 +131,127 @@ def extract_text_from_file(file_path: Path) -> str:
         raise
 
 
+def analyze_resume_core(
+    resume_id: str,
+    check_grammar: bool = True,
+    extract_experience: bool = True,
+    detect_errors: bool = True,
+) -> Dict[str, Any]:
+    """
+    Core resume analysis logic without Celery dependencies.
+
+    This function can be called directly or wrapped in a Celery task.
+
+    Args:
+        resume_id: Unique identifier of the resume to analyze
+        check_grammar: Whether to perform grammar checking
+        extract_experience: Whether to calculate experience
+        detect_errors: Whether to detect resume errors
+
+    Returns:
+        Dictionary containing analysis results
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(f"Starting core resume analysis for resume_id: {resume_id}")
+
+        # Step 1: Find and extract text
+        try:
+            file_path = find_resume_file(resume_id)
+        except FileNotFoundError as e:
+            return {
+                "resume_id": resume_id,
+                "status": "failed",
+                "error": str(e),
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            }
+
+        # Extract text
+        try:
+            resume_text = extract_text_from_file(file_path)
+        except ValueError as e:
+            return {
+                "resume_id": resume_id,
+                "status": "failed",
+                "error": str(e),
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            }
+
+        # Detect language
+        from langdetect import detect
+        try:
+            lang_code = detect(resume_text[:1000])
+            detected_language = 'ru' if lang_code == 'ru' else 'en' if lang_code == 'en' else lang_code
+        except:
+            detected_language = "en"
+
+        # Extract keywords and entities
+        keywords_result = extract_resume_keywords(resume_text, language=detected_language)
+        keywords = keywords_result.get("all_keywords") or keywords_result.get("keywords", [])
+
+        entities_result = extract_resume_entities(resume_text)
+        language = entities_result.get("language", detected_language)
+        entities = entities_result.get("technical_skills", [])
+
+        # Optional analysis
+        grammar_result = None
+        experience_result = None
+        errors_result = None
+
+        if check_grammar:
+            try:
+                grammar_result = check_grammar_resume(resume_text)
+            except Exception as e:
+                logger.warning(f"Grammar checking failed: {e}")
+
+        if extract_experience:
+            try:
+                experience_months = calculate_total_experience(resume_text)
+                experience_result = {
+                    "total_months": experience_months,
+                    "total_years": round(experience_months / 12, 1),
+                    "total_years_formatted": format_experience_summary(experience_months),
+                }
+            except Exception as e:
+                logger.warning(f"Experience calculation failed: {e}")
+
+        if detect_errors:
+            try:
+                errors_result = detect_resume_errors(resume_text)
+            except Exception as e:
+                logger.warning(f"Error detection failed: {e}")
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "resume_id": resume_id,
+            "status": "completed",
+            "language": language,
+            "keywords": keywords_result,
+            "entities": {"technical_skills": entities},
+            "grammar": grammar_result,
+            "experience": experience_result,
+            "errors": errors_result,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        # Convert numpy types to Python native types for JSON serialization
+        result = convert_numpy_types(result)
+
+        logger.info(f"Resume core analysis completed in {processing_time_ms}ms")
+        return result
+
+    except Exception as e:
+        logger.error(f"Unexpected error in resume core analysis: {e}", exc_info=True)
+        return {
+            "resume_id": resume_id,
+            "status": "failed",
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+
 @shared_task(
     name="tasks.analysis_task.analyze_resume_async",
     bind=True,
@@ -117,238 +268,61 @@ def analyze_resume_async(
     """
     Asynchronously analyze a resume with progress tracking.
 
-    This task performs comprehensive resume analysis including:
-    - Keyword extraction (KeyBERT)
-    - Named entity recognition (SpaCy)
-    - Grammar and spelling checking (LanguageTool)
-    - Experience calculation
-    - Error detection
-
-    The task provides progress updates throughout the analysis process,
-    allowing clients to monitor the status of long-running analyses.
+    This is a Celery wrapper around analyze_resume_core that provides
+    progress updates via Celery's update_state mechanism.
 
     Args:
         self: Celery task instance (bind=True)
         resume_id: Unique identifier of the resume to analyze
-        check_grammar: Whether to perform grammar checking (default: True)
-        extract_experience: Whether to calculate experience (default: True)
-        detect_errors: Whether to detect resume errors (default: True)
+        check_grammar: Whether to perform grammar checking
+        extract_experience: Whether to calculate experience
+        detect_errors: Whether to detect resume errors
 
     Returns:
-        Dictionary containing complete analysis results:
-        - resume_id: Resume identifier
-        - status: Final analysis status
-        - language: Detected language (en, ru)
-        - keywords: Keyword extraction results
-        - entities: Named entity recognition results
-        - grammar: Grammar checking results (if enabled)
-        - experience: Experience calculation results (if enabled)
-        - errors: Detected resume errors (if enabled)
-        - processing_time_ms: Total processing time
-
-    Raises:
-        FileNotFoundError: If resume file is not found
-        ValueError: If text extraction fails
-        SoftTimeLimitExceeded: If task exceeds time limit
-
-    Example:
-        >>> from tasks import analyze_resume_async
-        >>> task = analyze_resume_async.delay("abc123")
-        >>> # Can check task.status for 'PROGRESS' updates
-        >>> result = task.get()
-        >>> print(result['status'])
-        'completed'
+        Dictionary containing analysis results
     """
-    start_time = time.time()
-    total_steps = 5
-    current_step = 0
+    total_steps = 3
 
     try:
-        logger.info(f"Starting async resume analysis for resume_id: {resume_id}")
-
-        # Step 1: Find resume file
-        current_step += 1
+        # Step 1: Finding resume
         progress = {
-            "current": current_step,
+            "current": 1,
             "total": total_steps,
-            "percentage": int(current_step / total_steps * 100),
+            "percentage": 33,
             "status": "finding_resume",
             "message": "Locating resume file...",
         }
         self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Finding resume file")
 
-        try:
-            file_path = find_resume_file(resume_id)
-        except FileNotFoundError as e:
-            logger.error(f"Resume file not found: {e}")
-            return {
-                "resume_id": resume_id,
-                "status": "failed",
-                "error": str(e),
-                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
-            }
-
-        # Step 2: Extract text from file
-        current_step += 1
+        # Step 2: Analyzing
         progress = {
-            "current": current_step,
+            "current": 2,
             "total": total_steps,
-            "percentage": int(current_step / total_steps * 100),
-            "status": "extracting_text",
-            "message": "Extracting text from resume file...",
+            "percentage": 66,
+            "status": "analyzing",
+            "message": "Analyzing resume...",
         }
         self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Extracting text")
 
-        try:
-            resume_text = extract_text_from_file(file_path)
-        except ValueError as e:
-            logger.error(f"Text extraction failed: {e}")
-            return {
-                "resume_id": resume_id,
-                "status": "failed",
-                "error": str(e),
-                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
-            }
+        # Call core analysis function
+        result = analyze_resume_core(
+            resume_id=resume_id,
+            check_grammar=check_grammar,
+            extract_experience=extract_experience,
+            detect_errors=detect_errors,
+        )
 
-        # Step 3: Extract keywords and entities
-        current_step += 1
+        # Step 3: Complete
         progress = {
-            "current": current_step,
+            "current": 3,
             "total": total_steps,
-            "percentage": int(current_step / total_steps * 100),
-            "status": "extracting_keywords",
-            "message": "Extracting keywords and entities...",
+            "percentage": 100,
+            "status": "complete",
+            "message": "Analysis complete",
         }
         self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Keyword extraction")
-
-        try:
-            # Detect language first for model selection
-            from langdetect import detect
-            try:
-                lang_code = detect(resume_text[:1000])
-                # Map to our language format
-                if lang_code == 'ru':
-                    detected_language = 'ru'
-                elif lang_code == 'en':
-                    detected_language = 'en'
-                else:
-                    detected_language = lang_code
-            except:
-                detected_language = "en"
-
-            logger.info(f"Detected language: {detected_language}")
-
-            # Extract keywords with language-aware model selection
-            keywords_result = extract_resume_keywords(resume_text, language=detected_language)
-
-            # Extract named entities
-            entities_result = extract_resume_entities(resume_text)
-
-            # Use detected language for entities result
-            language = entities_result.get("language", detected_language)
-
-        except Exception as e:
-            logger.error(f"Keyword/entity extraction failed: {e}", exc_info=True)
-            language = "unknown"
-            keywords_result = {"keywords": [], "keyphrases": [], "scores": []}
-            entities_result = {
-                "organizations": [],
-                "dates": [],
-                "persons": [],
-                "locations": [],
-                "technical_skills": [],
-                "language": "unknown",
-            }
-
-        # Step 4: Run optional analysis (grammar, experience, errors)
-        current_step += 1
-        progress = {
-            "current": current_step,
-            "total": total_steps,
-            "percentage": int(current_step / total_steps * 100),
-            "status": "analyzing_content",
-            "message": "Analyzing grammar, experience, and errors...",
-        }
-        self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Content analysis")
-
-        grammar_result = None
-        experience_result = None
-        errors_result = None
-
-        # Grammar checking
-        if check_grammar:
-            try:
-                grammar_result = check_grammar_resume(resume_text)
-                logger.info(f"Grammar checking completed: {grammar_result.get('total_errors', 0)} errors found")
-            except Exception as e:
-                logger.warning(f"Grammar checking failed: {e}", exc_info=True)
-                grammar_result = None
-
-        # Experience calculation
-        if extract_experience:
-            try:
-                experience_months = calculate_total_experience(resume_text)
-                experience_result = {
-                    "total_months": experience_months,
-                    "total_years": round(experience_months / 12, 1),
-                    "total_years_formatted": format_experience_summary(experience_months),
-                }
-                logger.info(f"Experience calculation completed: {experience_result['total_years_formatted']}")
-            except Exception as e:
-                logger.warning(f"Experience calculation failed: {e}", exc_info=True)
-                experience_result = None
-
-        # Error detection
-        if detect_errors:
-            try:
-                errors_result = detect_resume_errors(resume_text)
-                logger.info(f"Error detection completed: {len(errors_result)} errors detected")
-            except Exception as e:
-                logger.warning(f"Error detection failed: {e}", exc_info=True)
-                errors_result = None
-
-        # Step 5: Compile results
-        current_step += 1
-        progress = {
-            "current": current_step,
-            "total": total_steps,
-            "percentage": int(current_step / total_steps * 100),
-            "status": "compiling_results",
-            "message": "Compiling analysis results...",
-        }
-        self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Compiling results")
-
-        processing_time_ms = round((time.time() - start_time) * 1000, 2)
-
-        result = {
-            "resume_id": resume_id,
-            "status": "completed",
-            "language": language,
-            "keywords": keywords_result,
-            "entities": entities_result,
-            "grammar": grammar_result,
-            "experience": experience_result,
-            "errors": errors_result,
-            "processing_time_ms": processing_time_ms,
-        }
-
-        logger.info(f"Resume analysis completed successfully in {processing_time_ms}ms")
 
         return result
-
-    except SoftTimeLimitExceeded:
-        logger.error(f"Task {self.request.id} exceeded time limit")
-        return {
-            "resume_id": resume_id,
-            "status": "failed",
-            "error": "Analysis exceeded maximum time limit",
-            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
-        }
 
     except Exception as e:
         logger.error(f"Unexpected error in resume analysis: {e}", exc_info=True)
@@ -356,7 +330,7 @@ def analyze_resume_async(
             "resume_id": resume_id,
             "status": "failed",
             "error": str(e),
-            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            "processing_time_ms": 0,
         }
 
 
@@ -405,21 +379,26 @@ def batch_analyze_resumes(
     failed = 0
 
     for i, resume_id in enumerate(resume_ids):
-        # Update progress for batch
-        progress = {
-            "current": i + 1,
-            "total": len(resume_ids),
-            "percentage": int((i + 1) / len(resume_ids) * 100),
-            "status": "processing_batch",
-            "message": f"Analyzing resume {i + 1}/{len(resume_ids)}...",
-        }
-        self.update_state(state="PROGRESS", meta=progress)
-
         logger.info(f"Processing resume {i + 1}/{len(resume_ids)}: {resume_id}")
+
+        # Update progress for batch (safe - ignore if task_id is not available)
+        try:
+            progress = {
+                "current": i + 1,
+                "total": len(resume_ids),
+                "percentage": int((i + 1) / len(resume_ids) * 100),
+                "status": "processing_batch",
+                "message": f"Analyzing resume {i + 1}/{len(resume_ids)}...",
+            }
+            self.update_state(state="PROGRESS", meta=progress)
+        except (ValueError, AttributeError):
+            # Task might not have a valid ID (e.g., when called as subtask)
+            pass
 
         # Analyze individual resume
         try:
-            result = analyze_resume_async(
+            # Call the core analysis function directly (not as Celery task)
+            result = analyze_resume_core(
                 resume_id=resume_id,
                 check_grammar=check_grammar,
                 extract_experience=extract_experience,
