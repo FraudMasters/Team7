@@ -226,7 +226,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
   /**
    * Get author display name from recruiter_id
    */
-  const getAuthorName = useCallback((recruiterId: string | null) => {
+  const getAuthorName = useCallback((recruiterId: string | null): string => {
     if (!recruiterId) return 'Unknown';
     // Extract username from email or use ID
     if (recruiterId.includes('@')) {

@@ -303,7 +303,7 @@ const WorkflowKanban: React.FC = () => {
                         {(provided, snapshot) => {
                           // Get organization_id from tags (use first tag's org_id)
                           const organizationId = candidate.tags && candidate.tags.length > 0
-                            ? candidate.tags[0].organization_id
+                            ? (candidate.tags[0]?.organization_id ?? '')
                             : '';
 
                           return (

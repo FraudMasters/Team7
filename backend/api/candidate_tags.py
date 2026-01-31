@@ -34,7 +34,7 @@ class CandidateTagCreate(BaseModel):
     tag_order: int = Field(0, ge=0, description="Order in which this tag appears in the UI")
     is_default: bool = Field(False, description="Whether this is a default tag for new organizations")
     is_active: bool = Field(True, description="Whether this tag is currently active")
-    color: Optional[str] = Field(None, regex=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display (e.g., #EF4444)")
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display (e.g., #EF4444)")
     description: Optional[str] = Field(None, max_length=500, description="Description of when to use this tag")
 
 
@@ -45,7 +45,7 @@ class CandidateTagUpdate(BaseModel):
     tag_order: Optional[int] = Field(None, ge=0, description="Order in which this tag appears in the UI")
     is_default: Optional[bool] = Field(None, description="Whether this is a default tag")
     is_active: Optional[bool] = Field(None, description="Whether this tag is currently active")
-    color: Optional[str] = Field(None, regex=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display")
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display")
     description: Optional[str] = Field(None, max_length=500, description="Description of when to use this tag")
 
 

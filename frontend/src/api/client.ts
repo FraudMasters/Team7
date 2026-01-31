@@ -367,6 +367,22 @@ export class ApiClient {
     return this.client;
   }
 
+  /**
+   * Generic POST request for custom endpoints
+   *
+   * @param url - Endpoint URL
+   * @param data - Request payload
+   * @returns Response data
+   * @throws ApiError if request fails
+   */
+  async post<T = unknown>(url: string, data?: unknown): Promise<AxiosResponse<T>> {
+    try {
+      return await this.client.post<T>(url, data);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
   // ==================== Skill Taxonomies ====================
 
   /**

@@ -20,6 +20,7 @@ import {
   CardContent,
   Tooltip,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
@@ -169,7 +170,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
   /**
    * Handle stage selection change
    */
-  const handleStageChange = useCallback((event: React.ChangeEvent<{ value: unknown }>) => {
+  const handleStageChange = useCallback((event: SelectChangeEvent<string>) => {
     setSelectedStageId(event.target.value as string);
     setError(null);
   }, []);
@@ -349,7 +350,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
 
       {/* Error Alert */}
       <Collapse in={!!error}>
-        <Alert severity={error?.includes(t('bulkActions.movePartialSuccess', { success: 0, failed: 0 }).split(' ')[0]) ? 'warning' : 'error'} sx={{ mt: 2 }}>
+        <Alert severity={(error && error.includes(t('bulkActions.movePartialSuccess', { success: 0, failed: 0 }).split(' ')[0])) ? 'warning' : 'error'} sx={{ mt: 2 }}>
           <Typography variant="body2">{error}</Typography>
         </Alert>
       </Collapse>

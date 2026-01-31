@@ -211,7 +211,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
     if (tag.color) return tag.color;
     // Default colors based on tag order
     const defaultColors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6B7280'];
-    return defaultColors[tag.tag_order % defaultColors.length];
+    return defaultColors[(tag.tag_order ?? 0) % defaultColors.length];
   }, []);
 
   /**

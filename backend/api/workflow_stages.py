@@ -32,7 +32,7 @@ class WorkflowStageCreate(BaseModel):
     stage_order: int = Field(..., ge=0, description="Order of this stage in the workflow")
     is_default: bool = Field(False, description="Whether this is a default stage for new organizations")
     is_active: bool = Field(True, description="Whether this stage is currently active")
-    color: Optional[str] = Field(None, regex=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display (e.g., #3B82F6)")
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display (e.g., #3B82F6)")
     description: Optional[str] = Field(None, max_length=500, description="Description of what happens in this stage")
 
 
@@ -43,7 +43,7 @@ class WorkflowStageUpdate(BaseModel):
     stage_order: Optional[int] = Field(None, ge=0, description="Order of this stage in the workflow")
     is_default: Optional[bool] = Field(None, description="Whether this is a default stage for new organizations")
     is_active: Optional[bool] = Field(None, description="Whether this stage is currently active")
-    color: Optional[str] = Field(None, regex=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display")
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display")
     description: Optional[str] = Field(None, max_length=500, description="Description of what happens in this stage")
 
 

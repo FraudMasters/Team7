@@ -11,12 +11,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Timeline,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineConnector,
-  TimelineContent,
-  TimelineDot,
   Avatar,
   Divider,
 } from '@mui/material';
@@ -378,115 +372,125 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
 
       {/* Activity Timeline */}
       <Paper elevation={1} sx={{ p: 3 }}>
-        <Timeline>
+        <Stack spacing={2}>
           {activities.map((activity, index) => {
             const display = getActivityTypeDisplay(activity.activity_type);
             const author = getAuthorName(activity.recruiter_id);
 
             return (
-              <TimelineItem key={activity.id}>
-                <TimelineSeparator>
-                  <TimelineDot color={display.color as any}>{display.icon}</TimelineDot>
-                  {index < activities.length - 1 && <TimelineConnector />}
-                </TimelineSeparator>
-                <TimelineContent sx={{ py: 2 }}>
-                  <Card
-                    variant="outlined"
-                    sx={{
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      '&:hover': {
-                        transform: 'translateX(4px)',
-                        boxShadow: 2,
-                      },
-                    }}
-                  >
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                      {/* Activity Header */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          mb: 1,
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip
-                            icon={display.icon}
-                            label={display.label}
-                            size="small"
-                            color={display.color as any}
-                            variant="outlined"
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            {formatTimestamp(activity.created_at)}
-                          </Typography>
-                        </Box>
-                        {activity.vacancy_id && (
-                          <Chip
-                            label={activity.vacancy_id.slice(0, 8)}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem' }}
-                          />
-                        )}
-                      </Box>
-
-                      {/* Activity Description */}
-                      <Typography variant="body2" color="text.primary" sx={{ mb: 1 }}>
-                        {getActivityDescription(activity)}
-                      </Typography>
-
-                      {/* Activity Details */}
-                      {(activity.from_stage || activity.to_stage || activity.reason) && (
-                        <Box sx={{ mt: 1 }}>
-                          {activity.from_stage && activity.to_stage && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                              <Chip
-                                label={activity.from_stage}
-                                size="small"
-                                sx={{ fontSize: '0.7rem', opacity: 0.8 }}
-                              />
-                              <SwapHorizIcon fontSize="small" color="action" />
-                              <Chip
-                                label={activity.to_stage}
-                                size="small"
-                                color="primary"
-                                sx={{ fontSize: '0.7rem' }}
-                              />
-                            </Box>
-                          )}
-                          {activity.reason && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                              "{activity.reason}"
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-
-                      {/* Author Info */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
-                        <Avatar
+              <Box key={activity.id}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateX(4px)',
+                      boxShadow: 2,
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    {/* Activity Header */}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 1,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
                           sx={{
-                            width: 24,
-                            height: 24,
-                            bgcolor: 'action.selected',
-                            fontSize: '0.7rem',
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            bgcolor: `${display.color}.main`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
                           }}
                         >
-                          {getAuthorInitials(author)}
-                        </Avatar>
+                          {display.icon}
+                        </Box>
+                        <Chip
+                          label={display.label}
+                          size="small"
+                          color={display.color as any}
+                          variant="outlined"
+                        />
                         <Typography variant="caption" color="text.secondary">
-                          {author}
+                          {formatTimestamp(activity.created_at)}
                         </Typography>
                       </Box>
-                    </CardContent>
-                  </Card>
-                </TimelineContent>
-              </TimelineItem>
+                      {activity.vacancy_id && (
+                        <Chip
+                          label={activity.vacancy_id.slice(0, 8)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                      )}
+                    </Box>
+
+                    {/* Activity Description */}
+                    <Typography variant="body2" color="text.primary" sx={{ mb: 1 }}>
+                      {getActivityDescription(activity)}
+                    </Typography>
+
+                    {/* Activity Details */}
+                    {(activity.from_stage || activity.to_stage || activity.reason) && (
+                      <Box sx={{ mt: 1 }}>
+                        {activity.from_stage && activity.to_stage && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                            <Chip
+                              label={activity.from_stage}
+                              size="small"
+                              sx={{ fontSize: '0.7rem', opacity: 0.8 }}
+                            />
+                            <SwapHorizIcon fontSize="small" color="action" />
+                            <Chip
+                              label={activity.to_stage}
+                              size="small"
+                              color="primary"
+                              sx={{ fontSize: '0.7rem' }}
+                            />
+                          </Box>
+                        )}
+                        {activity.reason && (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            "{activity.reason}"
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+
+                    {/* Author Info */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
+                      <Avatar
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          bgcolor: 'action.selected',
+                          fontSize: '0.7rem',
+                        }}
+                      >
+                        {getAuthorInitials(author)}
+                      </Avatar>
+                      <Typography variant="caption" color="text.secondary">
+                        {author}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+                {index < activities.length - 1 && (
+                  <Divider sx={{ mt: 2, borderColor: 'divider' }} />
+                )}
+              </Box>
             );
           })}
-        </Timeline>
+        </Stack>
       </Paper>
     </Stack>
   );
