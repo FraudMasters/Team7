@@ -270,6 +270,7 @@ docker-compose exec backend python scripts/reset_and_reload.py
 ## Documentation
 
 - [SETUP.md](SETUP.md) - Detailed installation instructions
+- [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Complete environment variables reference
 - [README_RU.md](README_RU.md) - Версия на русском языке
 - [ML_PIPELINE.md](ML_PIPELINE.md) - ML/NLP pipeline details
 
