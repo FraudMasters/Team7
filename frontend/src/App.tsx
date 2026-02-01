@@ -1,94 +1,73 @@
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '@components/Layout';
-import HomePage from '@pages/Home';
-import UploadPage from '@pages/Upload';
-import BatchUploadPage from '@pages/BatchUpload';
-import ResultsPage from '@pages/Results';
-import ComparePage from '@pages/Compare';
-import CompareVacancyPage from '@pages/CompareVacancy';
-import CompareCandidatesPage from '@pages/CompareCandidates';
-import AdminSynonymsPage from '@pages/AdminSynonyms';
-import AdminAnalyticsPage from '@pages/AdminAnalytics';
-import AnalyticsDashboardPage from '@pages/AnalyticsDashboard';
-import VacancyListPage from '@pages/VacancyList';
-import CreateVacancyPage from '@pages/CreateVacancy';
-import VacancyDetailsPage from '@pages/VacancyDetails';
-import ApplicationsPage from '@pages/Applications';
-import ResumeDatabasePage from '@pages/ResumeDatabase';
-import CandidateSearchPage from '@pages/CandidateSearch';
-import RecruiterDashboardPage from '@pages/RecruiterDashboard';
-import WorkflowBoardPage from '@pages/WorkflowBoard';
-import SkillGapAnalysisPage from '@pages/SkillGapAnalysis';
-import WeightCustomizationPage from '@pages/WeightCustomization';
-import IndustryTaxonomyManager from '@components/IndustryTaxonomyManager';
-import TaxonomyAnalytics from '@components/TaxonomyAnalytics';
-import PublicTaxonomyBrowser from '@components/PublicTaxonomyBrowser';
-import BackupsPage from '@pages/Backups';
+import LoadingSpinner from '@components/LoadingSpinner';
+
+// Lazy load all page components for code splitting and better performance
+const HomePage = lazy(() => import('@pages/Home'));
+const UploadPage = lazy(() => import('@pages/Upload'));
+const ResultsPage = lazy(() => import('@pages/Results'));
+const ComparePage = lazy(() => import('@pages/Compare'));
+const CompareVacancyPage = lazy(() => import('@pages/CompareVacancy'));
+const AdminSynonymsPage = lazy(() => import('@pages/AdminSynonyms'));
+const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalytics'));
+const AnalyticsDashboardPage = lazy(() => import('@pages/AnalyticsDashboard'));
+
+/**
+ * Loading fallback component for lazy-loaded routes
+ */
+const PageLoadingFallback = () => (
+  <LoadingSpinner size={60} label="Loading page..." />
+);
 
 /**
  * Main App Component
  *
  * Sets up React Router with all application routes.
+ * Uses React.lazy() for code splitting - each route is loaded on demand.
  * Uses the Layout component to provide consistent navigation and structure.
+ *
+ * Benefits of lazy loading:
+ * - Smaller initial bundle size
+ * - Faster initial page load
+ * - Better performance on slow networks
+ * - Code is loaded only when needed
  */
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Root route with Layout */}
-        <Route path="/" element={<Layout />}>
-          {/* Default home page */}
-          <Route index element={<HomePage />} />
+      <Suspense fallback={<PageLoadingFallback />}>
+        <Routes>
+          {/* Root route with Layout */}
+          <Route path="/" element={<Layout />}>
+            {/* Default home page */}
+            <Route index element={<HomePage />} />
 
-          {/* Legacy routes - kept for compatibility */}
-          <Route path="upload" element={<UploadPage />} />
-          <Route path="results/:id" element={<ResultsPage />} />
-          <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
-          <Route path="compare-vacancy/:vacancyId" element={<CompareVacancyPage />} />
-
-          {/* Job Seeker Module Routes */}
-          <Route path="jobs">
-            <Route index element={<VacancyListPage />} />
-            <Route path="create" element={<CreateVacancyPage />} />
+            {/* Resume upload page */}
             <Route path="upload" element={<UploadPage />} />
-            <Route path="batch-upload" element={<BatchUploadPage />} />
+
+            {/* Analysis results page with dynamic ID parameter */}
             <Route path="results/:id" element={<ResultsPage />} />
-            <Route path="applications" element={<ApplicationsPage />} />
-          </Route>
 
-          {/* Recruiter Module Routes */}
-          <Route path="recruiter">
-            <Route index element={<RecruiterDashboardPage />} />
-            <Route path="vacancies">
-              <Route index element={<VacancyListPage />} />
-              <Route path="create" element={<CreateVacancyPage />} />
-              <Route path=":id" element={<VacancyDetailsPage />} />
-              <Route path=":id/compare" element={<CompareCandidatesPage />} />
-            </Route>
-            <Route path="resumes" element={<ResumeDatabasePage />} />
-            <Route path="search" element={<CandidateSearchPage />} />
-            <Route path="workflow" element={<WorkflowBoardPage />} />
+            {/* Job comparison page with dynamic resume and vacancy ID parameters */}
+            <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
+
+            {/* Multi-resume comparison page for a specific vacancy */}
+            <Route path="compare-vacancy/:vacancyId" element={<CompareVacancyPage />} />
+
+            {/* Admin pages */}
+            <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
+            <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
+            <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
+
+            {/* Analytics dashboard */}
             <Route path="analytics" element={<AnalyticsDashboardPage />} />
-            <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
-            <Route path="weights" element={<WeightCustomizationPage />} />
+
+            {/* Catch-all route - redirect to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-
-          {/* Admin pages */}
-          <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
-          <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
-          <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
-          <Route path="admin/taxonomies" element={<IndustryTaxonomyManager />} />
-          <Route path="admin/taxonomy-analytics" element={<TaxonomyAnalytics />} />
-          <Route path="admin/public-taxonomies" element={<PublicTaxonomyBrowser />} />
-          <Route path="admin/backups" element={<BackupsPage />} />
-
-          {/* Analytics dashboard */}
-          <Route path="analytics" element={<AnalyticsDashboardPage />} />
-
-          {/* Catch-all route - redirect to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

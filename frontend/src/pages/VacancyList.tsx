@@ -16,7 +16,8 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  CircularProgress,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -26,6 +27,8 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useBreakpoints } from '../hooks/useBreakpoints';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface Vacancy {
   id: string;
@@ -49,6 +52,8 @@ const VacancyList: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const { isMobile, isTablet, isDesktop } = useBreakpoints();
 
   // Determine if we're in job seeker or recruiter context
   const isJobsContext = location.pathname.startsWith('/jobs');
@@ -155,62 +160,82 @@ const VacancyList: React.FC = () => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress size={60} />
+        <LoadingSpinner size={60} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+    <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, sm: 3 } }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" component="h1" fontWeight={600} gutterBottom>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          mb: { xs: 3, md: 4 },
+          gap: { xs: 2, sm: 0 },
+        }}
+      >
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography
+            variant={isMobile ? 'h5' : 'h4'}
+            component="h1"
+            fontWeight={600}
+            gutterBottom
+          >
             {t('vacancyList.title')}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography
+            variant={isMobile ? 'body2' : 'body1'}
+            color="text.secondary"
+          >
             {t('vacancyList.subtitle')}
           </Typography>
         </Box>
         <Button
           variant="contained"
-          size="large"
+          size={isMobile ? 'medium' : 'large'}
           startIcon={<AddIcon />}
           onClick={() => navigate(`${basePath}/create`)}
+          fullWidth={isMobile}
+          sx={{ minWidth: isMobile ? '100%' : 'auto' }}
         >
-          {t('vacancyList.createRequest')}
+          {isMobile ? t('vacancyList.createRequest') : t('vacancyList.createRequest')}
         </Button>
       </Box>
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: { xs: 2, md: 3 } }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
       {/* Vacancies List */}
       {vacancies.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: 'center' }}>
-          <WorkIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+        <Paper sx={{ p: { xs: 4, md: 6 }, textAlign: 'center' }}>
+          <WorkIcon sx={{ fontSize: { xs: 48, md: 60 }, color: 'text.secondary', mb: 2 }} />
+          <Typography variant={isMobile ? 'body1' : 'h6'} color="text.secondary" gutterBottom>
             {t('vacancyList.noActiveRequests')}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: { xs: 2, md: 3 } }}>
             {t('vacancyList.createFirstRequest')}
           </Typography>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => navigate(`${basePath}/create`)}
+            fullWidth={isMobile}
           >
             {t('vacancyList.createRequest')}
           </Button>
         </Paper>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, sm: 3 }}>
           {vacancies.map((vacancy) => (
-            <Grid item xs={12} md={6} lg={4} key={vacancy.id}>
+            <Grid item xs={12} sm={6} lg={4} key={vacancy.id}>
               <Card
                 sx={{
                   height: '100%',
@@ -223,80 +248,130 @@ const VacancyList: React.FC = () => {
                   },
                 }}
               >
-                <CardContent sx={{ flexGrow: 1 }}>
+                <CardContent sx={{ flexGrow: 1, pb: { xs: 1, sm: 2 } }}>
                   {/* Title */}
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                  <Typography
+                    variant={isMobile ? 'body1' : 'h6'}
+                    fontWeight={600}
+                    gutterBottom
+                    noWrap
+                  >
                     {vacancy.title}
                   </Typography>
 
                   {/* Salary */}
-                  <Typography variant="body2" color="primary" fontWeight={500} sx={{ mb: 1 }}>
+                  <Typography
+                    variant={isMobile ? 'caption' : 'body2'}
+                    color="primary"
+                    fontWeight={500}
+                    sx={{ mb: { xs: 0.5, md: 1 } }}
+                  >
                     {formatSalary(vacancy.salary_min, vacancy.salary_max)}
                   </Typography>
 
                   {/* Experience */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: { xs: 1, md: 2 } }}>
+                    <Typography variant={isMobile ? 'caption' : 'body2'} color="text.secondary">
                       {t('vacancyList.experience')}:
                     </Typography>
-                    <Typography variant="body2" fontWeight={500}>
+                    <Typography variant={isMobile ? 'caption' : 'body2'} fontWeight={500}>
                       {formatExperience(vacancy.min_experience_months)}
                     </Typography>
                   </Box>
 
                   {/* Skills */}
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                  <Box sx={{ mb: { xs: 1, md: 2 } }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
                       {t('vacancyList.requiredSkills', { count: vacancy.required_skills.length })}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {vacancy.required_skills.slice(0, 4).map((skill) => (
-                        <Chip key={skill} label={skill} size="small" variant="outlined" />
-                      ))}
-                      {vacancy.required_skills.length > 4 && (
+                      {vacancy.required_skills.slice(0, isMobile ? 3 : 4).map((skill) => (
                         <Chip
-                          label={t('vacancyList.more', { count: vacancy.required_skills.length - 4 })}
+                          key={skill}
+                          label={skill}
                           size="small"
                           variant="outlined"
+                          sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
+                        />
+                      ))}
+                      {vacancy.required_skills.length > (isMobile ? 3 : 4) && (
+                        <Chip
+                          label={t('vacancyList.more', { count: vacancy.required_skills.length - (isMobile ? 3 : 4) })}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
                         />
                       )}
                     </Box>
                   </Box>
 
                   {/* Meta info */}
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                     {vacancy.employment_type && (
-                      <Chip label={vacancy.employment_type} size="small" color="info" variant="outlined" />
+                      <Chip
+                        label={vacancy.employment_type}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                        sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
+                      />
                     )}
                     {vacancy.work_format && (
-                      <Chip label={vacancy.work_format} size="small" color="success" variant="outlined" />
+                      <Chip
+                        label={vacancy.work_format}
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
+                      />
                     )}
                     {vacancy.english_level && (
-                      <Chip label={`English: ${vacancy.english_level}`} size="small" />
+                      <Chip
+                        label={`English: ${vacancy.english_level}`}
+                        size="small"
+                        sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
+                      />
                     )}
                   </Stack>
                 </CardContent>
 
-                <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                <CardActions
+                  sx={{
+                    justifyContent: { xs: 'stretch', sm: 'space-between' },
+                    px: { xs: 1, sm: 2 },
+                    pb: { xs: 1, sm: 2 },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1, sm: 0 },
+                  }}
+                >
                   <Button
-                    size="small"
+                    size={isMobile ? 'small' : 'small'}
                     onClick={() => navigate(`${basePath}/${vacancy.id}`)}
+                    sx={{ flex: isMobile ? 1 : 'auto' }}
                   >
                     {t('vacancyList.moreDetails')}
                   </Button>
-                  <Box>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: { xs: 0.5, sm: 0 },
+                      justifyContent: { xs: 'stretch', sm: 'flex-end' },
+                    }}
+                  >
                     <IconButton
-                      size="small"
+                      size={isMobile ? 'small' : 'small'}
                       onClick={() => navigate(`${basePath}/${vacancy.id}/edit`)}
+                      sx={{ flex: isMobile ? 1 : 'auto' }}
                     >
-                      <EditIcon />
+                      <EditIcon fontSize={isMobile ? 'small' : 'medium'} />
                     </IconButton>
                     <IconButton
-                      size="small"
+                      size={isMobile ? 'small' : 'small'}
                       color="error"
                       onClick={() => handleDeleteClick(vacancy.id)}
+                      sx={{ flex: isMobile ? 1 : 'auto' }}
                     >
-                      <DeleteIcon />
+                      <DeleteIcon fontSize={isMobile ? 'small' : 'medium'} />
                     </IconButton>
                   </Box>
                 </CardActions>
@@ -307,7 +382,14 @@ const VacancyList: React.FC = () => {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        fullScreen={isMobile}
+        PaperProps={{
+          sx: { width: isMobile ? '100%' : 'auto' }
+        }}
+      >
         <DialogTitle>{t('vacancyList.deleteDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography>
@@ -315,8 +397,19 @@ const VacancyList: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>{t('common.cancel')}</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            fullWidth={isMobile}
+            sx={{ mb: isMobile ? 1 : 0 }}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            fullWidth={isMobile}
+          >
             {t('common.delete')}
           </Button>
         </DialogActions>

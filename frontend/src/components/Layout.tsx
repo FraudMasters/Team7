@@ -1,5 +1,5 @@
-import React, { ReactNode, useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import React, { ReactNode, useState, useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AppBar,
@@ -10,6 +10,14 @@ import {
   Button,
   Menu,
   MenuItem,
+  IconButton,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+  Collapse,
 } from '@mui/material';
 import {
   Description as ResumeIcon,
@@ -22,8 +30,15 @@ import {
   School as SchoolIcon,
   Tune as TuneIcon,
   Backup as BackupIcon,
+  Menu as MenuIcon,
+  Close as CloseIcon,
+  ExpandLess,
+  ExpandMore as ExpandMoreArrow,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
+import ThemeSwitcher from './ThemeSwitcher';
+import ResponsiveWrapper from './ResponsiveWrapper';
+import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 
 /**
  * Layout Component
@@ -38,13 +53,50 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [jobSeekerAnchorEl, setJobSeekerAnchorEl] = useState<null | HTMLElement>(null);
   const [recruiterAnchorEl, setRecruiterAnchorEl] = useState<null | HTMLElement>(null);
   const [adminAnchorEl, setAdminAnchorEl] = useState<null | HTMLElement>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileJobSeekerOpen, setMobileJobSeekerOpen] = useState(false);
+  const [mobileRecruiterOpen, setMobileRecruiterOpen] = useState(false);
+  const [mobileAdminOpen, setMobileAdminOpen] = useState(false);
+  const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false);
 
   const jobSeekerMenuOpen = Boolean(jobSeekerAnchorEl);
   const recruiterMenuOpen = Boolean(recruiterAnchorEl);
   const adminMenuOpen = Boolean(adminAnchorEl);
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+K or Cmd+K - Focus search or navigate to search page
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault();
+        navigate('/recruiter/search');
+      }
+
+      // Ctrl+/ or Cmd+/ - Show keyboard shortcuts
+      if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+        event.preventDefault();
+        setShortcutsDialogOpen(true);
+      }
+
+      // Alt+Home - Navigate to home
+      if (event.altKey && event.key === 'Home') {
+        event.preventDefault();
+        navigate('/');
+      }
+
+      // Escape - Close shortcuts dialog
+      if (event.key === 'Escape' && shortcutsDialogOpen) {
+        setShortcutsDialogOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate, shortcutsDialogOpen]);
 
   // Job Seeker Module menu items
   const jobSeekerItems = [
@@ -73,32 +125,186 @@ const Layout: React.FC<LayoutProps> = () => {
     { labelKey: 'nav.adminBackups', path: '/admin/backups', icon: <BackupIcon fontSize="small" /> },
   ];
 
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* App Bar / Navigation */}
-      <AppBar position="static" elevation={2}>
-        <Container maxWidth="lg">
-          <Toolbar disableGutters>
-            {/* Logo / Brand */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mr: 4 }}>
-              <ResumeIcon sx={{ mr: 1, fontSize: 32 }} />
-              <Typography
-                variant="h6"
-                component={Link}
-                to="/"
-                sx={{
-                  fontWeight: 700,
-                  color: 'inherit',
-                  textDecoration: 'none',
-                  letterSpacing: '-0.5px',
-                }}
-              >
-                {t('appName')}
-              </Typography>
-            </Box>
+  // Mobile menu handlers
+  const handleMobileMenuOpen = () => setMobileMenuOpen(true);
+  const handleMobileMenuClose = () => {
+    setMobileMenuOpen(false);
+    setMobileJobSeekerOpen(false);
+    setMobileRecruiterOpen(false);
+    setMobileAdminOpen(false);
+  };
 
-            {/* Navigation Links - Module Based */}
-            <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
+  const handleMobileJobSeekerToggle = () => {
+    setMobileJobSeekerOpen(!mobileJobSeekerOpen);
+    setMobileRecruiterOpen(false);
+    setMobileAdminOpen(false);
+  };
+
+  const handleMobileRecruiterToggle = () => {
+    setMobileRecruiterOpen(!mobileRecruiterOpen);
+    setMobileJobSeekerOpen(false);
+    setMobileAdminOpen(false);
+  };
+
+  const handleMobileAdminToggle = () => {
+    setMobileAdminOpen(!mobileAdminOpen);
+    setMobileJobSeekerOpen(false);
+    setMobileRecruiterOpen(false);
+  };
+
+  // Mobile menu drawer content
+  const mobileMenuContent = (
+    <Box sx={{ width: 280 }} role="presentation">
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <ResumeIcon sx={{ mr: 1, fontSize: 28 }} />
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            {t('appName')}
+          </Typography>
+        </Box>
+        <IconButton onClick={handleMobileMenuClose} size="large">
+          <CloseIcon />
+        </IconButton>
+      </Box>
+      <Divider />
+      <List>
+        {/* Job Seeker Module */}
+        <ListItem button onClick={handleMobileJobSeekerToggle}>
+          <ListItemIcon><WorkIcon /></ListItemIcon>
+          <ListItemText primary={t('nav.findJobs')} />
+          {mobileJobSeekerOpen ? <ExpandLess /> : <ExpandMoreArrow />}
+        </ListItem>
+        <Collapse in={mobileJobSeekerOpen} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {jobSeekerItems.map((item) => (
+              <ListItem
+                key={item.path}
+                button
+                component={Link}
+                to={item.path}
+                onClick={handleMobileMenuClose}
+                selected={location.pathname === item.path}
+                sx={{ pl: 4 }}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={t(item.labelKey)} />
+              </ListItem>
+            ))}
+          </List>
+        </Collapse>
+
+        {/* Recruiter Module */}
+        <ListItem button onClick={handleMobileRecruiterToggle}>
+          <ListItemIcon><RecruiterIcon /></ListItemIcon>
+          <ListItemText primary={t('nav.findEmployees')} />
+          {mobileRecruiterOpen ? <ExpandLess /> : <ExpandMoreArrow />}
+        </ListItem>
+        <Collapse in={mobileRecruiterOpen} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {recruiterItems.map((item) => (
+              <ListItem
+                key={item.path}
+                button
+                component={Link}
+                to={item.path}
+                onClick={handleMobileMenuClose}
+                selected={location.pathname === item.path}
+                sx={{ pl: 4 }}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={t(item.labelKey)} />
+              </ListItem>
+            ))}
+          </List>
+        </Collapse>
+
+        {/* Admin Module */}
+        <ListItem button onClick={handleMobileAdminToggle}>
+          <ListItemIcon><SettingsIcon /></ListItemIcon>
+          <ListItemText primary={t('nav.admin')} />
+          {mobileAdminOpen ? <ExpandLess /> : <ExpandMoreArrow />}
+        </ListItem>
+        <Collapse in={mobileAdminOpen} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {adminItems.map((item) => (
+              <ListItem
+                key={item.path}
+                button
+                component={Link}
+                to={item.path}
+                onClick={handleMobileMenuClose}
+                selected={location.pathname === item.path}
+                sx={{ pl: 4 }}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={t(item.labelKey)} />
+              </ListItem>
+            ))}
+          </List>
+        </Collapse>
+      </List>
+      <Divider />
+      <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <LanguageSwitcher />
+        <ThemeSwitcher />
+      </Box>
+    </Box>
+  );
+
+  return (
+    <ResponsiveWrapper>
+      {(isMobile) => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          {/* App Bar / Navigation */}
+          <AppBar position="static" elevation={2}>
+            <Container maxWidth="lg">
+              <Toolbar disableGutters>
+                {/* Logo / Brand */}
+                <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+                  <ResumeIcon sx={{ mr: 1, fontSize: 32 }} />
+                  <Typography
+                    variant="h6"
+                    component={Link}
+                    to="/"
+                    sx={{
+                      fontWeight: 700,
+                      color: 'inherit',
+                      textDecoration: 'none',
+                      letterSpacing: '-0.5px',
+                    }}
+                  >
+                    {t('appName')}
+                  </Typography>
+                </Box>
+
+                {/* Mobile Menu: Hamburger */}
+                {isMobile ? (
+                  <>
+                    <Box sx={{ flexGrow: 1 }} />
+                    <IconButton
+                      size="large"
+                      edge="end"
+                      color="inherit"
+                      aria-label="menu"
+                      onClick={handleMobileMenuOpen}
+                    >
+                      <MenuIcon />
+                    </IconButton>
+                    <Drawer
+                      anchor="left"
+                      open={mobileMenuOpen}
+                      onClose={handleMobileMenuClose}
+                      ModalProps={{
+                        keepMounted: true,
+                      }}
+                    >
+                      {mobileMenuContent}
+                    </Drawer>
+                  </>
+                ) : (
+                  <>
+                    {/* Desktop Navigation Links - Module Based */}
+                    <Box sx={{ flexGrow: 1, display: 'flex', gap: 1, ml: 2 }}>
               {/* Job Seeker Module */}
               <Button
                 color="inherit"
@@ -230,13 +436,17 @@ const Layout: React.FC<LayoutProps> = () => {
                   </MenuItem>
                 ))}
               </Menu>
-            </Box>
+                </Box>
 
-            {/* Language Switcher */}
-            <LanguageSwitcher />
-          </Toolbar>
-        </Container>
-      </AppBar>
+                {/* Language Switcher - Desktop */}
+                <LanguageSwitcher />
+                {/* Theme Switcher - Desktop */}
+                <ThemeSwitcher />
+                  </>
+                )}
+              </Toolbar>
+            </Container>
+          </AppBar>
 
       {/* Main Content Area */}
       <Box sx={{ flexGrow: 1, py: 4 }}>
@@ -265,6 +475,12 @@ const Layout: React.FC<LayoutProps> = () => {
         </Container>
       </Box>
     </Box>
+      )}
+      <KeyboardShortcutsHelp
+        open={shortcutsDialogOpen}
+        onClose={() => setShortcutsDialogOpen(false)}
+      />
+    </ResponsiveWrapper>
   );
 };
 

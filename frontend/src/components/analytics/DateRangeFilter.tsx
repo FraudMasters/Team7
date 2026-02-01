@@ -12,7 +12,6 @@ import {
   FormControl,
   InputLabel,
   Select,
-  SelectChangeEvent,
   MenuItem,
 } from '@mui/material';
 import {
@@ -64,7 +63,7 @@ interface DateRangeFilterProps {
  * Helper function to format date as ISO string (YYYY-MM-DD)
  */
 const formatDateAsISO = (date: Date): string => {
-  return date.toISOString().split('T')[0] || '';
+  return date.toISOString().split('T')[0];
 };
 
 /**
@@ -163,7 +162,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
    * Handle preset change
    */
   const handlePresetChange = useCallback(
-    (event: SelectChangeEvent<DateRangePreset>) => {
+    (event: React.ChangeEvent<{ value: unknown }>) => {
       const newPreset = event.target.value as DateRangePreset;
       setPreset(newPreset);
 

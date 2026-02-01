@@ -52,7 +52,7 @@ import {
   getSuggestedPresets,
 } from '@/data/positionPresets';
 
-const steps = ['Выбор позиции', 'Навыки', 'Условия', 'Описание'];
+const steps = ['Позиция и условия', 'Навыки', 'Описание'];
 
 interface SmartVacancyWizardProps {
   onComplete?: (vacancy: any) => void;
@@ -230,8 +230,6 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
         }
         return true;
       case 2:
-        return true;
-      case 3:
         if (!formData.description.trim()) {
           setError('Опишите обязанности и задачи');
           return false;
@@ -332,7 +330,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
   const PositionSelectionStep = () => {
     return (
       <Stack spacing={3}>
-        <Typography variant="h6">Выберите или введите позицию</Typography>
+        <Typography variant="h6">Позиция и условия работы</Typography>
 
         {/* Position Title Input with Suggestions */}
         <Box>
@@ -417,6 +415,87 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
               value={formData.salary_max || ''}
               onChange={handleSalaryMaxChange}
               placeholder="150000"
+            />
+          </Grid>
+        </Grid>
+
+        <Divider sx={{ my: 2 }} />
+
+        {/* Work Conditions - Combined from previous Conditions step */}
+        <Typography variant="subtitle1" fontWeight={600}>
+          Условия работы
+        </Typography>
+
+        <Grid container spacing={2}>
+          <Grid item xs={6}>
+            <FormControl fullWidth>
+              <InputLabel>Тип занятости</InputLabel>
+              <Select
+                value={formData.employment_type}
+                label="Тип занятости"
+                onChange={handleChange('employment_type')}
+              >
+                <MenuItem value="">Не указано</MenuItem>
+                <MenuItem value="full-time">Полный день</MenuItem>
+                <MenuItem value="part-time">Частичная занятость</MenuItem>
+                <MenuItem value="contract">Контракт</MenuItem>
+                <MenuItem value="freelance">Фриланс</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6}>
+            <FormControl fullWidth>
+              <InputLabel>Формат работы</InputLabel>
+              <Select
+                value={formData.work_format}
+                label="Формат работы"
+                onChange={handleChange('work_format')}
+              >
+                <MenuItem value="">Не указано</MenuItem>
+                <MenuItem value="remote">Удаленно</MenuItem>
+                <MenuItem value="office">В офисе</MenuItem>
+                <MenuItem value="hybrid">Гибридный</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6}>
+            <FormControl fullWidth>
+              <InputLabel>Уровень английского</InputLabel>
+              <Select
+                value={formData.english_level}
+                label="Уровень английского"
+                onChange={handleChange('english_level')}
+              >
+                <MenuItem value="">Не требуется</MenuItem>
+                <MenuItem value="A1">A1 - Beginner</MenuItem>
+                <MenuItem value="A2">A2 - Elementary</MenuItem>
+                <MenuItem value="B1">B1 - Intermediate</MenuItem>
+                <MenuItem value="B2">B2 - Upper-Intermediate</MenuItem>
+                <MenuItem value="C1">C1 - Advanced</MenuItem>
+                <MenuItem value="C2">C2 - Proficiency</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              label="Локация"
+              value={formData.location}
+              onChange={handleChange('location')}
+              placeholder="Москва, Санкт-Петербург"
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Индустрия / Компания"
+              value={formData.industry}
+              onChange={handleChange('industry')}
+              placeholder="IT, Финансы, E-commerce, Fintech"
             />
           </Grid>
         </Grid>
@@ -562,89 +641,6 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
     );
   };
 
-  // Conditions Step
-  const ConditionsStep = () => {
-    return (
-      <Stack spacing={3}>
-        <Typography variant="h6">Условия работы</Typography>
-
-        <Grid container spacing={2}>
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Тип занятости</InputLabel>
-              <Select
-                value={formData.employment_type}
-                label="Тип занятости"
-                onChange={handleChange('employment_type')}
-              >
-                <MenuItem value="">Не указано</MenuItem>
-                <MenuItem value="full-time">Полный день</MenuItem>
-                <MenuItem value="part-time">Частичная занятость</MenuItem>
-                <MenuItem value="contract">Контракт</MenuItem>
-                <MenuItem value="freelance">Фриланс</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Формат работы</InputLabel>
-              <Select
-                value={formData.work_format}
-                label="Формат работы"
-                onChange={handleChange('work_format')}
-              >
-                <MenuItem value="">Не указано</MenuItem>
-                <MenuItem value="remote">Удаленно</MenuItem>
-                <MenuItem value="office">В офисе</MenuItem>
-                <MenuItem value="hybrid">Гибридный</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Уровень английского</InputLabel>
-              <Select
-                value={formData.english_level}
-                label="Уровень английского"
-                onChange={handleChange('english_level')}
-              >
-                <MenuItem value="">Не требуется</MenuItem>
-                <MenuItem value="A1">A1 - Beginner</MenuItem>
-                <MenuItem value="A2">A2 - Elementary</MenuItem>
-                <MenuItem value="B1">B1 - Intermediate</MenuItem>
-                <MenuItem value="B2">B2 - Upper-Intermediate</MenuItem>
-                <MenuItem value="C1">C1 - Advanced</MenuItem>
-                <MenuItem value="C2">C2 - Proficiency</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6}>
-            <TextField
-              fullWidth
-              label="Локация"
-              value={formData.location}
-              onChange={handleChange('location')}
-              placeholder="Москва, Санкт-Петербург"
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Индустрия / Компания"
-              value={formData.industry}
-              onChange={handleChange('industry')}
-              placeholder="IT, Финансы, E-commerce, Fintech"
-            />
-          </Grid>
-        </Grid>
-      </Stack>
-    );
-  };
-
   // Description Step
   const DescriptionStep = () => {
     const skillsList = formData.required_skills.slice(0, 3).join(', ');
@@ -690,8 +686,6 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
       case 1:
         return <SkillsSelectionStep />;
       case 2:
-        return <ConditionsStep />;
-      case 3:
         return <DescriptionStep />;
       default:
         return null;

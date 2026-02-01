@@ -519,6 +519,154 @@ def calculate_multiple_skills_experience(
     }
 
 
+def calculate_dual_track_experience(
+    experience: List[Dict[str, Optional[str]]],
+    frameworks: List[str],
+    *,
+    case_sensitive: bool = False,
+    handle_overlaps: bool = True,
+) -> Dict[str, Optional[Union[int, str, List, Dict]]]:
+    """
+    Calculate dual-track experience: total experience and framework-specific experience.
+
+    This function provides a comprehensive view of a candidate's experience by calculating
+    both total work experience and experience with specific frameworks/technologies.
+    This is useful for understanding overall seniority while also assessing specialized
+    expertise in particular tech stacks.
+
+    Args:
+        experience: List of experience dictionaries, each containing:
+            - start: Start date string (required)
+            - end: End date string or None if current position (optional)
+            - company: Company name (optional, for logging)
+            - position: Job title (optional, for logging)
+            - description: Job description (optional)
+        frameworks: List of framework/technology names to calculate specific experience for
+            (e.g., ["React", "Spring Boot", "Django"])
+        case_sensitive: Whether framework matching should be case-sensitive
+        handle_overlaps: If True, merge overlapping periods to avoid double-counting
+
+    Returns:
+        Dictionary containing:
+            - total_experience: Dictionary with total work experience (months/years/periods)
+            - framework_experience: Dictionary with framework-specific experience data
+                including per-framework breakdown and summary
+            - summary: Human-readable summary of dual-track results
+            - error: Error message if calculation failed
+
+    Examples:
+        >>> experience = [
+        ...     {
+        ...         "start": "2020-05-01",
+        ...         "end": "2023-02-01",
+        ...         "description": "Full-stack development with React and Spring Boot"
+        ...     },
+        ...     {
+        ...         "start": "2023-02-01",
+        ...         "end": None,
+        ...         "description": "Backend development with Django"
+        ...     },
+        ... ]
+        >>> result = calculate_dual_track_experience(experience, ["React", "Django"])
+        >>> result["total_experience"]["total_months"]
+        46
+        >>> result["framework_experience"]["skills"]["React"]["total_months"]
+        33
+    """
+    if not experience:
+        return {
+            "total_experience": {
+                "total_months": 0,
+                "total_years": 0.0,
+                "periods": [],
+                "overlap_count": 0,
+            },
+            "framework_experience": {
+                "skills": {},
+                "summary": [],
+                "total_skills": 0,
+            },
+            "summary": "No experience data provided",
+        }
+
+    try:
+        # Calculate total experience
+        total_exp = calculate_total_experience(
+            experience,
+            handle_overlaps=handle_overlaps,
+            skip_invalid=True,
+        )
+
+        # Calculate framework-specific experience
+        framework_exp = calculate_multiple_skills_experience(
+            experience,
+            frameworks,
+            case_sensitive=case_sensitive,
+            handle_overlaps=handle_overlaps,
+        )
+
+        # Generate summary
+        summary_parts = []
+        total_months = total_exp.get("total_months")
+        total_years = total_exp.get("total_years")
+
+        if total_months is not None:
+            years = int(total_months // 12)
+            months = int(total_months % 12)
+
+            total_parts = []
+            if years > 0:
+                total_parts.append(f"{years} year{'s' if years != 1 else ''}")
+            if months > 0 or years == 0:
+                total_parts.append(f"{months} month{'s' if months != 1 else ''}")
+
+            summary_parts.append("Total Experience: " + " and ".join(total_parts))
+
+        # Add framework summary
+        framework_summary = framework_exp.get("summary", [])
+        if framework_summary:
+            top_frameworks = framework_summary[:3]  # Top 3 frameworks
+            framework_parts = []
+            for fw in top_frameworks:
+                fw_months = fw.get("total_months", 0)
+                if fw_months and fw_months > 0:
+                    fw_years = fw_months / 12
+                    framework_parts.append(
+                        f"{fw['skill']}: {fw_years:.1f} years ({fw_months} months)"
+                    )
+
+            if framework_parts:
+                summary_parts.append("Framework Experience: " + ", ".join(framework_parts))
+
+        summary = "\n".join(summary_parts) if summary_parts else "Unable to generate summary"
+
+        return {
+            "total_experience": total_exp,
+            "framework_experience": framework_exp,
+            "summary": summary,
+            "error": total_exp.get("error"),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating dual-track experience: {e}")
+        return {
+            "total_experience": {
+                "total_months": None,
+                "total_years": None,
+                "periods": [],
+                "overlap_count": 0,
+                "error": str(e),
+            },
+            "framework_experience": {
+                "skills": {},
+                "summary": [],
+                "total_skills": 0,
+            },
+            "summary": f"Error: {str(e)}",
+            "error": str(e),
+        }
+
+
 def format_experience_summary(
     experience_data: Dict[str, Optional[Union[int, str, List]]],
     *,
