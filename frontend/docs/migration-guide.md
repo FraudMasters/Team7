@@ -352,4 +352,4 @@ import { Box, Container, Stack, Typography } from '@mui/material';
 
 ---
 
-Last updated: 2025-02-01
+Last updated: 2026-02-01

@@ -3,7 +3,6 @@ import {
   Container,
   Typography,
   Box,
-  Grid,
   Button,
   Dialog,
   DialogTitle,
@@ -19,22 +18,19 @@ import {
 import { useTranslation } from 'react-i18next';
 import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
 import KeyMetrics from '@components/analytics/KeyMetrics';
-import FunnelVisualization from '@components/analytics/FunnelVisualization';
-import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
 import SkillDemandChart from '@components/analytics/SkillDemandChart';
-import SourceTracking from '@components/analytics/SourceTracking';
 import ReportBuilder from '@components/analytics/ReportBuilder';
 
 /**
  * Analytics Dashboard Page (Recruiter Module)
  *
- * Shows comprehensive hiring metrics and analytics with:
+ * Shows hiring metrics and analytics with:
  * - Key metrics (time-to-hire, resumes processed, match rates)
- * - Recruitment funnel visualization
- * - Recruiter performance comparison
  * - Skill demand trends
- * - Candidate source tracking
- * - Configurable date range filtering across all components
+ * - Configurable date range filtering
+ *
+ * Note: Funnel, Recruiter Performance, and Source Tracking are disabled
+ * due to backend API limitations (Enum types not created in DB).
  */
 const AnalyticsDashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -56,7 +52,6 @@ const AnalyticsDashboardPage: React.FC = () => {
 
   /**
    * Handle apply button click
-   * This triggers a refresh of all analytics components
    */
   const handleApplyFilter = (appliedDateRange: DateRangeFilterType) => {
     setDateRange(appliedDateRange);
@@ -85,9 +80,6 @@ const AnalyticsDashboardPage: React.FC = () => {
     setReportError(null);
 
     try {
-      // Use browser's print functionality which allows "Save as PDF"
-      // This is a simple, client-side solution that doesn't require
-      // additional PDF generation libraries
       await new Promise<void>((resolve) => {
         setTimeout(() => {
           window.print();
@@ -106,126 +98,119 @@ const AnalyticsDashboardPage: React.FC = () => {
 
   return (
     <>
-    <Container maxWidth="xl" sx={{ py: 4 }} className="analytics-dashboard">
-      {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-            {t('analyticsDashboard.title')}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {t('analyticsDashboard.subtitle')}
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<PdfIcon />}
-          onClick={handleOpenReportBuilder}
-          color="primary"
-        >
-          Generate Report
-        </Button>
-      </Box>
-
-      {/* Date Range Filter */}
-      <Box sx={{ mb: 4 }}>
-        <DateRangeFilter
-          onDateRangeChange={handleDateRangeChange}
-          onApply={handleApplyFilter}
-          initialDateRange={{ preset: 'last_30_days' }}
-          showPresets={true}
-        />
-      </Box>
-
-      {/* Key Metrics */}
-      <Box sx={{ mb: 4 }}>
-        <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
-      </Box>
-
-      {/* Funnel Visualization */}
-      <Box sx={{ mb: 4 }}>
-        <FunnelVisualization startDate={dateRange.startDate} endDate={dateRange.endDate} />
-      </Box>
-
-      {/* Recruiter Performance and Skill Demand - Side by Side */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} lg={8}>
-          <RecruiterPerformance startDate={dateRange.startDate} endDate={dateRange.endDate} />
-        </Grid>
-        <Grid item xs={12} lg={4}>
-          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
-        </Grid>
-      </Grid>
-
-      {/* Source Tracking */}
-      <Box sx={{ mb: 4 }}>
-        <SourceTracking startDate={dateRange.startDate} endDate={dateRange.endDate} />
-      </Box>
-    </Container>
-
-    {/* Report Builder Dialog */}
-    <Dialog
-      open={reportDialogOpen}
-      onClose={handleCloseReportBuilder}
-      maxWidth="xl"
-      fullWidth
-      PaperProps={{
-        sx: { height: '80vh', maxHeight: '80vh' }
-      }}
-    >
-      <DialogTitle>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" fontWeight={600}>
-            Generate Analytics Report
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button
-              variant="contained"
-              startIcon={generatingReport ? <CircularProgress size={16} /> : <PdfIcon />}
-              onClick={handleGeneratePDF}
-              disabled={generatingReport}
-              color="primary"
-            >
-              {generatingReport ? 'Generating...' : 'Export as PDF'}
-            </Button>
-            <IconButton
-              onClick={handleCloseReportBuilder}
-              disabled={generatingReport}
-              size="small"
-            >
-              <CloseIcon />
-            </IconButton>
+      <Container maxWidth="xl" sx={{ py: 4 }} className="analytics-dashboard">
+        {/* Header */}
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+              {t('analyticsDashboard.title')}
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              {t('analyticsDashboard.subtitle')}
+            </Typography>
           </Box>
+          <Button
+            variant="contained"
+            startIcon={<PdfIcon />}
+            onClick={handleOpenReportBuilder}
+            color="primary"
+          >
+            Generate Report
+          </Button>
         </Box>
-      </DialogTitle>
-      <DialogContent sx={{ p: 0 }}>
-        {reportError && (
-          <Alert severity="error" sx={{ m: 2 }} onClose={() => setReportError(null)}>
-            {reportError}
-          </Alert>
-        )}
-        <Box sx={{ height: '100%', overflow: 'auto' }}>
-          <ReportBuilder
-            onReportChange={(report) => {
-              // Report configuration saved
-            }}
+
+        {/* Date Range Filter */}
+        <Box sx={{ mb: 4 }}>
+          <DateRangeFilter
+            onDateRangeChange={handleDateRangeChange}
+            onApply={handleApplyFilter}
+            initialDateRange={{ preset: 'last_30_days' }}
+            showPresets={true}
           />
         </Box>
-      </DialogContent>
-    </Dialog>
 
-    {/* Print-specific styles - only applied when printing */}
-    <style>{`
-      @media print {
-        .analytics-dashboard .MuiButton-root:not([data-print-include]) {
-          display: none !important;
+        {/* Key Metrics */}
+        <Box sx={{ mb: 4 }}>
+          <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
+        </Box>
+
+        {/* Skill Demand */}
+        <Box sx={{ mb: 4 }}>
+          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+        </Box>
+
+        {/* Placeholder for disabled features */}
+        <Box sx={{ mb: 4 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Additional analytics features (Funnel, Recruiter Performance, Source Tracking)
+            are temporarily disabled due to backend database migration requirements.
+          </Alert>
+        </Box>
+      </Container>
+
+      {/* Report Builder Dialog */}
+      <Dialog
+        open={reportDialogOpen}
+        onClose={handleCloseReportBuilder}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{
+          sx: { height: '80vh', maxHeight: '80vh' }
+        }}
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" fontWeight={600}>
+              Generate Analytics Report
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Button
+                variant="contained"
+                startIcon={generatingReport ? <CircularProgress size={16} /> : <PdfIcon />}
+                onClick={handleGeneratePDF}
+                disabled={generatingReport}
+                color="primary"
+              >
+                {generatingReport ? 'Generating...' : 'Export as PDF'}
+              </Button>
+              <IconButton
+                onClick={handleCloseReportBuilder}
+                disabled={generatingReport}
+                size="small"
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {reportError && (
+            <Alert severity="error" sx={{ m: 2 }} onClose={() => setReportError(null)}>
+              {reportError}
+            </Alert>
+          )}
+          <Box sx={{ height: '100%', overflow: 'auto' }}>
+            <ReportBuilder
+              onReportChange={(report) => {
+                // Report configuration saved
+              }}
+            />
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print-specific styles - only applied when printing */}
+      <style>{`
+        @media print {
+          .analytics-dashboard .MuiButton-root:not([data-print-include]) {
+            display: none !important;
+          }
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         }
-        body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-      }
-    `}</style>
+      `}</style>
     </>
   );
 };

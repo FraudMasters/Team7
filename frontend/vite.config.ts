@@ -47,34 +47,24 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log'],
+        // Keep function names to avoid breaking runtime function calls
+        keep_fnames: true,
       },
     },
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // Separate vendor chunks for better caching
-          if (id.includes('node_modules')) {
-            // React core (most stable, longest cache)
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'react-vendor';
-            }
-            // Material UI (stable library)
-            if (id.includes('@mui/material') || id.includes('@mui/icons-material') ||
-                id.includes('@emotion/react') || id.includes('@emotion/styled')) {
-              return 'mui-vendor';
-            }
-            // API and data fetching
-            if (id.includes('axios')) {
-              return 'api-vendor';
-            }
-            // Virtual scrolling and performance libraries
-            if (id.includes('react-window') || id.includes('@hello-pangea/dnd')) {
-              return 'ui-vendor';
-            }
-            // Other third-party libraries
-            return 'vendor';
-          }
+        manualChunks: {
+          // Explicit chunk definition to avoid circular dependencies
+          // Using object syntax instead of function for better control
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-mui': [
+            '@mui/material',
+            '@mui/icons-material',
+            '@emotion/react',
+            '@emotion/styled',
+            'framer-motion',
+          ],
+          'vendor-data': ['axios', '@tanstack/react-query', '@tanstack/react-query-devtools'],
         },
         // Ensure consistent chunk hashes for better CDN caching
         chunkFileNames: 'assets/[name]-[hash].js',

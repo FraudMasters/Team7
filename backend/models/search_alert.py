@@ -1,10 +1,11 @@
 """
 SearchAlert model for notifications when new resumes match saved searches
 """
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Boolean, Text
+from sqlalchemy import DateTime, ForeignKey, Boolean, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -34,9 +35,9 @@ class SearchAlert(Base, UUIDMixin, TimestampMixin):
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     is_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", index=True)
-    sent_at: Mapped[Optional[object]] = mapped_column(
-        nullable=True
-    )  # DateTime timezone=True type
+    sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     def __repr__(self) -> str:

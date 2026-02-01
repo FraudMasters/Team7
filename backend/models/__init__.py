@@ -15,7 +15,7 @@ from .ml_model_version import MLModelVersion
 from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
-from .hiring_stage import HiringStage
+from .hiring_stage import HiringStage, HiringStageName
 from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
@@ -49,6 +49,7 @@ __all__ = [
     "ModelTrainingEvent",
     "UserPreferences",
     "HiringStage",
+    "HiringStageName",
     "AnalyticsEvent",
     "Recruiter",
     "Report",

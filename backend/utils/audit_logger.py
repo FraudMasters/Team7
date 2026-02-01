@@ -149,9 +149,9 @@ def get_request_context(request: Request) -> tuple[Optional[str], Optional[str]]
 def audit_action(
     action_type: Union[AuditActionType, str],
     entity_type: Optional[str] = None,
-    get_entity_id: Optional[Callable[[Any], Optional[UUID]] = None,
-    get_user_id: Optional[Callable[[Any], Optional[UUID]] = None,
-    get_org_id: Optional[Callable[[Any], Optional[UUID]] = None,
+    get_entity_id: Optional[Callable[[Any], Optional[UUID]]] = None,
+    get_user_id: Optional[Callable[[Any], Optional[UUID]]] = None,
+    get_org_id: Optional[Callable[[Any], Optional[UUID]]] = None,
     include_request_context: bool = True,
     log_before: bool = False,
     log_after: bool = False,

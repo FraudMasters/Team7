@@ -1,0 +1,120 @@
+ID,Title,Description,Priority,Complexity,Module,Dependencies,Status
+FR-001,Create SearchBar component,"Unified search input with 500ms debounce, clear button",High,Small,Search,,Backlog
+FR-002,Create SearchFilters component,"Advanced filters for skills, location, experience, salary",High,Medium,Search,FR-001,Backlog
+FR-003,Create SearchResults component,"Results list with match scores, virtual scrolling",High,Medium,Search,FR-001,Backlog
+FR-004,Create useSearch hook,"Hook for search API with caching",High,Small,Search,,Backlog
+FR-005,Add search types to types/api.ts,"SearchRequest, SearchResponse interfaces",High,Small,Search,,Backlog
+FR-006,Create SearchPage layout,"Grid layout: filters sidebar, results area",High,Medium,Search,FR-001;FR-002;FR-003,Backlog
+FR-007,Add skill autocomplete to filters,"Suggest skills from taxonomy",High,Small,Search,FR-002,Backlog
+FR-008,Add location autocomplete to filters,"Suggest locations",Medium,Small,Search,FR-002,Backlog
+FR-009,Implement pagination,"Load more or infinite scroll, 20 per page",Medium,Medium,Search,FR-003;FR-004,Backlog
+FR-010,Add search result sorting,"Sort by relevance, date, match score",Medium,Small,Search,FR-003,Backlog
+FR-011,Add empty state for no results,"No results with clear filters button",Low,Small,Search,FR-003,Backlog
+FR-012,Write E2E test for search flow,"Test search, filter, sort, click result",High,Medium,Search,FR-006,Backlog
+FR-020,Create SavedSearchCard component,"Card showing search name, criteria count",High,Small,Saved Searches,,Backlog
+FR-021,Create SavedSearchDialog component,"Form to name search, auto-match toggle",High,Medium,Saved Searches,FR-020,Backlog
+FR-022,Create useSavedSearches hook,"CRUD for saved searches API",High,Medium,Saved Searches,,Backlog
+FR-023,Create SavedSearchesPage layout,"Grid of saved search cards with FAB",High,Small,Saved Searches,FR-020,Backlog
+FR-024,Add edit saved search functionality,"Update search criteria and settings",High,Medium,Saved Searches,FR-021;FR-022,Backlog
+FR-025,Add delete saved search functionality,"Confirmation dialog, delete",High,Small,Saved Searches,FR-022,Backlog
+FR-026,Add one-click match button,"Triggers match endpoint",High,Medium,Saved Searches,FR-022,Backlog
+FR-027,Add match results view,"Show new matches since last run",Medium,Medium,Saved Searches,FR-026,Backlog
+FR-028,Add search alert indicators,"Badge for new matches",Medium,Small,Saved Searches,FR-020,Backlog
+FR-029,Write E2E test for saved searches,"Test create, edit, delete, match",High,Medium,Saved Searches,FR-023,Backlog
+FR-040,Create TagChip component,"Colored chip with remove button",High,Small,Tags,,Backlog
+FR-041,Create TagSelector component,"Multi-select with color picker",High,Medium,Tags,FR-040,Backlog
+FR-042,Create TagDialog component,"Create/edit tag: name, color, description",High,Small,Tags,,Backlog
+FR-043,Create useCandidateTags hook,"CRUD for tags API and assignment",High,Medium,Tags,,Backlog
+FR-044,Add tags to candidate card,"Show first 3 tags + overflow",High,Small,Tags,FR-040,Backlog
+FR-045,Add tag management page,"List all tags with color legend",Medium,Medium,Tags,FR-041;FR-042,Backlog
+FR-046,Add filter by tags to candidates,"Tag filter in kanban",High,Medium,Tags,FR-041,Backlog
+FR-047,Add tag colors preset,"Predefined colors",Low,Small,Tags,FR-042,Backlog
+FR-048,Add bulk tag assignment,"Select multiple, apply tag",Medium,Medium,Tags,FR-043,Backlog
+FR-049,Write E2E test for tags,"Test create, assign, filter, delete",High,Medium,Tags,FR-044,Backlog
+FR-060,Create NoteItem component,"Single note with author, timestamp",High,Small,Notes,,Backlog
+FR-061,Create NotesTimeline component,"Vertical timeline with notes",High,Medium,Notes,FR-060,Backlog
+FR-062,Create NoteDialog component,"Add/edit note with markdown",High,Medium,Notes,,Backlog
+FR-063,Create useCandidateNotes hook,"CRUD for notes API",High,Medium,Notes,,Backlog
+FR-064,Add notes to candidate detail,"Notes tab in profile",High,Small,Notes,FR-061,Backlog
+FR-065,Add note notification,"Badge for new notes",Medium,Small,Notes,FR-061,Backlog
+FR-066,Add note editing,"Edit with author validation",High,Medium,Notes,FR-062;FR-063,Backlog
+FR-067,Add note deletion,"Confirmation dialog",Medium,Small,Notes,FR-063,Backlog
+FR-068,Add @mentions in notes,"Autocomplete usernames",Low,Medium,Notes,FR-062,Backlog
+FR-069,Write E2E test for notes,"Test add, edit, delete",High,Medium,Notes,FR-064,Backlog
+FR-080,Create ReportCard component,"Card with report name, date, download",High,Small,Reports,,Backlog
+FR-081,Create ReportTemplates component,"Template selection with preview",High,Medium,Reports,,Backlog
+FR-082,Create ReportDownload component,"Download with progress, format selection",High,Medium,Reports,,Backlog
+FR-083,Create useReports hook,"List, generate, download, delete",High,Medium,Reports,,Backlog
+FR-084,Create ReportsPage layout,"List reports, generate button",High,Small,Reports,FR-080;FR-081,Backlog
+FR-085,Add report generation progress,"Progress indicator",High,Medium,Reports,FR-082;FR-083,Backlog
+FR-086,Add scheduled reports UI,"Configure frequency, recipients",Medium,Medium,Reports,FR-081,Backlog
+FR-087,Write E2E test for reports,"Test generate, download, delete",High,Medium,Reports,FR-084,Backlog
+FR-100,Create RankComparison component,"Side-by-side candidate comparison",Medium,Medium,Ranking,,Backlog
+FR-101,Create RankingFeedback component,"Thumbs up/down, comment",Medium,Small,Ranking,,Backlog
+FR-102,Create TopCandidates component,"Top 5 candidates display",Medium,Small,Ranking,,Backlog
+FR-103,Create useRanking hook,"Get rankings, submit feedback",Medium,Medium,Ranking,,Backlog
+FR-104,Add ranking to vacancy detail,"Show ranked candidates",Medium,Medium,Ranking,FR-102,Backlog
+FR-105,Add ranking history view,"Show changes over time",Low,Medium,Ranking,FR-103,Backlog
+FR-106,Write E2E test for ranking,"Test view rankings, feedback",Medium,Medium,Ranking,FR-104,Backlog
+FR-120,Create SkillGapChart component,"Bar chart: required vs actual",Medium,Medium,Skill Gap,,Backlog
+FR-121,Create GapAnalysisReport component,"Detailed gap report",Medium,Medium,Skill Gap,FR-120,Backlog
+FR-122,Create LearningRecommendations component,"List learning resources",Medium,Small,Skill Gap,,Backlog
+FR-123,Create useSkillGap hook,"Analyze gaps, generate plans",Medium,Medium,Skill Gap,,Backlog
+FR-124,Add skill gap to candidate detail,"Show gaps vs vacancy",Medium,Medium,Skill Gap,FR-120;FR-121,Backlog
+FR-125,Add learning plan generation,"Generate personalized plan",Low,Medium,Skill Gap,FR-122;FR-123,Backlog
+FR-126,Write E2E test for skill gap,"Test analyze, report, plan",Medium,Medium,Skill Gap,FR-124,Backlog
+FR-140,Create InterviewPrepPage,"Page for questions and tips",Medium,Medium,Interview Prep,,Backlog
+FR-141,Create QuestionGenerator component,"Generate questions",Medium,Medium,Interview Prep,,Backlog
+FR-142,Create InterviewTips component,"Show tips",Medium,Small,Interview Prep,,Backlog
+FR-143,Create useInterviewPrep hook,"Generate questions, get tips",Medium,Small,Interview Prep,,Backlog
+FR-144,Write E2E test for interview prep,"Test generate, view tips",Medium,Medium,Interview Prep,FR-141,Backlog
+FR-160,Create BatchUploadPage,"Drag-drop multiple files",Medium,Medium,Batch,,Backlog
+FR-161,Create BatchJobTracker component,"Job status, progress",Medium,Medium,Batch,,Backlog
+FR-162,Create BatchResults component,"Results table, download CSV",Medium,Small,Batch,,Backlog
+FR-163,Create useBatch hook,"Upload, status, results",Medium,Medium,Batch,,Backlog
+FR-164,Add batch upload to vacancies,"Upload resumes to vacancy",Medium,Medium,Batch,FR-160,Backlog
+FR-165,Write E2E test for batch,"Test upload, track, download",Medium,Medium,Batch,FR-161,Backlog
+FR-180,Create CandidateComparison component,"Side-by-side comparison",Medium,Medium,Comparison,,Backlog
+FR-181,Create ComparisonCriteria component,"Select fields to compare",Low,Small,Comparison,,Backlog
+FR-182,Add compare action to candidates,"Select and compare",Medium,Medium,Comparison,FR-180,Backlog
+FR-200,Create TaxonomyManager component,"Tree view of skills",Low,Medium,Taxonomy,,Backlog
+FR-201,Create TaxonomyImportExport component,"Upload/download JSON",Low,Medium,Taxonomy,,Backlog
+FR-202,Create SharedTaxonomies component,"Browse shared taxonomies",Low,Small,Taxonomy,,Backlog
+FR-203,Create TaxonomyVersions component,"Version history",Low,Medium,Taxonomy,,Backlog
+FR-204,Create useTaxonomy hook,"CRUD taxonomies",Low,Medium,Taxonomy,,Backlog
+FR-205,Write E2E test for taxonomy,"Test create, import, export",Low,Medium,Taxonomy,FR-200,Backlog
+FR-220,Create WeightsConfigPage component,"Sliders for weights",Low,Medium,Weights,,Backlog
+FR-221,Create PresetProfiles component,"Select presets",Low,Small,Weights,,Backlog
+FR-222,Create WeightComparison component,"Compare profiles",Low,Medium,Weights,,Backlog
+FR-223,Create useWeights hook,"Get, set weights",Low,Medium,Weights,,Backlog
+FR-240,Create PerformanceDashboard component,"Charts for metrics",Low,Medium,Performance,,Backlog
+FR-241,Create SystemHealth component,"Status indicators",Low,Small,Performance,,Backlog
+FR-242,Create MLPerformance component,"Model accuracy charts",Low,Medium,Performance,,Backlog
+FR-243,Create useMonitoring hook,"Fetch metrics",Low,Small,Performance,,Backlog
+FR-260,Create BackupManager component,"List, create backups",Low,Medium,Backups,,Backlog
+FR-261,Create BackupScheduler component,"Configure schedule",Low,Medium,Backups,,Backlog
+FR-262,Create BackupRestore component,"Select backup, restore",Low,Medium,Backups,,Backlog
+FR-263,Create useBackups hook,"Backup operations",Low,Medium,Backups,,Backlog
+FR-264,Write E2E test for backups,"Test create, download",Low,Medium,Backups,FR-260,Backlog
+FR-280,Create FairnessDashboard component,"Bias metrics",Low,Medium,Fairness,,Backlog
+FR-281,Create FairnessAlerts component,"Alert configuration",Low,Medium,Fairness,,Backlog
+FR-282,Create FairnessReports component,"Generate reports",Low,Medium,Fairness,,Backlog
+FR-283,Create useFairness hook,"Fetch metrics",Low,Small,Fairness,,Backlog
+FR-300,Create WorkExperienceTimeline component,"Timeline of history",Low,Medium,Experience,,Backlog
+FR-301,Add experience to candidate detail,"Display in profile",Medium,Small,Experience,FR-300,Backlog
+FR-302,Create ExperienceValidation component,"Validate vs requirements",Low,Medium,Experience,,Backlog
+FR-303,Write E2E test for experience,"Test display",Low,Small,Experience,FR-301,Backlog
+FR-320,Create StageConfigPage component,"Configure custom stages",Medium,Medium,Workflow,,Backlog
+FR-321,Add stage metrics to kanban,"Count per stage",Medium,Small,Workflow,,Backlog
+FR-322,Create CustomStageDialog component,"Create/edit stage",Medium,Medium,Workflow,FR-320,Backlog
+FR-323,Write E2E test for stages,"Test create, move",Medium,Medium,Workflow,FR-320,Backlog
+FR-900,Add error boundaries,"Wrap all pages",High,Small,Improvements,,Backlog
+FR-901,Add loading skeletons,"For all components",Medium,Medium,Improvements,,Backlog
+FR-902,Add toast notifications,"Success/error toasts",High,Medium,Improvements,,Backlog
+FR-903,Add optimistic updates,"Immediate UI updates",Medium,Medium,Improvements,,Backlog
+FR-904,Add proper empty states,"Consistent empty states",Medium,Small,Improvements,,Backlog
+FR-905,Add keyboard shortcuts,"Common shortcuts",Low,Medium,Improvements,,Backlog
+FR-906,Add pagination,"Consistent component",Medium,Medium,Improvements,,Backlog
+FR-907,Add TypeScript strict mode,"Enable strict",Medium,Large,Improvements,,Backlog
+FR-908,Add unit tests,"70% coverage",High,Large,Improvements,,Backlog
+FR-909,Add E2E tests,"Critical path coverage",High,Large,Improvements,,Backlog
