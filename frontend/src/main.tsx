@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider as MuiThemeProvider, CssBaseline } from '@mui/material';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider, useThemeContext } from './contexts/ThemeContext';
+import QueryProvider from './providers/QueryProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
 import './index.css';
@@ -39,7 +40,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <LanguageProvider>
         <ThemeProvider>
-          <AppWithTheme />
+          <QueryProvider>
+            <AppWithTheme />
+          </QueryProvider>
         </ThemeProvider>
       </LanguageProvider>
     </React.StrictMode>
