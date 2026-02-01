@@ -67,59 +67,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    // Optimize chunk sizes for faster initial load
+    // Disable manualChunks to avoid circular dependency issues with emotion/mui
+    // Vite's default chunking strategy is safer and works correctly
     rollupOptions: {
       output: {
-        // More granular chunk splitting for better caching and parallel loading
-        manualChunks: (id) => {
-          // React core - rarely changes, good for caching
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'react-core';
-          }
-          // React Router - separate for route lazy loading
-          if (id.includes('node_modules/react-router/')) {
-            return 'react-router';
-          }
-          // Material UI - split into smaller chunks
-          if (id.includes('node_modules/@mui/material/')) {
-            // Split heavy components
-            if (id.includes('@mui/material/Grid') || id.includes('@mui/material/Container')) {
-              return 'mui-layout';
-            }
-            if (id.includes('@mui/material/Table') || id.includes('@mui/material/DataGrid')) {
-              return 'mui-table';
-            }
-            return 'mui-core';
-          }
-          // MUI Icons - very large, keep separate
-          if (id.includes('node_modules/@mui/icons-material/')) {
-            return 'mui-icons';
-          }
-          // Emotion (CSS-in-JS) - separate for better caching
-          if (id.includes('node_modules/@emotion/')) {
-            return 'emotion';
-          }
-          // API client - small, rarely changes
-          if (id.includes('node_modules/axios/')) {
-            return 'api-client';
-          }
-          // DnD library - only used on workflow page
-          if (id.includes('node_modules/@hello-pangea/dnd/')) {
-            return 'dnd-library';
-          }
-          // Date utilities - only used where dates are needed
-          if (id.includes('node_modules/date-fns/')) {
-            return 'date-utils';
-          }
-          // i18n - rarely changes
-          if (id.includes('node_modules/i18next/')) {
-            return 'i18n';
-          }
-          // Other node_modules
-          if (id.includes('node_modules/')) {
-            return 'vendor';
-          }
-        },
         // Optimize chunk file names for better caching
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',

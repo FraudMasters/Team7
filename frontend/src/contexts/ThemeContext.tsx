@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from '@mui/material/styles';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { createTheme, Theme } from '@mui/material/styles';
 
 /**

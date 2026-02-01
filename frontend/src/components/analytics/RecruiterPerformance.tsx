@@ -136,23 +136,23 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   /**
    * Get time-to-hire color configuration based on days
    */
-  const getTimeToHireConfig = (days: number) => {
+  const getTimeToHireConfig = (days: number): { color: 'success' | 'warning' | 'error'; label: string; bgColor?: string } => {
     if (days <= 30) {
       return {
-        color: 'success' as const;
+        color: 'success',
         label: 'Fast',
         bgColor: 'success.main',
       };
     }
     if (days <= 45) {
       return {
-        color: 'warning' as const;
+        color: 'warning',
         label: 'Moderate',
         bgColor: 'warning.main',
       };
     }
     return {
-      color: 'error' as const;
+      color: 'error',
       label: 'Slow',
       bgColor: 'error.main',
     };
@@ -161,22 +161,22 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   /**
    * Get offer acceptance rate color configuration
    */
-  const getAcceptanceRateConfig = (rate: number) => {
+  const getAcceptanceRateConfig = (rate: number): { color: 'success' | 'warning' | 'error'; label: string } => {
     const percentage = rate * 100;
     if (percentage >= 90) {
       return {
-        color: 'success' as const;
+        color: 'success',
         label: 'Excellent',
       };
     }
     if (percentage >= 80) {
       return {
-        color: 'warning' as const;
+        color: 'warning',
         label: 'Good',
       };
     }
     return {
-      color: 'error' as const;
+      color: 'error',
       label: 'Low',
     };
   };
@@ -184,19 +184,19 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   /**
    * Get satisfaction score color configuration
    */
-  const getSatisfactionConfig = (score: number) => {
+  const getSatisfactionConfig = (score: number): { color: 'success' | 'warning' | 'error' } => {
     if (score >= 4.5) {
       return {
-        color: 'success' as const,
+        color: 'success',
       };
     }
     if (score >= 4.0) {
       return {
-        color: 'warning' as const,
+        color: 'warning',
       };
     }
     return {
-      color: 'error' as const,
+      color: 'error',
     };
   };
 
@@ -262,17 +262,18 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
     );
   }
 
-  // Calculate summary statistics
-  const topPerformer = data.recruiters[0];
+  // Calculate summary statistics (data.recruiters is guaranteed to have at least one item here)
+  const recruitersList = data.recruiters;
+  const topPerformer = recruitersList[0]!;
   const avgTimeToHire =
-    data.recruiters.reduce((sum, r) => sum + r.average_time_to_hire, 0) /
-    data.recruiters.length;
+    recruitersList.reduce((sum, r) => sum + r.average_time_to_hire, 0) /
+    recruitersList.length;
   const avgAcceptanceRate =
-    data.recruiters.reduce((sum, r) => sum + r.offer_acceptance_rate, 0) /
-    data.recruiters.length;
+    recruitersList.reduce((sum, r) => sum + r.offer_acceptance_rate, 0) /
+    recruitersList.length;
   const avgSatisfaction =
-    data.recruiters.reduce((sum, r) => sum + r.candidate_satisfaction_score, 0) /
-    data.recruiters.length;
+    recruitersList.reduce((sum, r) => sum + r.candidate_satisfaction_score, 0) /
+    recruitersList.length;
 
   return (
     <Stack spacing={3}>
@@ -284,7 +285,7 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
               Recruiter Performance Comparison
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Comparing <strong>{data.recruiters.length}</strong> recruiters •{' '}
+              Comparing <strong>{recruitersList.length}</strong> recruiters •{' '}
               <strong>{data.total_recruiters}</strong> total recruiters in organization
             </Typography>
           </Box>
@@ -451,7 +452,7 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {data.recruiters.map((recruiter, index) => {
+              {recruitersList.map((recruiter, index) => {
                 const timeConfig = getTimeToHireConfig(recruiter.average_time_to_hire);
                 const acceptanceConfig = getAcceptanceRateConfig(recruiter.offer_acceptance_rate);
                 const satisfactionConfig = getSatisfactionConfig(recruiter.candidate_satisfaction_score);

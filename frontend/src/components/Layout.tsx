@@ -252,8 +252,8 @@ const Layout: React.FC<LayoutProps> = () => {
   );
 
   return (
-    <ResponsiveWrapper>
-      {(isMobile) => (
+    <>
+      <ResponsiveWrapper render={(isMobile) => (
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           {/* App Bar / Navigation */}
           <AppBar position="static" elevation={2}>
@@ -475,12 +475,12 @@ const Layout: React.FC<LayoutProps> = () => {
         </Container>
       </Box>
     </Box>
-      )}
+      )} />
       <KeyboardShortcutsHelp
         open={shortcutsDialogOpen}
         onClose={() => setShortcutsDialogOpen(false)}
       />
-    </ResponsiveWrapper>
+    </>
   );
 };
 
