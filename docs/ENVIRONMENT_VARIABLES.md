@@ -22,6 +22,7 @@ Comprehensive guide to all environment variables used in AgentHR for configurati
 - [Analysis Configuration](#analysis-configuration)
 - [Development Settings](#development-settings)
 - [Production Deployment](#production-deployment)
+- [Quick Reference Tables](#quick-reference-tables)
 - [Environment-Specific Examples](#environment-specific-examples)
 - [Troubleshooting](#troubleshooting)
 
@@ -2900,6 +2901,202 @@ services:
           cpus: '4.0'
           memory: 8G
 ```
+
+---
+
+## Quick Reference Tables
+
+Quick reference for the most commonly used environment variables across different deployment environments.
+
+### Core Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `DEBUG` | `true` | `false` | `false` | Never enable in production |
+| `LOG_LEVEL` | `DEBUG` | `INFO` | `INFO` | Use DEBUG for local troubleshooting |
+| `LOG_FORMAT` | `text` | `json` | `json` | JSON for log aggregation in production |
+| `RELOAD` | `true` | `false` | `false` | Auto-reload on code changes (dev only) |
+| `TESTING` | `false` | `false` | `false` | Set to `true` only when running tests |
+
+---
+
+### Database Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/resume_analysis_dev` | `postgresql://staging_user:<pass>@staging-db:5432/resume_analysis_staging` | `postgresql://prod_user:<pass>@prod-db:5432/resume_analysis` | Use strong passwords in non-dev |
+| `DB_POOL_SIZE` | `5` | `15` | `30-50` | Scale based on worker count |
+| `DB_MAX_OVERFLOW` | `5` | `10` | `15-25` | ~50% of pool size |
+| `DB_POOL_RECYCLE` | `3600` | `3600` | `3600` | Recycle connections every hour |
+| `DB_POOL_TIMEOUT` | `30` | `30` | `30` | Seconds to wait for connection |
+
+**Pool Size Formula**: `DB_POOL_SIZE >= CELERY_WORKER_CONCURRENCY * 2`
+
+---
+
+### Redis Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `REDIS_URL` | `redis://localhost:6379/0` | `redis://staging-redis:6379/0` | `redis://prod-redis:6379/0` | Use Redis Sentinel for HA in prod |
+| `CELERY_BROKER_URL` | `redis://localhost:6379/0` | `redis://staging-redis:6379/0` | `redis://prod-redis:6379/0` | Same as REDIS_URL typically |
+| `CELERY_RESULT_BACKEND` | `redis://localhost:6379/0` | `redis://staging-redis:6379/0` | `redis://prod-redis:6379/0` | Where task results stored |
+
+---
+
+### Backend API Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `BACKEND_HOST` | `0.0.0.0` | `0.0.0.0` | `0.0.0.0` | Bind to all interfaces |
+| `BACKEND_PORT` | `8000` | `8000` | `8080` | Use 8080 in production (behind reverse proxy) |
+| `FRONTEND_URL` | `http://localhost:5173` | `https://staging.example.com` | `https://app.example.com` | Must match frontend URL |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | `https://staging.example.com` | `https://app.example.com,https://www.example.com` | Comma-separated, exact match required |
+
+---
+
+### Frontend Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `VITE_API_URL` | `http://localhost:8000` | `https://staging-api.example.com` | `https://api.example.com` | Backend API URL |
+| `VITE_ENABLE_REACT_DEVTOOLS` | `true` | `false` | `false` | Enable React DevTools plugin |
+| `VITE_DEBUG` | `true` | `false` | `false` | Additional frontend debug logging |
+| `VITE_ENABLE_ANALYTICS` | `false` | `false` | `true` | Google Analytics tracking |
+| `VITE_ENABLE_ERROR_TRACKING` | `false` | `true` | `true` | Sentry error tracking |
+| `VITE_SENTRY_ENVIRONMENT` | `development` | `staging` | `production` | Sentry environment name |
+
+---
+
+### Security Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `SECRET_KEY` | `dev-secret-key` | `<staging-secret>` | `<strong-secret>` | Generate with `openssl rand -hex 32` |
+| `JWT_ALGORITHM` | `HS256` | `HS256` | `RS256` | Use RS256 in production (asymmetric keys) |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | `30` | `30` | Shorter is more secure |
+| `RATE_LIMIT_PER_MINUTE` | `100` | `60` | `60` | Adjust based on traffic patterns |
+
+⚠️ **CRITICAL**: Use different `SECRET_KEY` values for each environment. Never commit secrets to version control.
+
+---
+
+### File Upload Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `MAX_UPLOAD_SIZE_MB` | `10` | `10` | `10` | Maximum file size in MB |
+| `ALLOWED_FILE_TYPES` | `.pdf,.docx` | `.pdf,.docx` | `.pdf,.docx` | Comma-separated extensions |
+| `UPLOAD_DIR` | `./uploads` | `/var/uploads` | `/var/uploads` | Use absolute path in production |
+| `ENABLE_FILE_CLEANUP` | `true` | `true` | `true` | Auto-delete old files |
+| `FILE_RETENTION_HOURS` | `24` | `48` | `48` | How long to keep uploaded files |
+
+---
+
+### Celery Worker Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `CELERY_WORKER_CONCURRENCY` | `2` | `4` | `8-16` | Parallel tasks per worker |
+| `CELERY_LOG_LEVEL` | `DEBUG` | `INFO` | `INFO` | Worker log level |
+| `CELERY_TASK_TIME_LIMIT` | `300` | `300` | `300` | Max seconds per task (hard limit) |
+| `CELERY_TASK_SOFT_TIME_LIMIT` | `280` | `280` | `280` | Graceful shutdown time (soft limit) |
+| `CELERY_TASK_MAX_RETRIES` | `3` | `3` | `3` | Retry failed tasks |
+| `CELERY_RESULT_EXPIRES` | `86400` | `86400` | `86400` | Result cache duration (seconds, 1 day) |
+
+**Worker Pool Sizing**: `DB_POOL_SIZE = CELERY_WORKER_CONCURRENCY * 10` (recommended)
+
+---
+
+### ML Models Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `KEYBERT_MODEL` | `distilbert-base-nli-mean-tokens` | `distilbert-base-nli-mean-tokens` | `sentence-transformers/all-MiniLM-L6-v2` | MiniLM is faster for production |
+| `SPACY_MODEL_EN` | `en_core_web_sm` | `en_core_web_sm` | `en_core_web_sm` | Use `_sm` for production |
+| `SPACY_MODEL_RU` | `ru_core_news_sm` | `ru_core_news_sm` | `ru_core_news_sm` | Small model for Russian |
+| `SENTENCE_TRANSFORMER_MODEL` | `all-MiniLM-L6-v2` | `all-MiniLM-L6-v2` | `all-MiniLM-L6-v2` | Balance speed and accuracy |
+| `MODELS_CACHE_PATH` | `./models_cache` | `/app/models_cache` | `/app/models_cache` | Use persistent volume in production |
+
+**Model Performance Trade-offs**:
+- `distilbert-base`: ~250MB, moderate CPU, good accuracy
+- `all-MiniLM-L6-v2`: ~80MB, low CPU, fast inference
+- `en_core_web_sm`: ~12MB, optimized for production
+- `en_core_web_md`: ~40MB, better accuracy, moderate resources
+
+---
+
+### Analysis Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `ANALYSIS_TIMEOUT_SECONDS` | `300` | `300` | `300` | Max analysis time (5 minutes) |
+| `ENABLE_KEYWORD_EXTRACTION` | `true` | `true` | `true` | Extract keywords from resumes |
+| `ENABLE_NER_EXTRACTION` | `true` | `true` | `true` | Named Entity Recognition |
+| `ENABLE_GRAMMAR_CHECK` | `true` | `true` | `true` | Spelling/grammar checking |
+| `ENABLE_EXPERIENCE_CALCULATION` | `true` | `true` | `true` | Calculate work experience |
+| `ENABLE_ERROR_DETECTION` | `true` | `true` | `true` | Detect resume errors |
+| `KEYWORD_EXTRACTION_TOP_N` | `20` | `20` | `20` | Number of keywords to extract |
+| `ATS_THRESHOLD` | `0.6` | `0.6` | `0.6` | Minimum ATS score to pass (0.0-1.0) |
+
+---
+
+### LLM API Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `LLM_PROVIDER` | `zai` | `zai` | `anthropic` or `openai` | Choose provider for ATS simulation |
+| `LLM_MODEL` | `claude-3-5-sonnet-20241022` | `claude-3-5-sonnet-20241022` | `claude-3-5-sonnet-20241022` | Model to use |
+| `LLM_TEMPERATURE` | `0.1` | `0.1` | `0.1` | Lower = more deterministic |
+| `LLM_MAX_TOKENS` | `4096` | `4096` | `4096` | Max response tokens |
+| `ZAI_API_KEY` | `<dev-key>` | `<staging-key>` | `<prod-key>` | Z.ai API key |
+| `OPENAI_API_KEY` | `<dev-key>` | `<staging-key>` | `<prod-key>` | OpenAI API key |
+| `ANTHROPIC_API_KEY` | `<dev-key>` | `<staging-key>` | `<prod-key>` | Anthropic API key |
+
+⚠️ **COST MANAGEMENT**: Set up spending limits on all LLM provider accounts to prevent unexpected charges.
+
+---
+
+### Backup Configuration
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `ENABLE_AUTO_BACKUP` | `false` | `true` | `true` | Enable automatic backups |
+| `BACKUP_INTERVAL_HOURS` | `24` | `24` | `24` | Backup frequency |
+| `BACKUP_RETENTION_DAYS` | `7` | `7` | `30` | Days to keep backups |
+| `BACKUP_S3_ENABLED` | `false` | `true` | `true` | Store backups in S3 |
+| `BACKUP_S3_BUCKET` | N/A | `staging-backups` | `production-backups` | S3 bucket name |
+| `BACKUP_S3_REGION` | N/A | `us-east-1` | `us-east-1` | AWS region |
+
+---
+
+### Monitoring & Alerting
+
+| Variable | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| `ENABLE_PROMETHEUS_METRICS` | `false` | `true` | `true` | Prometheus metrics endpoint |
+| `PROMETHEUS_PORT` | `9090` | `9090` | `9090` | Metrics port |
+| `ALERT_EMAIL_ADDRESS` | N/A | `staging@example.com` | `ops@example.com` | Alert notifications |
+| `VITE_GA_TRACKING_ID` | N/A | N/A | `UA-XXXXXXXXX-X` | Google Analytics (optional) |
+| `SENTRY_DSN` | N/A | `<staging-dsn>` | `<production-dsn>` | Error tracking DSN |
+
+---
+
+### Resource Limits (Docker)
+
+| Resource | Development | Staging | Production | Notes |
+|----------|------------|---------|------------|-------|
+| **Backend CPU** | `1.0` | `2.0` | `4.0` | CPU cores |
+| **Backend Memory** | `1G` | `4G` | `8G` | RAM |
+| **Worker CPU** | `1.0` | `2.0` | `4.0` | CPU cores |
+| **Worker Memory** | `1G` | `4G` | `8G` | RAM |
+| **PostgreSQL CPU** | `0.5` | `1.0` | `2.0` | CPU cores |
+| **PostgreSQL Memory** | `512M` | `2G` | `4G` | RAM |
+
+**Scaling Guide**:
+- **Small team** (< 50 users): Use development/staging values
+- **Medium team** (50-200 users): Use staging values
+- **Large team** (200+ users): Use production values and scale horizontally
 
 ---
 
