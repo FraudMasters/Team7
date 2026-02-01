@@ -12,6 +12,7 @@ The unified approach provides the best of all worlds:
 - Semantic understanding
 """
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -58,6 +59,7 @@ class UnifiedMatchResult:
             "passed": self.passed,
             "keyword_score": self.keyword_score,
             "keyword_passed": self.keyword_passed,
+            "keyword_matches": self.keyword_matches,
             "tfidf_score": self.tfidf_score,
             "tfidf_passed": self.tfidf_passed,
             "tfidf_matched": self.tfidf_matched,
@@ -158,6 +160,65 @@ class UnifiedSkillMatcher:
             f"vector={self.vector_weight:.2f}"
         )
 
+    def _find_skill_locations_in_text(
+        self,
+        resume_text: str,
+        skill: str,
+        matched_as: Optional[str] = None,
+        max_locations: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Find locations where a skill appears in the resume text.
+
+        Args:
+            resume_text: Full resume text to search
+            skill: The skill name to search for (required skill)
+            matched_as: The actual skill name from resume that matched (if different)
+            max_locations: Maximum number of locations to return
+
+        Returns:
+            List of location dicts with 'text', 'start', 'end', and 'context' keys
+        """
+        locations = []
+        search_terms = []
+
+        # Search for both the original skill and the matched variant
+        search_terms.append(skill.lower())
+        if matched_as and matched_as.lower() != skill.lower():
+            search_terms.append(matched_as.lower())
+
+        # Split resume text into lines for better context
+        lines = resume_text.split('\n')
+
+        for line_idx, line in enumerate(lines):
+            line_lower = line.lower()
+            for term in search_terms:
+                # Use word boundaries to avoid partial matches
+                pattern = r'\b' + re.escape(term) + r'\b'
+                matches = re.finditer(pattern, line_lower)
+
+                for match in matches:
+                    start = match.start()
+                    end = match.end()
+
+                    # Extract context (50 chars before and after)
+                    context_start = max(0, start - 50)
+                    context_end = min(len(line), end + 50)
+                    context = line[context_start:context_end].strip()
+
+                    locations.append({
+                        "text": line[start:end],
+                        "start": start,
+                        "end": end,
+                        "line": line_idx + 1,  # 1-indexed
+                        "context": context,
+                    })
+
+                    if len(locations) >= max_locations:
+                        return locations
+
+        return locations
+
     def match(
         self,
         resume_text: str,
@@ -181,7 +242,7 @@ class UnifiedSkillMatcher:
             weights: Optional custom weights dict with 'keyword_weight', 'tfidf_weight', 'vector_weight'
 
         Returns:
-            UnifiedMatchResult with comprehensive match information
+            UnifiedMatchResult with comprehensive match information including per-skill details
         """
         # Use custom weights if provided, otherwise use instance weights
         if weights:
@@ -200,6 +261,17 @@ class UnifiedSkillMatcher:
             required_skills=required_skills,
             context=context,
         )
+
+        # Add location information for matched skills
+        for skill, result in keyword_results.items():
+            if result.get("matched", False):
+                matched_as = result.get("matched_as", skill)
+                locations = self._find_skill_locations_in_text(
+                    resume_text, skill, matched_as
+                )
+                result["locations"] = locations
+            else:
+                result["locations"] = []
 
         matched_skills = [
             skill for skill, result in keyword_results.items()

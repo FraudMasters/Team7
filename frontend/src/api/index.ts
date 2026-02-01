@@ -10,6 +10,9 @@ export { workflowStagesClient, WorkflowStagesClient } from './workflowStages';
 export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
 export { candidateNotesClient, CandidateNotesClient } from './candidateNotes';
 export { candidateActivitiesClient, CandidateActivitiesClient } from './candidateActivities';
+export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
+export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
+export { candidateSearchClient, CandidateSearchClient } from './search';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -62,4 +65,14 @@ export type {
   ActivityItem,
   ActivityTimelineResponse,
   ActivityTypesResponse,
+  SavedSearchCreate,
+  SavedSearchUpdate,
+  SavedSearchResponse,
+  SavedSearchListResponse,
+  SearchHistoryItem,
+  SearchHistoryResponse,
+  SearchFilters,
+  CandidateSearchRequest,
+  CandidateSearchResult,
+  CandidateSearchResponse,
 } from '@/types/api';

@@ -58,6 +58,8 @@ celery_config: Dict[str, Any] = {
         "tasks.model_retraining.automated_retraining_task": {"queue": "learning"},
         "tasks.model_retraining.manual_retraining_task": {"queue": "learning"},
         "tasks.model_retraining.*": {"queue": "learning"},
+        "tasks.audit_tasks.cleanup_old_audit_logs": {"queue": "audit"},
+        "tasks.audit_tasks.*": {"queue": "audit"},
     },
 
     # Task priority (if needed in future)
@@ -97,6 +99,11 @@ celery_config: Dict[str, Any] = {
         },
         "daily-performance-monitoring": {
             "task": "tasks.performance_monitoring.periodic_performance_monitoring",
+            "schedule": 86400.0,  # Run daily (every 24 hours)
+            "options": {"expires": 3600},  # Task expires if not run within 1 hour
+        },
+        "audit_cleanup": {
+            "task": "tasks.audit_tasks.cleanup_old_audit_logs",
             "schedule": 86400.0,  # Run daily (every 24 hours)
             "options": {"expires": 3600},  # Task expires if not run within 1 hour
         },

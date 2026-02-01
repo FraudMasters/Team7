@@ -95,6 +95,14 @@ from .ats_simulation import (
     get_simple_ats_checker,
     evaluate_resume_ats,
 )
+from .interview_question_generator import (
+    InterviewQuestionGenerator,
+    InterviewPrepResult,
+    Question,
+    QuestionCategory,
+    get_interview_question_generator,
+    generate_interview_questions,
+)
 
 __all__ = [
     "extract_keywords",
@@ -149,6 +157,12 @@ __all__ = [
     "get_ats_simulator",
     "get_simple_ats_checker",
     "evaluate_resume_ats",
+    "InterviewQuestionGenerator",
+    "InterviewPrepResult",
+    "Question",
+    "QuestionCategory",
+    "get_interview_question_generator",
+    "generate_interview_questions",
     "save_resume_analysis",
     "get_resume_analysis",
     "delete_resume_analysis",

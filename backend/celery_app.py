@@ -19,6 +19,14 @@ from tasks import (
     process_all_pending_reports,
 )
 
+# Import model preloading to register the worker_ready signal handler
+# This ensures models are loaded when the worker starts up
+import tasks.model_preloading  # noqa: F401
+
+# Import cache warming to register periodic cache warming tasks
+# This ensures cache warming tasks are available for Celery beat
+import tasks.cache_warming  # noqa: F401
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -281,6 +289,10 @@ __all__ = [
     "batch_analyze_resumes",
     "generate_scheduled_reports",
     "process_all_pending_reports",
+    "preload_ml_models",
+    "health_check_with_models",
+    "warm_frequently_accessed_data",
+    "periodic_cache_warming",
     "get_task_status",
     "revoke_task",
 ]

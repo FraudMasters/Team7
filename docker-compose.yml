@@ -52,6 +52,28 @@ services:
     networks:
       - resume_network
 
+  # PostgreSQL Exporter (Prometheus metrics for PostgreSQL)
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: resume_analysis_postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_analysis}?sslmode=disable
+    ports:
+      - "9187:9187"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - resume_network
+
   # Backend API (FastAPI)
   backend:
     build:
@@ -229,6 +251,59 @@ services:
       - resume_network
     command: celery -A celery_app.celery_app beat --loglevel=info
 
+  # Celery Exporter (Prometheus metrics for Celery)
+  celery_exporter:
+    image: quay.io/prometheuscommunity/celery-exporter:v0.0.16
+    container_name: resume_analysis_celery_exporter
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CELERY_EXPORTER_BROKER_URL: redis://redis:6379/0
+      CELERY_EXPORTER_ENABLE_BROKER_OPTIONAL: "true"
+      CELERY_EXPORTER_BROKER_TRANSPORT: redis
+      CELERY_EXPORTER_BROKER_TRANSPORT_OPTIONS: "{'visibility_timeout': 3600}"
+    ports:
+      - "9540:9540"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - resume_network
+
+  # cAdvisor (Container metrics for Docker)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: resume_analysis_cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - resume_network
+
   # Frontend (React + Vite) - Production build with nginx
   frontend:
     build:
@@ -257,6 +332,20 @@ services:
       GF_SERVER_ROOT_URL: "http://localhost:3001"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_TELEMETRY_ENABLED: "false"
+      # SMTP Configuration (Email Alerts)
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: ${GRAFANA_SMTP_HOST:-smtp.gmail.com:587}
+      GF_SMTP_USER: ${GRAFANA_SMTP_USER:-}
+      GF_SMTP_PASSWORD: ${GRAFANA_SMTP_PASSWORD:-}
+      GF_SMTP_FROM_ADDRESS: ${GRAFANA_SMTP_FROM_ADDRESS:-grafana@localhost}
+      GF_SMTP_FROM_NAME: "Grafana Alerts"
+      GF_SMTP_STARTTLS_POLICY: ${GRAFANA_SMTP_STARTTLS_POLICY:-OpportunisticStartTLS}
+      # Alert Configuration
+      ALERT_EMAIL_ADDRESS: ${ALERT_EMAIL_ADDRESS:-alerts@example.com}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_WEBHOOK_USERNAME: ${ALERT_WEBHOOK_USERNAME:-}
+      ALERT_WEBHOOK_PASSWORD: ${ALERT_WEBHOOK_PASSWORD:-}
+      ALERT_WEBHOOK_BEARER_TOKEN: ${ALERT_WEBHOOK_BEARER_TOKEN:-}
     ports:
       - "3001:3000"
     volumes:
@@ -334,6 +423,7 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/grafana/provisioning/alerts/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     deploy:
       resources:

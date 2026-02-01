@@ -14,6 +14,7 @@ import {
   CardContent,
   CircularProgress,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -23,11 +24,12 @@ import {
   Business as BusinessIcon,
   LocationOn as LocationIcon,
   Money as MoneyIcon,
-  Compare as CompareIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import CandidateSelector from '../components/CandidateSelector';
+import { WeightProfileSelector } from '../components';
+import { apiClient } from '../api/client';
 
 interface Vacancy {
   id: string;
@@ -42,15 +44,6 @@ interface Vacancy {
   created_at: string;
 }
 
-interface Candidate {
-  resume_id: string;
-  name?: string;
-  match_percentage?: number;
-  matched_skills_count?: number;
-  total_skills_count?: number;
-  overall_match?: boolean;
-}
-
 const VacancyDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -58,9 +51,20 @@ const VacancyDetails: React.FC = () => {
   const [vacancy, setVacancy] = useState<Vacancy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [candidatesLoading, setCandidatesLoading] = useState(true);
-  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+
+  // Weight profile state
+  const organizationId = 'org123'; // TODO: Get from auth context
+  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>();
+  const [rematching, setRematching] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   useEffect(() => {
     const fetchVacancy = async () => {
@@ -80,37 +84,6 @@ const VacancyDetails: React.FC = () => {
     }
   }, [id]);
 
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      try {
-        setCandidatesLoading(true);
-        const response = await axios.get('/api/candidates', {
-          params: { vacancy_id: id, limit: 50 },
-        });
-
-        // Transform API response to match Candidate interface
-        const transformedCandidates: Candidate[] = response.data.candidates.map((c: any) => ({
-          resume_id: c.resume_id,
-          name: c.name || `Candidate ${c.resume_id.slice(0, 8)}`,
-          match_percentage: c.rank_score ? Math.round(c.rank_score * 100) : undefined,
-          matched_skills_count: c.ranking_factors?.skills_match?.matched_skills_count,
-          total_skills_count: c.ranking_factors?.skills_match?.total_skills_count,
-          overall_match: c.recommendation === 'excellent' || c.recommendation === 'good',
-        }));
-
-        setCandidates(transformedCandidates);
-      } catch (err) {
-        // Don't set error state - candidates section is optional
-      } finally {
-        setCandidatesLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchCandidates();
-    }
-  }, [id]);
-
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this vacancy?')) return;
 
@@ -122,15 +95,38 @@ const VacancyDetails: React.FC = () => {
     }
   };
 
-  const handleSelectionChange = (selectedIds: string[]) => {
-    setSelectedCandidateIds(selectedIds);
+  const handleProfileSelect = async (profile: any) => {
+    if (!id || !profile?.id) return;
+
+    setRematching(true);
+    setError(null);
+
+    try {
+      const result = await apiClient.rematchWithWeights(profile.id, {
+        vacancy_id: id,
+      });
+
+      setSelectedProfileId(profile.id);
+      setSnackbar({
+        open: true,
+        message: `Successfully re-matched ${result.candidates_matched} candidates with new weights`,
+        severity: 'success',
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to re-match candidates';
+      setError(errorMessage);
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      });
+    } finally {
+      setRematching(false);
+    }
   };
 
-  const handleCompareCandidates = () => {
-    if (selectedCandidateIds.length >= 2 && selectedCandidateIds.length <= 5) {
-      const candidatesParam = selectedCandidateIds.join(',');
-      navigate(`/recruiter/vacancies/${id}/compare?candidates=${candidatesParam}`);
-    }
+  const handleSnackbarClose = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   if (loading) {
@@ -220,39 +216,86 @@ const VacancyDetails: React.FC = () => {
 
           {/* Sidebar */}
           <Grid item xs={12} md={4}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Details
-                </Typography>
-                <Stack spacing={2}>
-                  {vacancy.min_experience_months && (
+            <Stack spacing={2}>
+              {/* Details Card */}
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    Details
+                  </Typography>
+                  <Stack spacing={2}>
+                    {vacancy.min_experience_months && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Experience Required
+                        </Typography>
+                        <Typography variant="body1">
+                          {Math.floor(vacancy.min_experience_months / 12)}+ years
+                        </Typography>
+                      </Box>
+                    )}
+                    {(vacancy.salary_min || vacancy.salary_max) && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Salary
+                        </Typography>
+                        <Typography variant="body1">
+                          {vacancy.salary_min && vacancy.salary_max
+                            ? `$${vacancy.salary_min} - $${vacancy.salary_max}`
+                            : vacancy.salary_min
+                              ? `$${vacancy.salary_min}+`
+                              : `Up to $${vacancy.salary_max}`}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+
+              {/* Weight Profile Selector */}
+              <Card variant="outlined">
+                <CardContent>
+                  <Stack spacing={2}>
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Experience Required
+                      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                        Matching Algorithm
                       </Typography>
-                      <Typography variant="body1">
-                        {Math.floor(vacancy.min_experience_months / 12)}+ years
+                      <Typography variant="caption" color="text.secondary">
+                        Select a weight profile to re-match candidates
                       </Typography>
                     </Box>
-                  )}
-                  {(vacancy.salary_min || vacancy.salary_max) && (
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Salary
-                      </Typography>
-                      <Typography variant="body1">
-                        {vacancy.salary_min && vacancy.salary_max
-                          ? `$${vacancy.salary_min} - $${vacancy.salary_max}`
-                          : vacancy.salary_min
-                            ? `$${vacancy.salary_min}+`
-                            : `Up to $${vacancy.salary_max}`}
-                      </Typography>
+                    <Box sx={{ position: 'relative' }}>
+                      {rematching && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1,
+                            borderRadius: 1,
+                          }}
+                        >
+                          <CircularProgress size={24} />
+                        </Box>
+                      )}
+                      <WeightProfileSelector
+                        organizationId={organizationId}
+                        selectedProfileId={selectedProfileId}
+                        onProfileSelect={handleProfileSelect}
+                        compact={true}
+                        disabled={rematching}
+                      />
                     </Box>
-                  )}
-                </Stack>
-              </CardContent>
-            </Card>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Stack>
           </Grid>
         </Grid>
 
@@ -274,37 +317,22 @@ const VacancyDetails: React.FC = () => {
         )}
       </Paper>
 
-      {/* Candidates Section */}
-      <Paper sx={{ p: 4, mt: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" fontWeight={600}>
-            Candidates for this Position
-          </Typography>
-          {selectedCandidateIds.length >= 2 && selectedCandidateIds.length <= 5 && (
-            <Button
-              variant="contained"
-              startIcon={<CompareIcon />}
-              onClick={handleCompareCandidates}
-              size="large"
-            >
-              Compare Selected ({selectedCandidateIds.length})
-            </Button>
-          )}
-        </Box>
-
-        {candidatesLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <CandidateSelector
-            candidates={candidates}
-            onSelectionChange={handleSelectionChange}
-            maxCandidates={5}
-            minCandidates={2}
-          />
-        )}
-      </Paper>
+      {/* Success/Error Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+          icon={snackbar.severity === 'success' ? <CheckCircleIcon /> : undefined}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

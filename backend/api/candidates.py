@@ -6,9 +6,12 @@ This module provides endpoints for:
 - Moving candidates through customizable workflow stages (kanban-style board)
 - Bulk moving multiple candidates to a stage at once
 - Getting ranked candidates for vacancies with AI-powered matching
+- Bulk actions on search results (export, tag, add to pipeline)
 
 Supports both kanban-style board management and intelligent candidate ranking.
 """
+import csv
+import io
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -173,6 +176,43 @@ class StageMetricsResponse(BaseModel):
     stage_id: Optional[str] = Field(None, description="Requested stage ID filter")
     metrics: List[StageMetrics] = Field(..., description="List of stage metrics")
     total_stages: int = Field(..., description="Total number of stages with metrics")
+
+
+# Bulk action models
+class BulkActionRequest(BaseModel):
+    """Request model for bulk actions on search results."""
+
+    action: str = Field(..., description="Action type: 'export', 'tag', or 'add_to_pipeline'")
+    resume_ids: List[str] = Field(..., description="List of resume IDs to perform action on", min_length=1)
+    # For 'tag' action
+    tag_name: Optional[str] = Field(None, description="Tag name (required for 'tag' action)")
+    tag_color: Optional[str] = Field(None, description="Tag color hex code (optional for 'tag' action)")
+    # For 'add_to_pipeline' action
+    stage_id: Optional[str] = Field(None, description="Target stage ID (required for 'add_to_pipeline' action)")
+    vacancy_id: Optional[str] = Field(None, description="Optional vacancy ID for 'add_to_pipeline' action")
+    notes: Optional[str] = Field(None, description="Optional notes for 'add_to_pipeline' action")
+    # For 'export' action
+    export_format: Optional[str] = Field("json", description="Export format: 'json' or 'csv' (default: 'json')")
+
+
+class BulkActionResult(BaseModel):
+    """Result of performing a single bulk action."""
+
+    resume_id: str = Field(..., description="Resume ID")
+    success: bool = Field(..., description="Whether the action was successful")
+    message: str = Field(..., description="Success or error message")
+    data: Optional[Dict[str, Any]] = Field(None, description="Additional data (e.g., exported candidate data)")
+
+
+class BulkActionResponse(BaseModel):
+    """Response model for bulk actions."""
+
+    action: str = Field(..., description="Action performed")
+    total_requested: int = Field(..., description="Total number of candidates requested")
+    successful: int = Field(..., description="Number of successful actions")
+    failed: int = Field(..., description="Number of failed actions")
+    results: List[BulkActionResult] = Field(..., description="Individual results for each candidate")
+    export_data: Optional[Dict[str, Any]] = Field(None, description="Exported data (for 'export' action)")
 
 
 @router.get(
@@ -1421,4 +1461,537 @@ async def get_stage_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve stage metrics: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/bulk-action",
+    tags=["Candidates"],
+)
+async def bulk_action(
+    request: Request,
+    bulk_data: BulkActionRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Perform bulk actions on search results.
+
+    Supports three action types:
+    - 'export': Export candidate data (json or csv format)
+    - 'tag': Add tags to multiple candidates
+    - 'add_to_pipeline': Add candidates to a pipeline stage
+
+    Args:
+        request: FastAPI request object
+        bulk_data: Bulk action details including action type, resume IDs, and action-specific parameters
+        db: Database session
+
+    Returns:
+        JSON response with bulk operation results including success/failure counts
+
+    Raises:
+        HTTPException(400): Invalid action type or missing required parameters
+        HTTPException(404): Candidates or resources not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> # Tag candidates
+        >>> data = {
+        ...     "action": "tag",
+        ...     "resume_ids": ["id1", "id2"],
+        ...     "tag_name": "High Priority"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     json=data
+        ... )
+        >>> # Export candidates
+        >>> data = {
+        ...     "action": "export",
+        ...     "resume_ids": ["id1", "id2"],
+        ...     "export_format": "json"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     json=data
+        ... )
+        >>> # Add to pipeline
+        >>> data = {
+        ...     "action": "add_to_pipeline",
+        ...     "resume_ids": ["id1", "id2"],
+        ...     "stage_id": "interview"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     json=data
+        ... )
+    """
+    try:
+        logger.info(
+            f"Performing bulk action '{bulk_data.action}' on {len(bulk_data.resume_ids)} candidates"
+        )
+
+        # Validate action type
+        valid_actions = ["export", "tag", "add_to_pipeline"]
+        if bulk_data.action not in valid_actions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid action type: {bulk_data.action}. Must be one of: {', '.join(valid_actions)}",
+            )
+
+        results = []
+        successful_count = 0
+        failed_count = 0
+        export_data = None
+
+        # Handle different action types
+        if bulk_data.action == "tag":
+            # Validate required parameters for tag action
+            if not bulk_data.tag_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="tag_name is required for 'tag' action",
+                )
+
+            # Process tagging for each resume
+            for resume_id in bulk_data.resume_ids:
+                try:
+                    # Parse candidate_id as UUID
+                    try:
+                        candidate_uuid = UUID(resume_id)
+                    except ValueError:
+                        results.append({
+                            "resume_id": resume_id,
+                            "success": False,
+                            "message": f"Invalid candidate ID format: {resume_id}",
+                            "data": None,
+                        })
+                        failed_count += 1
+                        continue
+
+                    # Verify resume exists
+                    resume_query = select(Resume).where(Resume.id == candidate_uuid)
+                    resume_result = await db.execute(resume_query)
+                    resume = resume_result.scalar_one_or_none()
+
+                    if not resume:
+                        results.append({
+                            "resume_id": resume_id,
+                            "success": False,
+                            "message": f"Candidate not found: {resume_id}",
+                            "data": None,
+                        })
+                        failed_count += 1
+                        continue
+
+                    # Find or create tag
+                    tag_query = select(CandidateTag).where(
+                        and_(
+                            CandidateTag.organization_id == resume.organization_id,
+                            CandidateTag.tag_name == bulk_data.tag_name
+                        )
+                    )
+                    tag_result = await db.execute(tag_query)
+                    tag = tag_result.scalar_one_or_none()
+
+                    if not tag:
+                        # Create new tag
+                        tag = CandidateTag(
+                            organization_id=resume.organization_id,
+                            tag_name=bulk_data.tag_name,
+                            color=bulk_data.tag_color,
+                        )
+                        db.add(tag)
+                        await db.commit()
+                        await db.refresh(tag)
+
+                    # Create activity record for tag addition
+                    activity = CandidateActivity(
+                        candidate_id=candidate_uuid,
+                        activity_type=CandidateActivityType.TAG_ADDED,
+                        tag_id=tag.id,
+                        metadata={
+                            "tag_name": bulk_data.tag_name,
+                            "bulk_operation": True,
+                        },
+                    )
+                    db.add(activity)
+                    await db.commit()
+
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": True,
+                        "message": f"Tag '{bulk_data.tag_name}' added to candidate",
+                        "data": {"tag_id": str(tag.id), "tag_name": bulk_data.tag_name},
+                    })
+                    successful_count += 1
+
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error tagging candidate {resume_id}: {e}", exc_info=True)
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "message": f"Failed to tag candidate: {str(e)}",
+                        "data": None,
+                    })
+                    failed_count += 1
+
+        elif bulk_data.action == "add_to_pipeline":
+            # Validate required parameters for add_to_pipeline action
+            if not bulk_data.stage_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="stage_id is required for 'add_to_pipeline' action",
+                )
+
+            # Determine if stage_id is a custom stage UUID or stage name
+            workflow_stage_config_id = None
+            new_stage_name = bulk_data.stage_id
+
+            try:
+                # Try parsing as UUID (custom stage)
+                stage_uuid = UUID(bulk_data.stage_id)
+
+                # Verify the custom stage exists
+                config_query = select(WorkflowStageConfig).where(WorkflowStageConfig.id == stage_uuid)
+                config_result = await db.execute(config_query)
+                workflow_config = config_result.scalar_one_or_none()
+
+                if workflow_config:
+                    workflow_stage_config_id = stage_uuid
+                    new_stage_name = workflow_config.stage_name
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Custom stage not found: {bulk_data.stage_id}",
+                    )
+            except ValueError:
+                # It's a stage name, validate it's a valid enum or allowed value
+                try:
+                    # Check if it's a valid enum value
+                    HiringStageName(bulk_data.stage_id)
+                except ValueError:
+                    # Not a default stage, check if it's a custom stage name
+                    config_query = select(WorkflowStageConfig).where(
+                        WorkflowStageConfig.stage_name == bulk_data.stage_id
+                    )
+                    config_result = await db.execute(config_query)
+                    workflow_config = config_result.scalar_one_or_none()
+
+                    if not workflow_config:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid stage name: {bulk_data.stage_id}",
+                        )
+
+                    workflow_stage_config_id = workflow_config.id
+
+            # Parse vacancy_id if provided
+            vacancy_uuid = None
+            if bulk_data.vacancy_id:
+                try:
+                    vacancy_uuid = UUID(bulk_data.vacancy_id)
+                except ValueError:
+                    logger.warning(f"Invalid vacancy_id format: {bulk_data.vacancy_id}")
+
+            # Process adding each candidate to pipeline
+            for resume_id in bulk_data.resume_ids:
+                try:
+                    # Parse candidate_id as UUID
+                    try:
+                        candidate_uuid = UUID(resume_id)
+                    except ValueError:
+                        results.append({
+                            "resume_id": resume_id,
+                            "success": False,
+                            "message": f"Invalid candidate ID format: {resume_id}",
+                            "data": None,
+                        })
+                        failed_count += 1
+                        continue
+
+                    # Verify resume exists
+                    resume_query = select(Resume).where(Resume.id == candidate_uuid)
+                    resume_result = await db.execute(resume_query)
+                    resume = resume_result.scalar_one_or_none()
+
+                    if not resume:
+                        results.append({
+                            "resume_id": resume_id,
+                            "success": False,
+                            "message": f"Candidate not found: {resume_id}",
+                            "data": None,
+                        })
+                        failed_count += 1
+                        continue
+
+                    # Get current/latest stage
+                    current_stage_query = (
+                        select(HiringStage)
+                        .where(HiringStage.resume_id == candidate_uuid)
+                        .order_by(HiringStage.created_at.desc())
+                        .limit(1)
+                    )
+                    current_stage_result = await db.execute(current_stage_query)
+                    current_stage = current_stage_result.scalar_one_or_none()
+
+                    previous_stage = current_stage.stage_name if current_stage else HiringStageName.APPLIED.value
+
+                    # Create new hiring stage record
+                    new_hiring_stage = HiringStage(
+                        resume_id=candidate_uuid,
+                        vacancy_id=vacancy_uuid,
+                        workflow_stage_config_id=workflow_stage_config_id,
+                        stage_name=new_stage_name,
+                        notes=bulk_data.notes,
+                    )
+
+                    db.add(new_hiring_stage)
+                    await db.commit()
+                    await db.refresh(new_hiring_stage)
+
+                    # Create analytics event for stage change
+                    analytics_event = AnalyticsEvent(
+                        event_type=AnalyticsEventType.STAGE_CHANGED,
+                        entity_type="resume",
+                        entity_id=candidate_uuid,
+                        event_data={
+                            "previous_stage": previous_stage,
+                            "new_stage": new_stage_name,
+                            "vacancy_id": str(vacancy_uuid) if vacancy_uuid else None,
+                            "notes": bulk_data.notes,
+                            "workflow_stage_config_id": str(workflow_stage_config_id) if workflow_stage_config_id else None,
+                            "bulk_operation": True,
+                        },
+                    )
+                    db.add(analytics_event)
+                    await db.commit()
+
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": True,
+                        "message": f"Candidate added to pipeline stage '{new_stage_name}'",
+                        "data": {
+                            "stage_id": bulk_data.stage_id,
+                            "stage_name": new_stage_name,
+                            "previous_stage": previous_stage,
+                        },
+                    })
+                    successful_count += 1
+
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error adding candidate {resume_id} to pipeline: {e}", exc_info=True)
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "message": f"Failed to add candidate to pipeline: {str(e)}",
+                        "data": None,
+                    })
+                    failed_count += 1
+
+        elif bulk_data.action == "export":
+            # Collect candidate data for export
+            exported_candidates = []
+
+            for resume_id in bulk_data.resume_ids:
+                try:
+                    # Parse candidate_id as UUID
+                    try:
+                        candidate_uuid = UUID(resume_id)
+                    except ValueError:
+                        results.append({
+                            "resume_id": resume_id,
+                            "success": False,
+                            "message": f"Invalid candidate ID format: {resume_id}",
+                            "data": None,
+                        })
+                        failed_count += 1
+                        continue
+
+                    # Get the resume with its latest hiring stage
+                    latest_stage_subq = (
+                        select(
+                            HiringStage.resume_id,
+                            func.max(HiringStage.created_at).label("max_created_at")
+                        )
+                        .group_by(HiringStage.resume_id)
+                        .subquery()
+                    )
+
+                    query = (
+                        select(Resume, HiringStage, WorkflowStageConfig)
+                        .outerjoin(
+                            HiringStage,
+                            and_(
+                                HiringStage.resume_id == Resume.id,
+                                HiringStage.created_at == latest_stage_subq.c.max_created_at,
+                            ),
+                        )
+                        .outerjoin(
+                            WorkflowStageConfig,
+                            HiringStage.workflow_stage_config_id == WorkflowStageConfig.id,
+                        )
+                        .where(Resume.id == candidate_uuid)
+                    )
+
+                    result = await db.execute(query)
+                    row = result.first()
+
+                    if not row:
+                        results.append({
+                            "resume_id": resume_id,
+                            "success": False,
+                            "message": f"Candidate not found: {resume_id}",
+                            "data": None,
+                        })
+                        failed_count += 1
+                        continue
+
+                    resume = row[0]
+                    hiring_stage = row[1]
+                    workflow_config = row[2]
+
+                    # Determine display stage name
+                    if workflow_config and workflow_config.display_name:
+                        stage_display = workflow_config.display_name
+                    elif workflow_config and workflow_config.stage_name:
+                        stage_display = workflow_config.stage_name
+                    elif hiring_stage:
+                        stage_display = hiring_stage.stage_name
+                    else:
+                        stage_display = HiringStageName.APPLIED.value
+
+                    # Get tags for this resume
+                    tags = []
+                    all_tag_activities_result = await db.execute(
+                        select(CandidateActivity, CandidateTag)
+                        .outerjoin(
+                            CandidateTag,
+                            CandidateActivity.tag_id == CandidateTag.id
+                        )
+                        .where(
+                            CandidateActivity.candidate_id == candidate_uuid,
+                            CandidateActivity.activity_type.in_([
+                                CandidateActivityType.TAG_ADDED,
+                                CandidateActivityType.TAG_REMOVED
+                            ]),
+                        )
+                        .order_by(CandidateActivity.created_at)
+                    )
+                    all_tag_activity_rows = all_tag_activities_result.all()
+
+                    tag_activity_map = {}
+                    for activity, tag in all_tag_activity_rows:
+                        if tag:
+                            tag_id_str = str(tag.id)
+                            if tag_id_str not in tag_activity_map:
+                                tag_activity_map[tag_id_str] = []
+                            tag_activity_map[tag_id_str].append({
+                                "activity_type": activity.activity_type,
+                                "timestamp": activity.created_at,
+                                "tag_name": tag.tag_name,
+                            })
+
+                    for tag_id, activities in tag_activity_map.items():
+                        latest = max(activities, key=lambda x: x["timestamp"])
+                        if latest["activity_type"] == CandidateActivityType.TAG_ADDED:
+                            tags.append(latest["tag_name"])
+
+                    # Build export data
+                    candidate_data = {
+                        "id": str(resume.id),
+                        "filename": resume.filename,
+                        "current_stage": hiring_stage.stage_name if hiring_stage else HiringStageName.APPLIED.value,
+                        "stage_name": stage_display,
+                        "vacancy_id": str(hiring_stage.vacancy_id) if hiring_stage and hiring_stage.vacancy_id else None,
+                        "created_at": resume.created_at.isoformat() if resume.created_at else None,
+                        "updated_at": hiring_stage.updated_at.isoformat() if hiring_stage and hiring_stage.updated_at else None,
+                        "tags": tags,
+                    }
+
+                    exported_candidates.append(candidate_data)
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": True,
+                        "message": "Candidate data exported",
+                        "data": candidate_data,
+                    })
+                    successful_count += 1
+
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error exporting candidate {resume_id}: {e}", exc_info=True)
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "message": f"Failed to export candidate: {str(e)}",
+                        "data": None,
+                    })
+                    failed_count += 1
+
+            # Prepare export data based on format
+            if bulk_data.export_format == "csv":
+                # Convert to CSV format
+                import csv
+                import io
+
+                if exported_candidates:
+                    output = io.StringIO()
+                    writer = csv.DictWriter(output, fieldnames=exported_candidates[0].keys())
+                    writer.writeheader()
+                    writer.writerows(exported_candidates)
+                    export_data = {
+                        "format": "csv",
+                        "data": output.getvalue(),
+                        "count": len(exported_candidates),
+                    }
+                else:
+                    export_data = {
+                        "format": "csv",
+                        "data": "",
+                        "count": 0,
+                    }
+            else:
+                # Default to JSON format
+                export_data = {
+                    "format": "json",
+                    "data": exported_candidates,
+                    "count": len(exported_candidates),
+                }
+
+        logger.info(
+            f"Bulk action '{bulk_data.action}' completed: {successful_count} successful, {failed_count} failed"
+        )
+
+        response_content = {
+            "action": bulk_data.action,
+            "total_requested": len(bulk_data.resume_ids),
+            "successful": successful_count,
+            "failed": failed_count,
+            "results": results,
+        }
+
+        # Include export data for export action
+        if export_data:
+            response_content["export_data"] = export_data
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_content,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk action operation: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to perform bulk action: {str(e)}",
         ) from e

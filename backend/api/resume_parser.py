@@ -14,12 +14,12 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ..config import get_settings
-from ..i18n.backend_translations import get_error_message, get_success_message
-from ..models.parsed_resume import ParsedResume, Skill, Education, WorkExperience, Language, ExperienceSummary
-from ..parsers import PDFParser, DOCXParser
-from ..nlp.resume_entities import extract_resume_entities
-from ..analyzers.experience_calculator import calculate_dual_track_experience
+from config import get_settings
+from i18n.backend_translations import get_error_message, get_success_message
+from models.parsed_resume import ParsedResume, Skill, Education, WorkExperience, Language, ExperienceSummary
+from parsers import PDFParser, DOCXParser
+from nlp.resume_entities import extract_resume_entities
+from analyzers.experience_calculator import calculate_dual_track_experience
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

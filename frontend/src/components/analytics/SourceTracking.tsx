@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Box,
   Paper,
@@ -54,7 +55,7 @@ interface SourceTrackingProps {
  * Get color for source based on index
  */
 const getSourceColor = (index: number): string => {
-  const colors = [
+  const colors: string[] = [
     '#3b82f6', // blue
     '#10b981', // green
     '#f59e0b', // amber
@@ -64,7 +65,7 @@ const getSourceColor = (index: number): string => {
     '#06b6d4', // cyan
     '#84cc16', // lime
   ];
-  return colors[index % colors.length];
+  return colors[Math.abs(index) % colors.length]!;
 };
 
 /**
@@ -87,7 +88,7 @@ const getSourceColor = (index: number): string => {
  * ```
  */
 const SourceTracking: React.FC<SourceTrackingProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics/source-tracking',
+  apiUrl = '/api/analytics/source-tracking',
   startDate,
   endDate,
 }) => {
@@ -103,23 +104,12 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
       setLoading(true);
       setError(null);
 
-      // Build URL with query parameters
-      const url = new URL(apiUrl);
-      if (startDate) {
-        url.searchParams.append('start_date', startDate);
-      }
-      if (endDate) {
-        url.searchParams.append('end_date', endDate);
-      }
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
 
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch source tracking: ${response.statusText}`);
-      }
-
-      const result: SourceTrackingResponse = await response.json();
-      setSourceData(result);
+      const response = await axios.get<SourceTrackingResponse>(apiUrl, { params });
+      setSourceData(response.data);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load source tracking data';
@@ -252,7 +242,7 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" fontWeight={700}>
-                  {(sourceData.sources[0]?.percentage * 100).toFixed(1)}%
+                  {((sourceData.sources[0]?.percentage || 0) * 100).toFixed(1)}%
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Highest Share

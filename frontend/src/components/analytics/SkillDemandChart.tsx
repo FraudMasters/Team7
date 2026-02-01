@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import {
   Box,
   Paper,
@@ -19,6 +20,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   Work as SkillIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 
 /**
@@ -73,7 +75,7 @@ interface SkillDemandChartProps {
  * ```
  */
 const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics/skill-demand',
+  apiUrl = '/api/analytics/skill-demand',
   startDate,
   endDate,
   limit = 20,
@@ -90,26 +92,13 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
       setLoading(true);
       setError(null);
 
-      // Build URL with query parameters
-      const url = new URL(apiUrl);
-      if (startDate) {
-        url.searchParams.append('start_date', startDate);
-      }
-      if (endDate) {
-        url.searchParams.append('end_date', endDate);
-      }
-      if (limit) {
-        url.searchParams.append('limit', limit.toString());
-      }
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+      if (limit) params.limit = limit.toString();
 
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch skill demand: ${response.statusText}`);
-      }
-
-      const result: SkillDemandResponse = await response.json();
-      setSkillData(result);
+      const response = await axios.get<SkillDemandResponse>(apiUrl, { params });
+      setSkillData(response.data);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load skill demand data';
@@ -122,6 +111,42 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
   useEffect(() => {
     fetchSkillDemand();
   }, [apiUrl, startDate, endDate, limit]);
+
+  /**
+   * Export skill demand data as CSV
+   */
+  const exportAsCSV = useCallback(() => {
+    if (!skillData || !skillData.skills || skillData.skills.length === 0) {
+      return;
+    }
+
+    const headers = [
+      'Rank',
+      'Skill Name',
+      'Demand Count',
+      'Demand Percentage (%)',
+      'Trend Percentage (%)',
+    ];
+
+    const rows = skillData.skills.map((skill, index) => [
+      index + 1,
+      `"${skill.skill_name}"`,
+      skill.demand_count,
+      (skill.demand_percentage * 100).toFixed(1),
+      `${skill.trend_percentage > 0 ? '+' : ''}${(skill.trend_percentage * 100).toFixed(1)}`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `skill-demand-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [skillData]);
 
   /**
    * Render loading state
@@ -192,9 +217,20 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSkillDemand} size="small">
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<FileDownloadIcon />}
+              onClick={exportAsCSV}
+              size="small"
+              disabled={!skillData || skillData.skills.length === 0}
+            >
+              Export CSV
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSkillDemand} size="small">
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         {/* Summary Stats */}
@@ -227,7 +263,7 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" fontWeight={700}>
-                  {(skillData.skills[0]?.demand_percentage * 100).toFixed(1)}%
+                  {((skillData.skills[0]?.demand_percentage || 0) * 100).toFixed(1)}%
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Highest Demand

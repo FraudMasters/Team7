@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" /
 
 from database import get_db
 from models.match_result import MatchResult
+from services.cache_service import get_cache_service, CacheService, invalidate_match_cache
 
 from analyzers import (
     extract_resume_keywords_hf as extract_resume_keywords,
@@ -332,6 +333,24 @@ class MatchFeedbackResponse(BaseModel):
     created_at: str = Field(..., description="Creation timestamp")
 
 
+def _generate_match_cache_key(resume_id: str, vacancy_data: Dict[str, Any]) -> str:
+    """
+    Generate a cache key for match results.
+
+    Args:
+        resume_id: Resume UUID
+        vacancy_data: Vacancy data dictionary
+
+    Returns:
+        Cache key string
+    """
+    # Create a hash from vacancy data for consistency
+    import hashlib
+    vacancy_str = json.dumps(vacancy_data, sort_keys=True)
+    vacancy_hash = hashlib.md5(vacancy_str.encode()).hexdigest()[:8]
+    return f"match:{resume_id}:{vacancy_hash}"
+
+
 @router.post(
     "/compare",
     response_model=MatchResponse,
@@ -353,6 +372,7 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
     - Experience verification (sums months across projects)
     - Case-insensitive comparison
     - Support for multi-word skills
+    - Result caching for improved performance
 
     Args:
         http_request: FastAPI request object (for Accept-Language header)
@@ -401,6 +421,18 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
 
     # Extract locale from Accept-Language header
     locale = _extract_locale(http_request)
+
+    # Check cache first
+    cache = get_cache_service()
+    cache_key = _generate_match_cache_key(request.resume_id, request.vacancy_data)
+    cached_result = cache.get(CacheService.NAMESPACE_MATCH, cache_key)
+
+    if cached_result is not None:
+        logger.info(f"Cache hit for match result: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=cached_result,
+        )
 
     start_time = time.time()
 
@@ -637,6 +669,10 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
             f"Matching completed for resume_id {request.resume_id} in {processing_time_ms:.2f}ms"
         )
 
+        # Cache the result (15 minute TTL for match results)
+        cache.set(CacheService.NAMESPACE_MATCH, cache_key, response_data, ttl=900)
+        logger.debug(f"Cached match result: {cache_key}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=response_data,
@@ -830,6 +866,19 @@ async def compare_resume_to_vacancy_unified(
     import time
 
     locale = _extract_locale(http_request)
+
+    # Check cache first
+    cache = get_cache_service()
+    cache_key = _generate_match_cache_key(request.resume_id, request.vacancy_data)
+    cached_result = cache.get(CacheService.NAMESPACE_MATCH, cache_key)
+
+    if cached_result is not None:
+        logger.info(f"Cache hit for unified match result: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=cached_result,
+        )
+
     start_time = time.time()
 
     try:
@@ -1022,6 +1071,9 @@ async def compare_resume_to_vacancy_unified(
                 existing_match.tfidf_missing = match_result.tfidf_missing
                 existing_match.matcher_version = "unified-v1"
                 logger.info(f"Updated existing match result: {existing_match.id}")
+
+                # Invalidate old match cache since we updated it
+                invalidate_match_cache(request.resume_id, vacancy_id if vacancy_uuid else None)
             else:
                 # Create new match result record (only if we have a vacancy_id)
                 if vacancy_uuid:
@@ -1081,6 +1133,10 @@ async def compare_resume_to_vacancy_unified(
             f"score={match_result.overall_score:.2f}, "
             f"recommendation={match_result.recommendation}"
         )
+
+        # Cache the result (15 minute TTL for match results)
+        cache.set(CacheService.NAMESPACE_MATCH, cache_key, response_data, ttl=900)
+        logger.debug(f"Cached unified match result: {cache_key}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

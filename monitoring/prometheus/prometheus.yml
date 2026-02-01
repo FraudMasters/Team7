@@ -5,6 +5,16 @@ global:
     cluster: 'agenthr'
     environment: 'development'
 
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load alert rules
+rule_files:
+  - '/etc/prometheus/alert_rules.yml'
+
 scrape_configs:
   # Prometheus self-monitoring
   - job_name: 'prometheus'
@@ -21,18 +31,18 @@ scrape_configs:
           service: 'backend'
           app: 'resume-analysis'
 
-  # Celery worker metrics (if available)
-  - job_name: 'celery-worker'
+  # Celery exporter metrics
+  - job_name: 'celery-exporter'
     static_configs:
-      - targets: ['celery_worker:9540']
+      - targets: ['celery_exporter:9540']
         labels:
-          service: 'celery-worker'
+          service: 'celery-exporter'
           app: 'resume-analysis'
 
   # PostgreSQL metrics (via exporter)
   - job_name: 'postgres'
     static_configs:
-      - targets: ['postgres:5432']
+      - targets: ['postgres_exporter:9187']
         labels:
           service: 'postgres'
 
@@ -56,3 +66,10 @@ scrape_configs:
       - targets: ['host.docker.internal:9323']
         labels:
           service: 'docker'
+
+  # cAdvisor container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'

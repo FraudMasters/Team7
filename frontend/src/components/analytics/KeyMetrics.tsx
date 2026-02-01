@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Box,
   Paper,
@@ -18,6 +19,8 @@ import {
   Description as ResumeIcon,
   TrendingUp as MatchIcon,
   AccessTime as ClockIcon,
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
 } from '@mui/icons-material';
 
 /**
@@ -92,13 +95,14 @@ interface KeyMetricsProps {
  * ```
  */
 const KeyMetrics: React.FC<KeyMetricsProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics/key-metrics',
+  apiUrl = '/api/analytics/key-metrics',
   startDate,
   endDate,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<KeyMetricsResponse | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   /**
    * Fetch key metrics from backend
@@ -108,23 +112,16 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
       setLoading(true);
       setError(null);
 
-      // Build URL with query parameters
-      const url = new URL(apiUrl);
+      const params: Record<string, string> = {};
       if (startDate) {
-        url.searchParams.append('start_date', startDate);
+        params.start_date = startDate;
       }
       if (endDate) {
-        url.searchParams.append('end_date', endDate);
+        params.end_date = endDate;
       }
 
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch metrics: ${response.statusText}`);
-      }
-
-      const result: KeyMetricsResponse = await response.json();
-      setMetrics(result);
+      const response = await axios.get<KeyMetricsResponse>(apiUrl, { params });
+      setMetrics(response.data);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load metrics data';
@@ -134,9 +131,34 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
     }
   };
 
+  /**
+   * Initial fetch on mount and when date range changes
+   */
   useEffect(() => {
     fetchMetrics();
   }, [apiUrl, startDate, endDate]);
+
+  /**
+   * Auto-refresh every 60 seconds when enabled
+   */
+  useEffect(() => {
+    if (!autoRefreshEnabled) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchMetrics();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, apiUrl, startDate, endDate]);
+
+  /**
+   * Toggle auto-refresh
+   */
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled((prev) => !prev);
+  };
 
   /**
    * Render loading state
@@ -194,9 +216,20 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Typography variant="h5" fontWeight={600}>
             Key Hiring Metrics
           </Typography>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchMetrics} size="small">
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={autoRefreshEnabled ? 'contained' : 'outlined'}
+              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
+              onClick={toggleAutoRefresh}
+              size="small"
+              color={autoRefreshEnabled ? 'primary' : 'default'}
+            >
+              {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchMetrics} size="small">
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         <Grid container spacing={2}>

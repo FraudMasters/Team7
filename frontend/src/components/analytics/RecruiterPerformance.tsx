@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import {
   Box,
   Paper,
@@ -24,6 +25,7 @@ import {
   CheckCircle as CheckIcon,
   Star as StarIcon,
   Description as DescriptionIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 
 /**
@@ -90,7 +92,7 @@ interface RecruiterPerformanceProps {
  * ```
  */
 const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics',
+  apiUrl = '/api/analytics',
   startDate,
   endDate,
   limit = 20,
@@ -107,19 +109,16 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
     setError(null);
 
     try {
-      const params = new URLSearchParams();
-      if (startDate) params.append('start_date', startDate);
-      if (endDate) params.append('end_date', endDate);
-      params.append('limit', limit.toString());
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+      params.limit = limit.toString();
 
-      const response = await fetch(`${apiUrl}/recruiter-performance?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch recruiter performance: ${response.statusText}`);
-      }
-
-      const result: RecruiterPerformanceResponse = await response.json();
-      setData(result);
+      const response = await axios.get<RecruiterPerformanceResponse>(
+        `${apiUrl}/recruiter-performance`,
+        { params }
+      );
+      setData(response.data);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load recruiter performance data';
@@ -136,23 +135,23 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   /**
    * Get time-to-hire color configuration based on days
    */
-  const getTimeToHireConfig = (days: number): { color: 'success' | 'warning' | 'error'; label: string; bgColor?: string } => {
+  const getTimeToHireConfig = (days: number) => {
     if (days <= 30) {
       return {
-        color: 'success',
+        color: 'success' as const,
         label: 'Fast',
         bgColor: 'success.main',
       };
     }
     if (days <= 45) {
       return {
-        color: 'warning',
+        color: 'warning' as const,
         label: 'Moderate',
         bgColor: 'warning.main',
       };
     }
     return {
-      color: 'error',
+      color: 'error' as const,
       label: 'Slow',
       bgColor: 'error.main',
     };
@@ -161,22 +160,22 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   /**
    * Get offer acceptance rate color configuration
    */
-  const getAcceptanceRateConfig = (rate: number): { color: 'success' | 'warning' | 'error'; label: string } => {
+  const getAcceptanceRateConfig = (rate: number) => {
     const percentage = rate * 100;
     if (percentage >= 90) {
       return {
-        color: 'success',
+        color: 'success' as const,
         label: 'Excellent',
       };
     }
     if (percentage >= 80) {
       return {
-        color: 'warning',
+        color: 'warning' as const,
         label: 'Good',
       };
     }
     return {
-      color: 'error',
+      color: 'error' as const,
       label: 'Low',
     };
   };
@@ -184,21 +183,65 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   /**
    * Get satisfaction score color configuration
    */
-  const getSatisfactionConfig = (score: number): { color: 'success' | 'warning' | 'error' } => {
+  const getSatisfactionConfig = (score: number) => {
     if (score >= 4.5) {
       return {
-        color: 'success',
+        color: 'success' as const,
       };
     }
     if (score >= 4.0) {
       return {
-        color: 'warning',
+        color: 'warning' as const,
       };
     }
     return {
-      color: 'error',
+      color: 'error' as const,
     };
   };
+
+  /**
+   * Export recruiter performance data as CSV
+   */
+  const exportAsCSV = useCallback(() => {
+    if (!data || !data.recruiters || data.recruiters.length === 0) {
+      return;
+    }
+
+    const headers = [
+      'Rank',
+      'Recruiter Name',
+      'Recruiter ID',
+      'Hires',
+      'Interviews Conducted',
+      'Resumes Processed',
+      'Avg Time-to-Hire (days)',
+      'Offer Acceptance Rate (%)',
+      'Candidate Satisfaction Score',
+    ];
+
+    const rows = data.recruiters.map((recruiter, index) => [
+      index + 1,
+      `"${recruiter.recruiter_name}"`,
+      `"${recruiter.recruiter_id}"`,
+      recruiter.hires,
+      recruiter.interviews_conducted,
+      recruiter.resumes_processed,
+      recruiter.average_time_to_hire.toFixed(1),
+      (recruiter.offer_acceptance_rate * 100).toFixed(1),
+      recruiter.candidate_satisfaction_score.toFixed(2),
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `recruiter-performance-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [data]);
 
   /**
    * Render loading state
@@ -262,18 +305,17 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
     );
   }
 
-  // Calculate summary statistics (data.recruiters is guaranteed to have at least one item here)
-  const recruitersList = data.recruiters;
-  const topPerformer = recruitersList[0]!;
+  // Calculate summary statistics
+  const topPerformer = data.recruiters[0];
   const avgTimeToHire =
-    recruitersList.reduce((sum, r) => sum + r.average_time_to_hire, 0) /
-    recruitersList.length;
+    data.recruiters.reduce((sum, r) => sum + r.average_time_to_hire, 0) /
+    data.recruiters.length;
   const avgAcceptanceRate =
-    recruitersList.reduce((sum, r) => sum + r.offer_acceptance_rate, 0) /
-    recruitersList.length;
+    data.recruiters.reduce((sum, r) => sum + r.offer_acceptance_rate, 0) /
+    data.recruiters.length;
   const avgSatisfaction =
-    recruitersList.reduce((sum, r) => sum + r.candidate_satisfaction_score, 0) /
-    recruitersList.length;
+    data.recruiters.reduce((sum, r) => sum + r.candidate_satisfaction_score, 0) /
+    data.recruiters.length;
 
   return (
     <Stack spacing={3}>
@@ -285,13 +327,24 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
               Recruiter Performance Comparison
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Comparing <strong>{recruitersList.length}</strong> recruiters •{' '}
+              Comparing <strong>{data.recruiters.length}</strong> recruiters •{' '}
               <strong>{data.total_recruiters}</strong> total recruiters in organization
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchPerformance} size="small">
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<FileDownloadIcon />}
+              onClick={exportAsCSV}
+              size="small"
+              disabled={!data || data.recruiters.length === 0}
+            >
+              Export CSV
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchPerformance} size="small">
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         {/* Summary Statistics */}
@@ -315,7 +368,7 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
                 Top Performer
               </Typography>
               <Typography variant="body2" fontWeight={600}>
-                {topPerformer.recruiter_name}
+                {topPerformer?.recruiter_name || 'N/A'}
               </Typography>
             </Box>
           </Box>
@@ -452,7 +505,7 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {recruitersList.map((recruiter, index) => {
+              {data.recruiters.map((recruiter, index) => {
                 const timeConfig = getTimeToHireConfig(recruiter.average_time_to_hire);
                 const acceptanceConfig = getAcceptanceRateConfig(recruiter.offer_acceptance_rate);
                 const satisfactionConfig = getSatisfactionConfig(recruiter.candidate_satisfaction_score);

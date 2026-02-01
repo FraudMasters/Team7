@@ -22,6 +22,8 @@ from analyzers import (
 )
 from database import get_db
 from models.job_vacancy import JobVacancy
+from models.audit_log import AuditActionType
+from utils.audit_logger import log_audit_event, get_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +168,18 @@ async def create_vacancy(
         db.add(new_vacancy)
         await db.commit()
         await db.refresh(new_vacancy)
+
+        # Log audit event
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.VACANCY_CREATED,
+            entity_type="vacancy",
+            entity_id=new_vacancy.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            after_value=_vacancy_to_response(new_vacancy),
+        )
 
         logger.info(f"Created vacancy: {new_vacancy.id} - {new_vacancy.title}")
 
@@ -642,6 +656,17 @@ async def get_vacancy(
                 detail="Vacancy not found",
             )
 
+        # Log audit event for viewing vacancy
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.VACANCY_VIEWED,
+            entity_type="vacancy",
+            entity_id=vacancy.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=_vacancy_to_response(vacancy),
@@ -700,6 +725,9 @@ async def update_vacancy(
                 detail="Vacancy not found",
             )
 
+        # Capture before state for audit log
+        before_state = _vacancy_to_response(vacancy_obj)
+
         # Update fields
         if vacancy.title is not None:
             vacancy_obj.title = vacancy.title
@@ -731,6 +759,19 @@ async def update_vacancy(
 
         await db.commit()
         await db.refresh(vacancy_obj)
+
+        # Log audit event with before and after values
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.VACANCY_UPDATED,
+            entity_type="vacancy",
+            entity_id=vacancy_obj.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            before_value=before_state,
+            after_value=_vacancy_to_response(vacancy_obj),
+        )
 
         logger.info(f"Updated vacancy: {vacancy_id}")
 
@@ -792,9 +833,24 @@ async def delete_vacancy(
                 detail="Vacancy not found",
             )
 
+        # Capture before state for audit log
+        before_state = _vacancy_to_response(vacancy)
+
         # Delete vacancy
         await db.delete(vacancy)
         await db.commit()
+
+        # Log audit event with before value
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.VACANCY_DELETED,
+            entity_type="vacancy",
+            entity_id=vacancy.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            before_value=before_state,
+        )
 
         logger.info(f"Deleted vacancy: {vacancy_id}")
 

@@ -1,130 +1,232 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Paper, Typography, Box, Tabs, Tab, Stack } from '@mui/material';
-import { useSearchParams } from 'react-router-dom';
-import KeyMetrics from '../components/analytics/KeyMetrics';
-import FunnelVisualization from '../components/analytics/FunnelVisualization';
-import SkillDemandChart from '../components/analytics/SkillDemandChart';
-import SourceTracking from '../components/analytics/SourceTracking';
-import RecruiterPerformance from '../components/analytics/RecruiterPerformance';
-import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '../components/analytics/DateRangeFilter';
-import ReportBuilder from '../components/analytics/ReportBuilder';
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`analytics-tabpanel-${index}`}
-      aria-labelledby={`analytics-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box>{children}</Box>}
-    </div>
-  );
-}
-
-function a11yProps(index: number) {
-  return {
-    id: `analytics-tab-${index}`,
-    'aria-controls': `analytics-tabpanel-${index}`,
-  };
-}
+import React, { useState } from 'react';
+import {
+  Container,
+  Typography,
+  Box,
+  Grid,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  PictureAsPdf as PdfIcon,
+} from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
+import KeyMetrics from '@components/analytics/KeyMetrics';
+import FunnelVisualization from '@components/analytics/FunnelVisualization';
+import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
+import SkillDemandChart from '@components/analytics/SkillDemandChart';
+import SourceTracking from '@components/analytics/SourceTracking';
+import ReportBuilder from '@components/analytics/ReportBuilder';
 
 /**
- * AnalyticsDashboardPage Component
+ * Analytics Dashboard Page (Recruiter Module)
  *
- * Main analytics dashboard for viewing hiring metrics, funnel visualization,
- * skill demand analytics, recruiter performance, source tracking, and custom reports.
+ * Shows comprehensive hiring metrics and analytics with:
+ * - Key metrics (time-to-hire, resumes processed, match rates)
+ * - Recruitment funnel visualization
+ * - Recruiter performance comparison
+ * - Skill demand trends
+ * - Candidate source tracking
+ * - Configurable date range filtering across all components
  */
 const AnalyticsDashboardPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation();
   const [dateRange, setDateRange] = useState<DateRangeFilterType>({
     startDate: '',
     endDate: '',
     preset: 'last_30_days',
   });
-
-  // Get tab from URL query parameter
-  const tabParam = searchParams.get('tab');
-  const tabValue = tabParam === 'reports' ? 1 : 0;
-
-  /**
-   * Handle tab change
-   */
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    const tab = newValue === 1 ? 'reports' : 'dashboard';
-    setSearchParams({ tab });
-  };
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   /**
-   * Handle date range change
+   * Handle date range change from DateRangeFilter component
    */
   const handleDateRangeChange = (newDateRange: DateRangeFilterType) => {
     setDateRange(newDateRange);
   };
 
+  /**
+   * Handle apply button click
+   * This triggers a refresh of all analytics components
+   */
+  const handleApplyFilter = (appliedDateRange: DateRangeFilterType) => {
+    setDateRange(appliedDateRange);
+  };
+
+  /**
+   * Open report builder dialog
+   */
+  const handleOpenReportBuilder = () => {
+    setReportDialogOpen(true);
+    setReportError(null);
+  };
+
+  /**
+   * Close report builder dialog
+   */
+  const handleCloseReportBuilder = () => {
+    setReportDialogOpen(false);
+  };
+
+  /**
+   * Generate PDF report using browser print functionality
+   */
+  const handleGeneratePDF = async () => {
+    setGeneratingReport(true);
+    setReportError(null);
+
+    try {
+      // Use browser's print functionality which allows "Save as PDF"
+      // This is a simple, client-side solution that doesn't require
+      // additional PDF generation libraries
+      await new Promise<void>((resolve) => {
+        setTimeout(() => {
+          window.print();
+          resolve();
+        }, 100);
+      });
+
+      setReportDialogOpen(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate report';
+      setReportError(errorMessage);
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          Hiring Analytics Dashboard
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Monitor key hiring metrics, track candidate progression, analyze skill demand,
-          compare recruiter performance, and build custom reports
-        </Typography>
+    <>
+    <Container maxWidth="xl" sx={{ py: 4 }} className="analytics-dashboard">
+      {/* Header */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+            {t('analyticsDashboard.title')}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {t('analyticsDashboard.subtitle')}
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<PdfIcon />}
+          onClick={handleOpenReportBuilder}
+          color="primary"
+        >
+          Generate Report
+        </Button>
       </Box>
 
-      {/* Tabs */}
-      <Paper elevation={1} sx={{ mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          aria-label="Analytics tabs"
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab label="Dashboard" {...a11yProps(0)} />
-          <Tab label="Reports" {...a11yProps(1)} />
-        </Tabs>
-      </Paper>
+      {/* Date Range Filter */}
+      <Box sx={{ mb: 4 }}>
+        <DateRangeFilter
+          onDateRangeChange={handleDateRangeChange}
+          onApply={handleApplyFilter}
+          initialDateRange={{ preset: 'last_30_days' }}
+          showPresets={true}
+        />
+      </Box>
 
-      {/* Dashboard Tab */}
-      <TabPanel value={tabValue} index={0}>
-        <Stack spacing={3}>
-          {/* Date Range Filter Section */}
-          <DateRangeFilter onDateRangeChange={handleDateRangeChange} />
+      {/* Key Metrics */}
+      <Box sx={{ mb: 4 }}>
+        <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
+      </Box>
 
-          {/* Key Metrics Section */}
-          <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
+      {/* Funnel Visualization */}
+      <Box sx={{ mb: 4 }}>
+        <FunnelVisualization startDate={dateRange.startDate} endDate={dateRange.endDate} />
+      </Box>
 
-          {/* Funnel Visualization Section */}
-          <FunnelVisualization startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Skill Demand Analytics Section */}
-          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Source Tracking Section */}
-          <SourceTracking startDate={dateRange.startDate} endDate={dateRange.endDate} />
-
-          {/* Recruiter Performance Section */}
+      {/* Recruiter Performance and Skill Demand - Side by Side */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} lg={8}>
           <RecruiterPerformance startDate={dateRange.startDate} endDate={dateRange.endDate} />
-        </Stack>
-      </TabPanel>
+        </Grid>
+        <Grid item xs={12} lg={4}>
+          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+        </Grid>
+      </Grid>
 
-      {/* Reports Tab */}
-      <TabPanel value={tabValue} index={1}>
-        <ReportBuilder />
-      </TabPanel>
+      {/* Source Tracking */}
+      <Box sx={{ mb: 4 }}>
+        <SourceTracking startDate={dateRange.startDate} endDate={dateRange.endDate} />
+      </Box>
     </Container>
+
+    {/* Report Builder Dialog */}
+    <Dialog
+      open={reportDialogOpen}
+      onClose={handleCloseReportBuilder}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: { height: '80vh', maxHeight: '80vh' }
+      }}
+    >
+      <DialogTitle>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" fontWeight={600}>
+            Generate Analytics Report
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Button
+              variant="contained"
+              startIcon={generatingReport ? <CircularProgress size={16} /> : <PdfIcon />}
+              onClick={handleGeneratePDF}
+              disabled={generatingReport}
+              color="primary"
+            >
+              {generatingReport ? 'Generating...' : 'Export as PDF'}
+            </Button>
+            <IconButton
+              onClick={handleCloseReportBuilder}
+              disabled={generatingReport}
+              size="small"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ p: 0 }}>
+        {reportError && (
+          <Alert severity="error" sx={{ m: 2 }} onClose={() => setReportError(null)}>
+            {reportError}
+          </Alert>
+        )}
+        <Box sx={{ height: '100%', overflow: 'auto' }}>
+          <ReportBuilder
+            onReportChange={(report) => {
+              // Report configuration saved
+            }}
+          />
+        </Box>
+      </DialogContent>
+    </Dialog>
+
+    {/* Print-specific styles - only applied when printing */}
+    <style>{`
+      @media print {
+        .analytics-dashboard .MuiButton-root:not([data-print-include]) {
+          display: none !important;
+        }
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    `}</style>
+    </>
   );
 };
 

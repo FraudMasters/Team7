@@ -33,6 +33,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Analytics as AnalyticsIcon,
   Visibility as VisibilityIcon,
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
 import UnifiedMatchMetrics from './UnifiedMatchMetrics';
 
@@ -411,6 +412,16 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               </ToggleButtonGroup>
 
               <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                startIcon={<BarChartIcon />}
+                onClick={() => navigate(`/match-breakdown/${resumeId}/${vacancyId}`)}
+              >
+                Detailed Breakdown
+              </Button>
+
+              <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
                 onClick={fetchUnifiedComparison}
@@ -511,6 +522,16 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                 <Box component="span" sx={{ ml: 0.5 }}>Простой</Box>
               </ToggleButton>
             </ToggleButtonGroup>
+
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<BarChartIcon />}
+              onClick={() => navigate(`/match-breakdown/${resumeId}/${vacancyId}`)}
+            >
+              Detailed Breakdown
+            </Button>
 
             <Tooltip title="Открыть резюме">
               <Button

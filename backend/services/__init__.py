@@ -10,6 +10,12 @@ from .backup_service import (
     BACKUP_BASE_DIR,
 )
 
+from .cache_service import (
+    CacheService,
+    get_cache_service,
+    cached,
+)
+
 __all__ = [
     "BackupService",
     "get_backup_service",
@@ -17,4 +23,7 @@ __all__ = [
     "calculate_checksum",
     "format_size",
     "BACKUP_BASE_DIR",
+    "CacheService",
+    "get_cache_service",
+    "cached",
 ]

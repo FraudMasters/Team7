@@ -2,9 +2,11 @@
 AnalyticsEvent model for tracking time-based analytics events
 """
 import enum
+from uuid import UUID
 from typing import Optional
 
 from sqlalchemy import ForeignKey, JSON, String
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -52,9 +54,9 @@ class AnalyticsEvent(Base, UUIDMixin, TimestampMixin):
         String(50), nullable=False, index=True
     )
     entity_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
-    entity_id: Mapped[Optional[UUIDMixin]] = mapped_column(nullable=True, index=True)
-    user_id: Mapped[Optional[UUIDMixin]] = mapped_column(nullable=True, index=True)
-    recruiter_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    entity_id: Mapped[Optional[UUID]] = mapped_column(PGUUID, nullable=True, index=True)
+    user_id: Mapped[Optional[UUID]] = mapped_column(PGUUID, nullable=True, index=True)
+    recruiter_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("recruiters.id", ondelete="SET NULL"), nullable=True, index=True
     )
     session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)

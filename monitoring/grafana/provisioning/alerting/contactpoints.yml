@@ -1,0 +1,106 @@
+apiVersion: 1
+
+contactPoints:
+  # Email notification channel
+  - name: email-alerts
+    type: email
+    uid: email-alerts-uid
+    settings:
+      addresses: |
+        ${ALERT_EMAIL_ADDRESS:-alerts@example.com}
+      singleEmail: false
+      message: |
+        {{ range .Alerts }}
+        Alert: {{ .Labels.alertname }}
+        Severity: {{ .Labels.severity }}
+        Summary: {{ .Annotations.summary }}
+        Description: {{ .Annotations.description }}
+        Labels:
+        {{ range .Labels.SortedPairs }}  - {{ .Name }}: {{ .Value }}
+        {{ end }}
+        {{ end }}
+    disableResolveMessage: false
+
+  # Webhook notification channel (e.g., Slack, Microsoft Teams, Discord, etc.)
+  - name: webhook-alerts
+    type: webhook
+    uid: webhook-alerts-uid
+    settings:
+      url: ${ALERT_WEBHOOK_URL:-}
+      httpMethod: POST
+      username: ${ALERT_WEBHOOK_USERNAME:-}
+      password: ${ALERT_WEBHOOK_PASSWORD:-}
+      bearerToken: ${ALERT_WEBHOOK_BEARER_TOKEN:-}
+      # Alert message template
+      body: |
+        {
+          "text": "{{ .CommonLabels.alertname }}",
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "{{ if eq .Status "firing" }}🚨 Alert Firing{{ else }}✅ Alert Resolved{{ end }}"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Alert Name:*\n{{ .CommonLabels.alertname }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Severity:*\n{{ .CommonLabels.severity }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Status:*\n{{ .Status }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Category:*\n{{ .CommonLabels.category }}"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Summary:*\n{{ .CommonAnnotations.summary }}\n\n*Description:*\n{{ .CommonAnnotations.description }}"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Labels:*\n{{ range .CommonLabels.SortedPairs }}• {{ .Name }}: {{ .Value }}\n{{ end }}"
+              }
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "View in Grafana"
+                  },
+                  "url": "{{ .ExternalURL }}",
+                  "style": "primary"
+                }
+              ]
+            }
+          ]
+        }
+    disableResolveMessage: false
+
+# Mute time intervals (optional - for quiet hours)
+muteTimes:
+  - name: quiet-hours
+    time_intervals:
+      - times:
+          - start_time: "22:00"
+            end_time: "08:00"
+        weekdays: ["monday", "tuesday", "wednesday", "thursday", "sunday"]

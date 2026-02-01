@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Box,
   Paper,
@@ -18,11 +19,14 @@ import {
   Refresh as RefreshIcon,
   TrendingDown as TrendingDownIcon,
   CheckCircle as CheckIcon,
-  Description as UploadIcon,
+  Description as DescriptionIcon,
+  Upload as UploadIcon,
   Person as PersonIcon,
   Work as WorkIcon,
   School as InterviewIcon,
   Celebration as HiredIcon,
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
 } from '@mui/icons-material';
 
 /**
@@ -76,7 +80,7 @@ const formatStageName = (stageName: string): string => {
 const getStageIcon = (stageName: string) => {
   const iconMap: Record<string, React.ReactElement> = {
     resumes_uploaded: <UploadIcon />,
-    resumes_processed: <Description />,
+    resumes_processed: <DescriptionIcon />,
     candidates_matched: <PersonIcon />,
     candidates_shortlisted: <WorkIcon />,
     candidates_interviewed: <InterviewIcon />,
@@ -114,13 +118,14 @@ const getConversionColor = (rate: number): string => {
  * ```
  */
 const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics/funnel',
+  apiUrl = '/api/analytics/funnel',
   startDate,
   endDate,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [funnelData, setFunnelData] = useState<FunnelMetricsResponse | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   /**
    * Fetch funnel metrics from backend
@@ -130,23 +135,16 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
       setLoading(true);
       setError(null);
 
-      // Build URL with query parameters
-      const url = new URL(apiUrl);
+      const params: Record<string, string> = {};
       if (startDate) {
-        url.searchParams.append('start_date', startDate);
+        params.start_date = startDate;
       }
       if (endDate) {
-        url.searchParams.append('end_date', endDate);
+        params.end_date = endDate;
       }
 
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch funnel data: ${response.statusText}`);
-      }
-
-      const result: FunnelMetricsResponse = await response.json();
-      setFunnelData(result);
+      const response = await axios.get<FunnelMetricsResponse>(apiUrl, { params });
+      setFunnelData(response.data);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load funnel data';
@@ -156,9 +154,34 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
     }
   };
 
+  /**
+   * Initial fetch on mount and when date range changes
+   */
   useEffect(() => {
     fetchFunnelData();
   }, [apiUrl, startDate, endDate]);
+
+  /**
+   * Auto-refresh every 60 seconds when enabled
+   */
+  useEffect(() => {
+    if (!autoRefreshEnabled) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchFunnelData();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, apiUrl, startDate, endDate]);
+
+  /**
+   * Toggle auto-refresh
+   */
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled((prev) => !prev);
+  };
 
   /**
    * Render loading state
@@ -221,9 +244,20 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
               Track candidate progression through the hiring pipeline
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchFunnelData} size="small">
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={autoRefreshEnabled ? 'contained' : 'outlined'}
+              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
+              onClick={toggleAutoRefresh}
+              size="small"
+              color={autoRefreshEnabled ? 'primary' : 'default'}
+            >
+              {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchFunnelData} size="small">
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         {/* Overall Metrics */}
@@ -381,7 +415,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
                   {index > 0 && previousStage && (
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="caption" color="text.secondary">
-                        {previousStage.count - stage.count.toLocaleString()} candidates dropped from previous stage
+                        {(previousStage.count - stage.count).toLocaleString()} candidates dropped from previous stage
                       </Typography>
                     </Box>
                   )}
@@ -405,7 +439,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
                 const dropOffRate = 1 - stage.conversion_rate;
 
                 return (
-                  dropOffRate > 0.3 && (
+                  dropOffRate > 0.3 && previousStage && (
                     <Typography key={stage.stage_name} variant="body2" color="text.secondary">
                       <strong>{formatStageName(stage.stage_name)}:</strong> {(dropOffRate * 100).toFixed(1)}% drop-off
                       from {formatStageName(previousStage.stage_name)}

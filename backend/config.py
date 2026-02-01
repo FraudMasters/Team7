@@ -32,6 +32,8 @@ class Settings(BaseSettings):
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         celery_broker_url: Celery broker URL
         celery_result_backend: Celery result backend URL
+        backup_retention_days: Default backup retention period in days
+        audit_log_retention_days: Default audit log retention period in days
     """
 
     model_config = SettingsConfigDict(
@@ -186,6 +188,14 @@ class Settings(BaseSettings):
     backup_compression_enabled: bool = Field(
         default=True,
         description="Enable backup compression",
+    )
+
+    # Audit Log Configuration
+    audit_log_retention_days: int = Field(
+        default=90,
+        ge=1,
+        le=365,
+        description="Default audit log retention period in days",
     )
 
     # ==============================================

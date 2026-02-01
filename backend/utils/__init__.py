@@ -1,22 +1,7 @@
 """
-Utils module for text normalization and helper functions.
+Utility modules for the backend application.
 
-This module provides various utility functions for text processing,
-normalization, and formatting used across the resume parser system.
+This package contains various helper utilities including:
+- audit_logger: Audit logging for tracking user actions
+- locale_helpers: Date and number formatting for different locales
 """
-
-from .text_normalizer import (
-    normalize_skill_name,
-    normalize_position_name,
-    normalize_text,
-    remove_special_chars,
-    split_on_separators,
-)
-
-__all__ = [
-    "normalize_skill_name",
-    "normalize_position_name",
-    "normalize_text",
-    "remove_special_chars",
-    "split_on_separators",
-]

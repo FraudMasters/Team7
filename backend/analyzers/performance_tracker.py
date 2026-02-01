@@ -10,6 +10,7 @@ The system supports:
 - A/B testing comparison support
 """
 import logging
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -24,6 +25,7 @@ from sklearn.metrics import (
 )
 
 from models.model_performance_history import ModelPerformanceHistory
+from utils.metrics import get_metrics_registry
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,8 @@ class PerformanceTracker:
             >>> print(f"Accuracy: {metrics['accuracy']}")
             0.75
         """
+        start_time = time.time()
+
         try:
             metrics: Dict[str, float] = {}
 
@@ -127,6 +131,19 @@ class PerformanceTracker:
                     metrics["auc_score"] = 0.0
             else:
                 metrics["auc_score"] = None
+
+            # Record metrics calculation timing
+            duration = time.time() - start_time
+            try:
+                registry = get_metrics_registry()
+                registry.record_ml_inference(
+                    model_name="performance_tracker",
+                    operation="calculate_metrics",
+                    duration=duration,
+                    prediction_type="evaluation",
+                )
+            except Exception as metrics_error:
+                logger.debug(f"Failed to record metrics: {metrics_error}")
 
             logger.info(
                 f"Calculated metrics: accuracy={metrics['accuracy']:.4f}, "
@@ -166,6 +183,8 @@ class PerformanceTracker:
             >>> print(cm['matrix'])
             [[1, 0], [1, 2]]
         """
+        start_time = time.time()
+
         try:
             cm = confusion_matrix(y_true, y_pred)
 
@@ -188,6 +207,19 @@ class PerformanceTracker:
                         "true_positives": int(tp),
                     }
                 )
+
+            # Record confusion matrix calculation timing
+            duration = time.time() - start_time
+            try:
+                registry = get_metrics_registry()
+                registry.record_ml_inference(
+                    model_name="performance_tracker",
+                    operation="calculate_confusion_matrix",
+                    duration=duration,
+                    prediction_type="evaluation",
+                )
+            except Exception as metrics_error:
+                logger.debug(f"Failed to record metrics: {metrics_error}")
 
             logger.debug(f"Calculated confusion matrix: {cm.shape}")
             return cm_dict

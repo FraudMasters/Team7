@@ -1,0 +1,324 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/performance-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/performance-tests.yml'
+  schedule:
+    # Run performance tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  performance-benchmarks:
+    name: API Performance Benchmarks
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-client \
+            redis-tools
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-benchmark[histogram]
+
+      - name: Verify services are running
+        run: |
+          pg_isready -h localhost -p 5432
+          redis-cli -h localhost -p 6379 ping
+
+      - name: Set up environment
+        working-directory: ./backend
+        run: |
+          cp .env.example .env || true
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          echo "REDIS_CACHE_ENABLED=true" >> .env
+          echo "REDIS_CACHE_KEY_PREFIX=agenthr:test" >> .env
+          echo "REDIS_CACHE_DEFAULT_TTL=3600" >> .env
+          echo "REDIS_CACHE_MAX_CONNECTIONS=10" >> .env
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head
+
+      - name: Run performance benchmarks
+        working-directory: ./backend
+        run: |
+          pytest tests/performance/ \
+            -v \
+            --benchmark-only \
+            --benchmark-json=../benchmark-results.json \
+            --benchmark-histogram \
+            --benchmark-autosave \
+            --benchmark-save-data \
+            --benchmark-max-time=60 \
+            --benchmark-min-rounds=5 \
+            --benchmark-timer-timeout=300 \
+            --benchmark-columns=min,max,mean,stddev,median,ops,rounds
+
+      - name: Generate benchmark report
+        if: always()
+        working-directory: ./backend
+        run: |
+          pytest-benchmark compare \
+            --benchmark-sort=name \
+            --benchmark-columns=min,max,mean,stddev,median,ops \
+            benchmark-results.json || true
+
+      - name: Check for performance regressions
+        if: always()
+        run: |
+          python .github/scripts/check_performance_regression.py \
+            --current=benchmark-results.json \
+            --baseline=.github/baselines/benchmark-baseline.json \
+            --threshold=0.20 \
+            --output=regression-report.json || true
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-results.json
+            regression-report.json
+            backend/.benchmarks/
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const results = JSON.parse(fs.readFileSync('benchmark-results.json', 'utf8'));
+              const regression = JSON.parse(fs.readFileSync('regression-report.json', 'utf8'));
+
+              let comment = '## 🚀 Performance Test Results\n\n';
+
+              if (regression.has_regression) {
+                comment += '⚠️ **Performance Regressions Detected**\n\n';
+                comment += 'The following metrics show significant degradation:\n\n';
+                for (const r of regression.regressions) {
+                  comment += `- **${r.metric}**: ${(r.degradation * 100).toFixed(1)}% slower\n`;
+                  comment += `  - Current: ${r.current.toFixed(2)}ms\n`;
+                  comment += `  - Baseline: ${r.baseline.toFixed(2)}ms\n\n`;
+                }
+              } else {
+                comment += '✅ **No Performance Regressions**\n\n';
+                comment += 'All benchmarks are within acceptable thresholds.\n\n';
+              }
+
+              comment += '### Benchmark Summary\n\n';
+              comment += '| Endpoint | Min | Max | Mean | Median |\n';
+              comment += '|----------|-----|-----|------|--------|\n';
+
+              for (const [key, value] of Object.entries(results.benchmarks)) {
+                comment += `| ${key} | ${value.min.toFixed(2)}ms | ${value.max.toFixed(2)}ms | ${value.mean.toFixed(2)}ms | ${value.median.toFixed(2)}ms |\n`;
+              }
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Could not post comment:', error.message);
+            }
+
+      - name: Update baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p .github/baselines
+          cp benchmark-results.json .github/baselines/benchmark-baseline.json
+
+      - name: Commit updated baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/baselines/benchmark-baseline.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update performance baseline [skip ci]"
+
+      - name: Push changes
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+  performance-trend-analysis:
+    name: Performance Trend Analysis
+    runs-on: ubuntu-latest
+    needs: performance-benchmarks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download historical benchmark results
+        uses: actions/cache/restore@v4
+        with:
+          path: benchmark-history/
+          key: benchmark-history-${{ runner.os }}
+          restore-keys: |
+            benchmark-history-${{ runner.os }}-
+
+      - name: Analyze performance trends
+        run: |
+          python .github/scripts/analyze_performance_trends.py \
+            --history-dir=benchmark-history/ \
+            --current=benchmark-results.json \
+            --output=trend-report.json \
+            --days=30
+
+      - name: Upload trend report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trend-report
+          path: trend-report.json
+          retention-days: 90
+
+      - name: Save benchmark results to history
+        uses: actions/cache/save@v4
+        with:
+          path: benchmark-history/
+          key: benchmark-history-${{ runner.os }}-${{ github.run_number }}
+
+  cache-effectiveness:
+    name: Cache Effectiveness Analysis
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-benchmark
+
+      - name: Set up environment
+        working-directory: ./backend
+        run: |
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          echo "REDIS_CACHE_ENABLED=true" >> .env
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: alembic upgrade head
+
+      - name: Run cache effectiveness tests
+        working-directory: ./backend
+        run: |
+          pytest tests/performance/test_api_performance.py \
+            -v \
+            -k "cached" \
+            --benchmark-only \
+            --benchmark-json=cache-results.json
+
+      - name: Calculate cache hit rate
+        run: |
+          python .github/scripts/calculate_cache_effectiveness.py \
+            --cached=cache-results.json \
+            --uncached=benchmark-results.json \
+            --output=cache-effectiveness.json
+
+      - name: Upload cache effectiveness results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-effectiveness
+          path: cache-effectiveness.json
+          retention-days: 30

@@ -4,9 +4,6 @@ import {
   Card,
   CardContent,
   Typography,
-  List,
-  ListItem,
-  ListItemText,
   Chip,
   Stack,
   CircularProgress,
@@ -22,6 +19,7 @@ import {
   Star as StarIcon,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
+import { FixedSizeList } from 'react-window';
 
 interface MatchResult {
   vacancy_id: string;
@@ -73,6 +71,142 @@ const MatchPercentageBar = styled(LinearProgress)<{ value: number }>(
     },
   })
 );
+
+interface RowProps {
+  index: number;
+  style: React.CSSProperties;
+  data: {
+    matches: MatchResult[];
+    best_match: MatchResult | null;
+  };
+}
+
+const MatchRow: React.FC<RowProps> = ({ index, style, data }) => {
+  const match = data.matches[index];
+  const { best_match } = data;
+
+  if (!match) return null;
+
+  return (
+    <div style={style}>
+      <Card
+        variant={index === 0 && best_match ? 'outlined' : 'elevation'}
+        sx={{
+          border: index === 0 && best_match ? 2 : 1,
+          borderColor: index === 0 && best_match ? 'primary.main' : 'divider',
+          m: 1,
+        }}
+      >
+        <CardContent>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              mb: 2,
+            }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                {match.vacancy_title}
+              </Typography>
+              <MatchPercentageBar
+                variant="determinate"
+                value={match.match_percentage}
+                sx={{ mb: 1 }}
+              />
+            </Box>
+            <Typography
+              variant="h4"
+              fontWeight={700}
+              color={
+                match.match_percentage >= 80
+                  ? 'success.main'
+                  : match.match_percentage >= 50
+                  ? 'warning.main'
+                  : 'error.main'
+              }
+            >
+              {match.match_percentage}%
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 0.5 }}
+              >
+                ✅ Matched ({match.matched_skills.length})
+              </Typography>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                {match.matched_skills.slice(0, 10).map((skill) => (
+                  <Chip
+                    key={skill}
+                    label={skill}
+                    size="small"
+                    color="success"
+                  />
+                ))}
+                {match.matched_skills.length > 10 && (
+                  <Chip
+                    label={`+${match.matched_skills.length - 10}`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
+            </Box>
+
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 0.5 }}
+              >
+                ❌ Missing ({match.missing_skills.length})
+              </Typography>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                {match.missing_skills.slice(0, 10).map((skill) => (
+                  <Chip
+                    key={skill}
+                    label={skill}
+                    size="small"
+                    color="error"
+                  />
+                ))}
+                {match.missing_skills.length > 10 && (
+                  <Chip
+                    label={`+${match.missing_skills.length - 10}`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
+            </Box>
+          </Stack>
+
+          {match.additional_matched && match.additional_matched.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="caption" color="text.secondary">
+                ⭐ Bonus: {match.additional_matched.join(', ')}
+              </Typography>
+            </>
+          )}
+
+          {match.salary_min && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              💰 ${match.salary_min?.toLocaleString()} - ${match.salary_max?.toLocaleString()}
+              {match.location && ` • ${match.location}`}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) => {
   const [loading, setLoading] = useState(false);
@@ -148,6 +282,13 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
   }
 
   const { best_match, matches } = matchData;
+
+  const ITEM_SIZE = 350;
+
+  const listData = {
+    matches,
+    best_match,
+  };
 
   return (
     <Box>
@@ -278,34 +419,28 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Job Details
               </Typography>
-              <List dense>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {best_match.salary_min && (
-                  <ListItem>
-                    <ListItemText
-                      primary={`Salary: $${best_match.salary_min?.toLocaleString()} - $${best_match.salary_max?.toLocaleString()}`}
-                    />
-                  </ListItem>
+                  <Typography variant="body2" color="text.secondary">
+                    Salary: ${best_match.salary_min?.toLocaleString()} - ${best_match.salary_max?.toLocaleString()}
+                  </Typography>
                 )}
                 {best_match.location && (
-                  <ListItem>
-                    <ListItemText
-                      primary={`Location: ${best_match.location}`}
-                    />
-                  </ListItem>
+                  <Typography variant="body2" color="text.secondary">
+                    Location: {best_match.location}
+                  </Typography>
                 )}
                 {best_match.work_format && (
-                  <ListItem>
-                    <ListItemText
-                      primary={`Work Format: ${best_match.work_format}`}
-                    />
-                  </ListItem>
+                  <Typography variant="body2" color="text.secondary">
+                    Work Format: {best_match.work_format}
+                  </Typography>
                 )}
                 {best_match.industry && (
-                  <ListItem>
-                    <ListItemText primary={`Industry: ${best_match.industry}`} />
-                  </ListItem>
+                  <Typography variant="body2" color="text.secondary">
+                    Industry: {best_match.industry}
+                  </Typography>
                 )}
-              </List>
+              </Box>
             </Box>
 
             <Button
@@ -325,125 +460,26 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
         All Vacancy Matches ({matchData.total_vacancies})
       </Typography>
 
-      <Stack spacing={2}>
-        {matches.map((match, index) => (
-          <Card
-            key={match.vacancy_id}
-            variant={index === 0 && best_match ? 'outlined' : 'elevation'}
-            sx={{
-              border: index === 0 && best_match ? 2 : 1,
-              borderColor: index === 0 && best_match ? 'primary.main' : 'divider',
-            }}
-          >
-            <CardContent>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  mb: 2,
-                }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
-                    {match.vacancy_title}
-                  </Typography>
-                  <MatchPercentageBar
-                    variant="determinate"
-                    value={match.match_percentage}
-                    sx={{ mb: 1 }}
-                  />
-                </Box>
-                <Typography
-                  variant="h4"
-                  fontWeight={700}
-                  color={
-                    match.match_percentage >= 80
-                      ? 'success.main'
-                      : match.match_percentage >= 50
-                      ? 'warning.main'
-                      : 'error.main'
-                  }
-                >
-                  {match.match_percentage}%
-                </Typography>
-              </Box>
-
-              <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', mb: 0.5 }}
-                  >
-                    ✅ Matched ({match.matched_skills.length})
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                    {match.matched_skills.slice(0, 10).map((skill) => (
-                      <Chip
-                        key={skill}
-                        label={skill}
-                        size="small"
-                        color="success"
-                      />
-                    ))}
-                    {match.matched_skills.length > 10 && (
-                      <Chip
-                        label={`+${match.matched_skills.length - 10}`}
-                        size="small"
-                        variant="outlined"
-                      />
-                    )}
-                  </Stack>
-                </Box>
-
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', mb: 0.5 }}
-                  >
-                    ❌ Missing ({match.missing_skills.length})
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                    {match.missing_skills.slice(0, 10).map((skill) => (
-                      <Chip
-                        key={skill}
-                        label={skill}
-                        size="small"
-                        color="error"
-                      />
-                    ))}
-                    {match.missing_skills.length > 10 && (
-                      <Chip
-                        label={`+${match.missing_skills.length - 10}`}
-                        size="small"
-                        variant="outlined"
-                      />
-                    )}
-                  </Stack>
-                </Box>
-              </Stack>
-
-              {match.additional_matched && match.additional_matched.length > 0 && (
-                <>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="caption" color="text.secondary">
-                    ⭐ Bonus: {match.additional_matched.join(', ')}
-                  </Typography>
-                </>
-              )}
-
-              {match.salary_min && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  💰 ${match.salary_min?.toLocaleString()} - ${match.salary_max?.toLocaleString()}
-                  {match.location && ` • ${match.location}`}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </Stack>
+      <Box
+        sx={{
+          height: 600,
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          overflow: 'hidden',
+          border: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <FixedSizeList
+          height={600}
+          itemCount={matches.length}
+          itemSize={ITEM_SIZE}
+          width="100%"
+          itemData={listData}
+        >
+          {MatchRow}
+        </FixedSizeList>
+      </Box>
 
       {/* Processing Time */}
       <Box sx={{ mt: 3, textAlign: 'center' }}>

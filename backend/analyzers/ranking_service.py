@@ -13,6 +13,7 @@ import json
 import logging
 import pickle
 import random
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -26,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import CandidateRank, JobVacancy, MatchResult, Resume, ResumeAnalysis
+from utils.metrics import get_metrics_registry
 
 logger = logging.getLogger(__name__)
 
@@ -420,20 +422,44 @@ class RankingModel:
         Returns:
             Probability of positive outcome (0-1)
         """
-        if not self.is_trained or self.model is None:
-            # Return heuristic score if model not trained
-            return float(np.mean(features))
+        start_time = time.time()
+        model_name = f"ranking_{self.model_type}"
 
-        # Scale features
-        features_scaled = self.scaler.transform(features.reshape(1, -1))
+        try:
+            if not self.is_trained or self.model is None:
+                # Return heuristic score if model not trained
+                result = float(np.mean(features))
+            else:
+                # Scale features
+                features_scaled = self.scaler.transform(features.reshape(1, -1))
 
-        # Get probability of positive class
-        proba = self.model.predict_proba(features_scaled)[0]
+                # Get probability of positive class
+                proba = self.model.predict_proba(features_scaled)[0]
 
-        # Return probability of class 1 (hired/suitable)
-        if len(proba) > 1:
-            return float(proba[1])
-        return float(proba[0])
+                # Return probability of class 1 (hired/suitable)
+                if len(proba) > 1:
+                    result = float(proba[1])
+                else:
+                    result = float(proba[0])
+
+            # Record inference metrics
+            duration = time.time() - start_time
+            try:
+                registry = get_metrics_registry()
+                registry.record_ml_inference(
+                    model_name=model_name,
+                    operation="predict_proba",
+                    duration=duration,
+                    prediction_type="probability",
+                )
+            except Exception as metrics_error:
+                logger.debug(f"Failed to record metrics: {metrics_error}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in predict_proba: {e}", exc_info=True)
+            raise
 
     def predict(self, features: npt.NDArray[np.float64]) -> Tuple[int, float]:
         """
@@ -447,19 +473,42 @@ class RankingModel:
             prediction: 0=reject, 1=accept
             confidence: Model confidence (0-1)
         """
-        if not self.is_trained or self.model is None:
-            # Use heuristic
-            score = float(np.mean(features))
-            return (1 if score > 0.5 else 0, abs(score - 0.5) * 2)
+        start_time = time.time()
+        model_name = f"ranking_{self.model_type}"
 
-        features_scaled = self.scaler.transform(features.reshape(1, -1))
-        prediction = int(self.model.predict(features_scaled)[0])
+        try:
+            if not self.is_trained or self.model is None:
+                # Use heuristic
+                score = float(np.mean(features))
+                result = (1 if score > 0.5 else 0, abs(score - 0.5) * 2)
+            else:
+                features_scaled = self.scaler.transform(features.reshape(1, -1))
+                prediction = int(self.model.predict(features_scaled)[0])
 
-        # Get confidence from probability
-        proba = self.model.predict_proba(features_scaled)[0]
-        confidence = float(max(proba))
+                # Get confidence from probability
+                proba = self.model.predict_proba(features_scaled)[0]
+                confidence = float(max(proba))
 
-        return (prediction, confidence)
+                result = (prediction, confidence)
+
+            # Record inference metrics
+            duration = time.time() - start_time
+            try:
+                registry = get_metrics_registry()
+                registry.record_ml_inference(
+                    model_name=model_name,
+                    operation="predict",
+                    duration=duration,
+                    prediction_type="classification",
+                )
+            except Exception as metrics_error:
+                logger.debug(f"Failed to record metrics: {metrics_error}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in predict: {e}", exc_info=True)
+            raise
 
     def get_feature_importance(self) -> Dict[str, float]:
         """

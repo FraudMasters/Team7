@@ -21,6 +21,8 @@ from config import get_settings
 from i18n.backend_translations import get_error_message, get_success_message
 from database import get_db
 from models.resume import Resume, ResumeStatus
+from models.audit_log import AuditActionType
+from utils.audit_logger import log_audit_event, get_request_context
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -210,6 +212,22 @@ async def upload_resume(
         db.add(new_resume)
         await db.commit()
         await db.refresh(new_resume)
+
+        # Log audit event
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.RESUME_UPLOADED,
+            entity_type="resume",
+            entity_id=resume_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "filename": file.filename or "unknown",
+                "file_size": file_size,
+                "content_type": file.content_type or "application/octet-stream",
+            },
+        )
 
         # Get translated success message
         success_message = get_success_message("file_uploaded", locale)
@@ -519,6 +537,20 @@ async def get_resume(request: Request, resume_id: str, db: AsyncSession = Depend
 
         logger.info(f"Analysis completed for resume: {resume_id}")
 
+        # Log audit event for viewing resume
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.RESUME_VIEWED,
+            entity_type="resume",
+            entity_id=UUID(resume_id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "filename": filename,
+            },
+        )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
@@ -602,6 +634,22 @@ async def delete_resume(
 
         # Delete from database if found
         if resume_record:
+            # Log audit event before deletion
+            ip_address, user_agent = get_request_context(request)
+            await log_audit_event(
+                db=db,
+                action_type=AuditActionType.RESUME_DELETED,
+                entity_type="resume",
+                entity_id=resume_record.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                before_value={
+                    "filename": resume_record.filename,
+                    "status": resume_record.status.value if resume_record.status else None,
+                    "created_at": resume_record.created_at.isoformat() if resume_record.created_at else None,
+                },
+            )
+
             await db.delete(resume_record)
             await db.commit()
 

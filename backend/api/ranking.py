@@ -77,6 +77,39 @@ class RankedCandidatesRequest(BaseModel):
     include_experiments: bool = Field(True, description="Include A/B test candidates")
 
 
+class FairRankingRequest(BaseModel):
+    """Request to rank a candidate with fairness-aware bias mitigation."""
+
+    resume_id: str = Field(..., description="Resume UUID")
+    vacancy_id: str = Field(..., description="Vacancy UUID")
+    enable_fairness: bool = Field(True, description="Enable fairness-aware ranking")
+    mitigation_strategy: Optional[str] = Field(
+        None,
+        description="Bias mitigation strategy (equal_opportunity, demographic_parity, adversarial)"
+    )
+    use_experiment: bool = Field(True, description="Include in A/B test experiment")
+
+
+class FairRankingResponse(BaseModel):
+    """Response from fairness-aware candidate ranking."""
+
+    resume_id: str = Field(..., description="Resume UUID")
+    vacancy_id: str = Field(..., description="Vacancy UUID")
+    rank_score: float = Field(..., description="Overall ranking score (0-1)")
+    adjusted_score: float = Field(..., description="Fairness-adjusted ranking score (0-1)")
+    rank_position: Optional[int] = Field(None, description="Position in ranked list")
+    recommendation: str = Field(..., description="Hiring recommendation")
+    confidence: float = Field(..., description="Model confidence (0-1)")
+    is_experiment: bool = Field(..., description="Part of A/B test")
+    experiment_group: Optional[str] = Field(None, description="A/B test group")
+    model_version: str = Field(..., description="Model version used")
+    fairness_enabled: bool = Field(..., description="Whether fairness mitigation was applied")
+    mitigation_strategy: Optional[str] = Field(None, description="Applied mitigation strategy")
+    bias_metrics: Dict[str, float] = Field(..., description="Bias detection metrics")
+    feature_contributions: Dict[str, float] = Field(..., description="Feature contribution scores")
+    ranking_factors: Dict[str, Any] = Field(..., description="Detailed factor scores")
+
+
 @router.post(
     "/rank",
     response_model=RankingResponse,
@@ -182,6 +215,130 @@ async def rank_candidate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ranking failed: {str(e)}",
+        )
+
+
+@router.post(
+    "/rank-fair",
+    response_model=FairRankingResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Ranking"],
+)
+async def rank_candidate_fair(
+    request: FairRankingRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Rank a candidate with fairness-aware bias mitigation.
+
+    This endpoint extends the standard ranking with bias detection and
+    mitigation techniques to ensure fair hiring outcomes across demographic groups.
+
+    Supported mitigation strategies:
+    - equal_opportunity: Equalize true positive rates across groups
+    - demographic_parity: Ensure similar selection rates across groups
+    - adversarial: Remove demographic information from embeddings
+
+    The ranking includes:
+    - Bias metrics (disparate impact, statistical parity difference)
+    - Fairness-adjusted scores
+    - Demographic inference for bias monitoring
+    - All standard ranking features
+
+    Args:
+        request: Fair ranking request with resume_id, vacancy_id, and fairness options
+        db: Database session
+
+    Returns:
+        Fairness-aware ranking result with bias metrics and adjusted scores
+
+    Raises:
+        HTTPException(404): If resume or vacancy not found
+        HTTPException(422): If UUID format is invalid
+        HTTPException(500): If ranking fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "resume_id": "abc-123-def",
+        ...     "vacancy_id": "vac-456-ghi",
+        ...     "enable_fairness": True,
+        ...     "mitigation_strategy": "equal_opportunity",
+        ...     "use_experiment": True
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/ranking/rank-fair",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "resume_id": "abc-123-def",
+            "vacancy_id": "vac-456-ghi",
+            "rank_score": 0.78,
+            "adjusted_score": 0.76,
+            "recommendation": "good",
+            "fairness_enabled": true,
+            "mitigation_strategy": "equal_opportunity",
+            "bias_metrics": {
+                "disparate_impact": 0.95,
+                "statistical_parity_diff": 0.03
+            },
+            ...
+        }
+    """
+    try:
+        logger.info(
+            f"Fairness ranking candidate {request.resume_id} for vacancy {request.vacancy_id} "
+            f"(fairness={request.enable_fairness}, strategy={request.mitigation_strategy})"
+        )
+
+        # Parse UUIDs
+        try:
+            resume_uuid = UUID(request.resume_id)
+            vacancy_uuid = UUID(request.vacancy_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid UUID format: {e}",
+            )
+
+        # Get ranking service
+        ranking_service = get_ranking_service()
+
+        # Rank the candidate with fairness awareness
+        result = await ranking_service.rank_candidate_fair(
+            db,
+            resume_uuid,
+            vacancy_uuid,
+            enable_fairness=request.enable_fairness,
+            mitigation_strategy=request.mitigation_strategy,
+            use_experiment=request.use_experiment,
+        )
+
+        logger.info(
+            f"Fairness ranked candidate {request.resume_id}: "
+            f"score={result['rank_score']:.2f}, "
+            f"adjusted_score={result['adjusted_score']:.2f}, "
+            f"recommendation={result['recommendation']}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=result,
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error in fairness ranking: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Fairness ranking failed: {str(e)}",
         )
 
 

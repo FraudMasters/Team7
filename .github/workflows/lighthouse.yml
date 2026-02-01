@@ -1,0 +1,267 @@
+name: Lighthouse CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lighthouse.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lighthouse.yml'
+  schedule:
+    # Run Lighthouse CI daily at 3 AM UTC (after performance tests)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  lighthouse-ci:
+    name: Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: http://localhost:8000
+        run: |
+          npm run build
+          # Verify build output
+          ls -lah dist/
+
+      - name: Start local server
+        working-directory: ./frontend
+        run: |
+          npx serve dist -l 8080 &
+          echo "Waiting for server to start..."
+          sleep 5
+          curl -f http://localhost:8080 || exit 1
+
+      - name: Run Lighthouse CI
+        working-directory: ./frontend
+        run: |
+          npm install -g @lhci/cli
+          lhci autorun --collect.url=http://localhost:8080 --collect.numRuns=3
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results
+          path: |
+            frontend/.lighthouseci/
+          retention-days: 30
+
+      - name: Parse Lighthouse results
+        if: always()
+        id: parse-results
+        working-directory: ./frontend
+        run: |
+          # Find the most recent results JSON
+          RESULTS_FILE=$(ls -t .lighthouseci/*.json 2>/dev/null | head -1 || echo "")
+          if [ -z "$RESULTS_FILE" ]; then
+            echo "No Lighthouse results found"
+            exit 1
+          fi
+
+          echo "results_file=$RESULTS_FILE" >> $GITHUB_OUTPUT
+
+          # Extract scores using jq
+          PERFORMANCE=$(jq -r '.[0].categories.performance.score * 100' "$RESULTS_FILE" || echo "0")
+          BEST_PRACTICES=$(jq -r '.[0].categories["best-practices"].score * 100' "$RESULTS_FILE" || echo "0")
+          ACCESSIBILITY=$(jq -r '.[0].categories.accessibility.score * 100' "$RESULTS_FILE" || echo "0")
+          SEO=$(jq -r '.[0].categories.seo.score * 100' "$RESULTS_FILE" || echo "0")
+          PWA=$(jq -r '.[0].categories.pwa.score * 100' "$RESULTS_FILE" || echo "0")
+
+          echo "performance=$PERFORMANCE" >> $GITHUB_OUTPUT
+          echo "best_practices=$BEST_PRACTICES" >> $GITHUB_OUTPUT
+          echo "accessibility=$ACCESSIBILITY" >> $GITHUB_OUTPUT
+          echo "seo=$SEO" >> $GITHUB_OUTPUT
+          echo "pwa=$PWA" >> $GITHUB_OUTPUT
+
+          echo "### Lighthouse Scores 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Category | Score | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | $PERFORMANCE | $(if [ "$PERFORMANCE" -ge 90 ]; then echo "✅"; elif [ "$PERFORMANCE" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Best Practices | $BEST_PRACTICES | $(if [ "$BEST_PRACTICES" -ge 90 ]; then echo "✅"; elif [ "$BEST_PRACTICES" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility | $ACCESSIBILITY | $(if [ "$ACCESSIBILITY" -ge 90 ]; then echo "✅"; elif [ "$ACCESSIBILITY" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SEO | $SEO | $(if [ "$SEO" -ge 90 ]; then echo "✅"; elif [ "$SEO" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| PWA | $PWA | $(if [ "$PWA" -ge 90 ]; then echo "✅"; elif [ "$PWA" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check performance thresholds
+        if: always()
+        run: |
+          PERFORMANCE=${{ steps.parse-results.outputs.performance }}
+          BEST_PRACTICES=${{ steps.parse-results.outputs.best_practices }}
+
+          # Round to integer
+          PERFORMANCE=${PERFORMANCE%.*}
+          BEST_PRACTICES=${BEST_PRACTICES%.*}
+
+          if [ "$PERFORMANCE" -lt 90 ]; then
+            echo "❌ Performance score ($PERFORMANCE) is below threshold (90)"
+            exit 1
+          fi
+
+          if [ "$BEST_PRACTICES" -lt 90 ]; then
+            echo "❌ Best Practices score ($BEST_PRACTICES) is below threshold (90)"
+            exit 1
+          fi
+
+          echo "✅ All Lighthouse scores meet the minimum thresholds"
+
+      - name: Comment PR with results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const performance = '${{ steps.parse-results.outputs.performance }}';
+            const bestPractices = '${{ steps.parse-results.outputs.best_practices }}';
+            const accessibility = '${{ steps.parse-results.outputs.accessibility }}';
+            const seo = '${{ steps.parse-results.outputs.seo }}';
+            const pwa = '${{ steps.parse-results.outputs.pwa }}';
+
+            const getEmoji = (score) => {
+              const num = parseInt(score);
+              if (num >= 90) return '✅';
+              if (num >= 50) return '⚠️';
+              return '❌';
+            };
+
+            const getBar = (score) => {
+              const num = parseInt(score);
+              const filled = '█'.repeat(Math.floor(num / 10));
+              const empty = '░'.repeat(10 - Math.floor(num / 10));
+              return `${filled}${empty}`;
+            };
+
+            let comment = '## 🔍 Lighthouse CI Results\n\n';
+            comment += '### Performance Scores\n\n';
+
+            comment += '| Category | Score | Bar | Status |\n';
+            comment += '|----------|-------|-----|--------|\n';
+            comment += `| Performance | ${performance} | ${getBar(performance)} ${performance}% | ${getEmoji(performance)} |\n`;
+            comment += `| Best Practices | ${bestPractices} | ${getBar(bestPractices)} ${bestPractices}% | ${getEmoji(bestPractices)} |\n`;
+            comment += `| Accessibility | ${accessibility} | ${getBar(accessibility)} ${accessibility}% | ${getEmoji(accessibility)} |\n`;
+            comment += `| SEO | ${seo} | ${getBar(seo)} ${seo}% | ${getEmoji(seo)} |\n`;
+            comment += `| PWA | ${pwa} | ${getBar(pwa)} ${pwa}% | ${getEmoji(pwa)} |\n\n`;
+
+            // Performance thresholds check
+            const perfNum = parseInt(performance);
+            const bpNum = parseInt(bestPractices);
+
+            if (perfNum >= 90 && bpNum >= 90) {
+              comment += '✅ **All performance thresholds met!**\n\n';
+            } else {
+              comment += '⚠️ **Performance Thresholds**\n\n';
+              if (perfNum < 90) {
+                comment += `- ❌ Performance must be ≥ 90 (current: ${performance})\n`;
+              } else {
+                comment += `- ✅ Performance ≥ 90 ✓\n`;
+              }
+              if (bpNum < 90) {
+                comment += `- ❌ Best Practices must be ≥ 90 (current: ${bestPractices})\n`;
+              } else {
+                comment += `- ✅ Best Practices ≥ 90 ✓\n`;
+              }
+              comment += '\n';
+            }
+
+            comment += '### 📊 Detailed Metrics\n\n';
+            comment += 'The detailed Lighthouse report has been uploaded as an artifact.\n\n';
+            comment += '**Required:** Performance ≥ 90, Best Practices ≥ 90';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Save baseline results
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p .github/baselines
+          cp frontend/.lighthouseci/*.json .github/baselines/lighthouse-baseline.json || true
+
+      - name: Commit updated baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/baselines/lighthouse-baseline.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update Lighthouse baseline [skip ci]"
+
+      - name: Push changes
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+  lighthouse-regression-check:
+    name: Check for Performance Regressions
+    runs-on: ubuntu-latest
+    needs: lighthouse-ci
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download current results
+        uses: actions/download-artifact@v4
+        with:
+          name: lighthouse-results
+          path: .lighthouseci/
+
+      - name: Get baseline from main branch
+        run: |
+          git show origin/main:.github/baselines/lighthouse-baseline.json > baseline.json 2>/dev/null || echo "No baseline found"
+
+      - name: Compare with baseline
+        run: |
+          if [ ! -f baseline.json ]; then
+            echo "No baseline found, skipping regression check"
+            exit 0
+          fi
+
+          # Extract scores
+          CURRENT_PERF=$(jq -r '.[0].categories.performance.score * 100' .lighthouseci/*.json | head -1)
+          BASELINE_PERF=$(jq -r '.[0].categories.performance.score * 100' baseline.json | head -1)
+
+          echo "Current Performance: $CURRENT_PERF"
+          echo "Baseline Performance: $BASELINE_PERF"
+
+          # Check for regression (more than 5 point drop)
+          PERF_DIFF=$(echo "$BASELINE_PERF - $CURRENT_PERF" | bc)
+          if [ $(echo "$PERF_DIFF > 5" | bc) -eq 1 ]; then
+            echo "❌ Performance regression detected: ${PERF_DIFF}% drop"
+            exit 1
+          else
+            echo "✅ No significant performance regression"
+          fi

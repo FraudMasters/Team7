@@ -1,0 +1,211 @@
+apiVersion: 1
+
+groups:
+  - name: api_performance_alerts
+    interval: 30s
+    rules:
+      - alert: HighAPIErrorRate
+        expr: |
+          (sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m]))) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: CriticalAPIErrorRate
+        expr: |
+          (sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m]))) > 0.15
+        for: 1m
+        labels:
+          severity: critical
+          category: api
+        annotations:
+          summary: "Critical API error rate"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 15%)"
+
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, handler)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "High API latency detected"
+          description: "P95 response time is {{ $value }}s (threshold: 2s)"
+
+      - alert: CriticalAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, handler)
+          ) > 5
+        for: 2m
+        labels:
+          severity: critical
+          category: api
+        annotations:
+          summary: "Critical API latency"
+          description: "P95 response time is {{ $value }}s (threshold: 5s)"
+
+  - name: celery_alerts
+    interval: 30s
+    rules:
+      - alert: CeleryQueueBackup
+        expr: celery_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: celery
+        annotations:
+          summary: "Celery queue backup detected"
+          description: "Queue depth is {{ $value }} tasks (threshold: 100)"
+
+      - alert: CriticalCeleryQueueBackup
+        expr: celery_queue_length > 500
+        for: 2m
+        labels:
+          severity: critical
+          category: celery
+        annotations:
+          summary: "Critical queue backup"
+          description: "Queue depth is {{ $value }} tasks (threshold: 500)"
+
+      - alert: HighCeleryTaskFailureRate
+        expr: |
+          (sum(rate(celery_tasks_total{status="failure"}[5m]))
+          /
+          sum(rate(celery_tasks_total[5m]))) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: celery
+        annotations:
+          summary: "High task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      - alert: CriticalCeleryTaskFailureRate
+        expr: |
+          (sum(rate(celery_tasks_total{status="failure"}[5m]))
+          /
+          sum(rate(celery_tasks_total[5m]))) > 0.25
+        for: 2m
+        labels:
+          severity: critical
+          category: celery
+        annotations:
+          summary: "Critical task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }} (threshold: 25%)"
+
+      - alert: CeleryWorkersDown
+        expr: count(celery_workers_up) < 1
+        for: 2m
+        labels:
+          severity: critical
+          category: celery
+        annotations:
+          summary: "No Celery workers running"
+          description: "{{ $value }} workers running (expected: at least 1)"
+
+      - alert: SlowCeleryTasks
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(celery_task_runtime_seconds_bucket[5m])) by (le, name)
+          ) > 300
+        for: 10m
+        labels:
+          severity: warning
+          category: celery
+        annotations:
+          summary: "Slow Celery tasks"
+          description: "P95 task runtime is {{ $value }}s (threshold: 300s)"
+
+  - name: ml_inference_alerts
+    interval: 30s
+    rules:
+      - alert: SlowMLInference
+        expr: |
+          histogram_quantile(0.95,
+            rate(ml_inference_duration_seconds_bucket[5m])
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          category: ml
+        annotations:
+          summary: "ML inference slower than target"
+          description: "P95 inference time is {{ $value }}s (target: < 30s)"
+
+      - alert: CriticalMLInference
+        expr: |
+          histogram_quantile(0.95,
+            rate(ml_inference_duration_seconds_bucket[5m])
+          ) > 60
+        for: 2m
+        labels:
+          severity: critical
+          category: ml
+        annotations:
+          summary: "Critical ML inference performance"
+          description: "P95 inference time is {{ $value }}s (threshold: 60s)"
+
+  - name: database_alerts
+    interval: 30s
+    rules:
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket[5m])) by (le, operation)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "Slow database queries"
+          description: "P95 query duration is {{ $value }}s (threshold: 1s)"
+
+      - alert: CriticalDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket[5m])) by (le, operation)
+          ) > 3
+        for: 2m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "Critical query performance"
+          description: "P95 query duration is {{ $value }}s (threshold: 3s)"
+
+  - name: system_alerts
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "Service is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} is down"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "High memory usage"
+          description: "Container {{ $labels.name }} using {{ $value | humanizePercentage }} of memory limit"

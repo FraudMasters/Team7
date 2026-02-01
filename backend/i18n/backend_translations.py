@@ -51,7 +51,9 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "keyword_extraction_failed": "Keyword extraction failed",
         "entity_extraction_failed": "Named entity recognition failed",
         "experience_calculation_failed": "Experience calculation failed",
-        "resume_parsing_failed": "Failed to parse resume. Please try again",
+        "interview_prep_generation_failed": "Failed to generate interview preparation questions",
+        "vacancy_not_found": "Job vacancy not found",
+        "invalid_vacancy_id": "Invalid vacancy ID format",
 
         # Processing errors
         "processing_timeout": "Processing timed out. Please try again",
@@ -105,7 +107,9 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "keyword_extraction_failed": "Не удалось извлечь ключевые слова",
         "entity_extraction_failed": "Не удалось распознать именованные сущности",
         "experience_calculation_failed": "Не удалось рассчитать опыт работы",
-        "resume_parsing_failed": "Не удалось проанализировать резюме. Попробуйте снова",
+        "interview_prep_generation_failed": "Не удалось сгенерировать вопросы для интервью",
+        "vacancy_not_found": "Вакансия не найдена",
+        "invalid_vacancy_id": "Неверный формат ID вакансии",
 
         # Processing errors
         "processing_timeout": "Превышено время обработки. Попробуйте снова",
@@ -138,7 +142,6 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "record_created": "Record created successfully",
         "record_updated": "Record updated successfully",
         "record_deleted": "Record deleted successfully",
-        "resume_parsing_initiated": "Resume parsing initiated",
     },
     "ru": {
         "file_uploaded": "Резюме успешно загружено",
@@ -147,7 +150,6 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "record_created": "Запись успешно создана",
         "record_updated": "Запись успешно обновлена",
         "record_deleted": "Запись успешно удалена",
-        "resume_parsing_initiated": "Анализ резюме инициирован",
     },
 }
 
