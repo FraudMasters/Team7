@@ -84,6 +84,17 @@ docker-compose logs -f
 # Windows: docker compose logs -f
 ```
 
+## Configuration
+
+For detailed information about environment variables, including:
+- Database and Redis settings
+- ML model configurations
+- Feature flags (keyword extraction, NER, grammar check)
+- Security settings (JWT, secrets)
+- Performance tuning parameters
+
+See the [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) reference guide.
+
 ## Common Commands
 
 ```bash

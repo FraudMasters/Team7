@@ -271,6 +271,7 @@ docker-compose exec backend python scripts/reset_and_reload.py
 
 - **[API Usage Guide](docs/API_USAGE_GUIDE.md)** - Comprehensive API documentation with workflow examples
 - [SETUP.md](SETUP.md) - Detailed installation instructions
+- [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Complete environment variables reference
 - [README_RU.md](README_RU.md) - Версия на русском языке
 - [ML_PIPELINE.md](ML_PIPELINE.md) - ML/NLP pipeline details
 - [Dataset Usage Guide](docs/dataset-usage-guide.md) - External dataset integration guide
