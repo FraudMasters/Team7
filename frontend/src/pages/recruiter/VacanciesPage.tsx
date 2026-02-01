@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 
-const MotionPaper = motion(Grid);
+const MotionPaper = motion(Paper);
 
 interface Vacancy {
   id: string;
@@ -128,17 +128,13 @@ export function VacanciesPage() {
             const remainingSkillsCount = Math.max(0, (vacancy.required_skills?.length || 0) - 3);
 
             return (
-              <MotionPaper
-                key={vacancy.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                component={Grid}
-                xs={12}
-                md={6}
-                lg={4}
-                sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-              >
+              <Grid item xs={12} md={6} lg={4} key={vacancy.id}>
+                <MotionPaper
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                >
                 <Box sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                     <Box sx={{ flex: 1 }}>
@@ -173,6 +169,7 @@ export function VacanciesPage() {
                   </Stack>
                 </Box>
               </MotionPaper>
+              </Grid>
             );
           })}
         </Grid>

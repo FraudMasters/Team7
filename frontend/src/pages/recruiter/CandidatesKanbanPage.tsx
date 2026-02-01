@@ -3,6 +3,7 @@ import { Container, Box, TextField, Typography, Paper, Stack, Grid } from '@mui/
 import { Search as SearchIcon } from '@mui/icons-material';
 import { KanbanBoard } from '../../components/kanban/KanbanBoard';
 import { useCandidates, useCandidateStages, useUpdateCandidateStage } from '../../hooks/useRecruiterData';
+import type { DropResult } from '@hello-pangea/dnd';
 
 const DEFAULT_STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired'];
 
