@@ -2182,6 +2182,695 @@ CELERY_TASK_TIME_LIMIT=300
 RATE_LIMIT_PER_MINUTE=60
 ```
 
+---
+
+## Production Security & Deployment Checklist
+
+### 1. Secrets Management
+
+#### ✅ Pre-Deployment Secrets Setup
+
+```bash
+# Generate all required secrets
+SECRET_KEY=$(openssl rand -hex 32)
+POSTGRES_PASSWORD=$(openssl rand -hex 16)
+REDIS_PASSWORD=$(openssl rand -hex 16)
+GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 16)
+
+# Store in secure secret manager (AWS example)
+aws secretsmanager create-secret \
+  --name agenthr/production \
+  --secret-string '{
+    "SECRET_KEY":"'$SECRET_KEY'",
+    "POSTGRES_PASSWORD":"'$POSTGRES_PASSWORD'",
+    "REDIS_PASSWORD":"'$REDIS_PASSWORD'",
+    "GRAFANA_ADMIN_PASSWORD":"'$GRAFANA_ADMIN_PASSWORD'"
+  }'
+```
+
+#### ✅ Recommended Secret Managers
+
+| Provider | Service | Integration | Cost |
+|----------|---------|-------------|------|
+| AWS | Secrets Manager | AWS SDK/Boto3 | $0.40/secret/month |
+| AWS | Parameter Store | AWS SDK/Boto3 | Free tier available |
+| HashiCorp | Vault | API/Consul | Open Source |
+| Azure | Key Vault | Azure SDK | Pay-per-operation |
+| Google Cloud | Secret Manager | GCP SDK | $0.03/secret/month |
+
+#### ✅ Docker Secret Integration
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+secrets:
+  db_password:
+    external: true
+  jwt_secret:
+    external: true
+
+services:
+  backend:
+    secrets:
+      - db_password
+      - jwt_secret
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      SECRET_KEY_FILE: /run/secrets/jwt_secret
+```
+
+#### ✅ Environment Variable Injection
+
+```bash
+# Load secrets from AWS Secrets Manager at runtime
+export SECRET_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id agenthr/production \
+  --query SecretString --output text | jq -r '.SECRET_KEY')
+
+export POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id agenthr/production \
+  --query SecretString --output text | jq -r '.POSTGRES_PASSWORD')
+
+# Verify secrets are loaded
+echo "SECRET_KEY: ${SECRET_KEY:0:10}..."  # Show only first 10 chars
+echo "POSTGRES_PASSWORD length: ${#POSTGRES_PASSWORD}"
+```
+
+#### ❌ Common Secrets Mistakes
+
+| Mistake | Risk | Solution |
+|---------|-------|----------|
+| Committing `.env` files | Public exposure | Add `.env` to `.gitignore` |
+| Using same secrets across environments | Cross-contamination | Unique secrets per env |
+| Hardcoding secrets in code | Exposure in version control | Use environment variables |
+| Sharing secrets via chat/email | Interception | Use secure sharing links |
+| Never rotating secrets | Extended breach window | Rotate every 90 days |
+
+---
+
+### 2. SSL/TLS Configuration
+
+#### ✅ SSL/TLS Certificate Setup
+
+```bash
+# Option 1: Let's Encrypt (recommended for production)
+sudo apt-get install certbot
+sudo certbot certonly --standalone -d api.example.com -d app.example.com
+
+# Copy certificates to project
+mkdir -p certs/
+sudo cp /etc/letsencrypt/live/api.example.com/fullchain.pem certs/backend.crt
+sudo cp /etc/letsencrypt/live/api.example.com/privkey.pem certs/backend.key
+sudo chmod 644 certs/backend.crt
+sudo chmod 600 certs/backend.key
+```
+
+#### ✅ Docker Compose SSL Configuration
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+services:
+  backend:
+    environment:
+      - SSL_ENABLED=true
+      - SSL_CERTFILE=/app/certs/backend.crt
+      - SSL_KEYFILE=/app/certs/backend.key
+    volumes:
+      - ./certs:/app/certs:ro
+    ports:
+      - "8443:8443"  # HTTPS port
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+```
+
+#### ✅ Nginx Reverse Proxy SSL Config
+
+```nginx
+# nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream backend {
+        server backend:8000;
+    }
+
+    # Redirect HTTP to HTTPS
+    server {
+        listen 80;
+        server_name api.example.com;
+        return 301 https://$server_name$request_uri;
+    }
+
+    # HTTPS server
+    server {
+        listen 443 ssl http2;
+        server_name api.example.com;
+
+        ssl_certificate /etc/nginx/certs/backend.crt;
+        ssl_certificate_key /etc/nginx/certs/backend.key;
+
+        # Modern SSL configuration
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # Security headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options DENY always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-XSS-Protection "1; mode=block" always;
+
+        location / {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+```
+
+#### ✅ Database SSL Configuration
+
+```bash
+# Force SSL connections to PostgreSQL
+DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"
+
+# Or with certificate verification (most secure)
+DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=verify-full&sslrootcert=/app/certs/ca.crt"
+```
+
+| SSL Mode | Description | Security | Use Case |
+|----------|-------------|----------|----------|
+| `disable` | No SSL | ❌ None | Local development only |
+| `allow` | Try SSL, fallback to no SSL | ⚠️ Low | Legacy systems |
+| `prefer` | Try SSL, allow no SSL | ⚠️ Low | Testing |
+| `require` | Require SSL, no verification | ✅ Medium | **Production minimum** |
+| `verify-ca` | Verify CA certificate | ✅ High | Recommended |
+| `verify-full` | Verify CA + hostname | ✅✅ Highest | **Best practice** |
+
+#### ✅ SSL Certificate Renewal
+
+```bash
+# Test renewal (dry-run)
+sudo certbot renew --dry-run
+
+# Setup auto-renewal cron job
+sudo crontab -e
+
+# Add line:
+0 0 * * * certbot renew --quiet --post-hook "docker-compose restart nginx"
+```
+
+---
+
+### 3. Firewall & Network Security
+
+#### ✅ UFW Firewall Setup (Ubuntu)
+
+```bash
+# Enable UFW
+sudo ufw enable
+
+# Default policies
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow SSH (IMPORTANT: Do this first!)
+sudo ufw allow 22/tcp comment 'SSH'
+
+# Allow HTTP/HTTPS
+sudo ufw allow 80/tcp comment 'HTTP'
+sudo ufw allow 443/tcp comment 'HTTPS'
+
+# Allow backend API port (if exposed directly)
+sudo ufw allow 8443/tcp comment 'Backend API HTTPS'
+
+# Allow monitoring ports (internal network only)
+sudo ufw allow from 10.0.0.0/8 to any port 9090 comment 'Prometheus internal'
+sudo ufw allow from 10.0.0.0/8 to any port 3001 comment 'Grafana internal'
+
+# Check status
+sudo ufw status numbered
+```
+
+#### ✅ Docker Network Isolation
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+# Create isolated networks
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true  # No internet access
+  monitoring:
+    driver: bridge
+
+services:
+  # Frontend can access backend
+  frontend:
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "443:443"
+
+  # Backend isolated to internal networks
+  backend:
+    networks:
+      - backend
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+
+  # Redis completely isolated
+  redis:
+    networks:
+      - backend
+    # No exposed ports!
+
+  # Monitoring on separate network
+  grafana:
+    networks:
+      - monitoring
+    ports:
+      - "3001:3000"
+```
+
+#### ✅ Security Groups (AWS)
+
+```bash
+# Security group for Backend
+aws ec2 create-security-group \
+  --group-name agenthr-backend-prod \
+  --description "AgentHR Backend Production"
+
+# Allow HTTPS from anywhere
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxxxxx \
+  --protocol tcp \
+  --port 443 \
+  --cidr 0.0.0.0/0
+
+# Allow SSH from specific IP only
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxxxxx \
+  --protocol tcp \
+  --port 22 \
+  --cidr YOUR.OFFICE.IP/32
+
+# Allow internal traffic (VPC only)
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxxxxx \
+  --protocol tcp \
+  --port 8000 \
+  --cidr 10.0.0.0/16
+```
+
+#### ✅ Network Security Checklist
+
+| Check | Command | Expected Result |
+|-------|---------|-----------------|
+| Firewall enabled | `sudo ufw status` | `Status: active` |
+| Open ports | `sudo ss -tulpn` | Only required ports open |
+| Docker networks | `docker network ls` | Isolated networks configured |
+| SSL enforced | `curl -I https://api.example.com` | HTTP/2 200 |
+| Database SSL | `psql "postgresql://...?sslmode=require"` | Connection succeeds |
+| No plaintext auth | `tcpdump -A -i eth0` | No passwords in packets |
+
+---
+
+### 4. Backup & Restore Procedures
+
+#### ✅ Automated Backup Setup
+
+```bash
+# 1. Enable automated backups in backend/.env
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE="0 2 * * *"  # Daily at 2 AM
+BACKUP_RETENTION_DAYS=30
+BACKUP_RETENTION_COUNT=10
+
+# 2. Configure S3 backup
+BACKUP_S3_ENABLED=true
+BACKUP_S3_BUCKET=agenthr-production-backups
+BACKUP_S3_REGION=us-east-1
+BACKUP_S3_PREFIX=database/
+BACKUP_S3_ENDPOINT=https://s3.amazonaws.com
+
+# 3. AWS credentials with backup permissions
+export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+#### ✅ S3 Bucket Setup with Lifecycle
+
+```bash
+# Create S3 bucket with versioning
+aws s3api create-bucket \
+  --bucket agenthr-production-backups \
+  --region us-east-1 \
+  --create-bucket-configuration LocationConstraint=us-east-1
+
+# Enable versioning
+aws s3api put-bucket-versioning \
+  --bucket agenthr-production-backups \
+  --versioning-configuration Status=Enabled
+
+# Set up lifecycle policy (move to Glacier after 30 days, delete after 90 days)
+cat > backup-lifecycle.json <<EOF
+{
+  "Rules": [
+    {
+      "Id": "BackupLifecycle",
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 90
+      },
+      "Filter": {
+        "Prefix": "database/"
+      }
+    }
+  ]
+}
+EOF
+
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket agenthr-production-backups \
+  --lifecycle-configuration file://backup-lifecycle.json
+```
+
+#### ✅ Manual Backup Procedure
+
+```bash
+#!/bin/bash
+# scripts/backup_production.sh
+
+set -e
+
+BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/tmp/backups"
+BACKUP_FILE="${BACKUP_DIR}/agenthr_backup_${BACKUP_DATE}.sql"
+
+echo "Starting backup at ${BACKUP_DATE}"
+
+# Create backup directory
+mkdir -p ${BACKUP_DIR}
+
+# 1. Database backup
+echo "Backing up PostgreSQL..."
+docker-compose exec -T postgres pg_dump \
+  -U postgres \
+  -d resume_analysis \
+  --clean \
+  --if-exists \
+  > ${BACKUP_FILE}
+
+# 2. Compress backup
+echo "Compressing backup..."
+gzip ${BACKUP_FILE}
+BACKUP_FILE="${BACKUP_FILE}.gz"
+
+# 3. Upload to S3
+echo "Uploading to S3..."
+aws s3 cp ${BACKUP_FILE} \
+  s3://agenthr-production-backups/database/backup_${BACKUP_DATE}.sql.gz \
+  --storage-class STANDARD_IA
+
+# 4. Verify upload
+echo "Verifying backup..."
+aws s3 ls s3://agenthr-production-backups/database/backup_${BACKUP_DATE}.sql.gz
+
+# 5. Clean up local file
+rm ${BACKUP_FILE}
+
+echo "Backup completed successfully: backup_${BACKUP_DATE}.sql.gz"
+```
+
+#### ✅ Restore Procedure
+
+```bash
+#!/bin/bash
+# scripts/restore_production.sh
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 <backup_file.sql.gz>"
+  exit 1
+fi
+
+BACKUP_FILE=$1
+BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+
+echo "⚠️  WARNING: This will REPLACE the current database!"
+echo "Backup file: ${BACKUP_FILE}"
+read -p "Continue? (yes/no): " CONFIRM
+
+if [ "$CONFIRM" != "yes" ]; then
+  echo "Restore cancelled"
+  exit 0
+fi
+
+# 1. Download backup from S3 (if needed)
+if [[ $BACKUP_FILE == s3://* ]]; then
+  echo "Downloading from S3..."
+  aws s3 cp ${BACKUP_FILE} /tmp/restore.sql.gz
+  BACKUP_FILE=/tmp/restore.sql.gz
+fi
+
+# 2. Create pre-restore backup
+echo "Creating pre-restore backup..."
+./scripts/backup_production.sh
+
+# 3. Stop application services
+echo "Stopping services..."
+docker-compose stop backend celery_worker celery_beat
+
+# 4. Restore database
+echo "Restoring database..."
+gunzip -c ${BACKUP_FILE} | docker-compose exec -T postgres psql \
+  -U postgres \
+  -d resume_analysis
+
+# 5. Restart services
+echo "Restarting services..."
+docker-compose start backend celery_worker celery_beat
+
+# 6. Verify restore
+echo "Verifying restore..."
+docker-compose exec backend python -c "
+import psycopg2
+conn = psycopg2.connect('postgresql://postgres:postgres@postgres:5432/resume_analysis')
+cur = conn.cursor()
+cur.execute('SELECT COUNT(*) FROM users')
+print(f'Users in database: {cur.fetchone()[0]}')
+conn.close()
+"
+
+echo "Restore completed successfully!"
+```
+
+#### ✅ Backup Testing & Verification
+
+```bash
+# Schedule monthly restore test (0 3 1 * * - first day of month at 3 AM)
+crontab -e
+
+# Add:
+0 3 1 * * /path/to/scripts/test_restore.sh
+
+# test_restore.sh
+#!/bin/bash
+TEST_DATE=$(date +%Y%m%d)
+LATEST_BACKUP=$(aws s3 ls s3://agenthr-production-backups/database/ | sort | tail -n 1 | awk '{print $4}')
+
+echo "Testing restore with: ${LATEST_BACKUP}"
+
+# Create test database
+docker-compose exec postgres psql -U postgres -c "DROP DATABASE IF EXISTS resume_analysis_test;"
+docker-compose exec postgres psql -U postgres -c "CREATE DATABASE resume_analysis_test;"
+
+# Restore to test database
+aws s3 cp s3://agenthr-production-backups/database/${LATEST_BACKUP} - \
+  | gunzip \
+  | docker-compose exec -T postgres psql -U postgres -d resume_analysis_test
+
+# Verify data
+docker-compose exec postgres psql -U postgres -d resume_analysis_test -c "SELECT COUNT(*) FROM resumes;"
+
+# Clean up
+docker-compose exec postgres psql -U postgres -c "DROP DATABASE resume_analysis_test;"
+
+echo "Restore test completed successfully!"
+```
+
+#### ✅ Backup Monitoring
+
+```yaml
+# Add to Prometheus alerts (alerting.yml)
+groups:
+  - name: backup_rules
+    rules:
+      - alert: BackupNotCompleted
+        expr: time() - backup_last_success_timestamp_seconds > 86400
+        for: 2h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup not completed in 24 hours"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+
+      - alert: BackupSizeTooSmall
+        expr: backup_size_bytes < 1000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup size suspiciously small"
+          description: "Backup size is only {{ $value }} bytes"
+```
+
+---
+
+### 5. Security Hardening Checklist
+
+#### ✅ Pre-Deployment Security Checklist
+
+```bash
+# Run this checklist before every production deployment
+
+# 1. Verify all secrets are from secure source
+echo "✓ Checking secrets source..."
+test -f /run/secrets/SECRET_KEY || test -n "$SECRET_KEY" || { echo "❌ SECRET_KEY missing"; exit 1; }
+
+# 2. Verify no default passwords
+echo "✓ Checking for default passwords..."
+grep -q "POSTGRES_PASSWORD=postgres" .env && { echo "❌ Default POSTGRES_PASSWORD detected"; exit 1; }
+grep -q "SECRET_KEY=changeme" .env && { echo "❌ Default SECRET_KEY detected"; exit 1; }
+
+# 3. Verify SSL/TLS is configured
+echo "✓ Checking SSL configuration..."
+grep -q "SSL_ENABLED=true" .env || { echo "❌ SSL not enabled"; exit 1; }
+test -f certs/backend.crt || { echo "❌ SSL certificate missing"; exit 1; }
+
+# 4. Verify HTTPS URLs
+echo "✓ Checking URL schemes..."
+grep -q "^FRONTEND_URL=http://" .env && { echo "❌ HTTP URL detected (use HTTPS)"; exit 1; }
+grep -q "https://" .env || { echo "❌ No HTTPS URLs found"; exit 1; }
+
+# 5. Verify CORS origins are specific
+echo "✓ Checking CORS configuration..."
+grep -q "CORS_ORIGINS=\*" .env && { echo "❌ Wildcard CORS detected"; exit 1; }
+
+# 6. Verify rate limiting enabled
+echo "✓ Checking rate limiting..."
+grep -q "RATE_LIMIT_PER_MINUTE=" .env || { echo "❌ Rate limiting not configured"; exit 1; }
+
+# 7. Verify DEBUG is off
+echo "✓ Checking DEBUG mode..."
+grep -q "DEBUG=true" .env && { echo "❌ DEBUG enabled in production"; exit 1; }
+
+# 8. Verify logging level is INFO or WARNING
+echo "✓ Checking log level..."
+grep -q "LOG_LEVEL=DEBUG" .env && { echo "⚠️  DEBUG log level (should be INFO)"; }
+
+# 9. Verify backups enabled
+echo "✓ Checking backup configuration..."
+grep -q "BACKUP_ENABLED=true" .env || { echo "❌ Backups not enabled"; exit 1; }
+
+# 10. Verify monitoring enabled
+echo "✓ Checking monitoring..."
+grep -q "ENABLE_PROMETHEUS_METRICS=true" .env || { echo "⚠️  Monitoring not enabled"; }
+
+echo "✅ All security checks passed!"
+```
+
+#### ✅ Post-Deployment Verification
+
+```bash
+# Run these checks immediately after deployment
+
+# 1. Check all services are healthy
+echo "✓ Checking service health..."
+docker-compose ps | grep -q "Up" || { echo "❌ Services not running"; exit 1; }
+
+# 2. Verify SSL certificate
+echo "✓ Verifying SSL certificate..."
+curl -I https://api.example.com 2>&1 | grep -q "HTTP/2 200" || { echo "❌ SSL not working"; exit 1; }
+
+# 3. Test API health endpoint
+echo "✓ Testing API health..."
+curl -f https://api.example.com/health || { echo "❌ Health check failed"; exit 1; }
+
+# 4. Verify database connection
+echo "✓ Testing database..."
+docker-compose exec -T postgres pg_isready -U postgres || { echo "❌ Database not ready"; exit 1; }
+
+# 5. Verify Redis connection
+echo "✓ Testing Redis..."
+docker-compose exec -T redis redis-cli ping || { echo "❌ Redis not responding"; exit 1; }
+
+# 6. Check no exposed ports except 80/443
+echo "✓ Checking exposed ports..."
+sudo ss -tulpn | grep -v ":80\|:443\|:22" && { echo "⚠️  Additional ports exposed"; }
+
+# 7. Verify firewall is active
+echo "✓ Checking firewall..."
+sudo ufw status | grep -q "Status: active" || { echo "❌ Firewall not active"; exit 1; }
+
+# 8. Check recent application logs for errors
+echo "✓ Checking application logs..."
+docker-compose logs --tail=50 backend | grep -i error && { echo "⚠️  Errors in logs"; }
+
+echo "✅ Post-deployment verification passed!"
+```
+
+#### ✅ Ongoing Security Monitoring
+
+```bash
+# Add to monitoring dashboard
+
+# 1. Track failed authentication attempts
+# Query: rate(authentication_failed_total[5m]) > threshold
+
+# 2. Monitor unusual API traffic patterns
+# Query: rate(api_requests_total[1h]) > 2 * avg_over_time(rate(api_requests_total[1h])[7d:])
+
+# 3. Alert on backup failures
+# Query: backup_last_success_timestamp_seconds < time() - 86400
+
+# 4. Monitor SSL certificate expiration
+# Query: ssl_certificate_expiry_seconds < time() + 2592000 (30 days)
+
+# 5. Track database connection pool saturation
+# Query: db_pool_active_connections / db_pool_size > 0.8
+```
+
+---
+
 ### Environment-Specific Files
 
 ```bash
