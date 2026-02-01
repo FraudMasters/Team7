@@ -59,6 +59,28 @@ const LandingPage: React.FC = () => {
         p: 2,
       }}
     >
+      {/* Skip Link for Keyboard Users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          zIndex: 9999,
+          '&:focus': {
+            left: '10px',
+            top: '10px',
+            bgcolor: 'primary.main',
+            color: 'white',
+            p: 2,
+            borderRadius: 1,
+          },
+        }}
+      >
+        Skip to main content
+      </Box>
+
       <Container maxWidth="lg">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -80,26 +102,32 @@ const LandingPage: React.FC = () => {
             >
               AgentHR
             </Typography>
-            <Typography variant="h5" color="text.secondary">
+            <Typography variant="h5" color="text.secondary" component="h2">
               AI-Powered Recruitment Platform
             </Typography>
           </Box>
 
           {/* Role Cards */}
-          <Stack
+          <nav aria-label="Select your role" id="main-content">
+            <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={4}
             justifyContent="center"
             alignItems="stretch"
+            role="list"
           >
             {roles.map((role, index) => (
               <MotionCard
                 key={role.title}
+                component="article"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 + index * 0.1 }}
                 whileHover={{ y: -4 }}
                 onClick={() => navigate(role.path)}
+                tabIndex={0}
+                role="listitem"
+                aria-label={`Select ${role.title} role: ${role.description}`}
                 sx={{
                   flex: 1,
                   maxWidth: { xs: '100%', md: 400 },
@@ -108,6 +136,17 @@ const LandingPage: React.FC = () => {
                   '&:hover': {
                     boxShadow: 8,
                   },
+                  '&:focus-visible': {
+                    outline: '3px solid',
+                    outlineColor: 'primary.main',
+                    outlineOffset: '4px',
+                  },
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(role.path);
+                  }
                 }}
               >
                 <CardContent sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -123,16 +162,18 @@ const LandingPage: React.FC = () => {
                       mb: 3,
                       color: 'white',
                     }}
+                    aria-hidden="true"
                   >
                     {role.icon}
                   </Box>
-                  <Typography variant="h4" fontWeight={700} gutterBottom>
+                  <Typography variant="h4" fontWeight={700} gutterBottom component="h3">
                     {role.title}
                   </Typography>
                   <Typography variant="body1" color="text.secondary" sx={{ mb: 4, flexGrow: 1 }}>
                     {role.description}
                   </Typography>
                   <Box
+                    component="span"
                     sx={{
                       py: 1.5,
                       px: 3,
@@ -141,7 +182,9 @@ const LandingPage: React.FC = () => {
                       color: 'white',
                       textAlign: 'center',
                       fontWeight: 600,
+                      display: 'inline-block',
                     }}
+                    aria-label={`Button: ${role.buttonText}`}
                   >
                     {role.buttonText}
                   </Box>
@@ -149,6 +192,7 @@ const LandingPage: React.FC = () => {
               </MotionCard>
             ))}
           </Stack>
+          </nav>
         </motion.div>
       </Container>
     </Box>

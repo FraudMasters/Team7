@@ -59,6 +59,28 @@ const JobSeekerLayout: React.FC = () => {
         pb: 7,
       }}
     >
+      {/* Skip Link for Keyboard Users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          zIndex: 9999,
+          '&:focus': {
+            left: '10px',
+            top: '10px',
+            bgcolor: 'primary.main',
+            color: 'white',
+            p: 2,
+            borderRadius: 1,
+          },
+        }}
+      >
+        Skip to main content
+      </Box>
+
       {/* Sticky Top AppBar */}
       <AppBar
         position="sticky"
@@ -72,6 +94,7 @@ const JobSeekerLayout: React.FC = () => {
         <Toolbar sx={{ justifyContent: 'center' }}>
           <Typography
             variant="h6"
+            component="h1"
             sx={{
               fontWeight: 700,
               background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -87,16 +110,20 @@ const JobSeekerLayout: React.FC = () => {
       {/* Main Content */}
       <Box
         component="main"
+        id="main-content"
         sx={{
           flexGrow: 1,
           p: 2,
         }}
+        tabIndex={-1}
       >
         <Outlet />
       </Box>
 
       {/* Bottom Navigation */}
       <Paper
+        component="nav"
+        aria-label="Main navigation"
         sx={{
           position: 'fixed',
           bottom: 0,
@@ -107,12 +134,19 @@ const JobSeekerLayout: React.FC = () => {
           zIndex: (theme) => theme.zIndex.appBar - 1,
         }}
       >
-        <BottomNavigation value={value} onChange={handleChange}>
-          {navItems.map((item) => (
+        <BottomNavigation
+          value={value}
+          onChange={handleChange}
+          aria-label="Job seeker navigation"
+          showLabels
+        >
+          {navItems.map((item, index) => (
             <BottomNavigationAction
               key={item.path}
               label={item.label}
               icon={item.icon}
+              aria-current={value === index ? 'page' : undefined}
+              aria-label={`Navigate to ${item.label}`}
             />
           ))}
         </BottomNavigation>

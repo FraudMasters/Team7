@@ -1,97 +1,77 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from '@components/Layout';
-import HomePage from '@pages/Home';
-import UploadPage from '@pages/Upload';
-import BatchUploadPage from '@pages/BatchUpload';
-import ResultsPage from '@pages/Results';
-import ComparePage from '@pages/Compare';
-import CompareVacancyPage from '@pages/CompareVacancy';
-import CompareCandidatesPage from '@pages/CompareCandidates';
-import AdminSynonymsPage from '@pages/AdminSynonyms';
-import AdminAnalyticsPage from '@pages/AdminAnalytics';
-import AnalyticsDashboardPage from '@pages/AnalyticsDashboard';
-import VacancyListPage from '@pages/VacancyList';
-import CreateVacancyPage from '@pages/CreateVacancy';
-import VacancyDetailsPage from '@pages/VacancyDetails';
-import ApplicationsPage from '@pages/Applications';
-import ResumeDatabasePage from '@pages/ResumeDatabase';
-import CandidateSearchPage from '@pages/CandidateSearch';
-import RecruiterDashboardPage from '@pages/RecruiterDashboard';
-import WorkflowBoardPage from '@pages/WorkflowBoard';
-import SkillGapAnalysisPage from '@pages/SkillGapAnalysis';
-import WeightCustomizationPage from '@pages/WeightCustomization';
-import IndustryTaxonomyManager from '@components/IndustryTaxonomyManager';
-import TaxonomyAnalytics from '@components/TaxonomyAnalytics';
-import PublicTaxonomyBrowser from '@components/PublicTaxonomyBrowser';
-import BackupsPage from '@pages/Backups';
-import InterviewPrepPage from '@pages/InterviewPrepPage';
+
+// Layouts
+import JobSeekerLayout from './layouts/JobSeekerLayout';
+import RecruiterLayout from './layouts/RecruiterLayout';
+
+// Pages - Landing
+import LandingPage from './pages/LandingPage';
+
+// Job Seeker Pages
+import { JobsBrowsePage } from './pages/jobs/JobsBrowsePage';
+import { JobDetailPage } from './pages/jobs/JobDetailPage';
+import { ApplicationFlowPage } from './pages/jobs/ApplicationFlowPage';
+
+// Recruiter Pages
+import { DashboardPage } from './pages/recruiter/DashboardPage';
+import { CandidatesKanbanPage } from './pages/recruiter/CandidatesKanbanPage';
+import { VacanciesPage } from './pages/recruiter/VacanciesPage';
+import { VacancyFormPage } from './pages/recruiter/VacancyFormPage';
+
+// Legacy pages (wrapped for compatibility)
+import HomePage from './pages/Home';
+import UploadPage from './pages/Upload';
+import BatchUploadPage from './pages/BatchUpload';
+import ResultsPage from './pages/Results';
+import ApplicationsPage from './pages/Applications';
+import ResumeDatabasePage from './pages/ResumeDatabase';
+import RecruiterDashboardPage from './pages/RecruiterDashboard';
+import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 
 /**
  * Main App Component
  *
- * Sets up React Router with all application routes.
- * Uses the Layout component to provide consistent navigation and structure.
+ * Dual flow architecture for job seekers and recruiters.
+ * Uses React Router v6 with nested routes and layout components.
  */
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Root route with Layout */}
-        <Route path="/" element={<Layout />}>
-          {/* Default home page */}
-          <Route index element={<HomePage />} />
+        {/* Root route - Landing Page */}
+        <Route path="/" element={<LandingPage />} />
 
-          {/* Legacy routes - kept for compatibility */}
-          <Route path="upload" element={<UploadPage />} />
-          <Route path="results/:id" element={<ResultsPage />} />
-          <Route path="compare/:resumeId/:vacancyId" element={<ComparePage />} />
-          <Route path="compare-vacancy/:vacancyId" element={<CompareVacancyPage />} />
-
-          {/* Interview Preparation */}
-          <Route path="interview-prep/:id" element={<InterviewPrepPage />} />
-
-          {/* Job Seeker Module Routes */}
-          <Route path="jobs">
-            <Route index element={<VacancyListPage />} />
-            <Route path="create" element={<CreateVacancyPage />} />
-            <Route path="upload" element={<UploadPage />} />
-            <Route path="batch-upload" element={<BatchUploadPage />} />
-            <Route path="results/:id" element={<ResultsPage />} />
-            <Route path="applications" element={<ApplicationsPage />} />
-          </Route>
-
-          {/* Recruiter Module Routes */}
-          <Route path="recruiter">
-            <Route index element={<RecruiterDashboardPage />} />
-            <Route path="vacancies">
-              <Route index element={<VacancyListPage />} />
-              <Route path="create" element={<CreateVacancyPage />} />
-              <Route path=":id" element={<VacancyDetailsPage />} />
-              <Route path=":id/compare" element={<CompareCandidatesPage />} />
-            </Route>
-            <Route path="resumes" element={<ResumeDatabasePage />} />
-            <Route path="search" element={<CandidateSearchPage />} />
-            <Route path="workflow" element={<WorkflowBoardPage />} />
-            <Route path="analytics" element={<AnalyticsDashboardPage />} />
-            <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
-            <Route path="weights" element={<WeightCustomizationPage />} />
-          </Route>
-
-          {/* Admin pages */}
-          <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
-          <Route path="admin/synonyms" element={<AdminSynonymsPage />} />
-          <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
-          <Route path="admin/taxonomies" element={<IndustryTaxonomyManager />} />
-          <Route path="admin/taxonomy-analytics" element={<TaxonomyAnalytics />} />
-          <Route path="admin/public-taxonomies" element={<PublicTaxonomyBrowser />} />
-          <Route path="admin/backups" element={<BackupsPage />} />
-
-          {/* Analytics dashboard */}
-          <Route path="analytics" element={<AnalyticsDashboardPage />} />
-
-          {/* Catch-all route - redirect to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Job Seeker Flow */}
+        <Route path="/jobs" element={<JobSeekerLayout />}>
+          <Route index element={<JobsBrowsePage />} />
+          <Route path=":id" element={<JobDetailPage />} />
+          <Route path=":id/apply" element={<ApplicationFlowPage />} />
         </Route>
+
+        {/* Recruiter Flow */}
+        <Route path="/recruiter" element={<RecruiterLayout />}>
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="candidates" element={<CandidatesKanbanPage />} />
+          <Route path="vacancies">
+            <Route index element={<VacanciesPage />} />
+            <Route path="create" element={<VacancyFormPage />} />
+            <Route path=":id/edit" element={<VacancyFormPage />} />
+          </Route>
+          <Route path="analytics" element={<AnalyticsDashboardPage />} />
+        </Route>
+
+        {/* Legacy routes - wrapped with single layout for compatibility */}
+        <Route path="legacy" element={<RecruiterLayout />}>
+          <Route path="upload" element={<UploadPage />} />
+          <Route path="batch-upload" element={<BatchUploadPage />} />
+          <Route path="results/:id" element={<ResultsPage />} />
+          <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="resumes" element={<ResumeDatabasePage />} />
+          <Route path="analytics" element={<AnalyticsDashboardPage />} />
+        </Route>
+
+        {/* Catch-all route - redirect to landing */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -9,6 +9,10 @@ import App from './App';
 import './index.css';
 import './i18n'; // Initialize i18n
 
+// Import variable fonts
+import '@fontsource-variable/inter';
+import '@fontsource/space-grotesk';
+
 /**
  * Inner App Component that uses the theme context
  * This allows us to use useThemeContext inside the provider tree

@@ -65,6 +65,8 @@ const RecruiterLayout: React.FC = () => {
       >
         <Typography
           variant="h6"
+          role="heading"
+          aria-level={1}
           sx={{
             fontWeight: 700,
             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -77,35 +79,48 @@ const RecruiterLayout: React.FC = () => {
       </Box>
 
       {/* Navigation */}
-      <List sx={{ px: 2, py: 3, flex: 1 }}>
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+      <nav aria-label="Main navigation">
+        <List
+          sx={{ px: 2, py: 3, flex: 1 }}
+          role="menubar"
+          aria-label="Recruiter navigation menu"
+        >
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
 
-          return (
-            <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
-              <ListItemButton
-                onClick={() => {
-                  navigate(item.path);
-                  if (isMobile) setMobileOpen(false);
-                }}
-                sx={{
-                  borderRadius: 2,
-                  px: 2,
-                  py: 1.5,
-                  backgroundColor: isActive ? 'action.selected' : 'transparent',
-                  '&:hover': {
-                    backgroundColor: isActive ? 'action.selected' : 'action.hover',
-                  },
-                }}
-              >
-                <ListItemIcon
+            return (
+              <ListItem key={item.path} disablePadding sx={{ mb: 1 }} role="none">
+                <ListItemButton
+                  role="menuitem"
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => {
+                    navigate(item.path);
+                    if (isMobile) setMobileOpen(false);
+                  }}
                   sx={{
-                    minWidth: 40,
-                    color: isActive ? 'primary.main' : 'text.primary',
+                    borderRadius: 2,
+                    px: 2,
+                    py: 1.5,
+                    backgroundColor: isActive ? 'action.selected' : 'transparent',
+                    '&:hover': {
+                      backgroundColor: isActive ? 'action.selected' : 'action.hover',
+                    },
+                    '&:focus-visible': {
+                      outline: '2px solid',
+                      outlineColor: 'primary.main',
+                      outlineOffset: '2px',
+                    },
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 40,
+                      color: isActive ? 'primary.main' : 'text.primary',
+                    }}
+                    aria-hidden="true"
+                  >
+                    {item.icon}
+                  </ListItemIcon>
                 <ListItemText
                   primary={item.label}
                   sx={{
@@ -118,12 +133,35 @@ const RecruiterLayout: React.FC = () => {
             </ListItem>
           );
         })}
-      </List>
+        </List>
+      </nav>
     </Box>
   );
 
   return (
     <Box sx={{ display: 'flex' }}>
+      {/* Skip Link for Keyboard Users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          zIndex: 9999,
+          '&:focus': {
+            left: '10px',
+            top: '10px',
+            bgcolor: 'primary.main',
+            color: 'white',
+            p: 2,
+            borderRadius: 1,
+          },
+        }}
+      >
+        Skip to main content
+      </Box>
+
       {/* Top AppBar */}
       <AppBar
         position="fixed"
@@ -141,18 +179,26 @@ const RecruiterLayout: React.FC = () => {
             color="inherit"
             edge="start"
             onClick={handleDrawerToggle}
+            aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileOpen}
+            aria-controls="drawer-menu"
             sx={{ mr: 2, display: { xs: 'flex', md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" fontWeight={600} color="text.primary">
+          <Typography variant="h6" fontWeight={600} color="text.primary" component="h2">
             Recruiter Portal
           </Typography>
         </Toolbar>
       </AppBar>
 
       {/* Sidebar */}
-      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
+      <Box
+        component="nav"
+        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
+        aria-label="Recruiter sidebar navigation"
+        id="drawer-menu"
+      >
         {/* Mobile Drawer */}
         <Drawer
           variant="temporary"
@@ -191,6 +237,7 @@ const RecruiterLayout: React.FC = () => {
       {/* Main Content */}
       <Box
         component="main"
+        id="main-content"
         sx={{
           flexGrow: 1,
           p: 3,
@@ -198,6 +245,7 @@ const RecruiterLayout: React.FC = () => {
           bgcolor: 'background.default',
           minHeight: '100vh',
         }}
+        tabIndex={-1}
       >
         <Toolbar />
         <Outlet />
