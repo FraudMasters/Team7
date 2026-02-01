@@ -1091,6 +1091,94 @@ VITE_API_URL=https://api.example.com/v1
 
 ---
 
+## Backend Localization Configuration
+
+### Language Settings
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DEFAULT_LANGUAGE` | string | `en` | Default language for backend processing |
+| `SUPPORTED_LANGUAGES` | string | `en,ru` | Comma-separated list of supported languages |
+
+**Supported Languages**:
+
+| Code | Language | Features | Model Requirements |
+|------|----------|----------|-------------------|
+| `en` | English | Full support | `en_core_web_sm` SpaCy model |
+| `ru` | Russian | Full support | `ru_core_news_sm` SpaCy model |
+
+**Language Detection Flow**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Language Detection & Processing                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Resume Uploaded                                            │
+│       │                                                     │
+│       ▼                                                     │
+│  Detect Language (auto-detect)                              │
+│       │                                                     │
+│       ├─ Supported? ──No──▶ Skip language-specific features │
+│       │                                                     │
+│       └─ Yes ──▶ Load Language-Specific Models             │
+│                     │                                       │
+│                     ├─ English ─▶ en_core_web_sm           │
+│                     ├─ Russian ─▶ ru_core_news_sm          │
+│                     └─ Other ──▶ Use DEFAULT_LANGUAGE model│
+│                                                             │
+│  Process with Language-Specific Features:                   │
+│  - NER extraction (Named Entity Recognition)                │
+│  - Grammar checking (LanguageTool)                          │
+│  - Date parsing (experience calculation)                    │
+│  - Text normalization                                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Configuration Examples**:
+
+```bash
+# English-only deployment
+DEFAULT_LANGUAGE=en
+SUPPORTED_LANGUAGES=en
+
+# Bilingual deployment (English and Russian)
+DEFAULT_LANGUAGE=en
+SUPPORTED_LANGUAGES=en,ru
+
+# Russian-first deployment
+DEFAULT_LANGUAGE=ru
+SUPPORTED_LANGUAGES=ru,en
+```
+
+**Model Dependencies**:
+
+Language-specific features require the corresponding SpaCy models:
+- English: `SPACY_MODEL_EN=en_core_web_sm`
+- Russian: `SPACY_MODEL_RU=ru_core_news_sm`
+
+Models must be downloaded before first use:
+```bash
+python -m spacy download en_core_web_sm
+python -m spacy download ru_core_news_sm
+```
+
+**Production Recommendations**:
+- Only include languages you actually support in `SUPPORTED_LANGUAGES`
+- Set `DEFAULT_LANGUAGE` to your most common language
+- Ensure language-specific models are pre-downloaded
+- Monitor memory usage when loading multiple language models (~20-50MB per language)
+- Consider using CPU-based models (_sm) for production
+
+**Interdependencies**:
+- Affects model loading (only loads models for supported languages)
+- Impacts NER extraction quality (language-dependent)
+- Grammar checking requires language-specific LanguageTool configuration
+- Date parsing varies by language format
+
+---
+
 ## ML Models Configuration
 
 ### Model Cache Settings
@@ -1252,6 +1340,84 @@ python -m spacy download ru_core_news_sm
 **Production Recommendation**:
 - Set to `1` on Apple Silicon Macs
 - No impact on Linux/Windows servers (uses CUDA or CPU)
+
+---
+
+## LanguageTool Configuration
+
+### Grammar & Spelling Checking
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `LANGUAGETOOL_SERVER` | string | `http://localhost:8081/v2/check` | LanguageTool API server URL |
+| `LANGUAGETOOL_USE_PUBLIC_AS_FALLBACK` | boolean | `true` | Fall back to public API if local server fails |
+
+**Server Options**:
+
+| Deployment | Server URL | Notes |
+|------------|-----------|-------|
+| **Local Server** | `http://localhost:8081/v2/check` | Recommended for privacy and speed |
+| **Public API** | `https://api.languagetool.org/v2/check` | Rate limited (20 requests/day) |
+| **Custom Server** | `http://your-server:port/v2/check` | Self-hosted instance |
+
+**Local Server Setup**:
+
+```bash
+# Using Docker (recommended)
+docker run -p 8081:8010 \
+  -e LANGUAGETOOL_LANGUAGE=en,ru \
+  -v lt-data:/ngrams \
+  languagetoolorg/languagetool:latest
+
+# Or download and run locally
+wget https://languagetool.org/download/LanguageTool-5.9.zip
+unzip LanguageTool-5.9.zip
+cd LanguageTool-5.9
+java -cp languagetool-server.jar org.languagetool.server.HTTPServer \
+  --port 8081 --language-models /path/to/ngrams
+```
+
+**Fallback Behavior**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         LanguageTool Fallback Logic                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Grammar Check Request                                      │
+│       │                                                     │
+│       ▼                                                     │
+│  Try LANGUAGETOOL_SERVER                                    │
+│       │                                                     │
+│       ├─ Success → Return results                           │
+│       │                                                     │
+│       └─ Failure AND LANGUAGETOOL_USE_PUBLIC_AS_FALLBACK   │
+│             │                                              │
+│             ▼                                              │
+│       Try Public API                                       │
+│             │                                              │
+│             ├─ Success → Return results (with warning)     │
+│             └─ Failure → Skip grammar check                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Performance Impact**:
+
+- **Local server**: ~50-100ms per check, no rate limits
+- **Public API**: ~200-500ms per check, 20 requests/day limit
+- **Disabled**: Grammar check skipped (set `ENABLE_GRAMMAR_CHECK=false`)
+
+**Production Recommendations**:
+- Use local server for production deployments
+- Set `LANGUAGETOOL_USE_PUBLIC_AS_FALLBACK=true` for resilience
+- Monitor server health and restart if unresponsive
+- Consider caching results for repeated text
+
+**Interdependencies**:
+- Requires `ENABLE_GRAMMAR_CHECK=true` to be active
+- Adds ~2-3 seconds to total analysis time per resume
+- Network connection required (unless using local server)
 
 ---
 
@@ -1515,6 +1681,309 @@ BACKUP_S3_REGION=us-east-1
 | `GRAFANA_PASSWORD` | string | `admin` | Grafana admin password |
 
 **Important**: Change the default password in production!
+
+---
+
+## Backend Email Notifications
+
+### SMTP Configuration
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SMTP_HOST` | string | `smtp.gmail.com` | SMTP server hostname |
+| `SMTP_PORT` | integer | `587` | SMTP server port |
+| `SMTP_USER` | string | - | SMTP username |
+| `SMTP_PASSWORD` | string | - | SMTP password or app-specific password |
+| `SMTP_FROM` | string | `noreply@resume-analysis.com` | From email address |
+| `SMTP_TLS` | boolean | `true` | Enable TLS encryption |
+
+**Common SMTP Providers**:
+
+| Provider | Host | Port | Notes |
+|----------|------|------|-------|
+| **Gmail** | `smtp.gmail.com` | `587` | Requires App Password |
+| **Outlook** | `smtp.office365.com` | `587` | Standard credentials |
+| **SendGrid** | `smtp.sendgrid.net` | `587` | API key as password |
+| **AWS SES** | `email-smtp.us-east-1.amazonaws.com` | `587` | IAM credentials |
+| **Mailgun** | `smtp.mailgun.org` | `587` | SMTP credentials |
+
+**Gmail Setup (App Password)**:
+
+```bash
+# 1. Enable 2-Factor Authentication on your Google Account
+# 2. Generate App Password: https://myaccount.google.com/apppasswords
+# 3. Use App Password in configuration
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=abcd efgh ijkl mnop  # App Password (16 chars)
+SMTP_FROM=noreply@yourdomain.com
+SMTP_TLS=true
+```
+
+**SendGrid Setup**:
+
+```bash
+# 1. Create SendGrid account: https://sendgrid.com/
+# 2. Generate API Key with "Mail Send" permissions
+# 3. Use API Key as SMTP password
+
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASSWORD=SG.your_sendgrid_api_key_here
+SMTP_FROM=noreply@yourdomain.com
+SMTP_TLS=true
+```
+
+**AWS SES Setup**:
+
+```bash
+# 1. Verify domain in AWS SES Console
+# 2. Create SMTP credentials (IAM user)
+# 3. Use generated credentials
+
+SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+SMTP_PORT=587
+SMTP_USER=AKIAIOSFODNN7EXAMPLE
+SMTP_PASSWORD=BLongPasswordWith+Characters/And/Numbers
+SMTP_FROM=noreply@yourdomain.com
+SMTP_TLS=true
+```
+
+**TLS Configuration**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              SMTP Connection Security                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  SMTP_TLS=true (Recommended)                                │
+│       │                                                     │
+│       ├─ STARTTLS command                                  │
+│       ├─ Encrypted connection (TLS 1.2+)                   │
+│       └─ Secure credential transmission                    │
+│                                                             │
+│  SMTP_TLS=false (Not Recommended)                          │
+│       │                                                     │
+│       ├─ Plaintext connection                              │
+│       └─ Credentials sent unencrypted ⚠️                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Production Recommendations**:
+- Always use `SMTP_TLS=true` in production
+- Use app-specific passwords (not primary account passwords)
+- Set up SPF, DKIM, and DMARC records for better deliverability
+- Monitor email sending limits (quotas vary by provider)
+- Use dedicated transactional email services (SendGrid, AWS SES) for production
+- Test email delivery before production deployment
+- Implement retry logic for failed emails
+- Monitor bounce rates and blacklist status
+
+**Security Best Practices**:
+- Store `SMTP_PASSWORD` in secrets manager (never in code)
+- Use minimal permissions for SMTP account
+- Rotate SMTP credentials regularly (every 90 days)
+- Monitor for unusual sending activity
+- Implement rate limiting to prevent account suspension
+- Use separate SMTP accounts for dev/staging/production
+
+**Troubleshooting**:
+
+```bash
+# Test SMTP connection
+openssl s_client -connect smtp.gmail.com:587 -starttls smtp
+
+# Common errors:
+# 535 5.7.8 Username and Password not accepted → Use App Password
+# 550 5.7.1 Relaying denied → Check SMTP_USER and FROM address match
+# Connection timeout → Check firewall allows port 587
+```
+
+---
+
+## Backend Webhook Configuration
+
+### Analysis Completion Webhooks
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `WEBHOOK_URL` | string | - | Webhook endpoint URL for analysis completion |
+| `WEBHOOK_SECRET` | string | - | Webhook signature secret for verification |
+
+**Webhook Purpose**:
+When configured, the backend sends HTTP POST requests to `WEBHOOK_URL` when:
+- Resume analysis completes successfully
+- Analysis fails or times out
+- Batch analysis jobs complete
+- Critical errors occur
+
+**Webhook Payload Format**:
+
+```json
+{
+  "event": "analysis.completed",
+  "timestamp": "2026-02-01T12:34:56Z",
+  "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "success",
+  "data": {
+    "resume_id": "123",
+    "filename": "resume.pdf",
+    "ats_score": 0.75,
+    "keywords_matched": ["python", "django", "api"],
+    "processing_time_seconds": 12.5
+  },
+  "signature": "sha256=..."
+}
+```
+
+**Webhook Events**:
+
+| Event | Trigger | Retry Policy |
+|-------|---------|--------------|
+| `analysis.completed` | Analysis finishes successfully | 3 retries with exponential backoff |
+| `analysis.failed` | Analysis fails or times out | 3 retries with exponential backoff |
+| `analysis.batch_completed` | Batch job completes | No retry (informational) |
+| `system.error` | Critical system error | 5 retries with exponential backoff |
+
+**Signature Verification**:
+
+Webhooks include an HMAC signature in the `X-Webhook-Signature` header:
+
+```python
+# Backend generates signature
+import hmac
+import hashlib
+
+signature = hmac.new(
+    WEBHOOK_SECRET.encode(),
+    json.dumps(payload).encode(),
+    hashlib.sha256
+).hexdigest()
+header = f"sha256={signature}"
+```
+
+Verify signatures in your webhook handler:
+
+```python
+# Your webhook server verifies signature
+import hmac
+import hashlib
+
+def verify_webhook(payload, signature_header):
+    signature = signature_header.split('=')[1]
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected)
+```
+
+**Configuration Examples**:
+
+```bash
+# Slack webhook
+WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+WEBHOOK_SECRET=$(openssl rand -hex 32)
+
+# Discord webhook
+WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
+WEBHOOK_SECRET=$(openssl rand -hex 32)
+
+# Custom webhook server
+WEBHOOK_URL=https://your-server.com/api/webhooks/resume-analysis
+WEBHOOK_SECRET=$(openssl rand -hex 32)
+```
+
+**Webhook Server Implementation Example**:
+
+```python
+# Flask webhook server
+from flask import Flask, request, jsonify
+import hmac
+import hashlib
+
+app = Flask(__name__)
+WEBHOOK_SECRET = "your-secret-here"
+
+@app.route('/webhooks/resume-analysis', methods=['POST'])
+def handle_webhook():
+    # Verify signature
+    signature = request.headers.get('X-Webhook-Signature')
+    payload = request.get_data()
+
+    if not verify_signature(payload, signature):
+        return jsonify({'error': 'Invalid signature'}), 401
+
+    # Process webhook
+    data = request.get_json()
+    if data['event'] == 'analysis.completed':
+        # Send notification, update database, etc.
+        print(f"Analysis {data['analysis_id']} completed with score {data['data']['ats_score']}")
+
+    return jsonify({'status': 'received'}), 200
+
+def verify_signature(payload, signature_header):
+    signature = signature_header.split('=')[1]
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected)
+
+if __name__ == '__main__':
+    app.run(port=5000)
+```
+
+**Production Recommendations**:
+- Always use HTTPS for `WEBHOOK_URL` (never HTTP)
+- Generate strong random secret with `openssl rand -hex 32`
+- Verify webhook signatures to prevent request forgery
+- Implement idempotency (handle duplicate webhook deliveries)
+- Return 200 status code quickly, process asynchronously
+- Use exponential backoff for retries (1s, 2s, 4s, 8s, 16s)
+- Monitor webhook delivery success rate
+- Implement dead letter queue for failed webhooks
+- Set reasonable timeout (5-10 seconds) for webhook requests
+
+**Security Best Practices**:
+- Treat `WEBHOOK_SECRET` like a password (store in secrets manager)
+- Rotate `WEBHOOK_SECRET` regularly (every 90 days)
+- Never log full webhook payload in production (PII risk)
+- Validate webhook URL format and scheme
+- Implement rate limiting on your webhook endpoint
+- Use IP whitelisting if possible
+- Monitor for suspicious webhook activity
+
+**Troubleshooting**:
+
+```bash
+# Test webhook endpoint
+curl -X POST WEBHOOK_URL \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Signature: sha256=test" \
+  -d '{"test": true}'
+
+# Check backend logs for webhook delivery errors
+grep "webhook" /var/log/backend.log
+
+# Common errors:
+# Connection timeout → Check firewall, webhook server availability
+# 401 Unauthorized → Signature verification failed, check WEBHOOK_SECRET
+# 404 Not Found → WEBHOOK_URL incorrect or webhook server down
+# 500 Internal Server Error → Webhook server error, check webhook server logs
+```
+
+**Interdependencies**:
+- Webhooks sent after analysis completes (depends on `ANALYSIS_TIMEOUT_SECONDS`)
+- Requires internet connectivity for external webhook URLs
+- Adds ~1-3 seconds to analysis completion if webhook is slow
+- Retry attempts use Celery task queue (depends on `CELERY_BROKER_URL`)
 
 ---
 
@@ -1825,6 +2294,101 @@ mkdir -p ./uploads
 chmod 755 ./uploads
 ```
 
+### File Cleanup Configuration
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ENABLE_FILE_CLEANUP` | boolean | `true` | Enable automatic file cleanup |
+| `FILE_CLEANUP_INTERVAL_HOURS` | integer | `24` | Cleanup check interval (hours) |
+| `FILE_RETENTION_HOURS` | integer | `48` | File retention period (hours) |
+
+**Cleanup Process**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Automatic File Cleanup Process                  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Every FILE_CLEANUP_INTERVAL_HOURS (24 hours by default)    │
+│       │                                                     │
+│       ▼                                                     │
+│  Scan UPLOAD_DIR for uploaded files                         │
+│       │                                                     │
+│       ├─ For each file:                                     │
+│       │   │                                                 │
+│       │   ├─ Check age (creation_time)                      │
+│       │   │                                                 │
+│       │   ├─ If age > FILE_RETENTION_HOURS:                 │
+│       │   │   ├─ Delete file                               │
+│       │   │   └─ Log deletion                              │
+│       │   │                                                 │
+│       │   └─ Else: Keep file                               │
+│                                                             │
+│  Summary logged: Files deleted, disk space reclaimed        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Configuration Examples**:
+
+```bash
+# Development - Frequent cleanup, short retention
+ENABLE_FILE_CLEANUP=true
+FILE_CLEANUP_INTERVAL_HOURS=6     # Check every 6 hours
+FILE_RETENTION_HOURS=12            # Keep files for 12 hours
+
+# Staging - Moderate cleanup
+ENABLE_FILE_CLEANUP=true
+FILE_CLEANUP_INTERVAL_HOURS=12
+FILE_RETENTION_HOURS=24            # Keep files for 1 day
+
+# Production - Standard cleanup
+ENABLE_FILE_CLEANUP=true
+FILE_CLEANUP_INTERVAL_HOURS=24     # Check once per day
+FILE_RETENTION_HOURS=48            # Keep files for 2 days
+
+# Audit/Legal - Long retention
+ENABLE_FILE_CLEANUP=true
+FILE_CLEANUP_INTERVAL_HOURS=24
+FILE_RETENTION_HOURS=720           # Keep files for 30 days
+```
+
+**Cleanup Schedule Examples**:
+
+| Retention | Interval | Files Kept | Disk Usage | Best For |
+|-----------|----------|------------|------------|----------|
+| 12 hours | 6 hours | 0.5 days | Low | Development, testing |
+| 24 hours | 12 hours | 1-2 days | Medium | Staging environments |
+| 48 hours | 24 hours | 2-3 days | Medium | Production (default) |
+| 720 hours | 24 hours | 30 days | High | Audit requirements |
+
+**Production Recommendations**:
+- Set `FILE_RETENTION_HOURS` based on legal/audit requirements
+- Adjust `FILE_CLEANUP_INTERVAL_HOURS` based on upload volume
+- Monitor disk usage to ensure cleanup is working
+- Consider disabling cleanup during debugging (`ENABLE_FILE_CLEANUP=false`)
+- Ensure cleanup interval is shorter than retention period
+- Account for backup schedules when setting retention
+
+**Interdependencies**:
+- Requires Celery beat for scheduled cleanup tasks
+- Cleanup task logs to `LOG_FILE` if configured
+- Disk space monitoring recommended for production
+- Cleanup runs even if analysis tasks are running
+
+**Monitoring**:
+
+```bash
+# Check for recent cleanup activity
+grep "File cleanup" /var/log/backend.log | tail -20
+
+# Monitor upload directory size
+du -sh ./uploads
+
+# Find old files (if cleanup not working)
+find ./uploads -type f -mtime +2
+```
+
 ---
 
 ## Analysis Configuration
@@ -2130,6 +2694,49 @@ Some features depend on others:
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `TESTING` | boolean | `false` | Enable test mode |
+
+### Backend Feature Flags
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ENABLE_EXPERIMENTAL_FEATURES` | boolean | `false` | Enable experimental features |
+| `ENABLE_BETA_FEATURES` | boolean | `false` | Enable beta features |
+
+**Experimental Features**:
+When `ENABLE_EXPERIMENTAL_FEATURES=true`, the following experimental features are enabled:
+- Advanced ML models (may be slower or resource-intensive)
+- New analysis algorithms (under testing)
+- Experimental UI components (if using corresponding frontend flag)
+- Debug endpoints and additional logging
+
+⚠️ **Warning**: Experimental features may be:
+- Unstable or buggy
+- Slow or resource-intensive
+- Changed or removed in future versions
+- Not suitable for production use
+
+**Beta Features**:
+When `ENABLE_BETA_FEATURES=true`, the following beta features are enabled:
+- Newly released features (mostly stable but may have edge cases)
+- Advanced configurations and tuning options
+- Pre-release optimizations
+
+ℹ️ **Note**: Beta features are more stable than experimental features but may still have issues. Good for staging environments.
+
+**Recommended Usage**:
+
+| Environment | Experimental | Beta | Notes |
+|-------------|---------------|------|-------|
+| Development | `true` | `true` | Test all features |
+| Staging | `false` | `true` | Test production-ready features |
+| Production | `false` | `false` | Stable features only |
+
+**Feature Feedback**:
+If you enable experimental or beta features, please:
+- Report issues on GitHub with detailed descriptions
+- Monitor system performance and resource usage
+- Provide feedback on feature quality and usefulness
+- Check release notes for changes to experimental features
 
 ### Frontend DevTools
 
