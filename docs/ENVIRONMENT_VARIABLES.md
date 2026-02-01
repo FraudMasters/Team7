@@ -6,6 +6,7 @@ Comprehensive guide to all environment variables used in AgentHR for configurati
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
+- [Variable Interdependencies](#variable-interdependencies)
 - [Database Configuration](#database-configuration)
 - [Redis Configuration](#redis-configuration)
 - [Backend API Configuration](#backend-api-configuration)
@@ -96,6 +97,575 @@ VITE_API_URL=http://localhost:8000
 
 ```bash
 docker-compose up -d
+```
+
+---
+
+## Variable Interdependencies
+
+This section explains how environment variables relate to and depend on each other. Understanding these relationships is crucial for proper configuration and avoiding runtime errors.
+
+### High-Level Interdependency Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Environment Variable Relationships            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐  │
+│  │   Database   │────▶│   Backend    │────▶│   Frontend   │  │
+│  │   Variables  │     │   Variables  │     │   Variables  │  │
+│  └──────────────┘     └──────┬───────┘     └──────┬───────┘  │
+│                              │                     │           │
+│                              ▼                     ▼           │
+│                        ┌────────────────────────────┐         │
+│                        │    Cross-Service Config    │         │
+│                        │  (CORS, URLs, Security)    │         │
+│                        └────────────────────────────┘         │
+│                                                                 │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐  │
+│  │     Redis    │────▶│    Celery    │────▶│   ML Models  │  │
+│  │  Variables   │     │  Variables   │     │  Variables   │  │
+│  └──────────────┘     └──────────────┘     └──────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Database Configuration Interdependencies
+
+#### Database URL Construction
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            DATABASE_URL Construction Logic                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  DATABASE_URL =                                            │
+│    "postgresql://" +                                       │
+│    POSTGRES_USER + ":" +                                   │
+│    POSTGRES_PASSWORD + "@" +                               │
+│    POSTGRES_HOST + ":" +                                   │
+│    POSTGRES_PORT + "/" +                                   │
+│    POSTGRES_DB                                             │
+│                                                             │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  │
+│  │ Component    │  │ Example Value │  │ Required?    │  │
+│  ├───────────────┼─────────────────┼─────────────────┤  │
+│  │ POSTGRES_USER│ postgres        │ ✅ Yes         │  │
+│  │ POSTGRES_    │ postgres        │ ✅ Yes         │  │
+│  │   PASSWORD   │                 │                │  │
+│  │ POSTGRES_    │ localhost:5432  │ ✅ Yes         │  │
+│  │   HOST:PORT  │                 │                │  │
+│  │ POSTGRES_DB  │ resume_analysis │ ✅ Yes         │  │
+│  └───────────────┴─────────────────┴─────────────────┘  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Database Pool ↔ Celery Workers Relationship
+
+**Critical Formula**: `DB_POOL_SIZE >= CELERY_WORKER_CONCURRENCY * 2`
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│        Pool Size Calculation Based on Workers               │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   CELERY_WORKER_CONCURRENCY=2                               │
+│         │                                                    │
+│         │ Formula: pool_size = workers * 2                  │
+│         ▼                                                    │
+│   DB_POOL_SIZE=20  (Recommended: 10x workers for spikes)    │
+│         │                                                    │
+│         │ Additional capacity for overflow                  │
+│         ▼                                                    │
+│   DB_MAX_OVERFLOW=10  (Spare connections)                   │
+│                                                              │
+│   Total Capacity: 30 concurrent connections                 │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Pool Settings Interdependency Matrix**:
+
+| Variable | Depends On | Affects | Formula/Rule |
+|----------|-----------|---------|--------------|
+| `DB_POOL_SIZE` | `CELERY_WORKER_CONCURRENCY` | `DB_MAX_OVERFLOW` | `>= workers * 2` |
+| `DB_MAX_OVERFLOW` | `DB_POOL_SIZE` | Total connections | `~ pool_size / 2` |
+| `DB_POOL_RECYCLE` | Database idle timeout | Connection stability | `< database timeout` |
+| `DB_POOL_TIMEOUT` | Expected load | User experience | `30` (balanced) |
+| `DB_POOL_PRE_PING` | Network stability | Error rate | `true` (always) |
+
+**Example Configurations**:
+
+```bash
+# Scenario 1: Development (2 workers)
+CELERY_WORKER_CONCURRENCY=2
+DB_POOL_SIZE=20      # 2 * 2 * 5 (safety factor)
+DB_MAX_OVERFLOW=10
+
+# Scenario 2: Production (10 workers)
+CELERY_WORKER_CONCURRENCY=10
+DB_POOL_SIZE=50      # 10 * 2 * 2.5
+DB_MAX_OVERFLOW=20
+
+# Scenario 3: High-traffic (20 workers)
+CELERY_WORKER_CONCURRENCY=20
+DB_POOL_SIZE=100     # 20 * 2 * 2.5
+DB_MAX_OVERFLOW=30
+```
+
+---
+
+### Redis ↔ Celery Configuration Interdependencies
+
+#### Broker and Backend URL Construction
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         Celery-Redis Connection Flow                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────┐     ┌──────────────┐                     │
+│  │  REDIS_URL   │────▶│   Celery     │                     │
+│  │  redis://... │     │   Tasks      │                     │
+│  └──────────────┘     └──────┬───────┘                     │
+│                             │                                │
+│                             │ Uses for:                     │
+│                             ├─ CELERY_BROKER_URL           │
+│                             ├─ CELERY_RESULT_BACKEND       │
+│                             └─ Lock/Cache storage          │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │           URL Relationship Examples                  │   │
+│  ├─────────────────────────────────────────────────────┤   │
+│  │ Scenario 1: Shared (Default)                         │   │
+│  │   REDIS_URL              = redis://localhost:6379/0  │   │
+│  │   CELERY_BROKER_URL      = redis://localhost:6379/0  │   │
+│  │   CELERY_RESULT_BACKEND  = redis://localhost:6379/0  │   │
+│  ├─────────────────────────────────────────────────────┤   │
+│  │ Scenario 2: Separate Databases                       │   │
+│  │   REDIS_URL              = redis://localhost:6379/0  │   │
+│  │   CELERY_BROKER_URL      = redis://localhost:6379/1  │   │
+│  │   CELERY_RESULT_BACKEND  = redis://localhost:6379/2  │   │
+│  ├─────────────────────────────────────────────────────┤   │
+│  │ Scenario 3: Redis Cluster (Production)               │   │
+│  │   REDIS_URL              = redis://cluster:6379/0    │   │
+│  │   CELERY_BROKER_URL      = redis://cluster:6379/0    │   │
+│  │   CELERY_RESULT_BACKEND  = redis://cluster:6379/0    │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Celery Task Configuration Interdependencies
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         Task Time Limit Hierarchy                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  HARD Limit (CELERY_TASK_TIME_LIMIT)                        │
+│  │  300 seconds (5 minutes)                                 │
+│  │                                                          │
+│  │  ┌─ SOFT Limit (CELERY_TASK_SOFT_TIME_LIMIT)            │
+│  │  │   280 seconds (4.67 minutes)                         │
+│  │  │                                                     │
+│  │  │   ┌─ Analysis Timeout (ANALYSIS_TIMEOUT_SECONDS)    │
+│  │  │   │   180 seconds (3 minutes)                        │
+│  │  │   │                                                │
+│  │  │   │   Must be: SOFT < HARD                          │
+│  │  │   │           Analysis << SOFT                       │
+│  │  │   │                                                │
+│  │  │   └────────────────────────────────                 │
+│  │  │                                                     │
+│  │  └────────────────────────────────                     │
+│  │                                                          │
+│  └─────────────────────────────────────────────────────    │
+│                                                             │
+│  Rule: ANALYSIS < SOFT < HARD                              │
+│  Rule: SOFT should be 10-20 seconds before HARD            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Celery Configuration Matrix**:
+
+| Variable | Depends On | Affects | Validation Rule |
+|----------|-----------|---------|-----------------|
+| `CELERY_BROKER_URL` | `REDIS_URL` | Task queue connectivity | Must be valid Redis URL |
+| `CELERY_RESULT_BACKEND` | `REDIS_URL` | Result retrieval | Must be valid Redis URL |
+| `CELERY_TASK_TIME_LIMIT` | `CELERY_TASK_SOFT_TIME_LIMIT` | Task termination | `> SOFT_LIMIT` by ~20s |
+| `CELERY_TASK_SOFT_TIME_LIMIT` | `ANALYSIS_TIMEOUT_SECONDS` | Graceful shutdown | `> ANALYSIS_TIMEOUT` |
+| `CELERY_WORKER_CONCURRENCY` | CPU cores | `DB_POOL_SIZE`, memory | `<= CPU cores` |
+| `CELERY_RESULT_EXPIRES` | Storage capacity | Redis memory usage | `86400` (1 day default) |
+
+---
+
+### Frontend ↔ Backend Configuration Interdependencies
+
+#### CORS Configuration Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            Frontend-Backend Communication Flow             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────┐         ┌──────────────────┐        │
+│  │   Frontend       │         │    Backend       │        │
+│  │   (Browser)      │         │   (FastAPI)      │        │
+│  └────────┬─────────┘         └────────┬─────────┘        │
+│           │                           │                   │
+│           │ VITE_API_URL              │                   │
+│           │ http://localhost:8000     │                   │
+│           │                           │                   │
+│           └─────────▶ HTTP Request ──▶│                   │
+│                                       │                   │
+│                                       │ Check CORS        │
+│                                       │                   │
+│                                       │ FRONTEND_URL      │
+│                                       │ http://localhost:5173
+│                                       │                   │
+│                                       │ Is origin in      │
+│                                       │ CORS_ORIGINS?    │
+│                                       │                   │
+│                         ┌─────────────┴─────────────┐     │
+│                         │                           │     │
+│                    Yes  │                           │ No  │
+│                         ▼                           ▼     │
+│                  ┌──────────┐               ┌──────────┐  │
+│                  │ Allow   │               │ Block   │  │
+│                  │ Response│               │ (CORS)  │  │
+│                  └──────────┘               └──────────┘  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Frontend-Backend Relationship Matrix**:
+
+| Frontend Variable | Backend Variable | Relationship | Error If Mismatch |
+|-------------------|------------------|--------------|------------------|
+| `VITE_API_URL` | `BACKEND_HOST`:`BACKEND_PORT` | Must match | Connection refused |
+| `VITE_API_URL` (origin) | `FRONTEND_URL` | Should match | CORS errors |
+| `VITE_API_URL` (origin) | `CORS_ORIGINS` | Must be in list | **CORS blocked** |
+| `VITE_API_TIMEOUT` | `ANALYSIS_TIMEOUT_SECONDS` | Frontend > Backend | Premature timeout |
+
+**Configuration Examples**:
+
+```bash
+# ✅ CORRECT - Matching configurations
+# backend/.env
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+FRONTEND_URL=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# frontend/.env
+VITE_API_URL=http://localhost:8000
+VITE_API_TIMEOUT=120000  # 2 minutes
+
+# ❌ WRONG - CORS will block
+# backend/.env
+BACKEND_PORT=8000
+CORS_ORIGINS=http://localhost:5173
+
+# frontend/.env
+VITE_API_URL=http://localhost:3000  # Different port - NOT in CORS_ORIGINS!
+```
+
+---
+
+### ML Model Configuration Interdependencies
+
+#### Model Cache Path Relationships
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           ML Model Cache Storage Hierarchy                  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  MODELS_CACHE_PATH=/app/models_cache                        │
+│         │                                                   │
+│         ├─────────────────────────────────────┐             │
+│         │                                     │             │
+│         ▼                                     ▼             │
+│  TRANSFORMERS_CACHE                   HF_HOME              │
+│  /app/models_cache/hub              /app/models_cache      │
+│         │                                     │             │
+│         │                                     │             │
+│         ▼                                     │             │
+│  ┌──────────────────┐                        │             │
+│  │  Hugging Face    │                        │             │
+│  │  Models          │                        │             │
+│  │  (KeyBERT,       │                        │             │
+│  │   SentTrans)     │                        │             │
+│  └──────────────────┘                        │             │
+│                                              │             │
+│         ┌────────────────────────────────────┘             │
+│         │                                                   │
+│         ▼                                                   │
+│  ┌──────────────────┐                                      │
+│  │  SpaCy Models    │                                      │
+│  │  (en_core_web_sm│                                      │
+│  │   ru_core_news) │                                      │
+│  └──────────────────┘                                      │
+│                                                             │
+│  All paths should point to SAME directory for efficiency    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Model Configuration Matrix**:
+
+| Variable | Depends On | Affects | Recommendation |
+|----------|-----------|---------|----------------|
+| `MODELS_CACHE_PATH` | Disk space | `TRANSFORMERS_CACHE`, `HF_HOME` | Persistent volume |
+| `TRANSFORMERS_CACHE` | `MODELS_CACHE_PATH` | Hugging Face models | `${MODELS_CACHE_PATH}/hub` |
+| `HF_HOME` | `MODELS_CACHE_PATH` | Hugging Face config | `${MODELS_CACHE_PATH}` |
+| `KEYBERT_MODEL` | `TRANSFORMERS_CACHE` | Memory, speed | `distilbert-base-nli-mean-tokens` |
+| `SPACY_MODEL_EN` | `MODELS_CACHE_PATH` | NER accuracy | `en_core_web_sm` |
+| `SPACY_MODEL_RU` | `MODELS_CACHE_PATH` | NER accuracy | `ru_core_news_sm` |
+
+**Memory Interdependencies**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│        Model Memory Usage & Trade-offs                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Total Memory = DB_Pool + KeyBERT + SpaCy_EN + SpaCy_RU    │
+│                                                             │
+│  Example Configuration:                                     │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │ Model                    │ Memory │ Impact       │      │
+│  ├──────────────────────────┼────────┼──────────────┤      │
+│  │ KeyBERT (distilbert)     │ 250MB  │ Medium       │      │
+│  │ SpaCy EN (sm)            │  12MB  │ Low          │      │
+│  │ SpaCy RU (sm)            │  17MB  │ Low          │      │
+│  │ DB Pool (20 connections) │ 200MB  │ High         │      │
+│  │ OVERHEAD                 │ 100MB  │ Baseline     │      │
+│  ├──────────────────────────┼────────┼──────────────┤      │
+│  │ TOTAL                    │ 579MB  │              │      │
+│  └──────────────────────────┴────────┴──────────────┘      │
+│                                                             │
+│  If using larger models:                                    │
+│  - KeyBERT (mpnet): +150MB                                  │
+│  - SpaCy (md): +60MB per language                           │
+│  - SpaCy (lg): +480MB per language                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Security Configuration Interdependencies
+
+#### JWT Authentication Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            JWT Token Lifecycle                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. Login Request                                          │
+│     │                                                       │
+│     ▼                                                       │
+│  2. Validate Credentials                                    │
+│     │                                                       │
+│     ▼                                                       │
+│  3. Generate Token                                          │
+│     │                                                       │
+│     ├─ SECRET_KEY (signing)                                │
+│     ├─ JWT_ALGORITHM (HS256/RS256)                         │
+│     └─ JWT_ACCESS_TOKEN_EXPIRE_MINUTES (30)               │
+│                                                             │
+│  4. Return Token to Client                                  │
+│     │                                                       │
+│     ├─ Token includes expiration timestamp                 │
+│     └─ Client stores token                                 │
+│                                                             │
+│  5. Authenticated Request                                   │
+│     │                                                       │
+│     ├─ Client sends token in header                        │
+│     ├─ Server validates with SECRET_KEY                    │
+│     ├─ Check expiration (<= EXPIRE_MINUTES)                │
+│     └─ Allow/Deny request                                  │
+│                                                             │
+│  Interdependency:                                           │
+│  SHORTER expiration = More secure but worse UX              │
+│  LONGER expiration = Better UX but less secure              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Security Configuration Matrix**:
+
+| Variable | Depends On | Affects | Security Trade-off |
+|----------|-----------|---------|-------------------|
+| `SECRET_KEY` | Cryptographically random | All JWT tokens | **Critical** - Must be strong |
+| `JWT_ALGORITHM` | Key type (symmetric/asymmetric) | Token validation | `HS256` (fast) vs `RS256` (secure) |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | User experience requirement | Login frequency | `30` (balanced) |
+| `RATE_LIMIT_PER_MINUTE` | Expected traffic | API protection | `60` (standard) |
+| `CORS_ORIGINS` | `FRONTEND_URL` | XSS protection | Must be specific domains |
+
+**Security Level Configurations**:
+
+```bash
+# High Security (Financial/Healthcare)
+SECRET_KEY=<very-strong-random-key>
+JWT_ALGORITHM=RS256  # Asymmetric
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
+RATE_LIMIT_PER_MINUTE=30
+
+# Standard Security (Most Applications)
+SECRET_KEY=<strong-random-key>
+JWT_ALGORITHM=HS256  # Symmetric (faster)
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+RATE_LIMIT_PER_MINUTE=60
+
+# Relaxed Security (Internal Tools)
+SECRET_KEY=<random-key>
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24 hours
+RATE_LIMIT_PER_MINUTE=120
+```
+
+---
+
+### Analysis Feature Interdependencies
+
+#### Feature Dependency Graph
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           Analysis Pipeline Dependencies                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────┐                                      │
+│  │ Text Extraction  │                                      │
+│  └────────┬─────────┘                                      │
+│           │                                               │
+│           ▼                                               │
+│  ┌──────────────────┐                                      │
+│  │ Language Detect  │                                      │
+│  └────────┬─────────┘                                      │
+│           │                                               │
+│           ├───────────────────────────────────────┐       │
+│           │                                       │       │
+│           ▼                                       ▼       │
+│  ┌──────────────────┐                    ┌────────────┐  │
+│  │ Select Models    │                    │ All Features│  │
+│  │ based on language│                    │ continue   │  │
+│  └────────┬─────────┘                    └────────────┘  │
+│           │                                       │       │
+│           │                                       │       │
+│           ├─────────┬──────────┬──────────┬───────┘       │
+│           │         │          │          │               │
+│           ▼         ▼          ▼          ▼               │
+│     ┌─────────┐ ┌─────┐ ┌──────────┐ ┌──────┐           │
+│     │  NER    │ │Key  │ │ Grammar  │ │ Exp  │           │
+│     │Extract. │ │word │ │  Check   │ │Calc. │           │
+│     └────┬────┘ └──┬──┘ └────┬─────┘ └──┬───┘           │
+│          │        │         │          │               │
+│          │        │         │          │               │
+│          ▼        ▼         ▼          ▼               │
+│     ┌──────────────────────────────────────┐           │
+│     │      Error Detection (always)        │           │
+│     └──────────────┬───────────────────────┘           │
+│                    │                                   │
+│                    ▼                                   │
+│          ┌──────────────────────┐                      │
+│          │   Analysis Results   │                      │
+│          └──────────────────────┘                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Feature Toggle Matrix**:
+
+| Feature | Required Variables | Optional Variables | Conflicts With |
+|---------|-------------------|-------------------|----------------|
+| `ENABLE_KEYWORD_EXTRACTION` | `KEYBERT_MODEL`, `TRANSFORMERS_CACHE` | `KEYWORD_EXTRACTION_TOP_N` | None |
+| `ENABLE_NER_EXTRACTION` | `SPACY_MODEL_EN`, `SPACY_MODEL_RU` | `MODELS_CACHE_PATH` | None |
+| `ENABLE_GRAMMAR_CHECK` | Network access | `LLM_PROVIDER` | Offline environments |
+| `ENABLE_EXPERIENCE_CALCULATION` | None | `RESUME_MIN_LENGTH` | None |
+| `ENABLE_ERROR_DETECTION` | `RESUME_MIN_LENGTH` | None | None |
+
+**Performance Impact Chain**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│      Configuration → Performance Impact Chain              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ENABLE_GRAMMAR_CHECK=true                                 │
+│      │                                                      │
+│      ├─ Requires: Network connection                       │
+│      ├─ Adds: +5-10 seconds per analysis                   │
+│      ├─ Depends on: LanguageTool API availability          │
+│      └─ Fallback: Disables automatically if fails          │
+│                                                             │
+│  ENABLE_NER_EXTRACTION=true                                │
+│      │                                                      │
+│      ├─ Requires: SpaCy models loaded                      │
+│      ├─ Adds: +1-3 seconds per analysis                    │
+│      ├─ Memory: +50MB per language model                   │
+│      └─ Depends on: `SPACY_MODEL_*` variables              │
+│                                                             │
+│  ENABLE_KEYWORD_EXTRACTION=true                            │
+│      │                                                      │
+│      ├─ Requires: KeyBERT model loaded                     │
+│      ├─ Adds: +2-5 seconds per analysis                    │
+│      ├─ Memory: +100-400MB (depending on model)            │
+│      └─ Depends on: `KEYBERT_MODEL`, `TRANSFORMERS_CACHE`  │
+│                                                             │
+│  Total Time = Base + NER + Keywords + Grammar               │
+│  Total Memory = Base + NER + Keywords + DB_Pool            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Complete Interdependency Quick Reference
+
+#### Critical Variable Relationships
+
+| Variable Group | Primary Variables | Critical Dependencies | Validation |
+|----------------|------------------|----------------------|------------|
+| **Database** | `DATABASE_URL`, `DB_POOL_SIZE` | `CELERY_WORKER_CONCURRENCY` | `DB_POOL_SIZE >= workers * 2` |
+| **Celery** | `CELERY_BROKER_URL`, `CELERY_WORKER_CONCURRENCY` | `REDIS_URL`, `DB_POOL_SIZE` | Worker concurrency <= CPU cores |
+| **Frontend-Backend** | `VITE_API_URL`, `CORS_ORIGINS` | `BACKEND_PORT`, `FRONTEND_URL` | API URL origin in CORS_ORIGINS |
+| **Security** | `SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | None (independent) | Secret key >= 32 chars |
+| **ML Models** | `MODELS_CACHE_PATH`, `KEYBERT_MODEL` | `TRANSFORMERS_CACHE`, `HF_HOME` | All paths point to same dir |
+| **Analysis** | `ENABLE_*` flags | Model variables | Grammar check requires network |
+
+#### Configuration Validation Checklist
+
+Before deploying, verify these relationships:
+
+```bash
+# ✅ 1. Database & Celery Alignment
+if [ $CELERY_WORKER_CONCURRENCY -gt 2 ]; then
+    [ $DB_POOL_SIZE -ge $(($CELERY_WORKER_CONCURRENCY * 2)) ] || echo "ERROR: Pool too small"
+fi
+
+# ✅ 2. Time Limit Hierarchy
+[ $ANALYSIS_TIMEOUT_SECONDS -lt $CELERY_TASK_SOFT_TIME_LIMIT ] || echo "ERROR: Analysis timeout too high"
+[ $CELERY_TASK_SOFT_TIME_LIMIT -lt $CELERY_TASK_TIME_LIMIT ] || echo "ERROR: Soft limit >= hard limit"
+
+# ✅ 3. CORS Configuration
+# VITE_API_URL origin must be in CORS_ORIGINS
+# e.g., if VITE_API_URL=http://localhost:8000
+# then CORS_ORIGINS must contain http://localhost:8000 or http://localhost:*
+
+# ✅ 4. Model Cache Consistency
+# All model cache paths should be under same parent directory
+[ -n "$MODELS_CACHE_PATH" ] || echo "ERROR: MODELS_CACHE_PATH not set"
+
+# ✅ 5. Security Settings
+[ ${#SECRET_KEY} -ge 32 ] || echo "WARNING: SECRET_KEY too short"
+[ $JWT_ACCESS_TOKEN_EXPIRE_MINUTES -le 1440 ] || echo "WARNING: Token expiry > 24 hours"
 ```
 
 ---
