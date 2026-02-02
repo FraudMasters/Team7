@@ -22,6 +22,7 @@ import {
   Work as WorkIcon,
   People as PeopleIcon,
   BarChart as BarChartIcon,
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 280;
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { label: 'Vacancies', path: '/recruiter/vacancies', icon: <WorkIcon /> },
   { label: 'Candidates', path: '/recruiter/candidates', icon: <PeopleIcon /> },
   { label: 'Analytics', path: '/recruiter/analytics', icon: <BarChartIcon /> },
+  { label: 'Weights', path: '/recruiter/weights', icon: <TuneIcon /> },
 ];
 
 const RecruiterLayout: React.FC = () => {

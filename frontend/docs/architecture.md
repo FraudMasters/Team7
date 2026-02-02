@@ -167,6 +167,187 @@ frontend/
 - `/recruiter/candidates` - Candidates (PeopleIcon)
 - `/recruiter/analytics` - Analytics (BarChartIcon)
 
+## Page Documentation
+
+### Job Seeker Pages
+
+#### SavedJobsPage
+
+**Route**: `/jobs/saved`
+
+**Purpose**: Allows candidates to bookmark and manage jobs they're interested in
+
+**Key Features**:
+- Save/unsave jobs with bookmark icon
+- List view of all saved jobs
+- Quick access to job details
+- Filter and sort saved jobs
+- Persistent storage across sessions
+
+**Components**:
+- Job card grid/list
+- Bookmark toggle buttons
+- Empty state with call-to-action
+- Filter controls (by date, company, location)
+
+**State Management**:
+- Local storage for persistence
+- API integration to sync saved jobs
+- Real-time bookmark updates
+
+#### MyApplicationsPage
+
+**Route**: `/jobs/applications`
+
+**Purpose**: Track all job applications and their status
+
+**Key Features**:
+- View all submitted applications
+- Track application status (submitted, under review, rejected, offered)
+- Application timeline and history
+- Quick access to application details
+- Filter by status, date, or company
+
+**Components**:
+- Application list with status badges
+- Status filter chips
+- Application detail cards
+- Empty state for no applications
+- Timeline view for each application
+
+**State Management**:
+- API integration for application data
+- Real-time status updates
+- Local caching for performance
+
+#### CandidateProfilePage
+
+**Route**: `/jobs/profile`
+
+**Purpose**: Manage candidate profile and resume information
+
+**Key Features**:
+- Edit personal information
+- Upload and manage resumes
+- View profile completion status
+- Skills and experience management
+- Preferences and settings
+
+**Components**:
+- Profile form with validation
+- Resume upload section
+- Skills tags input
+- Experience timeline
+- Education history
+- Profile completeness indicator
+
+**State Management**:
+- Form state management
+- API integration for profile updates
+- Optimistic updates for better UX
+
+### Recruiter Pages
+
+#### VacancyDetailPage
+
+**Route**: `/recruiter/vacancies/:id`
+
+**Purpose**: View detailed information about a specific vacancy
+
+**Key Features**:
+- Complete vacancy information display
+- Application statistics
+- Candidate list for this vacancy
+- Edit vacancy details
+- View matching candidates
+- Application management actions
+
+**Components**:
+- Vacancy header with actions
+- Job description section
+- Requirements display
+- Application metrics cards
+- Candidates list (filtered for this vacancy)
+- Edit/delete actions
+- Status management
+
+**State Management**:
+- Route parameter for vacancy ID
+- API integration for vacancy data
+- Real-time candidate list updates
+
+#### CandidateDetailPage
+
+**Route**: `/recruiter/candidates/:id`
+
+**Purpose**: View detailed candidate profile and application information
+
+**Key Features**:
+- Complete candidate profile
+- Resume viewer
+- Application history
+- Skill assessment
+- Match scores for vacancies
+- Notes and comments
+- Status change actions
+
+**Components**:
+- Candidate header with profile picture
+- Contact information
+- Resume preview/download
+- Skills and experience sections
+- Application history timeline
+- Match score indicators
+- Notes section
+- Status change buttons
+- Activity log
+
+**State Management**:
+- Route parameter for candidate ID
+- API integration for candidate data
+- Real-time status updates
+- Notes persistence
+
+#### WeightsPage
+
+**Route**: `/recruiter/weights`
+
+**Purpose**: Customize matching algorithm weights for candidate-vacancy matching
+
+**Key Features**:
+- Adjust importance weights for different criteria
+- Preview impact of weight changes
+- Save custom weight profiles
+- Reset to defaults
+- Real-time matching score preview
+
+**Components**:
+- Weight sliders for each criterion:
+  - Skills match
+  - Experience relevance
+  - Education level
+  - Location proximity
+  - Salary expectations
+  - Industry fit
+- Weight profile selector
+- Preview section with sample matches
+- Save/Reset buttons
+- Validation indicators
+
+**State Management**:
+- Form state for weight values
+- API integration for saving profiles
+- Local storage for drafts
+- Real-time preview calculations
+
+**Weight Categories**:
+1. **Skills Match** (0-100): Importance of skill alignment
+2. **Experience** (0-100): Relevance of work experience
+3. **Education** (0-100): Importance of educational background
+4. **Location** (0-100): Preference for local candidates
+5. **Salary** (0-100): Alignment on salary expectations
+6. **Industry** (0-100): Industry experience importance
+
 ## State Management
 
 ### Context Providers

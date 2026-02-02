@@ -1,150 +1,105 @@
-import { Box, Paper, Typography, Stack, Chip } from '@mui/material';
+import React from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { motion } from 'framer-motion';
+import { Box, Paper, Typography, Card, CardContent } from '@mui/material';
 
-const MotionPaper = motion(Paper);
-
-export interface Candidate {
-  id: string;
-  name: string;
-  email: string;
-  stage: string;
-  tags: string[];
-  notes_count: number;
-  match_score?: number;
-}
-
-export interface KanbanColumn {
+export interface Column {
   id: string;
   title: string;
-  candidates: Candidate[];
+  candidates: any[];
 }
 
-interface KanbanBoardProps {
-  columns: KanbanColumn[];
-  onDragEnd: (result: DropResult) => void;
+export interface KanbanBoardProps {
+  columns: Column[];
+  onDragEnd: (result: DropResult) => void | Promise<void>;
 }
 
-export function KanbanBoard({ columns, onDragEnd }: KanbanBoardProps) {
+/**
+ * Simple Kanban Board Component
+ *
+ * Basic drag-and-drop kanban board for candidate pipeline.
+ * Uses hello-pangea/dnd for drag and drop functionality.
+ */
+const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <Box
-        sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 2 }}
-        role="region"
-        aria-label="Kanban board for candidate workflow"
+        sx={{
+          display: 'flex',
+          gap: 2,
+          overflowX: 'auto',
+          height: '100%',
+        }}
       >
         {columns.map((column) => (
-          <MotionPaper
+          <Box
             key={column.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
             sx={{
-              minWidth: 300,
-              width: 300,
-              bgcolor: 'background.default',
+              minWidth: 280,
+              maxWidth: 320,
+              flex: '0 0 auto',
+              display: 'flex',
+              flexDirection: 'column',
             }}
-            role="region"
-            aria-labelledby={`column-${column.id}-title`}
           >
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography
-                  id={`column-${column.id}-title`}
-                  variant="subtitle2"
-                  fontWeight={600}
-                  component="h2"
-                >
-                  {column.title}
-                </Typography>
-                <Chip
-                  label={`${column.candidates.length} ${column.candidates.length === 1 ? 'candidate' : 'candidates'}`}
-                  size="small"
-                  variant="outlined"
-                  aria-label={`Column contains ${column.candidates.length} candidates`}
-                />
-              </Stack>
-            </Box>
+            {/* Column Header */}
+            <Paper
+              sx={{
+                p: 2,
+                mb: 2,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+              }}
+            >
+              <Typography variant="h6" fontWeight={600}>
+                {column.title}
+              </Typography>
+              <Typography variant="caption">
+                {column.candidates.length} candidates
+              </Typography>
+            </Paper>
+
+            {/* Column Content */}
             <Droppable droppableId={column.id}>
-              {(provided) => (
+              {(provided, snapshot) => (
                 <Box
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  sx={{ p: 2, minHeight: 200 }}
-                  role="list"
-                  aria-label={`${column.title} candidates`}
+                  sx={{
+                    flex: 1,
+                        minHeight: 200,
+                    bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'background.default',
+                    borderRadius: 1,
+                    p: 1,
+                  }}
                 >
-                  {column.candidates.map((candidate, index) => (
+                  {column.candidates.map((candidate: any, index: number) => (
                     <Draggable
                       key={candidate.id}
                       draggableId={candidate.id}
                       index={index}
                     >
                       {(provided, snapshot) => (
-                        <MotionPaper
+                        <Card
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           sx={{
-                            mb: 2,
-                            cursor: 'grab',
-                            boxShadow: snapshot.isDragging ? '0 8px 16px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.08)',
-                            opacity: snapshot.isDragging ? 0.8 : 1,
-                            '&:focus-visible': {
-                              outline: '2px solid',
-                              outlineColor: 'primary.main',
-                              outlineOffset: '2px',
-                            },
+                            mb: 1,
+                            boxShadow: snapshot.isDragging ? 8 : 1,
+                            transform: snapshot.isDragging ? 'rotate(3deg)' : 'none',
                           }}
-                          role="listitem"
-                          aria-labelledby={`candidate-${candidate.id}-name`}
-                          aria-describedby={`candidate-${candidate.id}-details`}
                         >
-                          <Box sx={{ p: 2 }}>
-                            <Stack direction="row" spacing={2} alignItems="center">
-                              <Box
-                                sx={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: '50%',
-                                  bgcolor: 'primary.main',
-                                  color: 'white',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.875rem',
-                                  fontWeight: 600,
-                                }}
-                                aria-hidden="true"
-                              >
-                                {candidate.name.charAt(0)}
-                              </Box>
-                              <Box sx={{ flex: 1 }}>
-                                <Typography
-                                  id={`candidate-${candidate.id}-name`}
-                                  variant="body2"
-                                  fontWeight={600}
-                                >
-                                  {candidate.name}
-                                </Typography>
-                                <Typography
-                                  id={`candidate-${candidate.id}-details`}
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  {candidate.email}
-                                </Typography>
-                              </Box>
-                              {candidate.match_score && (
-                                <Chip
-                                  label={`${candidate.match_score}% match`}
-                                  size="small"
-                                  color={candidate.match_score > 70 ? 'success' : 'default'}
-                                  aria-label={`Match score: ${candidate.match_score} percent`}
-                                />
-                              )}
-                            </Stack>
-                          </Box>
-                        </MotionPaper>
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              {candidate.name || candidate.filename || 'Unknown'}
+                            </Typography>
+                            {candidate.email && (
+                              <Typography variant="caption" color="text.secondary">
+                                {candidate.email}
+                              </Typography>
+                            )}
+                          </CardContent>
+                        </Card>
                       )}
                     </Draggable>
                   ))}
@@ -152,9 +107,12 @@ export function KanbanBoard({ columns, onDragEnd }: KanbanBoardProps) {
                 </Box>
               )}
             </Droppable>
-          </MotionPaper>
+          </Box>
         ))}
       </Box>
     </DragDropContext>
   );
-}
+};
+
+export default KanbanBoard;
+export { KanbanBoard };

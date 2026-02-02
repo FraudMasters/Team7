@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -8,79 +8,77 @@ import {
   Chip,
   Button,
   Divider,
-  CircularProgress,
-  Grid,
 } from '@mui/material';
 import {
   LocationOn,
   WorkOutline,
   AttachMoney,
   Business,
+  Edit,
+  People,
 } from '@mui/icons-material';
 import { useJob } from '../../hooks/useJobs';
+import { PageTransition } from '../../components/ui/PageTransition';
+import { LoadingState } from '../../components/ui/LoadingState';
+import { ErrorState } from '../../components/ui/ErrorState';
 
-export function JobDetailPage() {
+export function VacancyDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: job, isLoading, error } = useJob(id || '');
+  const navigate = useNavigate();
+  const { data: vacancy, isLoading, error } = useJob(id || '');
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
-        <CircularProgress />
-      </Box>
+      <PageTransition>
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <LoadingState message="Loading vacancy details..." />
+        </Container>
+      </PageTransition>
     );
   }
 
-  if (error || !job) {
+  if (error || !vacancy) {
     return (
-      <Box sx={{ textAlign: 'center', py: 12 }}>
-        <Typography variant="h6">Job not found</Typography>
-      </Box>
+      <PageTransition>
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <ErrorState
+            title="Vacancy Not Found"
+            message="The vacancy you're looking for doesn't exist or you don't have permission to view it."
+            onRetry={() => navigate('/recruiter/vacancies')}
+          />
+        </Container>
+      </PageTransition>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Paper
-        sx={{
-          p: { xs: 3, md: 5 },
-          animation: 'fadeInUp 0.5s ease-out both',
-          '@keyframes fadeInUp': {
-            '0%': {
-              opacity: 0,
-              transform: 'translateY(20px)',
-            },
-            '100%': {
-              opacity: 1,
-              transform: 'translateY(0)',
-            },
-          },
-        }}
-      >
-        <Stack spacing={4}>
+    <PageTransition>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Paper sx={{ p: { xs: 3, md: 5 } }}>
+          <Stack spacing={4}>
           {/* Header */}
           <Box>
             <Typography variant="h3" fontWeight={700} gutterBottom>
-              {job.title}
+              {vacancy.title}
             </Typography>
             <Stack direction="row" spacing={2} flexWrap="wrap" color="text.secondary">
-              {job.industry && (
+              {vacancy.industry && (
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Business sx={{ fontSize: 18 }} />
-                  <Typography>{job.industry}</Typography>
+                  <Typography>{vacancy.industry}</Typography>
                 </Stack>
               )}
-              {job.location && (
+              {vacancy.location && (
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOn sx={{ fontSize: 18 }} />
-                  <Typography>{job.location}</Typography>
+                  <Typography>{vacancy.location}</Typography>
                 </Stack>
               )}
               <Stack direction="row" spacing={1} alignItems="center">
                 <WorkOutline sx={{ fontSize: 18 }} />
                 <Typography>
-                  {job.work_format && `${job.work_format}`}
-                  {job.min_experience_months > 0 && ` • ${Math.floor(job.min_experience_months / 12)}+ years`}
+                  {vacancy.work_format && `${vacancy.work_format}`}
+                  {vacancy.min_experience_months > 0 && ` • ${Math.floor(vacancy.min_experience_months / 12)}+ years`}
                 </Typography>
               </Stack>
             </Stack>
@@ -89,12 +87,12 @@ export function JobDetailPage() {
           <Divider />
 
           {/* Salary */}
-          {job.salary_min && (
+          {vacancy.salary_min && (
             <Stack direction="row" spacing={1} alignItems="center" color="success.main">
               <AttachMoney sx={{ fontSize: 20 }} />
               <Typography variant="h6" fontWeight={600} color="success.main">
-                {job.salary_min.toLocaleString()}
-                {job.salary_max && ` - ${job.salary_max.toLocaleString()}`}
+                {vacancy.salary_min.toLocaleString()}
+                {vacancy.salary_max && ` - ${vacancy.salary_max.toLocaleString()}`}
               </Typography>
             </Stack>
           )}
@@ -105,7 +103,7 @@ export function JobDetailPage() {
               Required Skills
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-              {job.required_skills.map((skill) => (
+              {vacancy.required_skills.map((skill) => (
                 <Chip
                   key={skill}
                   label={skill}
@@ -134,7 +132,7 @@ export function JobDetailPage() {
                 lineHeight: 1.8,
               }}
             >
-              {job.description}
+              {vacancy.description}
             </Typography>
           </Box>
 
@@ -143,21 +141,24 @@ export function JobDetailPage() {
             <Button
               variant="contained"
               size="large"
-              href={`/jobs/${job.id}/apply`}
+              startIcon={<People />}
+              onClick={() => navigate('/recruiter/candidates')}
               sx={{ flexGrow: 1 }}
             >
-              Apply Now
+              View Candidates
             </Button>
             <Button
               variant="outlined"
               size="large"
-              sx={{ minWidth: 120 }}
+              startIcon={<Edit />}
+              onClick={() => navigate(`/recruiter/vacancies/${vacancy.id}/edit`)}
             >
-              Save
+              Edit Vacancy
             </Button>
           </Stack>
         </Stack>
       </Paper>
-    </Container>
+      </Container>
+    </PageTransition>
   );
 }

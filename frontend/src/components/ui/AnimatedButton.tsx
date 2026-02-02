@@ -1,9 +1,5 @@
 import React from 'react';
 import { Button, ButtonProps } from '@mui/material';
-import { motion } from 'framer-motion';
-
-// Create motion-wrapped Button component
-const MotionButton = motion(Button);
 
 /**
  * Gradient variants matching the design system
@@ -35,10 +31,10 @@ export interface AnimatedButtonProps extends Omit<ButtonProps, 'variant'> {
 /**
  * AnimatedButton Component
  *
- * Wraps MUI Button with subtle micro-interactions:
- * - Hover: Lifts up slightly (y: -2px)
- * - Press/Click: Scales down slightly (scale: 0.98)
- * - Fast animations (0.1-0.2s duration) for responsive feel
+ * Wraps MUI Button with subtle micro-interactions using CSS:
+ * - Hover: Lifts up slightly and adds shadow
+ * - Press/Click: Scales down slightly
+ * - Fast transitions (0.1-0.2s duration) for responsive feel
  *
  * All standard MUI Button props are supported via ...rest spread.
  *
@@ -68,25 +64,37 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
         color: 'white',
         '&:hover': {
           background: gradientMap[gradient],
+          transform: 'translateY(-2px)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         },
+        '&:active': {
+          transform: 'scale(0.98)',
+        },
+        transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out',
         // Override variant to contained for gradient buttons
         ...(sx || {}),
       }
-    : sx;
+    : {
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        },
+        '&:active': {
+          transform: 'scale(0.98)',
+        },
+        transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out',
+        ...sx,
+      };
 
   return (
-    <MotionButton
-      // Framer Motion animations
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.1 }}
+    <Button
       // Force variant to contained if gradient is specified
       variant={gradient ? 'contained' : (rest.variant || 'text')}
       sx={gradientSx}
       {...rest}
     >
       {children}
-    </MotionButton>
+    </Button>
   );
 };
 

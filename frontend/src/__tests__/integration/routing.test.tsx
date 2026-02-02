@@ -55,13 +55,6 @@ vi.mock('../../api/client', () => ({
   },
 }));
 
-// Mock framer-motion to avoid animation-related test issues
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  },
-}));
-
 describe('Routing Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();

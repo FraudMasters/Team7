@@ -1,7 +1,4 @@
 import { Card, CardContent, Box, Typography, SxProps, Theme } from '@mui/material';
-import { motion } from 'framer-motion';
-
-const MotionCard = motion(Card);
 
 const colorMap = {
   primary: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -22,11 +19,24 @@ interface BentoCardProps {
 
 export function BentoCard({ title, value, subtitle, icon, color = 'primary', delay = 0, sx }: BentoCardProps) {
   return (
-    <MotionCard
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      sx={{ height: '100%', display: 'flex', flexDirection: 'column', ...sx }}
+    <Card
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        animation: `fadeInUp 0.5s ease-out ${delay}ms both`,
+        '@keyframes fadeInUp': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(20px)',
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateY(0)',
+          },
+        },
+        ...sx,
+      }}
     >
       <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Box
@@ -55,6 +65,6 @@ export function BentoCard({ title, value, subtitle, icon, color = 'primary', del
           </Typography>
         )}
       </CardContent>
-    </MotionCard>
+    </Card>
   );
 }

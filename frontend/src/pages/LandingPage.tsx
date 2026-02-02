@@ -11,9 +11,6 @@ import {
   useTheme,
 } from '@mui/material';
 import { Work as WorkIcon, BusinessCenter as BusinessIcon } from '@mui/icons-material';
-import { motion } from 'framer-motion';
-
-const MotionCard = motion(Card);
 
 interface RoleCard {
   title: string;
@@ -82,10 +79,20 @@ const LandingPage: React.FC = () => {
       </Box>
 
       <Container maxWidth="lg">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+        <Box
+          sx={{
+            animation: 'fadeInUp 0.6s ease-out both',
+            '@keyframes fadeInUp': {
+              '0%': {
+                opacity: 0,
+                transform: 'translateY(20px)',
+              },
+              '100%': {
+                opacity: 1,
+                transform: 'translateY(0)',
+              },
+            },
+          }}
         >
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: { xs: 6, md: 10 } }}>
@@ -117,13 +124,9 @@ const LandingPage: React.FC = () => {
             role="list"
           >
             {roles.map((role, index) => (
-              <MotionCard
+              <Card
                 key={role.title}
                 component="article"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + index * 0.1 }}
-                whileHover={{ y: -4 }}
                 onClick={() => navigate(role.path)}
                 tabIndex={0}
                 role="listitem"
@@ -133,7 +136,19 @@ const LandingPage: React.FC = () => {
                   maxWidth: { xs: '100%', md: 400 },
                   cursor: 'pointer',
                   transition: 'transform 0.2s, box-shadow 0.2s',
+                  animation: `fadeInUp 0.5s ease-out ${200 + index * 100}ms both`,
+                  '@keyframes fadeInUp': {
+                    '0%': {
+                      opacity: 0,
+                      transform: 'translateY(20px)',
+                    },
+                    '100%': {
+                      opacity: 1,
+                      transform: 'translateY(0)',
+                    },
+                  },
                   '&:hover': {
+                    transform: 'translateY(-4px)',
                     boxShadow: 8,
                   },
                   '&:focus-visible': {
@@ -189,11 +204,11 @@ const LandingPage: React.FC = () => {
                     {role.buttonText}
                   </Box>
                 </CardContent>
-              </MotionCard>
+              </Card>
             ))}
           </Stack>
           </nav>
-        </motion.div>
+        </Box>
       </Container>
     </Box>
   );

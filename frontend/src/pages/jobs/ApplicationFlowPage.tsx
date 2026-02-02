@@ -15,7 +15,7 @@ import {
   Alert,
 } from '@mui/material';
 import { useJob } from '../../hooks/useJobs';
-import { ResumeUpload } from '../../components/resume/ResumeUpload';
+import ResumeUploader from '../../components/ResumeUploader';
 
 const steps = ['Upload Resume', 'Contact Info', 'Review', 'Submit'];
 
@@ -85,7 +85,12 @@ export function ApplicationFlowPage() {
               <Typography variant="body1" color="text.secondary">
                 Upload your resume and we'll match your skills to this position.
               </Typography>
-              <ResumeUpload onUploadComplete={handleUploadComplete} />
+              <ResumeUploader
+                uploadUrl="http://localhost:8000/api/resumes/upload"
+                onUploadComplete={handleUploadComplete}
+                onUploadError={() => {}}
+                onUploadStart={() => {}}
+              />
             </Stack>
           )}
 

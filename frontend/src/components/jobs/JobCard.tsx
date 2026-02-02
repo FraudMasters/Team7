@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   Card,
   CardContent,
@@ -17,8 +16,6 @@ import {
   Bookmark,
 } from '@mui/icons-material';
 import type { JobVacancy } from '../../hooks/useJobs';
-
-const MotionCard = motion(Card);
 
 interface JobCardProps {
   job: JobVacancy;
@@ -37,10 +34,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
   };
 
   return (
-    <MotionCard
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
+    <Card
       component={Link}
       to={`/jobs/${job.id}`}
       sx={{
@@ -48,6 +42,11 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        transition: 'transform 0.2s ease-out, box-shadow 0.2s ease-out',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        },
       }}
     >
       <CardContent sx={{ flexGrow: 1, p: 3 }}>
@@ -123,6 +122,6 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
           )}
         </Stack>
       </CardContent>
-    </MotionCard>
+    </Card>
   );
 }

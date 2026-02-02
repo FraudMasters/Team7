@@ -2,11 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Container, Typography, Button, Stack, Grid, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Paper, Chip } from '@mui/material';
 import { Add as AddIcon, MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
-
-const MotionPaper = motion(Paper);
 
 interface Vacancy {
   id: string;
@@ -129,11 +126,23 @@ export function VacanciesPage() {
 
             return (
               <Grid item xs={12} md={6} lg={4} key={vacancy.id}>
-                <MotionPaper
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                <Paper
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    animation: `fadeInUp 0.5s ease-out ${index * 50}ms both`,
+                    '@keyframes fadeInUp': {
+                      '0%': {
+                        opacity: 0,
+                        transform: 'translateY(20px)',
+                      },
+                      '100%': {
+                        opacity: 1,
+                        transform: 'translateY(0)',
+                      },
+                    },
+                  }}
                 >
                 <Box sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
@@ -168,7 +177,7 @@ export function VacanciesPage() {
                     )}
                   </Stack>
                 </Box>
-              </MotionPaper>
+              </Paper>
               </Grid>
             );
           })}
