@@ -30,7 +30,7 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   Email as EmailIcon,
-  PushNotification as PushIcon,
+  NotificationsActive as PushIcon,
 } from '@mui/icons-material';
 import { PageTransition } from '../../components/ui/PageTransition';
 

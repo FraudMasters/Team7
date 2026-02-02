@@ -22,7 +22,7 @@ import {
   Lightbulb as TipsIcon,
   ExpandMore as ExpandMoreIcon,
   CheckCircle as CheckIcon,
-  Question as QuestionIcon,
+  Help as QuestionIcon,
   RecordVoiceOver as VoiceIcon,
   Psychology as MindIcon,
   Stars as StarsIcon,
