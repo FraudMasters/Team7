@@ -280,7 +280,7 @@ const HomePage: React.FC = () => {
             </Typography>
           </Box>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={3} columns={{ xs: 12, sm: 12, md: 12 }}>
             {jobSeekerActions.map((action) => (
               <Grid item xs={12} sm={6} md={4} key={action.path}>
                 <Card
@@ -349,7 +349,7 @@ const HomePage: React.FC = () => {
             </Typography>
           </Box>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={3} columns={{ xs: 12, sm: 12, md: 12 }}>
             {recruiterActions.map((action) => (
               <Grid item xs={12} sm={6} md={3} key={action.path}>
                 <Card

@@ -38,8 +38,14 @@ import {
   BusinessCenter as BusinessCenterIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import ErrorBoundary from './ErrorBoundary';
+import ErrorMessage, { ErrorType, ErrorAction } from './ErrorMessage';
 import {
   searchSkills,
   getCanonicalSkillName,
@@ -52,7 +58,34 @@ import {
   getSuggestedPresets,
 } from '@/data/positionPresets';
 
-const steps = ['Позиция и условия', 'Навыки', 'Описание'];
+const steps = ['Выбор позиции', 'Навыки', 'Условия', 'Описание'];
+
+// Zod validation schema for vacancy form
+const vacancySchema = z.object({
+  title: z.string().min(1, 'Укажите название позиции'),
+  positionCategory: z.string().optional(),
+  min_experience_months: z.number().min(0, 'Опыт работы не может быть отрицательным'),
+  salary_min: z.number().nullable().optional(),
+  salary_max: z.number().nullable().optional(),
+  required_skills: z.array(z.string()).min(1, 'Добавьте хотя бы один обязательный навык'),
+  additional_requirements: z.array(z.string()).optional(),
+  industry: z.string().optional(),
+  work_format: z.string().optional(),
+  location: z.string().optional(),
+  english_level: z.string().optional(),
+  employment_type: z.string().optional(),
+  description: z.string().min(30, 'Описание должно содержать минимум 30 символов'),
+}).refine((data) => {
+  if (data.salary_min && data.salary_max && data.salary_min > data.salary_max) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Минимальная зарплата не может быть больше максимальной',
+  path: ['salary_min'],
+});
+
+type VacancyFormData = z.infer<typeof vacancySchema>;
 
 interface SmartVacancyWizardProps {
   onComplete?: (vacancy: any) => void;
@@ -124,72 +157,80 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  // Determine if we're in job seeker or recruiter context
-  const isJobsContext = location.pathname.startsWith('/jobs');
-  const basePath = isJobsContext ? '/jobs' : '/recruiter/vacancies';
   const [activeStep, setActiveStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | ErrorType | string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suggestedPresets, setSuggestedPresets] = useState<typeof POSITION_PRESETS>([]);
+  const [draftRestored, setDraftRestored] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: initialData?.title || '',
-    positionCategory: initialData?.positionCategory || '',
-    min_experience_months: initialData?.min_experience_months || 0,
-    salary_min: initialData?.salary_min || null,
-    salary_max: initialData?.salary_max || null,
-    required_skills: initialData?.required_skills || [],
-    additional_requirements: initialData?.additional_requirements || [],
-    industry: initialData?.industry || '',
-    work_format: initialData?.work_format || '',
-    location: initialData?.location || '',
-    english_level: initialData?.english_level || '',
-    employment_type: initialData?.employment_type || '',
-    description: initialData?.description || '',
+  // React Hook Form setup with Zod validation
+  const {
+    control,
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isDirty, dirtyFields },
+    reset,
+  } = useForm<VacancyFormData>({
+    resolver: zodResolver(vacancySchema),
+    mode: 'onBlur',
+    defaultValues: {
+      title: initialData?.title || '',
+      positionCategory: initialData?.positionCategory || '',
+      min_experience_months: initialData?.min_experience_months || 0,
+      salary_min: initialData?.salary_min || null,
+      salary_max: initialData?.salary_max || null,
+      required_skills: initialData?.required_skills || [],
+      additional_requirements: initialData?.additional_requirements || [],
+      industry: initialData?.industry || '',
+      work_format: initialData?.work_format || '',
+      location: initialData?.location || '',
+      english_level: initialData?.english_level || '',
+      employment_type: initialData?.employment_type || '',
+      description: initialData?.description || '',
+    },
   });
 
-  // Form field change handlers - memoized to prevent re-renders
-  const handleFieldChange = useCallback((field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  // Watch form values for auto-save and preset search
+  const formValues = watch();
 
-  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, title: e.target.value }));
-  }, []);
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('vacancy-draft');
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        // Only restore if we're not editing existing vacancy
+        if (!initialData?.title) {
+          reset(draft);
+          setDraftRestored(true);
+          // Auto-hide the draft restored message after 5 seconds
+          setTimeout(() => setDraftRestored(false), 5000);
+        }
+      } catch (err) {
+        // Invalid draft, ignore
+      }
+    }
+  }, [reset, initialData]);
 
-  const handleSalaryMinChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      salary_min: e.target.value ? parseInt(e.target.value) : null,
-    }));
-  }, []);
+  // Auto-save to localStorage when form is dirty
+  useEffect(() => {
+    if (isDirty) {
+      localStorage.setItem('vacancy-draft', JSON.stringify(formValues));
+    }
+  }, [formValues, isDirty]);
 
-  const handleSalaryMaxChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      salary_max: e.target.value ? parseInt(e.target.value) : null,
-    }));
-  }, []);
-
-  const handleExperienceChange = useCallback((_: Event, value: number | number[]) => {
-    setFormData((prev) => ({
-      ...prev,
-      min_experience_months: value as number,
-    }));
-  }, []);
-
-  const handleChange = useCallback((field: string) => (e: any) => {
-    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+  // Clear draft on successful submission
+  const clearDraft = useCallback(() => {
+    localStorage.removeItem('vacancy-draft');
   }, []);
 
   // Debounced preset search
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (formData.title.length >= 2) {
-        const suggestions = getSuggestedPresets(formData.title);
+      if (formValues.title.length >= 2) {
+        const suggestions = getSuggestedPresets(formValues.title);
         setSuggestedPresets(suggestions);
       } else {
         setSuggestedPresets([]);
@@ -197,10 +238,53 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [formData.title]);
+  }, [formValues.title]);
 
-  const handleNext = () => {
-    if (validateStep(activeStep)) {
+  const handleNext = async () => {
+    // Validate current step fields
+    let isValid = false;
+    switch (activeStep) {
+      case 0:
+        // Validate title and salary
+        const titleValid = await vacancySchema.shape.title.safeParseAsync(formValues.title);
+        const salaryValid = await vacancySchema.safeParseAsync({
+          salary_min: formValues.salary_min,
+          salary_max: formValues.salary_max,
+        });
+        if (!titleValid.success) {
+          setError(titleValid.error.errors[0].message);
+          return;
+        }
+        if (!salaryValid.success && salaryValid.error.errors.some((e: any) => e.path.includes('salary_min'))) {
+          setError('Минимальная зарплата не может быть больше максимальной');
+          return;
+        }
+        isValid = true;
+        break;
+      case 1:
+        const skillsValid = await vacancySchema.shape.required_skills.safeParseAsync(formValues.required_skills);
+        if (!skillsValid.success) {
+          setError(skillsValid.error.errors[0].message);
+          return;
+        }
+        isValid = true;
+        break;
+      case 2:
+        isValid = true;
+        break;
+      case 3:
+        const descValid = await vacancySchema.shape.description.safeParseAsync(formValues.description);
+        if (!descValid.success) {
+          setError(descValid.error.errors[0].message);
+          return;
+        }
+        isValid = true;
+        break;
+      default:
+        isValid = true;
+    }
+
+    if (isValid) {
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
       setError(null);
     }
@@ -211,49 +295,14 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
     setError(null);
   };
 
-  const validateStep = (step: number): boolean => {
-    switch (step) {
-      case 0:
-        if (!formData.title.trim()) {
-          setError('Укажите название позиции');
-          return false;
-        }
-        if (formData.salary_min && formData.salary_max && formData.salary_min > formData.salary_max) {
-          setError('Минимальная зарплата не может быть больше максимальной');
-          return false;
-        }
-        return true;
-      case 1:
-        if (formData.required_skills.length === 0) {
-          setError('Добавьте хотя бы один обязательный навык');
-          return false;
-        }
-        return true;
-      case 2:
-        if (!formData.description.trim()) {
-          setError('Опишите обязанности и задачи');
-          return false;
-        }
-        if (formData.description.length < 30) {
-          setError('Описание должно содержать минимум 30 символов');
-          return false;
-        }
-        return true;
-      default:
-        return true;
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!validateStep(activeStep)) return;
-
+  const onSubmit = async (data: VacancyFormData) => {
     setIsSubmitting(true);
 
     try {
       const response = await fetch('/api/vacancies/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(data),
       });
 
       if (!response.ok) {
@@ -262,93 +311,138 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 
       const vacancy = await response.json();
 
+      // Clear draft on success
+      clearDraft();
+
       if (onComplete) {
         onComplete(vacancy);
       } else {
-        navigate(basePath);
+        navigate('/recruiter/vacancies');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create vacancy');
+      setError(err instanceof Error ? err : 'Failed to create vacancy');
       setIsSubmitting(false);
     }
   };
 
   const applyPreset = useCallback((preset: typeof POSITION_PRESETS[0]) => {
-    setFormData((prev) => ({
-      ...prev,
-      title: preset.title,
-      required_skills: [...preset.requiredSkills],
-      additional_requirements: [...preset.optionalSkills],
-      min_experience_months: preset.minExperience,
-      salary_min: preset.suggestedSalary?.min || null,
-      salary_max: preset.suggestedSalary?.max || null,
-      description: preset.description,
-    }));
+    setValue('title', preset.title);
+    setValue('required_skills', [...preset.requiredSkills]);
+    setValue('additional_requirements', [...preset.optionalSkills]);
+    setValue('min_experience_months', preset.minExperience);
+    setValue('salary_min', preset.suggestedSalary?.min || null);
+    setValue('salary_max', preset.suggestedSalary?.max || null);
+    setValue('description', preset.description);
 
     setSuggestedPresets([]);
-  }, []);
+  }, [setValue]);
+
+  // Keyboard shortcuts for form navigation and actions
+  useKeyboardNavigation({
+    shortcuts: [
+      {
+        id: 'vacancy-form.save',
+        key: 's',
+        modifiers: ['Ctrl'],
+        handler: () => handleSubmit(onSubmit)(),
+        description: 'Save vacancy form',
+        preventDefault: true,
+        priority: 10,
+      },
+      {
+        id: 'vacancy-form.cancel',
+        key: 'Escape',
+        handler: () => {
+          // Navigate back on Escape if not on first step
+          if (activeStep > 0) {
+            handleBack();
+          } else {
+            // If on first step, navigate back to vacancies list
+            navigate('/recruiter/vacancies');
+          }
+        },
+        description: 'Cancel or go back',
+        preventDefault: false,
+        priority: 5,
+        when: () => !isSubmitting, // Disable when submitting
+      },
+    ],
+    priority: 10,
+    preventDefault: true,
+  });
 
   const addSkill = useCallback((skill: string, isRequired: boolean) => {
     const canonicalName = getCanonicalSkillName(skill) || skill;
-    const targetArray = isRequired ? 'required_skills' : 'additional_requirements';
+    const targetField = isRequired ? 'required_skills' : 'additional_requirements';
+    const currentSkills = isRequired ? formValues.required_skills : formValues.additional_requirements;
 
-    setFormData((prev) => {
-      if (prev[targetArray].includes(canonicalName)) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [targetArray]: [...prev[targetArray], canonicalName],
-      };
-    });
-  }, []);
+    if (!currentSkills.includes(canonicalName)) {
+      setValue(targetField, [...currentSkills, canonicalName]);
+    }
+  }, [formValues.required_skills, formValues.additional_requirements, setValue]);
 
   const removeSkill = useCallback((skill: string, isRequired: boolean) => {
-    const targetArray = isRequired ? 'required_skills' : 'additional_requirements';
-    setFormData((prev) => ({
-      ...prev,
-      [targetArray]: prev[targetArray].filter((s: string) => s !== skill),
-    }));
-  }, []);
+    const targetField = isRequired ? 'required_skills' : 'additional_requirements';
+    const currentSkills = isRequired ? formValues.required_skills : formValues.additional_requirements;
+
+    setValue(targetField, currentSkills.filter((s: string) => s !== skill));
+  }, [formValues.required_skills, formValues.additional_requirements, setValue]);
 
   // Memoized categories
   const allCategories = useMemo(() => getAllCategories(), []);
   const experienceLabel = useMemo(() => {
-    if (formData.min_experience_months === 0) return 'Стажер';
-    if (formData.min_experience_months < 12) {
-      return `${formData.min_experience_months} мес.`;
+    if (formValues.min_experience_months === 0) return 'Стажер';
+    if (formValues.min_experience_months < 12) {
+      return `${formValues.min_experience_months} мес.`;
     }
-    const years = Math.floor(formData.min_experience_months / 12);
-    const months = formData.min_experience_months % 12;
+    const years = Math.floor(formValues.min_experience_months / 12);
+    const months = formValues.min_experience_months % 12;
     if (months === 0) {
       return `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`;
     }
     return `${years} ${years === 1 ? 'год' : 'лет'} ${months} мес.`;
-  }, [formData.min_experience_months]);
+  }, [formValues.min_experience_months]);
+
+  // Error handler for ErrorBoundary
+  const handleError = useCallback((error: Error, errorInfo: React.ErrorInfo) => {
+    console.error('ErrorBoundary caught an error in SmartVacancyWizard:', error);
+    console.error('Error Info:', errorInfo);
+  }, []);
 
   // Step components
   const PositionSelectionStep = () => {
     return (
       <Stack spacing={3}>
-        <Typography variant="h6">Позиция и условия работы</Typography>
+        <Typography variant="h6">Выберите или введите позицию</Typography>
 
         {/* Position Title Input with Suggestions */}
         <Box>
-          <TextField
-            fullWidth
-            label="Должность"
-            value={formData.title}
-            onChange={handleTitleChange}
-            placeholder="Например: Java Developer, Python, DevOps"
-            helperText="Мы предложим готовые пресеты навыков для вашей позиции"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <WorkIcon />
-                </InputAdornment>
-              ),
-            }}
+          <Controller
+            name="title"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Должность"
+                placeholder="Например: Java Developer, Python, DevOps"
+                helperText="Мы предложим готовые пресеты навыков для вашей позиции"
+                error={!!errors.title}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <WorkIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
           />
+          {errors.title && (
+            <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+              {errors.title.message}
+            </Typography>
+          )}
 
           {/* Preset Suggestions */}
           {suggestedPresets.length > 0 && (
@@ -377,125 +471,68 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
           <Typography gutterBottom>
             Опыт работы: {experienceLabel}
           </Typography>
-          <Slider
-            value={formData.min_experience_months}
-            onChange={handleExperienceChange}
-            min={0}
-            max={120}
-            step={6}
-            marks={[
-              { value: 0, label: 'Стажер' },
-              { value: 12, label: '1 год' },
-              { value: 36, label: '3 года' },
-              { value: 60, label: '5 лет' },
-              { value: 120, label: '10+ лет' },
-            ]}
-            valueLabelDisplay="off"
-            sx={{ mt: 2 }}
+          <Controller
+            name="min_experience_months"
+            control={control}
+            render={({ field }) => (
+              <Slider
+                {...field}
+                min={0}
+                max={120}
+                step={6}
+                marks={[
+                  { value: 0, label: 'Стажер' },
+                  { value: 12, label: '1 год' },
+                  { value: 36, label: '3 года' },
+                  { value: 60, label: '5 лет' },
+                  { value: 120, label: '10+ лет' },
+                ]}
+                valueLabelDisplay="off"
+                sx={{ mt: 2 }}
+                onChange={(_, value) => field.onChange(value as number)}
+              />
+            )}
           />
         </Box>
 
         {/* Salary Range */}
         <Grid container spacing={2}>
           <Grid item xs={6}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Зарплата от ($)"
-              value={formData.salary_min || ''}
-              onChange={handleSalaryMinChange}
-              placeholder="100000"
+            <Controller
+              name="salary_min"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  value={field.value || ''}
+                  onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                  fullWidth
+                  type="number"
+                  label="Зарплата от ($)"
+                  placeholder="100000"
+                  error={!!errors.salary_min}
+                  helperText={errors.salary_min?.message}
+                />
+              )}
             />
           </Grid>
           <Grid item xs={6}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Зарплата до ($)"
-              value={formData.salary_max || ''}
-              onChange={handleSalaryMaxChange}
-              placeholder="150000"
-            />
-          </Grid>
-        </Grid>
-
-        <Divider sx={{ my: 2 }} />
-
-        {/* Work Conditions - Combined from previous Conditions step */}
-        <Typography variant="subtitle1" fontWeight={600}>
-          Условия работы
-        </Typography>
-
-        <Grid container spacing={2}>
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Тип занятости</InputLabel>
-              <Select
-                value={formData.employment_type}
-                label="Тип занятости"
-                onChange={handleChange('employment_type')}
-              >
-                <MenuItem value="">Не указано</MenuItem>
-                <MenuItem value="full-time">Полный день</MenuItem>
-                <MenuItem value="part-time">Частичная занятость</MenuItem>
-                <MenuItem value="contract">Контракт</MenuItem>
-                <MenuItem value="freelance">Фриланс</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Формат работы</InputLabel>
-              <Select
-                value={formData.work_format}
-                label="Формат работы"
-                onChange={handleChange('work_format')}
-              >
-                <MenuItem value="">Не указано</MenuItem>
-                <MenuItem value="remote">Удаленно</MenuItem>
-                <MenuItem value="office">В офисе</MenuItem>
-                <MenuItem value="hybrid">Гибридный</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Уровень английского</InputLabel>
-              <Select
-                value={formData.english_level}
-                label="Уровень английского"
-                onChange={handleChange('english_level')}
-              >
-                <MenuItem value="">Не требуется</MenuItem>
-                <MenuItem value="A1">A1 - Beginner</MenuItem>
-                <MenuItem value="A2">A2 - Elementary</MenuItem>
-                <MenuItem value="B1">B1 - Intermediate</MenuItem>
-                <MenuItem value="B2">B2 - Upper-Intermediate</MenuItem>
-                <MenuItem value="C1">C1 - Advanced</MenuItem>
-                <MenuItem value="C2">C2 - Proficiency</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6}>
-            <TextField
-              fullWidth
-              label="Локация"
-              value={formData.location}
-              onChange={handleChange('location')}
-              placeholder="Москва, Санкт-Петербург"
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Индустрия / Компания"
-              value={formData.industry}
-              onChange={handleChange('industry')}
-              placeholder="IT, Финансы, E-commerce, Fintech"
+            <Controller
+              name="salary_max"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  value={field.value || ''}
+                  onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                  fullWidth
+                  type="number"
+                  label="Зарплата до ($)"
+                  placeholder="150000"
+                  error={!!errors.salary_max}
+                  helperText={errors.salary_max?.message}
+                />
+              )}
             />
           </Grid>
         </Grid>
@@ -550,7 +587,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
                   variant="outlined"
                   clickable
                   onClick={() => addSkill(skill.name, true)}
-                  color={formData.required_skills.includes(skill.name) ? 'primary' : 'default'}
+                  color={formValues.required_skills.includes(skill.name) ? 'primary' : 'default'}
                 />
               ))}
             </Box>
@@ -580,13 +617,14 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
                 label="Навык"
                 placeholder="Начните вводить (напр: Java, react, docker)"
                 helperText="Автодополнение с синонимами (js → JavaScript)"
+                error={!!errors.required_skills}
               />
             )}
           />
 
           {/* Selected Required Skills */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-            {formData.required_skills.map((skill: string) => (
+            {formValues.required_skills.map((skill: string) => (
               <SkillChip
                 key={skill}
                 skill={skill}
@@ -595,6 +633,11 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
               />
             ))}
           </Box>
+          {errors.required_skills && (
+            <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+              {errors.required_skills.message}
+            </Typography>
+          )}
         </Box>
 
         {/* Additional Skills with Autocomplete */}
@@ -619,7 +662,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 
           {/* Selected Additional Skills */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-            {formData.additional_requirements.map((skill: string) => (
+            {formValues.additional_requirements.map((skill: string) => (
               <SkillChip
                 key={skill}
                 skill={skill}
@@ -641,14 +684,122 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
     );
   };
 
+  // Conditions Step
+  const ConditionsStep = () => {
+    return (
+      <Stack spacing={3}>
+        <Typography variant="h6">Условия работы</Typography>
+
+        <Grid container spacing={2}>
+          <Grid item xs={6}>
+            <Controller
+              name="employment_type"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Тип занятости</InputLabel>
+                  <Select
+                    {...field}
+                    label="Тип занятости"
+                  >
+                    <MenuItem value="">Не указано</MenuItem>
+                    <MenuItem value="full-time">Полный день</MenuItem>
+                    <MenuItem value="part-time">Частичная занятость</MenuItem>
+                    <MenuItem value="contract">Контракт</MenuItem>
+                    <MenuItem value="freelance">Фриланс</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+          </Grid>
+
+          <Grid item xs={6}>
+            <Controller
+              name="work_format"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Формат работы</InputLabel>
+                  <Select
+                    {...field}
+                    label="Формат работы"
+                  >
+                    <MenuItem value="">Не указано</MenuItem>
+                    <MenuItem value="remote">Удаленно</MenuItem>
+                    <MenuItem value="office">В офисе</MenuItem>
+                    <MenuItem value="hybrid">Гибридный</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+          </Grid>
+
+          <Grid item xs={6}>
+            <Controller
+              name="english_level"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <InputLabel>Уровень английского</InputLabel>
+                  <Select
+                    {...field}
+                    label="Уровень английского"
+                  >
+                    <MenuItem value="">Не требуется</MenuItem>
+                    <MenuItem value="A1">A1 - Beginner</MenuItem>
+                    <MenuItem value="A2">A2 - Elementary</MenuItem>
+                    <MenuItem value="B1">B1 - Intermediate</MenuItem>
+                    <MenuItem value="B2">B2 - Upper-Intermediate</MenuItem>
+                    <MenuItem value="C1">C1 - Advanced</MenuItem>
+                    <MenuItem value="C2">C2 - Proficiency</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+            />
+          </Grid>
+
+          <Grid item xs={6}>
+            <Controller
+              name="location"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Локация"
+                  placeholder="Москва, Санкт-Петербург"
+                />
+              )}
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <Controller
+              name="industry"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Индустрия / Компания"
+                  placeholder="IT, Финансы, E-commerce, Fintech"
+                />
+              )}
+            />
+          </Grid>
+        </Grid>
+      </Stack>
+    );
+  };
+
   // Description Step
   const DescriptionStep = () => {
-    const skillsList = formData.required_skills.slice(0, 3).join(', ');
-    const experienceText = formData.min_experience_months > 0
-      ? `${Math.floor(formData.min_experience_months / 12)}+ лет`
+    const skillsList = formValues.required_skills.slice(0, 3).join(', ');
+    const experienceText = formValues.min_experience_months > 0
+      ? `${Math.floor(formValues.min_experience_months / 12)}+ лет`
       : '';
 
-    const defaultDescription = `Мы ищем ${formData.title || 'разработчика'} в команду.
+    const defaultDescription = `Мы ищем ${formValues.title || 'разработчика'} в команду.
 
 Обязанности:
 • Разработка и поддержка сервисов
@@ -664,17 +815,28 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
       <Stack spacing={3}>
         <Typography variant="h6">Описание вакансии</Typography>
 
-        <TextField
-          fullWidth
-          multiline
-          rows={8}
-          label="Опишите обязанности и задачи"
-          value={formData.description}
-          onChange={handleChange('description')}
-          placeholder={defaultDescription}
-          helperText={`Минимум 30 символов (currently: ${formData.description.length})`}
-          required
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              fullWidth
+              multiline
+              rows={8}
+              label="Опишите обязанности и задачи"
+              placeholder={defaultDescription}
+              helperText={`Минимум 30 символов (currently: ${field.value?.length || 0})`}
+              required
+              error={!!errors.description}
+            />
+          )}
         />
+        {errors.description && (
+          <Typography variant="caption" color="error">
+            {errors.description.message}
+          </Typography>
+        )}
       </Stack>
     );
   };
@@ -686,6 +848,8 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
       case 1:
         return <SkillsSelectionStep />;
       case 2:
+        return <ConditionsStep />;
+      case 3:
         return <DescriptionStep />;
       default:
         return null;
@@ -693,11 +857,12 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
   };
 
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', p: 3 }}>
+    <ErrorBoundary onError={handleError}>
+      <Box sx={{ maxWidth: 900, mx: 'auto', p: 3 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={() => navigate(basePath)} disabled={isSubmitting}>
+          <IconButton onClick={() => navigate('/recruiter/vacancies')} disabled={isSubmitting}>
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h4" component="h1" fontWeight={600}>
@@ -721,9 +886,45 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
 
         {/* Error Alert */}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
+          <ErrorMessage
+            error={error}
+            title="Failed to Create Vacancy"
+            actions={[
+              {
+                label: 'Retry',
+                onClick: () => {
+                  setError(null);
+                  handleSubmit(onSubmit)();
+                },
+                primary: true,
+              },
+              {
+                label: 'Save Draft',
+                onClick: () => {
+                  setError(null);
+                  // Draft is already auto-saved
+                },
+                variant: 'outlined',
+              },
+            ]}
+          />
+        )}
+
+        {/* Draft Restored Alert */}
+        {draftRestored && (
+          <Alert severity="info" sx={{ mb: 3 }} onClose={() => setDraftRestored(false)}>
+            Черновик формы восстановлен из сохраненной версии
           </Alert>
+        )}
+
+        {/* Auto-save Indicator */}
+        {isDirty && (
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+            <CircularProgress size={16} />
+            <Typography variant="caption">
+              Автосохранение...
+            </Typography>
+          </Box>
         )}
 
         {/* Step Content */}
@@ -744,7 +945,7 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
           {activeStep === steps.length - 1 ? (
             <Button
               variant="contained"
-              onClick={handleSubmit}
+              onClick={handleSubmit(onSubmit)}
               color="primary"
               startIcon={isSubmitting ? <CircularProgress size={20} /> : <AutoAwesomeIcon />}
               disabled={isSubmitting}
@@ -758,7 +959,8 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
           )}
         </Box>
       </Paper>
-    </Box>
+      </Box>
+    </ErrorBoundary>
   );
 };
 

@@ -3,7 +3,28 @@
  *
  * Centralized exports for all UI components.
  */
+export { default as KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 export { default as Layout } from './Layout';
+export { default as LoadingSpinner } from './LoadingSpinner';
+export {
+  default as ErrorMessage,
+  NetworkError,
+  AuthError,
+  ValidationError,
+  FileTypeError,
+  ServerError,
+  NotFoundError,
+} from './ErrorMessage';
+export type { ErrorType, ErrorAction, ErrorMessageProps } from './ErrorMessage';
+export {
+  ResponsiveWrapper,
+  MobileOnly,
+  TabletAndUp,
+  DesktopAndUp,
+  TabletOnly,
+  HideOnMobile,
+  HideOnDesktop,
+} from './ResponsiveWrapper';
 export { default as ResumeUploader } from './ResumeUploader';
 export { default as AnalysisResults } from './AnalysisResults';
 export { default as JobComparison } from './JobComparison';
@@ -23,6 +44,3 @@ export { default as SkillDemandChart } from './analytics/SkillDemandChart';
 export { default as SourceTracking } from './analytics/SourceTracking';
 export { default as ModelQualityMetrics } from './ModelQualityMetrics';
 export { default as UnifiedMatchMetrics } from './UnifiedMatchMetrics';
-export { default as MatchingWeightsEditor } from './MatchingWeightsEditor';
-export { default as WeightProfileSelector } from './WeightProfileSelector';
-export { default as MatchingWeightsComparison } from './MatchingWeightsComparison';

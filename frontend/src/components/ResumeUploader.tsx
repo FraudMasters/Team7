@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -31,6 +31,20 @@ interface UploadState {
 }
 
 /**
+ * Imperative handle exposed by ResumeUploader
+ */
+export interface ResumeUploaderHandle {
+  /**
+   * Trigger the file input click to open file picker
+   */
+  triggerUpload: () => void;
+  /**
+   * Cancel current upload and reset state
+   */
+  cancelUpload: () => void;
+}
+
+/**
  * ResumeUploader Component Props
  */
 interface ResumeUploaderProps {
@@ -44,8 +58,8 @@ interface ResumeUploaderProps {
   onUploadComplete?: (resumeId: string) => void;
   /** Callback when upload fails */
   onUploadError?: (error: string) => void;
-  /** Callback when upload starts */
-  onUploadStart?: () => void;
+  /** Callback when uploading state changes */
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 /**
@@ -60,20 +74,26 @@ interface ResumeUploaderProps {
  *
  * @example
  * ```tsx
+ * const uploaderRef = useRef<ResumeUploaderHandle>(null);
  * <ResumeUploader
+ *   ref={uploaderRef}
  *   uploadUrl="http://localhost:8000/api/resumes/upload"
  *   onUploadComplete={(id) => navigate(`/results/${id}`)}
  * />
+ *
+ * // Programmatic trigger
+ * uploaderRef.current?.triggerUpload();
+ * uploaderRef.current?.cancelUpload();
  * ```
  */
-const ResumeUploader: React.FC<ResumeUploaderProps> = ({
+const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
   uploadUrl = 'http://localhost:8000/api/resumes/upload',
   maxFileSize = 10 * 1024 * 1024, // 10MB
   acceptedFileTypes = ['.pdf', '.docx'],
   onUploadComplete,
   onUploadError,
-  onUploadStart,
-}) => {
+  onUploadingChange,
+}, ref) => {
   const { t } = useTranslation();
 
   const [uploadState, setUploadState] = useState<UploadState>({
@@ -87,6 +107,44 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
 
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Notify parent of uploading state changes
+   */
+  useEffect(() => {
+    onUploadingChange?.(uploadState.uploading);
+  }, [uploadState.uploading, onUploadingChange]);
+
+  /**
+   * Reset upload state
+   */
+  const handleReset = useCallback(() => {
+    setUploadState({
+      file: null,
+      uploading: false,
+      progress: 0,
+      error: null,
+      success: false,
+      resumeId: null,
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  /**
+   * Expose methods via ref for parent component access
+   */
+  useImperativeHandle(ref, () => ({
+    triggerUpload: () => {
+      if (!uploadState.uploading) {
+        fileInputRef.current?.click();
+      }
+    },
+    cancelUpload: () => {
+      handleReset();
+    },
+  }), [uploadState.uploading, handleReset]);
 
   /**
    * Validate file type and size
@@ -146,7 +204,6 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
   const uploadFile = useCallback(
     async (file: File) => {
       setUploadState((prev) => ({ ...prev, uploading: true, progress: 0 }));
-      onUploadStart?.();
 
       const formData = new FormData();
       formData.append('file', file);
@@ -271,23 +328,6 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
     },
     [handleFileSelect]
   );
-
-  /**
-   * Reset upload state
-   */
-  const handleReset = useCallback(() => {
-    setUploadState({
-      file: null,
-      uploading: false,
-      progress: 0,
-      error: null,
-      success: false,
-      resumeId: null,
-    });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, []);
 
   /**
    * Format file size for display
@@ -523,6 +563,8 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({
       )}
     </Box>
   );
-};
+});
+
+ResumeUploader.displayName = 'ResumeUploader';
 
 export default ResumeUploader;

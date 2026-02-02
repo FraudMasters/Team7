@@ -1,278 +1,345 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+/**
+ * useBreakpoints Hook
+ *
+ * A custom hook for convenient access to MUI breakpoint queries.
+ * Provides a simplified interface for responsive design with commonly
+ * used breakpoint checks.
+ *
+ * @module hooks/useBreakpoints
+ */
+
+import { useTheme, useMediaQuery } from '@mui/material';
+import { useMemo } from 'react';
 
 /**
- * Breakpoint names for responsive design
- *
- * These align with Material-UI's default breakpoints for consistency.
+ * Breakpoint names following MUI v6 standard breakpoints
  */
 export type Breakpoint = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 /**
- * Breakpoint configuration
- *
- * Defines the minimum width for each breakpoint.
- * The value represents the minimum viewport width in pixels.
+ * Breakpoint values in pixels
+ * Matches MUI v6 default breakpoints
  */
-export interface BreakpointConfig {
-  /** Breakpoint name */
-  name: Breakpoint;
-  /** Display name */
-  displayName: string;
-  /** Minimum width in pixels */
-  minWidth: number;
-  /** Typical device */
-  device: string;
-}
-
-/**
- * Supported breakpoints configuration
- *
- * Aligned with Material-UI's default breakpoints:
- * - xs: 0px (extra small - mobile phones)
- * - sm: 600px (small - tablets, large phones)
- * - md: 900px (medium - landscape tablets, small desktops)
- * - lg: 1200px (large - desktops)
- * - xl: 1536px (extra large - large desktops)
- */
-export const BREAKPOINTS: Record<Breakpoint, BreakpointConfig> = {
-  xs: {
-    name: 'xs',
-    displayName: 'Extra Small',
-    minWidth: 0,
-    device: 'Mobile phones',
-  },
-  sm: {
-    name: 'sm',
-    displayName: 'Small',
-    minWidth: 600,
-    device: 'Tablets, large phones',
-  },
-  md: {
-    name: 'md',
-    displayName: 'Medium',
-    minWidth: 900,
-    device: 'Landscape tablets, small desktops',
-  },
-  lg: {
-    name: 'lg',
-    displayName: 'Large',
-    minWidth: 1200,
-    device: 'Desktops',
-  },
-  xl: {
-    name: 'xl',
-    displayName: 'Extra Large',
-    minWidth: 1536,
-    device: 'Large desktops',
-  },
-} as const;
-
-/**
- * Breakpoint values return type
- *
- * Provides boolean flags for each breakpoint and utility functions.
- */
-export interface BreakpointValues {
-  /** Current breakpoint name */
-  currentBreakpoint: Breakpoint;
-  /** Viewport width in pixels */
-  width: number;
-  /** Viewport height in pixels */
-  height: number;
-  /** Extra small screen (0px and up) */
-  isXs: boolean;
-  /** Small screen (600px and up) */
-  isSm: boolean;
-  /** Medium screen (900px and up) */
-  isMd: boolean;
-  /** Large screen (1200px and up) */
-  isLg: boolean;
-  /** Extra large screen (1536px and up) */
-  isXl: boolean;
-  /** Mobile-only screen (less than 600px) */
-  isMobile: boolean;
-  /** Tablet-only screen (600px to 899px) */
-  isTablet: boolean;
-  /** Desktop screen (900px and up) */
-  isDesktop: boolean;
-  /** Check if current viewport is at least the given breakpoint */
-  isUp: (breakpoint: Breakpoint) => boolean;
-  /** Check if current viewport is below the given breakpoint */
-  isDown: (breakpoint: Breakpoint) => boolean;
-  /** Check if current viewport is between two breakpoints (inclusive) */
-  isBetween: (minBreakpoint: Breakpoint, maxBreakpoint: Breakpoint) => boolean;
-  /** Get breakpoint configuration */
-  getBreakpointConfig: (breakpoint: Breakpoint) => BreakpointConfig;
-}
-
-/**
- * Get current breakpoint based on window width
- *
- * @param width - Window width in pixels
- * @returns Current breakpoint name
- */
-const getCurrentBreakpoint = (width: number): Breakpoint => {
-  if (width >= BREAKPOINTS.xl.minWidth) return 'xl';
-  if (width >= BREAKPOINTS.lg.minWidth) return 'lg';
-  if (width >= BREAKPOINTS.md.minWidth) return 'md';
-  if (width >= BREAKPOINTS.sm.minWidth) return 'sm';
-  return 'xs';
+export const BREAKPOINT_VALUES: Record<Breakpoint, number> = {
+  xs: 0,
+  sm: 600,
+  md: 900,
+  lg: 1200,
+  xl: 1536,
 };
+
+/**
+ * Breakpoint query result
+ *
+ * Provides boolean flags for each breakpoint direction
+ * and utility methods for common responsive checks.
+ */
+export interface BreakpointsResult {
+  /**
+   * Viewport width is >= sm (600px)
+   */
+  isSmUp: boolean;
+
+  /**
+   * Viewport width is >= md (900px)
+   */
+  isMdUp: boolean;
+
+  /**
+   * Viewport width is >= lg (1200px)
+   */
+  isLgUp: boolean;
+
+  /**
+   * Viewport width is >= xl (1536px)
+   */
+  isXlUp: boolean;
+
+  /**
+   * Viewport width is < sm (600px) - mobile
+   */
+  isXsOnly: boolean;
+
+  /**
+   * Viewport width is < md (900px) - mobile and tablet
+   */
+  isSmOnly: boolean;
+
+  /**
+   * Viewport width is < lg (1200px)
+   */
+  isMdOnly: boolean;
+
+  /**
+   * Current active breakpoint
+   */
+  currentBreakpoint: Breakpoint;
+
+  /**
+   * Check if viewport is >= specific breakpoint
+   *
+   * @param breakpoint - Breakpoint to check
+   * @returns true if viewport width >= breakpoint
+   *
+   * @example
+   * ```ts
+   * const breakpoints = useBreakpoints();
+   * if (breakpoints.up('lg')) {
+   *   // Render desktop layout
+   * }
+   * ```
+   */
+  up: (breakpoint: Breakpoint) => boolean;
+
+  /**
+   * Check if viewport is < specific breakpoint
+   *
+   * @param breakpoint - Breakpoint to check
+   * @returns true if viewport width < breakpoint
+   *
+   * @example
+   * ```ts
+   * const breakpoints = useBreakpoints();
+   * if (breakpoints.down('md')) {
+   *   // Render mobile/tablet layout
+   * }
+   * ```
+   */
+  down: (breakpoint: Breakpoint) => boolean;
+
+  /**
+   * Check if viewport is between two breakpoints
+   *
+   * @param start - Start breakpoint (inclusive)
+   * @param end - End breakpoint (exclusive)
+   * @returns true if viewport is in range
+   *
+   * @example
+   * ```ts
+   * const breakpoints = useBreakpoints();
+   * if (breakpoints.between('sm', 'lg')) {
+   *   // Render tablet-only layout
+   * }
+   * ```
+   */
+  between: (start: Breakpoint, end: Breakpoint) => boolean;
+
+  /**
+   * Check if viewport matches only one breakpoint
+   *
+   * @param breakpoint - Breakpoint to check
+   * @returns true if viewport is in breakpoint range
+   *
+   * @example
+   * ```ts
+   * const breakpoints = useBreakpoints();
+   * if (breakpoints.only('md')) {
+   *   // Render md-only layout (900px - 1199px)
+   * }
+   * ```
+   */
+  only: (breakpoint: Breakpoint) => boolean;
+}
+
+/**
+ * Get the current breakpoint based on window width
+ *
+ * @param width - Current window width in pixels
+ * @returns Current breakpoint name
+ *
+ * @private
+ */
+function getCurrentBreakpoint(width: number): Breakpoint {
+  if (width < BREAKPOINT_VALUES.sm) return 'xs';
+  if (width < BREAKPOINT_VALUES.md) return 'sm';
+  if (width < BREAKPOINT_VALUES.lg) return 'md';
+  if (width < BREAKPOINT_VALUES.xl) return 'lg';
+  return 'xl';
+}
 
 /**
  * useBreakpoints Hook
  *
- * Provides responsive breakpoint detection for React components.
- * Automatically tracks viewport size and updates breakpoint values on resize.
+ * Provides convenient access to MUI breakpoint queries for responsive design.
+ * Returns boolean flags for common breakpoints and utility methods for
+ * custom breakpoint checks.
  *
- * This hook is SSR-safe and will default to desktop dimensions on the server.
- *
- * @returns Breakpoint values and utility functions
+ * @returns BreakpointsResult object with breakpoint information
  *
  * @example
  * ```tsx
- * const { currentBreakpoint, isMobile, isDesktop, isUp } = useBreakpoints();
+ * function MyComponent() {
+ *   const breakpoints = useBreakpoints();
  *
- * // Show different content based on screen size
- * {isMobile && <MobileNavigation />}
- * {isDesktop && <DesktopNavigation />}
+ *   return (
+ *     <Box>
+ *       {breakpoints.isXsOnly && <MobileView />}
+ *       {breakpoints.isMdUp && <DesktopView />}
  *
- * // Check if screen is at least a certain size
- * {isUp('md') && <AdvancedFeatures />}
+ *       <Typography>
+ *         Current breakpoint: {breakpoints.currentBreakpoint}
+ *       </Typography>
+ *     </Box>
+ *   );
+ * }
+ * ```
  *
- * // Conditional styling
- * <div style={{ fontSize: isMobile ? '14px' : '16px' }}>
- *   Responsive text
- * </div>
+ * @example
+ * ```tsx
+ * function ResponsiveGrid() {
+ *   const breakpoints = useBreakpoints();
  *
- * // Conditional classes
- * <div className={currentBreakpoint === 'xs' ? 'mobile' : 'desktop'}>
- *   Content
- * </div>
+ *   const columns = useMemo(() => {
+ *     if (breakpoints.up('xl')) return 4;
+ *     if (breakpoints.up('lg')) return 3;
+ *     if (breakpoints.up('md')) return 2;
+ *     return 1;
+ *   }, [breakpoints]);
+ *
+ *   return <Grid container columns={columns}>...</Grid>;
+ * }
+ * ```
+ *
+ * @example
+ * ```tsx
+ * function TabletOnlyComponent() {
+ *   const breakpoints = useBreakpoints();
+ *
+ *   // Only render on tablet (sm to md)
+ *   if (!breakpoints.between('sm', 'lg')) {
+ *     return null;
+ *   }
+ *
+ *   return <TabletLayout />;
+ * }
  * ```
  */
-export const useBreakpoints = (): BreakpointValues => {
-  // Initialize state with default values (SSR-safe)
-  const [windowSize, setWindowSize] = useState(() => {
-    // Default to desktop dimensions for SSR
-    if (typeof window === 'undefined') {
-      return {
-        width: 1200, // Default to lg breakpoint
-        height: 800,
-      };
-    }
-    return {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
-  });
+export function useBreakpoints(): BreakpointsResult {
+  const theme = useTheme();
 
-  // Update window size on resize
-  useEffect(() => {
-    // Skip effect on server
-    if (typeof window === 'undefined') {
-      return;
-    }
+  // Call all media query hooks at top level (React Hooks rules)
+  const isXs = useMediaQuery(theme.breakpoints.only('xs'));
+  const isSm = useMediaQuery(theme.breakpoints.only('sm'));
+  const isMd = useMediaQuery(theme.breakpoints.only('md'));
+  const isLg = useMediaQuery(theme.breakpoints.only('lg'));
+  const isXl = useMediaQuery(theme.breakpoints.only('xl'));
 
-    let timeoutId: NodeJS.Timeout;
+  const isSmUp = useMediaQuery(theme.breakpoints.up('sm'));
+  const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
+  const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+  const isXlUp = useMediaQuery(theme.breakpoints.up('xl'));
 
-    // Handle window resize with debouncing
-    const handleResize = () => {
-      // Clear previous timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
+  const isLgDown = useMediaQuery(theme.breakpoints.down('lg'));
 
-      // Debounce resize event to avoid excessive re-renders
-      timeoutId = setTimeout(() => {
-        setWindowSize({
-          width: window.innerWidth,
-          height: window.innerHeight,
-        });
-      }, 150); // 150ms debounce
-    };
+  // Determine current breakpoint
+  const currentBreakpoint = useMemo((): Breakpoint => {
+    if (isXl) return 'xl';
+    if (isLg) return 'lg';
+    if (isMd) return 'md';
+    if (isSm) return 'sm';
+    return 'xs';
+  }, [isXs, isSm, isMd, isLg, isXl]);
 
-    // Add event listener
-    window.addEventListener('resize', handleResize);
-
-    // Initial check in case window size changed during initialization
-    handleResize();
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+  // Create the result object with memoized methods
+  const result = useMemo<BreakpointsResult>(() => {
+    const up = (breakpoint: Breakpoint): boolean => {
+      switch (breakpoint) {
+        case 'xs':
+          return true; // Always true since xs starts at 0
+        case 'sm':
+          return isSmUp;
+        case 'md':
+          return isMdUp;
+        case 'lg':
+          return isLgUp;
+        case 'xl':
+          return isXlUp;
+        default:
+          return false;
       }
     };
-  }, []);
 
-  // Memoize current breakpoint calculation
-  const currentBreakpoint = useMemo<Breakpoint>(() => {
-    return getCurrentBreakpoint(windowSize.width);
-  }, [windowSize.width]);
-
-  // Memoize breakpoint flags
-  const breakpointFlags = useMemo(() => {
-    const { width } = windowSize;
-    return {
-      isXs: width >= BREAKPOINTS.xs.minWidth,
-      isSm: width >= BREAKPOINTS.sm.minWidth,
-      isMd: width >= BREAKPOINTS.md.minWidth,
-      isLg: width >= BREAKPOINTS.lg.minWidth,
-      isXl: width >= BREAKPOINTS.xl.minWidth,
-      // Convenience flags for common breakpoints
-      isMobile: width < BREAKPOINTS.sm.minWidth,
-      isTablet:
-        width >= BREAKPOINTS.sm.minWidth && width < BREAKPOINTS.md.minWidth,
-      isDesktop: width >= BREAKPOINTS.md.minWidth,
+    const down = (breakpoint: Breakpoint): boolean => {
+      switch (breakpoint) {
+        case 'xs':
+          return false; // Nothing is below xs
+        case 'sm':
+          return isSmDown;
+        case 'md':
+          return isMdDown;
+        case 'lg':
+          return isLgDown;
+        case 'xl':
+          return true; // Everything is below xl max
+        default:
+          return false;
+      }
     };
-  }, [windowSize.width]);
 
-  // Check if viewport is at least the given breakpoint
-  const isUp = useCallback(
-    (breakpoint: Breakpoint): boolean => {
-      return windowSize.width >= BREAKPOINTS[breakpoint].minWidth;
-    },
-    [windowSize.width]
-  );
+    const only = (breakpoint: Breakpoint): boolean => {
+      switch (breakpoint) {
+        case 'xs':
+          return isXs;
+        case 'sm':
+          return isSm;
+        case 'md':
+          return isMd;
+        case 'lg':
+          return isLg;
+        case 'xl':
+          return isXl;
+        default:
+          return false;
+      }
+    };
 
-  // Check if viewport is below the given breakpoint
-  const isDown = useCallback(
-    (breakpoint: Breakpoint): boolean => {
-      return windowSize.width < BREAKPOINTS[breakpoint].minWidth;
-    },
-    [windowSize.width]
-  );
+    const between = (start: Breakpoint, end: Breakpoint): boolean => {
+      // Convert breakpoint names to indices for comparison
+      const breakpointOrder: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl'];
+      const startIndex = breakpointOrder.indexOf(start);
+      const endIndex = breakpointOrder.indexOf(end);
 
-  // Check if viewport is between two breakpoints (inclusive)
-  const isBetween = useCallback(
-    (minBreakpoint: Breakpoint, maxBreakpoint: Breakpoint): boolean => {
-      const minWidth = BREAKPOINTS[minBreakpoint].minWidth;
-      const maxWidth = BREAKPOINTS[maxBreakpoint].minWidth;
-      return windowSize.width >= minWidth && windowSize.width < maxWidth;
-    },
-    [windowSize.width]
-  );
+      if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
+        console.warn(
+          `useBreakpoints: Invalid between(${start}, ${end}) - start must be before end`
+        );
+        return false;
+      }
 
-  // Get breakpoint configuration
-  const getBreakpointConfig = useCallback(
-    (breakpoint: Breakpoint): BreakpointConfig => {
-      return BREAKPOINTS[breakpoint];
-    },
-    []
-  );
+      // Check if current breakpoint is in range
+      const currentIndex = breakpointOrder.indexOf(currentBreakpoint);
+      return currentIndex >= startIndex && currentIndex < endIndex;
+    };
 
-  return {
+    return {
+      isSmUp,
+      isMdUp,
+      isLgUp,
+      isXlUp,
+      isXsOnly: isXs,
+      isSmOnly: isSmDown,
+      isMdOnly: isLgDown,
+      currentBreakpoint,
+      up,
+      down,
+      between,
+      only,
+    };
+  }, [
+    isSmUp,
+    isMdUp,
+    isLgUp,
+    isXlUp,
+    isXs,
+    isSmDown,
+    isMdDown,
+    isLgDown,
     currentBreakpoint,
-    width: windowSize.width,
-    height: windowSize.height,
-    ...breakpointFlags,
-    isUp,
-    isDown,
-    isBetween,
-    getBreakpointConfig,
-  };
-};
+  ]);
+
+  return result;
+}
 
 export default useBreakpoints;

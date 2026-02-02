@@ -48,7 +48,6 @@
     "adminTaxonomies": "Skill Taxonomies",
     "adminTaxonomyAnalytics": "Taxonomy Analytics",
     "adminPublicTaxonomies": "Public Taxonomies",
-    "adminBackups": "Backup & Restore",
     "findJobs": "Find Jobs",
     "findEmployees": "Find Employees",
     "browseJobs": "Browse Jobs",
@@ -428,10 +427,6 @@
       "analytics": {
         "title": "Analytics",
         "description": "View hiring metrics and reports"
-      },
-      "workflowBoard": {
-        "title": "Workflow Board",
-        "description": "Track candidates through hiring stages"
       }
     },
     "tip": "Tip: Click on any resume in the Resume Database to view detailed analysis and match results."
@@ -493,6 +488,11 @@
     "requiredSkills": "Required skills ({{count}}):",
     "more": "+{{count}}",
     "moreDetails": "More details",
+    "searchPlaceholder": "Search vacancies...",
+    "noResults": "No results found",
+    "tryDifferentSearch": "Try different search terms",
+    "clearSearch": "Clear search",
+    "results": "{{count}} results",
     "deleteDialog": {
       "title": "Confirm Delete",
       "message": "Are you sure you want to delete this job request? This action cannot be undone."
@@ -502,6 +502,45 @@
       "to": "to ${{amount}}",
       "range": "${{min}} - ${{max}}",
       "notSpecified": "Not specified"
+    }
+  },
+  "candidatesKanban": {
+    "title": "Candidates",
+    "description": "Review and manage candidates through the hiring pipeline",
+    "searchPlaceholder": "Search candidates...",
+    "keyboardShortcuts": "Keyboard shortcuts",
+    "toFocusSearch": "to focus search",
+    "toSelectAll": "to select all",
+    "toNavigate": "to navigate",
+    "toViewDetails": "to view details",
+    "toClose": "to close",
+    "candidates": "candidates",
+    "skills": "Skills",
+    "match": "Match",
+    "appliedFor": "Applied for",
+    "status": "Status",
+    "close": "Close",
+    "noCandidates": "No candidates",
+    "selected": "{{count}} candidate(s) selected",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "clearSelection": "Clear",
+    "moveToStage": "Move to Stage",
+    "addTags": "Add Tags",
+    "targetStage": "Target Stage",
+    "tag": "Tag",
+    "addTag": "Add Tag",
+    "tagPlaceholder": "e.g., Frontend, Senior, Remote",
+    "movedToStage": "Moved {{count}} candidate(s) to {{stage}}",
+    "addedTag": "Added tag \"{{tag}}\" to {{count}} candidate(s)",
+    "moveFailed": "Failed to move candidates. Please try again.",
+    "addTagFailed": "Failed to add tags. Please try again.",
+    "stages": {
+      "new": "New",
+      "screening": "Screening",
+      "interview": "Interview",
+      "offer": "Offer",
+      "hired": "Hired"
     }
   },
   "funnel": {
@@ -764,117 +803,6 @@
     },
     "success": {
       "saved": "Weights saved successfully!"
-    }
-  },
-  "notes": {
-    "title": "Recruiter Notes",
-    "loading": "Loading notes...",
-    "noNotes": "No notes yet. Be the first to add a comment about this candidate.",
-    "addNote": "Add a Note",
-    "placeholder": "Add your observations, interview notes, or any comments about this candidate...",
-    "submit": "Post Note",
-    "private": "Private",
-    "privateNote": "Private note",
-    "privateHint": "Only you can see this note",
-    "publicHint": "All team members can see this note",
-    "showingMore": "Showing {{shown}} of {{total}} notes"
-  },
-  "tags": {
-    "loading": "Loading tags...",
-    "noTags": "No tags assigned",
-    "add": "Add Tag",
-    "available": "Available Tags",
-    "noAvailable": "No available tags",
-    "maxReached": "Maximum {{max}} tags reached"
-  },
-  "activityTimeline": {
-    "title": "Activity Timeline",
-    "subtitle": "{{count}} activities recorded",
-    "forVacancy": "for vacancy",
-    "filteredBy": "• Filtered by: {{type}}",
-    "loading": "Loading activity timeline...",
-    "loadingHint": "This may take a few moments",
-    "errorTitle": "Failed to Load Activity Timeline",
-    "retry": "Retry",
-    "refresh": "Refresh",
-    "noActivitiesTitle": "No Activity Recorded",
-    "noActivities": "No activities found for this candidate. Activities will appear here as the candidate moves through the hiring pipeline."
-  },
-  "bulkActions": {
-    "title": "Bulk Candidate Actions",
-    "selected": "{{count}} selected",
-    "selectCount": "Select candidates to move them to a different stage in bulk.",
-    "selectAll": "Select All",
-    "clearSelection": "Clear Selection",
-    "moveCandidates": "Move {{count}} candidate{{plural}} to:",
-    "targetStage": "Target Stage",
-    "moveToStage": "Move to Stage",
-    "moving": "Moving...",
-    "current": "Current: {{stage}}",
-    "moveSuccess": "Successfully moved {{count}} candidate{{plural}} to new stage.",
-    "movePartialSuccess": "Moved {{success}} candidates successfully. {{failed}} failed.",
-    "moveError": "Failed to move candidates",
-    "noCandidates": "No candidates available for bulk operations.",
-    "tip": "Tip:",
-    "selectStageTip": "Select a target stage to enable the bulk move operation.",
-    "enterBulkMode": "Bulk Mode",
-    "exitBulkMode": "Exit Bulk Mode",
-    "loadingCandidates": "Loading candidates for bulk operations...",
-    "export": "Export",
-    "addTag": "Add Tag",
-    "exportPartialSuccess": "Exported {{success}} candidates successfully. {{failed}} failed.",
-    "exportError": "Failed to export candidates",
-    "exportSuccess": "Successfully exported {{count}} candidate{{plural}}.",
-    "tagPartialSuccess": "Tagged {{success}} candidates successfully. {{failed}} failed.",
-    "tagError": "Failed to tag candidates",
-    "tagSuccess": "Successfully tagged {{count}} candidate{{plural}}.",
-    "exportDialog": {
-      "title": "Export Candidates",
-      "description": "Export {{count}} selected candidate{{plural}} to a file.",
-      "format": "Export Format",
-      "export": "Export",
-      "exporting": "Exporting..."
-    },
-    "tagDialog": {
-      "title": "Add Tag to Candidates",
-      "description": "Add a tag to {{count}} selected candidate{{plural}}.",
-      "tagName": "Tag Name",
-      "tagNamePlaceholder": "e.g., High Priority",
-      "tagColor": "Tag Color",
-      "tag": "Add Tag",
-      "tagging": "Adding Tag..."
-    }
-  },
-  "workflow": {
-    "loading": "Loading workflow board...",
-    "board": {
-      "title": "Workflow Board",
-      "subtitle": "Track candidates through hiring stages with drag-and-drop",
-      "stats": {
-        "totalCandidates": "Total Candidates",
-        "allStages": "across all stages",
-        "activeStages": "Active Stages",
-        "configuredStages": "configured stages",
-        "openVacancies": "Open Vacancies",
-        "activeVacancies": "active vacancies"
-      },
-      "filterByVacancy": "Filter by Vacancy",
-      "allVacancies": "All Vacancies",
-      "vacancyHelper": "Show candidates for a specific vacancy",
-      "filteredByVacancy": "Filtered by vacancy",
-      "refresh": "Refresh",
-      "refreshing": "Refreshing...",
-      "stageStats": "Stage Statistics",
-      "stageMetrics": "Stage Metrics",
-      "metricsTooltip": "Average time candidates spend in each stage and drop-off rates",
-      "timeInStage": "Time in Stage",
-      "daysAvg": "days avg",
-      "median": "Median",
-      "days": "days",
-      "range": "Range",
-      "dropoffRate": "Drop-off Rate",
-      "exited": "exited",
-      "tip": "💡 Drag and drop candidate cards to move them between stages. Click on candidates to view details, notes, and activity history."
     }
   }
 }

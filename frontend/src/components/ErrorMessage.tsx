@@ -1,660 +1,884 @@
-import React, { useState, useCallback, useEffect, ReactNode } from 'react';
-import { Snackbar, Alert, AlertProps, Slide, SlideProps, Button, Box, Typography } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import React from 'react';
+import {
+  Alert,
+  AlertTitle,
+  Box,
+  Button,
+  ButtonProps,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Typography,
+  useTheme,
+  alpha,
+} from '@mui/material';
+import {
+  ErrorOutline,
+  WifiOff,
+  Lock,
+  AssignmentLate,
+  UploadFile,
+  CloudOff,
+  SearchOff,
+  Close,
+  Description,
+  Storage,
+  Group,
+  PlaylistAddCheck,
+} from '@mui/icons-material';
 
 /**
- * Slide transition for Snackbar
- *
- * Animates the message sliding in from the bottom.
+ * Error type enumeration for all supported error categories
  */
-function SlideTransition(props: SlideProps) {
-  return <Slide {...props} direction="up" />;
-}
+export type ErrorType =
+  | 'network'      // Network connectivity issues
+  | 'auth'         // Authentication/authorization errors
+  | 'validation'   // Form validation errors
+  | 'fileUpload'   // File upload errors
+  | 'server'       // Server-side errors
+  | 'notFound'     // Resource not found errors
+  // Resume upload workflow errors
+  | 'fileSizeExceeded'      // File size exceeds maximum
+  | 'invalidFileFormat'     // File format not supported
+  | 'resumeParseError'      // Resume parsing failed
+  // Vacancy management workflow errors
+  | 'vacancyValidation'     // Vacancy form validation errors
+  | 'vacancySaveFailed'     // Failed to save vacancy
+  // Candidate management workflow errors
+  | 'candidateLoadFailed'   // Failed to load candidates
+  | 'candidateMoveFailed'   // Failed to move candidate between stages
+  | 'batchActionFailed';    // Batch action (move, tag, delete) failed
 
 /**
- * Action button configuration for error messages
+ * Recovery action button configuration
  */
 export interface ErrorAction {
-  /** Label for the action button */
+  /**
+   * Button label
+   */
   label: string;
-  /** Click handler for the action */
+
+  /**
+   * Click handler for the action
+   */
   onClick: () => void;
-  /** Whether this action should close the error message */
-  closeOnClick?: boolean;
+
+  /**
+   * Button variant
+   * @default 'contained'
+   */
+  variant?: ButtonProps['variant'];
+
+  /**
+   * Button color
+   * @default 'primary'
+   */
+  color?: ButtonProps['color'];
+
+  /**
+   * Whether this is the primary action
+   * @default false
+   */
+  primary?: boolean;
 }
 
 /**
- * Structured error message details
- * Provides comprehensive error information with actionable guidance
- */
-export interface ErrorDetails {
-  /** Brief title of what went wrong */
-  title: string;
-  /** Detailed explanation of the error */
-  description: string;
-  /** Why the error occurred (root cause) */
-  reason?: string;
-  /** How to fix the error (actionable steps) */
-  solution?: string;
-  /** Optional action buttons */
-  actions?: ErrorAction[];
-}
-
-/**
- * Error message configuration
- */
-export interface ErrorMessageConfig {
-  /** Whether the message is currently visible */
-  open: boolean;
-  /** The message content (can be simple string or structured ErrorDetails) */
-  message: string | ErrorDetails;
-  /** Severity level of the message */
-  severity: AlertProps['severity'];
-  /** Auto-hide duration in milliseconds (null for no auto-hide) */
-  autoHideDuration?: number | null;
-}
-
-/**
- * ErrorMessage Component Props
+ * Props for ErrorMessage component
  */
 export interface ErrorMessageProps {
-  /** Custom error message state (optional, component manages its own state if not provided) */
-  errorState?: ErrorMessageConfig;
-  /** Callback when error state changes (optional) */
-  onErrorStateChange?: (state: ErrorMessageConfig) => void;
-  /** Position of the snackbar */
-  anchorOrigin?: {
-    vertical: 'top' | 'bottom';
-    horizontal: 'left' | 'center' | 'right';
-  };
-  /** Enable slide transition */
-  enableSlideTransition?: boolean;
-  /** Children wrapper to provide error context (optional) */
-  children?: ReactNode;
+  /**
+   * The error object or error type to display
+   * Can be an Error instance, error type string, or custom error message
+   */
+  error: Error | ErrorType | string;
+
+  /**
+   * Optional custom title to override the default
+   * If not provided, title is derived from error type
+   */
+  title?: string;
+
+  /**
+   * Optional custom message to override the default
+   * If not provided, message is derived from error type or error object
+   */
+  message?: string;
+
+  /**
+   * Recovery action buttons to display
+   * At least one action is recommended for better UX
+   */
+  actions?: ErrorAction[];
+
+  /**
+   * Error severity level
+   * @default 'error'
+   */
+  severity?: 'error' | 'warning' | 'info';
+
+  /**
+   * Display mode
+   * - 'inline': Show as an alert/box in the flow
+   * - 'modal': Show as a modal dialog
+   * - 'fullPage': Show as a full page error
+   * @default 'inline'
+   */
+  mode?: 'inline' | 'modal' | 'fullPage';
+
+  /**
+   * Whether to show the error icon
+   * @default true
+   */
+  showIcon?: boolean;
+
+  /**
+   * Whether the modal is open (only for modal mode)
+   * @default true
+   */
+  open?: boolean;
+
+  /**
+   * Callback when modal is closed (only for modal mode)
+   */
+  onClose?: () => void;
+
+  /**
+   * Optional error details for debugging (collapsed by default)
+   */
+  details?: string;
 }
 
 /**
- * Predefined error templates for common failures
- * Each template includes: what went wrong, why it happened, and how to fix it
+ * Get default error title for error type
  */
-export const ErrorTemplates = {
-  /**
-   * Network connection error
-   * Occurs when the application cannot reach the backend server
-   */
-  networkError: (details?: { endpoint?: string }): ErrorDetails => ({
-    title: 'Connection Error',
-    description: 'Unable to connect to the server. Please check your internet connection.',
-    reason: details?.endpoint
-      ? `The request to ${details.endpoint} failed due to a network issue.`
-      : 'A network error occurred while communicating with the server.',
-    solution: '1. Check your internet connection\n2. Verify the server is running\n3. Try refreshing the page\n4. Contact support if the issue persists',
-    actions: [
-      { label: 'Retry', onClick: () => window.location.reload(), closeOnClick: false },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * Authentication error
-   * Occurs when user is not logged in or session has expired
-   */
-  authError: (): ErrorDetails => ({
-    title: 'Authentication Required',
-    description: 'You need to log in to access this feature.',
-    reason: 'Your session may have expired or you are not logged in.',
-    solution: 'Please log in again to continue. If the problem persists, try clearing your browser cookies.',
-    actions: [
-      { label: 'Log In', onClick: () => (window.location.href = '/login'), closeOnClick: false },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * Permission denied error
-   * Occurs when user tries to access resources they don't have permission for
-   */
-  permissionError: (details?: { resource?: string }): ErrorDetails => ({
-    title: 'Access Denied',
-    description: details?.resource
-      ? `You don't have permission to access ${details.resource}.`
-      : "You don't have permission to perform this action.",
-    reason: 'Your account does not have the required permissions for this resource.',
-    solution: 'Contact your administrator to request access, or try accessing a different resource.',
-    actions: [
-      { label: 'Go Back', onClick: () => window.history.back(), closeOnClick: false },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * File upload error - invalid type
-   */
-  fileTypeError: (details?: { allowedTypes?: string[] }): ErrorDetails => ({
-    title: 'Invalid File Type',
-    description: 'The file you uploaded is not supported.',
-    reason: 'This file type is not accepted by the system.',
-    solution: details?.allowedTypes
-      ? `Please upload one of the following file types: ${details.allowedTypes.join(', ')}`
-      : 'Please upload a PDF or DOCX file.',
-    actions: [
-      { label: 'Choose Another File', onClick: () => {}, closeOnClick: true },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * File upload error - size exceeded
-   */
-  fileSizeError: (details?: { maxSize?: string }): ErrorDetails => ({
-    title: 'File Too Large',
-    description: 'The file you uploaded exceeds the size limit.',
-    reason: 'The system has a maximum file size limit for uploads.',
-    solution: details?.maxSize
-      ? `Please compress your file or choose a file smaller than ${details.maxSize}.`
-      : 'Please compress your file or choose a smaller file (max 10MB).',
-    actions: [
-      { label: 'Choose Another File', onClick: () => {}, closeOnClick: true },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * Validation error
-   * Occurs when user input fails validation
-   */
-  validationError: (details?: { field?: string; message?: string }): ErrorDetails => ({
-    title: 'Validation Error',
-    description: details?.message || 'Please check your input and try again.',
-    reason: details?.field
-      ? `The field "${details.field}" contains invalid data or is incomplete.`
-      : 'One or more fields contain invalid data or are incomplete.',
-    solution: '1. Review the highlighted fields\n2. Correct any errors marked in red\n3. Ensure all required fields are filled\n4. Try again',
-    actions: [
-      { label: 'Fix Errors', onClick: () => {}, closeOnClick: true },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * Not found error
-   * Occurs when a requested resource doesn't exist
-   */
-  notFoundError: (details?: { resource?: string }): ErrorDetails => ({
-    title: 'Not Found',
-    description: details?.resource
-      ? `The requested ${details.resource} could not be found.`
-      : 'The requested resource could not be found.',
-    reason: 'The resource may have been deleted, moved, or never existed.',
-    solution: '1. Check the URL for typos\n2. Go back to the previous page\n3. Use search to find what you are looking for',
-    actions: [
-      { label: 'Go Back', onClick: () => window.history.back(), closeOnClick: false },
-      { label: 'Home', onClick: () => (window.location.href = '/'), closeOnClick: false },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * Generic server error
-   */
-  serverError: (details?: { statusCode?: number }): ErrorDetails => ({
-    title: 'Server Error',
-    description: 'Something went wrong on our end. Please try again later.',
-    reason: details?.statusCode
-      ? `The server returned an error code (${details.statusCode}).`
-      : 'An unexpected error occurred while processing your request.',
-    solution: '1. Wait a moment and try again\n2. Refresh the page\n3. If the problem persists, contact support',
-    actions: [
-      { label: 'Retry', onClick: () => window.location.reload(), closeOnClick: false },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
-
-  /**
-   * Generic error fallback
-   */
-  genericError: (details?: { message?: string }): ErrorDetails => ({
-    title: 'Error',
-    description: details?.message || 'An unexpected error occurred.',
-    reason: 'The application encountered an unexpected condition.',
-    solution: 'Please try again. If the problem persists, contact support with details about what you were doing.',
-    actions: [
-      { label: 'Retry', onClick: () => window.location.reload(), closeOnClick: false },
-      { label: 'Close', onClick: () => {}, closeOnClick: true },
-    ],
-  }),
+const getDefaultTitle = (errorType: ErrorType): string => {
+  switch (errorType) {
+    case 'network':
+      return 'Network Connection Error';
+    case 'auth':
+      return 'Authentication Error';
+    case 'validation':
+      return 'Validation Error';
+    case 'fileUpload':
+      return 'File Upload Error';
+    case 'server':
+      return 'Server Error';
+    case 'notFound':
+      return 'Resource Not Found';
+    case 'fileSizeExceeded':
+      return 'File Size Exceeded';
+    case 'invalidFileFormat':
+      return 'Invalid File Format';
+    case 'resumeParseError':
+      return 'Resume Parse Error';
+    case 'vacancyValidation':
+      return 'Vacancy Validation Error';
+    case 'vacancySaveFailed':
+      return 'Failed to Save Vacancy';
+    case 'candidateLoadFailed':
+      return 'Failed to Load Candidates';
+    case 'candidateMoveFailed':
+      return 'Failed to Move Candidate';
+    case 'batchActionFailed':
+      return 'Batch Action Failed';
+    default:
+      return 'Error';
+  }
 };
 
 /**
- * Helper function to create a simple error message (backward compatible)
+ * Get default error message for error type
  */
-export const createSimpleErrorMessage = (
-  message: string,
-  severity: AlertProps['severity'] = 'error'
-): ErrorMessageConfig => ({
-  open: true,
-  message,
-  severity,
-  autoHideDuration: 6000,
-});
-
-/**
- * Helper function to create a structured error message with actionable steps
- */
-export const createStructuredErrorMessage = (
-  errorDetails: ErrorDetails,
-  severity: AlertProps['severity'] = 'error'
-): ErrorMessageConfig => ({
-  open: true,
-  message: errorDetails,
-  severity,
-  autoHideDuration: null, // Don't auto-hide structured messages
-});
-
-/**
- * Format error details as a readable message string
- * This is used when displaying ErrorDetails in the Alert component
- */
-const formatErrorDetails = (details: ErrorDetails): string => {
-  let message = `${details.title}\n\n${details.description}`;
-
-  if (details.reason) {
-    message += `\n\nWhy: ${details.reason}`;
+const getDefaultMessage = (errorType: ErrorType): string => {
+  switch (errorType) {
+    case 'network':
+      return 'Unable to connect to the server. Please check your internet connection and try again.';
+    case 'auth':
+      return 'You are not authorized to perform this action. Please log in and try again.';
+    case 'validation':
+      return 'Please correct the errors in the form and try again.';
+    case 'fileUpload':
+      return 'The file could not be uploaded. Please check the file format and size.';
+    case 'server':
+      return 'Something went wrong on our end. Our team has been notified and we are working to fix it.';
+    case 'notFound':
+      return 'The requested resource could not be found. It may have been moved or deleted.';
+    case 'fileSizeExceeded':
+      return 'The file is too large. Please compress it or choose a smaller file.';
+    case 'invalidFileFormat':
+      return 'The file format is not supported. Please upload a PDF, DOC, or DOCX file.';
+    case 'resumeParseError':
+      return 'Could not parse the resume. Please ensure it contains readable text and try again.';
+    case 'vacancyValidation':
+      return 'Please fill in all required fields and fix any validation errors.';
+    case 'vacancySaveFailed':
+      return 'Failed to save the vacancy. Please check your connection and try again.';
+    case 'candidateLoadFailed':
+      return 'Failed to load candidates. Please refresh the page to try again.';
+    case 'candidateMoveFailed':
+      return 'Failed to move the candidate to the new stage. Please try again.';
+    case 'batchActionFailed':
+      return 'Failed to complete the batch action. Some changes may not have been applied.';
+    default:
+      return 'An unexpected error occurred. Please try again.';
   }
-
-  if (details.solution) {
-    message += `\n\nHow to fix:\n${details.solution}`;
-  }
-
-  return message;
 };
 
 /**
- * Default error message state
+ * Get icon for error type
  */
-const defaultErrorState: ErrorMessageConfig = {
-  open: false,
-  message: '',
-  severity: 'error',
-  autoHideDuration: 6000,
+const getErrorIcon = (errorType: ErrorType) => {
+  switch (errorType) {
+    case 'network':
+      return <WifiOff />;
+    case 'auth':
+      return <Lock />;
+    case 'validation':
+      return <AssignmentLate />;
+    case 'fileUpload':
+      return <UploadFile />;
+    case 'server':
+      return <CloudOff />;
+    case 'notFound':
+      return <SearchOff />;
+    case 'fileSizeExceeded':
+      return <Storage />;
+    case 'invalidFileFormat':
+      return <Description />;
+    case 'resumeParseError':
+      return <AssignmentLate />;
+    case 'vacancyValidation':
+      return <AssignmentLate />;
+    case 'vacancySaveFailed':
+      return <CloudOff />;
+    case 'candidateLoadFailed':
+      return <Group />;
+    case 'candidateMoveFailed':
+      return <Group />;
+    case 'batchActionFailed':
+      return <PlaylistAddCheck />;
+    default:
+      return <ErrorOutline />;
+  }
+};
+
+/**
+ * Detect error type from Error object or message
+ */
+const detectErrorType = (error: Error | string): ErrorType => {
+  const message = typeof error === 'string' ? error : error.message;
+
+  // Network errors
+  if (
+    message.toLowerCase().includes('network') ||
+    message.toLowerCase().includes('connection') ||
+    message.toLowerCase().includes('fetch') ||
+    message.includes('ERR_NETWORK') ||
+    message.includes('ERR_INTERNET_DISCONNECTED')
+  ) {
+    return 'network';
+  }
+
+  // Auth errors
+  if (
+    message.toLowerCase().includes('unauthorized') ||
+    message.toLowerCase().includes('authentication') ||
+    message.toLowerCase().includes('login') ||
+    message.toLowerCase().includes('token') ||
+    message.includes('401') ||
+    message.includes('403')
+  ) {
+    return 'auth';
+  }
+
+  // File size errors (specific check before validation)
+  if (
+    message.toLowerCase().includes('size') &&
+    (message.toLowerCase().includes('too large') ||
+     message.toLowerCase().includes('exceeded') ||
+     message.toLowerCase().includes('maximum') ||
+     message.toLowerCase().includes('limit'))
+  ) {
+    return 'fileSizeExceeded';
+  }
+
+  // Invalid file format errors
+  if (
+    message.toLowerCase().includes('format') ||
+    message.toLowerCase().includes('unsupported') ||
+    message.toLowerCase().includes('extension')
+  ) {
+    return 'invalidFileFormat';
+  }
+
+  // Resume parse errors
+  if (
+    message.toLowerCase().includes('parse') ||
+    message.toLowerCase().includes('could not read') ||
+    message.toLowerCase().includes('unable to extract')
+  ) {
+    return 'resumeParseError';
+  }
+
+  // Vacancy validation errors
+  if (
+    message.toLowerCase().includes('vacancy') &&
+    message.toLowerCase().includes('validation')
+  ) {
+    return 'vacancyValidation';
+  }
+
+  // Vacancy save errors
+  if (
+    message.toLowerCase().includes('vacancy') &&
+    (message.toLowerCase().includes('save') || message.toLowerCase().includes('create') || message.toLowerCase().includes('update'))
+  ) {
+    return 'vacancySaveFailed';
+  }
+
+  // Candidate load errors
+  if (
+    message.toLowerCase().includes('candidate') &&
+    message.toLowerCase().includes('load')
+  ) {
+    return 'candidateLoadFailed';
+  }
+
+  // Candidate move errors
+  if (
+    message.toLowerCase().includes('candidate') &&
+    message.toLowerCase().includes('move')
+  ) {
+    return 'candidateMoveFailed';
+  }
+
+  // Batch action errors
+  if (
+    message.toLowerCase().includes('batch') ||
+    message.toLowerCase().includes('bulk')
+  ) {
+    return 'batchActionFailed';
+  }
+
+  // Validation errors (general)
+  if (
+    message.toLowerCase().includes('validation') ||
+    message.toLowerCase().includes('required') ||
+    message.toLowerCase().includes('invalid') ||
+    message.includes('422') ||
+    message.includes('400')
+  ) {
+    return 'validation';
+  }
+
+  // File upload errors (general)
+  if (
+    message.toLowerCase().includes('upload') ||
+    message.toLowerCase().includes('file')
+  ) {
+    return 'fileUpload';
+  }
+
+  // Not found errors
+  if (
+    message.toLowerCase().includes('not found') ||
+    message.toLowerCase().includes('does not exist') ||
+    message.includes('404')
+  ) {
+    return 'notFound';
+  }
+
+  // Server errors
+  if (
+    message.toLowerCase().includes('server') ||
+    message.toLowerCase().includes('internal') ||
+    message.includes('500') ||
+    message.includes('502') ||
+    message.includes('503')
+  ) {
+    return 'server';
+  }
+
+  // Default to server error for unknown errors
+  return 'server';
 };
 
 /**
  * ErrorMessage Component
  *
- * A reusable component for displaying error and notification messages throughout the application.
- * Replaces browser alert() calls with a more user-friendly Material-UI Snackbar.
- *
- * Features:
- * - Supports multiple severity levels (error, warning, info, success)
- * - Auto-hide with configurable duration
- * - Theme-aware styling (works with light and dark modes)
- * - Smooth slide-in animation
- * - Can be controlled or uncontrolled (internal state management)
- * - Context-based usage for managing errors from child components
- * - Supports internationalization via i18next
- * - Structured error messages with actionable next steps
- * - Pre-built error templates for common failures (network, auth, file upload, etc.)
- * - Action buttons for immediate user response (retry, navigate, etc.)
+ * A comprehensive error message component with specific templates for all error types
+ * including network, auth, validation, file upload, server, and not found errors.
+ * Supports inline, modal, and full-page display modes with recovery actions.
  *
  * @example
  * ```tsx
- * // Simple usage (backward compatible)
- * const [error, setError] = useState({ open: false, message: '', severity: 'error' });
- *
+ * // Network error with retry action
  * <ErrorMessage
- *   errorState={{
- *     open: error.open,
- *     message: 'Failed to load data',
- *     severity: 'error'
- *   }}
- *   onErrorStateChange={setError}
+ *   error={new Error('Network request failed')}
+ *   actions={[{ label: 'Retry', onClick: () => retry() }]}
  * />
- * ```
  *
- * @example
- * ```tsx
- * // Using pre-built error templates with actionable steps
- * const [error, setError] = useState({ open: false, message: '', severity: 'error' });
+ * // Validation error with multiple actions
+ * <ErrorMessage
+ *   error="validation"
+ *   title="Please fix the errors"
+ *   message="There are 3 validation errors in the form."
+ *   actions={[
+ *     { label: 'View Errors', onClick: () => scrollToErrors() },
+ *     { label: 'Reset Form', onClick: () => reset(), variant: 'outlined' },
+ *   ]}
+ * />
  *
- * // Network error with retry button
- * setError({
- *   open: true,
- *   message: ErrorTemplates.networkError({ endpoint: '/api/vacancies' }),
- *   severity: 'error'
- * });
+ * // File upload error
+ * <ErrorMessage
+ *   error="fileUpload"
+ *   message="resume.pdf is too large. Maximum size is 10MB."
+ *   actions={[{ label: 'Remove File', onClick: () => removeFile() }]}
+ * />
  *
- * <ErrorMessage errorState={error} onErrorStateChange={setError} />
- * ```
+ * // Modal error dialog
+ * <ErrorMessage
+ *   error={error}
+ *   mode="modal"
+ *   actions={[
+ *     { label: 'Try Again', onClick: () => retry() },
+ *     { label: 'Go Back', onClick: () => goBack(), variant: 'outlined' },
+ *   ]}
+ * />
  *
- * @example
- * ```tsx
- * // Using helper functions
- * const handleError = createErrorHandler(setError);
- *
- * // Show file type error
- * handleError(
- *   ErrorTemplates.fileTypeError({ allowedTypes: ['pdf', 'docx'] })
- * );
- *
- * // Show auth error with login button
- * handleError(ErrorTemplates.authError());
- * ```
- *
- * @example
- * ```tsx
- * // Custom structured error message
- * const [error, setError] = useState({ open: false, message: '', severity: 'error' });
- *
- * setError({
- *   open: true,
- *   message: {
- *     title: 'Upload Failed',
- *     description: 'Could not upload the resume file.',
- *     reason: 'The file size exceeds the 10MB limit.',
- *     solution: 'Compress your file or choose a smaller file.',
- *     actions: [
- *       { label: 'Choose Another File', onClick: () => fileInputRef.current?.click() },
- *       { label: 'Close', onClick: () => setError({ open: false, message: '', severity: 'error' }) }
- *     ]
- *   },
- *   severity: 'error'
- * });
+ * // Full page error
+ * <ErrorMessage
+ *   error="notFound"
+ *   mode="fullPage"
+ *   actions={[{ label: 'Go Home', onClick: () => navigate('/') }]}
+ * />
  * ```
  */
 const ErrorMessage: React.FC<ErrorMessageProps> = ({
-  errorState,
-  onErrorStateChange,
-  anchorOrigin = { vertical: 'bottom', horizontal: 'right' },
-  enableSlideTransition = true,
-  children,
+  error,
+  title,
+  message,
+  actions = [],
+  severity = 'error',
+  mode = 'inline',
+  showIcon = true,
+  open = true,
+  onClose,
+  details,
 }) => {
-  const { t } = useTranslation();
+  const theme = useTheme();
 
-  // Internal state for uncontrolled usage
-  const [internalErrorState, setInternalErrorState] = useState<ErrorMessageConfig>(defaultErrorState);
-
-  // Use external state if provided, otherwise use internal state
-  const currentErrorState = errorState || internalErrorState;
-
-  /**
-   * Update error state (internal or external)
-   */
-  const updateErrorState = useCallback(
-    (updates: Partial<ErrorMessageConfig>) => {
-      const newState: ErrorMessageConfig = {
-        ...currentErrorState,
-        ...updates,
-      };
-
-      if (onErrorStateChange) {
-        onErrorStateChange(newState);
-      } else {
-        setInternalErrorState(newState);
-      }
-    },
-    [currentErrorState, onErrorStateChange]
-  );
-
-  /**
-   * Show error message
-   *
-   * Displays an error or notification message with specified severity.
-   * Can be called directly or exposed via context.
-   *
-   * @param message - The message to display (string or ErrorDetails)
-   * @param severity - Severity level (default: 'error')
-   * @param autoHideDuration - Duration in ms, null for no auto-hide (default: 6000)
-   */
-  const showError = useCallback(
-    (
-      message: string | ErrorDetails,
-      severity: AlertProps['severity'] = 'error',
-      autoHideDuration: number | null = 6000
-    ) => {
-      // Don't auto-hide messages with actions
-      const shouldAutoHide =
-        typeof message === 'string' ||
-        (!message.actions || message.actions.length === 0);
-
-      updateErrorState({
-        open: true,
-        message,
-        severity,
-        autoHideDuration: shouldAutoHide ? autoHideDuration : null,
-      });
-    },
-    [updateErrorState]
-  );
-
-  /**
-   * Close the error message
-   *
-   * Hides the currently displayed message.
-   */
-  const closeError = useCallback(() => {
-    updateErrorState({ open: false });
-  }, [updateErrorState]);
-
-  /**
-   * Handle Snackbar close event
-   *
-   * Called when user clicks the close button or after auto-hide duration.
-   *
-   * @param event - The event that triggered the close
-   * @param reason - The reason for closing
-   */
-  const handleClose = useCallback(
-    (_event?: React.SyntheticEvent | Event, reason?: string) => {
-      // Don't close if user clicked away (reason: 'clickaway')
-      if (reason === 'clickaway') {
-        return;
-      }
-      closeError();
-    },
-    [closeError]
-  );
-
-  /**
-   * Reset message when closed
-   * Clears the message text after the Snackbar closes
-   */
-  useEffect(() => {
-    if (!currentErrorState.open && currentErrorState.message) {
-      const timeoutId = setTimeout(() => {
-        updateErrorState({ message: '' });
-      }, 500); // Wait for transition to complete
-
-      return () => clearTimeout(timeoutId);
+  // Detect error type
+  const errorType: ErrorType = React.useMemo(() => {
+    const validErrorTypes: ErrorType[] = [
+      'network', 'auth', 'validation', 'fileUpload', 'server', 'notFound',
+      'fileSizeExceeded', 'invalidFileFormat', 'resumeParseError',
+      'vacancyValidation', 'vacancySaveFailed',
+      'candidateLoadFailed', 'candidateMoveFailed', 'batchActionFailed'
+    ];
+    if (typeof error === 'string' && validErrorTypes.includes(error as ErrorType)) {
+      return error as ErrorType;
     }
-  }, [currentErrorState.open, currentErrorState.message, updateErrorState]);
+    return detectErrorType(error);
+  }, [error]);
 
-  /**
-   * Expose error display function to window for global access
-   * This provides a migration path from alert() to ErrorMessage
-   */
-  useEffect(() => {
-    // Only expose in development or if explicitly enabled
-    if (process.env.NODE_ENV === 'development') {
-      (window as any).showErrorMessage = showError;
-    }
-  }, [showError]);
+  // Get default title and message
+  const defaultTitle = getDefaultTitle(errorType);
+  const defaultMessage = getDefaultMessage(errorType);
 
-  /**
-   * Render alert content
-   * Handles both simple string messages and structured ErrorDetails with actions
-   */
-  const renderAlertContent = () => {
-    const message = currentErrorState.message;
+  // Use custom or default values
+  const displayTitle = title || defaultTitle;
+  const displayMessage = message || (typeof error === 'string' ? error : error.message) || defaultMessage;
 
-    // Handle simple string messages (backward compatible)
-    if (typeof message === 'string') {
-      return message;
-    }
+  // Get error icon
+  const icon = getErrorIcon(errorType);
 
-    // Handle structured ErrorDetails
+  // Inline mode
+  if (mode === 'inline') {
     return (
-      <Box>
-        <Typography variant="body2" component="div" sx={{ mb: message.actions && message.actions.length > 0 ? 1.5 : 0 }}>
-          <Typography component="div" variant="inherit" sx={{ fontWeight: 600, mb: 0.5 }}>
-            {message.title}
-          </Typography>
-          <Typography component="div" variant="inherit" sx={{ mb: 0.5 }}>
-            {message.description}
-          </Typography>
-          {message.reason && (
-            <Typography component="div" variant="inherit" sx={{ fontSize: '0.9em', opacity: 0.9, mb: 0.5 }}>
-              <strong>Why:</strong> {message.reason}
+      <Alert
+        severity={severity}
+        icon={showIcon ? icon : false}
+        sx={{
+          mb: 2,
+          '& .MuiAlert-icon': {
+            fontSize: '2rem',
+          },
+        }}
+        action={
+          actions.length > 0 ? (
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              {actions.map((action, index) => (
+                <Button
+                  key={index}
+                  size="small"
+                  variant={action.variant || (action.primary ? 'contained' : 'outlined')}
+                  color={action.color || 'primary'}
+                  onClick={action.onClick}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </Box>
+          ) : undefined
+        }
+      >
+        <AlertTitle>{displayTitle}</AlertTitle>
+        <Typography variant="body2">{displayMessage}</Typography>
+        {details && (
+          <Box
+            sx={{
+              mt: 1,
+              p: 1,
+              bgcolor: alpha(theme.palette.common.black, 0.05),
+              borderRadius: 1,
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              overflow: 'auto',
+              maxHeight: 100,
+            }}
+          >
+            {details}
+          </Box>
+        )}
+      </Alert>
+    );
+  }
+
+  // Modal mode
+  if (mode === 'modal') {
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="error-dialog-title"
+        aria-describedby="error-dialog-description"
+      >
+        {onClose && (
+          <IconButton
+            aria-label="close"
+            onClick={onClose}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <Close />
+          </IconButton>
+        )}
+        <DialogTitle id="error-dialog-title" sx={{ pr: onClose ? 5 : 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {showIcon && icon}
+            <Typography variant="h6" component="span">
+              {displayTitle}
             </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="error-dialog-description" color="text.primary">
+            {displayMessage}
+          </DialogContentText>
+          {details && (
+            <Box
+              sx={{
+                mt: 2,
+                p: 1.5,
+                bgcolor: alpha(theme.palette.common.black, 0.05),
+                borderRadius: 1,
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                overflow: 'auto',
+                maxHeight: 150,
+              }}
+            >
+              {details}
+            </Box>
           )}
-          {message.solution && (
-            <Typography component="div" variant="inherit" sx={{ fontSize: '0.9em', opacity: 0.9, whiteSpace: 'pre-line' }}>
-              <strong>How to fix:</strong> {message.solution}
-            </Typography>
-          )}
-        </Typography>
-        {message.actions && message.actions.length > 0 && (
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
-            {message.actions.map((action, index) => (
+        </DialogContent>
+        {actions.length > 0 && (
+          <DialogActions sx={{ p: 2, pt: 0 }}>
+            {actions.map((action, index) => (
               <Button
                 key={index}
-                size="small"
-                variant="outlined"
-                color="inherit"
-                onClick={() => {
-                  action.onClick();
-                  if (action.closeOnClick) {
-                    closeError();
-                  }
-                }}
-                sx={{
-                  color: 'inherit',
-                  borderColor: 'rgba(255, 255, 255, 0.5)',
-                  '&:hover': {
-                    borderColor: 'rgba(255, 255, 255, 0.8)',
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                  },
-                }}
+                variant={action.variant || (action.primary ? 'contained' : 'outlined')}
+                color={action.color || 'primary'}
+                onClick={action.onClick}
+                autoFocus={action.primary}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </DialogActions>
+        )}
+      </Dialog>
+    );
+  }
+
+  // Full page mode
+  if (mode === 'fullPage') {
+    return (
+      <Paper
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '60vh',
+          p: 4,
+          textAlign: 'center',
+          bgcolor: alpha(theme.palette.background.paper, 0.8),
+        }}
+      >
+        {showIcon && (
+          <Box
+            sx={{
+              fontSize: '4rem',
+              color: theme.palette.error.main,
+              mb: 2,
+            }}
+          >
+            {icon}
+          </Box>
+        )}
+        <Typography variant="h4" gutterBottom color="text.primary">
+          {displayTitle}
+        </Typography>
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          sx={{ maxWidth: 600, mb: 3 }}
+        >
+          {displayMessage}
+        </Typography>
+        {details && (
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              bgcolor: alpha(theme.palette.common.black, 0.05),
+              borderRadius: 1,
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              overflow: 'auto',
+              maxWidth: 600,
+              maxHeight: 150,
+            }}
+          >
+            {details}
+          </Box>
+        )}
+        {actions.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {actions.map((action, index) => (
+              <Button
+                key={index}
+                variant={action.variant || (action.primary ? 'contained' : 'outlined')}
+                color={action.color || 'primary'}
+                size="large"
+                onClick={action.onClick}
               >
                 {action.label}
               </Button>
             ))}
           </Box>
         )}
-      </Box>
-    );
-  };
-
-  // Render children with error context if provided
-  if (children) {
-    return (
-      <>
-        {children}
-        <Snackbar
-          open={currentErrorState.open}
-          autoHideDuration={currentErrorState.autoHideDuration ?? undefined}
-          onClose={handleClose}
-          anchorOrigin={anchorOrigin}
-          TransitionComponent={enableSlideTransition ? SlideTransition : undefined}
-          sx={{
-            '& .MuiAlert-root': {
-              borderRadius: 2,
-              boxShadow: 3,
-            },
-          }}
-        >
-          <Alert
-            onClose={handleClose}
-            severity={currentErrorState.severity}
-            variant="filled"
-            sx={{
-              width: '100%',
-              minWidth: 300,
-              maxWidth: 600,
-            }}
-          >
-            {renderAlertContent()}
-          </Alert>
-        </Snackbar>
-      </>
+      </Paper>
     );
   }
 
-  // Standalone rendering
-  return (
-    <Snackbar
-      open={currentErrorState.open}
-      autoHideDuration={currentErrorState.autoHideDuration ?? undefined}
-      onClose={handleClose}
-      anchorOrigin={anchorOrigin}
-      TransitionComponent={enableSlideTransition ? SlideTransition : undefined}
-      sx={{
-        '& .MuiAlert-root': {
-          borderRadius: 2,
-          boxShadow: 3,
-        },
-      }}
-    >
-      <Alert
-        onClose={handleClose}
-        severity={currentErrorState.severity}
-        variant="filled"
-        sx={{
-          width: '100%',
-          minWidth: 300,
-          maxWidth: 600,
-        }}
-      >
-        {renderAlertContent()}
-      </Alert>
-    </Snackbar>
-  );
+  return null;
 };
-
-export default ErrorMessage;
 
 /**
- * Helper function to show error messages programmatically
- * Use this to quickly replace alert() calls without significant refactoring
- *
- * @example
- * ```tsx
- * // Before
- * alert('Failed to delete resume');
- *
- * // After - create a state and use ErrorMessage
- * const [error, setError] = useState({ open: false, message: '', severity: 'error' });
- * setError({ open: true, message: 'Failed to delete resume', severity: 'error' });
- * <ErrorMessage errorState={error} onErrorStateChange={setError} />
- * ```
- *
- * @example
- * ```tsx
- * // Using structured error messages with actionable steps
- * const handleError = createErrorHandler(setError);
- *
- * // Show network error with retry option
- * handleError(ErrorTemplates.networkError({ endpoint: '/api/vacancies' }));
- *
- * // Show file type error
- * handleError(ErrorTemplates.fileTypeError({ allowedTypes: ['pdf', 'docx'] }));
- * ```
+ * Pre-configured error message components for common error types
  */
-export const createErrorHandler = (
-  setError: React.Dispatch<React.SetStateAction<ErrorMessageConfig>>
-) => {
-  return (
-    message: string | ErrorDetails,
-    severity: AlertProps['severity'] = 'error'
-  ) => {
-    // Don't auto-hide structured messages with actions
-    const isStructured = typeof message !== 'string' && message.actions && message.actions.length > 0;
 
-    setError({
-      open: true,
-      message,
-      severity,
-      autoHideDuration: isStructured ? null : 6000,
-    });
-  };
-};
+/**
+ * Network error message component
+ */
+export const NetworkError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="network"
+    title="Network Connection Error"
+    message="Unable to connect to the server. Please check your internet connection and try again."
+    {...props}
+  />
+);
+
+/**
+ * Authentication error message component
+ */
+export const AuthError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="auth"
+    title="Authentication Error"
+    message="You are not authorized to perform this action. Please log in and try again."
+    {...props}
+  />
+);
+
+/**
+ * Validation error message component
+ */
+export const ValidationError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="validation"
+    title="Validation Error"
+    message="Please correct the errors in the form and try again."
+    {...props}
+  />
+);
+
+/**
+ * File upload error message component
+ */
+export const FileTypeError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="fileUpload"
+    title="File Upload Error"
+    message="The file could not be uploaded. Please check the file format and size."
+    {...props}
+  />
+);
+
+/**
+ * Server error message component
+ */
+export const ServerError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="server"
+    title="Server Error"
+    message="Something went wrong on our end. Our team has been notified and we are working to fix it."
+    {...props}
+  />
+);
+
+/**
+ * Not found error message component
+ */
+export const NotFoundError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="notFound"
+    title="Resource Not Found"
+    message="The requested resource could not be found. It may have been moved or deleted."
+    {...props}
+  />
+);
+
+/**
+ * Workflow-specific error message components for Resume Upload
+ */
+
+/**
+ * File size exceeded error for resume upload
+ */
+export const FileSizeExceededError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="fileSizeExceeded"
+    title="File Size Exceeded"
+    message="The file is too large. Please compress it or choose a smaller file."
+    {...props}
+  />
+);
+
+/**
+ * Invalid file format error for resume upload
+ */
+export const InvalidFileFormatError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="invalidFileFormat"
+    title="Invalid File Format"
+    message="The file format is not supported. Please upload a PDF, DOC, or DOCX file."
+    {...props}
+  />
+);
+
+/**
+ * Resume parse error
+ */
+export const ResumeParseError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="resumeParseError"
+    title="Resume Parse Error"
+    message="Could not parse the resume. Please ensure it contains readable text and try again."
+    {...props}
+  />
+);
+
+/**
+ * Workflow-specific error message components for Vacancy Management
+ */
+
+/**
+ * Vacancy validation error
+ */
+export const VacancyValidationError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="vacancyValidation"
+    title="Vacancy Validation Error"
+    message="Please fill in all required fields and fix any validation errors."
+    {...props}
+  />
+);
+
+/**
+ * Vacancy save failed error
+ */
+export const VacancySaveFailedError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="vacancySaveFailed"
+    title="Failed to Save Vacancy"
+    message="Failed to save the vacancy. Please check your connection and try again."
+    {...props}
+  />
+);
+
+/**
+ * Workflow-specific error message components for Candidate Management
+ */
+
+/**
+ * Candidate load failed error
+ */
+export const CandidateLoadFailedError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="candidateLoadFailed"
+    title="Failed to Load Candidates"
+    message="Failed to load candidates. Please refresh the page to try again."
+    {...props}
+  />
+);
+
+/**
+ * Candidate move failed error
+ */
+export const CandidateMoveFailedError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="candidateMoveFailed"
+    title="Failed to Move Candidate"
+    message="Failed to move the candidate to the new stage. Please try again."
+    {...props}
+  />
+);
+
+/**
+ * Batch action failed error
+ */
+export const BatchActionFailedError: React.FC<Omit<ErrorMessageProps, 'error' | 'title' | 'message'>> = (props) => (
+  <ErrorMessage
+    error="batchActionFailed"
+    title="Batch Action Failed"
+    message="Failed to complete the batch action. Some changes may not have been applied."
+    {...props}
+  />
+);
+
+export default ErrorMessage;

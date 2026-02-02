@@ -14,7 +14,6 @@ import {
   CardContent,
   CircularProgress,
   Alert,
-  Snackbar,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -24,12 +23,10 @@ import {
   Business as BusinessIcon,
   LocationOn as LocationIcon,
   Money as MoneyIcon,
-  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { WeightProfileSelector } from '../components';
-import { apiClient } from '../api/client';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface Vacancy {
   id: string;
@@ -51,20 +48,6 @@ const VacancyDetails: React.FC = () => {
   const [vacancy, setVacancy] = useState<Vacancy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Weight profile state
-  const organizationId = 'org123'; // TODO: Get from auth context
-  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>();
-  const [rematching, setRematching] = useState(false);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
 
   useEffect(() => {
     const fetchVacancy = async () => {
@@ -95,45 +78,11 @@ const VacancyDetails: React.FC = () => {
     }
   };
 
-  const handleProfileSelect = async (profile: any) => {
-    if (!id || !profile?.id) return;
-
-    setRematching(true);
-    setError(null);
-
-    try {
-      const result = await apiClient.rematchWithWeights(profile.id, {
-        vacancy_id: id,
-      });
-
-      setSelectedProfileId(profile.id);
-      setSnackbar({
-        open: true,
-        message: `Successfully re-matched ${result.candidates_matched} candidates with new weights`,
-        severity: 'success',
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to re-match candidates';
-      setError(errorMessage);
-      setSnackbar({
-        open: true,
-        message: errorMessage,
-        severity: 'error',
-      });
-    } finally {
-      setRematching(false);
-    }
-  };
-
-  const handleSnackbarClose = () => {
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
-
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress />
-      </Box>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <LoadingSpinner variant="vacancy-details" message="Loading vacancy details..." />
+      </Container>
     );
   }
 
@@ -216,86 +165,39 @@ const VacancyDetails: React.FC = () => {
 
           {/* Sidebar */}
           <Grid item xs={12} md={4}>
-            <Stack spacing={2}>
-              {/* Details Card */}
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                    Details
-                  </Typography>
-                  <Stack spacing={2}>
-                    {vacancy.min_experience_months && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Experience Required
-                        </Typography>
-                        <Typography variant="body1">
-                          {Math.floor(vacancy.min_experience_months / 12)}+ years
-                        </Typography>
-                      </Box>
-                    )}
-                    {(vacancy.salary_min || vacancy.salary_max) && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Salary
-                        </Typography>
-                        <Typography variant="body1">
-                          {vacancy.salary_min && vacancy.salary_max
-                            ? `$${vacancy.salary_min} - $${vacancy.salary_max}`
-                            : vacancy.salary_min
-                              ? `$${vacancy.salary_min}+`
-                              : `Up to $${vacancy.salary_max}`}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-
-              {/* Weight Profile Selector */}
-              <Card variant="outlined">
-                <CardContent>
-                  <Stack spacing={2}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Details
+                </Typography>
+                <Stack spacing={2}>
+                  {vacancy.min_experience_months && (
                     <Box>
-                      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                        Matching Algorithm
-                      </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Select a weight profile to re-match candidates
+                        Experience Required
+                      </Typography>
+                      <Typography variant="body1">
+                        {Math.floor(vacancy.min_experience_months / 12)}+ years
                       </Typography>
                     </Box>
-                    <Box sx={{ position: 'relative' }}>
-                      {rematching && (
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 1,
-                            borderRadius: 1,
-                          }}
-                        >
-                          <CircularProgress size={24} />
-                        </Box>
-                      )}
-                      <WeightProfileSelector
-                        organizationId={organizationId}
-                        selectedProfileId={selectedProfileId}
-                        onProfileSelect={handleProfileSelect}
-                        compact={true}
-                        disabled={rematching}
-                      />
+                  )}
+                  {(vacancy.salary_min || vacancy.salary_max) && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Salary
+                      </Typography>
+                      <Typography variant="body1">
+                        {vacancy.salary_min && vacancy.salary_max
+                          ? `$${vacancy.salary_min} - $${vacancy.salary_max}`
+                          : vacancy.salary_min
+                            ? `$${vacancy.salary_min}+`
+                            : `Up to $${vacancy.salary_max}`}
+                      </Typography>
                     </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Stack>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
 
@@ -316,23 +218,6 @@ const VacancyDetails: React.FC = () => {
           </>
         )}
       </Paper>
-
-      {/* Success/Error Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-          icon={snackbar.severity === 'success' ? <CheckCircleIcon /> : undefined}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Container>
   );
 };

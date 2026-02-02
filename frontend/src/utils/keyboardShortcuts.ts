@@ -1,490 +1,465 @@
 /**
- * Keyboard Shortcuts Utilities
+ * Keyboard Shortcuts Utility
  *
- * Provides utilities for managing keyboard shortcuts in the application.
- * Handles key combination parsing, validation, and formatting.
+ * Provides helper functions and utilities for working with keyboard shortcuts
+ * in the application. This module complements the KeyboardShortcutsHelp component
+ * and useKeyboardNavigation hook with formatting and validation utilities.
  *
  * @module utils/keyboardShortcuts
  */
 
-/**
- * Keyboard key codes
- */
-export type KeyCode =
-  | 'a'
-  | 'b'
-  | 'c'
-  | 'd'
-  | 'e'
-  | 'f'
-  | 'g'
-  | 'h'
-  | 'i'
-  | 'j'
-  | 'k'
-  | 'l'
-  | 'm'
-  | 'n'
-  | 'o'
-  | 'p'
-  | 'q'
-  | 'r'
-  | 's'
-  | 't'
-  | 'u'
-  | 'v'
-  | 'w'
-  | 'x'
-  | 'y'
-  | 'z'
-  | '0'
-  | '1'
-  | '2'
-  | '3'
-  | '4'
-  | '5'
-  | '6'
-  | '7'
-  | '8'
-  | '9'
-  | 'Enter'
-  | 'Escape'
-  | 'Esc'
-  | 'Space'
-  | 'ArrowUp'
-  | 'ArrowDown'
-  | 'ArrowLeft'
-  | 'ArrowRight'
-  | 'Tab'
-  | 'Home'
-  | 'End'
-  | 'PageUp'
-  | 'PageDown'
-  | 'Delete'
-  | 'Backspace'
-  | 'Insert'
-  | 'F1'
-  | 'F2'
-  | 'F3'
-  | 'F4'
-  | 'F5'
-  | 'F6'
-  | 'F7'
-  | 'F8'
-  | 'F9'
-  | 'F10'
-  | 'F11'
-  | 'F12';
+import type { KeyboardShortcut, ShortcutCategory } from '@/components/KeyboardShortcutsHelp';
 
 /**
- * Modifier keys
+ * Modifier key names
  */
-export type ModifierKey = 'Ctrl' | 'Control' | 'Alt' | 'Shift' | 'Meta' | 'Cmd';
+export type ModifierKey = 'Ctrl' | 'Shift' | 'Alt' | 'Meta' | 'Cmd';
 
 /**
- * Keyboard shortcut configuration
+ * Key combination format
  */
-export interface KeyboardShortcut {
-  /** Unique identifier for the shortcut */
-  id: string;
-  /** Key code */
-  key: KeyCode;
-  /** Modifier keys (Ctrl, Alt, Shift, Meta/Cmd) */
+export interface KeyCombination {
+  /**
+   * Modifier keys (Ctrl, Shift, Alt, Meta/Cmd)
+   */
   modifiers?: ModifierKey[];
-  /** Callback function when shortcut is triggered */
-  handler: (event: KeyboardEvent) => void;
-  /** Human-readable description */
-  description?: string;
-  /** Whether the shortcut is currently enabled */
-  enabled?: boolean;
-}
 
-/**
- * Parsed keyboard shortcut
- */
-export interface ParsedShortcut {
-  /** Key code */
+  /**
+   * Primary key (e.g., 'S', 'Enter', 'Escape')
+   */
   key: string;
-  /** Ctrl modifier */
-  ctrl: boolean;
-  /** Alt modifier */
-  alt: boolean;
-  /** Shift modifier */
-  shift: boolean;
-  /** Meta/Cmd modifier */
-  meta: boolean;
+
+  /**
+   * Whether to prevent default browser behavior
+   * @default true
+   */
+  preventDefault?: boolean;
 }
 
 /**
- * Standard keyboard shortcuts for the application
+ * Platform-specific key mappings
  */
-export const STANDARD_SHORTCUTS: Record<string, Omit<KeyboardShortcut, 'handler'>> = {
-  globalSearch: {
-    id: 'globalSearch',
-    key: 'k',
-    modifiers: ['Ctrl'],
-    description: 'Focus search input',
+const PLATFORM_KEYS: Record<string, Record<string, string>> = {
+  // macOS uses Cmd instead of Ctrl for some shortcuts
+  macos: {
+    Ctrl: 'Cmd',
+    Meta: 'Cmd',
   },
-  showHelp: {
-    id: 'showHelp',
-    key: '/',
-    modifiers: ['Ctrl'],
-    description: 'Show keyboard shortcuts help',
+  // Windows, Linux, and others use Ctrl
+  default: {
+    Meta: 'Win',
   },
-  navigateHome: {
-    id: 'navigateHome',
-    key: 'Home',
-    modifiers: ['Alt'],
-    description: 'Navigate to home page',
-  },
-  navigateUp: {
-    id: 'navigateUp',
-    key: 'ArrowUp',
-    description: 'Navigate up in lists',
-  },
-  navigateDown: {
-    id: 'navigateDown',
-    key: 'ArrowDown',
-    description: 'Navigate down in lists',
-  },
-  selectItem: {
-    id: 'selectItem',
-    key: 'Enter',
-    description: 'Select focused item',
-  },
-  closeModal: {
-    id: 'closeModal',
-    key: 'Escape',
-    description: 'Close modal or dropdown',
-  },
-  saveForm: {
-    id: 'saveForm',
-    key: 's',
-    modifiers: ['Ctrl'],
-    description: 'Save current form',
-  },
-  toggleDarkMode: {
-    id: 'toggleDarkMode',
-    key: 'd',
-    modifiers: ['Ctrl', 'Shift'],
-    description: 'Toggle dark mode',
-  },
-} as const;
+};
 
 /**
- * Parse a keyboard shortcut string into key and modifiers
+ * Detect the current platform
  *
- * @param shortcut - Shortcut string (e.g., "Ctrl+K", "Alt+Home", "Ctrl+Shift+S")
- * @returns Parsed shortcut object
- *
- * @throws {Error} If shortcut string is invalid
+ * @returns 'macos' if running on macOS, 'default' otherwise
  *
  * @example
  * ```ts
- * parseShortcutString("Ctrl+K")  // { key: 'k', ctrl: true, alt: false, shift: false, meta: false }
- * parseShortcutString("Alt+Home")  // { key: 'Home', ctrl: false, alt: true, shift: false, meta: false }
- * parseShortcutString("Ctrl+Shift+S")  // { key: 's', ctrl: true, alt: false, shift: true, meta: false }
+ * const platform = getPlatform();
+ * if (platform === 'macos') {
+ *   // Show Cmd symbols instead of Ctrl
+ * }
  * ```
  */
-export function parseShortcutString(shortcut: string): ParsedShortcut {
-  const parts = shortcut.split('+').map((p) => p.trim().toLowerCase());
-  const key = parts.pop() || '';
+export function getPlatform(): 'macos' | 'default' {
+  if (typeof window === 'undefined') return 'default';
 
-  const modifiers = {
-    ctrl: false,
-    alt: false,
-    shift: false,
-    meta: false,
-  };
+  return navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'macos' : 'default';
+}
 
-  for (const part of parts) {
-    switch (part) {
-      case 'ctrl':
-      case 'control':
-        modifiers.ctrl = true;
-        break;
-      case 'alt':
-        modifiers.alt = true;
-        break;
-      case 'shift':
-        modifiers.shift = true;
-        break;
-      case 'meta':
-      case 'cmd':
-        modifiers.meta = true;
-        break;
-      default:
-        throw new Error(`Invalid modifier: ${part}`);
-    }
-  }
+/**
+ * Format a key combination for display
+ *
+ * Formats a key combination array into a human-readable string with
+ * platform-specific key names and symbols.
+ *
+ * @param keys - Array of key names (e.g., ['Ctrl', 'S'])
+ * @param platform - Target platform ('macos' or 'default')
+ * @returns Formatted key combination string
+ *
+ * @example
+ * ```ts
+ * formatKeyCombination(['Ctrl', 'S'], 'default')  // "Ctrl+S"
+ * formatKeyCombination(['Ctrl', 'S'], 'macos')     // "⌘+S"
+ * formatKeyCombination(['Shift', 'Enter'])         // "Shift+Enter"
+ * ```
+ */
+export function formatKeyCombination(
+  keys: string[],
+  platform: 'macos' | 'default' = getPlatform()
+): string {
+  return keys
+    .map((key) => {
+      // Apply platform-specific mappings
+      const platformMap = platform === 'macos' ? PLATFORM_KEYS.macos : PLATFORM_KEYS.default;
+      const mappedKey = platformMap[key] || key;
 
-  if (!key) {
-    throw new Error(`Shortcut must have a key: ${shortcut}`);
-  }
+      // Convert special keys to symbols for macOS
+      if (platform === 'macos') {
+        const symbolMap: Record<string, string> = {
+          Cmd: '⌘',
+          Ctrl: '⌃',
+          Shift: '⇧',
+          Alt: '⌥',
+          Meta: '⌘',
+        };
+        return symbolMap[mappedKey] || mappedKey;
+      }
+
+      return mappedKey;
+    })
+    .join('+');
+}
+
+/**
+ * Format key combination as JSX elements for UI rendering
+ *
+ * Returns an array of strings and/or elements that can be rendered
+ * in React components with proper styling.
+ *
+ * @param keys - Array of key names
+ * @param platform - Target platform
+ * @returns Array of key strings ready for rendering
+ *
+ * @example
+ * ```tsx
+ * const keys = formatKeysForDisplay(['Ctrl', 'S']);
+ * // ['Ctrl', 'S'] - render with <Chip /> components
+ *
+ * {keys.map((key, i) => (
+ *   <React.Fragment key={i}>
+ *     {i > 0 && <span>+</span>}
+ *     <Chip label={key} />
+ *   </React.Fragment>
+ * ))}
+ * ```
+ */
+export function formatKeysForDisplay(
+  keys: string[],
+  platform: 'macos' | 'default' = getPlatform()
+): string[] {
+  return keys.map((key) => {
+    const platformMap = platform === 'macos' ? PLATFORM_KEYS.macos : PLATFORM_KEYS.default;
+    return platformMap[key] || key;
+  });
+}
+
+/**
+ * Parse a keyboard event into key combination
+ *
+ * Extracts modifier keys and primary key from a KeyboardEvent
+ * into a standardized KeyCombination format.
+ *
+ * @param event - Keyboard event to parse
+ * @returns Parsed key combination
+ *
+ * @example
+ * ```ts
+ * useEffect(() => {
+ *   const handleKeyDown = (e: KeyboardEvent) => {
+ *     const combo = parseKeyCombination(e);
+ *     // combo: { modifiers: ['Ctrl'], key: 'S', preventDefault: true }
+ *   };
+ *   window.addEventListener('keydown', handleKeyDown);
+ * }, []);
+ * ```
+ */
+export function parseKeyCombination(event: KeyboardEvent): KeyCombination {
+  const modifiers: ModifierKey[] = [];
+
+  if (event.ctrlKey) modifiers.push('Ctrl');
+  if (event.shiftKey) modifiers.push('Shift');
+  if (event.altKey) modifiers.push('Alt');
+  if (event.metaKey) modifiers.push('Meta');
 
   return {
-    key,
-    ...modifiers,
+    modifiers,
+    key: event.key,
+    preventDefault: true,
   };
 }
 
 /**
- * Format a keyboard shortcut object into a human-readable string
+ * Check if a keyboard event matches a key combination
  *
- * @param shortcut - Shortcut object or parsed shortcut
- * @returns Formatted shortcut string (e.g., "Ctrl+K", "Alt+Home")
+ * Tests whether a KeyboardEvent matches the expected combination
+ * of modifier keys and primary key.
  *
- * @example
- * ```ts
- * formatShortcut({ key: 'k', ctrl: true, alt: false, shift: false, meta: false })  // "Ctrl+K"
- * formatShortcut({ key: 'Home', ctrl: false, alt: true, shift: false, meta: false })  // "Alt+Home"
- * formatShortcut({ key: 's', ctrl: true, alt: false, shift: true, meta: false })  // "Ctrl+Shift+S"
- * ```
- */
-export function formatShortcut(shortcut: ParsedShortcut | KeyboardShortcut): string {
-  const parsed = 'key' in shortcut && typeof shortcut.key === 'string'
-    ? shortcut as ParsedShortcut
-    : _shortcutToParsed(shortcut as KeyboardShortcut);
-
-  const parts: string[] = [];
-
-  if (parsed.ctrl) parts.push('Ctrl');
-  if (parsed.alt) parts.push('Alt');
-  if (parsed.shift) parts.push('Shift');
-  if (parsed.meta) parts.push(isMac() ? 'Cmd' : 'Meta');
-
-  parts.push(_formatKey(parsed.key));
-
-  return parts.join('+');
-}
-
-/**
- * Check if a keyboard event matches a shortcut
- *
- * @param event - Keyboard event
- * @param shortcut - Shortcut to match against
- * @returns True if event matches the shortcut
+ * @param event - Keyboard event to test
+ * @param expected - Expected key combination
+ * @returns true if event matches the combination
  *
  * @example
  * ```ts
- * const shortcut = { key: 'k', ctrl: true, alt: false, shift: false, meta: false };
- * const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
- * matchesShortcut(event, shortcut)  // true
+ * const isCtrlS = matchesKeyCombination(event, {
+ *   modifiers: ['Ctrl'],
+ *   key: 'S'
+ * });
+ *
+ * if (isCtrlS) {
+ *   // Handle Ctrl+S shortcut
+ * }
  * ```
  */
-export function matchesShortcut(
+export function matchesKeyCombination(
   event: KeyboardEvent,
-  shortcut: ParsedShortcut | KeyboardShortcut
+  expected: KeyCombination
 ): boolean {
-  const parsed = 'key' in shortcut && typeof shortcut.key === 'string'
-    ? shortcut as ParsedShortcut
-    : _shortcutToParsed(shortcut as KeyboardShortcut);
-
-  // Normalize event key
-  const eventKey = event.key.toLowerCase();
-
-  // Check key match
-  if (eventKey !== parsed.key.toLowerCase()) {
+  // Check primary key
+  if (event.key.toLowerCase() !== expected.key.toLowerCase()) {
     return false;
   }
 
   // Check modifiers
-  if (parsed.ctrl !== event.ctrlKey) return false;
-  if (parsed.alt !== event.altKey) return false;
-  if (parsed.shift !== event.shiftKey) return false;
-  if (parsed.meta !== event.metaKey) return false;
+  const expectedModifiers = expected.modifiers || [];
+  const hasCtrl = expectedModifiers.includes('Ctrl');
+  const hasShift = expectedModifiers.includes('Shift');
+  const hasAlt = expectedModifiers.includes('Alt');
+  const hasMeta = expectedModifiers.includes('Meta') || expectedModifiers.includes('Cmd');
+
+  // All specified modifiers must be present
+  if (hasCtrl && !event.ctrlKey) return false;
+  if (hasShift && !event.shiftKey) return false;
+  if (hasAlt && !event.altKey) return false;
+  if (hasMeta && !event.metaKey) return false;
+
+  // No unspecified modifiers should be present
+  if (!hasCtrl && event.ctrlKey) return false;
+  if (!hasShift && event.shiftKey) return false;
+  if (!hasAlt && event.altKey) return false;
+  if (!hasMeta && event.metaKey) return false;
 
   return true;
 }
 
 /**
- * Check if the current platform is Mac
+ * Format keyboard shortcut description for help text
  *
- * @returns True if running on macOS
+ * Creates a human-readable description of a keyboard shortcut
+ * with proper key formatting.
  *
- * @example
- * ```ts
- * isMac()  // true on macOS, false on Windows/Linux
- * ```
- */
-export function isMac(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-  return navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-}
-
-/**
- * Get the platform-specific modifier key name
- *
- * @param modifier - Modifier key
- * @returns Platform-specific modifier name (Cmd on Mac, Ctrl on others)
- *
- * @example
- * ```ts
- * getModifierKeyName('Ctrl')  // "Cmd" on Mac, "Ctrl" on Windows/Linux
- * getModifierKeyName('Meta')  // "Cmd" on Mac, "Win" on Windows
- * ```
- */
-export function getModifierKeyName(modifier: ModifierKey): string {
-  if (modifier === 'Ctrl' || modifier === 'Control') {
-    return isMac() ? 'Cmd' : 'Ctrl';
-  }
-  if (modifier === 'Meta' || modifier === 'Cmd') {
-    return isMac() ? 'Cmd' : 'Win';
-  }
-  return modifier;
-}
-
-/**
- * Format a key for display (capitalize first letter, handle special keys)
- *
- * @private
- * @param key - Key code
- * @returns Formatted key name
- */
-function _formatKey(key: string): string {
-  const specialKeys: Record<string, string> = {
-    'arrowup': '↑',
-    'arrowdown': '↓',
-    'arrowleft': '←',
-    'arrowright': '→',
-    'enter': 'Enter',
-    'escape': 'Esc',
-    'esc': 'Esc',
-    ' ': 'Space',
-    'tab': 'Tab',
-    'home': 'Home',
-    'end': 'End',
-    'pageup': 'Page Up',
-    'pagedown': 'Page Down',
-    'delete': 'Delete',
-    'backspace': 'Backspace',
-    'insert': 'Insert',
-  };
-
-  const lowerKey = key.toLowerCase();
-
-  if (specialKeys[lowerKey]) {
-    return specialKeys[lowerKey];
-  }
-
-  // Capitalize single letter keys
-  return key.length === 1 ? key.toUpperCase() : key;
-}
-
-/**
- * Convert a KeyboardShortcut to ParsedShortcut
- *
- * @private
  * @param shortcut - Keyboard shortcut object
- * @returns Parsed shortcut object
- */
-function _shortcutToParsed(shortcut: KeyboardShortcut): ParsedShortcut {
-  const key = shortcut.key.toLowerCase();
-  const modifiers = shortcut.modifiers || [];
-
-  return {
-    key,
-    ctrl: modifiers.includes('Ctrl') || modifiers.includes('Control'),
-    alt: modifiers.includes('Alt'),
-    shift: modifiers.includes('Shift'),
-    meta: modifiers.includes('Meta') || modifiers.includes('Cmd'),
-  };
-}
-
-/**
- * Normalize a key code for comparison
- *
- * Handles case-insensitivity and special key aliases.
- *
- * @param key - Key code to normalize
- * @returns Normalized key code
+ * @param platform - Target platform
+ * @returns Formatted description with keys
  *
  * @example
  * ```ts
- * normalizeKey('Enter')  // 'enter'
- * normalizeKey('K')  // 'k'
- * normalizeKey('Escape')  // 'escape'
- * normalizeKey('Esc')  // 'escape'
- * ```
- */
-export function normalizeKey(key: string): string {
-  const aliases: Record<string, string> = {
-    'esc': 'escape',
-    'ctrl': 'control',
-    'cmd': 'meta',
-    'del': 'delete',
-    'ins': 'insert',
-    'return': 'enter',
-  };
-
-  const normalized = key.toLowerCase();
-  return aliases[normalized] || normalized;
-}
-
-/**
- * Check if a key is a printable character
- *
- * @param key - Key code to check
- * @returns True if key is printable
- *
- * @example
- * ```ts
- * isPrintableKey('a')  // true
- * isPrintableKey('Enter')  // false
- * isPrintableKey(' ')  // true
- * ```
- */
-export function isPrintableKey(key: string): boolean {
-  const nonPrintableKeys = [
-    'enter', 'escape', 'esc', 'tab', 'arrowup', 'arrowdown',
-    'arrowleft', 'arrowright', 'home', 'end', 'pageup', 'pagedown',
-    'delete', 'backspace', 'insert', 'f1', 'f2', 'f3', 'f4', 'f5',
-    'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12',
-  ];
-
-  const normalized = normalizeKey(key);
-  return !nonPrintableKeys.includes(normalized);
-}
-
-/**
- * Prevent default behavior for keyboard shortcuts that conflict with browser defaults
- *
- * Some shortcuts like Ctrl+S (save), Ctrl+P (print), etc. have browser defaults
- * that should be prevented when used in the application.
- *
- * @param event - Keyboard event
- * @returns True if default was prevented
- *
- * @example
- * ```ts
- * const handleKeyDown = (event: KeyboardEvent) => {
- *   preventShortcutDefaults(event);
- *   // Handle shortcut...
+ * const shortcut = {
+ *   id: 'save',
+ *   keys: ['Ctrl', 'S'],
+ *   description: 'Save document',
+ *   category: 'forms'
  * };
+ *
+ * formatShortcutHelp(shortcut);
+ * // "Ctrl+S - Save document" (on Windows/Linux)
+ * // "⌘+S - Save document" (on macOS)
  * ```
  */
-export function preventShortcutDefaults(event: KeyboardEvent): boolean {
-  const key = event.key.toLowerCase();
-  const ctrl = event.ctrlKey || event.metaKey;
+export function formatShortcutHelp(
+  shortcut: KeyboardShortcut,
+  platform: 'macos' | 'default' = getPlatform()
+): string {
+  const keys = formatKeyCombination(shortcut.keys, platform);
+  return `${keys} - ${shortcut.description}`;
+}
 
-  // Prevent browser defaults for common shortcuts
-  const preventableShortcuts = [
-    { key: 's', ctrl: true }, // Save
-    { key: 'p', ctrl: true }, // Print
-    { key: 'f', ctrl: true }, // Find
-    { key: 'g', ctrl: true }, // Find again
-    { key: 'k', ctrl: true }, // Focus search (DevTools)
-    { key: 'o', ctrl: true }, // Open
-  ];
+/**
+ * Group shortcuts by category
+ *
+ * Organizes an array of shortcuts into groups based on their category.
+ * Useful for rendering organized shortcut lists.
+ *
+ * @param shortcuts - Array of keyboard shortcuts
+ * @returns Object with shortcuts grouped by category
+ *
+ * @example
+ * ```ts
+ * const shortcuts = getAllKeyboardShortcuts();
+ * const grouped = groupShortcutsByCategory(shortcuts);
+ * // {
+ * //   global: [{ id: 'global.search', ... }],
+ * //   upload: [{ id: 'upload.focusZone', ... }],
+ * //   vacancy: [{ id: 'vacancy.new', ... }],
+ * //   ...
+ * // }
+ * ```
+ */
+export function groupShortcutsByCategory(
+  shortcuts: KeyboardShortcut[]
+): Record<ShortcutCategory, KeyboardShortcut[]> {
+  return shortcuts.reduce((acc, shortcut) => {
+    const category = shortcut.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(shortcut);
+    return acc;
+  }, {} as Record<ShortcutCategory, KeyboardShortcut[]>);
+}
 
-  for (const shortcut of preventableShortcuts) {
-    if (key === shortcut.key && ctrl === shortcut.ctrl) {
-      event.preventDefault();
+/**
+ * Filter shortcuts by search query
+ *
+ * Filters shortcuts array by matching search query against
+ * shortcut ID, description, or keys.
+ *
+ * @param shortcuts - Array of keyboard shortcuts
+ * @param query - Search query string
+ * @returns Filtered array of shortcuts
+ *
+ * @example
+ * ```ts
+ * const shortcuts = getAllKeyboardShortcuts();
+ * const results = filterShortcuts(shortcuts, 'save');
+ * // Returns all shortcuts matching 'save' in description or keys
+ * ```
+ */
+export function filterShortcuts(shortcuts: KeyboardShortcut[], query: string): KeyboardShortcut[] {
+  if (!query.trim()) return shortcuts;
+
+  const lowerQuery = query.toLowerCase();
+
+  return shortcuts.filter((shortcut) => {
+    // Search in description
+    if (shortcut.description.toLowerCase().includes(lowerQuery)) {
       return true;
     }
+
+    // Search in keys
+    if (shortcut.keys.some((key) => key.toLowerCase().includes(lowerQuery))) {
+      return true;
+    }
+
+    // Search in ID
+    if (shortcut.id.toLowerCase().includes(lowerQuery)) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
+/**
+ * Validate a key combination array
+ *
+ * Checks if a key combination array is valid and properly formatted.
+ *
+ * @param keys - Array of key names to validate
+ * @returns true if the key combination is valid
+ *
+ * @example
+ * ```ts
+ * validateKeyCombination(['Ctrl', 'S']);    // true
+ * validateKeyCombination(['Ctrl', 'Shift', 'Enter']); // true
+ * validateKeyCombination([]);               // false
+ * validateKeyCombination(['Invalid']);      // true (no strict validation)
+ * ```
+ */
+export function validateKeyCombination(keys: string[]): boolean {
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return false;
   }
 
-  return false;
+  // Valid modifier keys
+  const validModifiers = ['Ctrl', 'Shift', 'Alt', 'Meta', 'Cmd'];
+
+  // Must have at least one primary key (non-modifier)
+  const hasPrimaryKey = keys.some((key) => !validModifiers.includes(key));
+
+  return hasPrimaryKey;
+}
+
+/**
+ * Get keyboard shortcut accessibility label
+ *
+ * Generates an ARIA-friendly label for a keyboard shortcut
+ * for use with accessibility attributes.
+ *
+ * @param shortcut - Keyboard shortcut object
+ * @returns Accessible label string
+ *
+ * @example
+ * ```tsx
+ * <button
+ *   aria-label={getShortcutAriaLabel(shortcut)}
+ *   onClick={handleAction}
+ * >
+ *   Save
+ * </button>
+ * ```
+ */
+export function getShortcutAriaLabel(shortcut: KeyboardShortcut): string {
+  const keys = shortcut.keys.join(' plus ');
+  return `Keyboard shortcut: ${keys}. ${shortcut.description}`;
+}
+
+/**
+ * Convert keyboard shortcut to useKeyboardNavigation format
+ *
+ * Transforms a KeyboardShortcut object into the format expected
+ * by the useKeyboardNavigation hook.
+ *
+ * @param shortcut - Keyboard shortcut from KeyboardShortcutsHelp
+ * @returns Shortcut config for useKeyboardNavigation
+ *
+ * @example
+ * ```ts
+ * const shortcut = {
+ *   id: 'save',
+ *   keys: ['Ctrl', 'S'],
+ *   description: 'Save',
+ *   category: 'forms'
+ * };
+ *
+ * const config = toUseKeyboardNavigationFormat(shortcut);
+ * // {
+ * //   id: 'save',
+ * //   key: 'S',
+ * //   modifiers: { Ctrl: true },
+ * //   handler: () => {},
+ * //   description: 'Save'
+ * // }
+ * ```
+ */
+export function toUseKeyboardNavigationFormat(
+  shortcut: KeyboardShortcut
+): {
+  id: string;
+  key: string;
+  modifiers: { Ctrl?: boolean; Shift?: boolean; Alt?: boolean; Meta?: boolean };
+  description: string;
+} {
+  const modifiers: { Ctrl?: boolean; Shift?: boolean; Alt?: boolean; Meta?: boolean } = {};
+
+  shortcut.keys.forEach((key) => {
+    switch (key) {
+      case 'Ctrl':
+        modifiers.Ctrl = true;
+        break;
+      case 'Shift':
+        modifiers.Shift = true;
+        break;
+      case 'Alt':
+        modifiers.Alt = true;
+        break;
+      case 'Meta':
+      case 'Cmd':
+        modifiers.Meta = true;
+        break;
+    }
+  });
+
+  // Last key is typically the primary key
+  const primaryKey = shortcut.keys[shortcut.keys.length - 1];
+
+  return {
+    id: shortcut.id,
+    key: primaryKey,
+    modifiers,
+    description: shortcut.description,
+  };
 }

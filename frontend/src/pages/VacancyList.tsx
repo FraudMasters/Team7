@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -9,26 +9,46 @@ import {
   CardActions,
   Chip,
   Stack,
-  Grid,
+  Grid2,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Alert,
-  useMediaQuery,
-  useTheme,
+  CircularProgress,
+  TextField,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Collapse,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Work as WorkIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  ExpandMore as ExpandMoreIcon,
+  Clear as ClearIcon,
+  Save as SaveIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useBreakpoints } from '../hooks/useBreakpoints';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorBoundary from '../components/ErrorBoundary';
+import ErrorMessage, { ErrorType, ErrorAction } from '../components/ErrorMessage';
+import useKeyboardNavigation from '../hooks/useKeyboardNavigation';
 
 interface Vacancy {
   id: string;
@@ -48,22 +68,256 @@ interface Vacancy {
   updated_at: string;
 }
 
+// Zod validation schema for inline vacancy edit
+const vacancyEditSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().min(10, 'Description must be at least 10 characters'),
+  required_skills: z.array(z.string()).min(1, 'At least one skill is required'),
+  min_experience_months: z.number().min(0, 'Experience cannot be negative'),
+  salary_min: z.number().nullable().optional(),
+  salary_max: z.number().nullable().optional(),
+  industry: z.string().optional(),
+  work_format: z.string().optional(),
+  location: z.string().optional(),
+  english_level: z.string().optional(),
+  employment_type: z.string().optional(),
+}).refine((data) => {
+  if (data.salary_min && data.salary_max && data.salary_min > data.salary_max) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Minimum salary cannot be greater than maximum salary',
+  path: ['salary_min'],
+});
+
+type VacancyEditFormData = z.infer<typeof vacancyEditSchema>;
+
 const VacancyList: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
-  const theme = useTheme();
-  const { isMobile, isTablet, isDesktop } = useBreakpoints();
-
-  // Determine if we're in job seeker or recruiter context
-  const isJobsContext = location.pathname.startsWith('/jobs');
-  const basePath = isJobsContext ? '/jobs' : '/recruiter/vacancies';
-
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | ErrorType | string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vacancyToDelete, setVacancyToDelete] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedVacancyIndex, setSelectedVacancyIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline editing state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null);
+  const [saveError, setSaveError] = useState<Error | ErrorType | string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Filter states
+  const [workFormatFilter, setWorkFormatFilter] = useState<string>('all');
+  const [locationFilter, setLocationFilter] = useState<string>('');
+  const [dateFromFilter, setDateFromFilter] = useState<string>('');
+  const [dateToFilter, setDateToFilter] = useState<string>('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  // Filter vacancies based on search query and filters
+  const filteredVacancies = vacancies.filter((vacancy) => {
+    // Search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        vacancy.title.toLowerCase().includes(query) ||
+        vacancy.description.toLowerCase().includes(query) ||
+        vacancy.required_skills.some((skill) => skill.toLowerCase().includes(query)) ||
+        vacancy.industry?.toLowerCase().includes(query) ||
+        vacancy.location?.toLowerCase().includes(query);
+
+      if (!matchesSearch) return false;
+    }
+
+    // Work format filter
+    if (workFormatFilter !== 'all') {
+      if (vacancy.work_format !== workFormatFilter) return false;
+    }
+
+    // Location filter
+    if (locationFilter.trim()) {
+      if (!vacancy.location?.toLowerCase().includes(locationFilter.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // Date range filter
+    if (dateFromFilter) {
+      const vacancyDate = new Date(vacancy.created_at);
+      const fromDate = new Date(dateFromFilter);
+      if (vacancyDate < fromDate) return false;
+    }
+
+    if (dateToFilter) {
+      const vacancyDate = new Date(vacancy.created_at);
+      const toDate = new Date(dateToFilter);
+      toDate.setHours(23, 59, 59, 999); // End of day
+      if (vacancyDate > toDate) return false;
+    }
+
+    return true;
+  });
+
+  // Check if any filters are active
+  const hasActiveFilters =
+    workFormatFilter !== 'all' ||
+    locationFilter.trim() !== '' ||
+    dateFromFilter !== '' ||
+    dateToFilter !== '';
+
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    setWorkFormatFilter('all');
+    setLocationFilter('');
+    setDateFromFilter('');
+    setDateToFilter('');
+  }, []);
+
+  /**
+   * Keyboard navigation handlers
+   */
+  const handleNextVacancy = useCallback(() => {
+    if (filteredVacancies.length > 0) {
+      setSelectedVacancyIndex((prev) => {
+        if (prev < filteredVacancies.length - 1) {
+          return prev + 1;
+        }
+        return prev;
+      });
+    }
+  }, [filteredVacancies.length]);
+
+  const handlePreviousVacancy = useCallback(() => {
+    if (filteredVacancies.length > 0) {
+      setSelectedVacancyIndex((prev) => {
+        if (prev > 0) {
+          return prev - 1;
+        }
+        return prev;
+      });
+    }
+  }, [filteredVacancies.length]);
+
+  const handleViewVacancy = useCallback(() => {
+    if (selectedVacancyIndex >= 0) {
+      const selectedVacancy = filteredVacancies[selectedVacancyIndex];
+      if (selectedVacancy) {
+        navigate(`${selectedVacancy.id}`);
+      }
+    }
+  }, [selectedVacancyIndex, filteredVacancies, navigate]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedVacancyIndex(-1);
+    setSearchQuery('');
+  }, []);
+
+  const handleCreateVacancy = useCallback(() => {
+    navigate('/vacancies/create');
+  }, [navigate]);
+
+  const handleFocusSearch = useCallback(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
+  /**
+   * Register keyboard shortcuts using useKeyboardNavigation hook
+   * - Ctrl+N: Create new vacancy
+   * - Ctrl+F: Focus search field
+   * - Arrow Down/Right: Navigate to next vacancy
+   * - Arrow Up/Left: Navigate to previous vacancy
+   * - Enter: View selected vacancy details
+   * - Escape: Clear selection or search
+   */
+  useKeyboardNavigation({
+    shortcuts: [
+      {
+        id: 'createVacancy',
+        key: 'n',
+        modifiers: ['Ctrl'],
+        handler: handleCreateVacancy,
+        description: 'Create new vacancy',
+        priority: 10,
+        when: () => !deleteDialogOpen,
+      },
+      {
+        id: 'focusSearch',
+        key: 'f',
+        modifiers: ['Ctrl'],
+        handler: handleFocusSearch,
+        description: 'Focus search field',
+        priority: 10,
+      },
+      {
+        id: 'nextVacancyDown',
+        key: 'ArrowDown',
+        handler: handleNextVacancy,
+        description: 'Navigate to next vacancy',
+        priority: 5,
+        when: () => !deleteDialogOpen && filteredVacancies.length > 0,
+      },
+      {
+        id: 'nextVacancyRight',
+        key: 'ArrowRight',
+        handler: handleNextVacancy,
+        description: 'Navigate to next vacancy',
+        priority: 5,
+        when: () => {
+          const target = document.activeElement as HTMLElement;
+          return !deleteDialogOpen && filteredVacancies.length > 0 && target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA';
+        },
+      },
+      {
+        id: 'previousVacancyUp',
+        key: 'ArrowUp',
+        handler: handlePreviousVacancy,
+        description: 'Navigate to previous vacancy',
+        priority: 5,
+        when: () => !deleteDialogOpen && filteredVacancies.length > 0,
+      },
+      {
+        id: 'previousVacancyLeft',
+        key: 'ArrowLeft',
+        handler: handlePreviousVacancy,
+        description: 'Navigate to previous vacancy',
+        priority: 5,
+        when: () => {
+          const target = document.activeElement as HTMLElement;
+          return !deleteDialogOpen && filteredVacancies.length > 0 && target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA';
+        },
+      },
+      {
+        id: 'viewVacancy',
+        key: 'Enter',
+        handler: handleViewVacancy,
+        description: 'View selected vacancy details',
+        priority: 5,
+        when: () => !deleteDialogOpen && selectedVacancyIndex >= 0,
+      },
+      {
+        id: 'clearSelection',
+        key: 'Escape',
+        handler: handleClearSelection,
+        description: 'Clear selection or search',
+        priority: 5,
+        when: () => !deleteDialogOpen,
+      },
+    ],
+  });
+
+  // Reset selected index when filtered vacancies change
+  useEffect(() => {
+    setSelectedVacancyIndex((prev) => {
+      if (prev >= filteredVacancies.length) {
+        return Math.max(0, filteredVacancies.length - 1);
+      }
+      return prev;
+    });
+  }, [filteredVacancies.length]);
 
   useEffect(() => {
     fetchVacancies();
@@ -83,7 +337,7 @@ const VacancyList: React.FC = () => {
       const data: Vacancy[] = await response.json();
       setVacancies(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch vacancies');
+      setError(err instanceof Error ? err : 'Failed to fetch vacancies');
     } finally {
       setLoading(false);
     }
@@ -111,7 +365,67 @@ const VacancyList: React.FC = () => {
       setDeleteDialogOpen(false);
       setVacancyToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete vacancy');
+      setError(err instanceof Error ? err : 'Failed to delete vacancy');
+    }
+  };
+
+  // Inline edit handlers
+  const handleEditClick = useCallback((vacancy: Vacancy) => {
+    setEditingVacancy(vacancy);
+    setEditDialogOpen(true);
+    setSaveError(null);
+  }, []);
+
+  const handleEditDialogClose = useCallback(() => {
+    setEditDialogOpen(false);
+    setEditingVacancy(null);
+    setSaveError(null);
+    // Clear draft from localStorage
+    try {
+      localStorage.removeItem('vacancy-edit-draft');
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  const handleSaveVacancy = async (data: VacancyEditFormData) => {
+    if (!editingVacancy) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(`/api/vacancies/${editingVacancy.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update vacancy');
+      }
+
+      const updatedVacancy: Vacancy = await response.json();
+
+      // Update vacancy in list without page reload
+      setVacancies((prev) =>
+        prev.map((v) => (v.id === updatedVacancy.id ? updatedVacancy : v))
+      );
+
+      // Clear draft from localStorage
+      try {
+        localStorage.removeItem('vacancy-edit-draft');
+      } catch {
+        // Ignore localStorage errors
+      }
+
+      handleEditDialogClose();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err : 'Failed to update vacancy');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -157,239 +471,753 @@ const VacancyList: React.FC = () => {
     return 'лет';
   };
 
+  const handleError = useCallback((error: Error, errorInfo: React.ErrorInfo) => {
+    console.error('ErrorBoundary caught an error in VacancyList:', error);
+    console.error('Error Info:', errorInfo);
+  }, []);
+
+  // Inline edit form component
+  const InlineEditForm: React.FC<{ vacancy: Vacancy }> = ({ vacancy }) => {
+    // Load draft from localStorage on mount
+    const [draftLoaded, setDraftLoaded] = useState(false);
+
+    const {
+      register,
+      handleSubmit,
+      control,
+      watch,
+      formState: { errors, isDirty },
+      reset,
+      setValue,
+    } = useForm<VacancyEditFormData>({
+      resolver: zodResolver(vacancyEditSchema),
+      defaultValues: {
+        title: vacancy.title,
+        description: vacancy.description,
+        required_skills: vacancy.required_skills,
+        min_experience_months: vacancy.min_experience_months,
+        salary_min: vacancy.salary_min || null,
+        salary_max: vacancy.salary_max || null,
+        industry: vacancy.industry || '',
+        work_format: vacancy.work_format || '',
+        location: vacancy.location || '',
+        english_level: vacancy.english_level || '',
+        employment_type: vacancy.employment_type || '',
+      },
+      mode: 'onBlur',
+    });
+
+    // Load draft from localStorage on mount
+    useEffect(() => {
+      if (!draftLoaded) {
+        try {
+          const draft = localStorage.getItem('vacancy-edit-draft');
+          if (draft) {
+            const draftData = JSON.parse(draft);
+            if (draftData.vacancyId === vacancy.id) {
+              // Restore draft values
+              Object.keys(draftData).forEach((key) => {
+                if (key !== 'vacancyId' && key in draftData) {
+                  setValue(key as keyof VacancyEditFormData, draftData[key]);
+                }
+              });
+            }
+          }
+        } catch {
+          // Ignore localStorage errors
+        }
+        setDraftLoaded(true);
+      }
+    }, [draftLoaded, vacancy.id, setValue]);
+
+    // Auto-save draft to localStorage when form is dirty
+    useEffect(() => {
+      if (isDirty && draftLoaded) {
+        const formData = watch();
+        try {
+          localStorage.setItem(
+            'vacancy-edit-draft',
+            JSON.stringify({ ...formData, vacancyId: vacancy.id })
+          );
+        } catch {
+          // Ignore localStorage errors
+        }
+      }
+    }, [isDirty, watch, draftLoaded, vacancy.id]);
+
+    const onSubmit = (data: VacancyEditFormData) => {
+      handleSaveVacancy(data);
+    };
+
+    const onCancel = () => {
+      reset(); // Restore original values
+      handleEditDialogClose();
+    };
+
+    return (
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {saveError && (
+          <ErrorMessage
+            error={saveError}
+            title="Failed to Save Vacancy"
+            actions={[
+              {
+                label: 'Retry',
+                onClick: () => {
+                  setSaveError(null);
+                  handleSubmit(onSubmit)();
+                },
+                primary: true,
+              },
+              {
+                label: 'Cancel',
+                onClick: () => setSaveError(null),
+                variant: 'outlined',
+              },
+            ]}
+          />
+        )}
+
+        {/* Title */}
+        <TextField
+          fullWidth
+          label="Title"
+          {...register('title')}
+          error={!!errors.title}
+          helperText={errors.title?.message}
+          required
+        />
+
+        {/* Description */}
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          label="Description"
+          {...register('description')}
+          error={!!errors.description}
+          helperText={errors.description?.message}
+          required
+        />
+
+        {/* Skills */}
+        <FormControl error={!!errors.required_skills}>
+          <InputLabel>Required Skills (comma separated)</InputLabel>
+          <Controller
+            name="required_skills"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="Required Skills (comma separated)"
+                value={field.value.join(', ')}
+                onChange={(e) => {
+                  const skills = e.target.value
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  field.onChange(skills);
+                }}
+                error={!!errors.required_skills}
+                helperText={errors.required_skills?.message || 'Separate multiple skills with commas'}
+              />
+            )}
+          />
+        </FormControl>
+
+        {/* Grid for fields */}
+        <Grid2 container spacing={2}>
+          {/* Experience */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Min Experience (months)"
+              {...register('min_experience_months', { valueAsNumber: true })}
+              error={!!errors.min_experience_months}
+              helperText={errors.min_experience_months?.message}
+              inputProps={{ min: 0 }}
+            />
+          </Grid2>
+
+          {/* Salary Min */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Salary Min"
+              {...register('salary_min', { valueAsNumber: true })}
+              error={!!errors.salary_min}
+              helperText={errors.salary_min?.message}
+              inputProps={{ min: 0 }}
+            />
+          </Grid2>
+
+          {/* Salary Max */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Salary Max"
+              {...register('salary_max', { valueAsNumber: true })}
+              error={!!errors.salary_max}
+              helperText={errors.salary_max?.message}
+              inputProps={{ min: 0 }}
+            />
+          </Grid2>
+
+          {/* English Level */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth>
+              <InputLabel>English Level</InputLabel>
+              <Select label="English Level" {...register('english_level')}>
+                <MenuItem value="">Not specified</MenuItem>
+                <MenuItem value="A1">A1 - Beginner</MenuItem>
+                <MenuItem value="A2">A2 - Elementary</MenuItem>
+                <MenuItem value="B1">B1 - Intermediate</MenuItem>
+                <MenuItem value="B2">B2 - Upper Intermediate</MenuItem>
+                <MenuItem value="C1">C1 - Advanced</MenuItem>
+                <MenuItem value="C2">C2 - Proficiency</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid2>
+
+          {/* Industry */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              label="Industry"
+              {...register('industry')}
+            />
+          </Grid2>
+
+          {/* Work Format */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth>
+              <InputLabel>Work Format</InputLabel>
+              <Select label="Work Format" {...register('work_format')}>
+                <MenuItem value="">Not specified</MenuItem>
+                <MenuItem value="remote">Remote</MenuItem>
+                <MenuItem value="office">Office</MenuItem>
+                <MenuItem value="hybrid">Hybrid</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid2>
+
+          {/* Location */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              label="Location"
+              {...register('location')}
+            />
+          </Grid2>
+
+          {/* Employment Type */}
+          <Grid2 size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth>
+              <InputLabel>Employment Type</InputLabel>
+              <Select label="Employment Type" {...register('employment_type')}>
+                <MenuItem value="">Not specified</MenuItem>
+                <MenuItem value="full-time">Full-time</MenuItem>
+                <MenuItem value="part-time">Part-time</MenuItem>
+                <MenuItem value="contract">Contract</MenuItem>
+                <MenuItem value="internship">Internship</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid2>
+        </Grid2>
+
+        {/* Form Actions */}
+        <DialogActions sx={{ px: 0, mt: 2 }}>
+          <Button
+            onClick={onCancel}
+            startIcon={<CloseIcon />}
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            startIcon={isSaving ? <CircularProgress size={20} /> : <SaveIcon />}
+            disabled={isSaving || !isDirty}
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Box>
+    );
+  };
+
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <LoadingSpinner size={60} />
-      </Box>
+      <ErrorBoundary onError={handleError}>
+        <Box
+          sx={{
+            maxWidth: 1200,
+            mx: 'auto',
+            p: { xs: 2, sm: 3 },
+            overflowX: 'hidden',
+          }}
+        >
+        {/* Header Skeleton */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            mb: 4,
+            flexDirection: { xs: 'column', sm: 'row' },
+            gap: { xs: 2, sm: 0 },
+          }}
+        >
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="h4" component="h1" fontWeight={600} gutterBottom sx={{ color: 'text.primary' }}>
+              {t('vacancyList.title')}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Search Skeleton */}
+        <Box sx={{ mb: 3 }}>
+          <Box
+            sx={{
+              width: '100%',
+              height: 56,
+              bgcolor: 'action.hover',
+              borderRadius: 2,
+            }}
+          />
+        </Box>
+
+        {/* Loading Message */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+          Loading vacancies...
+        </Typography>
+
+        {/* Vacancy Cards Skeleton */}
+        <LoadingSpinner variant="cards" count={6} />
+        </Box>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, sm: 3 } }}>
+    <ErrorBoundary onError={handleError}>
+      <Box
+        sx={{
+          maxWidth: 1200,
+          mx: 'auto',
+          p: { xs: 2, sm: 3 },
+          overflowX: 'hidden',
+        }}
+      >
       {/* Header */}
       <Box
         sx={{
           display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
           justifyContent: 'space-between',
           alignItems: { xs: 'flex-start', sm: 'center' },
-          mb: { xs: 3, md: 4 },
+          mb: 4,
+          flexDirection: { xs: 'column', sm: 'row' },
           gap: { xs: 2, sm: 0 },
         }}
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography
-            variant={isMobile ? 'h5' : 'h4'}
-            component="h1"
-            fontWeight={600}
-            gutterBottom
-          >
+          <Typography variant="h4" component="h1" fontWeight={600} gutterBottom>
             {t('vacancyList.title')}
           </Typography>
-          <Typography
-            variant={isMobile ? 'body2' : 'body1'}
-            color="text.secondary"
-          >
+          <Typography variant="body1" color="text.secondary">
             {t('vacancyList.subtitle')}
           </Typography>
         </Box>
         <Button
           variant="contained"
-          size={isMobile ? 'medium' : 'large'}
+          size="large"
           startIcon={<AddIcon />}
-          onClick={() => navigate(`${basePath}/create`)}
-          fullWidth={isMobile}
-          sx={{ minWidth: isMobile ? '100%' : 'auto' }}
+          onClick={() => navigate('/vacancies/create')}
+          sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
         >
-          {isMobile ? t('vacancyList.createRequest') : t('vacancyList.createRequest')}
+          {t('vacancyList.createRequest')}
         </Button>
+      </Box>
+
+      {/* Search Field */}
+      <Box sx={{ mb: 3, minWidth: 0 }}>
+        <TextField
+          inputRef={searchInputRef}
+          fullWidth
+          placeholder={t('vacancyList.searchPlaceholder') || 'Search vacancies...'}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+            },
+          }}
+        />
+        {searchQuery && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {t('vacancyList.results', { count: filteredVacancies.length })}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Sticky Filter Bar */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          bgcolor: 'background.default',
+          mb: 3,
+          transition: 'box-shadow 0.3s',
+          py: 1,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        }}
+      >
+        <Accordion
+          expanded={filtersExpanded}
+          onChange={() => setFiltersExpanded(!filtersExpanded)}
+          elevation={2}
+          sx={{
+            '&:before': {
+              display: 'none',
+            },
+          }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{
+              '& .MuiAccordionSummary-content': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FilterListIcon color="primary" />
+              <Typography variant="h6" fontWeight={600}>
+                Filters
+              </Typography>
+              {hasActiveFilters && (
+                <Chip
+                  label="Active"
+                  color="primary"
+                  size="small"
+                  sx={{ ml: 1 }}
+                />
+              )}
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={3}>
+              {/* Work Format Filter */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
+                  Work Format:
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
+                  <Button
+                    size="small"
+                    variant={workFormatFilter === 'all' ? 'contained' : 'outlined'}
+                    onClick={() => setWorkFormatFilter('all')}
+                  >
+                    All Formats
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={workFormatFilter === 'remote' ? 'contained' : 'outlined'}
+                    onClick={() => setWorkFormatFilter('remote')}
+                  >
+                    Remote
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={workFormatFilter === 'office' ? 'contained' : 'outlined'}
+                    onClick={() => setWorkFormatFilter('office')}
+                  >
+                    Office
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={workFormatFilter === 'hybrid' ? 'contained' : 'outlined'}
+                    onClick={() => setWorkFormatFilter('hybrid')}
+                  >
+                    Hybrid
+                  </Button>
+                </Stack>
+              </Box>
+
+              {/* Location Filter */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
+                  Location:
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Filter by location..."
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+
+              {/* Date Range Filter */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
+                  Date Range:
+                </Typography>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                  <TextField
+                    type="date"
+                    label="From"
+                    size="small"
+                    value={dateFromFilter}
+                    onChange={(e) => setDateFromFilter(e.target.value)}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    type="date"
+                    label="To"
+                    size="small"
+                    value={dateToFilter}
+                    onChange={(e) => setDateToFilter(e.target.value)}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                    sx={{ flex: 1 }}
+                  />
+                </Stack>
+              </Box>
+
+              {/* Filter Actions */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t('vacancyList.results', { count: filteredVacancies.length })}
+                </Typography>
+                {hasActiveFilters && (
+                  <Button
+                    size="small"
+                    startIcon={<ClearIcon />}
+                    onClick={handleClearFilters}
+                    color="secondary"
+                  >
+                    Clear All Filters
+                  </Button>
+                )}
+              </Box>
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
       </Box>
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: { xs: 2, md: 3 } }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <ErrorMessage
+          error={error}
+          actions={[
+            {
+              label: 'Retry',
+              onClick: () => {
+                setError(null);
+                fetchVacancies();
+              },
+              primary: true,
+            },
+            {
+              label: 'Dismiss',
+              onClick: () => setError(null),
+              variant: 'outlined',
+            },
+          ]}
+        />
       )}
 
       {/* Vacancies List */}
-      {vacancies.length === 0 ? (
-        <Paper sx={{ p: { xs: 4, md: 6 }, textAlign: 'center' }}>
-          <WorkIcon sx={{ fontSize: { xs: 48, md: 60 }, color: 'text.secondary', mb: 2 }} />
-          <Typography variant={isMobile ? 'body1' : 'h6'} color="text.secondary" gutterBottom>
+      {filteredVacancies.length === 0 && searchQuery ? (
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <SearchIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {t('vacancyList.noResults')}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            {t('vacancyList.tryDifferentSearch')}
+          </Typography>
+          <Button variant="outlined" onClick={() => setSearchQuery('')}>
+            {t('vacancyList.clearSearch')}
+          </Button>
+        </Paper>
+      ) : filteredVacancies.length === 0 ? (
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <WorkIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
             {t('vacancyList.noActiveRequests')}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: { xs: 2, md: 3 } }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {t('vacancyList.createFirstRequest')}
           </Typography>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => navigate(`${basePath}/create`)}
-            fullWidth={isMobile}
+            onClick={() => navigate('/vacancies/create')}
           >
             {t('vacancyList.createRequest')}
           </Button>
         </Paper>
       ) : (
-        <Grid container spacing={{ xs: 2, sm: 3 }}>
-          {vacancies.map((vacancy) => (
-            <Grid item xs={12} sm={6} lg={4} key={vacancy.id}>
+        <Grid2
+          container
+          spacing={{ xs: 2, sm: 3 }}
+          columns={{ xs: 1, sm: 2, md: 2, lg: 3 }}
+        >
+          {filteredVacancies.map((vacancy, index) => (
+            <Grid2
+              size={{ xs: 1, sm: 1, md: 1, lg: 1 }}
+              key={vacancy.id}
+              sx={{
+                minWidth: 0,
+              }}
+            >
               <Card
                 sx={{
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  transition: 'transform 0.2s',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  outline: selectedVacancyIndex === index ? '3px solid' : 'none',
+                  outlineColor: 'primary.main',
+                  boxShadow: selectedVacancyIndex === index ? 8 : 1,
+                  transform: selectedVacancyIndex === index ? 'translateY(-4px)' : 'none',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
                   },
                 }}
+                onClick={() => {
+                  setSelectedVacancyIndex(index);
+                  navigate(`${vacancy.id}`);
+                }}
+                tabIndex={0}
+                aria-selected={selectedVacancyIndex === index}
               >
-                <CardContent sx={{ flexGrow: 1, pb: { xs: 1, sm: 2 } }}>
+                <CardContent sx={{ flexGrow: 1 }}>
                   {/* Title */}
-                  <Typography
-                    variant={isMobile ? 'body1' : 'h6'}
-                    fontWeight={600}
-                    gutterBottom
-                    noWrap
-                  >
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
                     {vacancy.title}
                   </Typography>
 
                   {/* Salary */}
-                  <Typography
-                    variant={isMobile ? 'caption' : 'body2'}
-                    color="primary"
-                    fontWeight={500}
-                    sx={{ mb: { xs: 0.5, md: 1 } }}
-                  >
+                  <Typography variant="body2" color="primary" fontWeight={500} sx={{ mb: 1 }}>
                     {formatSalary(vacancy.salary_min, vacancy.salary_max)}
                   </Typography>
 
                   {/* Experience */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: { xs: 1, md: 2 } }}>
-                    <Typography variant={isMobile ? 'caption' : 'body2'} color="text.secondary">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
                       {t('vacancyList.experience')}:
                     </Typography>
-                    <Typography variant={isMobile ? 'caption' : 'body2'} fontWeight={500}>
+                    <Typography variant="body2" fontWeight={500}>
                       {formatExperience(vacancy.min_experience_months)}
                     </Typography>
                   </Box>
 
                   {/* Skills */}
-                  <Box sx={{ mb: { xs: 1, md: 2 } }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
                       {t('vacancyList.requiredSkills', { count: vacancy.required_skills.length })}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {vacancy.required_skills.slice(0, isMobile ? 3 : 4).map((skill) => (
-                        <Chip
-                          key={skill}
-                          label={skill}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
-                        />
+                      {vacancy.required_skills.slice(0, 4).map((skill) => (
+                        <Chip key={skill} label={skill} size="small" variant="outlined" />
                       ))}
-                      {vacancy.required_skills.length > (isMobile ? 3 : 4) && (
+                      {vacancy.required_skills.length > 4 && (
                         <Chip
-                          label={t('vacancyList.more', { count: vacancy.required_skills.length - (isMobile ? 3 : 4) })}
+                          label={t('vacancyList.more', { count: vacancy.required_skills.length - 4 })}
                           size="small"
                           variant="outlined"
-                          sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
                         />
                       )}
                     </Box>
                   </Box>
 
                   {/* Meta info */}
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
                     {vacancy.employment_type && (
-                      <Chip
-                        label={vacancy.employment_type}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                        sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
-                      />
+                      <Chip label={vacancy.employment_type} size="small" color="info" variant="outlined" />
                     )}
                     {vacancy.work_format && (
-                      <Chip
-                        label={vacancy.work_format}
-                        size="small"
-                        color="success"
-                        variant="outlined"
-                        sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
-                      />
+                      <Chip label={vacancy.work_format} size="small" color="success" variant="outlined" />
                     )}
                     {vacancy.english_level && (
-                      <Chip
-                        label={`English: ${vacancy.english_level}`}
-                        size="small"
-                        sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
-                      />
+                      <Chip label={`English: ${vacancy.english_level}`} size="small" />
                     )}
                   </Stack>
                 </CardContent>
 
-                <CardActions
-                  sx={{
-                    justifyContent: { xs: 'stretch', sm: 'space-between' },
-                    px: { xs: 1, sm: 2 },
-                    pb: { xs: 1, sm: 2 },
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    gap: { xs: 1, sm: 0 },
-                  }}
-                >
+                <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
                   <Button
-                    size={isMobile ? 'small' : 'small'}
-                    onClick={() => navigate(`${basePath}/${vacancy.id}`)}
-                    sx={{ flex: isMobile ? 1 : 'auto' }}
+                    size="small"
+                    onClick={() => navigate(`${vacancy.id}`)}
                   >
                     {t('vacancyList.moreDetails')}
                   </Button>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      gap: { xs: 0.5, sm: 0 },
-                      justifyContent: { xs: 'stretch', sm: 'flex-end' },
-                    }}
-                  >
+                  <Box>
                     <IconButton
-                      size={isMobile ? 'small' : 'small'}
-                      onClick={() => navigate(`${basePath}/${vacancy.id}/edit`)}
-                      sx={{ flex: isMobile ? 1 : 'auto' }}
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(vacancy);
+                      }}
                     >
-                      <EditIcon fontSize={isMobile ? 'small' : 'medium'} />
+                      <EditIcon />
                     </IconButton>
                     <IconButton
-                      size={isMobile ? 'small' : 'small'}
+                      size="small"
                       color="error"
-                      onClick={() => handleDeleteClick(vacancy.id)}
-                      sx={{ flex: isMobile ? 1 : 'auto' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(vacancy.id);
+                      }}
                     >
-                      <DeleteIcon fontSize={isMobile ? 'small' : 'medium'} />
+                      <DeleteIcon />
                     </IconButton>
                   </Box>
                 </CardActions>
               </Card>
-            </Grid>
+            </Grid2>
           ))}
-        </Grid>
+        </Grid2>
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        fullScreen={isMobile}
-        PaperProps={{
-          sx: { width: isMobile ? '100%' : 'auto' }
-        }}
-      >
+      <Dialog open={deleteDialogOpen} onClose={() => {
+        setDeleteDialogOpen(false);
+        setSelectedVacancyIndex(-1);
+      }}>
         <DialogTitle>{t('vacancyList.deleteDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography>
@@ -397,24 +1225,33 @@ const VacancyList: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setDeleteDialogOpen(false)}
-            fullWidth={isMobile}
-            sx={{ mb: isMobile ? 1 : 0 }}
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            color="error"
-            variant="contained"
-            fullWidth={isMobile}
-          >
+          <Button onClick={() => {
+            setDeleteDialogOpen(false);
+            setSelectedVacancyIndex(-1);
+          }}>{t('common.cancel')}</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             {t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+
+      {/* Inline Edit Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleEditDialogClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { height: '80vh', maxHeight: 600 }
+        }}
+      >
+        <DialogTitle>Edit Vacancy</DialogTitle>
+        <DialogContent sx={{ pb: 0 }}>
+          {editingVacancy && <InlineEditForm vacancy={editingVacancy} />}
+        </DialogContent>
+      </Dialog>
+      </Box>
+    </ErrorBoundary>
   );
 };
 

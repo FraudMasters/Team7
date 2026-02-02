@@ -1,78 +1,334 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Box } from '@mui/material';
+import Layout from '@components/Layout';
+import LoadingSpinner from '@components/LoadingSpinner';
+import ErrorBoundary from '@components/ErrorBoundary';
 
-// Layouts
-import JobSeekerLayout from './layouts/JobSeekerLayout';
-import RecruiterLayout from './layouts/RecruiterLayout';
+// Lazy load all route components for code splitting and better performance
+const HomePage = lazy(() => import('@pages/Home'));
+const UploadPage = lazy(() => import('@pages/Upload'));
+const BatchUploadPage = lazy(() => import('@pages/BatchUpload'));
+const ResultsPage = lazy(() => import('@pages/Results'));
+const ComparePage = lazy(() => import('@pages/Compare'));
+const CompareVacancyPage = lazy(() => import('@pages/CompareVacancy'));
+const AdminSynonymsPage = lazy(() => import('@pages/AdminSynonyms'));
+const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalytics'));
+const AnalyticsDashboardPage = lazy(() => import('@pages/AnalyticsDashboard'));
+const VacancyListPage = lazy(() => import('@pages/VacancyList'));
+const CreateVacancyPage = lazy(() => import('@pages/CreateVacancy'));
+const VacancyDetailsPage = lazy(() => import('@pages/VacancyDetails'));
+const ApplicationsPage = lazy(() => import('@pages/Applications'));
+const ResumeDatabasePage = lazy(() => import('@pages/ResumeDatabase'));
+const CandidateSearchPage = lazy(() => import('@pages/CandidateSearch'));
+const CandidatesKanbanPage = lazy(() => import('@pages/CandidatesKanbanPage'));
+const RecruiterDashboardPage = lazy(() => import('@pages/RecruiterDashboard'));
+const SkillGapAnalysisPage = lazy(() => import('@pages/SkillGapAnalysis'));
+const WeightCustomizationPage = lazy(() => import('@pages/WeightCustomization'));
+const IndustryTaxonomyManager = lazy(() => import('@components/IndustryTaxonomyManager'));
+const TaxonomyAnalytics = lazy(() => import('@components/TaxonomyAnalytics'));
+const PublicTaxonomyBrowser = lazy(() => import('@components/PublicTaxonomyBrowser'));
+const LoadingSpinnerDemoPage = lazy(() => import('@pages/LoadingSpinnerDemo'));
 
-// Pages - Landing
-import LandingPage from './pages/LandingPage';
+/**
+ * Loading fallback components for different page types
+ *
+ * Provides appropriate skeleton screens based on the content being loaded,
+ * improving perceived performance and user experience.
+ */
 
-// Job Seeker Pages
-import { JobsBrowsePage } from './pages/jobs/JobsBrowsePage';
-import { JobDetailPage } from './pages/jobs/JobDetailPage';
-import { ApplicationFlowPage } from './pages/jobs/ApplicationFlowPage';
+// Home page loading state
+const HomeLoading = () => <LoadingSpinner variant="page" count={6} />;
 
-// Recruiter Pages
-import { DashboardPage } from './pages/recruiter/DashboardPage';
-import { CandidatesKanbanPage } from './pages/recruiter/CandidatesKanbanPage';
-import { VacanciesPage } from './pages/recruiter/VacanciesPage';
-import { VacancyFormPage } from './pages/recruiter/VacancyFormPage';
+// Vacancy list loading state
+const VacancyListLoading = () => (
+  <LoadingSpinner variant="cards" count={9} message="Loading vacancies..." />
+);
 
-// Legacy pages (wrapped for compatibility)
-import HomePage from './pages/Home';
-import UploadPage from './pages/Upload';
-import BatchUploadPage from './pages/BatchUpload';
-import ResultsPage from './pages/Results';
-import ApplicationsPage from './pages/Applications';
-import ResumeDatabasePage from './pages/ResumeDatabase';
-import RecruiterDashboardPage from './pages/RecruiterDashboard';
-import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
+// Form pages loading state (create, upload, etc.)
+const FormLoading = ({ message = "Loading form..." }: { message?: string }) => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+    <LoadingSpinner variant="form" message={message} />
+  </Box>
+);
+
+// Dashboard pages loading state
+const DashboardLoading = () => (
+  <LoadingSpinner variant="page" count={6} message="Loading dashboard..." />
+);
+
+// Results/comparison pages loading state
+const ResultsLoading = () => (
+  <LoadingSpinner variant="page" count={4} message="Loading results..." />
+);
+
+// List/table pages loading state (applications, resumes, candidates)
+const ListLoading = ({ count = 10 }: { count?: number }) => (
+  <LoadingSpinner variant="list" count={count} />
+);
+
+// Admin pages loading state
+const AdminLoading = ({ message = "Loading..." }: { message?: string }) => (
+  <LoadingSpinner variant="page" count={6} message={message} />
+);
 
 /**
  * Main App Component
  *
- * Dual flow architecture for job seekers and recruiters.
- * Uses React Router v6 with nested routes and layout components.
+ * Sets up React Router with all application routes.
+ * Uses lazy loading with React.lazy() for code splitting and better performance.
+ * All route components are wrapped in Suspense with loading fallbacks.
+ * Uses the Layout component to provide consistent navigation and structure.
  */
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Root route - Landing Page */}
-        <Route path="/" element={<LandingPage />} />
+      <ErrorBoundary>
+        <Suspense fallback={<DashboardLoading />}>
+          <Routes>
+          {/* Root route with Layout */}
+          <Route path="/" element={<Layout />}>
+            {/* Default home page */}
+            <Route
+              index
+              element={
+                <Suspense fallback={<HomeLoading />}>
+                  <HomePage />
+                </Suspense>
+              }
+            />
 
-        {/* Job Seeker Flow */}
-        <Route path="/jobs" element={<JobSeekerLayout />}>
-          <Route index element={<JobsBrowsePage />} />
-          <Route path=":id" element={<JobDetailPage />} />
-          <Route path=":id/apply" element={<ApplicationFlowPage />} />
-        </Route>
+            {/* Legacy routes - kept for compatibility */}
+            <Route
+              path="upload"
+              element={
+                <Suspense fallback={<FormLoading message="Uploading resume..." />}>
+                  <UploadPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="results/:id"
+              element={
+                <Suspense fallback={<ResultsLoading />}>
+                  <ResultsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="compare/:resumeId/:vacancyId"
+              element={
+                <Suspense fallback={<ResultsLoading />}>
+                  <ComparePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="compare-vacancy/:vacancyId"
+              element={
+                <Suspense fallback={<ResultsLoading />}>
+                  <CompareVacancyPage />
+                </Suspense>
+              }
+            />
 
-        {/* Recruiter Flow */}
-        <Route path="/recruiter" element={<RecruiterLayout />}>
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="candidates" element={<CandidatesKanbanPage />} />
-          <Route path="vacancies">
-            <Route index element={<VacanciesPage />} />
-            <Route path="create" element={<VacancyFormPage />} />
-            <Route path=":id/edit" element={<VacancyFormPage />} />
+            {/* Job Seeker Module Routes */}
+            <Route path="jobs">
+              <Route
+                index
+                element={
+                  <Suspense fallback={<VacancyListLoading />}>
+                    <VacancyListPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="upload"
+                element={
+                  <Suspense fallback={<FormLoading message="Uploading resume..." />}>
+                    <UploadPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="batch-upload"
+                element={
+                  <Suspense fallback={<FormLoading message="Loading batch upload..." />}>
+                    <BatchUploadPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="results/:id"
+                element={
+                  <Suspense fallback={<ResultsLoading />}>
+                    <ResultsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="applications"
+                element={
+                  <Suspense fallback={<ListLoading count={8} />}>
+                    <ApplicationsPage />
+                  </Suspense>
+                }
+              />
+            </Route>
+
+            {/* Recruiter Module Routes */}
+            <Route path="recruiter">
+              <Route
+                index
+                element={
+                  <Suspense fallback={<DashboardLoading />}>
+                    <RecruiterDashboardPage />
+                  </Suspense>
+                }
+              />
+              <Route path="vacancies">
+                <Route
+                  index
+                  element={
+                    <Suspense fallback={<VacancyListLoading />}>
+                      <VacancyListPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="create"
+                  element={
+                    <Suspense fallback={<FormLoading message="Loading vacancy form..." />}>
+                      <CreateVacancyPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path=":id"
+                  element={
+                    <Suspense fallback={<DashboardLoading />}>
+                      <VacancyDetailsPage />
+                    </Suspense>
+                  }
+                />
+              </Route>
+              <Route
+                path="resumes"
+                element={
+                  <Suspense fallback={<ListLoading count={12} />}>
+                    <ResumeDatabasePage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="candidates"
+                element={
+                  <Suspense fallback={<LoadingSpinner variant="cards" count={8} message="Loading candidates..." />}>
+                    <CandidatesKanbanPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="search"
+                element={
+                  <Suspense fallback={<ListLoading count={10} />}>
+                    <CandidateSearchPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="analytics"
+                element={
+                  <Suspense fallback={<DashboardLoading />}>
+                    <AnalyticsDashboardPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="skill-gap"
+                element={
+                  <Suspense fallback={<DashboardLoading />}>
+                    <SkillGapAnalysisPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="weights"
+                element={
+                  <Suspense fallback={<FormLoading message="Loading customization..." />}>
+                    <WeightCustomizationPage />
+                  </Suspense>
+                }
+              />
+            </Route>
+
+            {/* Admin pages */}
+            <Route path="admin" element={<Navigate to="/admin/synonyms" replace />} />
+            <Route
+              path="admin/synonyms"
+              element={
+                <Suspense fallback={<AdminLoading message="Loading synonym manager..." />}>
+                  <AdminSynonymsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="admin/analytics"
+              element={
+                <Suspense fallback={<AdminLoading message="Loading analytics..." />}>
+                  <AdminAnalyticsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="admin/taxonomies"
+              element={
+                <Suspense fallback={<AdminLoading message="Loading taxonomy manager..." />}>
+                  <IndustryTaxonomyManager />
+                </Suspense>
+              }
+            />
+            <Route
+              path="admin/taxonomy-analytics"
+              element={
+                <Suspense fallback={<AdminLoading message="Loading taxonomy analytics..." />}>
+                  <TaxonomyAnalytics />
+                </Suspense>
+              }
+            />
+            <Route
+              path="admin/public-taxonomies"
+              element={
+                <Suspense fallback={<AdminLoading message="Loading public taxonomies..." />}>
+                  <PublicTaxonomyBrowser />
+                </Suspense>
+              }
+            />
+            <Route
+              path="demo/loading-spinner"
+              element={
+                <Suspense fallback={<AdminLoading message="Loading demo..." />}>
+                  <LoadingSpinnerDemoPage />
+                </Suspense>
+              }
+            />
+
+            {/* Analytics dashboard */}
+            <Route
+              path="analytics"
+              element={
+                <Suspense fallback={<DashboardLoading />}>
+                  <AnalyticsDashboardPage />
+                </Suspense>
+              }
+            />
+
+            {/* Catch-all route - redirect to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-          <Route path="analytics" element={<AnalyticsDashboardPage />} />
-        </Route>
-
-        {/* Legacy routes - wrapped with single layout for compatibility */}
-        <Route path="legacy" element={<RecruiterLayout />}>
-          <Route path="upload" element={<UploadPage />} />
-          <Route path="batch-upload" element={<BatchUploadPage />} />
-          <Route path="results/:id" element={<ResultsPage />} />
-          <Route path="applications" element={<ApplicationsPage />} />
-          <Route path="resumes" element={<ResumeDatabasePage />} />
-          <Route path="analytics" element={<AnalyticsDashboardPage />} />
-        </Route>
-
-        {/* Catch-all route - redirect to landing */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
     </BrowserRouter>
   );
 }

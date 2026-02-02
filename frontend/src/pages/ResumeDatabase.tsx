@@ -258,7 +258,7 @@ const ResumeDatabasePage: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
-      <Box sx={{ mt: { xs: 2, sm: 3, md: 4 }, mb: 2 }}>
+      <Box sx={{ mt: { xs: 2, sm: 3, md: 4 }, mb: 2, overflowX: 'hidden' }}>
         <Typography
           variant={isMobile ? 'h5' : 'h4'}
           component="h1"
@@ -323,72 +323,80 @@ const ResumeDatabasePage: React.FC = () => {
               />
 
               {/* Sort and Quick Filter Options */}
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={2}
-                alignItems={{ xs: 'flex-start', sm: 'center' }}
-                justifyContent={{ xs: 'flex-start', sm: 'space-between' }}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: 2,
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  justifyContent: { xs: 'flex-start', sm: 'space-between' },
+                  overflowX: 'hidden',
+                }}
               >
                 {/* Sort Options */}
-                <ToggleButtonGroup
-                  value={sortBy}
-                  exclusive
-                  onChange={(_, value) => value && setSortBy(value)}
-                  size="small"
-                >
-                  <ToggleButton value="name" aria-label="sort by name">
-                    <Tooltip title={t('resumeDatabase.sortByName')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <SortIcon fontSize="small" />
-                        <Typography variant="body2">{t('resumeDatabase.name')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                  <ToggleButton value="date" aria-label="sort by date">
-                    <Tooltip title={t('resumeDatabase.sortByDate')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <RecentIcon fontSize="small" />
-                        <Typography variant="body2">{t('resumeDatabase.date')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                  <ToggleButton value="status" aria-label="sort by status">
-                    <Tooltip title={t('resumeDatabase.sortByStatus')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Typography variant="body2">{t('resumeDatabase.status')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                </ToggleButtonGroup>
+                <Box sx={{ flex: { xs: '1', sm: '1 1 auto' }, minWidth: 0, overflowX: 'auto' }}>
+                  <ToggleButtonGroup
+                    value={sortBy}
+                    exclusive
+                    onChange={(_, value) => value && setSortBy(value)}
+                    size="small"
+                  >
+                    <ToggleButton value="name" aria-label="sort by name">
+                      <Tooltip title={t('resumeDatabase.sortByName')}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <SortIcon fontSize="small" />
+                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: 'body2' } }}>{t('resumeDatabase.name')}</Typography>
+                        </Box>
+                      </Tooltip>
+                    </ToggleButton>
+                    <ToggleButton value="date" aria-label="sort by date">
+                      <Tooltip title={t('resumeDatabase.sortByDate')}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <RecentIcon fontSize="small" />
+                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: 'body2' } }}>{t('resumeDatabase.date')}</Typography>
+                        </Box>
+                      </Tooltip>
+                    </ToggleButton>
+                    <ToggleButton value="status" aria-label="sort by status">
+                      <Tooltip title={t('resumeDatabase.sortByStatus')}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: 'body2' } }}>{t('resumeDatabase.status')}</Typography>
+                        </Box>
+                      </Tooltip>
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
 
                 {/* Quick Filters */}
-                <ToggleButtonGroup
-                  value={quickFilter}
-                  exclusive
-                  onChange={(_, value) => value && setQuickFilter(value)}
-                  size="small"
-                >
-                  <ToggleButton value="all" aria-label="show all">
-                    <Typography variant="body2">{t('resumeDatabase.all')}</Typography>
-                  </ToggleButton>
-                  <ToggleButton value="starred" aria-label="show starred only">
-                    <Tooltip title={t('resumeDatabase.starredOnly')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <StarIcon fontSize="small" />
-                        <Typography variant="body2">{t('resumeDatabase.starred')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                  <ToggleButton value="recent" aria-label="show recent only">
-                    <Tooltip title={t('resumeDatabase.recentOnly')}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <RecentIcon fontSize="small" />
-                        <Typography variant="body2">{t('resumeDatabase.recent')}</Typography>
-                      </Box>
-                    </Tooltip>
-                  </ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
+                <Box sx={{ flex: { xs: '1', sm: '1 1 auto' }, minWidth: 0, overflowX: 'auto' }}>
+                  <ToggleButtonGroup
+                    value={quickFilter}
+                    exclusive
+                    onChange={(_, value) => value && setQuickFilter(value)}
+                    size="small"
+                  >
+                    <ToggleButton value="all" aria-label="show all">
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: 'body2' } }}>{t('resumeDatabase.all')}</Typography>
+                    </ToggleButton>
+                    <ToggleButton value="starred" aria-label="show starred only">
+                      <Tooltip title={t('resumeDatabase.starredOnly')}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <StarIcon fontSize="small" />
+                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: 'body2' } }}>{t('resumeDatabase.starred')}</Typography>
+                        </Box>
+                      </Tooltip>
+                    </ToggleButton>
+                    <ToggleButton value="recent" aria-label="show recent only">
+                      <Tooltip title={t('resumeDatabase.recentOnly')}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <RecentIcon fontSize="small" />
+                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: 'body2' } }}>{t('resumeDatabase.recent')}</Typography>
+                        </Box>
+                      </Tooltip>
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+              </Box>
 
               {/* Results Count */}
               <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>

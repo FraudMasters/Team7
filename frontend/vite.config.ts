@@ -39,66 +39,67 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
-    chunkSizeWarningLimit: 600,
-    // CDN-specific optimizations
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        // Keep function names to avoid breaking runtime function calls
-        keep_fnames: true,
-      },
-    },
+    sourcemap: false, // Disable sourcemaps in production for better performance
+    minify: 'terser', // Use terser for better minification
+    target: 'es2015', // Target modern browsers for smaller bundle size
+    cssCodeSplit: true, // Enable CSS code splitting
+    chunkSizeWarningLimit: 1000, // Warn for chunks > 1MB
     rollupOptions: {
       output: {
         manualChunks: {
-          // Explicit chunk definition to avoid circular dependencies
-          // Using object syntax instead of function for better control
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-mui': [
-            '@mui/material',
-            '@mui/icons-material',
-            '@emotion/react',
-            '@emotion/styled',
-            'framer-motion',
-          ],
-          'vendor-data': ['axios', '@tanstack/react-query', '@tanstack/react-query-devtools'],
+          // Separate vendor chunks for better caching
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          'api-vendor': ['axios'],
+          'form-vendor': ['react-hook-form', 'zod', '@hookform/resolvers'],
+          'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          'dnd-vendor': ['@hello-pangea/dnd', 'react-window'],
         },
-        // Ensure consistent chunk hashes for better CDN caching
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
+        // Optimize chunk filenames for long-term caching
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
-          // Separate different asset types for better caching
-          if (assetInfo.name?.endsWith('.css')) {
-            return 'assets/styles-[hash].[ext]';
+          const name = assetInfo.name || '';
+          if (name.endsWith('.css')) {
+            return 'assets/css/[name]-[hash][extname]';
           }
-          if (/\.(png|jpe?g|gif|svg|webp|ico)$/.test(assetInfo.name || '')) {
-            return 'assets/images-[hash].[ext]';
+          if (/\.(png|jpe?g|gif|svg|webp|ico)$/.test(name)) {
+            return 'assets/images/[name]-[hash][extname]';
           }
-          if (/\.(woff2?|eot|ttf|otf)$/.test(assetInfo.name || '')) {
-            return 'assets/fonts-[hash].[ext]';
+          if (/\.(woff2?|eot|ttf|otf)$/.test(name)) {
+            return 'assets/fonts/[name]-[hash][extname]';
           }
-          return 'assets/[name]-[hash].[ext]';
+          return 'assets/[name]-[hash][extname]';
         },
       },
+      // Treeshake console logs in production
+      treeshake: {
+        moduleSideEffects: false,
+      },
     },
-    // CSS code splitting for better caching
-    cssCodeSplit: true,
-    // Asset inline limit (base64 encode small assets)
-    assetsInlineLimit: 4096,
+    // terser options for better minification
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.* in production
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+      },
+      format: {
+        comments: false, // Remove comments
+      },
+    },
   },
-  // Optimize dependencies pre-bundling for better caching
+  // Optimize dependencies
   optimizeDeps: {
     include: [
       'react',
       'react-dom',
       'react-router-dom',
       '@mui/material',
-      '@emotion/react',
-      '@emotion/styled',
+      '@mui/icons-material',
       'axios',
+      'i18next',
+      'react-i18next',
     ],
   },
   test: {
