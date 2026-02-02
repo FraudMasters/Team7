@@ -11,12 +11,20 @@ from .base import Base, TimestampMixin, UUIDMixin
 
 
 class ResumeStatus(str, enum.Enum):
-    """Status of resume processing"""
+    """Status of resume processing and hiring pipeline"""
 
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    # Processing statuses
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+    # Hiring pipeline / Kanban stages
+    NEW = "NEW"
+    REVIEWED = "REVIEWED"      # Screening stage
+    INTERVIEW = "INTERVIEW"    # Interview stage
+    OFFERED = "OFFERED"        # Offer stage
+    HIRED = "HIRED"            # Hired stage
 
 
 class Resume(Base, UUIDMixin, TimestampMixin):
