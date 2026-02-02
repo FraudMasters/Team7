@@ -16,6 +16,13 @@ import { MyApplicationsPage } from './pages/jobs/MyApplicationsPage';
 import { CandidateProfilePage } from './pages/jobs/CandidateProfilePage';
 import { ResumeUploadPage } from './pages/jobs/ResumeUploadPage';
 import { ResumeResultsPage } from './pages/jobs/ResumeResultsPage';
+import { RecommendedJobsPage } from './pages/jobs/RecommendedJobsPage';
+import { SkillAssessmentPage } from './pages/jobs/SkillAssessmentPage';
+import { LearningPage } from './pages/jobs/LearningPage';
+import { SalaryCalculatorPage } from './pages/jobs/SalaryCalculatorPage';
+import { InterviewTipsPage } from './pages/jobs/InterviewTipsPage';
+import { JobAlertsPage } from './pages/jobs/JobAlertsPage';
+import { SettingsPage } from './pages/jobs/SettingsPage';
 
 // Recruiter Pages
 import { DashboardPage } from './pages/recruiter/DashboardPage';
@@ -62,6 +69,13 @@ function App() {
           <Route path="applications" element={<MyApplicationsPage />} />
           <Route path="upload" element={<ResumeUploadPage />} />
           <Route path="resume-results/:id" element={<ResumeResultsPage />} />
+          <Route path="recommended" element={<RecommendedJobsPage />} />
+          <Route path="assessment" element={<SkillAssessmentPage />} />
+          <Route path="learning" element={<LearningPage />} />
+          <Route path="salary" element={<SalaryCalculatorPage />} />
+          <Route path="tips" element={<InterviewTipsPage />} />
+          <Route path="alerts" element={<JobAlertsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
 
         {/* Candidate Profile */}
