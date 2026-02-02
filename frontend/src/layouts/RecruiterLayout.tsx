@@ -12,9 +12,11 @@ import {
   ListItemIcon,
   ListItemText,
   IconButton,
+  Collapse,
   useMediaQuery,
   useTheme,
-  Paper,
+  Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -23,6 +25,22 @@ import {
   People as PeopleIcon,
   BarChart as BarChartIcon,
   Tune as TuneIcon,
+  ExpandLess,
+  ExpandMore,
+  Description as DocsIcon,
+  Search as SearchIcon,
+  BookmarkBorder as SavedIcon,
+  CloudUpload as CloudUploadIcon,
+  Folder as FolderIcon,
+  Assessment as AnalyticsIcon,
+  Settings as SettingsIcon,
+  Backup as BackupIcon,
+  Timeline as TimelineIcon,
+  Psychology as PsychologyIcon,
+  Storage as StorageIcon,
+  Compare as CompareIcon,
+  ViewColumn as KanbanIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 280;
@@ -31,25 +49,83 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ReactElement;
+  children?: NavItem[];
 }
 
-const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/recruiter/dashboard', icon: <DashboardIcon /> },
-  { label: 'Vacancies', path: '/recruiter/vacancies', icon: <WorkIcon /> },
-  { label: 'Candidates', path: '/recruiter/candidates', icon: <PeopleIcon /> },
-  { label: 'Analytics', path: '/recruiter/analytics', icon: <BarChartIcon /> },
-  { label: 'Weights', path: '/recruiter/weights', icon: <TuneIcon /> },
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    items: [
+      { label: 'Dashboard', path: '/recruiter/dashboard', icon: <DashboardIcon /> },
+    ],
+  },
+  {
+    title: 'Hiring',
+    items: [
+      { label: 'Vacancies', path: '/recruiter/vacancies', icon: <WorkIcon /> },
+      { label: 'Candidates', path: '/recruiter/candidates', icon: <PeopleIcon /> },
+      { label: 'Pipeline', path: '/recruiter/candidates', icon: <KanbanIcon /> },
+      { label: 'Applications', path: '/recruiter/applications', icon: <TimelineIcon /> },
+    ],
+  },
+  {
+    title: 'Resumes',
+    items: [
+      { label: 'Database', path: '/recruiter/resumes', icon: <StorageIcon /> },
+      { label: 'Upload', path: '/recruiter/upload', icon: <UploadIcon /> },
+      { label: 'Batch Upload', path: '/recruiter/batch-upload', icon: <CloudUploadIcon /> },
+    ],
+  },
+  {
+    title: 'Search',
+    items: [
+      { label: 'Candidate Search', path: '/recruiter/search', icon: <SearchIcon /> },
+      { label: 'Saved Searches', path: '/recruiter/saved-searches', icon: <SavedIcon /> },
+      { label: 'Compare', path: '/recruiter/compare', icon: <CompareIcon /> },
+    ],
+  },
+  {
+    title: 'Analytics',
+    items: [
+      { label: 'Overview', path: '/recruiter/analytics', icon: <BarChartIcon /> },
+      { label: 'Skill Gap Analysis', path: '/recruiter/skill-gap', icon: <PsychologyIcon /> },
+    ],
+  },
+  {
+    title: 'Settings',
+    items: [
+      { label: 'Weights', path: '/recruiter/weights', icon: <TuneIcon /> },
+      { label: 'Backups', path: '/recruiter/backups', icon: <BackupIcon /> },
+      { label: 'Workflow', path: '/recruiter/workflow', icon: <TimelineIcon /> },
+    ],
+  },
 ];
 
 const RecruiterLayout: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    Hiring: true,
+    Resumes: false,
+    Search: false,
+    Analytics: false,
+    Settings: false,
+  });
+
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleSectionToggle = (section: string) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
   const drawerContent = (
@@ -80,61 +156,107 @@ const RecruiterLayout: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Navigation */}
-      <nav aria-label="Main navigation">
+      {/* Navigation Sections */}
+      <nav aria-label="Main navigation" sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <List
-          sx={{ px: 2, py: 3, flex: 1 }}
+          sx={{ px: 2, py: 2 }}
           role="menubar"
           aria-label="Recruiter navigation menu"
         >
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
-
-            return (
-              <ListItem key={item.path} disablePadding sx={{ mb: 1 }} role="none">
-                <ListItemButton
-                  role="menuitem"
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => {
-                    navigate(item.path);
-                    if (isMobile) setMobileOpen(false);
-                  }}
-                  sx={{
-                    borderRadius: 2,
-                    px: 2,
-                    py: 1.5,
-                    backgroundColor: isActive ? 'action.selected' : 'transparent',
-                    '&:hover': {
-                      backgroundColor: isActive ? 'action.selected' : 'action.hover',
-                    },
-                    '&:focus-visible': {
-                      outline: '2px solid',
-                      outlineColor: 'primary.main',
-                      outlineOffset: '2px',
-                    },
-                  }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 40,
-                      color: isActive ? 'primary.main' : 'text.primary',
-                    }}
-                    aria-hidden="true"
+          {navSections.map((section, sectionIdx) => (
+            <Box key={sectionIdx || 'root'}>
+              {section.title && (
+                <>
+                  <ListItem
+                    disablePadding
+                    sx={{ mt: sectionIdx > 0 ? 2 : 0, mb: 1 }}
+                    role="none"
                   >
-                    {item.icon}
-                  </ListItemIcon>
-                <ListItemText
-                  primary={item.label}
-                  sx={{
-                    '& .MuiTypography-root': {
-                      fontWeight: isActive ? 600 : 500,
-                    },
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
+                    <ListItemButton
+                      onClick={() => handleSectionToggle(section.title!)}
+                      sx={{
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1,
+                        '&:hover': { backgroundColor: 'action.hover' },
+                      }}
+                    >
+                      <ListItemText
+                        primary={section.title}
+                        sx={{
+                          '& .MuiTypography-root': {
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5,
+                            color: 'text.secondary',
+                          },
+                        }}
+                      />
+                      {expandedSections[section.title!] ? <ExpandLess /> : <ExpandMore />}
+                    </ListItemButton>
+                  </ListItem>
+                </>
+              )}
+
+              <Collapse in={!section.title || expandedSections[section.title!]} timeout="auto" unmountOnExit>
+                {section.items.map((item) => {
+                  const isActive = location.pathname === item.path ||
+                    (item.path !== '/recruiter/dashboard' && location.pathname.startsWith(item.path + '/'));
+
+                  return (
+                    <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }} role="none">
+                      <ListItemButton
+                        role="menuitem"
+                        aria-current={isActive ? 'page' : undefined}
+                        onClick={() => {
+                          navigate(item.path);
+                          if (isMobile) setMobileOpen(false);
+                        }}
+                        sx={{
+                          borderRadius: 2,
+                          px: 2,
+                          py: 1,
+                          backgroundColor: isActive ? 'action.selected' : 'transparent',
+                          '&:hover': {
+                            backgroundColor: isActive ? 'action.selected' : 'action.hover',
+                          },
+                          '&:focus-visible': {
+                            outline: '2px solid',
+                            outlineColor: 'primary.main',
+                            outlineOffset: '2px',
+                          },
+                        }}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            minWidth: 40,
+                            color: isActive ? 'primary.main' : 'text.primary',
+                          }}
+                          aria-hidden="true"
+                        >
+                          {item.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={item.label}
+                          sx={{
+                            '& .MuiTypography-root': {
+                              fontWeight: isActive ? 600 : 500,
+                              fontSize: '0.875rem',
+                            },
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </Collapse>
+
+              {sectionIdx < navSections.length - 1 && (
+                <Divider sx={{ my: 1, mx: 2 }} />
+              )}
+            </Box>
+          ))}
         </List>
       </nav>
     </Box>
@@ -191,6 +313,17 @@ const RecruiterLayout: React.FC = () => {
           <Typography variant="h6" fontWeight={600} color="text.primary" component="h2">
             Recruiter Portal
           </Typography>
+          <Box sx={{ ml: 'auto', display: { xs: 'none', md: 'flex' }, gap: 1 }}>
+            <Tooltip title="Quick Search (Ctrl+K)">
+              <IconButton
+                color="inherit"
+                onClick={() => navigate('/recruiter/search')}
+                aria-label="Quick search"
+              >
+                <SearchIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Toolbar>
       </AppBar>
 

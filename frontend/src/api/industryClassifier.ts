@@ -39,7 +39,7 @@ import type {
  * Default API configuration for industry classifier
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL ?? '',
   timeout: 30000, // 30 seconds for classification
   headers: {
     'Content-Type': 'application/json',

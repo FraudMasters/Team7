@@ -25,16 +25,20 @@ import { VacancyFormPage } from './pages/recruiter/VacancyFormPage';
 import { VacancyDetailPage } from './pages/recruiter/VacancyDetailPage';
 import { CandidateDetailPage } from './pages/recruiter/CandidateDetailPage';
 import { WeightsPage } from './pages/recruiter/WeightsPage';
+import { SearchPage } from './pages/recruiter/SearchPage';
+import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
 
-// Legacy pages (wrapped for compatibility)
-import HomePage from './pages/Home';
+// Additional Recruiter Pages
+import ComparePage from './pages/Compare';
+import SkillGapAnalysisPage from './pages/SkillGapAnalysis';
+import BackupsPage from './pages/Backups';
+import WorkflowBoardPage from './pages/WorkflowBoard';
 import UploadPage from './pages/Upload';
 import BatchUploadPage from './pages/BatchUpload';
-import ResultsPage from './pages/Results';
 import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
-import RecruiterDashboardPage from './pages/RecruiterDashboard';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
+import ResultsPage from './pages/Results';
 
 /**
  * Main App Component
@@ -70,6 +74,17 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="candidates" element={<CandidatesKanbanPage />} />
           <Route path="candidates/:id" element={<CandidateDetailPage />} />
+          <Route path="search" element={<SearchPage />} />
+          <Route path="saved-searches" element={<SavedSearchesPage />} />
+          <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="resumes" element={<ResumeDatabasePage />} />
+          <Route path="upload" element={<UploadPage />} />
+          <Route path="batch-upload" element={<BatchUploadPage />} />
+          <Route path="compare" element={<ComparePage />} />
+          <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
+          <Route path="backups" element={<BackupsPage />} />
+          <Route path="workflow" element={<WorkflowBoardPage />} />
+          <Route path="results/:id" element={<ResultsPage />} />
           <Route path="vacancies">
             <Route index element={<VacanciesPage />} />
             <Route path="create" element={<VacancyFormPage />} />
@@ -77,16 +92,6 @@ function App() {
             <Route path=":id/edit" element={<VacancyFormPage />} />
           </Route>
           <Route path="weights" element={<WeightsPage />} />
-          <Route path="analytics" element={<AnalyticsDashboardPage />} />
-        </Route>
-
-        {/* Legacy routes - wrapped with single layout for compatibility */}
-        <Route path="legacy" element={<RecruiterLayout />}>
-          <Route path="upload" element={<UploadPage />} />
-          <Route path="batch-upload" element={<BatchUploadPage />} />
-          <Route path="results/:id" element={<ResultsPage />} />
-          <Route path="applications" element={<ApplicationsPage />} />
-          <Route path="resumes" element={<ResumeDatabasePage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
         </Route>
 

@@ -119,7 +119,7 @@ import type {
  * Default API configuration
  */
 const DEFAULT_CONFIG: ApiClientConfig = {
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL ?? '',
   timeout: 120000, // 2 minutes for long-running analysis
   headers: {
     'Content-Type': 'application/json',

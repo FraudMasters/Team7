@@ -3,7 +3,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 // Backend API URL from environment or default
-const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
+// Inside Docker, use 'backend' service name. Outside, use localhost.
+const API_URL = process.env.VITE_API_URL ||
+  (process.env.NODE_ENV === 'production' ? '' : 'http://backend:8000');
 
 // https://vitejs.dev/config/
 export default defineConfig({
