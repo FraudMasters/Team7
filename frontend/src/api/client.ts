@@ -44,6 +44,7 @@ import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import {
   trackApiCall,
   logMetricsSummary,
+  getPerformanceStats as getPerformanceStatsUtil,
   type PerformanceStats,
 } from '@/utils/performanceTracker';
 import type {
@@ -418,8 +419,7 @@ export class ApiClient {
    * ```
    */
   getPerformanceStats(): PerformanceStats {
-    const { getPerformanceStats: getStats } = require('@/utils/performanceTracker');
-    return getStats();
+    return getPerformanceStatsUtil();
   }
 
   /**

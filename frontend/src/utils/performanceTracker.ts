@@ -75,7 +75,7 @@ interface ApiMetric {
 /**
  * Performance statistics summary
  */
-interface PerformanceStats {
+export interface PerformanceStats {
   /**
    * Total number of API calls tracked
    */
@@ -285,17 +285,19 @@ export function getPerformanceStats(): PerformanceStats {
   // Group by endpoint
   const endpointGroups: Record<string, ApiMetric[]> = {};
   metrics.forEach((m) => {
-    if (!endpointGroups[m.endpoint]) {
-      endpointGroups[m.endpoint] = [];
+    const endpoint = m.endpoint ?? 'unknown';
+    if (!endpointGroups[endpoint]) {
+      endpointGroups[endpoint] = [];
     }
-    endpointGroups[m.endpoint].push(m);
+    endpointGroups[endpoint].push(m);
   });
 
   // Find slowest endpoint
   let slowestEndpoint: PerformanceStats['slowestEndpoint'] = null;
   Object.entries(endpointGroups).forEach(([endpoint, endpointMetrics]) => {
+    if (endpointMetrics.length === 0) return;
     const avgDuration = endpointMetrics.reduce((sum, m) => sum + m.duration, 0) / endpointMetrics.length;
-    if (!slowestEndpoint || avgDuration > slowestEndpoint.averageDuration) {
+    if (!slowestEndpoint || avgDuration > (slowestEndpoint.averageDuration ?? 0)) {
       slowestEndpoint = {
         endpoint,
         averageDuration: Math.round(avgDuration),
@@ -307,8 +309,9 @@ export function getPerformanceStats(): PerformanceStats {
   // Find most called endpoint
   let mostCalledEndpoint: PerformanceStats['mostCalledEndpoint'] = null;
   Object.entries(endpointGroups).forEach(([endpoint, endpointMetrics]) => {
+    if (endpointMetrics.length === 0) return;
     const avgDuration = endpointMetrics.reduce((sum, m) => sum + m.duration, 0) / endpointMetrics.length;
-    if (!mostCalledEndpoint || endpointMetrics.length > mostCalledEndpoint.callCount) {
+    if (!mostCalledEndpoint || endpointMetrics.length > (mostCalledEndpoint.callCount ?? 0)) {
       mostCalledEndpoint = {
         endpoint,
         callCount: endpointMetrics.length,
@@ -322,9 +325,9 @@ export function getPerformanceStats(): PerformanceStats {
     successfulCalls,
     failedCalls,
     averageDuration: Math.round(averageDuration),
-    minDuration,
-    maxDuration,
-    p95Duration,
+    minDuration: minDuration ?? 0,
+    maxDuration: maxDuration ?? 0,
+    p95Duration: p95Duration ?? 0,
     slowestEndpoint,
     mostCalledEndpoint,
   };
@@ -441,15 +444,18 @@ export function logMetricsByEndpoint(): void {
 
   const endpointGroups: Record<string, ApiMetric[]> = {};
   metrics.forEach((m) => {
-    if (!endpointGroups[m.endpoint]) {
-      endpointGroups[m.endpoint] = [];
+    const endpoint = m.endpoint ?? 'unknown';
+    if (!endpointGroups[endpoint]) {
+      endpointGroups[endpoint] = [];
     }
-    endpointGroups[m.endpoint].push(m);
+    endpointGroups[endpoint].push(m);
   });
 
   console.group('[API Performance by Endpoint]');
 
   Object.entries(endpointGroups).forEach(([endpoint, endpointMetrics]) => {
+    if (endpointMetrics.length === 0) return;
+
     const durations = endpointMetrics.map((m) => m.duration).sort((a, b) => a - b);
     const avgDuration = Math.round(
       endpointMetrics.reduce((sum, m) => sum + m.duration, 0) / endpointMetrics.length
@@ -457,7 +463,8 @@ export function logMetricsByEndpoint(): void {
     const successRate =
       (endpointMetrics.filter((m) => m.success).length / endpointMetrics.length) * 100;
 
-    console.groupCollapsed(`${endpointMetrics[0].method} ${endpoint}`);
+    const firstMetric = endpointMetrics[0];
+    console.groupCollapsed(`${firstMetric.method} ${endpoint}`);
     console.log(`Calls: ${endpointMetrics.length}`);
     console.log(`Success rate: ${successRate.toFixed(1)}%`);
     console.log(`Avg: ${avgDuration}ms`);

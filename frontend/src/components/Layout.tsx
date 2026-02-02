@@ -34,6 +34,7 @@ import {
   School as SchoolIcon,
   Tune as TuneIcon,
   Menu as MenuIcon,
+  ViewKanban as KanbanIcon,
 } from '@mui/icons-material';
 import LanguageSwitcher from './LanguageSwitcher';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
@@ -214,6 +215,7 @@ const Layout: React.FC<LayoutProps> = () => {
   const recruiterItems = [
     { labelKey: 'nav.dashboard', path: '/recruiter', icon: <RecruiterIcon fontSize="small" /> },
     { labelKey: 'nav.manageVacancies', path: '/recruiter/vacancies', icon: <WorkIcon fontSize="small" /> },
+    { labelKey: 'nav.candidatePipeline', path: '/recruiter/candidates', icon: <KanbanIcon fontSize="small" /> },
     { labelKey: 'nav.resumeDatabase', path: '/recruiter/resumes', icon: <PersonIcon fontSize="small" /> },
     { labelKey: 'nav.searchCandidates', path: '/recruiter/search', icon: <RecruiterIcon fontSize="small" /> },
     { labelKey: 'nav.skillGapAnalysis', path: '/recruiter/skill-gap', icon: <SchoolIcon fontSize="small" /> },

@@ -27,7 +27,7 @@ const CandidateComparisonTest: React.FC = () => {
           <Typography variant="body1" color="text.secondary">
             Testing the CandidateComparisonTable component with top 3 candidates
           </Typography>
-        </Stack>
+        </Box>
 
         {/* Configuration */}
         <Paper elevation={1} sx={{ p: 3 }}>

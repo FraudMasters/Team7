@@ -58,6 +58,7 @@
     "manageVacancies": "Управление вакансиями",
     "resumeDatabase": "База резюме",
     "searchCandidates": "Поиск кандидатов",
+    "candidatePipeline": "Пайплайн кандидатов",
     "skillGapAnalysis": "Анализ разрыва навыков",
     "matchingWeights": "Веса алгоритма"
   },
