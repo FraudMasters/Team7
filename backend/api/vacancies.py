@@ -207,8 +207,8 @@ async def create_vacancy(
 @router.get("/", response_model=VacancyListResponse, tags=["Vacancies"])
 async def list_vacancies(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of records to return"),
     db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
     """
