@@ -1,7 +1,7 @@
 /**
  * Locale Formatters
  *
- * Provides locale-aware formatting utilities for dates, numbers, and currency.
+ * Provides locale-aware formatting utilities for dates, numbers, currency, addresses, and more.
  * Uses the browser's Intl API for standardized internationalization.
  *
  * @module utils/localeFormatters
@@ -17,6 +17,18 @@ export interface DurationObject {
   hours?: number;
   minutes?: number;
   seconds?: number;
+}
+
+/**
+ * Address object for postal addresses
+ */
+export interface Address {
+  street?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
 }
 
 /**
@@ -131,6 +143,34 @@ const DURATION_UNIT_LABELS: Record<
     hour: ['ч', 'ч'],
     minute: ['мин', 'мин'],
     second: ['с', 'с'],
+  },
+} as const;
+
+/**
+ * Address field order and formatting for each locale
+ */
+const ADDRESS_FORMAT_CONFIG: Record<
+  SupportedLanguage,
+  {
+    fieldOrder: (keyof Address)[];
+    separators: Record<string, string>;
+  }
+> = {
+  en: {
+    fieldOrder: ['street', 'street2', 'city', 'state', 'postalCode', 'country'],
+    separators: {
+      cityState: ', ',
+      statePostal: ' ',
+      postalCountry: '\n',
+    },
+  },
+  ru: {
+    fieldOrder: ['country', 'postalCode', 'city', 'state', 'street', 'street2'],
+    separators: {
+      cityState: ', ',
+      statePostal: ' ',
+      postalCountry: '\n',
+    },
   },
 } as const;
 
@@ -682,6 +722,154 @@ export function formatPhoneNumber(
   } catch (error) {
     throw new Error(
       `Failed to format phone number: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Format a mailing address with locale-specific field ordering and line breaks
+ *
+ * Formats an address object into a properly formatted string with locale-specific
+ * field ordering and line breaks. English addresses use the standard Western format
+ * (street first, then city/state/postal), while Russian addresses use the Eastern
+ * European format (country and postal code first, then city, then street).
+ *
+ * @param address - Address object containing address components
+ * @param locale - Locale code ('en' or 'ru')
+ * @returns Formatted address string with proper line breaks
+ *
+ * @throws {Error} If address is invalid or locale is invalid
+ *
+ * @example
+ * ```ts
+ * // English format
+ * const address = {
+ *   street: '123 Main Street',
+ *   city: 'Springfield',
+ *   state: 'IL',
+ *   postalCode: '62701',
+ *   country: 'USA',
+ * };
+ * formatAddress(address, 'en');
+ * // '123 Main Street\nSpringfield, IL 62701\nUSA'
+ *
+ * // Russian format
+ * formatAddress(address, 'ru');
+ * // 'USA\n62701\nSpringfield, IL\n123 Main Street'
+ *
+ * // Partial address
+ * const partialAddress = {
+ *   street: '456 Oak Avenue',
+ *   city: 'Moscow',
+ * };
+ * formatAddress(partialAddress, 'en');
+ * // '456 Oak Avenue\nMoscow'
+ * ```
+ */
+export function formatAddress(
+  address: Address,
+  locale: SupportedLanguage = 'en'
+): string {
+  try {
+    const normalizedLocale = _validateLocale(locale);
+
+    if (!address || typeof address !== 'object') {
+      throw new Error(`Invalid address: ${address}`);
+    }
+
+    const config = ADDRESS_FORMAT_CONFIG[normalizedLocale];
+    const lines: string[] = [];
+    const currentLine: string[] = [];
+
+    for (const field of config.fieldOrder) {
+      const value = address[field];
+      if (!value || typeof value !== 'string' || value.trim() === '') {
+        continue;
+      }
+
+      const trimmedValue = value.trim();
+
+      // English format: street lines together, city/state/postal together, country separate
+      if (normalizedLocale === 'en') {
+        if (field === 'street' || field === 'street2') {
+          if (currentLine.length > 0 && currentLine[0]?.startsWith(trimmedValue[0] || '')) {
+            // Start new line for street fields
+            if (currentLine.length > 0) {
+              lines.push(currentLine.join(' '));
+              currentLine.length = 0;
+            }
+          }
+          currentLine.push(trimmedValue);
+        } else if (field === 'city') {
+          if (currentLine.length > 0) {
+            lines.push(currentLine.join(' '));
+            currentLine.length = 0;
+          }
+          currentLine.push(trimmedValue);
+        } else if (field === 'state') {
+          currentLine.push(trimmedValue);
+        } else if (field === 'postalCode') {
+          currentLine.push(trimmedValue);
+        } else if (field === 'country') {
+          if (currentLine.length > 0) {
+            lines.push(currentLine.join(', '));
+            currentLine.length = 0;
+          }
+          lines.push(trimmedValue);
+        }
+      }
+      // Russian format: country first, then postal code, then city/state, then street lines
+      else if (normalizedLocale === 'ru') {
+        if (field === 'country' || field === 'postalCode') {
+          lines.push(trimmedValue);
+        } else if (field === 'city') {
+          currentLine.push(trimmedValue);
+        } else if (field === 'state') {
+          currentLine.push(trimmedValue);
+        } else if (field === 'street' || field === 'street2') {
+          if (currentLine.length > 0) {
+            lines.push(currentLine.join(', '));
+            currentLine.length = 0;
+          }
+          lines.push(trimmedValue);
+        }
+      }
+    }
+
+    // Add remaining current line
+    if (currentLine.length > 0) {
+      if (normalizedLocale === 'en' && currentLine.length >= 2) {
+        // Join city/state/postal with appropriate separators
+        const cityIdx = config.fieldOrder.indexOf('city');
+        const stateIdx = config.fieldOrder.indexOf('state');
+        const postalIdx = config.fieldOrder.indexOf('postalCode');
+
+        // Check if we have city and state
+        if (
+          currentLine.length >= 2 &&
+          address.city &&
+          address.state &&
+          cityIdx < stateIdx
+        ) {
+          lines.push(`${currentLine[0]}, ${currentLine[1]}${currentLine[2] ? ' ' + currentLine[2] : ''}`);
+        } else {
+          lines.push(currentLine.join(', '));
+        }
+      } else {
+        lines.push(currentLine.join(', '));
+      }
+    }
+
+    const result = lines.join('\n').trim();
+
+    if (!result) {
+      throw new Error('Address is empty');
+    }
+
+    return result;
+  } catch (error) {
+    throw new Error(
+      `Failed to format address: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }

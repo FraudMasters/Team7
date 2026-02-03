@@ -15,6 +15,9 @@ import {
   formatCurrency,
   formatFileSize,
   formatRelativeTime,
+  formatDuration,
+  formatPhoneNumber,
+  formatAddress,
   getSupportedLocales,
 } from './localeFormatters';
 import type { SupportedLanguage } from '@/contexts/LanguageContext';
