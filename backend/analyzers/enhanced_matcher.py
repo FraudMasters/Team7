@@ -399,6 +399,40 @@ class EnhancedSkillMatcher:
 
         return [p for p in result if p]
 
+    def _try_compound_match(
+        self,
+        resume_skills: List[str],
+        normalized_required: str
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Attempt a compound skill match between resume skills and required skill.
+
+        Compound skill matching handles skills like "C/C++" where the required
+        skill "C" should match the compound skill. This provides high confidence
+        (0.9) since it's a meaningful match pattern.
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+            normalized_required: Normalized name of the required skill
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> result = matcher._try_compound_match(['C/C++', 'Python'], 'c')
+            >>> result
+            ('C/C++', 0.9, 'compound')
+        """
+        for resume_skill in resume_skills:
+            parts = self._split_compound_skill(resume_skill)
+            if len(parts) > 1:
+                for part in parts:
+                    if self.normalize_skill_name(part) == normalized_required:
+                        return resume_skill, 0.9, "compound"
+
+        return None
+
     def match_with_context(
         self,
         resume_skills: List[str],
@@ -467,18 +501,16 @@ class EnhancedSkillMatcher:
             return result
 
         # Strategy 1.5: Compound skill match (e.g., "C/C++" contains "C")
-        for resume_skill in resume_skills:
-            parts = self._split_compound_skill(resume_skill)
-            if len(parts) > 1:
-                for part in parts:
-                    if self.normalize_skill_name(part) == normalized_required:
-                        result.update({
-                            "matched": True,
-                            "confidence": 0.9,
-                            "matched_as": resume_skill,
-                            "match_type": "compound"
-                        })
-                        return result
+        compound_match = self._try_compound_match(resume_skills, normalized_required)
+        if compound_match:
+            matched_skill, confidence, match_type = compound_match
+            result.update({
+                "matched": True,
+                "confidence": confidence,
+                "matched_as": matched_skill,
+                "match_type": match_type
+            })
+            return result
 
         # Strategy 1.75: C/C++ language hierarchy match
         # C++ implies C knowledge, C# doesn't imply C
