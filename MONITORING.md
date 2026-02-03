@@ -288,6 +288,593 @@ container_fs_usage_bytes / container_fs_limit_bytes * 100
 
 ---
 
+## ML Model Monitoring
+
+ML model monitoring goes beyond basic inference metrics to track model health, detect performance degradation, and ensure models continue to make accurate predictions over time.
+
+### Why ML Monitoring Matters
+
+ML models degrade over time due to:
+- **Data Drift:** Input data distribution changes (e.g., new resume formats)
+- **Concept Drift:** Relationship between inputs and outputs changes
+- **Model Entropy:** Model performance degrades without retraining
+- **Feature Changes:** New skills, technologies, or job market trends
+
+### ML Monitoring Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ML MONITORING PIPELINE                       │
+│                                                                  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    │
+│  │   Resume     │───▶│   Feature    │───▶│  Prediction  │    │
+│  │    Input     │    │ Extraction   │    │   & Score    │    │
+│  └──────────────┘    └──────────────┘    └──────────────┘    │
+│         │                   │                    │             │
+│         ▼                   ▼                    ▼             │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              MONITORING METRICS COLLECTION              │ │
+│  │  • Feature distributions (keywords, skills, experience) │ │
+│  │  • Prediction scores (match percentages)                │ │
+│  │  • Model confidence (probability distributions)         │ │
+│  │  • Prediction latency (inference time)                  │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│                           │                                    │
+│                           ▼                                    │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              DRIFT DETECTION ENGINE                     │ │
+│  │  • Compare current vs. baseline distributions           │ │
+│  │  • Statistical tests (KS test, Chi-square)              │ │
+│  │  • Alert on significant drift                           │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│                           │                                    │
+│                           ▼                                    │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              PERFORMANCE TRACKING                       │ │
+│  │  • Accuracy metrics over time                           │ │
+│  │  • Prediction quality scores                           │ │
+│  │  • Model comparison (A/B testing)                      │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### ML Model Metrics
+
+| Metric | Type | Description | Healthy Range | Alert Threshold |
+|--------|------|-------------|---------------|-----------------|
+| `ml_model_accuracy` | Gauge | Model accuracy on validation set | > 85% | < 80% warning, < 75% critical |
+| `ml_prediction_distribution` | Histogram | Distribution of prediction scores | Stable mean/stddev | Mean shift > 10% or stddev change > 20% |
+| `ml_feature_drift_score` | Gauge | Statistical drift score for features | < 0.1 | > 0.1 warning, > 0.2 critical |
+| `ml_model_confidence` | Histogram | Confidence scores of predictions | Mean > 0.7 | Mean < 0.6 warning |
+| `ml_retraining_age` | Gauge | Days since last model retraining | < 30 days | > 30 warning, > 60 critical |
+| `ml_prediction_volume` | Counter | Total predictions made | Increasing | Sudden drop > 50% |
+
+**Key Query Examples:**
+```promql
+# Model accuracy trend
+ml_model_accuracy{model_name="ranking_random_forest"}
+
+# Prediction distribution shift
+avg(ml_prediction_score{model_name="ranking_random_forest"}) by (model_name)
+
+# Feature drift detection
+ml_feature_drift_score{feature_name="skills"} > 0.1
+
+# Model confidence over time
+histogram_quantile(0.95, sum(rate(ml_model_confidence_bucket[5m])) by (le, model_name))
+
+# Time since retraining
+ml_retraining_age{model_name="ranking_random_forest"}
+```
+
+---
+
+### Drift Detection
+
+Drift detection monitors changes in the statistical properties of model inputs and outputs.
+
+#### Types of Drift
+
+| Drift Type | Description | Detection Method | Impact |
+|------------|-------------|------------------|---------|
+| **Covariate Drift** | Input feature distribution changes | Kolmogorov-Smirnov test, Population Stability Index (PSI) | Model may mispredict on new data |
+| **Prior Probability Drift** | Class distribution changes | Chi-square test, KL divergence | Model may be biased toward old patterns |
+| **Concept Drift** | Relationship between inputs and outputs changes | Accuracy tracking, error rate monitoring | Model becomes less accurate |
+| **Feature Entropy** | New features emerge or old features disappear | Feature frequency tracking | Model may not recognize new patterns |
+
+#### Drift Detection Metrics
+
+**Population Stability Index (PSI):**
+
+PSI measures how much a variable's distribution has changed over time.
+
+| PSI Range | Interpretation | Action |
+|-----------|----------------|--------|
+| 0 - 0.1 | No significant drift | Monitor |
+| 0.1 - 0.2 | Moderate drift | Investigate |
+| > 0.2 | Significant drift | Retrain model |
+
+**Example PromQL for PSI:**
+```promql
+# Calculate PSI for a feature (simplified)
+abs(
+  avg(ml_feature_value{feature="skills", window="baseline"}) -
+  avg(ml_feature_value{feature="skills", window="current"})
+) / stddev(ml_feature_value{feature="skills", window="baseline"})
+```
+
+**Kolmogorov-Smirnov Test:**
+
+Detects if two samples come from the same distribution.
+
+```python
+# Backend implementation example
+from scipy.stats import ks_2samp
+
+def detect_feature_drift(baseline_features, current_features):
+    """
+    Detect drift using KS test
+
+    Args:
+        baseline_features: Feature values from training data
+        current_features: Feature values from recent predictions
+
+    Returns:
+        {
+            'ks_statistic': 0.15,
+            'p_value': 0.001,
+            'drift_detected': True,
+            'drift_severity': 'high'
+        }
+    """
+    ks_statistic, p_value = ks_2samp(baseline_features, current_features)
+
+    return {
+        'ks_statistic': ks_statistic,
+        'p_value': p_value,
+        'drift_detected': p_value < 0.05,  # 95% confidence
+        'drift_severity': 'high' if ks_statistic > 0.15 else 'medium' if ks_statistic > 0.1 else 'low'
+    }
+```
+
+#### Monitoring Key Features
+
+Monitor these features for drift in the resume analysis pipeline:
+
+| Feature | Monitoring Approach | Drift Indicators |
+|---------|-------------------|------------------|
+| **Skills** | Track top 100 skills frequency | New technologies (e.g., "Docker", "Kubernetes") emerge |
+| **Experience Duration** | Track years of experience distribution | Shift in seniority levels of applicants |
+| **Language** | Track language distribution (en/ru) | Change in applicant geography |
+| **Document Format** | Track PDF vs DOCX ratio | New document types appear |
+| **Text Length** | Track resume word count distribution | Resume length trends change |
+| **Keywords** | Track keyword extraction results | New terminology or buzzwords emerge |
+
+#### Drift Detection Alerts
+
+Set up Grafana alerts for drift:
+
+```yaml
+# Feature Drift Alert
+groups:
+  - name: ml_drift_detection
+    rules:
+      - alert: HighFeatureDrift
+        expr: ml_feature_drift_score > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          component: ml
+        annotations:
+          summary: "Significant feature drift detected"
+          description: "Feature '{{ $labels.feature_name }}' has drift score {{ $value }} (threshold: 0.2)"
+
+      - alert: ModelAccuracyDrop
+        expr: ml_model_accuracy < 0.75
+        for: 10m
+        labels:
+          severity: critical
+          component: ml
+        annotations:
+          summary: "Model accuracy dropped below 75%"
+          description: "Model '{{ $labels.model_name }}' accuracy is {{ $value }}"
+
+      - alert: PredictionDistributionShift
+        expr: abs(avg(ml_prediction_score{model_name="ranking_random_forest"}) offset 1h - avg(ml_prediction_score{model_name="ranking_random_forest"})) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "Prediction distribution shifted significantly"
+          description: "Prediction mean shifted by {{ $value }} in the last hour"
+```
+
+---
+
+### Performance Tracking
+
+Track ML model performance over time to identify degradation and retraining needs.
+
+#### Performance Metrics
+
+| Metric | Description | Calculation | Target |
+|--------|-------------|-------------|--------|
+| **Accuracy** | Percentage of correct predictions | (TP + TN) / Total | > 85% |
+| **Precision** | True positives / All predicted positives | TP / (TP + FP) | > 80% |
+| **Recall** | True positives / All actual positives | TP / (TP + FN) | > 80% |
+| **F1 Score** | Harmonic mean of precision and recall | 2 × (Precision × Recall) / (Precision + Recall) | > 80% |
+| **AUC-ROC** | Area under ROC curve | sklearn.metrics.roc_auc_score | > 0.85 |
+| **Mean Squared Error** | Average squared difference | sklearn.metrics.mean_squared_error | < 0.1 |
+
+#### Model Performance Dashboard Queries
+
+**Accuracy Trend by Model:**
+```promql
+# Rolling accuracy over 7 days
+avg(ml_model_accuracy{model_name="ranking_random_forest"}[7d])
+```
+
+**Prediction Quality Distribution:**
+```promql
+# Distribution of prediction confidence scores
+sum(rate(ml_model_confidence_bucket[5m])) by (le, model_name)
+```
+
+**Model Comparison:**
+```promql
+# Compare accuracy across models
+avg(ml_model_accuracy) by (model_name)
+```
+
+**Performance Degradation Detection:**
+```promql
+# Detect 10% drop in accuracy compared to baseline
+(avg(ml_model_accuracy{model_name="ranking_random_forest"} offset 1h) - avg(ml_model_accuracy{model_name="ranking_random_forest"})) / avg(ml_model_accuracy{model_name="ranking_random_forest"} offset 1h) > 0.1
+```
+
+---
+
+### Model Retracking & Retraining
+
+Monitor when models need retraining.
+
+#### Retraining Triggers
+
+| Trigger | Metric | Threshold | Action |
+|---------|--------|-----------|--------|
+| **Time-based** | Days since retraining | > 30 days | Schedule retraining |
+| **Performance-based** | Model accuracy | < 80% | Immediate retraining |
+| **Drift-based** | Feature drift score | > 0.2 | Investigate, retrain if needed |
+| **Volume-based** | Predictions since retraining | > 10,000 | Consider retraining |
+
+#### Retraining Metrics
+
+```promql
+# Days since last retraining
+ml_retraining_age{model_name="ranking_random_forest"}
+
+# Predictions since retraining
+ml_predictions_total{model_name="ranking_random_forest"} - ml_predictions_total{model_name="ranking_random_forest"} @ end(last_retraining_timestamp)
+
+# Retraining frequency
+count(increase(ml_retraining_total[30d])) by (model_name)
+```
+
+#### Retraining Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              MODEL RETRAINING WORKFLOW                          │
+│                                                                  │
+│  1. TRIGGER DETECTION                                            │
+│     ├── Performance drop detected                               │
+│     ├── Drift score exceeds threshold                           │
+│     └── Scheduled retraining date reached                       │
+│                           │                                     │
+│                           ▼                                     │
+│  2. DATA COLLECTION                                             │
+│     ├── Recent labeled data (last 30 days)                      │
+│     ├── Validation set (20% holdout)                            │
+│     └── Test set (unseen data)                                  │
+│                           │                                     │
+│                           ▼                                     │
+│  3. MODEL TRAINING                                              │
+│     ├── Train new model version                                 │
+│     ├── Hyperparameter tuning                                   │
+│     └── Cross-validation                                        │
+│                           │                                     │
+│                           ▼                                     │
+│  4. MODEL EVALUATION                                            │
+│     ├── Compare new vs. old model                               │
+│     ├── Verify performance improvement                          │
+│     └── Check for regression on edge cases                      │
+│                           │                                     │
+│                           ▼                                     │
+│  5. MODEL DEPLOYMENT                                            │
+│     ├── A/B testing (10% traffic to new model)                  │
+│     ├── Monitor for 24 hours                                    │
+│     └── Full rollout if successful                              │
+│                           │                                     │
+│                           ▼                                     │
+│  6. CLEANUP                                                      │
+│     ├── Archive old model version                               │
+│     ├── Update baseline metrics                                 │
+│     └── Log retraining metadata                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Model A/B Testing
+
+Test new model versions before full deployment.
+
+#### A/B Testing Metrics
+
+| Metric | Control (Model A) | Test (Model B) | Significance Test |
+|--------|-------------------|----------------|-------------------|
+| Accuracy | 85% | 87% | p-value < 0.05 |
+| p95 Inference Time | 12s | 14s | Not significant |
+| Prediction Volume | 1000 | 1000 | Equal traffic split |
+
+#### A/B Testing PromQL Queries
+
+```promql
+# Compare accuracy between model versions
+avg(ml_model_accuracy) by (model_version)
+
+# Compare inference time
+histogram_quantile(0.95, sum(rate(ml_inference_duration_seconds_bucket[5m])) by (le, model_version))
+
+# Traffic split percentage
+sum(rate(ml_predictions_total{model_version="v1.2"}[5m])) / sum(rate(ml_predictions_total[5m])) * 100
+
+# Statistical significance (requires external calculation)
+# Export metrics to Python/R for t-test or chi-square test
+```
+
+#### A/B Testing Configuration
+
+```python
+# A/B testing middleware (backend/api/ab_testing.py)
+import random
+import logging
+from prometheus_client import Counter
+
+logger = logging.getLogger(__name__)
+
+# Track which model version made predictions
+ab_test_predictions = Counter(
+    'ml_ab_test_predictions_total',
+    'Predictions made during A/B test',
+    ['model_version', 'variant']
+)
+
+def get_model_version_for_request(resume_id: str, user_id: str = None) -> str:
+    """
+    Determine which model version to use for A/B testing
+
+    Args:
+        resume_id: Unique identifier for the resume
+        user_id: Optional user identifier for consistent splitting
+
+    Returns:
+        Model version to use ('v1.1' or 'v1.2')
+    """
+    # 10% of traffic gets new model (v1.2)
+    TRAFFIC_SPLIT = 0.10
+
+    # Use user_id for consistent assignment if provided
+    if user_id:
+        # Hash user_id for deterministic assignment
+        hash_val = hash(user_id) % 100
+        use_new_model = hash_val < (TRAFFIC_SPLIT * 100)
+    else:
+        # Random assignment for anonymous requests
+        use_new_model = random.random() < TRAFFIC_SPLIT
+
+    model_version = "v1.2" if use_new_model else "v1.1"
+    variant = "test" if use_new_model else "control"
+
+    # Log the assignment
+    logger.info(
+        f"A/B test assignment",
+        extra={
+            "resume_id": resume_id,
+            "user_id": user_id,
+            "model_version": model_version,
+            "variant": variant,
+            "traffic_split": TRAFFIC_SPLIT
+        }
+    )
+
+    # Track prediction count
+    ab_test_predictions.labels(
+        model_version=model_version,
+        variant=variant
+    ).inc()
+
+    return model_version
+```
+
+---
+
+### Model Health Dashboard
+
+Create a dedicated dashboard in Grafana for ML model health monitoring.
+
+**Dashboard Panels:**
+
+1. **Model Accuracy Trend** - Timeseries of accuracy over 30 days
+2. **Feature Drift Scores** - Gauge panel for top 10 features
+3. **Prediction Distribution** - Histogram of prediction scores
+4. **Model Confidence** - Heatmap of confidence distributions
+5. **Retraining Status** - Single stat panel showing days since retraining
+6. **A/B Test Results** - Comparison table of model versions
+7. **Prediction Volume** - Timeseries of predictions per model
+8. **Inference Time by Model** - Box plot of latency distributions
+
+**Dashboard JSON Location:**
+`monitoring/grafana/dashboards/ml-model-health.json`
+
+---
+
+### ML Monitoring Best Practices
+
+#### ✅ DO
+
+1. **Establish Baselines**
+   - Capture feature distributions during training
+   - Store baseline metrics for comparison
+   - Document expected performance ranges
+
+2. **Monitor Continuously**
+   - Check drift metrics every hour
+   - Review accuracy trends daily
+   - Validate predictions on sample data weekly
+
+3. **Set Up Alerts**
+   - Alert on significant drift (> 0.2 PSI)
+   - Alert on accuracy drops (> 10%)
+   - Alert on prediction anomalies
+
+4. **Version Models**
+   - Track model versions in Git
+   - Archive old model versions
+   - Maintain rollback capability
+
+5. **Document Retraining**
+   - Log retraining triggers
+   - Record performance improvements
+   - Note any data quality issues
+
+#### ❌ DON'T
+
+1. **Don't Ignore Drift**
+   - Small drift compounds over time
+   - Investigate all drift alerts
+
+2. **Don't Retrain Too Frequently**
+   - Requires significant computation
+   - May introduce instability
+   - Set minimum retraining interval (7 days)
+
+3. **Don't Skip Validation**
+   - Always test on holdout set
+   - Verify performance before deployment
+   - Monitor for regression
+
+4. **Don't Forget Edge Cases**
+   - Test on rare resume formats
+   - Validate on new skills/technologies
+   - Check language-specific performance
+
+---
+
+### Troubleshooting ML Models
+
+#### Model Accuracy Suddenly Dropped
+
+**Symptoms:**
+- Accuracy drops from 85% to 70%
+- Drift alerts firing
+- Prediction distribution shifted
+
+**Investigation:**
+
+```logql
+# Check for recent code changes
+{job="backend"} |~ "model.*version|model.*loaded"
+
+# Check for data quality issues
+{job="backend"} |~ "extraction.*error|parse.*error"
+
+# Check for feature drift
+{job="backend"} |~ "drift.*score|feature.*distribution"
+
+# Check prediction distribution
+{job="backend"} | json | unwrap prediction_score
+```
+
+**Solutions:**
+1. Roll back to previous model version if degradation is severe
+2. Investigate data quality issues
+3. Collect new training data if drift is confirmed
+4. Retrain model with updated data
+
+#### High Feature Drift Detected
+
+**Symptoms:**
+- PSI score > 0.2 for skills feature
+- New technologies not recognized
+- Model confidence dropping
+
+**Investigation:**
+
+```promql
+# Identify which features are drifting
+ml_feature_drift_score{feature_name=~".*"} > 0.1
+
+# Check prediction confidence for drifted features
+avg(ml_model_confidence{feature_drift_detected="true"}) by (feature_name)
+```
+
+**Solutions:**
+1. Update skill taxonomy with new technologies
+2. Add training examples with new features
+3. Retrain model with updated data
+4. Monitor feature extraction pipeline
+
+#### Model Inference Slow
+
+**Symptoms:**
+- p95 inference time > 60 seconds
+- Tasks timing out
+- Queue backup
+
+**Investigation:**
+
+```promql
+# Check inference time by model
+histogram_quantile(0.95, sum(rate(ml_inference_duration_seconds_bucket[5m])) by (le, model_name))
+
+# Check if model is loading repeatedly
+rate(ml_model_load_total[5m])
+```
+
+**Solutions:**
+1. Pre-load models on worker startup (not per-request)
+2. Implement model caching
+3. Use batch inference for multiple resumes
+4. Scale up Celery workers
+
+---
+
+### ML Monitoring Checklist
+
+#### Daily Monitoring
+- [ ] Check model accuracy metrics
+- [ ] Review drift detection alerts
+- [ ] Verify inference time performance
+- [ ] Check prediction volume trends
+
+#### Weekly Monitoring
+- [ ] Analyze feature distributions
+- [ ] Review model comparison metrics
+- [ ] Validate on sample predictions
+- [ ] Check retraining schedule
+
+#### Monthly Monitoring
+- [ ] Evaluate retraining necessity
+- [ ] Review model performance over time
+- [ ] Update baseline metrics if needed
+- [ ] Document model behavior changes
+
+---
+
 ## Grafana Dashboards
 
 Grafana comes with 5 pre-configured dashboards that automatically provision on startup. Dashboards are located in `monitoring/grafana/dashboards/` and auto-refresh every 10 seconds.
