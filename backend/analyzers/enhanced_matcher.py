@@ -328,6 +328,48 @@ class EnhancedSkillMatcher:
 
         return None
 
+    def _try_fuzzy_match(
+        self,
+        resume_skills: List[str],
+        required_skill: str,
+        threshold: float = 0.7
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Attempt a fuzzy match between resume skills and required skill.
+
+        Fuzzy matching uses string similarity to detect typos and minor variations.
+        This provides medium confidence (0.7-1.0) depending on similarity score.
+        Useful when the resume has "ReactJS" and vacancy requires "React.js".
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+            required_skill: The skill required by the vacancy (not normalized)
+            threshold: Minimum similarity score (0.0-1.0) to consider a match
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> result = matcher._try_fuzzy_match(['ReactJS'], 'React.js')
+            >>> result
+            ('ReactJS', 0.85, 'fuzzy')
+        """
+        best_match: Optional[str] = None
+        best_similarity = 0.0
+
+        for resume_skill in resume_skills:
+            similarity = self.calculate_fuzzy_similarity(resume_skill, required_skill)
+
+            if similarity >= threshold and similarity > best_similarity:
+                best_match = resume_skill
+                best_similarity = similarity
+
+        if best_match:
+            return best_match, best_similarity, "fuzzy"
+
+        return None
+
     def find_fuzzy_match(
         self,
         resume_skills: List[str],
@@ -354,17 +396,13 @@ class EnhancedSkillMatcher:
             >>> result
             ('ReactJS', 0.85)
         """
-        best_match: Optional[Tuple[str, float]] = None
-        best_similarity = 0.0
+        result = self._try_fuzzy_match(resume_skills, required_skill, threshold)
 
-        for resume_skill in resume_skills:
-            similarity = self.calculate_fuzzy_similarity(resume_skill, required_skill)
+        if result:
+            matched_skill, confidence, _ = result
+            return matched_skill, confidence
 
-            if similarity >= threshold and similarity > best_similarity:
-                best_match = (resume_skill, similarity)
-                best_similarity = similarity
-
-        return best_match
+        return None
 
     def _try_direct_match(
         self,
@@ -710,14 +748,14 @@ class EnhancedSkillMatcher:
 
         # Strategy 4: Fuzzy match
         if use_fuzzy:
-            fuzzy_match = self.find_fuzzy_match(resume_skills, required_skill)
+            fuzzy_match = self._try_fuzzy_match(resume_skills, required_skill)
             if fuzzy_match:
-                matched_skill, confidence = fuzzy_match
+                matched_skill, confidence, match_type = fuzzy_match
                 result.update({
                     "matched": True,
                     "confidence": confidence,
                     "matched_as": matched_skill,
-                    "match_type": "fuzzy"
+                    "match_type": match_type
                 })
                 return result
 
