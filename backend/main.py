@@ -266,6 +266,7 @@ from api import (
     candidate_notes,
     candidate_activities,
     search,
+    notifications,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -298,6 +299,7 @@ app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["C
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 
 
 if __name__ == "__main__":
