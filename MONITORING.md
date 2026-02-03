@@ -1109,6 +1109,806 @@ curl -s http://localhost:3100/loki/api/v1/label/job/values | jq '.data[]'
 
 ---
 
+## Request Tracing
+
+Request tracing allows you to follow a single request as it travels through multiple services, making it easier to debug issues and understand system behavior.
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     REQUEST TRACING FLOW                        │
+│                                                                  │
+│  1. Frontend Request                                           │
+│     ├── Generate correlation_id                                │
+│     └── Send to Backend with X-Request-ID header               │
+│                           │                                     │
+│                           ▼                                     │
+│  2. Backend API Processing                                     │
+│     ├── Log correlation_id                                     │
+│     ├── Process request (HTTP → Business Logic)                │
+│     └── Forward to Celery if needed                            │
+│                           │                                     │
+│                           ▼                                     │
+│  3. Background Task (Celery)                                   │
+│     ├── Inherit correlation_id                                 │
+│     ├── Execute ML analysis                                    │
+│     └── Update database                                        │
+│                           │                                     │
+│                           ▼                                     │
+│  4. Database Operations                                        │
+│     ├── Query with trace metadata                              │
+│     └── Return results                                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Correlation ID Pattern
+
+Every request in AgentHR includes a `correlation_id` that links all log entries across services.
+
+#### Frontend (React)
+
+```javascript
+// Generate correlation ID on frontend
+const generateCorrelationId = () => {
+  return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Send request with correlation ID
+const correlationId = generateCorrelationId();
+
+fetch('http://localhost:8000/api/resumes/upload', {
+  method: 'POST',
+  headers: {
+    'X-Request-ID': correlationId,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(data)
+}).then(response => {
+  console.log(`Request ${correlationId} completed`);
+});
+```
+
+#### Backend (FastAPI)
+
+```python
+from fastapi import Header, Request
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+@app.middleware("http")
+async def add_correlation_id(request: Request, call_next):
+    """Extract or generate correlation ID for each request"""
+    correlation_id = request.headers.get("X-Request-ID")
+
+    if not correlation_id:
+        correlation_id = str(uuid.uuid4())
+
+    # Add to request state for use in endpoints
+    request.state.correlation_id = correlation_id
+
+    # Log the incoming request
+    logger.info(
+        f"Incoming request",
+        extra={
+            "correlation_id": correlation_id,
+            "method": request.method,
+            "path": request.url.path,
+            "client": request.client.host
+        }
+    )
+
+    # Process request
+    response = await call_next(request)
+
+    # Add correlation ID to response headers
+    response.headers["X-Request-ID"] = correlation_id
+
+    return response
+
+# Usage in endpoint
+@app.post("/api/resumes/upload")
+async def upload_resume(request: Request):
+    correlation_id = request.state.correlation_id
+
+    logger.info(
+        f"Processing resume upload",
+        extra={
+            "correlation_id": correlation_id,
+            "action": "resume_upload_start"
+        }
+    )
+
+    # ... processing logic ...
+
+    logger.info(
+        f"Resume upload completed",
+        extra={
+            "correlation_id": correlation_id,
+            "action": "resume_upload_complete",
+            "resume_id": resume.id
+        }
+    )
+```
+
+#### Celery Tasks
+
+```python
+from celery import Celery
+import logging
+
+logger = logging.getLogger(__name__)
+
+@celery_app.task(bind=True)
+def analyze_resume_task(self, resume_id: str, correlation_id: str):
+    """Background task with correlation ID tracing"""
+
+    logger.info(
+        f"Starting resume analysis",
+        extra={
+            "correlation_id": correlation_id,
+            "task_id": self.request.id,
+            "resume_id": resume_id,
+            "action": "analysis_start"
+        }
+    )
+
+    try:
+        # Step 1: Extract text
+        logger.info(
+            f"Extracting text from resume",
+            extra={
+                "correlation_id": correlation_id,
+                "step": "text_extraction",
+                "resume_id": resume_id
+            }
+        )
+        text = extract_text(resume_id)
+
+        # Step 2: Detect language
+        logger.info(
+            f"Detecting language",
+            extra={
+                "correlation_id": correlation_id,
+                "step": "language_detection"
+            }
+        )
+        lang = detect_language(text)
+
+        # Step 3: Extract keywords
+        logger.info(
+            f"Extracting keywords",
+            extra={
+                "correlation_id": correlation_id,
+                "step": "keyword_extraction",
+                "language": lang
+            }
+        )
+        keywords = extract_keywords(text, lang)
+
+        # Step 4: Save results
+        logger.info(
+            f"Saving analysis results",
+            extra={
+                "correlation_id": correlation_id,
+                "step": "save_results",
+                "keywords_count": len(keywords)
+            }
+        )
+        save_results(resume_id, keywords)
+
+        logger.info(
+            f"Analysis completed successfully",
+            extra={
+                "correlation_id": correlation_id,
+                "action": "analysis_complete",
+                "duration_seconds": self.request.time_running
+            }
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Analysis failed",
+            extra={
+                "correlation_id": correlation_id,
+                "action": "analysis_failed",
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
+        raise
+```
+
+### Tracing Workflows
+
+#### Complete Request Trace
+
+**Scenario:** User uploads a resume and wants to see the full processing journey
+
+**Step 1: Capture correlation ID from frontend**
+```javascript
+const correlationId = 'abc-123-def-456';
+```
+
+**Step 2: Find all logs for this request in Loki**
+```logql
+# All logs for this correlation ID across all services
+{job=~"backend|celery-worker|frontend"} |~ "abc-123-def-456"
+```
+
+**Step 3: Filter by service to see the flow**
+```logql
+# Backend logs only
+{job="backend"} |~ "abc-123-def-456"
+
+# Celery worker logs only
+{job="celery-worker"} |~ "abc-123-def-456"
+```
+
+**Step 4: View the complete trace timeline**
+```logql
+{job=~"backend|celery-worker"} |~ "abc-123-def-456" | logfmt | line_format "{{.timestamp}} {{.level}} [{{.job}}] {{.action}} - {{.message}}"
+```
+
+This produces output like:
+```
+2024-01-15T10:30:00Z INFO [backend] resume_upload_start - Processing resume upload
+2024-01-15T10:30:01Z INFO [backend] resume_upload_complete - Resume upload completed
+2024-01-15T10:30:02Z INFO [celery-worker] analysis_start - Starting resume analysis
+2024-01-15T10:30:03Z INFO [celery-worker] text_extraction - Extracting text from resume
+2024-01-15T10:30:05Z INFO [celery-worker] language_detection - Detecting language
+2024-01-15T10:30:06Z INFO [celery-worker] keyword_extraction - Extracting keywords
+2024-01-15T10:30:15Z INFO [celery-worker] save_results - Saving analysis results
+2024-01-15T10:30:16Z INFO [celery-worker] analysis_complete - Analysis completed successfully
+```
+
+#### Performance Tracing
+
+**Scenario:** Resume analysis is slow, identify the bottleneck
+
+**Step 1: Find slow analyses**
+```logql
+{job="celery-worker"} | json | unwrap duration_seconds | quantile_over_time(0.95, [5m]) > 30
+```
+
+**Step 2: Get correlation IDs for slow requests**
+```logql
+{job="celery-worker"} | json | unwrap duration_seconds > 30
+```
+
+**Step 3: Trace slow request through all services**
+```logql
+{job=~"backend|celery-worker"} |~ "correlation_id=\"SLOW-REQUEST-UUID\""
+```
+
+**Step 4: Identify slow step**
+```logql
+{job="celery-worker"} |~ "correlation_id=\"SLOW-REQUEST-UUID\"" | json | unwrap step_duration_ms
+```
+
+### Tracing Tools
+
+#### 1. Grafana Trace View
+
+In Grafana Explore:
+1. Select Loki datasource
+2. Enter correlation ID query: `{job="backend"} |~ "abc-123-def-456"`
+3. Click "Show context" to see surrounding logs
+4. Use "Jump to" to navigate to specific time points
+
+#### 2. Distributed Tracing with Loki
+
+**Trace by labels:**
+```logql
+{job="backend", correlation_id="abc-123-def-456"}
+```
+
+**Trace with time range:**
+```logql
+{job="backend"} |~ "abc-123-def-456" | line_format "{{.timestamp}} {{.message}}"
+```
+
+**Extract timing information:**
+```logql
+{job="celery-worker"} |~ "abc-123-def-456" | json | unwrap duration_seconds
+```
+
+#### 3. Correlation ID Table
+
+Create a dashboard panel showing all requests by correlation ID:
+
+```logql
+{job=~"backend|celery-worker"}
+| json
+| label_format correlation_id={{.correlation_id}}, action={{.action}}, job={{.job}}
+| line_format "{{.correlation_id}} | {{.job}} | {{.action}} | {{.duration_ms}}"
+```
+
+### Best Practices
+
+#### ✅ DO
+
+1. **Always generate correlation IDs on the frontend** for user-initiated requests
+2. **Include correlation ID in all log statements** across all services
+3. **Return correlation ID in API responses** so clients can reference it
+4. **Pass correlation ID to background tasks** as an explicit parameter
+5. **Use structured logging** with consistent field names
+6. **Log at entry/exit points** of each service boundary
+
+#### ❌ DON'T
+
+1. **Don't generate multiple correlation IDs** for a single logical request
+2. **Don't log sensitive data** with correlation IDs (passwords, tokens)
+3. **Don't rely on timestamps alone** for request correlation
+4. **Don't omit correlation IDs from error logs** (they're most critical there)
+5. **Don't use random UUIDs without logging them** consistently
+
+### Request Tracing Example: Complete Flow
+
+**User uploads resume → Backend validates → Celery analyzes → DB stores → Frontend notified**
+
+```logql
+# Trace complete upload workflow
+{job=~"frontend|backend|celery-worker"} |~ "abc-123-def-456"
+```
+
+**Expected timeline:**
+```
+1. [frontend] Generated correlation_id: abc-123-def-456
+2. [backend] Received upload request (abc-123-def-456)
+3. [backend] Validated file type (abc-123-def-456)
+4. [backend] Saved file to disk (abc-123-def-456)
+5. [backend] Queued Celery task (abc-123-def-456)
+6. [backend] Returned response to client (abc-123-def-456)
+7. [celery-worker] Started analysis task (abc-123-def-456)
+8. [celery-worker] Extracted text from PDF (abc-123-def-456)
+9. [celery-worker] Detected language: en (abc-123-def-456)
+10. [celery-worker] Extracted keywords (abc-123-def-456)
+11. [celery-worker] Saved to database (abc-123-def-456)
+12. [celery-worker] Task completed (abc-123-def-456)
+```
+
+---
+
+## Debugging Workflows
+
+Systematic procedures for diagnosing and resolving common issues in AgentHR.
+
+### Debugging Workflow Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DEBUGING METHODOLOGY                         │
+│                                                                  │
+│  1. Define Problem                                              │
+│     ├── What is the symptom?                                    │
+│     ├── When does it occur?                                     │
+│     └── What is the expected behavior?                          │
+│                           │                                     │
+│                           ▼                                     │
+│  2. Gather Information                                          │
+│     ├── Check metrics (Grafana/Prometheus)                      │
+│     ├── Search logs (Loki)                                      │
+│     ├── Correlate events (correlation_id)                       │
+│     └── Reproduce issue                                         │
+│                           │                                     │
+│                           ▼                                     │
+│  3. Form Hypothesis                                             │
+│     ├── Which component is failing?                             │
+│     ├── What is the root cause?                                 │
+│     └── What changed recently?                                  │
+│                           │                                     │
+│                           ▼                                     │
+│  4. Test Hypothesis                                             │
+│     ├── Verify with targeted queries                            │
+│     ├── Test in isolation                                       │
+│     └── Check configurations                                    │
+│                           │                                     │
+│                           ▼                                     │
+│  5. Implement Fix                                               │
+│     ├── Apply fix                                               │
+│     ├── Test resolution                                         │
+│     └── Monitor for recurrence                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Common Debugging Scenarios
+
+#### Scenario 1: Resume Analysis Stuck in "Pending" State
+
+**Symptoms:**
+- Resume uploaded successfully
+- Status remains "pending" after 30+ seconds
+- No analysis results available
+
+**Debugging Workflow:**
+
+**Step 1: Check Celery Worker Status**
+```bash
+# Verify workers are running
+docker-compose ps celery-worker
+
+# Check worker logs
+docker-compose logs celery-worker --tail=100
+```
+
+**Expected output:** Workers should show "celery@worker: Ready"
+**Problem if:** No workers running or workers show "Disconnected"
+
+**Step 2: Check Task Queue**
+```logql
+# Search for task creation
+{job="backend"} |~ "resume_id=\"PROBLEM-RESUME-ID\"" |~ "task.*delay"
+```
+
+**Step 3: Check if Task Started**
+```logql
+# Celery received task?
+{job="celery-worker"} |~ "resume_id=\"PROBLEM-RESUME-ID\""
+```
+
+**Step 4: Check for Errors**
+```logql
+# Any errors related to this resume?
+{job="celery-worker", level="ERROR"} |~ "PROBLEM-RESUME-ID"
+```
+
+**Common Causes & Solutions:**
+
+| Cause | Check | Solution |
+|-------|-------|----------|
+| No workers running | `docker-compose ps celery-worker` | `docker-compose up -d celery-worker` |
+| Redis connection failed | Check logs for "Redis connection refused" | Verify Redis is running: `docker-compose up -d redis` |
+| File not found | `{job="backend"} |~ "FileNotFoundError"` | Check upload directory permissions |
+| Out of memory | `{job="celery-worker"} |~ "MemoryError"` | Increase worker memory limit |
+| ML model not loaded | `{job="celery-worker"} |~ "Model.*not.*found"` | Download missing SpaCy models |
+
+**Verification:**
+```bash
+# Trigger test analysis
+curl -X POST http://localhost:8000/api/resumes/test-resume-id/analyze
+
+# Check it completes within 30 seconds
+```
+
+---
+
+#### Scenario 2: High API Latency (>5s)
+
+**Symptoms:**
+- API responses slow
+- User complaints about load times
+- Grafana shows p95 latency spike
+
+**Debugging Workflow:**
+
+**Step 1: Identify Slow Endpoints**
+```promql
+# P95 latency by endpoint
+histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint))
+```
+
+**Step 2: Find Correlation IDs for Slow Requests**
+```logql
+# Find requests taking >5 seconds
+{job="backend"} | json | unwrap duration_ms > 5000
+```
+
+**Step 3: Trace Slow Request**
+```logql
+# Full trace of slow request
+{job="backend"} |~ "correlation_id=\"SLOW-REQUEST-ID\""
+```
+
+**Step 4: Identify Bottleneck**
+```logql
+# Check database query time
+{job="backend"} |~ "correlation_id=\"SLOW-REQUEST-ID\"" | json | unwrap db_query_duration_ms
+
+# Check external API calls
+{job="backend"} |~ "correlation_id=\"SLOW-REQUEST-ID\"" |~ "http.*duration"
+
+# Check ML inference time
+{job="backend"} |~ "correlation_id=\"SLOW-REQUEST-ID\"" |~ "inference.*duration"
+```
+
+**Step 5: Check Database Performance**
+```promql
+# P95 query duration
+histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m]))
+
+# Active connections
+pg_stat_database_numbackends
+
+# Cache hit ratio
+sum(rate(pg_stat_database_blks_hit[5m])) / (sum(rate(pg_stat_database_blks_hit[5m])) + sum(rate(pg_stat_database_blks_read[5m]))) * 100
+```
+
+**Common Causes & Solutions:**
+
+| Cause | Indicator | Solution |
+|-------|-----------|----------|
+| N+1 query problem | Many similar DB queries | Use `select_in` loading in SQLAlchemy |
+| Missing index | Slow query on specific table | Add database index |
+| Connection pool exhaustion | `numbackends` near max | Increase pool size |
+| ML model slow loading | First request to endpoint | Pre-load models on startup |
+| External API timeout | Waiting for LanguageTool | Add timeout, use fallback |
+
+**Verification:**
+```bash
+# Test endpoint performance
+ab -n 100 -c 10 http://localhost:8000/api/resumes/
+
+# Should see p95 < 500ms
+```
+
+---
+
+#### Scenario 3: High Error Rate (>5%)
+
+**Symptoms:**
+- Spike in 5xx errors
+- Many HTTP 500 responses
+- Alert notifications firing
+
+**Debugging Workflow:**
+
+**Step 1: Check Error Rate**
+```promql
+# Error percentage
+sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100
+```
+
+**Step 2: Identify Failing Endpoints**
+```promql
+# Error rate by endpoint
+sum(rate(http_requests_total{status=~"5.."}[5m])) by (endpoint)
+```
+
+**Step 3: Find Error Logs**
+```logql
+# All errors in last 5 minutes
+{level="ERROR"}[5m]
+
+# Errors by endpoint
+{job="backend", level="ERROR"} |= "POST /api/resumes"
+```
+
+**Step 4: Check for Common Patterns**
+```logql
+# Database connection errors
+{job="backend"} |~ "connection.*refused|pool.*exhausted"
+
+# File system errors
+{job="backend"} |~ "FileNotFoundError|Permission denied"
+
+# Validation errors
+{job="backend"} |~ "ValidationError|422"
+
+# ML model errors
+{job="celery-worker"} |~ "Model.*Error|Spacy.*Error"
+```
+
+**Step 5: Correlate with Deployments**
+```bash
+# Check recent changes
+git log --since="1 hour ago"
+
+# Check if deployment coincides with error spike
+docker-compose ps
+```
+
+**Common Causes & Solutions:**
+
+| Error Pattern | Likely Cause | Solution |
+|---------------|--------------|----------|
+| `500` + `FileNotFoundError` | Resume file missing | Check file storage, restore from backup |
+| `500` + `Connection pool exhausted` | Too many DB connections | Increase pool size or add connection limit |
+| `422` + `ValidationError` | Client sending invalid data | Add client-side validation, update API docs |
+| `500` + `Spacy.*Error` | ML model not loaded | Restart workers, verify model installation |
+| `503` + `Service Unavailable` | Upstream service down | Check Redis, PostgreSQL availability |
+
+**Verification:**
+```bash
+# Test endpoint returns 2xx
+curl -w "%{http_code}" -o /dev/null -s http://localhost:8000/api/resumes/
+
+# Should return 200
+```
+
+---
+
+#### Scenario 4: Memory Leak (Gradual Slowdown)
+
+**Symptoms:**
+- System starts fast, slows down over hours
+- Container memory usage increases continuously
+- OOM kills after days
+
+**Debugging Workflow:**
+
+**Step 1: Monitor Memory Usage**
+```promql
+# Memory trend
+container_memory_usage_bytes{container="backend"}
+
+# Memory rate of change
+rate(container_memory_usage_bytes{container="backend"}[1h])
+```
+
+**Step 2: Check for Growing Objects**
+```logql
+# Look for increasing metrics
+{job="backend"} |~ "cache.*size|object.*count"
+```
+
+**Step 3: Profile Memory**
+```bash
+# Access container
+docker-compose exec backend bash
+
+# Use memory_profiler
+pip install memory_profiler
+python -m memory_profiler backend/api/main.py
+```
+
+**Step 4: Check Common Leak Sources**
+
+**Celery task leaks:**
+```logql
+{job="celery-worker"} |~ "task.*result|task.*cache"
+```
+
+**Session leaks:**
+```logql
+{job="backend"} |~ "session.*created|session.*not.*closed"
+```
+
+**Model caching issues:**
+```logql
+{job="backend"} |~ "model.*loaded|cache.*size"
+```
+
+**Common Causes & Solutions:**
+
+| Cause | Evidence | Solution |
+|-------|----------|----------|
+| Unbounded cache growth | Cache size keeps increasing | Set maxsize on caches, use TTL |
+| SQLAlchemy sessions not closed | Many "session created" logs | Use context managers for sessions |
+| ML models loaded repeatedly | Model loaded multiple times | Load models once at startup |
+| File handles not closed | Too many open files error | Use `with open()` context manager |
+| Celery result backend growing | Redis memory growing | Enable result expiration (`result_expires`) |
+
+**Verification:**
+```bash
+# Monitor memory for 1 hour
+watch -n 60 'docker stats backend --no-stream --format "table {{.MemUsage}}"'
+
+# Memory should stabilize, not grow indefinitely
+```
+
+---
+
+#### Scenario 5: Celery Task Queue Backup
+
+**Symptoms:**
+- Tasks waiting too long
+- Queue depth > 100
+- Users experience delays
+
+**Debugging Workflow:**
+
+**Step 1: Check Queue Depth**
+```promql
+# Current queue length
+celery_queue_length
+```
+
+**Step 2: Check Worker Status**
+```promql
+# Active workers
+celery_workers_up
+
+# Tasks per worker
+celery_worker_tasks_active
+```
+
+**Step 3: Identify Long-Running Tasks**
+```logql
+# Tasks running >5 minutes
+{job="celery-worker"} | json | unwrap runtime_seconds > 300
+```
+
+**Step 4: Check Failure Rate**
+```promql
+# Failed task percentage
+sum(rate(celery_tasks_total{status="failed"}[5m])) / sum(rate(celery_tasks_total[5m])) * 100
+```
+
+**Step 5: Find Stuck Tasks**
+```logql
+# Tasks started but not completed
+{job="celery-worker"} |~ "task.*started" |~ "correlation_id=\"STUCK-TASK-ID\""
+
+# No corresponding "completed" log
+```
+
+**Common Causes & Solutions:**
+
+| Cause | Check | Solution |
+|-------|-------|----------|
+| Not enough workers | `celery_workers_up` < expected | Scale up workers: `docker-compose up -d --scale celery-worker=4` |
+| Long-running tasks | Task runtime > 5 minutes | Break into smaller tasks, add timeouts |
+| Workers crashed | `{job="celery-worker", level="ERROR"}` | Fix error, restart workers |
+| Too many tasks enqueued | `celery_queue_length` > 1000 | Implement rate limiting |
+| DB connection exhaustion | `pg_stat_database_numbackends` high | Increase DB pool or add connection limits |
+
+**Verification:**
+```bash
+# Queue should drain within minutes
+watch -n 10 'curl -s http://localhost:5555/api/tasks | jq ".queue_length"'
+
+# Workers should show "Ready"
+docker-compose logs celery-worker --tail=20 | grep "Ready"
+```
+
+---
+
+### Debugging Checklist
+
+Use this checklist when investigating issues:
+
+#### Initial Assessment
+- [ ] Define problem: What, when, where?
+- [ ] Check current alerts (Grafana)
+- [ ] Verify service status (docker-compose ps)
+- [ ] Reproduce issue if possible
+
+#### Information Gathering
+- [ ] Check metrics (Prometheus/Grafana dashboards)
+- [ ] Search recent logs (Loki)
+- [ ] Find correlation IDs for affected requests
+- [ ] Check error rates by service
+
+#### Root Cause Analysis
+- [ ] Identify failing component
+- [ ] Trace request flow through system
+- [ ] Check recent changes/deploys
+- [ ] Review configuration files
+
+#### Hypothesis Testing
+- [ ] Form hypothesis about root cause
+- [ ] Verify with targeted queries
+- [ ] Test in isolation
+- [ ] Check for similar past issues
+
+#### Resolution
+- [ ] Implement fix
+- [ ] Verify issue resolved
+- [ ] Monitor for 24 hours
+- [ ] Document for future reference
+
+### Debugging Tools Quick Reference
+
+| Tool | Purpose | Command/URL |
+|------|---------|-------------|
+| **Grafana** | Metrics visualization | http://localhost:3001 |
+| **Prometheus** | Metrics query | http://localhost:9090/graph |
+| **Loki** | Log search | http://localhost:3100 |
+| **Flower** | Celery monitoring | http://localhost:5555 |
+| **docker-compose logs** | Container logs | `docker-compose logs -f backend` |
+| **curl** | Test API endpoints | `curl -v http://localhost:8000/health` |
+| **ab** | Load testing | `ab -n 100 -c 10 http://localhost:8000/api/resumes/` |
+| **jq** | JSON parsing | `curl ... | jq '.'` |
+
+---
+
 ## Common Queries
 
 ### Grafana Logs (Loki)
