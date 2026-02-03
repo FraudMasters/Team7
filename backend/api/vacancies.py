@@ -6,7 +6,7 @@ and delete job vacancy requests that define the candidate profile they're lookin
 """
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status, Depends, Query
@@ -87,6 +87,28 @@ class VacancyResponse(BaseModel):
     source: Optional[str] = Field(None, description="Source")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+
+
+class VacancySearchRequest(BaseModel):
+    """Request model for vacancy search."""
+
+    query: Optional[str] = Field(None, description="Search query with boolean operators (AND, OR, NOT)")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Filter criteria for search")
+    skip: int = Field(0, ge=0, description="Number of results to skip (pagination)")
+    limit: int = Field(100, ge=1, le=200, description="Maximum number of results to return")
+    sort_by: str = Field("date", description="Sort field: date, title, or salary")
+
+
+class VacancySearchResponse(BaseModel):
+    """Response model for vacancy search."""
+
+    total: int = Field(..., description="Total number of matching vacancies")
+    vacancies: List[Dict[str, Any]] = Field(..., description="List of vacancy results")
+    query: str = Field(..., description="Search query that was executed")
+    filters_applied: Dict[str, Any] = Field(default_factory=dict, description="Filters that were applied")
+    execution_time_seconds: float = Field(..., description="Time taken to execute search")
+    skip: int = Field(..., description="Number of results skipped")
+    limit: int = Field(..., description="Maximum number of results returned")
 
 
 def _vacancy_to_response(vacancy: JobVacancy) -> dict:
