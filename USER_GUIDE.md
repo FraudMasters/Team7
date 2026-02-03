@@ -375,6 +375,586 @@ Here are some tips to make the most of your dashboard:
 
 ---
 
+---
+
+## Posting Job Vacancies
+
+Job vacancies are the foundation of AgentHR's matching and ranking system. The better your job postings, the better your candidate matches. This section will walk you through creating effective vacancies that help the AI find the right people for your roles.
+
+### Creating Your First Job Posting
+
+Let's walk through posting a job vacancy step by step.
+
+#### Step 1: Navigate to the Vacancies Section
+
+From your dashboard or navigation menu:
+
+1. **Click "Vacancies"** in the main navigation
+2. **Click "New Vacancy"** or "Create Vacancy" button
+
+You'll see the vacancy creation form.
+
+#### Step 2: Fill in the Basic Information
+
+**Job Title** (Required)
+
+Enter a clear, specific job title:
+
+| ✅ Good Titles | ❌ Vague Titles |
+|----------------|-----------------|
+| "Senior Python Developer" | "Developer" |
+| "Marketing Manager - B2B SaaS" | "Marketing Person" |
+| "Customer Support Representative (Remote)" | "Support" |
+
+> **Why it matters**: Clear titles help candidates understand the role and help the AI match accurately.
+
+**Description** (Required)
+
+Write a detailed job description that includes:
+
+- **Role overview** – What this person will do day-to-day
+- **Key responsibilities** – 3-7 bullet points of main duties
+- **Company culture** – Brief description of your work environment
+- **What success looks like** – Outcomes you expect
+
+**Example description:**
+
+```
+We're looking for a Senior Python Developer to join our growing team building scalable web applications. You'll work on our core product, serving thousands of users daily.
+
+Key responsibilities:
+- Design and implement RESTful APIs using FastAPI
+- Collaborate with frontend developers to integrate backend services
+- Optimize database queries and improve application performance
+- Mentor junior developers and conduct code reviews
+- Participate in architecture decisions and technical planning
+
+Our culture: We value continuous learning, open communication, and work-life balance. We're a remote-first team with flexible hours.
+
+Success in this role means delivering reliable, well-tested code that improves user experience and system performance.
+```
+
+#### Step 3: Specify Required Skills
+
+This is **critical** for good matching. Add 5-15 skills that candidates must have.
+
+**How to add skills:**
+
+1. **Type a skill** in the skills field (e.g., "Python")
+2. **Press Enter** or click "Add"
+3. **Repeat** for all required skills
+
+**Tips for better skill matching:**
+
+| ✅ Do This | ❌ Avoid This |
+|------------|---------------|
+| Use standard names: "Python", "JavaScript", "SQL" | Using variations without adding synonyms |
+| Include frameworks: "React", "Django", "FastAPI" | Being too vague: "coding" |
+| Add specific tools: "PostgreSQL", "Git", "Docker" | Being too narrow: "Python 3.9.2" |
+| Mix hard and soft skills if relevant | Including 20+ skills |
+
+**Example required skills list:**
+
+```
+Required Skills:
+- Python
+- FastAPI
+- PostgreSQL
+- Docker
+- Git
+- REST APIs
+- SQL
+- Unit Testing
+- CI/CD
+```
+
+> **Pro tip**: AgentHR understands related terms. If you require "PostgreSQL", it will also recognize "postgres" or "Postgres SQL" as matches.
+
+#### Step 4: Set Experience Requirements
+
+**Minimum Experience (Required)**
+
+Specify the minimum experience in **months**:
+
+| Years | Months | When to Use |
+|-------|--------|-------------|
+| 0-1 | 0-12 | Entry-level positions, internships, junior roles |
+| 2-3 | 24-36 | Mid-level positions, some professional experience |
+| 4-6 | 48-72 | Senior roles, team leadership |
+| 7+ | 84+ | Principal/lead roles, extensive expertise |
+
+**Example:** For a "Senior Developer" role requiring 4+ years, enter `48` months.
+
+> **Why months?**: Using months allows for more precise matching. Instead of "3-5 years," you can specify exact requirements like "36 months."
+
+#### Step 5: Add Additional Details (Optional)
+
+These fields help candidates and improve matching:
+
+**Location**
+
+- **City, State/Country** (e.g., "San Francisco, CA")
+- **"Remote"** for fully remote positions
+- **"Hybrid"** for mixed remote/office work
+
+**Employment Type**
+
+- `full-time` – Standard 40-hour employment
+- `part-time` – Less than full-time hours
+- `contract` – Fixed-term or project-based
+- `internship` – Intern positions
+
+**Salary Range** (if you wish to display it)
+
+You can add:
+- Minimum salary
+- Maximum salary
+- Currency (USD, EUR, etc.)
+- Period (hourly, monthly, annually)
+
+**Example:**
+```
+Salary: $80,000 - $120,000 USD per year
+```
+
+#### Step 6: Review and Create
+
+Before clicking "Create" or "Save":
+
+**Checklist:**
+
+- [ ] Title is clear and specific
+- [ ] Description explains the role well
+- [ ] 5-15 required skills listed
+- [ ] Experience requirement set correctly (in months)
+- [ ] Location specified (or "Remote")
+- [ ] Employment type selected
+
+**Click "Create Vacancy"** to post your job.
+
+You should see a confirmation message with your vacancy details. **Save the vacancy ID** if shown—you'll need it when uploading resumes.
+
+---
+
+### Required Fields and Best Practices
+
+Let's dive deeper into creating effective job postings.
+
+#### Required Fields
+
+| Field | Description | Why It's Required |
+|-------|-------------|-------------------|
+| **Title** | Name of the position | Used for display and matching context |
+| **Description** | Details about the role | AI analyzes this to understand requirements |
+| **Required Skills** | List of necessary skills | Core matching criteria for candidates |
+| **Min Experience (months)** | Minimum experience required | Filters candidates by experience level |
+
+#### Optional but Recommended Fields
+
+| Field | Benefit |
+|-------|---------|
+| **Location** | Candidates can filter by location; better matching for on-site roles |
+| **Employment Type** | Clear expectations for work arrangement |
+| **Salary Range** | Attracts appropriate candidates; improves match quality |
+| **Nice-to-Have Skills** | Helps distinguish exceptional candidates |
+
+#### Writing Effective Job Descriptions
+
+A good job description helps AgentHR's AI understand what you're looking for. Follow these guidelines:
+
+**Be Specific About Responsibilities**
+
+✅ **Good:**
+```
+- Design and implement RESTful APIs using FastAPI
+- Optimize PostgreSQL database queries for performance
+- Write unit tests with pytest achieving 80%+ code coverage
+```
+
+❌ **Poor:**
+```
+- Write code
+- Work on databases
+- Do testing
+```
+
+**Mention Technologies and Tools**
+
+Include specific tools, frameworks, and versions:
+
+✅ **Good:**
+```
+- Develop web applications using React 18+ and TypeScript
+- Build backend services with Python 3.10 and FastAPI
+- Manage deployments with Docker and Kubernetes
+```
+
+❌ **Poor:**
+```
+- Frontend development
+- Backend development
+- DevOps tasks
+```
+
+**Describe the Ideal Candidate**
+
+Help the AI identify candidates who fit your culture and requirements:
+
+✅ **Good:**
+```
+We're looking for someone who:
+- Takes ownership of projects from concept to deployment
+- Communicates technical concepts to non-technical stakeholders
+- Enjoys mentoring junior developers
+- Thrives in a fast-paced, collaborative environment
+```
+
+**Include Soft Skills When Relevant**
+
+If soft skills matter for the role, include them:
+
+```
+Required Skills:
+- Python
+- FastAPI
+- PostgreSQL
+- Communication
+- Problem Solving
+- Team Collaboration
+```
+
+> **Note**: AgentHR extracts soft skills from resumes too, so if you list "Communication" as required, candidates with demonstrated communication skills will rank higher.
+
+#### Specifying Required Skills
+
+Skills are the **most important factor** in matching. Here's how to get them right:
+
+**Use Standard Terminology**
+
+Industry-standard terms help AgentHR match more accurately:
+
+| Standard Term | Also Matches |
+|---------------|--------------|
+| Python | python, py, Python 3 |
+| JavaScript | javascript, JS, ECMAScript |
+| PostgreSQL | postgres, Postgres, PostgreSQL, psql |
+| React | react, React.js, ReactJS |
+
+**Include Frameworks and Libraries**
+
+Don't just list "Python" – be specific:
+
+| Too Broad | Better |
+|-----------|--------|
+| Python | Python, FastAPI, Django, SQLAlchemy |
+| JavaScript | JavaScript, React, Node.js, TypeScript |
+| Databases | SQL, PostgreSQL, MongoDB, Redis |
+
+**Balance Specificity**
+
+| ✅ Right Level | ❌ Too Broad | ❌ Too Narrow |
+|----------------|--------------|---------------|
+| "Python" | "Programming" | "Python 3.9.2" |
+| "AWS" | "Cloud" | "AWS EC2 us-east-1" |
+| "Machine Learning" | "AI" | "PyTorch 1.10 Transformer" |
+
+**Number of Skills**
+
+| Role Type | Recommended Skill Count |
+|-----------|------------------------|
+| Entry-level | 5-8 skills |
+| Mid-level | 8-12 skills |
+| Senior/Specialist | 10-15 skills |
+
+**Why not 20+ skills?** Too many requirements can:
+- Filter out great candidates who are missing one minor skill
+- Make matching overly strict
+- Reduce your candidate pool unnecessarily
+
+#### Setting Experience Requirements
+
+Experience requirements work hand-in-hand with skills matching.
+
+**Conversion Reference**
+
+| Years | Months | Example Roles |
+|-------|--------|---------------|
+| Entry (0-1 yr) | 0-12 | Junior Developer, Intern, Associate |
+| Junior (1-2 yrs) | 12-24 | Junior Analyst, Support Rep I |
+| Mid (2-4 yrs) | 24-48 | Developer, Marketing Specialist |
+| Senior (4-7 yrs) | 48-84 | Senior Developer, Team Lead |
+| Lead (7+ yrs) | 84+ | Principal Engineer, Engineering Manager |
+
+**Experience Matching Rules**
+
+AgentHR's matching system:
+
+1. **Below minimum** – Lower match score (significant gap)
+2. **At minimum** – Full points for experience
+3. **Above minimum** – No extra points (experience is pass/fail)
+
+**Example:**
+- Required: 48 months (4 years)
+- Candidate with 36 months: Penalized for insufficient experience
+- Candidate with 48 months: Full points ✓
+- Candidate with 120 months: Same points as 48 months ✓
+
+> **Key Insight**: More experience than required doesn't improve matching. Focus on the *minimum* you need, not the "ideal" amount.
+
+**When to Require Experience**
+
+✅ **Set experience requirements when:**
+- Role requires proven track record
+- Seniority or leadership is needed
+- Domain expertise is critical
+- Industry knowledge is essential
+
+❌ **Skip or minimize experience when:**
+- Potential matters more than years (e.g., junior roles)
+- You're willing to train exceptional candidates
+- Skills are more important than tenure
+
+---
+
+### Managing Multiple Vacancies
+
+When hiring for multiple positions, staying organized is key.
+
+#### Viewing All Your Vacancies
+
+From the **Vacancies** section, you'll see:
+
+| Column | Description |
+|--------|-------------|
+| **Title** | Job posting title (click to view details) |
+| **Status** | Active, Closed, or Draft |
+| **Candidates** | Number of applicants |
+| **Created** | When the vacancy was posted |
+| **Actions** | Edit, close, or delete options |
+
+#### Editing a Vacancy
+
+Need to update requirements or add details?
+
+1. **Click on the vacancy title** to open details
+2. **Click "Edit"** or the pencil icon
+3. **Make your changes** (add skills, update description, etc.)
+4. **Click "Save"**
+
+> **Note**: When you edit a vacancy, existing match scores are **not** automatically recalculated. You may need to re-run matching for candidates.
+
+#### Closing a Vacancy
+
+When a position is filled or you're no longer accepting applicants:
+
+1. **Open the vacancy** details
+2. **Click "Close"** or "Close Position"**
+3. **Confirm** the action
+
+**What happens when you close a vacancy:**
+- Status changes to "Closed"
+- Vacancy no longer appears in active listings
+- Historical data is preserved for analytics
+- You can still view past candidates and rankings
+
+#### Duplicating a Vacancy
+
+Hiring for multiple similar positions? Save time by duplicating:
+
+1. **Open the vacancy** you want to copy
+2. **Click "Duplicate"** or "Copy"**
+3. **Edit the copy** (update title, adjust requirements if needed)
+4. **Save as new vacancy**
+
+**Use cases for duplication:**
+- Hiring multiple developers for the same team
+- Seasonal hiring with similar roles
+- Opening a position you filled previously
+
+#### Deleting a Vacancy
+
+**Warning**: Deletion is permanent and removes all associated data.
+
+1. **Open the vacancy** details
+2. **Click "Delete"** (usually in a menu or settings)
+3. **Confirm deletion**
+
+**When to delete vs. close:**
+
+| Action | When to Use |
+|--------|-------------|
+| **Close** | Position filled, hiring paused, or role not needed now (but might be later) |
+| **Delete** | Created by mistake, test vacancy, or you're certain you'll never need it again |
+
+#### Best Practices for Multiple Vacancies
+
+**1. Use Descriptive Titles**
+
+When posting multiple similar roles, differentiate them:
+
+✅ **Good:**
+```
+- Senior Python Developer - Backend Team
+- Senior Python Developer - Data Team
+- Senior Python Developer - DevOps Team
+```
+
+❌ **Confusing:**
+```
+- Senior Python Developer
+- Senior Python Developer (2)
+- Senior Python Developer (Copy)
+```
+
+**2. Track Candidate Sources**
+
+If you're receiving candidates from multiple sources (job boards, referrals, etc.), note this in the vacancy title or description:
+
+```
+Senior Python Developer - LinkedIn Campaign
+Senior Python Developer - Employee Referral
+```
+
+**3. Review Regularly**
+
+Set a weekly reminder to:
+- Check which vacancies have the most/least candidates
+- Close filled positions promptly
+- Update requirements if you're not getting good matches
+
+**4. Archive Old Vacancies**
+
+After closing a vacancy, export any important data:
+- Candidate rankings
+- Interview notes
+- Hiring metrics
+
+Then close (not delete) the vacancy to preserve history.
+
+---
+
+### Common Vacancy Creation Mistakes
+
+Avoid these common pitfalls:
+
+| Mistake | Why It's a Problem | Fix |
+|---------|-------------------|-----|
+| **Vague titles** ("Developer") | AI can't match precisely; candidates unsure if they qualify | Use specific titles ("Senior Python Developer") |
+| **Too few skills** (<5) | Matches are too broad; many unqualified candidates | Add 5-15 specific, relevant skills |
+| **Too many skills** (>20) | Overly strict; filters out good candidates missing one minor skill | Focus on truly essential skills |
+| **No description** | AI lacks context for matching | Write at least 2-3 paragraphs |
+| **Unrealistic experience** ("10 years for junior role") | No candidates match; poor rankings | Set reasonable minimums |
+| **Generic description** ("Looking for a hard worker") | Doesn't help AI understand requirements | Be specific about role and technologies |
+| **Mixed seniority in one posting** ("Junior or Senior") | Can't set appropriate experience level | Create separate vacancies or set flexible requirements |
+
+---
+
+### Vacancy Examples
+
+Here are complete examples for common roles. Use these as templates.
+
+#### Example 1: Senior Software Engineer
+
+```
+Title: Senior Software Engineer
+
+Description:
+We're seeking a Senior Software Engineer to join our platform team building scalable microservices. You'll architect solutions, mentor junior developers, and drive technical decisions.
+
+Key responsibilities:
+- Design and implement microservices using Go and Kubernetes
+- Lead code reviews and architectural discussions
+- Collaborate with product to define technical requirements
+- Improve system performance and reliability
+- Mentor 2-3 junior developers
+
+Our stack: Go, Kubernetes, PostgreSQL, Redis, gRPC, Terraform
+
+Culture: We're a remote-first team with async communication. We value ownership, continuous learning, and work-life balance.
+
+Required Skills:
+- Go
+- Kubernetes
+- PostgreSQL
+- Docker
+- Microservices
+- REST APIs
+- Git
+- CI/CD
+- System Design
+- Linux
+
+Minimum Experience: 60 months (5 years)
+
+Location: Remote
+Employment Type: full-time
+Salary: $130,000 - $170,000 USD/year
+```
+
+#### Example 2: Marketing Coordinator
+
+```
+Title: Marketing Coordinator
+
+Description:
+Join our marketing team to support campaign execution, content creation, and brand awareness initiatives. Great opportunity for someone early in their marketing career.
+
+Key responsibilities:
+- Assist in planning and executing multi-channel marketing campaigns
+- Create content for social media, blog, and email newsletters
+- Coordinate with designers and content writers
+- Track campaign performance and prepare reports
+- Manage marketing calendar and deadlines
+
+Required Skills:
+- Social Media Marketing
+- Content Writing
+- Email Marketing
+- Google Analytics
+- Canva
+- Microsoft Excel
+- Communication
+- Project Management
+
+Minimum Experience: 12 months (1 year)
+
+Location: New York, NY (Hybrid)
+Employment Type: full-time
+```
+
+#### Example 3: Customer Support Representative
+
+```
+Title: Customer Support Representative
+
+Description:
+Be the voice of our company! Help customers resolve issues, answer questions, and ensure they have a great experience with our product.
+
+Key responsibilities:
+- Respond to customer inquiries via email, chat, and phone
+- Troubleshoot technical issues and guide users to solutions
+- Document common issues and contribute to knowledge base
+- Escalate complex issues to technical team
+- Maintain high customer satisfaction ratings
+
+Required Skills:
+- Customer Service
+- Technical Troubleshooting
+- Written Communication
+- Verbal Communication
+- Problem Solving
+- Patience
+- Empathy
+- CRM Software
+
+Minimum Experience: 12 months (1 year)
+
+Location: Remote
+Employment Type: full-time
+```
+
+---
+
 ### What's Next?
 
-Now that you know how to access AgentHR and understand your dashboard, you're ready to start using it! In the next section, we'll cover [Posting Job Vacancies](#posting-job-vacancies)—creating the job postings that candidates will be matched to.
+Now that you've created your job vacancy, you're ready to start receiving and evaluating candidates. In the next section, we'll cover [Uploading and Managing Resumes](#uploading-and-managing-resumes)—how to add candidate resumes to AgentHR and understand what happens during analysis.
