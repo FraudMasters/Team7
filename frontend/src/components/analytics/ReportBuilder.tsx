@@ -652,17 +652,20 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         throw new Error(`Failed to export Excel: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      // Get the blob from response
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
 
-      // Download the Excel file from the provided URL
-      if (result.download_url) {
-        const link = document.createElement('a');
-        link.href = result.download_url;
-        link.download = `report-${editingReport?.name || 'custom'}-${Date.now()}.xlsx`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
+      // Create download link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `report-${editingReport?.name || 'custom'}-${Date.now()}.xlsx`;
+      link.style.visibility = 'hidden';
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to export Excel';
       setError(errorMessage);
