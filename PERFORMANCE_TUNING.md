@@ -3456,6 +3456,888 @@ docker-compose exec db psql -U agenthr -d agenthr -c "VACUUM ANALYZE;"
 
 ---
 
+## Frontend Performance
+
+Frontend performance optimization ensures fast load times, smooth interactions, and efficient resource utilization. The AgentHR frontend uses Vite with React and implements several performance optimization strategies.
+
+### Overview
+
+The frontend performance stack includes:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     React Application                       │
+│                   (Component Level)                         │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Performance Optimization                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │Code Splitting│  │Lazy Loading  │  │Virtualization│     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Vite Build Pipeline                       │
+│              Bundle Optimization + Minification              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Browser (Production Build)                  │
+│              Optimized Chunks + Caching Strategy            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Performance Characteristics
+
+| Optimization Type | Impact | Use Case |
+|-------------------|--------|----------|
+| **Code Splitting** | High (Initial Load) | Separate vendor chunks, route-based splitting |
+| **Lazy Loading** | High (Initial Load) | Heavy components, modal dialogs, charts |
+| **Virtualization** | High (Rendering) | Large lists (100+ items), tables, grids |
+| **Bundle Optimization** | Medium (Bundle Size) | Tree shaking, minification, compression |
+| **API Call Optimization** | Medium (Response Time) | Request batching, caching, pagination |
+
+---
+
+## 1. Code Splitting and Lazy Loading
+
+Code splitting divides your application into smaller chunks that are loaded on demand, reducing the initial bundle size and improving load times.
+
+### Manual Chunk Splitting
+
+The Vite configuration defines manual chunks for better caching:
+
+**Configuration:** `frontend/vite.config.ts`
+
+```typescript
+rollupOptions: {
+  output: {
+    manualChunks: {
+      // Separate vendor chunks for better caching
+      'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+      'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+      'api-vendor': ['axios'],
+      'form-vendor': ['react-hook-form', 'zod', '@hookform/resolvers'],
+      'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+      'dnd-vendor': ['@hello-pangea/dnd', 'react-window'],
+    },
+  },
+}
+```
+
+**Benefits:**
+- **Better Caching**: Vendor chunks change rarely, so browsers cache them longer
+- **Parallel Loading**: Chunks load in parallel, reducing total load time
+- **Incremental Updates**: Only changed chunks need to be re-downloaded
+
+### Route-Based Code Splitting
+
+Split routes into separate chunks loaded on navigation:
+
+```tsx
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+// Lazy load route components
+const Dashboard = lazy(() => import('@pages/Dashboard'));
+const CandidatesList = lazy(() => import('@pages/CandidatesList'));
+const CandidateDetails = lazy(() => import('@pages/CandidateDetails'));
+const ResumeAnalysis = lazy(() => import('@pages/ResumeAnalysis'));
+const Settings = lazy(() => import('@pages/Settings'));
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/candidates" element={<CandidatesList />} />
+          <Route path="/candidates/:id" element={<CandidateDetails />} />
+          <Route path="/analyze" element={<ResumeAnalysis />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+
+// Loading component
+function LoadingSpinner() {
+  return (
+    <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+      <CircularProgress />
+    </Box>
+  );
+}
+```
+
+### Component-Level Lazy Loading
+
+Lazy load heavy components that aren't immediately visible:
+
+```tsx
+import { lazy, Suspense, useState } from 'react';
+
+// Lazy load heavy components
+const ChartComponent = lazy(() => import('@components/ChartComponent'));
+const RichTextEditor = lazy(() => import('@components/RichTextEditor'));
+const PdfViewer = lazy(() => import('@components/PdfViewer'));
+
+function ResumeAnalysis() {
+  const [showChart, setShowChart] = useState(false);
+
+  return (
+    <Box>
+      <Button onClick={() => setShowChart(true)}>Show Analysis Chart</Button>
+
+      {showChart && (
+        <Suspense fallback={<CircularProgress />}>
+          <ChartComponent data={analysisData} />
+        </Suspense>
+      )}
+    </Box>
+  );
+}
+```
+
+### Modal and Dialog Lazy Loading
+
+Lazy load modal content:
+
+```tsx
+import { lazy, Suspense } from 'react';
+import { Dialog, DialogTitle, DialogContent } from '@mui/material';
+
+// Lazy load modal content
+const BulkUploadModal = lazy(() => import('@components/BulkUploadModal'));
+const ExportDialog = lazy(() => import('@components/ExportDialog'));
+
+function CandidatesList() {
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  return (
+    <>
+      <Button onClick={() => setUploadModalOpen(true)}>Bulk Upload</Button>
+
+      <Dialog open={uploadModalOpen} onClose={() => setUploadModalOpen(false)}>
+        <Suspense fallback={<CircularProgress />}>
+          <BulkUploadModal onClose={() => setUploadModalOpen(false)} />
+        </Suspense>
+      </Dialog>
+    </>
+  );
+}
+```
+
+---
+
+## 2. Virtualization for Large Lists
+
+Virtualization renders only visible items in a list, dramatically improving performance for large datasets (100+ items).
+
+### react-window Implementation
+
+The application uses `react-window` for efficient list rendering:
+
+```tsx
+import { FixedSizeList } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+
+interface Candidate {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+}
+
+function VirtualizedCandidateList({ candidates }: { candidates: Candidate[] }) {
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const candidate = candidates[index];
+
+    return (
+      <div style={style} className="candidate-row">
+        <ListItemText
+          primary={candidate.name}
+          secondary={candidate.email}
+        />
+        <Chip label={candidate.status} size="small" />
+      </div>
+    );
+  };
+
+  return (
+    <Box sx={{ height: 600, width: '100%' }}>
+      <AutoSizer>
+        {({ height, width }) => (
+          <FixedSizeList
+            height={height}
+            width={width}
+            itemSize={80} // Height of each row
+            itemCount={candidates.length}
+            overscanCount={5} // Render 5 extra items above/below viewport
+          >
+            {Row}
+          </FixedSizeList>
+        )}
+      </AutoSizer>
+    </Box>
+  );
+}
+```
+
+### Virtualized Grid for Tables
+
+Use `react-window` for large data tables:
+
+```tsx
+import { VariableSizeGrid } from 'react-window';
+
+interface Column {
+  key: string;
+  label: string;
+  width: number;
+}
+
+function VirtualizedTable({ data, columns }: { data: any[]; columns: Column[] }) {
+  const getColumnWidth = (index: number) => columns[index].width;
+
+  const Cell = ({ columnIndex, rowIndex, style }: { columnIndex: number; rowIndex: number; style: React.CSSProperties }) => {
+    const column = columns[columnIndex];
+    const value = data[rowIndex][column.key];
+
+    return (
+      <div style={style} className="table-cell">
+        {value}
+      </div>
+    );
+  };
+
+  return (
+    <AutoSizer>
+      {({ height, width }) => (
+        <VariableSizeGrid
+          height={height}
+          width={width}
+          columnCount={columns.length}
+          columnWidth={getColumnWidth}
+          rowCount={data.length}
+          rowHeight={() => 60} // Fixed row height
+          overscanColumnCount={2}
+          overscanRowCount={5}
+        >
+          {Cell}
+        </VariableSizeGrid>
+      )}
+    </AutoSizer>
+  );
+}
+```
+
+### Virtualization Benefits
+
+| Scenario | Without Virtualization | With Virtualization |
+|----------|------------------------|---------------------|
+| **1,000 items list** | 2-5 seconds render time | < 100ms render time |
+| **Memory usage** | 50-100MB | 5-10MB |
+| **Scroll performance** | Laggy | Smooth (60 FPS) |
+| **Initial load** | Heavy DOM | Light DOM |
+
+### When to Use Virtualization
+
+**Use virtualization when:**
+- Lists have 100+ items
+- Tables with 50+ rows
+- Grid layouts with many cells
+- Rendering performance is critical
+
+**Don't use virtualization when:**
+- Lists have < 50 items
+- Items have variable, unpredictable heights
+- You need simple scroll-to-bottom behavior
+
+---
+
+## 3. Bundle Optimization
+
+Optimize bundle size through configuration and best practices.
+
+### Vite Build Configuration
+
+**Configuration:** `frontend/vite.config.ts`
+
+```typescript
+build: {
+  outDir: 'dist',
+  sourcemap: false, // Disable sourcemaps in production for better performance
+  minify: 'terser', // Use terser for better minification
+  target: 'es2015', // Target modern browsers for smaller bundle size
+  cssCodeSplit: true, // Enable CSS code splitting
+  chunkSizeWarningLimit: 1000, // Warn for chunks > 1MB
+
+  rollupOptions: {
+    output: {
+      // Optimize chunk filenames for long-term caching
+      chunkFileNames: 'assets/js/[name]-[hash].js',
+      entryFileNames: 'assets/js/[name]-[hash].js',
+      assetFileNames: (assetInfo) => {
+        const name = assetInfo.name || '';
+        if (name.endsWith('.css')) {
+          return 'assets/css/[name]-[hash][extname]';
+        }
+        if (/\.(png|jpe?g|gif|svg|webp|ico)$/.test(name)) {
+          return 'assets/images/[name]-[hash][extname]';
+        }
+        if (/\.(woff2?|eot|ttf|otf)$/.test(name)) {
+          return 'assets/fonts/[name]-[hash][extname]';
+        }
+        return 'assets/[name]-[hash][extname]';
+      },
+    },
+    // Treeshake console logs in production
+    treeshake: {
+      moduleSideEffects: false,
+    },
+  },
+
+  // terser options for better minification
+  terserOptions: {
+    compress: {
+      drop_console: true, // Remove console.* in production
+      drop_debugger: true,
+      pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+    },
+    format: {
+      comments: false, // Remove comments
+    },
+  },
+}
+```
+
+### Dependency Optimization
+
+Pre-bundle frequently used dependencies:
+
+```typescript
+optimizeDeps: {
+  include: [
+    'react',
+    'react-dom',
+    'react-router-dom',
+    '@mui/material',
+    '@mui/icons-material',
+    'axios',
+    'i18next',
+    'react-i18next',
+  ],
+}
+```
+
+### Bundle Analysis
+
+Analyze bundle size to identify optimization opportunities:
+
+```bash
+# Install bundle analyzer
+npm install --save-dev rollup-plugin-visualizer
+
+# Add to vite.config.ts
+import { visualizer } from 'rollup-plugin-visualizer';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    visualizer({
+      filename: './dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
+});
+```
+
+Run build with analysis:
+
+```bash
+npm run build
+open dist/stats.html
+```
+
+### Bundle Size Targets
+
+| Bundle Type | Target Size | Maximum |
+|-------------|-------------|---------|
+| **Initial JS** | < 200KB | < 400KB |
+| **Per route chunk** | < 100KB | < 200KB |
+| **Vendor chunks** | < 300KB each | < 500KB |
+| **CSS** | < 50KB | < 100KB |
+| **Total (gzipped)** | < 500KB | < 1MB |
+
+### Tree Shaking Best Practices
+
+1. **Use ES modules**: Import specific exports instead of entire libraries
+
+```tsx
+// ❌ Bad - imports entire library
+import _ from 'lodash';
+import * as Icons from '@mui/icons-material';
+
+// ✅ Good - imports specific exports
+import debounce from 'lodash/debounce';
+import SearchIcon from '@mui/icons-material/Search';
+```
+
+2. **Avoid side effects**: Mark pure functions in package.json
+
+```json
+{
+  "sideEffects": false
+}
+```
+
+3. **Use modern syntax**: Let Vite handle transpilation
+
+```tsx
+// ✅ Use optional chaining
+const email = candidate?.contact?.email;
+
+// ✅ Use nullish coalescing
+const timeout = config?.timeout ?? 5000;
+```
+
+---
+
+## 4. API Call Optimization
+
+Optimize API calls to reduce latency and bandwidth usage.
+
+### Performance Monitoring
+
+The frontend includes automatic API performance tracking:
+
+```tsx
+import { apiClient } from '@/api/client';
+
+// Get performance statistics
+const stats = apiClient.getPerformanceStats();
+
+console.log(`Average duration: ${stats.averageDuration}ms`);
+console.log(`Success rate: ${(stats.successfulCalls / stats.totalCalls * 100).toFixed(1)}%`);
+console.log(`Slowest endpoint: ${stats.slowestEndpoint.endpoint}`);
+```
+
+**See:** `frontend/PERFORMANCE_TRACKING.md` for complete documentation.
+
+### Request Batching
+
+Batch multiple API calls into a single request:
+
+```tsx
+// ❌ Bad - Multiple API calls
+const candidate1 = await apiClient.getCandidate('id-1');
+const candidate2 = await apiClient.getCandidate('id-2');
+const candidate3 = await apiClient.getCandidate('id-3');
+
+// ✅ Good - Batched request
+const candidates = await apiClient.getCandidates({
+  ids: ['id-1', 'id-2', 'id-3']
+});
+```
+
+### Request Cancellation
+
+Cancel pending requests when component unmounts:
+
+```tsx
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+
+function CandidateList() {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchCandidates = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get('/api/candidates', {
+          signal: controller.signal,
+        });
+        setCandidates(response.data);
+      } catch (error) {
+        if (axios.isCancel(error)) {
+          console.log('Request canceled');
+        } else {
+          console.error('Error fetching candidates:', error);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidates();
+
+    return () => {
+      controller.abort(); // Cancel request on unmount
+    };
+  }, []);
+
+  return <div>{/* render candidates */}</div>;
+}
+```
+
+### Response Caching
+
+Cache API responses in memory or localStorage:
+
+```tsx
+import { useState, useEffect } from 'react';
+
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function useCachedFetch<T>(key: string, fetcher: () => Promise<T>) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const cached = cache.get(key);
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      setData(cached.data);
+      return;
+    }
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const result = await fetcher();
+        cache.set(key, { data: result, timestamp: Date.now() });
+        setData(result);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [key, fetcher]);
+
+  return { data, loading };
+}
+
+// Usage
+function CandidateDetails({ id }: { id: string }) {
+  const { data: candidate, loading } = useCachedFetch(
+    `candidate-${id}`,
+    () => apiClient.getCandidate(id)
+  );
+
+  if (loading) return <CircularProgress />;
+  return <div>{candidate?.name}</div>;
+}
+```
+
+### Pagination
+
+Implement pagination for large datasets:
+
+```tsx
+import { useState } from 'react';
+
+function usePaginatedFetch(fetchFn: (page: number, limit: number) => Promise<any>) {
+  const [data, setData] = useState([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const loadMore = async () => {
+    if (loading || !hasMore) return;
+
+    setLoading(true);
+    try {
+      const response = await fetchFn(page, 20); // 20 items per page
+      setData((prev) => [...prev, ...response.items]);
+      setHasMore(response.items.length === 20);
+      setPage((prev) => prev + 1);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { data, loading, hasMore, loadMore };
+}
+
+// Usage with infinite scroll
+function CandidatesList() {
+  const { data, loading, hasMore, loadMore } = usePaginatedFetch(
+    (page, limit) => apiClient.listCandidates({ page, limit })
+  );
+
+  return (
+    <InfiniteScroll
+      dataLength={data.length}
+      next={loadMore}
+      hasMore={hasMore}
+      loader={<CircularProgress />}
+    >
+      {data.map((candidate) => (
+        <CandidateCard key={candidate.id} candidate={candidate} />
+      ))}
+    </InfiniteScroll>
+  );
+}
+```
+
+### Debouncing User Input
+
+Debounce search and filter inputs:
+
+```tsx
+import { useState, useEffect } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
+
+function CandidateSearch() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+
+  // Debounce search with 500ms delay
+  const debouncedSearch = useDebouncedCallback(
+    async (searchQuery: string) => {
+      if (!searchQuery) {
+        setResults([]);
+        return;
+      }
+
+      const response = await apiClient.searchCandidates(searchQuery);
+      setResults(response);
+    },
+    500 // Wait 500ms after user stops typing
+  );
+
+  useEffect(() => {
+    debouncedSearch(query);
+  }, [query, debouncedSearch]);
+
+  return (
+    <Box>
+      <TextField
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search candidates..."
+        fullWidth
+      />
+      <Box mt={2}>
+        {results.map((candidate) => (
+          <CandidateCard key={candidate.id} candidate={candidate} />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+```
+
+### Optimistic Updates
+
+Update UI immediately, rollback on error:
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+function UpdateCandidateStatus({ candidateId }: { candidateId: string }) {
+  const queryClient = useQueryClient();
+
+  const updateStatus = useMutation({
+    mutationFn: (status: string) =>
+      apiClient.updateCandidate(candidateId, { status }),
+
+    onMutate: async (newStatus) => {
+      // Cancel ongoing queries
+      await queryClient.cancelQueries({ queryKey: ['candidate', candidateId] });
+
+      // Snapshot previous value
+      const previousCandidate = queryClient.getQueryData(['candidate', candidateId]);
+
+      // Optimistically update
+      queryClient.setQueryData(['candidate', candidateId], (old: any) => ({
+        ...old,
+        status: newStatus,
+      }));
+
+      // Return context with previous value
+      return { previousCandidate };
+    },
+
+    onError: (err, newStatus, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['candidate', candidateId], context?.previousCandidate);
+    },
+
+    onSettled: () => {
+      // Refetch to ensure server state
+      queryClient.invalidateQueries({ queryKey: ['candidate', candidateId] });
+    },
+  });
+
+  return (
+    <Button
+      onClick={() => updateStatus.mutate('active')}
+      disabled={updateStatus.isPending}
+    >
+      Activate
+    </Button>
+  );
+}
+```
+
+---
+
+## 5. Performance Monitoring and Debugging
+
+### Browser DevTools
+
+Use Chrome DevTools for performance profiling:
+
+**Lighthouse Score:**
+
+```bash
+# Run Lighthouse audit
+npm run build
+npx serve dist
+# Open Chrome DevTools > Lighthouse > Run audit
+```
+
+**Target Scores:**
+- Performance: > 90
+- First Contentful Paint (FCP): < 1.5s
+- Largest Contentful Paint (LCP): < 2.5s
+- Total Blocking Time (TBT): < 200ms
+- Cumulative Layout Shift (CLS): < 0.1
+
+### React DevTools Profiler
+
+Profile component render performance:
+
+```tsx
+import { Profiler } from 'react';
+
+function onRenderCallback(
+  id: string,
+  phase: 'mount' | 'update',
+  actualDuration: number,
+  baseDuration: number,
+  startTime: number,
+  commitTime: number
+) {
+  if (actualDuration > 100) {
+    console.warn(`Slow render: ${id} took ${actualDuration}ms`);
+  }
+}
+
+function App() {
+  return (
+    <Profiler id="App" onRender={onRenderCallback}>
+      <CandidatesList />
+    </Profiler>
+  );
+}
+```
+
+### Network Performance Monitoring
+
+Monitor API performance:
+
+```tsx
+import { useEffect } from 'react';
+import { apiClient } from '@/api/client';
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    const stats = apiClient.getPerformanceStats();
+
+    // Alert on performance degradation
+    if (stats.averageDuration > 1000) {
+      console.warn('API performance degrading:', stats);
+    }
+
+    // Alert on high failure rate
+    const failureRate = (stats.failedCalls / stats.totalCalls) * 100;
+    if (failureRate > 5) {
+      console.error('High API failure rate:', failureRate);
+    }
+  }, 30000); // Check every 30 seconds
+
+  return () => clearInterval(interval);
+}, []);
+```
+
+---
+
+## Quick Reference: Frontend Performance
+
+### Code Splitting Checklist
+
+- [ ] Route-based splitting with `React.lazy()`
+- [ ] Vendor chunks configured in `vite.config.ts`
+- [ ] Heavy components lazy-loaded
+- [ ] Modals/dialogs lazy-loaded
+- [ ] Loading states with `Suspense`
+
+### Virtualization Checklist
+
+- [ ] Lists with 100+ items use `react-window`
+- [ ] Tables with 50+ rows virtualized
+- [ ] `FixedSizeList` for fixed-height items
+- [ ] `VariableSizeList` for variable-height items
+- [ ] Overscan configured for smooth scrolling
+
+### Bundle Optimization Checklist
+
+- [ ] Tree shaking enabled
+- [ ] Minification with terser
+- [ ] Console logs removed in production
+- [ ] CSS code splitting enabled
+- [ ] Bundle size < 500KB (gzipped)
+- [ ] Bundle analyzer run to identify bloat
+
+### API Optimization Checklist
+
+- [ ] Requests cancelled on unmount
+- [ ] Response caching implemented
+- [ ] Pagination for large datasets
+- [ ] Debounced user input
+- [ ] Optimistic updates for mutations
+- [ ] Performance monitoring enabled
+
+### Performance Targets
+
+| Metric | Target | Maximum |
+|--------|--------|---------|
+| **Initial load time** | < 2s | < 3s |
+| **Time to Interactive (TTI)** | < 3s | < 5s |
+| **First Contentful Paint (FCP)** | < 1.5s | < 2.5s |
+| **Largest Contentful Paint (LCP)** | < 2.5s | < 4s |
+| **Total Blocking Time (TBT)** | < 200ms | < 500ms |
+| **API response time (p95)** | < 500ms | < 1000ms |
+| **Bundle size (gzipped)** | < 500KB | < 1MB |
+
+### Common Performance Issues
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| **Large bundle size** | Slow initial load | Code splitting, tree shaking, lazy loading |
+| **Unnecessary re-renders** | Janky UI | `React.memo()`, `useMemo()`, `useCallback()` |
+| **Slow list rendering** | Freeze on scroll | Virtualization with `react-window` |
+| **Too many API calls** | Network congestion | Batching, caching, pagination |
+| **Large images** | Slow load times | Image optimization, lazy loading, WebP format |
+
+---
+
 ## Related Documentation
 
 - [ML_PIPELINE.md](ML_PIPELINE.md) - Detailed ML/NLP pipeline documentation
