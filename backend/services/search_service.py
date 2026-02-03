@@ -70,6 +70,26 @@ class SearchFilters:
 
 
 @dataclass
+class VacancyFilters:
+    """
+    Filter configuration for vacancy search.
+
+    Attributes:
+        work_format: Work format filter (remote, hybrid, office) (optional)
+        location: Location filter (optional)
+        salary_min: Minimum salary filter (optional)
+        salary_max: Maximum salary filter (optional)
+        employment_type: Employment type filter (full-time, part-time, contract) (optional)
+    """
+
+    work_format: Optional[str] = None
+    location: Optional[str] = None
+    salary_min: Optional[float] = None
+    salary_max: Optional[float] = None
+    employment_type: Optional[str] = None
+
+
+@dataclass
 class SearchResult:
     """
     Search result containing candidates and metadata.
