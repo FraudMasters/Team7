@@ -16,6 +16,11 @@ from .cache_service import (
     cached,
 )
 
+from .notification_service import (
+    NotificationService,
+    get_notification_service,
+)
+
 __all__ = [
     "BackupService",
     "get_backup_service",
@@ -26,4 +31,6 @@ __all__ = [
     "CacheService",
     "get_cache_service",
     "cached",
+    "NotificationService",
+    "get_notification_service",
 ]
