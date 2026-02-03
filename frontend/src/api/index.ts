@@ -13,6 +13,16 @@ export { candidateActivitiesClient, CandidateActivitiesClient } from './candidat
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
 export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
 export { candidateSearchClient, CandidateSearchClient } from './search';
+export {
+  listNotifications,
+  getUnreadCount,
+  createNotification,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+} from './notifications';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -75,4 +85,23 @@ export type {
   CandidateSearchRequest,
   CandidateSearchResult,
   CandidateSearchResponse,
+  Notification,
+  NotificationListItem,
+  NotificationResponse,
+  NotificationListResponse,
+  MarkNotificationReadRequest,
+  MarkNotificationReadResponse,
+  MarkAllReadRequest,
+  MarkAllReadResponse,
+  DeleteNotificationRequest,
+  DeleteNotificationResponse,
+  NotificationTypeSettings,
+  NotificationPreferences,
+  NotificationPreferencesUpdate,
+  NotificationPreferencesResponse,
+  NotificationType,
+  NotificationPriority,
+  NotificationStatus,
+  NotificationChannel,
+  UnreadCountResponse,
 } from '@/types/api';
