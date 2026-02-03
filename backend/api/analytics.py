@@ -1734,3 +1734,30 @@ async def get_source_tracking(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve source tracking: {str(e)}",
         ) from e
+
+
+class StageDistribution(BaseModel):
+    """Hiring stage distribution for a candidate source."""
+
+    stage_name: str = Field(..., description="Name of the hiring stage")
+    count: int = Field(..., description="Number of candidates at this stage")
+    percentage: float = Field(..., description="Percentage of candidates at this stage (0-1)")
+
+
+class CandidateSourceMetrics(BaseModel):
+    """Candidate source attribution metrics."""
+
+    source: str = Field(..., description="Candidate source (e.g., referral, LinkedIn, website, etc.)")
+    candidate_count: int = Field(..., description="Number of candidates from this source")
+    hired_count: int = Field(..., description="Number of candidates hired from this source")
+    conversion_rate: float = Field(..., description="Conversion rate (hired/uploaded) for this source (0-1)")
+    average_time_to_hire_days: float = Field(..., description="Average time-to-hire in days for this source")
+    stage_distribution: list[StageDistribution] = Field(..., description="Distribution of candidates across hiring stages")
+
+
+class CandidateSourceAttributionResponse(BaseModel):
+    """Response model for candidate source attribution analytics."""
+
+    sources: list[CandidateSourceMetrics] = Field(..., description="List of candidate source metrics")
+    total_candidates: int = Field(..., description="Total candidates across all sources")
+    date_range: Optional[str] = Field(None, description="Applied date range filter (if any)")
