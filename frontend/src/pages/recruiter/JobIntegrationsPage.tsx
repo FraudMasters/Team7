@@ -19,50 +19,33 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   Chip,
   Alert,
   CircularProgress,
   Menu,
   MenuItem,
   Switch,
-  FormControlLabel,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
-  Sync as SyncIcon,
   CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobIntegrationsClient } from '../../api/jobIntegrations';
 import { useBreakpoints } from '../../hooks/useBreakpoints';
-
-interface JobBoardIntegration {
-  id: string;
-  name: string;
-  api_endpoint: string;
-  api_key: string;
-  enabled: boolean;
-  config?: Record<string, unknown>;
-  last_sync_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { JobIntegrationForm } from '../../components/JobIntegrationForm';
+import type { JobBoardIntegrationResponse } from '../../types/api';
 
 export function JobIntegrationsPage() {
   const queryClient = useQueryClient();
   const { isMobile } = useBreakpoints();
 
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<JobBoardIntegration | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editEndpoint, setEditEndpoint] = useState('');
-  const [editApiKey, setEditApiKey] = useState('');
-  const [editEnabled, setEditEnabled] = useState(true);
+  const [selectedIntegration, setSelectedIntegration] = useState<JobBoardIntegrationResponse | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   const {
@@ -73,30 +56,6 @@ export function JobIntegrationsPage() {
     queryKey: ['job-integrations'],
     queryFn: async () => {
       return await jobIntegrationsClient.listIntegrations(0, 100);
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: { name: string; api_endpoint: string; api_key: string; enabled: boolean }) => {
-      return await jobIntegrationsClient.createIntegration(data);
-    },
-    onSuccess: () => {
-      setEditDialogOpen(false);
-      setSelectedIntegration(null);
-      resetForm();
-      queryClient.invalidateQueries({ queryKey: ['job-integrations'] });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; name?: string; api_endpoint?: string; api_key?: string; enabled?: boolean }) => {
-      return await jobIntegrationsClient.updateIntegration(id, data);
-    },
-    onSuccess: () => {
-      setEditDialogOpen(false);
-      setSelectedIntegration(null);
-      resetForm();
-      queryClient.invalidateQueries({ queryKey: ['job-integrations'] });
     },
   });
 
@@ -123,14 +82,7 @@ export function JobIntegrationsPage() {
   const integrations = integrationsData?.integrations || [];
   const total = integrationsData?.total || 0;
 
-  const resetForm = () => {
-    setEditName('');
-    setEditEndpoint('');
-    setEditApiKey('');
-    setEditEnabled(true);
-  };
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, integration: JobBoardIntegration) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, integration: JobBoardIntegrationResponse) => {
     setMenuAnchor(event.currentTarget);
     setSelectedIntegration(integration);
   };
@@ -141,14 +93,8 @@ export function JobIntegrationsPage() {
   };
 
   const handleEdit = () => {
-    if (selectedIntegration) {
-      setEditName(selectedIntegration.name);
-      setEditEndpoint(selectedIntegration.api_endpoint);
-      setEditApiKey(selectedIntegration.api_key);
-      setEditEnabled(selectedIntegration.enabled);
-      setEditDialogOpen(true);
-    }
     handleMenuClose();
+    setFormDialogOpen(true);
   };
 
   const handleDeleteClick = () => {
@@ -164,30 +110,12 @@ export function JobIntegrationsPage() {
   };
 
   const handleCreateNew = () => {
-    resetForm();
     setSelectedIntegration(null);
-    setEditDialogOpen(true);
+    setFormDialogOpen(true);
   };
 
-  const handleEditSave = () => {
-    if (editName.trim() && editEndpoint.trim()) {
-      if (selectedIntegration) {
-        updateMutation.mutate({
-          id: selectedIntegration.id,
-          name: editName,
-          api_endpoint: editEndpoint,
-          api_key: editApiKey,
-          enabled: editEnabled,
-        });
-      } else {
-        createMutation.mutate({
-          name: editName,
-          api_endpoint: editEndpoint,
-          api_key: editApiKey,
-          enabled: editEnabled,
-        });
-      }
-    }
+  const handleFormSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['job-integrations'] });
   };
 
   const handleDeleteConfirm = () => {
@@ -377,74 +305,13 @@ export function JobIntegrationsPage() {
         </MenuItem>
       </Menu>
 
-      {/* Edit/Create Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{selectedIntegration ? 'Edit Integration' : 'Add Integration'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Integration Name"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            sx={{ mt: 2 }}
-            placeholder="e.g., Indeed, ZipRecruiter"
-            slotProps={{
-              input: {
-                'aria-label': 'Integration name',
-              },
-            }}
-          />
-          <TextField
-            fullWidth
-            label="API Endpoint"
-            value={editEndpoint}
-            onChange={(e) => setEditEndpoint(e.target.value)}
-            sx={{ mt: 2 }}
-            placeholder="https://api.example.com/v1"
-            slotProps={{
-              input: {
-                'aria-label': 'API endpoint',
-              },
-            }}
-          />
-          <TextField
-            fullWidth
-            label="API Key"
-            value={editApiKey}
-            onChange={(e) => setEditApiKey(e.target.value)}
-            sx={{ mt: 2 }}
-            type="password"
-            placeholder="Your API key"
-            slotProps={{
-              input: {
-                'aria-label': 'API key',
-              },
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={editEnabled}
-                onChange={(e) => setEditEnabled(e.target.checked)}
-                aria-label="Enable integration"
-              />
-            }
-            label="Enable integration"
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleEditSave}
-            variant="contained"
-            disabled={!editName.trim() || !editEndpoint.trim() || createMutation.isPending || updateMutation.isPending}
-          >
-            {selectedIntegration ? 'Save' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Edit/Create Form Dialog */}
+      <JobIntegrationForm
+        open={formDialogOpen}
+        onClose={() => setFormDialogOpen(false)}
+        onSuccess={handleFormSuccess}
+        integration={selectedIntegration}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
