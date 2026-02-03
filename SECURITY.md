@@ -4445,6 +4445,1211 @@ volumes:
 
 ---
 
+## Dependency Management
+
+Dependencies represent a significant attack vector. A compromised dependency can lead to supply chain attacks, data breaches, and complete system compromise. This section covers dependency management, vulnerability scanning, and update procedures.
+
+### Current Security Posture
+
+**✅ Implemented**:
+- `requirements.txt` for Python dependency tracking
+- `safety` scanning integrated in security scan results
+- Pinned dependency versions in requirements.txt
+
+**⚠️ Needs Implementation**:
+- Automated vulnerability scanning in CI/CD pipeline
+- Dependency lock file (requirements.lock or Poetry.lock)
+- Software Bill of Materials (SBOM) generation
+- Automated dependency update bot (Dependabot, Renovate)
+- Pre-commit hooks for vulnerability scanning
+
+### Dependency Security Threats
+
+#### Supply Chain Attack Vectors
+
+| Attack Type | Description | Impact | Mitigation |
+|-------------|-------------|--------|------------|
+| **Malicious Dependency** | Attacker publishes malicious package to public repository | Code execution, data theft, backdoor | Verify package source, check maintainer identity |
+| **Dependency Confusion** | Attacker publishes package with same name to public registry | System installs malicious internal package | Use private registry with proper namespacing |
+| **Typosquatting** | Attacker publishes package with similar name to popular package | Developer accidentally installs malicious package | Use lock files, verify package names |
+| **Transitive Vulnerability** | Vulnerability in dependency's dependency | Indirect compromise via trusted package | Scan full dependency tree |
+| **Abandoned Package** | Maintainer stops updating, vulnerabilities unpatched | Known vulnerabilities remain exploitable | Monitor package health, have migration plan |
+| **Compromised Maintainer** | Attacker gains access to maintainer account | Malicious code pushed to trusted package | Enable 2FA, require code review for updates |
+
+### Vulnerability Scanning Tools
+
+#### 1. pip-audit
+
+**pip-audit** audits Python dependencies for known vulnerabilities.
+
+**Installation**:
+```bash
+pip install pip-audit
+```
+
+**Usage**:
+```bash
+# Audit requirements.txt
+pip-audit --requirement requirements.txt
+
+# Audit installed packages
+pip-audit
+
+# Generate SARIF output for CI/CD
+pip-audit --format json --output audit-report.json
+
+# Exclude specific vulnerabilities (use sparingly)
+pip-audit --exclude-vuln <CVE-ID>
+```
+
+**CI/CD Integration**:
+```yaml
+# .github/workflows/security-scan.yml
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run vulnerability scan
+        run: pip-audit --requirement backend/requirements.txt --format json --output audit-report.json
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pip-audit-report
+          path: audit-report.json
+```
+
+#### 2. Safety
+
+**safety** checks installed dependencies against security vulnerabilities database.
+
+**Installation**:
+```bash
+pip install safety
+```
+
+**Usage**:
+```bash
+# Scan requirements.txt
+safety check --file requirements.txt
+
+# Scan with JSON output
+safety check --file requirements.txt --json --output safety-report.json
+
+# Ignore specific vulnerabilities (document reason)
+safety check --file requirements.txt --ignore 51457
+
+# Continuous monitoring API
+safety check --api-key <KEY> --continue-on-error
+```
+
+**Current Integration**:
+```json
+// From backend/security_scan_results.json
+{
+  "safety_dependency_scan": {
+    "scan_date": "2026-01-24",
+    "python_version": "3.9+",
+    "dependencies_scanned": 35,
+    "vulnerabilities_found": 0,
+    "results": []
+  }
+}
+```
+
+#### 3. Snyk
+
+**Snyk** provides comprehensive dependency scanning with remediation advice.
+
+**Installation**:
+```bash
+npm install -g snyk
+# or
+pip install snyk
+```
+
+**Usage**:
+```bash
+# Authenticate
+snyk auth <API-KEY>
+
+# Test for vulnerabilities
+snyk test --file=requirements.txt
+
+# Monitor for new vulnerabilities
+snyk monitor --file=requirements.txt
+
+# Generate SBOM
+snyk sbom --file=requirements.txt --format=spdx-json > sbom.json
+```
+
+#### 4. Trivy
+
+**Trivy** is a comprehensive security scanner that supports multiple languages.
+
+**Installation**:
+```bash
+# macOS
+brew install trivy
+
+# Linux
+curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+```
+
+**Usage**:
+```bash
+# Scan filesystem
+trivy fs --security-checks vuln .
+
+# Scan Docker image
+trivy image agenthr-backend:latest
+
+# Scan with severity filter
+trivy fs --severity HIGH,CRITICAL .
+
+# Generate SARIF report
+trivy fs --format sarif --output trivy-report.json .
+```
+
+#### 5. OWASP Dependency-Check
+
+**Dependency-Check** identifies project dependencies and checks for vulnerabilities.
+
+**Installation**:
+```bash
+# Docker (recommended)
+docker pull owasp/dependency-check
+```
+
+**Usage**:
+```bash
+# Scan Python dependencies
+docker run --rm \
+  -v /path/to/project:/scan \
+  owasp/dependency-check \
+  --scan /scan \
+  --format JSON \
+  --out /scan/reports
+
+# View results
+cat reports/dependency-check-report.json
+```
+
+### Dependency Management Best Practices
+
+#### 1. Use Dependency Lock Files
+
+**Poetry** (recommended for Python):
+```bash
+# Install Poetry
+pip install poetry
+
+# Initialize project
+poetry init
+
+# Install dependencies
+poetry add fastapi uvicorn sqlalchemy
+
+# Generate poetry.lock (commit this file)
+poetry lock
+
+# Install exact versions from lock file
+poetry install
+```
+
+**pip-tools** (alternative):
+```bash
+# Install pip-tools
+pip install pip-tools
+
+# Create requirements.in (specify dependencies)
+cat > requirements.in << EOF
+fastapi>=0.100.0,<0.101.0
+uvicorn[standard]>=0.23.0,<0.24.0
+sqlalchemy>=2.0.0,<2.1.0
+EOF
+
+# Compile pinned requirements
+pip-compile requirements.in --output-file requirements.txt
+
+# Upgrade dependencies
+pip-compile --upgrade requirements.in
+```
+
+#### 2. Pin Dependency Versions
+
+**Bad** (unpinned):
+```txt
+fastapi
+uvicorn
+sqlalchemy
+```
+
+**Good** (pinned):
+```txt
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+```
+
+**Better** (version ranges):
+```txt
+fastapi>=0.104.0,<0.105.0
+uvicorn[standard]>=0.24.0,<0.25.0
+sqlalchemy>=2.0.23,<2.1.0
+```
+
+#### 3. Separate Development Dependencies
+
+**requirements.txt** (production):
+```txt
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+pydantic-settings==2.1.0
+```
+
+**requirements-dev.txt** (development):
+```txt
+-r requirements.txt
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.12.0
+flake8==6.1.0
+mypy==1.7.1
+safety==2.3.5
+bandit==1.7.5
+```
+
+#### 4. Vendor Critical Dependencies
+
+For security-critical code, consider vendoring dependencies:
+
+```bash
+# Copy dependency into project
+pip install -t vendor/ package-name
+
+# Use vendored dependency
+import sys
+sys.path.insert(0, 'vendor')
+import package_name
+```
+
+#### 5. Regular Dependency Updates
+
+**Weekly Review Process**:
+1. Run `pip-audit` and `safety check`
+2. Review flagged vulnerabilities
+3. Check if update is compatible
+4. Test in staging environment
+5. Deploy to production
+
+**Automated Updates** (GitHub Dependabot):
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "security-team"
+    labels:
+      - "dependencies"
+      - "security"
+    ignore:
+      # Ignore major version updates for stability
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+```
+
+### Software Bill of Materials (SBOM)
+
+An SBOM provides a complete inventory of all software components.
+
+#### Generate SBOM with Syft
+
+```bash
+# Install Syft
+brew install syft  # macOS
+# or
+curl -ssL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+# Generate SBOM
+syft backend -o spdx-json > sbom.json
+
+# Generate in multiple formats
+syft backend -o cyclonedx-json > sbom-cyclonedx.json
+syft backend -o spdx-json > sbom-spdx.json
+syft backend -o table > sbom.txt
+```
+
+#### SBOM Format (SPDX JSON)
+
+```json
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "agenthr-backend",
+  "documentNamespace": "https://agenthr.com/sbom/backend-1.0.0",
+  "creationInfo": {
+    "created": "2026-02-04T12:00:00Z",
+    "creators": ["Tool: syft-0.85.0"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-fastapi",
+      "name": "fastapi",
+      "versionInfo": "0.104.1",
+      "downloadLocation": "https://pypi.org/pypi/fastapi/0.104.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/fastapi@0.104.1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Dependency Security Checklist
+
+#### Initial Setup
+
+- [ ] Pin all dependency versions in requirements.txt
+- [ ] Use Poetry or pip-tools for dependency resolution
+- [ ] Separate production and development dependencies
+- [ ] Add requirements.txt to version control
+- [ ] Add poetry.lock or requirements.lock to version control
+
+#### Vulnerability Scanning
+
+- [ ] Integrate pip-audit in CI/CD pipeline
+- [ ] Integrate safety check in CI/CD pipeline
+- [ ] Configure automated scanning (weekly minimum)
+- [ ] Set up vulnerability alerts (email, Slack)
+- [ ] Fail builds on HIGH/CRITICAL vulnerabilities
+- [ ] Document vulnerability exceptions with justification
+
+#### Dependency Updates
+
+- [ ] Enable Dependabot or Renovate for automated updates
+- [ ] Establish dependency update review process
+- [ ] Test updates in staging before production
+- [ ] Monitor security advisories for dependencies
+- [ ] Maintain list of approved dependency versions
+
+#### Supply Chain Security
+
+- [ ] Verify package maintainer identity
+- [ ] Check package download counts and activity
+- [ ] Review package source code for critical dependencies
+- [ ] Use private registry for internal packages
+- [ ] Enable 2FA for package maintainer accounts
+- [ ] Generate and maintain SBOM
+
+#### Documentation
+
+- [ ] Document all third-party dependencies
+- [ ] Maintain dependency inventory with versions
+- [ ] Document licensing information
+- [ ] Track security policy URLs for dependencies
+- [ ] Update architecture diagrams with dependencies
+
+#### Monitoring
+
+- [ ] Monitor dependency security advisories
+- [ ] Subscribe to Python Security Announcements
+- [ ] Set up Google Alerts for dependency names
+- [ ] Review dependency changelogs regularly
+- [ ] Track dependency deprecation notices
+
+---
+
+## Logging & Monitoring Security
+
+Security monitoring and logging are critical for detecting, investigating, and responding to security incidents. Proper logging practices must balance security visibility with privacy protection.
+
+### Current Security Posture
+
+**✅ Implemented**:
+- Structured JSON logging (Loki integration)
+- Log aggregation via Loki
+- Metrics collection via Prometheus
+- Grafana dashboards for monitoring
+- Celery task logging
+
+**⚠️ Needs Implementation**:
+- Security event classification and tagging
+- PII redaction in logs
+- Centralized security alerting
+- Log tamper detection
+- Audit log retention policy
+- Log forwarding to SIEM (Security Information and Event Management)
+- Real-time threat detection rules
+
+### Security Event Logging
+
+#### Security Event Categories
+
+**Critical Security Events** (immediate alerting):
+- Authentication failures (5+ in 5 minutes)
+- Authorization failures (access denied to protected resources)
+- SQL injection attempts
+- XSS attempt signatures
+- Path traversal attempts
+- Command injection attempts
+- File upload malware detection
+- Rate limit exceeded
+- Admin access granted
+- Database connection failures
+- System configuration changes
+
+**Warning Security Events** (hourly digest):
+- Unusual API request patterns
+- Large file uploads (>8MB)
+- Multiple failed file uploads
+- Unknown user agents
+- Requests from unusual geolocations
+- Spike in error rates
+- Slow API responses (>5s)
+
+**Informational Security Events** (daily summary):
+- Successful logins
+- New user registrations
+- File uploads processed
+- API rate limit usage
+- System health checks
+- Scheduled task completion
+
+#### Security Logging Implementation
+
+**backend/core/security_logging.py**:
+
+```python
+import json
+import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
+from fastapi import Request
+from user_agents import parse as parse_user_agent
+
+logger = logging.getLogger(__name__)
+
+
+class SecurityEventLogger:
+    """
+    Centralized security event logging with PII redaction.
+    """
+
+    # Fields to redact from logs
+    PII_FIELDS = {
+        'password', 'secret', 'token', 'api_key', 'apikey',
+        'private_key', 'authorization', 'cookie', 'session',
+        'ssn', 'social_security', 'credit_card', 'email',
+        'phone', 'address', 'full_name', 'real_name'
+    }
+
+    # Patterns to redact (regex)
+    SENSITIVE_PATTERNS = [
+        r'Bearer\s+[A-Za-z0-9\-._~+/]+=*',  # Bearer tokens
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Emails
+        r'\b\d{3}-\d{2}-\d{4}\b',  # SSN
+        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b',  # Credit card
+    ]
+
+    @classmethod
+    def redact_pii(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recursively redact PII from log data.
+        """
+        if isinstance(data, dict):
+            return {
+                key: cls.redact_pii(value)
+                if key.lower() not in cls.PII_FIELDS
+                else "***REDACTED***"
+                for key, value in data.items()
+            }
+        elif isinstance(data, list):
+            return [cls.redact_pii(item) for item in data]
+        else:
+            return data
+
+    @classmethod
+    def log_security_event(
+        cls,
+        event_type: str,
+        severity: str,  # critical, warning, info
+        request: Optional[Request] = None,
+        details: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None
+    ) -> None:
+        """
+        Log a security event with full context.
+        """
+        event = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'event_type': event_type,
+            'severity': severity,
+            'category': 'security',
+        }
+
+        # Add request context
+        if request:
+            user_agent = request.headers.get('user-agent', 'unknown')
+            ua_parsed = parse_user_agent(user_agent)
+
+            event['request'] = {
+                'method': request.method,
+                'path': request.url.path,
+                'query_params': dict(request.query_params),
+                'client_host': request.client.host if request.client else None,
+                'user_agent': {
+                    'browser': ua_parsed.browser.family,
+                    'os': ua_parsed.os.family,
+                    'device': ua_parsed.device.family,
+                    'is_bot': ua_parsed.is_bot,
+                    'is_mobile': ua_parsed.is_mobile
+                }
+            }
+
+        # Add user context (without PII)
+        if user_id:
+            event['user'] = {
+                'user_id': user_id,
+                # Never log user PII (email, name, etc.)
+            }
+
+        # Add event details (with PII redaction)
+        if details:
+            event['details'] = cls.redact_pii(details)
+
+        # Log to structured logger
+        log_method = {
+            'critical': logger.critical,
+            'warning': logger.warning,
+            'info': logger.info
+        }.get(severity, logger.info)
+
+        log_method('security_event', extra={'event': event})
+
+
+# Usage examples
+security_logger = SecurityEventLogger()
+
+
+def log_failed_login(request: Request, username: str, reason: str):
+    """Log failed login attempt."""
+    security_logger.log_security_event(
+        event_type='auth_failure',
+        severity='warning',
+        request=request,
+        details={
+            'username': username,  # Will be redacted
+            'reason': reason,
+            'login_method': 'password'
+        }
+    )
+
+
+def log_sql_injection_attempt(request: Request, payload: str):
+    """Log SQL injection attempt."""
+    security_logger.log_security_event(
+        event_type='sql_injection_attempt',
+        severity='critical',
+        request=request,
+        details={
+            'payload': payload[:100],  # Truncate for safety
+            'pattern_detected': 'sql_injection_signature'
+        }
+    )
+
+
+def log_file_upload_malware_detected(request: Request, filename: str, threat_name: str):
+    """Log malware detection."""
+    security_logger.log_security_event(
+        event_type='malware_detected',
+        severity='critical',
+        request=request,
+        details={
+            'filename': filename,
+            'threat_name': threat_name,
+            'action': 'quarantined'
+        }
+    )
+
+
+def log_rate_limit_exceeded(request: Request, limit: int, window: int):
+    """Log rate limit exceeded."""
+    security_logger.log_security_event(
+        event_type='rate_limit_exceeded',
+        severity='warning',
+        request=request,
+        details={
+            'limit': limit,
+            'window_seconds': window,
+            'action': 'request_blocked'
+        }
+    )
+```
+
+### Avoiding PII in Logs
+
+#### PII Redaction Patterns
+
+**Email Addresses**:
+```python
+import re
+
+def redact_email(text: str) -> str:
+    """Redact email addresses."""
+    return re.sub(
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        '***@***.***',
+        text
+    )
+```
+
+**Phone Numbers**:
+```python
+def redact_phone(text: str) -> str:
+    """Redact phone numbers."""
+    return re.sub(
+        r'\b\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b',
+        '***-***-****',
+        text
+    )
+```
+
+**Names** (context-specific):
+```python
+# Instead of logging:
+logger.info(f"User {user.full_name} uploaded resume")
+
+# Log user ID only:
+logger.info(f"User {user.id} uploaded resume")
+
+# Or use anonymized identifier:
+logger.info(f"User {hash_email(user.email)} uploaded resume")
+```
+
+**Request Body Sanitization**:
+```python
+def sanitize_request_body(body: dict) -> dict:
+    """Remove sensitive fields from request body."""
+    sensitive_fields = {'password', 'token', 'secret', 'api_key'}
+
+    return {
+        k: '***REDACTED***' if k.lower() in sensitive_fields else v
+        for k, v in body.items()
+    }
+```
+
+### Security Monitoring & Alerting
+
+#### Prometheus Security Metrics
+
+**backend/core/security_metrics.py**:
+
+```python
+from prometheus_client import Counter, Histogram, Gauge
+
+# Security event counters
+auth_failures_total = Counter(
+    'security_auth_failures_total',
+    'Total authentication failures',
+    ['method', 'reason']
+)
+
+sql_injection_attempts_total = Counter(
+    'security_sql_injection_attempts_total',
+    'Total SQL injection attempts detected'
+)
+
+path_traversal_attempts_total = Counter(
+    'security_path_traversal_attempts_total',
+    'Total path traversal attempts detected'
+)
+
+malware_detected_total = Counter(
+    'security_malware_detected_total',
+    'Total malware detections',
+    ['threat_name']
+)
+
+rate_limit_exceeded_total = Counter(
+    'security_rate_limit_exceeded_total',
+    'Total rate limit violations',
+    ['endpoint']
+)
+
+# Security metrics gauge
+active_sessions = Gauge(
+    'security_active_sessions',
+    'Currently active user sessions'
+)
+
+failed_requests_by_ip = Gauge(
+    'security_failed_requests_by_ip',
+    'Failed requests by IP address (last 5 minutes)',
+    ['ip_address']
+)
+```
+
+#### Grafana Alert Rules
+
+**Grafana Alert Configuration**:
+
+```yaml
+# grafana/alerts/security_alerts.yml
+groups:
+  - name: security_alerts
+    interval: 30s
+    rules:
+      - alert: HighAuthenticationFailureRate
+        expr: rate(security_auth_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High rate of authentication failures"
+          description: "{{ $value }} auth failures per second"
+
+      - alert: SQLInjectionAttemptsDetected
+        expr: increase(security_sql_injection_attempts_total[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "SQL injection attempt detected"
+          description: "SQL injection attempt detected from IP: {{ $labels.ip_address }}"
+
+      - alert: MalwareDetected
+        expr: increase(security_malware_detected_total[1m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Malware detected in file upload"
+          description: "Threat: {{ $labels.threat_name }}"
+
+      - alert: RateLimitExceeded
+        expr: rate(security_rate_limit_exceeded_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High rate of rate limit violations"
+          description: "{{ $value }} violations per second"
+```
+
+#### Loki Security Queries
+
+**Query Examples for Grafana/Loki**:
+
+```logql
+# Authentication failures (last hour)
+{job="backend"} | logfmt | event_type="auth_failure" | line_format "{{.timestamp}} - {{.request.client_host}} - {{.details.reason}}"
+
+# SQL injection attempts (all time)
+{job="backend"} | logfmt | event_type="sql_injection_attempt"
+
+# Failed authorizations by IP (last 24 hours)
+{job="backend"} | logfmt | event_type="authz_failure" | line_format "{{.request.client_host}}" | count by (request.client_host)
+
+# Malware detections by threat type
+{job="backend"} | logfmt | event_type="malware_detected" | count by (details.threat_name)
+
+# Rate limit violations by endpoint
+{job="backend"} | logfmt | event_type="rate_limit_exceeded" | count by (request.path)
+
+# All critical security events (last hour)
+{job="backend"} | logfmt | severity="critical"
+
+# Unusual user agents (bots)
+{job="backend"} | logfmt | request.user_agent.is_bot="true"
+
+# Requests from unexpected countries
+{job="backend"} | logfmt | request.country!~"US|CA|GB|DE"
+```
+
+### Log Retention & Archival
+
+#### Retention Policy
+
+**Hot Storage** (immediate access):
+- **Duration**: 30 days
+- **Storage**: Loki
+- **Access**: Grafana dashboards
+- **Purpose**: Operational monitoring, incident investigation
+
+**Warm Storage** (scheduled access):
+- **Duration**: 1 year
+- **Storage**: S3/Glacier with periodic retrieval
+- **Purpose**: Compliance, trend analysis, security investigations
+
+**Cold Storage** (archival):
+- **Duration**: 7 years (for GDPR/CCPA compliance)
+- **Storage**: S3 Glacier Deep Archive
+- **Purpose**: Legal hold, regulatory compliance
+
+#### Log Rotation
+
+**Loki Configuration**:
+
+```yaml
+# loki-config.yml
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: boltdb-shipper
+      object_store: s3
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # Retention policy
+  retention_period: 720h  # 30 days
+
+  # Per-stream retention
+  retention_stream:
+    - selector: '{severity="critical"}'
+      priority: 1
+      period: 2160h  # 90 days for critical logs
+
+    - selector: '{category="security"}'
+      priority: 2
+      period: 1440h  # 60 days for security logs
+
+chunk_store_config:
+  max_look_back_period: 720h
+```
+
+### SIEM Integration
+
+#### Send Logs to Splunk
+
+```python
+import requests
+import json
+
+class SplunkSender:
+    """Send security events to Splunk SIEM."""
+
+    def __init__(self, hec_url: str, hec_token: str):
+        self.hec_url = hec_url
+        self.hec_token = hec_token
+
+    def send_event(self, event: dict):
+        """Send event to Splunk HTTP Event Collector."""
+        headers = {
+            'Authorization': f'Splunk {self.hec_token}',
+            'Content-Type': 'application/json'
+        }
+
+        data = {
+            'event': event,
+            'sourcetype': '_json',
+            'index': 'security',
+            'source': 'agenthr-backend'
+        }
+
+        response = requests.post(
+            self.hec_url,
+            headers=headers,
+            data=json.dumps(data),
+            timeout=5
+        )
+
+        response.raise_for_status()
+```
+
+#### Send Logs to Elasticsearch
+
+```python
+from elasticsearch import Elasticsearch
+
+class ElasticsearchSender:
+    """Send security events to Elasticsearch/ELK stack."""
+
+    def __init__(self, hosts: list, index_prefix: str = 'security-events'):
+        self.es = Elasticsearch(hosts)
+        self.index_prefix = index_prefix
+
+    def send_event(self, event: dict):
+        """Send event to Elasticsearch."""
+        # Create daily index
+        index = f"{self.index_prefix}-{datetime.now().strftime('%Y.%m.%d')}"
+
+        self.es.index(
+            index=index,
+            document=event,
+            refresh=False
+        )
+```
+
+### Real-Time Threat Detection
+
+#### Anomaly Detection Rules
+
+**Backend FastAPI Middleware**:
+
+```python
+from fastapi import Request, HTTPException, status
+from collections import defaultdict
+import time
+from datetime import datetime, timedelta
+
+class SecurityMonitor:
+    """
+    Real-time security monitoring with anomaly detection.
+    """
+
+    def __init__(self):
+        # Track failed requests by IP
+        self.failed_requests = defaultdict(list)
+
+        # Track request rates by IP
+        self.request_timestamps = defaultdict(list)
+
+        # Track SQL injection signatures
+        self.sql_signatures = [
+            r"(\%27)|(\')|(\-\-)|(\%23)|(#)",
+            r"(\bor\b|\band\b).*?=",
+            r"exec(\s|\+)+(s|x)p\w+",
+            r"union.*?select",
+            r"select.*?from",
+            r"drop\s+table",
+            r"insert\s+into",
+            r"update.*?set"
+        ]
+
+        # Track path traversal signatures
+        self.path_traversal_signatures = [
+            r"\.\./",
+            r"\.\./",
+            r"%2e%2e%2f",
+            r"..%5c",
+            r"%2e%2e%5c"
+        ]
+
+    async def check_request_security(self, request: Request) -> None:
+        """
+        Check incoming request for security threats.
+        """
+        client_ip = request.client.host if request.client else "unknown"
+
+        # Check for SQL injection
+        for param in request.query_params:
+            if self._detect_sql_injection(request.query_params[param]):
+                await self._handle_security_threat(
+                    request,
+                    threat_type="sql_injection",
+                    details={"param": param}
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Invalid request parameter"
+                )
+
+        # Check for path traversal
+        path = request.url.path
+        if self._detect_path_traversal(path):
+            await self._handle_security_threat(
+                request,
+                threat_type="path_traversal",
+                details={"path": path}
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid request path"
+            )
+
+        # Check request rate
+        await self._check_request_rate(request, client_ip)
+
+    def _detect_sql_injection(self, value: str) -> bool:
+        """Detect SQL injection patterns."""
+        import re
+        for signature in self.sql_signatures:
+            if re.search(signature, value, re.IGNORECASE):
+                return True
+        return False
+
+    def _detect_path_traversal(self, path: str) -> bool:
+        """Detect path traversal patterns."""
+        import re
+        for signature in self.path_traversal_signatures:
+            if re.search(signature, path, re.IGNORECASE):
+                return True
+        return False
+
+    async def _check_request_rate(self, request: Request, client_ip: str) -> None:
+        """Check if client is exceeding rate limits."""
+        now = time.time()
+
+        # Clean old timestamps (older than 1 minute)
+        self.request_timestamps[client_ip] = [
+            ts for ts in self.request_timestamps[client_ip]
+            if now - ts < 60
+        ]
+
+        # Add current timestamp
+        self.request_timestamps[client_ip].append(now)
+
+        # Check rate limit (100 requests per minute)
+        if len(self.request_timestamps[client_ip]) > 100:
+            await self._handle_security_threat(
+                request,
+                threat_type="rate_limit",
+                details={
+                    "client_ip": client_ip,
+                    "request_count": len(self.request_timestamps[client_ip])
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Rate limit exceeded"
+            )
+
+    async def _handle_security_threat(
+        self,
+        request: Request,
+        threat_type: str,
+        details: dict
+    ) -> None:
+        """Handle detected security threat."""
+        security_logger.log_security_event(
+            event_type=f'{threat_type}_attempt',
+            severity='critical',
+            request=request,
+            details=details
+        )
+
+
+# Initialize security monitor
+security_monitor = SecurityMonitor()
+
+
+# FastAPI middleware
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """Security monitoring middleware."""
+    # Skip security checks for health endpoint
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    # Check request security
+    await security_monitor.check_request_security(request)
+
+    # Process request
+    response = await call_next(request)
+
+    return response
+```
+
+### Logging Security Checklist
+
+#### Log Content
+
+- [ ] No passwords or secrets in logs
+- [ ] No API keys or tokens in logs
+- [ ] No credit card numbers in logs
+- [ ] No SSN or personal IDs in logs
+- [ ] Email addresses redacted
+- [ ] Phone numbers redacted
+- [ ] User IDs instead of names
+- [ ] Request bodies sanitized
+- [ ] Cookie values redacted
+
+#### Security Events
+
+- [ ] Authentication failures logged
+- [ ] Authorization failures logged
+- [ ] SQL injection attempts logged
+- [ ] XSS attempts logged
+- [ ] Path traversal attempts logged
+- [ ] File upload malware detection logged
+- [ ] Rate limit violations logged
+- [ ] Configuration changes logged
+- [ ] Admin access logged
+
+#### Alerting
+
+- [ ] Critical security events trigger immediate alerts
+- [ ] Warning events trigger hourly/daily digests
+- [ ] Alert recipients configured (email, Slack, PagerDuty)
+- [ ] Alert escalation rules configured
+- [ ] False positive tracking in place
+- [ ] Alert response procedures documented
+
+#### Monitoring
+
+- [ ] Grafana dashboards for security metrics
+- [ ] Prometheus counters for security events
+- [ ] Loki queries for security log search
+- [ ] Real-time threat detection rules
+- [ ] Anomaly detection configured
+- [ ] Baseline of normal behavior
+
+#### Retention & Archival
+
+- [ ] Hot storage retention configured (30 days)
+- [ ] Warm storage retention configured (1 year)
+- [ ] Cold storage retention configured (7 years)
+- [ ] Log rotation configured
+- [ ] Log archival process automated
+- [ ] Restore process tested
+
+#### SIEM Integration
+
+- [ ] SIEM integration configured (Splunk/ELK)
+- [ ] Security logs forwarded to SIEM
+- [ ] SIEM alerts configured
+- [ ] SIEM dashboards created
+- [ ] SIEM user access controlled
+- [ ] SIEM retention policy configured
+
+#### Compliance
+
+- [ ] Audit log trail maintained
+- [ ] Log tamper detection enabled
+- [ ] Log access controlled and audited
+- [ ] Data retention policy documented
+- [ ] GDPR right to deletion supported
+- [ ] CCPA compliance verified
+
+---
+
 **Last Updated**: 2026-02-04
 **Version**: 1.0.0
 **Maintainer**: Security Team
