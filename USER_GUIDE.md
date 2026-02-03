@@ -198,6 +198,657 @@ If you get stuck at any point:
 
 ---
 
+---
+
+## Understanding AI Match Scores
+
+When you match a candidate to a job vacancy, AgentHR gives you a match score from 0-100%. But what does this number actually mean? This section explains how the AI calculates scores, why they matter, and how to use them to make better hiring decisions.
+
+### What is a Match Score?
+
+A **match score** is a percentage that tells you how well a candidate's resume fits your job requirements. Think of it like a compatibility score—the higher the percentage, the better the fit.
+
+**Key Things to Understand:**
+
+✅ **It's not random** – Scores are based on actual data from the resume and your job requirements
+
+✅ **It's consistent** – Every candidate is evaluated the same way, reducing bias
+
+✅ **It's explainable** – You can see exactly why a candidate scored high or low
+
+✅ **It's a tool, not a decision** – Scores help you prioritize, but you still make the final call
+
+**What the Score Range Means:**
+
+| Score Range | Meaning | Recommended Action |
+|-------------|---------|-------------------|
+| **80-100%** | Excellent fit | Prioritize this candidate—move to screening quickly |
+| **60-79%** | Good fit | Strong candidate—worth reviewing and considering |
+| **40-59%** | Possible fit | May have potential—review if short on better options |
+| **0-39%** | Poor fit | Unlikely to be a match—review only if exceptional circumstances |
+
+> **Important**: Match scores compare candidates to **your specific requirements**. A candidate with 70% for one job might score 90% for another—because different jobs have different needs.
+
+---
+
+### How the Three Matching Methods Work
+
+AgentHR uses **three different matching methods** to evaluate candidates. Each method looks at the match from a different angle, and the final score combines all three.
+
+Why three methods? Think of it like hiring decisions—you want multiple perspectives before making a choice. The three methods work together to give you a more accurate, complete picture.
+
+#### Method 1: Keyword Matching (Exact Skills)
+
+**Simple Explanation**: Looks for exact skill matches between the resume and your job requirements.
+
+**How It Works:**
+
+Keyword matching is straightforward—like checking items off a shopping list:
+
+```
+Your Job Requirements:
+- Python
+- JavaScript
+- React
+- SQL
+
+Candidate A's Resume:
+- "Experience with Python, JavaScript, and React"
+- "Used SQL for database queries"
+
+Keyword Match: 4 out of 4 skills found = 100% keyword score
+```
+
+**What It Checks:**
+
+| Requirement | Found in Resume? | Example |
+|-------------|------------------|---------|
+| "Python" | ✅ Yes | "Developed applications using Python" |
+| "JavaScript" | ✅ Yes | "JavaScript development" |
+| "React" | ✅ Yes | "Built React components" |
+| "SQL" | ✅ Yes | "Wrote SQL queries" |
+
+**Strengths:**
+- ✅ Easy to understand—black and white
+- ✅ Great for must-have technical skills
+- ✅ Consistent and objective
+
+**Limitations:**
+- ❌ Misses related skills (e.g., "React.js" vs "React")
+- ❌ Doesn't measure skill level or depth
+- ❌ All skills count equally—can't prioritize
+
+**Real-World Example:**
+
+```
+Job: Senior Python Developer
+Required: Python, Django, PostgreSQL, Docker
+
+Candidate 1 Resume:
+- "5 years Python development"
+- "Built Django web applications"
+- "Worked with PostgreSQL databases"
+- "Deployed using Docker"
+
+Keyword Score: 100% (4/4 skills matched)
+
+Candidate 2 Resume:
+- "Python expert"
+- "Flask framework experience"
+- "MySQL databases"
+- "Kubernetes deployment"
+
+Keyword Score: 25% (1/4 skills matched - only Python)
+```
+
+Notice that Candidate 2 might actually be qualified—they know Flask (similar to Django) and Kubernetes (more advanced than Docker)—but keyword matching only sees exact matches.
+
+#### Method 2: TF-IDF Matching (Important Skills Weighted)
+
+**Simple Explanation**: Identifies the most important skills in your job description and gives them extra weight when matching.
+
+**What "TF-IDF" Actually Means (In Plain English):**
+
+TF-IDF stands for "Term Frequency-Inverse Document Frequency"—but forget the technical name. Here's what it really does:
+
+**If a skill appears frequently in YOUR job description but rarely in other jobs, it must be important to YOU.**
+
+**How It Works:**
+
+Imagine you're hiring for a specialized role:
+
+```
+Job Description: "Machine Learning Engineer specializing in
+Natural Language Processing with PyTorch and TensorFlow"
+
+TF-IDF Analysis:
+- "Machine Learning" → Found in many job descriptions → Lower weight
+- "Natural Language Processing" → Found in few job descriptions → Higher weight ⭐
+- "PyTorch" → Found in few job descriptions → Higher weight ⭐
+- "TensorFlow" → Found in few job descriptions → Higher weight ⭐
+```
+
+**Example Comparison:**
+
+Let's say you're hiring for a "PyTorch Developer" (a specific AI framework):
+
+| Candidate | Skills | Keyword Score | TF-IDF Score | Why TF-IDF Differs |
+|-----------|--------|---------------|--------------|-------------------|
+| **A** | Python, PyTorch, SQL, Docker | 75% (3/4) | **95%** | Has PyTorch (rare, important skill) |
+| **B** | Python, JavaScript, React, SQL | 75% (3/4) | 60% | Missing PyTorch (has common skills instead) |
+
+Both candidates matched 3 out of 4 keywords, but:
+- **Candidate A** has PyTorch—TF-IDF recognizes this as rare and critical
+- **Candidate B** has JavaScript and React—useful, but not what makes this role special
+
+**Strengths:**
+- ✅ Prioritizes skills that make your role unique
+- ✅ Identifies specialists vs. generalists
+- ✅ Helps find candidates with your specific requirements
+
+**Limitations:**
+- ❌ Still focuses on exact words
+- ❌ Doesn't understand related concepts
+- ❌ Can be skewed by unusual job descriptions
+
+**When TF-IDF Helps Most:**
+
+| Scenario | Why TF-IDF Matters |
+|----------|-------------------|
+| **Specialized roles** | "React Native Developer" vs "Web Developer" |
+| **Niche technologies** | "Kubernetes," "Snowflake," "Tableau" |
+| **Industry-specific skills** | "HIPAA compliance," "FPGA design" |
+| **Unique combinations** | "Python + Finance + Statistics" |
+
+#### Method 3: Vector Similarity (Understanding Meaning)
+
+**Simple Explanation**: Understands the meaning behind skills, not just the words. Knows that related terms and synonyms are often the same thing.
+
+**How It Works (The Magic Part):**
+
+Vector similarity uses AI to "read" like a human would. It converts words into mathematical representations (called "vectors") that capture meaning and context.
+
+**What This Means in Practice:**
+
+The AI understands that:
+- "JS" and "JavaScript" are the same thing ✓
+- "React" and "ReactJS" refer to the same technology ✓
+- "Postgres" and "PostgreSQL" are equivalent ✓
+- "Machine Learning" and "ML" can be used interchangeably ✓
+
+**Example: Related Skills Matching**
+
+```
+Your Job Requires: "Python web development"
+
+Candidate Resume:
+- "Built applications using Django and Flask"
+- "Developed RESTful APIs with FastAPI"
+- "Server-side development using Python"
+
+Keyword Matching:
+- "Python" → Found ✓
+- "web development" → Not found (wrong wording) ✗
+Score: 50% (1/2)
+
+Vector Similarity:
+- Knows Django = Python web framework ✓
+- Knows Flask = Python web framework ✓
+- Knows FastAPI = Python web framework ✓
+- Knows RESTful APIs = web development ✓
+Score: 95% (understands the meaning!)
+```
+
+**Synonym Matching Examples:**
+
+| Job Requirement | Candidate Wrote | Vector Understands | Match? |
+|-----------------|-----------------|-------------------|--------|
+| "JavaScript" | "JS" | Same thing | ✅ Yes |
+| "PostgreSQL" | "postgres" | Same database | ✅ Yes |
+| "React" | "ReactJS" | Same framework | ✅ Yes |
+| "Machine Learning" | "ML" | Abbreviation | ✅ Yes |
+
+**Related Skills Matching:**
+
+The AI also recognizes when a candidate has **related skills** that show they can do the job:
+
+| You Need | Candidate Has | Vector Sees Connection |
+|----------|---------------|------------------------|
+| "Spring Boot" | "Java" | Spring Boot is a Java framework ✅ |
+| "pandas" | "Data analysis" | pandas is used for data analysis ✅ |
+| "AWS Lambda" | "Serverless computing" | Lambda is a serverless service ✅ |
+
+**Strengths:**
+- ✅ Finds matches others miss (synonyms, related terms)
+- ✅ Understands context, not just keywords
+- ✅ Most sophisticated of the three methods
+- ✅ Reduces false negatives (good candidates marked as poor fit)
+
+**Limitations:**
+- ❌ Can be overly permissive (might match loosely related skills)
+- ❌ Harder to explain exactly why a match occurred
+- ❌ Requires careful tuning to avoid over-matching
+
+**Real-World Example:**
+
+```
+Job: "React Developer"
+
+Candidate Resume:
+- "Frontend development using ReactJS"
+- "Built SPAs with Redux"
+- "JavaScript and TypeScript experience"
+
+Keyword Score: 66% (2/3 - ReactJS != React, missing Redux in requirements)
+
+Vector Score: 90%
+- Knows ReactJS = React ✓
+- Knows SPAs = React applications ✓
+- Knows Redux = React state management (commonly used together) ✓
+```
+
+#### How All Three Methods Work Together
+
+The final match score combines all three methods:
+
+```
+Final Match Score = (Keyword Score × 25%) + (TF-IDF Score × 25%) + (Vector Score × 50%)
+```
+
+**Why Vector Gets 50% Weight:**
+
+Vector similarity is the smartest method, so it counts more. This prevents missing good candidates just because they used different words than you did.
+
+**Example: Combined Scoring**
+
+```
+Job: "Python Backend Developer"
+
+Candidate: "Django Developer with 5 years experience"
+
+Breakdown:
+- Keyword Score: 20% (only "Python" matched explicitly)
+- TF-IDF Score: 40% (Python recognized, but Django not in job description)
+- Vector Score: 90% (knows Django = Python backend framework)
+
+Final Score: (20% × 0.25) + (40% × 0.25) + (90% × 0.50) = 60%
+```
+
+A 60% score might not seem great, but this candidate is actually a strong match—vector similarity recognized the connection between Django and Python backend development.
+
+---
+
+### Interpreting Your Match Results
+
+Now that you understand how scores are calculated, here's how to use them effectively.
+
+#### Understanding the Match Score Breakdown
+
+When you view match results, you'll typically see:
+
+```
+Overall Match Score: 78%
+
+Breakdown:
+- Keyword Score: 65%
+- TF-IDF Score: 72%
+- Vector Score: 88%
+
+Matched Skills:
+- Python ✓
+- FastAPI ✓
+- PostgreSQL ✓
+- Docker ✓
+
+Missing Skills:
+- CI/CD ✗
+- Unit Testing ✗
+```
+
+**How to Read This:**
+
+1. **Overall Score (78%)** – Good fit, worth reviewing
+2. **Keyword Score (65%)** – Some explicit skills missing
+3. **Vector Score (88%)** – But has related skills and experience
+4. **Missing Skills** – CI/CD and Unit Testing not found—ask about these in interview
+
+#### What Different Score Patterns Mean
+
+| Pattern | Interpretation | Action |
+|---------|----------------|--------|
+| **High Keyword (80%+) + High TF-IDF (80%+) + High Vector (80%+)** | Near-perfect match | Prioritize immediately |
+| **Low Keyword (<40%) + High Vector (80%+)** | Different words, same skills | Review—likely qualified |
+| **High Keyword (80%+) + Low Vector (<50%)** | Exact words but lacks context | Cautious—may be padding resume |
+| **All Medium (50-70%)** | Partial match | Consider if short on candidates |
+| **All Low (<40%)** | Poor fit | Skip unless exceptional |
+
+#### When to Trust High Scores
+
+✅ **High scores are reliable when:**
+- Job requirements are clear and specific
+- Candidate has a standard resume format
+- Skills are technical and well-defined (e.g., "Python," not "Management")
+- Score is high across **all three methods**
+
+⚠️ **High scores may be misleading when:**
+- Job description is vague or generic
+- Candidate "keyword stuffed" their resume (listing every buzzword)
+- Skills are subjective (e.g., "Communication," "Leadership")
+- Only one method is high (e.g., keyword 90%, but vector 30%)
+
+#### When to Look Past Low Scores
+
+✅ **Consider low-score candidates when:**
+- They have **high vector scores** but low keyword scores (different words for same skills)
+- They have **unique backgrounds** (career changers, self-taught)
+- Job requirements were possibly **too strict**
+- You need **diverse perspectives**
+
+✅ **Red flags even with high scores:**
+- Skills match but **experience is minimal**
+- Score is high but **employment dates don't add up**
+- Match is technical but **soft skills seem lacking**
+
+---
+
+### Tips for Better Matching
+
+Get more accurate matches by following these best practices.
+
+#### For Writing Job Descriptions
+
+✅ **Be Specific About Skills**
+
+```
+❌ Too vague:
+"Programming experience"
+
+✅ Better:
+"Python development using Django and FastAPI"
+```
+
+✅ **Use Standard Terminology**
+
+```
+❌ Confusing:
+"JS coding", "Postgres SQL", "reactjs"
+
+✅ Better:
+"JavaScript", "PostgreSQL", "React"
+```
+
+✅ **Prioritize Must-Have vs. Nice-to-Have**
+
+```
+Required Skills (Must-Have):
+- Python
+- SQL
+- Git
+
+Nice-to-Have Skills:
+- AWS
+- Docker
+- Kubernetes
+```
+
+> **Tip**: Only list 5-15 required skills. Too many requirements filter out great candidates.
+
+✅ **Avoid Generic Requirements**
+
+```
+❌ Not helpful:
+"Problem solver," "Team player," "Hard worker"
+
+✅ More specific:
+"Experience debugging complex issues,"
+"Collaborated with 5+ person teams,"
+"Delivered projects under tight deadlines"
+```
+
+#### For Understanding Matches
+
+✅ **Look at the Breakdown, Not Just the Overall Score**
+
+A 75% score could mean:
+- Good across the board (solid candidate) ✓
+- High keyword, low vector (keyword stuffing) ✗
+- Low keyword, high vector (different terminology) ✓
+
+✅ **Review Matched vs. Missing Skills**
+
+Don't just look at the percentage—see **what** matched and **what** didn't.
+
+```
+Candidate A: 80% match
+Missing: Unit Testing, CI/CD
+
+Candidate B: 75% match
+Missing: CI/CD
+
+→ Candidate A is missing one more skill, but both missing CI/CD
+→ Compare other factors (experience, education, etc.)
+```
+
+✅ **Consider Experience Levels**
+
+A match score doesn't tell you about **depth** of experience:
+
+```
+Candidate A: 90% match, 6 months Python experience
+Candidate B: 85% match, 5 years Python experience
+
+→ Candidate B might be better despite lower score
+```
+
+✅ **Check Vector Scores for Hidden Gems**
+
+Candidates with low keyword scores but high vector scores often:
+- Use different terminology than you expected
+- Have related skills that transfer well
+- Come from different industries but have relevant experience
+
+#### Common Matching Pitfalls to Avoid
+
+❌ **Don't filter out candidates below 80% automatically**
+
+You might miss:
+- Candidates with non-standard resume formats
+- People using synonyms (e.g., "JS" instead of "JavaScript")
+- Career changers with transferable skills
+- Great candidates missing one minor skill
+
+❌ **Don't ignore candidates with "weird" skill combinations**
+
+Sometimes unusual combinations are valuable:
+
+```
+"Python + Finance + Statistics" → Data Science candidate
+"JavaScript + Design + UX" → Frontend developer with design skills
+"Sales + SQL + Python" → Sales engineer or data analyst
+```
+
+❌ **Don't assume higher score always = better candidate**
+
+Consider:
+- **Experience quality** – 2 years at a top company vs. 5 years at a startup
+- **Role relevance** – Direct experience vs. adjacent experience
+- **Growth trajectory** – Fast learner vs. stagnant experience
+- **Cultural fit** – Skills match but work style doesn't align
+
+❌ **Don't forget about soft skills**
+
+Match scores focus on technical skills. You still need to evaluate:
+- Communication ability
+- Team collaboration
+- Problem-solving approach
+- Leadership potential
+- Work ethic and reliability
+
+#### Improving Match Accuracy Over Time
+
+✅ **Provide Feedback on Rankings**
+
+When you interview candidates:
+- Note whether the match score was accurate
+- Identify which factors were most predictive
+- Report back on hiring outcomes
+
+This helps improve the AI for future matches.
+
+✅ **Refine Job Descriptions Based on Results**
+
+If you're getting too many poor matches:
+- Clarify requirements
+- Remove less important skills
+- Add more specific examples
+
+If you're getting too many perfect matches:
+- Requirements may be too broad
+- Consider raising the bar
+- Add specialized skills
+
+✅ **Track Which Scores Lead to Successful Hires**
+
+Over time, you'll learn:
+- What score range typically indicates a good hire
+- Which matching method correlates best with success
+- Which skills matter most vs. least
+
+---
+
+### Match Score Examples
+
+Let's look at some realistic examples to solidify your understanding.
+
+#### Example 1: The Perfect Match
+
+```
+Job: Senior Python Developer
+Required: Python, Django, PostgreSQL, Docker, Git, CI/CD
+
+Candidate: Senior Software Engineer
+Resume:
+- "7 years Python development"
+- "Built scalable Django applications"
+- "PostgreSQL database optimization"
+- "Containerized with Docker"
+- "Git version control"
+- "CI/CD pipelines with Jenkins"
+
+Keyword Score: 100% (6/6 skills matched)
+TF-IDF Score: 95% (all important skills present)
+Vector Score: 98% (perfect match)
+
+Overall Match Score: 98%
+Recommendation: Excellent—immediate interview
+```
+
+#### Example 2: The Synonym Mismatch
+
+```
+Job: React Developer
+Required: React, JavaScript, TypeScript, Redux, REST APIs
+
+Candidate: Frontend Engineer
+Resume:
+- "ReactJS development for 4 years"
+- "JS and TypeScript expert"
+- "State management with Redux"
+- "Built RESTful APIs"
+- "Webpack bundling"
+
+Keyword Score: 60% (3/5 - ReactJS != React, JS != JavaScript)
+TF-IDF Score: 70%
+Vector Score: 95% (understands all the synonyms)
+
+Overall Match Score: 80%
+Recommendation: Good—highly qualified despite wording differences
+```
+
+#### Example 3: The Related Skills Candidate
+
+```
+Job: Machine Learning Engineer
+Required: Python, TensorFlow, PyTorch, Scikit-learn, NLP
+
+Candidate: Data Scientist
+Resume:
+- "Python for data analysis"
+- "Statistical modeling with R"
+- "SQL database queries"
+- "Tableau dashboards"
+- "Excel reporting"
+
+Keyword Score: 20% (1/5 - only Python matched)
+TF-IDF Score: 30%
+Vector Score: 55% (recognizes some overlap but not much)
+
+Overall Match Score: 40%
+Recommendation: Maybe—wrong type of "data" experience
+```
+
+This candidate has "Python" but is a **data analyst**, not a **machine learning engineer**. The low score correctly identifies the mismatch.
+
+#### Example 4: The Overqualified Specialist
+
+```
+Job: Junior Web Developer
+Required: HTML, CSS, JavaScript, Git
+
+Candidate: Senior Full-Stack Engineer
+Resume:
+- "10 years full-stack development"
+- "Expert in React, Angular, Vue"
+- "Node.js, Python, Go backend"
+- "AWS, GCP, Azure cloud platforms"
+- "Kubernetes, Docker, CI/CD"
+- "Architecture and team leadership"
+
+Keyword Score: 50% (2/4 - missing HTML, CSS explicitly)
+TF-IDF Score: 60%
+Vector Score: 85% (has way more than required)
+
+Overall Match Score: 70%
+Recommendation: Good—but may be overqualified
+```
+
+The score is lower than expected because the candidate didn't list basic skills (HTML, CSS)—probably assumed they were too obvious to mention. But vector similarity recognizes their extensive expertise.
+
+---
+
+### Quick Reference: Match Score Cheat Sheet
+
+| Score | Meaning | Do This |
+|-------|---------|---------|
+| **90-100%** | Exceptional fit | Interview immediately, move to top of list |
+| **80-89%** | Strong match | Schedule interview, review resume details |
+| **70-79%** | Good match | Worth reviewing, check what's missing |
+| **60-69%** | Decent match | Review if short on candidates, or if vector score is high |
+| **50-59%** | Weak match | Only review if exceptional circumstances |
+| **0-49%** | Poor match | Skip, unless you have a specific reason |
+
+**Red Flags Even with High Scores:**
+- High keyword score + Low vector score → Possible keyword stuffing
+- Good match but little experience → Verify depth of knowledge
+- Perfect match but employment gaps → Ask about what happened
+- All skills match but wrong industry → May lack domain knowledge
+
+**Green Flags Even with Lower Scores:**
+- Low keyword + High vector → Different terminology, same skills
+- Missing one skill but strong experience → Can probably learn quickly
+- Related industry experience → Transferable skills
+- Strong growth trajectory → Fast learner, worth considering
+
+---
+
+### What's Next?
+
+Now that you understand how match scores work and what they mean, you're ready to dive deeper into candidate evaluation. In the next section, we'll cover [Candidate Ranking and Recommendations](#candidate-ranking-and-recommendations)—how AgentHR uses 13 different factors to rank candidates and provide clear recommendation levels like "Excellent," "Good," "Maybe," and "Poor."
+
+---
+
+---
+
 ## Getting Started
 
 Welcome to AgentHR! This section will help you access the platform, understand what you're seeing, and get comfortable with your dashboard. Let's get started.
