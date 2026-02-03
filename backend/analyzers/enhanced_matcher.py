@@ -433,6 +433,62 @@ class EnhancedSkillMatcher:
 
         return None
 
+    def _try_language_hierarchy_match(
+        self,
+        resume_skills: List[str],
+        normalized_required: str
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Attempt a language hierarchy match between resume skills and required skill.
+
+        Language hierarchy matching handles cases where one language implies knowledge
+        of another. For example:
+        - C++ implies C knowledge (when C is required, C++ is acceptable)
+        - C# doesn't imply C (different language family)
+        - C/C++ is a compound skill that covers both
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+            normalized_required: Normalized name of the required skill
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> result = matcher._try_language_hierarchy_match(['C++'], 'c')
+            >>> result
+            ('C++', 0.85, 'language_hierarchy')
+        """
+        # C/C++ language hierarchy: C++ implies C, C# doesn't imply C
+        c_related = {
+            'c': ['c', 'c++', 'c/c++'],
+            'c++': ['c++', 'c/c++'],
+            'c#': ['c#', 'c sharp'],
+        }
+
+        if normalized_required not in c_related:
+            return None
+
+        for resume_skill in resume_skills:
+            normalized_resume = self.normalize_skill_name(resume_skill)
+
+            # Check if resume skill is in the list of acceptable variants
+            if normalized_resume in [self.normalize_skill_name(v) for v in c_related[normalized_required]]:
+                # Special case: if required is 'c', match 'c++' but NOT 'c#'
+                if normalized_required == 'c':
+                    if 'c#' in normalized_resume or 'csharp' in normalized_resume or 'c sharp' in normalized_resume:
+                        continue
+                    # Match 'c++' or 'c/c++' as 'c'
+                    if normalized_resume in ['c++', 'c/c++']:
+                        return resume_skill, 0.85, 'language_hierarchy'
+
+                # Match exact variants
+                if normalized_resume in c_related[normalized_required]:
+                    return resume_skill, 0.95, 'language_hierarchy'
+
+        return None
+
     def match_with_context(
         self,
         resume_skills: List[str],
@@ -512,40 +568,17 @@ class EnhancedSkillMatcher:
             })
             return result
 
-        # Strategy 1.75: C/C++ language hierarchy match
-        # C++ implies C knowledge, C# doesn't imply C
-        c_related = {
-            'c': ['c', 'c++', 'c/c++'],
-            'c++': ['c++', 'c/c++'],
-            'c#': ['c#', 'c sharp'],
-        }
-        if normalized_required in c_related:
-            for resume_skill in resume_skills:
-                normalized_resume = self.normalize_skill_name(resume_skill)
-                # Check if resume skill is in the list of acceptable variants
-                if normalized_resume in [self.normalize_skill_name(v) for v in c_related[normalized_required]]:
-                    # Special case: if required is 'c', match 'c++' but NOT 'c#'
-                    if normalized_required == 'c':
-                        if 'c#' in normalized_resume or 'csharp' in normalized_resume or 'c sharp' in normalized_resume:
-                            continue
-                        # Match 'c++' or 'c/c++' as 'c'
-                        if normalized_resume in ['c++', 'c/c++']:
-                            result.update({
-                                "matched": True,
-                                "confidence": 0.85,
-                                "matched_as": resume_skill,
-                                "match_type": "language_hierarchy"
-                            })
-                            return result
-                    # Match exact variants
-                    if normalized_resume in c_related[normalized_required]:
-                        result.update({
-                            "matched": True,
-                            "confidence": 0.95,
-                            "matched_as": resume_skill,
-                            "match_type": "language_hierarchy"
-                        })
-                        return result
+        # Strategy 1.75: Language hierarchy match (e.g., C++ implies C)
+        hierarchy_match = self._try_language_hierarchy_match(resume_skills, normalized_required)
+        if hierarchy_match:
+            matched_skill, confidence, match_type = hierarchy_match
+            result.update({
+                "matched": True,
+                "confidence": confidence,
+                "matched_as": matched_skill,
+                "match_type": match_type
+            })
+            return result
 
         # Strategy 2: Context-aware match
         if context:
