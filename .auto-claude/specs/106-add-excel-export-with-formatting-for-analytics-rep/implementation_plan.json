@@ -76,7 +76,8 @@
             "command": "cd backend && python -c \"from api.reports import format_excel_headers, apply_data_bars; print('Utilities imported successfully')\"",
             "expected": "Utilities imported successfully"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Implemented two utility functions: format_excel_headers (applies bold font, blue background color, centered alignment to header rows) and apply_data_bars (applies conditional formatting data bars to numeric columns using DataBarRule from openpyxl). Both functions follow code patterns from taxonomy_import_export.py with proper type hints, docstrings, error handling, and logging."
         },
         {
           "id": "subtask-2-3",
@@ -361,5 +362,5 @@
   "qa_signoff": null,
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-02-03T23:09:09.285Z"
+  "updated_at": "2026-02-03T23:17:42.783Z"
 }
