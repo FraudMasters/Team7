@@ -849,6 +849,1114 @@ Now that you understand how match scores work and what they mean, you're ready t
 
 ---
 
+## Candidate Ranking and Recommendations
+
+Match scores tell you how well a candidate's skills fit your job requirements. But skills are only one part of the picture. **Candidate ranking** goes deeper by evaluating 13 different factors to give you a complete picture of each candidate's potential.
+
+This section explains how AgentHR's ranking system works, what the 13 factors are, and how to interpret recommendation levels like "Excellent," "Good," "Maybe," and "Poor."
+
+### What is AI Ranking?
+
+**Simple explanation**: Ranking takes all candidates for a job and orders them from best to worst using 13 different measures, then gives each candidate a clear recommendation.
+
+**In more detail**:
+
+When you upload resumes for a vacancy, AgentHR calculates a **ranking score** from 0-100% for each candidate. Unlike match scores (which focus mainly on skills), ranking considers **many factors** including:
+
+- Skills match quality
+- Experience level and relevance
+- Education and qualifications
+- Resume completeness
+- How recent the resume is
+- And 8 more factors
+
+**Why ranking matters:**
+
+| Without Ranking | With AI Ranking |
+|----------------|----------------|
+| Manually review every resume | AI surfaces top candidates first |
+| Spend hours screening | Focus on 5-10 best candidates |
+| Subjective assessments | Data-driven, explainable scores |
+| No priority order | Clear ranked list |
+| Miss qualified candidates | AI finds hidden gems |
+
+**Key difference: Match Score vs. Ranking Score**
+
+| Aspect | Match Score | Ranking Score |
+|--------|-------------|---------------|
+| **Focus** | Skills fit to job requirements | Overall candidate quality |
+| **Factors** | 3 matching methods (keyword, TF-IDF, vector) | 13 factors including skills, experience, education |
+| **Output** | Percentage (0-100%) | Percentage + recommendation level |
+| **Use case** | Compare one candidate to job | Compare all candidates to each other |
+| **When to use** | Quick skill check | Prioritize who to interview first |
+
+**Example to illustrate the difference:**
+
+```
+Two candidates for Senior Python Developer role:
+
+Candidate A:
+- Match Score: 95% (has all skills)
+- Experience: 6 months (junior level)
+- Education: High school diploma
+- Ranking Score: 65%
+- Recommendation: Maybe
+
+Candidate B:
+- Match Score: 85% (missing one skill)
+- Experience: 5 years (senior level)
+- Education: M.S. Computer Science
+- Ranking Score: 88%
+- Recommendation: Excellent
+```
+
+Candidate A has better skills match, but Candidate B ranks higher because of experience and education. This is why ranking matters—it looks at the **whole candidate**, not just skills.
+
+---
+
+### Understanding Recommendation Levels
+
+Each candidate receives a **recommendation level** based on their ranking score. This gives you an immediate, clear recommendation without needing to interpret the number.
+
+#### The Four Recommendation Levels
+
+| Recommendation | Score Range | Color | Meaning | Action |
+|----------------|-------------|-------|---------|--------|
+| **Excellent** | 80-100% | 🟢 Green | Top-tier candidate | Interview immediately |
+| **Good** | 60-79% | 🔵 Blue | Strong candidate | Schedule interview |
+| **Maybe** | 40-59% | 🟡 Yellow | Potential fit | Review if short on options |
+| **Poor** | 0-39% | 🔴 Red | Not a match | Skip unless exceptional |
+
+#### What Each Level Really Means
+
+**Excellent (80-100%) 🟢**
+
+These are your **top candidates**—the ones you should prioritize above all others.
+
+**Characteristics:**
+- Strong skills match with job requirements
+- Relevant experience at appropriate level
+- Good educational background
+- Well-written, complete resume
+- Recent work history
+
+**What to do:**
+- ✅ Interview immediately
+- ✅ Move to top of your list
+- ✅ Prepare targeted interview questions
+- ✅ Consider making offer quickly if interview goes well
+
+**Example:**
+```
+Candidate: Sarah Chen
+Ranking Score: 92%
+Recommendation: Excellent
+
+Why:
+- All required skills present (Python, Django, PostgreSQL)
+- 5 years relevant experience (matches 4-year requirement)
+- M.S. Computer Science
+- Clean, complete resume
+- Currently employed (shows employability)
+```
+
+**Good (60-79%) 🔵**
+
+These are **solid candidates** worth your time and consideration.
+
+**Characteristics:**
+- Most required skills present (may be missing 1-2)
+- Appropriate experience level
+- Decent educational background
+- Acceptable resume quality
+- Employable candidate
+
+**What to do:**
+- ✅ Schedule interview
+- ✅ Review resume thoroughly
+- ✅ Check which skills/experience are lacking
+- ✅ Ask about gaps in interview
+
+**Example:**
+```
+Candidate: Michael Rodriguez
+Ranking Score: 72%
+Recommendation: Good
+
+Why:
+- Has 8 out of 10 required skills (missing CI/CD and Docker)
+- 3 years experience (slightly below 4-year preference)
+- B.S. Information Technology
+- Good resume format
+- Employed but looking for new opportunities
+```
+
+**Maybe (40-59%) 🟡**
+
+These candidates **might work out** but need closer review. Use good judgment.
+
+**Characteristics:**
+- Missing several key skills
+- Experience level not ideal (too junior or overqualified)
+- Educational background doesn't align well
+- Resume has issues (formatting, completeness)
+- Employment gaps or concerns
+
+**What to do:**
+- ⚠️ Review only if short on "Excellent" or "Good" candidates
+- ⚠️ Look for redeeming qualities (unique skills, growth potential)
+- ⚠️ Consider if skill gaps are trainable
+- ⚠️ May be worth interview for junior roles
+
+**Example:**
+```
+Candidate: Jessica Kim
+Ranking Score: 48%
+Recommendation: Maybe
+
+Why:
+- Has only 5 of 10 required skills
+- 18 months experience (below 4-year requirement)
+- B.A. Business (not technical)
+- Resume has some formatting issues
+- But shows strong learning trajectory and side projects
+
+Verdict: Consider for junior role or if she shows exceptional aptitude
+```
+
+**Poor (0-39%) 🔴**
+
+These candidates are **unlikely to be a good fit** for the role.
+
+**Characteristics:**
+- Missing most required skills
+- Experience level completely wrong
+- Major resume problems (incomplete, unreadable)
+- Significant employment concerns
+- Clear mismatch with requirements
+
+**What to do:**
+- ❌ Skip reviewing (unless you have a specific reason)
+- ❌ Don't waste interview time
+- ❌ Consider for different roles if applicable
+- ❌ Send polite rejection if they applied directly
+
+**Example:**
+```
+Candidate: David Thompson
+Ranking Score: 25%
+Recommendation: Poor
+
+Why:
+- Has only 2 of 10 required skills
+- No relevant experience (retail background)
+- High school diploma only
+- Resume is incomplete and poorly formatted
+- Long employment gaps
+
+Verdict: Not suitable for this technical role
+```
+
+#### When to Look Past the Recommendation
+
+The AI is a tool, not a decision-maker. Here are situations where you might override the recommendation:
+
+✅ **Consider "Maybe" candidates when:**
+- You're hiring for a junior/trainee role
+- Candidate shows exceptional growth potential
+- They have unique skills not in requirements
+- They come with strong referral
+- You're willing to train
+
+✅ **Consider "Poor" candidates when:**
+- They're transferring from adjacent field (e.g., teacher → training)
+- Exceptional portfolio or side projects
+- Strong referral from trusted source
+- You're exploring non-traditional backgrounds
+- For completely different role
+
+⚠️ **Be cautious with "Excellent" candidates when:**
+- Employment dates don't add up
+- Skills seem too good to be true
+- Resume has inconsistencies
+- Poor communication in initial contact
+- Cultural fit concerns (still important!)
+
+---
+
+### The 13 Factors That Influence Rankings
+
+AgentHR evaluates candidates using **13 specific factors**. Understanding these helps you interpret rankings and explains why one candidate ranks higher than another.
+
+#### How the 13 Factors Work
+
+Each factor contributes to the final ranking score. Some factors have more influence than others.
+
+**Score Calculation:**
+
+```
+Ranking Score = (Factor 1 × Weight) + (Factor 2 × Weight) + ... + (Factor 13 × Weight)
+```
+
+Different factors have different weights based on how important they are for predicting job fit.
+
+#### All 13 Factors Explained
+
+Here are all 13 factors, what they measure, and why they matter:
+
+**1. Overall Match Score (Weight: High)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Combined score from all three matching methods (keyword, TF-IDF, vector) |
+| **Why it matters** | Primary indicator of skills alignment with job requirements |
+| **Good score** | 80%+ (strong skills match) |
+| **Impact** | High – This is the most important factor |
+
+**Example:**
+```
+Job: Senior Python Developer
+Candidate A: Overall match 90% → Strong influence on ranking
+Candidate B: Overall match 45% → Significantly lowers ranking
+```
+
+---
+
+**2. Keyword Score (Weight: Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Exact skill matches between resume and job requirements |
+| **Why it matters** | Confirms candidate explicitly lists required skills |
+| **Good score** | 70%+ (most skills found verbatim) |
+| **Impact** | Medium – Validates explicit skill mentions |
+
+**Example:**
+```
+Required: Python, Django, PostgreSQL, Docker, Git, CI/CD
+
+Candidate resume says:
+- "Python development"
+- "Django web apps"
+- "PostgreSQL databases"
+- "Docker containers"
+- "Git version control"
+
+Keyword Score: 83% (5 out of 6 skills found explicitly)
+Missing: CI/CD
+```
+
+---
+
+**3. TF-IDF Score (Weight: Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Importance-weighted skill matching (rare skills count more) |
+| **Why it matters** | Identifies candidates with your specific, niche requirements |
+| **Good score** | 70%+ (has important specialized skills) |
+| **Impact** | Medium – Helps find specialists |
+
+**Example:**
+```
+Job: "PyTorch Developer" (specialized AI framework)
+
+Candidate A:
+- Has: Python, JavaScript, React, SQL
+- TF-IDF Score: 40% (common skills only)
+
+Candidate B:
+- Has: Python, PyTorch, TensorFlow, NLP
+- TF-IDF Score: 90% (has rare, important skills)
+
+→ Candidate B ranks higher despite same overall skill count
+```
+
+---
+
+**4. Vector Score (Weight: High)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Semantic similarity (understands related skills and synonyms) |
+| **Why it matters** | Finds candidates who use different terminology but have relevant skills |
+| **Good score** | 75%+ (strong contextual understanding) |
+| **Impact** | High – Captures related and synonymous skills |
+
+**Example:**
+```
+Job requires: "Python web development"
+
+Candidate resume says:
+- "Built applications using Django and Flask"
+- "Developed RESTful APIs with FastAPI"
+
+Vector Score: 85%
+(Recognizes Django = Python web framework, FastAPI = Python web development)
+
+Even though "Python web development" isn't explicitly mentioned
+```
+
+---
+
+**5. Skills Match Ratio (Weight: High)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Percentage of required skills found in resume |
+| **Why it matters** | Direct measure of requirements coverage |
+| **Good score** | 70%+ (has most required skills) |
+| **Impact** | High – Core requirement satisfaction |
+
+**Example:**
+```
+Required Skills (10 total): Python, FastAPI, PostgreSQL, Docker, Git,
+                           REST APIs, SQL, Unit Testing, CI/CD, Linux
+
+Candidate has: 8 out of 10 skills
+Skills Match Ratio: 80%
+
+Missing: CI/CD, Unit Testing
+→ Strong candidate despite missing 2 skills
+```
+
+---
+
+**6. Experience Months (Weight: High)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Total months of work experience extracted from resume |
+| **Why it matters** | Indicates career maturity and depth |
+| **Good score** | Meets or exceeds minimum requirement |
+| **Impact** | High – Experience correlates with job performance |
+
+**Scoring:**
+```
+Required: 48 months (4 years)
+
+Candidate with 36 months: Penalized (below minimum)
+Candidate with 48 months: Full points (meets requirement)
+Candidate with 120 months: Same points as 48 months (no extra credit)
+
+Note: More experience than required doesn't increase score
+```
+
+---
+
+**7. Experience Relevance (Weight: High)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | How well candidate's work history aligns with job requirements |
+| **Why it matters** | Quality of experience matters more than quantity |
+| **Good score** | 0.7+ (highly relevant past roles) |
+| **Impact** | High – Relevant experience is highly valued |
+
+**Example:**
+```
+Job: Senior Python Developer
+
+Candidate A:
+- Experience: 60 months
+- Roles: Python Developer, Backend Engineer, Django Developer
+- Experience Relevance: 0.85 (highly relevant)
+
+Candidate B:
+- Experience: 60 months
+- Roles: JavaScript Developer, Frontend Engineer, UI Designer
+- Experience Relevance: 0.25 (not relevant)
+
+→ Candidate A ranks much higher despite same total experience
+```
+
+---
+
+**8. Education Level (Weight: Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Highest degree or certification achieved |
+| **Why it matters** | Indicates foundational knowledge and commitment |
+| **Good score** | Depends on job requirements |
+| **Impact** | Medium – More important for some roles than others |
+
+**Education Scoring:**
+```
+Ph.D./Doctorate        → Highest points
+Master's Degree        → High points
+Bachelor's Degree      → Good points
+Associate Degree       → Some points
+High School Diploma    → Minimal points
+Certifications         → Bonus points
+```
+
+**Role Importance:**
+| Role Type | Education Importance |
+|-----------|---------------------|
+| Research/Science | Very High |
+| Data Science | High |
+| Software Engineering | Medium |
+| Marketing/Sales | Low-Medium |
+| Customer Support | Low |
+
+---
+
+**9. Recent Experience (Weight: Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | Relevant work experience in the past 2-3 years |
+| **Why it matters** | Skills can get outdated; recent experience shows currency |
+| **Good score** | Has relevant experience in past 24 months |
+| **Impact** | Medium – Fresh experience is valuable |
+
+**Example:**
+```
+Job: Python Developer
+
+Candidate A:
+- Python Developer (2020-2022) - 2 years ago
+- Marketing Manager (2022-2024) - Career change
+- Recent Python Experience: Low (over 2 years ago)
+
+Candidate B:
+- Python Developer (2022-2024) - Current
+- Recent Python Experience: High (actively working with Python)
+
+→ Candidate B ranks higher due to recent relevant experience
+```
+
+---
+
+**10. Skill Rarity Score (Weight: Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | How rare or specialized the candidate's skills are |
+| **Why it matters** | Rare skills are harder to find and more valuable |
+| **Good score** | High (has uncommon, in-demand skills) |
+| **Impact** | Medium – Distinguishes exceptional candidates |
+
+**Example:**
+```
+Job: Machine Learning Engineer
+
+Candidate A skills:
+- Python, Data Analysis, Excel
+
+Skill Rarity Score: Low (common skills)
+
+Candidate B skills:
+- Python, PyTorch, TensorFlow, NLP, Computer Vision
+
+Skill Rarity Score: High (rare, specialized skills)
+
+→ Candidate B ranks higher for specialized ML role
+```
+
+---
+
+**11. Title Similarity (Weight: Low-Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | How similar candidate's job titles are to your job title |
+| **Why it matters** | Title similarity suggests role familiarity |
+| **Good score** | High similarity |
+| **Impact** | Low-Medium – Helpful but not critical |
+
+**Example:**
+```
+Your Job Title: "Senior Python Developer"
+
+Candidate A: "Python Developer" → High title similarity ✓
+Candidate B: "Backend Engineer" → Medium similarity (related role)
+Candidate C: "Marketing Manager" → Low similarity (different field)
+
+→ Title similarity gives Candidate A a small boost
+```
+
+---
+
+**12. Freshness Score (Weight: Low)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | How recently the resume was created/updated |
+| **Why it matters** | Recent resumes suggest candidate is actively looking |
+| **Good score** | Resume is less than 6 months old |
+| **Impact** | Low – Minor factor |
+
+**Scoring:**
+```
+Resume < 3 months old  → High freshness score
+Resume 3-6 months old  → Medium freshness score
+Resume 6-12 months old → Low freshness score
+Resume > 12 months old → Very low freshness score
+```
+
+**Note:** This is a minor factor. An excellent candidate with a 2-year-old resume still ranks high overall.
+
+---
+
+**13. Completeness Score (Weight: Low-Medium)**
+
+| Aspect | Details |
+|--------|---------|
+| **What it measures** | How complete and well-structured the resume is |
+| **Why it matters** | Complete resumes show professionalism and attention to detail |
+| **Good score** | All sections present and filled |
+| **Impact** | Low-Medium – Quality indicator |
+
+**What's Checked:**
+```
+✓ Name and contact information present
+✓ Work experience section exists
+✓ Education section exists
+✓ Skills are listed
+✓ Consistent formatting
+✓ No major gaps or missing information
+```
+
+**Example:**
+```
+Candidate A:
+- Complete contact info
+- Detailed work history with dates
+- Education listed
+- Skills section present
+- Professional formatting
+Completeness Score: 95%
+
+Candidate B:
+- Missing phone number
+- Vague work history ("Worked at companies")
+- No education listed
+- Minimal formatting
+Completeness Score: 30%
+
+→ Candidate A gets a small boost for professionalism
+```
+
+---
+
+#### How the 13 Factors Work Together
+
+The ranking system combines all 13 factors into a single score. Here's how:
+
+**Weight Distribution (Approximate):**
+
+| Factor Category | Total Weight |
+|-----------------|--------------|
+| Skills Matching (Factors 1-5) | ~40% |
+| Experience (Factors 6-7, 9) | ~30% |
+| Education & Background (Factor 8) | ~10% |
+| Special Attributes (Factors 10-11) | ~10% |
+| Resume Quality (Factors 12-13) | ~10% |
+
+**Real-World Example:**
+
+```
+Candidate: Emily Watson, applying for Senior Python Developer
+
+Factor Breakdown:
+1. Overall Match Score: 85% (strong skills match)
+2. Keyword Score: 80% (8/10 skills found)
+3. TF-IDF Score: 75% (has some specialized skills)
+4. Vector Score: 90% (understands context well)
+5. Skills Match Ratio: 80% (8/10 requirements)
+6. Experience Months: 48 months (meets 4-year requirement)
+7. Experience Relevance: 0.82 (highly relevant past roles)
+8. Education Level: Master's (high score)
+9. Recent Experience: High (current role is relevant)
+10. Skill Rarity: Medium (mix of common and rare skills)
+11. Title Similarity: High ("Python Developer")
+12. Freshness: High (resume updated 1 month ago)
+13. Completeness: 90% (well-structured resume)
+
+Final Ranking Score: 87%
+Recommendation: Excellent
+```
+
+#### Why Some Factors Matter More
+
+**Skills Matching (40% weight)**
+- Most predictive of job performance
+- Direct measure of requirements satisfaction
+- Objective and verifiable
+
+**Experience (30% weight)**
+- Critical for senior roles
+- Shows proven track record
+- Relevance more important than duration
+
+**Education (10% weight)**
+- Foundational knowledge
+- More important for technical/scientific roles
+- Less important for practical skills
+
+**Special Attributes (10% weight)**
+- Differentiates top candidates
+- Rare skills are valuable
+- Title similarity indicates role fit
+
+**Resume Quality (10% weight)**
+- Shows professionalism
+- Attention to detail
+- Communication skills
+
+---
+
+### Using Feature Importance to Understand Scores
+
+When you view candidate rankings, you can see **which factors contributed most** to each candidate's score. This is called **feature importance**.
+
+#### What is Feature Importance?
+
+**Simple explanation**: Feature importance shows you which of the 13 factors helped or hurt a candidate's ranking the most.
+
+**In practice**: When you click on a ranked candidate, you'll see something like:
+
+```
+Candidate: John Smith
+Ranking Score: 78%
+
+Top Contributing Factors:
+✓ Strong vector similarity (90%) - Understood related skills
+✓ Relevant experience (5 years) - Good experience level
+✓ High completeness score (95%) - Professional resume
+
+Factors Lowering Score:
+✗ Missing skills match (only 6/10) - Lacks some required skills
+✗ Below minimum experience (36 vs 48 months) - Less experience than preferred
+```
+
+This helps you understand:
+- **Why** the candidate ranked where they did
+- **What** they're strong in
+- **What** to ask about in interviews
+
+#### How to Access Feature Importance
+
+**From the Ranking List:**
+1. Navigate to the **Ranking** section
+2. Select a vacancy
+3. View ranked candidates list
+4. **Click on a candidate** to see detailed breakdown
+5. **Feature importance** shown in a dedicated section
+
+**What You'll See:**
+
+```
+Candidate Details: John Smith
+─────────────────────────────────
+
+Overall Ranking Score: 78%
+
+Factor Breakdown:
+┌────────────────────────────────────┬─────────┬──────────┐
+│ Factor                             │ Score   │ Impact   │
+├────────────────────────────────────┼─────────┼──────────┤
+│ Overall Match Score                │ 85%     │ +15 pts  │
+│ Vector Score                       │ 92%     │ +12 pts  │
+│ Experience Relevance               │ 0.88    │ +10 pts  │
+│ Skills Match Ratio                 │ 60%     │ -8 pts   │
+│ Experience Months                  │ 36 mo   │ -5 pts   │
+│ Education Level                    │ B.S.    │ +5 pts   │
+│ ... [other factors]                │ ...     │ ...      │
+└────────────────────────────────────┴─────────┴──────────┘
+
+Top Strengths:
+• Excellent semantic understanding (vector score)
+• Highly relevant work experience
+• Strong educational background
+
+Areas to Explore:
+• Missing 4 of 10 required skills
+• Less experience than preferred
+```
+
+#### Using Feature Importance in Decision Making
+
+**1. Prepare Targeted Interview Questions**
+
+Use the feature importance to focus your interview:
+
+```
+Candidate shows:
+✓ High vector score (understands related concepts)
+✗ Low keyword score (missing explicit skills)
+
+Interview Questions:
+"You have strong experience with Django, but our job requires
+Flask. How easily could you transition to Flask?"
+"Your experience with FastAPI is impressive—tell me about
+a challenging project you built with it."
+```
+
+**2. Identify "Hidden Gems"**
+
+Candidates with lower overall scores but strong specific factors:
+
+```
+Candidate: Low overall score but HIGH vector similarity
+
+Interpretation: Uses different terminology but has relevant skills
+
+Action: Interview anyway—ask to explain their experience using
+       your terminology
+```
+
+**3. Spot Overqualified Candidates**
+
+```
+Candidate: Excellent score but EXPERIENCE MONTHS far exceeds requirement
+
+Interpretation: May be overqualified
+
+Action: Discuss career goals and ensure role aligns with
+       their expectations
+```
+
+**4. Validate Rankings**
+
+Feature importance helps you trust the system:
+
+```
+Candidate: 85% ranking score
+
+Check: Does this make sense?
+→ Skills match: High ✓
+→ Experience: Good ✓
+→ Education: Appropriate ✓
+→ No red flags ✓
+
+Verdict: Ranking seems accurate—proceed with confidence
+```
+
+#### Understanding Feature Importance Across All Candidates
+
+You can also view **global feature importance** to understand which factors matter most for a specific job vacancy.
+
+**Global Feature Importance Report:**
+
+```
+Vacancy: Senior Python Developer
+
+Top Factors for This Vacancy (Based on successful hires):
+
+1. Experience Relevance    (0.82 correlation)
+   → Highly relevant experience predicts success
+
+2. Skills Match Ratio      (0.76 correlation)
+   → Having required skills is critical
+
+3. Vector Score            (0.71 correlation)
+   → Understanding context matters more than exact words
+
+4. Experience Months       (0.65 correlation)
+   → Minimum experience threshold important
+
+5. Education Level         (0.42 correlation)
+   → Education helpful but not essential
+```
+
+**How to Use This:**
+
+- **Focus on what matters** – If experience relevance is #1, prioritize that over education
+- **Refine job requirements** – If education has low correlation, consider making it optional
+- **Set realistic expectations** – If vector score > keyword score, accept synonyms more readily
+
+#### Common Patterns and What They Mean
+
+| Pattern | Interpretation | Action |
+|---------|----------------|--------|
+| **High vector, low keyword** | Uses different terminology | Ask to explain skills in your terms |
+| **High experience, low skills** | Experienced but different skills | Consider transferable skills |
+| **High skills, low experience** | Skilled but junior | Assess aptitude and learning ability |
+| **Balanced medium scores** | Average across the board | Good candidate, no standouts |
+| **High education, low everything else** | Educated but not experienced | May need more training |
+| **All scores high** | Exceptional candidate | Interview immediately |
+
+---
+
+### Putting It All Together
+
+Now let's see how everything works in practice with some complete examples.
+
+#### Example 1: The Perfect Candidate
+
+```
+Candidate: Sarah Chen
+Vacancy: Senior Python Developer
+Ranking Score: 91%
+Recommendation: Excellent
+
+Factor Breakdown:
+─────────────────────────────────────
+Overall Match Score     92%  (+14 pts) ← Strong skills match
+Vector Score            95%  (+12 pts) ← Understands context
+Skills Match Ratio      90%  (+10 pts) ← 9/10 skills found
+Experience Relevance    0.88 (+10 pts) ← Highly relevant roles
+Experience Months       60 mo (+8 pts)  ← Exceeds 48-mo requirement
+Recent Experience       High (+7 pts)  ← Current role is relevant
+Education Level         M.S.  (+6 pts)  ← Master's degree
+Completeness Score      95%  (+3 pts)  ← Professional resume
+Freshness Score         High  (+2 pts)  ← Recent resume
+TF-IDF Score            82%  (+5 pts)  ← Has specialized skills
+Keyword Score           85%  (+4 pts)  ← Explicit skill matches
+Title Similarity        0.90 (+3 pts)  ← Similar job titles
+Skill Rarity            Med   (+2 pts)  ← Mix of skills
+
+Missing Factors:
+• None significantly low
+
+Verdict: Exceptional candidate—interview immediately
+Why: Strong across all factors, no red flags
+Interview Focus: Cultural fit, career goals, team dynamics
+```
+
+#### Example 2: The Good-but-Imperfect Candidate
+
+```
+Candidate: Michael Rodriguez
+Vacancy: Senior Python Developer
+Ranking Score: 73%
+Recommendation: Good
+
+Factor Breakdown:
+─────────────────────────────────────
+Overall Match Score     80%  (+12 pts) ← Good skills match
+Vector Score            88%  (+11 pts) ← Understands context
+Experience Relevance    0.75 (+8 pts)  ← Relevant experience
+Experience Months       36 mo (-5 pts)  ← Below 48-mo requirement
+Skills Match Ratio      70%  (+5 pts)  ← 7/10 skills found
+Recent Experience       High (+7 pts)  ← Current role relevant
+Education Level         B.S.  (+5 pts)  ← Bachelor's degree
+Completeness Score      88%  (+3 pts)  ← Good resume
+Keyword Score           65%  (+2 pts)  ← Some explicit skills
+TF-IDF Score            60%  (+2 pts)  ← Few specialized skills
+Freshness Score         Med   (+1 pt)   ← Resume 4 months old
+Title Similarity        0.70 (+2 pts)  ← Related title
+Skill Rarity            Low   (0 pts)  ← Common skills
+
+Missing Skills:
+• CI/CD pipelines
+• Docker
+• Unit testing frameworks
+
+Verdict: Solid candidate—interview with targeted questions
+Why: Good skills and experience, slightly junior, missing some skills
+Interview Focus:
+• Ask about CI/CD and Docker experience (may have it but not listed)
+• Assess if 3 years experience is sufficient despite 4-year preference
+• Evaluate learning ability for missing skills
+• Consider if willing to train on missing tools
+```
+
+#### Example 3: The Synonym User
+
+```
+Candidate: Emily Watson
+Vacancy: Senior Python Developer
+Ranking Score: 68%
+Recommendation: Good
+
+Factor Breakdown:
+─────────────────────────────────────
+Vector Score            94%  (+13 pts) ← Excellent contextual match
+Overall Match Score     75%  (+10 pts) ← Decent overall
+Experience Relevance    0.82 (+9 pts)  ← Relevant experience
+Experience Months       54 mo (+8 pts)  ← Meets requirement
+Recent Experience       High (+7 pts)  ← Currently in relevant role
+Education Level         M.S.  (+6 pts)  ← Master's degree
+Completeness Score      92%  (+3 pts)  ← Professional resume
+Title Similarity        0.85 (+3 pts)  ← Similar title
+Freshness Score         High  (+2 pts)  ← Recent resume
+Skills Match Ratio      60%  (+3 pts)  ← 6/10 skills found
+Keyword Score           40%  (-8 pts)  ← Low exact matches
+TF-IDF Score            55%  (0 pts)   ← Few specialized skills
+Skill Rarity            Med   (+1 pt)   ← Some rare skills
+
+Keyword vs Vector Gap:
+• Vector score (94%) much higher than keyword score (40%)
+• Resume says: "Django, Flask, FastAPI" not "Python"
+• AI understands: These are all Python frameworks
+
+Verdict: Strong candidate—don't be fooled by low keyword score
+Why: High vector score confirms she has the skills
+Interview Focus:
+• Confirm Python expertise (she uses framework names instead)
+• Assess depth of framework knowledge
+• Likely qualified despite keyword score appearance
+```
+
+#### Example 4: The Experienced Career Changer
+
+```
+Candidate: David Kim
+Vacancy: Senior Python Developer
+Ranking Score: 55%
+Recommendation: Maybe
+
+Factor Breakdown:
+─────────────────────────────────────
+Experience Months       120 mo (+8 pts) ← Lots of experience
+Education Level         Ph.D.  (+8 pts) ← Doctorate degree
+Completeness Score      95%  (+4 pts)  ← Excellent resume
+Freshness Score         High  (+2 pts)  ← Recent resume
+Title Similarity        0.30  (0 pts)  ← Different field
+Overall Match Score     45%  (-5 pts)  ← Poor skills match
+Vector Score            55%  (+3 pts)  ← Some contextual match
+Experience Relevance    0.25 (-8 pts)  ← Not relevant experience
+Recent Experience       Low  (-8 pts)  ← Recent work not relevant
+Skills Match Ratio      30%  (-10 pts) ← Only 3/10 skills
+Keyword Score           30%  (-8 pts)  ← Few explicit matches
+TF-IDF Score            35%  (-5 pts)  ← Lacks specialized skills
+Skill Rarity            Low   (0 pts)  ← Common skills only
+
+Background:
+• 10 years experience in... Java and C# development
+• Ph.D. in Computer Science
+• Recently completed Python bootcamp
+• Strong programming fundamentals
+• Minimal Python-specific experience
+
+Verdict: Promising but risky—consider for different role
+Why: Excellent background but wrong technology stack
+Options:
+• Consider for Java/C# role instead
+• Interview for junior Python role (would need training)
+• If hiring for general programming role, could work out
+• Probably not for "Senior Python" specifically
+```
+
+---
+
+### Best Practices for Using Rankings
+
+**1. Trust but Verify**
+
+✅ **Do:**
+- Use rankings as a prioritization tool
+- Review top candidates thoroughly
+- Check feature importance for insights
+- Interview based on ranking plus human judgment
+
+❌ **Don't:**
+- Automatically reject candidates below certain score
+- Hire solely based on ranking number
+- Ignore red flags because score is high
+- Skip human review
+
+**2. Look at the Whole Picture**
+
+A ranking score is one data point. Also consider:
+- **Communication quality** – How well do they write/speak?
+- **Cultural fit** – Will they thrive in your environment?
+- **Career goals** – Does this role align with their aspirations?
+- **References** – What do past employers say?
+- **Portfolio/work samples** – Can they demonstrate skills?
+
+**3. Use Rankings Efficiently**
+
+```
+✅ Efficient Workflow:
+1. Upload 50 resumes
+2. Wait for rankings
+3. Review top 10 candidates (Excellent + Good)
+4. Interview top 5
+5. Make offer to top 2-3
+
+❌ Inefficient Workflow:
+1. Upload 50 resumes
+2. Read all 50 resumes manually
+3. Try to remember who was best
+4. Interview randomly
+5. Decide based on gut feeling
+```
+
+**4. Provide Feedback**
+
+When you interview candidates:
+- Note whether ranking was accurate
+- Report hiring outcomes back to system
+- Help improve future rankings
+- Identify patterns (what works for your company)
+
+**5. Adjust Over Time**
+
+Track which rankings lead to successful hires:
+- What score range typically indicates good fit?
+- Which factors correlate with success in YOUR company?
+- Are you consistently good hires from "Maybe" candidates?
+
+Use this to refine your hiring process.
+
+---
+
+### Frequently Asked Questions About Rankings
+
+**Q: Is a higher ranking score always better?**
+
+A: Usually, but not always. Consider:
+- **Score distribution** – If everyone scores 85-92%, differences are minor
+- **Factor breakdown** – Look at why they scored high
+- **Human factors** – Communication, culture fit still matter
+- **Role alignment** – Career goals, salary expectations
+
+**Q: Should I ever interview a "Poor" candidate?**
+
+A: Rarely, but consider if:
+- Strong referral from trusted source
+- Exceptional portfolio or achievements
+- Career changer with transferable skills
+- You're exploring non-traditional backgrounds
+- For different role than they applied for
+
+**Q: What if I disagree with the ranking?**
+
+A: Trust your judgment. The AI is a tool, not a replacement. You might know things it doesn't:
+- Industry-specific knowledge
+- Company culture nuances
+- Unique candidate circumstances
+- Market conditions
+
+**Q: Why do two candidates with same skills have different scores?**
+
+A: The 13 factors consider more than just skills:
+- Experience quality and relevance
+- Education level
+- Resume completeness
+- How recent their experience is
+- And 8 other factors
+
+**Q: How can I improve my job posting to get better rankings?**
+
+A: See [Section 2: Posting Job Vacancies](#posting-job-vacancies). Key tips:
+- Be specific about required skills (5-15 skills)
+- Set appropriate experience minimums
+- Write detailed job descriptions
+- Use standard terminology
+
+**Q: Do rankings account for soft skills?**
+
+A: Partially. AgentHR can extract some soft skills (communication, leadership, teamwork) if mentioned in the resume. However:
+- Hard skills are weighted more heavily
+- Soft skills are best assessed in interviews
+- Consider soft skills separately from ranking scores
+
+---
+
+### What's Next?
+
+Now that you understand how candidate ranking works and how to interpret the 13 factors and recommendation levels, you're ready to start organizing your hiring workflow. In the next section, we'll cover [Using the Kanban Board](#using-the-kanban-board)—how to visually track candidates through your hiring process from application to hire.
+
+---
+
+---
+
 ## Getting Started
 
 Welcome to AgentHR! This section will help you access the platform, understand what you're seeing, and get comfortable with your dashboard. Let's get started.
