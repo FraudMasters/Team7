@@ -160,6 +160,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run linting
+        working-directory: ./backend
+        run: |
+          echo "### Running Python Linting Tools 🔍" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run black to check code formatting
+          echo "Checking code formatting with black..."
+          black --check --config pyproject.toml .
+
+          # Run flake8 to check code style
+          echo "Checking code style with flake8..."
+          flake8 --config pyproject.toml .
+
+          # Run mypy to check type hints
+          echo "Checking type hints with mypy..."
+          mypy --config-file pyproject.toml .
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All linting checks passed!" >> $GITHUB_STEP_SUMMARY
+
       - name: Run tests
         working-directory: ./backend
         env:
