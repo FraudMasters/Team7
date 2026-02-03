@@ -10,12 +10,123 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles.colors import Color
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def format_excel_headers(worksheet, header_row: int = 1) -> None:
+    """
+    Apply formatting to Excel headers including bold font, background color, and alignment.
+
+    This function applies professional styling to header cells in an Excel worksheet,
+    making them stand out with bold text, a colored background, and centered alignment.
+
+    Args:
+        worksheet: The openpyxl worksheet object to format
+        header_row: The row number containing headers (default: 1)
+
+    Returns:
+        None
+
+    Examples:
+        >>> from openpyxl import Workbook
+        >>> wb = Workbook()
+        >>> ws = wb.active
+        >>> ws.append(["Name", "Date", "Value"])
+        >>> format_excel_headers(ws)
+    """
+    try:
+        # Define header style
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(
+            start_color="4472C4",
+            end_color="4472C4",
+            fill_type="solid"
+        )
+        header_alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            wrap_text=True
+        )
+
+        # Apply formatting to all cells in the header row
+        for cell in worksheet[header_row]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        logger.debug(f"Applied header formatting to row {header_row}")
+
+    except Exception as e:
+        logger.error(f"Error formatting Excel headers: {e}", exc_info=True)
+        raise
+
+
+def apply_data_bars(worksheet, column_letter: str, min_row: int = 2, max_row: Optional[int] = None, color: str = "63BE7B") -> None:
+    """
+    Apply conditional formatting data bars to a column of numeric values.
+
+    Data bars provide visual indicators of cell values relative to each other,
+    with longer bars representing higher values. This is useful for quickly
+    identifying trends and patterns in numeric data.
+
+    Args:
+        worksheet: The openpyxl worksheet object to format
+        column_letter: The column letter to apply data bars to (e.g., 'C', 'D')
+        min_row: The starting row number for data bars (default: 2, skipping header)
+        max_row: The ending row number (default: None, which uses all data rows)
+        color: Hex color code for the data bars (default: "63BE7B" - green)
+
+    Returns:
+        None
+
+    Examples:
+        >>> from openpyxl import Workbook
+        >>> wb = Workbook()
+        >>> ws = wb.active
+        >>> ws.append(["Item", "Value"])
+        >>> ws.append(["A", 100])
+        >>> ws.append(["B", 250])
+        >>> ws.append(["C", 150])
+        >>> apply_data_bars(ws, "B", 2, 4)
+    """
+    try:
+        from openpyxl.formatting.rule import DataBarRule
+
+        # Determine the actual max row if not provided
+        if max_row is None:
+            max_row = worksheet.max_row
+
+        # Validate that there are cells to format
+        if min_row > max_row:
+            logger.warning(f"Invalid row range: min_row {min_row} > max_row {max_row}")
+            return
+
+        # Create data bar rule
+        data_bar_rule = DataBarRule(
+            start_type="min",
+            end_type="max",
+            color=Color(color),
+            showValue=True,
+            minLength=None,
+            maxLength=None
+        )
+
+        # Apply data bar rule to the specified range
+        range_string = f"{column_letter}{min_row}:{column_letter}{max_row}"
+        worksheet.conditional_formatting.add(range_string, data_bar_rule)
+
+        logger.debug(f"Applied data bars to range {range_string}")
+
+    except Exception as e:
+        logger.error(f"Error applying data bars: {e}", exc_info=True)
+        raise
 
 
 class ReportCreate(BaseModel):
