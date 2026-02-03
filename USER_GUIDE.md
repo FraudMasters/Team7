@@ -958,3 +958,919 @@ Employment Type: full-time
 ### What's Next?
 
 Now that you've created your job vacancy, you're ready to start receiving and evaluating candidates. In the next section, we'll cover [Uploading and Managing Resumes](#uploading-and-managing-resumes)—how to add candidate resumes to AgentHR and understand what happens during analysis.
+
+---
+
+---
+
+## Uploading and Managing Resumes
+
+Uploading resumes is a core part of using AgentHR. This section will walk you through how to upload resumes, what formats are supported, and what happens during the AI analysis process.
+
+### Supported File Formats
+
+AgentHR accepts resumes in **two formats only**:
+
+| Format | File Extension | Best For | Notes |
+|--------|---------------|----------|-------|
+| **PDF** | `.pdf` | Most resumes | Recommended format - preserves formatting |
+| **Microsoft Word** | `.docx` | Word documents | Modern Word format (`.doc` not supported) |
+
+#### Why Only PDF and DOCX?
+
+You might wonder why AgentHR doesn't accept other formats like `.doc` (older Word), `.txt`, or `.rtf`. There are good reasons:
+
+✅ **PDF is the industry standard** – Most resumes are shared as PDFs
+✅ **Preserves formatting** – PDFs maintain layout, fonts, and styling
+✅ **Reliable parsing** – AI can consistently extract information
+✅ **Security** – PDFs are less likely to contain macros or viruses
+
+❌ **Why not other formats?**
+- `.doc` (old Word) – Outdated format, inconsistent parsing
+- `.txt` – No formatting, loses structure
+- `.rtf` – Inconsistent support across platforms
+- `.html/.md` – Not standard resume formats
+
+#### Preparing Your Resume Files
+
+Before uploading, ensure your files meet these requirements:
+
+**File Size Limits**
+- Maximum file size: **10 MB** per resume
+- Most resumes are 100-500 KB – well under the limit
+- If a file is too large, it may contain:
+  - High-resolution images
+  - Embedded photos
+  - Scan of a paper resume (see below)
+
+**Document Quality Best Practices**
+
+| ✅ Good Resumes | ❌ Problematic Resumes |
+|-----------------|----------------------|
+| Digital PDFs created from Word/Google Docs | Scanned paper resumes (images) |
+| Clean, text-based PDFs | Password-protected files |
+| Standard fonts and formatting | Corrupted or damaged files |
+| Single-page or multi-page documents | Files with embedded viruses |
+
+**Scanned Resumes**
+
+If you have only paper resumes:
+1. **Scan them** using OCR (Optical Character Recognition) software
+2. **Save as PDF** with text layer (not just images)
+3. **Test the file** – try selecting text with your mouse
+4. **Upload** if text is selectable
+
+> **Tip:** Many modern scanners and multifunction printers have OCR built-in. Look for "Searchable PDF" or "OCR" options.
+
+**Multiple-Page Resumes**
+
+AgentHR handles multi-page resumes automatically:
+- All pages are analyzed together
+- No need to combine pages manually
+- Each resume is treated as one candidate
+
+---
+
+### Uploading Single Resumes
+
+The most common scenario is uploading one resume at a time as candidates apply.
+
+#### Step 1: Navigate to the Resumes Section
+
+From your dashboard or navigation menu:
+
+1. **Click "Resumes"** in the main navigation
+2. **Click "Upload Resume"** or "Add Resume" button
+
+You'll see the upload interface.
+
+#### Step 2: Select Your File
+
+**Method 1: Drag and Drop (Recommended)**
+
+1. **Locate the resume file** on your computer (PDF or DOCX)
+2. **Drag it** onto the upload area
+3. **Drop it** when you see the "Drop here" message
+
+**Method 2: File Browser**
+
+1. **Click "Browse Files"** or "Choose File"
+2. **Navigate** to where you saved the resume
+3. **Select the file** (resume.pdf, for example)
+4. **Click "Open"**
+
+#### Step 3: Start the Upload
+
+The file will begin uploading automatically. You'll see:
+
+**Upload Progress**
+
+```
+Uploading: john_doe_resume.pdf
+Progress: ████████████ 100%
+Status: Complete
+```
+
+**What You'll See**
+
+| Field | Description |
+|-------|-------------|
+| **Filename** | Name of the file you uploaded |
+| **File Size** | Size in KB or MB |
+| **Status** | "Pending" → "Processing" → "Analyzed" |
+| **Upload Time** | When you uploaded the file |
+
+#### Step 4: Wait for Analysis
+
+Resume analysis happens **automatically in the background**. Here's what to expect:
+
+**Initial Status: "Pending"**
+
+Immediately after upload, the resume status is "pending" – this means it's in the queue for analysis.
+
+**Processing: 5-10 Seconds**
+
+AgentHR's AI analyzes the resume:
+
+```
+Processing: john_doe_resume.pdf
+Status: Analyzing...
+Time Remaining: ~5 seconds
+```
+
+**Completed: "Analyzed"**
+
+Once analysis is complete, you can:
+- View extracted information
+- Match to job vacancies
+- See AI rankings
+- Add to your pipeline
+
+#### Step 5: Verify the Upload
+
+After analysis completes, verify that AgentHR correctly extracted information:
+
+**Check Key Fields**
+
+| Field | What to Check |
+|-------|---------------|
+| **Name** | Candidate's full name |
+| **Contact** | Email, phone number |
+| **Skills** | List of technical/soft skills |
+| **Experience** | Work history with roles and dates |
+| **Education** | Degrees, certifications |
+| **Status** | Should show "Analyzed" |
+
+If something looks wrong:
+- The resume may have unusual formatting
+- The file might be a scan (not text)
+- Contact support for help
+
+---
+
+### Batch Upload for Multiple Resumes
+
+When you have many resumes to process (e.g., after posting a job ad), batch upload saves time.
+
+#### When to Use Batch Upload
+
+✅ **Use batch upload when:**
+- You received 20+ resumes from a job posting
+- Importing resumes from another system
+- Processing resumes from a recruiting event
+- Setting up AgentHR for the first time
+
+❌ **Upload individually when:**
+- Each resume needs special attention
+- You're uploading a few resumes per day
+- You want to review each upload immediately
+
+#### How to Batch Upload
+
+**Step 1: Prepare Your Files**
+
+1. **Gather all resumes** in one folder on your computer
+2. **Verify file formats** – ensure all are PDF or DOCX
+3. **Rename if helpful** – e.g., `resume_01_john_doe.pdf`
+4. **Check file sizes** – ensure none exceed 10 MB
+
+**Step 2: Access Batch Upload**
+
+From the Resumes section:
+
+1. **Click "Resumes"** in navigation
+2. **Look for "Batch Upload"** or "Upload Multiple"**
+3. **Click the button** to open batch upload interface
+
+**Step 3: Select Multiple Files**
+
+**Drag and Drop Method:**
+1. **Select multiple files** on your computer (Ctrl+click or Cmd+click)
+2. **Drag all selected files** to the upload area
+3. **Drop to upload**
+
+**File Browser Method:**
+1. **Click "Browse Files"**
+2. **Use Ctrl+click** (Windows) or **Cmd+click** (Mac) to select multiple files
+3. **Click "Open"** to start the upload
+
+**Step 4: Monitor Batch Progress**
+
+You'll see a progress list:
+
+```
+Batch Upload Progress
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[✓] resume_01_john_doe.pdf        Analyzed
+[✓] resume_02_jane_smith.pdf      Analyzed
+[▶] resume_03_bob_wilson.pdf      Processing... (45%)
+[ ] resume_04_alice_chen.pdf       Queued
+[ ] resume_05_charlie_brown.pdf    Queued
+
+Progress: 2 of 5 resumes completed
+Estimated Time: 30 seconds
+```
+
+**What Each Status Means**
+
+| Status | Meaning |
+|--------|---------|
+| **Queued** | Waiting to be processed |
+| **Processing** | AI is analyzing the resume |
+| **Analyzed** | Successfully processed |
+| **Error** | Failed to process (see error message) |
+
+**Step 5: Review Results**
+
+After the batch completes, you'll see a summary:
+
+```
+Batch Upload Complete
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total Files: 5
+Successful: 4
+Failed: 1
+
+View Results | Download Report
+```
+
+**Handling Errors**
+
+If some resumes failed:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Invalid file type" | Not PDF or DOCX | Convert to PDF and retry |
+| "File too large" | Over 10 MB | Compress or reduce file size |
+| "Parse error" | Corrupted or scanned | Use a better file |
+| "Password protected" | Encrypted PDF | Remove password protection |
+
+#### Best Practices for Batch Upload
+
+**1. Organize Before Uploading**
+
+Group resumes by job posting or source:
+
+```
+Resumes/
+├── senior_dev_role/
+│   ├── resume_01.pdf
+│   ├── resume_02.pdf
+│   └── resume_03.pdf
+├── marketing_role/
+│   ├── resume_01.pdf
+│   └── resume_02.pdf
+```
+
+**2. Use Descriptive Filenames**
+
+| ✅ Good Names | ❌ Poor Names |
+|---------------|---------------|
+| `john_doe_senior_dev.pdf` | `resume.pdf` |
+| `jane_smith_python_dev.pdf` | `document1.pdf` |
+| `bob_wilson_marketing.pdf` | `download.pdf` |
+| `alice_chen_frontend.pdf` | `Resume(1).pdf` |
+
+**3. Upload in Smaller Batches**
+
+Instead of uploading 100 resumes at once:
+- **Break into batches** of 10-20 resumes
+- **Verify first batch** processes correctly
+- **Continue with remaining batches**
+
+This makes it easier to spot and fix issues.
+
+**4. Keep a Source Log**
+
+Track where resumes came from:
+
+| Filename | Source | Date Uploaded | Status |
+|----------|--------|---------------|--------|
+| `john_doe.pdf` | LinkedIn | 2024-01-15 | ✓ Analyzed |
+| `jane_smith.pdf` | Indeed | 2024-01-15 | ✓ Analyzed |
+| `bob_wilson.pdf` | Employee Referral | 2024-01-16 | ✓ Analyzed |
+
+---
+
+### What Happens During Resume Analysis
+
+When you upload a resume, AgentHR's AI performs sophisticated analysis in the background. Here's what happens under the hood.
+
+#### The Analysis Pipeline
+
+**Step 1: File Validation** (1 second)
+
+AgentHR first checks:
+- File format is PDF or DOCX ✓
+- File size is under 10 MB ✓
+- File is not corrupted ✓
+- File is not password-protected ✓
+
+If any check fails, you'll see an error message.
+
+**Step 2: Text Extraction** (2-3 seconds)
+
+The AI extracts text from the document:
+
+```
+Raw Document → Extract Text → Clean & Normalize
+```
+
+**What gets extracted:**
+- All visible text
+- Headings and section titles
+- Bullet points and lists
+- Tables (e.g., skills matrix)
+- Metadata (author, creation date)
+
+**What's ignored:**
+- Images and photos
+- Graphics and charts
+- Decorative elements
+- Hidden metadata
+
+> **Note:** Scanned resumes (images) cannot be extracted. Only text-based PDFs and DOCX files work.
+
+**Step 3: Information Extraction** (2-4 seconds)
+
+Using natural language processing (NLP), AgentHR identifies and categorizes information:
+
+**Contact Information**
+```
+Found:
+- Name: John Doe
+- Email: john.doe@email.com
+- Phone: (555) 123-4567
+- Location: San Francisco, CA
+```
+
+**Work Experience**
+```
+Extracted:
+- Senior Developer at Tech Corp (2020-2024)
+- Software Engineer at Startup Inc (2017-2020)
+- Junior Developer at Agency XYZ (2015-2017)
+```
+
+**Education**
+```
+Extracted:
+- B.S. Computer Science, Stanford University (2015)
+- AWS Certified Solutions Architect (2023)
+```
+
+**Skills**
+```
+Categorized:
+- Technical Skills: Python, JavaScript, React, SQL
+- Soft Skills: Leadership, Communication
+- Tools: Git, Docker, AWS
+- Languages: English (native), Spanish (conversational)
+```
+
+**Step 4: Structure Validation** (1 second)
+
+AgentHR checks the resume's completeness:
+
+| Field | Status | Impact |
+|-------|--------|--------|
+| **Name** | ✓ Found | Used for display and matching |
+| **Email** | ✓ Found | Allows contacting candidate |
+| **Phone** | ✓ Found | Alternative contact method |
+| **Experience** | ✓ Found | Critical for experience matching |
+| **Skills** | ✓ Found | Core matching criteria |
+| **Education** | ✓ Found | Contributes to ranking |
+| **Portfolio** | ⚠ Missing | Optional but recommended |
+
+**Step 5: Data Storage** (<1 second)
+
+All extracted information is stored in the database:
+- Original file (for reference)
+- Extracted text (for search)
+- Structured data (for matching)
+- Metadata (upload time, status)
+
+#### How Long Does Analysis Take?
+
+| File Size | Typical Time | Maximum Time |
+|-----------|--------------|--------------|
+| < 500 KB | 3-5 seconds | 10 seconds |
+| 500 KB - 2 MB | 5-8 seconds | 15 seconds |
+| 2 MB - 10 MB | 8-12 seconds | 30 seconds |
+
+> **Note:** Analysis time can vary based on:
+> - Server load (how many others are uploading)
+> - Resume complexity (formatting, length)
+> - Network speed (your internet connection)
+
+#### What the AI Can and Cannot Do
+
+**✅ What AgentHR Does Well**
+
+| Task | Accuracy | Notes |
+|------|----------|-------|
+| **Extract contact info** | 95%+ | Works with standard formats |
+| **Identify skills** | 90%+ | Recognizes 1000s of skills |
+| **Parse work experience** | 85%+ | Handles most resume formats |
+| **Detect education** | 95%+ | Degrees, certifications |
+| **Calculate experience duration** | 90%+ | Months/years of experience |
+
+**⚠️ What AgentHR May Struggle With**
+
+| Challenge | Why | Workaround |
+|-----------|-----|------------|
+| **Unusual layouts** | Creative designs break standard patterns | Use standard resume format |
+| **Tables with complex structures** | Hard to parse cell relationships | Prefer bulleted lists |
+| **Non-English resumes** | Trained primarily on English | Language support is limited |
+| **Scanned documents** | No text to extract | Use OCR or digital originals |
+| **Multiple languages in one resume** | Confuses the parser | Stick to one language |
+
+**❌ What AgentHR Does Not Do**
+
+- **Read images** – Photos, logos, charts are ignored
+- **Decode handwritten notes** – Must be machine-readable text
+- **Interpret video resumes** – Only document formats supported
+- **Access external links** – Portfolios, GitHub profiles not analyzed
+- **Verify information** – Assumes resume is accurate and truthful
+
+#### Understanding the Extracted Data
+
+After analysis, you can view the structured data. Here's how to interpret it:
+
+**Skills Section**
+
+```
+Technical Skills (8 found):
+- Python (proficient)
+- JavaScript (intermediate)
+- React (proficient)
+- SQL (expert)
+- Docker (beginner)
+- AWS (intermediate)
+- Git (proficient)
+- FastAPI (beginner)
+
+Soft Skills (3 found):
+- Team Leadership
+- Communication
+- Problem Solving
+```
+
+**Understanding Skill Levels**
+
+AgentHR attempts to detect proficiency from context:
+
+| Level Indicators | Detected Level |
+|------------------|----------------|
+| "Expert", "Advanced", "5+ years" | Expert |
+| "Proficient", "Skilled", "3+ years" | Proficient |
+| "Familiar", "Intermediate", "1-2 years" | Intermediate |
+| "Basic", "Beginner", "Learning" | Beginner |
+| No context mentioned | Not specified |
+
+**Experience Section**
+
+```
+Work Experience (3 positions found):
+
+1. Senior Developer at Tech Corp
+   Duration: 48 months (4 years)
+   Relevance Score: 0.85 (high)
+   Keywords: Python, FastAPI, Team Leadership
+
+2. Software Engineer at Startup Inc
+   Duration: 36 months (3 years)
+   Relevance Score: 0.72 (medium)
+   Keywords: JavaScript, React, SQL
+
+3. Junior Developer at Agency XYZ
+   Duration: 24 months (2 years)
+   Relevance Score: 0.45 (lower)
+   Keywords: HTML, CSS, Basic JavaScript
+```
+
+**Relevance Score Explained**
+
+The relevance score (0-1) indicates how well the experience aligns with your job requirements:
+- **0.8-1.0** – Highly relevant experience
+- **0.5-0.8** – Somewhat relevant
+- **0.0-0.5** – Less relevant or entry-level
+
+#### Troubleshooting Analysis Issues
+
+**Problem: Resume Stuck in "Pending" Status**
+
+**Possible Causes:**
+- Server is busy with many uploads
+- Background worker stopped
+- Network interruption
+
+**Solutions:**
+1. **Wait 30 seconds** – may still be processing
+2. **Refresh the page** – status may update
+3. **Check your internet** – ensure stable connection
+4. **Contact support** – if issue persists
+
+**Problem: Poor Information Extraction**
+
+**Symptoms:**
+- Name not detected
+- Skills missing
+- Experience not parsed correctly
+
+**Possible Causes:**
+- Unusual resume format
+- Highly designed/template-heavy resume
+- Scanned document (not text)
+- Multiple columns or complex layout
+
+**Solutions:**
+1. **Check the original file** – open and verify text is selectable
+2. **Use a simpler format** – standard one-column layout
+3. **Convert scanned PDFs** – use OCR to create searchable PDF
+4. **Manual review** – you can still use the resume with manual review
+
+**Problem: Wrong Experience Calculated**
+
+**Symptoms:**
+- Experience months don't match resume
+- Dates misinterpreted
+
+**Possible Causes:**
+- Date format confusion (MM/YYYY vs DD/MM/YYYY)
+- "Present" or "Current" not recognized
+- Gaps in employment
+
+**Solutions:**
+1. **Use standard date formats** – "January 2020" or "01/2020"
+2. **Be consistent** – use same format throughout
+3. **Note:** You can manually edit extracted data if needed
+
+#### Tips for Better Resume Analysis
+
+**For Resume Submitters (Candidates)**
+
+If you're sharing guidelines with candidates:
+
+✅ **Best Practices:**
+- Use standard, clean formatting
+- Include clear section headings (Experience, Skills, Education)
+- Use bullet points for skills and responsibilities
+- Save as PDF from Word/Google Docs
+- Test that text is selectable
+
+❌ **Avoid:**
+- Highly creative or non-standard layouts
+- Embedded photos of text
+- Multiple columns
+- Excessive formatting (tables, boxes)
+- Password-protected files
+
+**For HR Users**
+
+1. **Provide guidelines** to candidates on preferred resume format
+2. **Test first batch** – upload 5-10 resumes to verify quality
+3. **Review extractions** – spot-check for accuracy
+4. **Report issues** – help improve the AI by reporting patterns
+
+---
+
+### Viewing and Managing Uploaded Resumes
+
+Once resumes are uploaded and analyzed, you'll need to find, view, and manage them.
+
+#### The Resumes List
+
+From the Resumes section, you'll see all uploaded resumes:
+
+| Column | Description | Actions |
+|--------|-------------|---------|
+| **Name** | Candidate's extracted name | Click to view details |
+| **Filename** | Original file name | Download original |
+| **Skills** | Number/count of skills found | Hover to see list |
+| **Experience** | Total months calculated | View breakdown |
+| **Status** | Analyzed, Pending, or Error | Retry if error |
+| **Uploaded** | Date and time of upload | Sort by date |
+| **Actions** | View, Match, Delete | Quick actions |
+
+#### Sorting and Filtering
+
+**Sort Options**
+
+| Sort By | Best For |
+|---------|----------|
+| **Upload Date (Newest)** | Recently added candidates |
+| **Upload Date (Oldest)** | First come, first served |
+| **Name (A-Z)** | Finding specific candidate |
+| **Experience (Most)** | Senior candidates first |
+| **Skill Count (Most)** | Most skilled candidates |
+
+**Filter Options**
+
+| Filter | Use When |
+|--------|----------|
+| **Status** | Show only "Analyzed" resumes |
+| **Date Range** | View uploads from specific period |
+| **Skill Contains** | Find candidates with specific skill |
+| **Experience Range** | Filter by years of experience |
+
+**Example: Find Senior Python Developers**
+
+1. **Filter Skills**: "python"
+2. **Filter Experience**: "48+ months" (4+ years)
+3. **Sort By**: "Experience (Most)"
+
+Results show candidates with Python experience, sorted by most experienced first.
+
+#### Viewing Resume Details
+
+Click on any resume to see the full analysis:
+
+**Candidate Information Tab**
+```
+Name: John Doe
+Email: john.doe@email.com
+Phone: (555) 123-4567
+Location: San Francisco, CA
+LinkedIn: linkedin.com/in/johndoe
+```
+
+**Skills Tab**
+```
+Technical Skills: 8 found
+Soft Skills: 3 found
+Languages: 2 found
+
+Full List: [View All Skills]
+```
+
+**Experience Tab**
+```
+Total Experience: 108 months (9 years)
+
+Positions:
+- Senior Developer (48 months)
+- Software Engineer (36 months)
+- Junior Developer (24 months)
+```
+
+**Education Tab**
+```
+Degrees:
+- B.S. Computer Science, Stanford (2015)
+
+Certifications:
+- AWS Solutions Architect (2023)
+- Scrum Master (2021)
+```
+
+**Original File Tab**
+```
+Filename: john_doe_resume.pdf
+Size: 245 KB
+Uploaded: Jan 15, 2024 at 2:30 PM
+Status: Analyzed
+
+Actions: [Download] [View PDF]
+```
+
+#### Editing Extracted Data
+
+Sometimes the AI makes mistakes or misses information. You can edit:
+
+**When to Edit**
+
+✅ **Edit extracted data when:**
+- Name spelling is wrong
+- Skills were missed
+- Experience dates incorrect
+- Phone/email misread
+
+❌ **Don't edit to:**
+- Add information not in resume
+- Inflate experience or skills
+- "Fix" candidate's qualifications
+
+**How to Edit**
+
+1. **Open resume details**
+2. **Click "Edit"** on the section
+3. **Make changes**
+4. **Click "Save"**
+
+> **Note:** Edits are saved in AgentHR only – original resume file is unchanged.
+
+#### Deleting Resumes
+
+**When to Delete**
+
+✅ **Delete when:**
+- Candidate withdraws application
+- Duplicate upload
+- Wrong file uploaded
+- Test/placeholder resumes
+
+❌ **Consider closing instead when:**
+- Position filled, but might hire again
+- Want to keep for future openings
+- Analytics/history needed
+
+**How to Delete**
+
+1. **Open resume details** or find in list
+2. **Click "Delete"** or trash icon
+3. **Confirm deletion**
+
+⚠️ **Warning:** Deletion is permanent. The resume file and all extracted data are removed.
+
+**Bulk Delete**
+
+For multiple resumes:
+1. **Select checkboxes** next to resumes
+2. **Click "Bulk Delete"**
+3. **Confirm action**
+
+---
+
+### Linking Resumes to Vacancies
+
+Uploading resumes is just the first step. Next, you'll link them to job vacancies for matching and ranking.
+
+#### Automatic Matching on Upload
+
+If you have a vacancy open when uploading:
+
+1. **Select vacancy** from dropdown during upload
+2. **Upload resume** as usual
+3. **Auto-match happens** – resume is matched to selected vacancy
+
+You'll see:
+
+```
+Resume uploaded: john_doe.pdf
+Matched to: Senior Python Developer
+Match Score: 82%
+Status: Ready for ranking
+```
+
+#### Manual Matching After Upload
+
+For resumes already uploaded:
+
+1. **Open resume details**
+2. **Click "Match to Vacancy"**
+3. **Select vacancy** from list
+4. **Click "Match"**
+
+AgentHR runs all three matching methods and calculates scores.
+
+#### Matching to Multiple Vacancies
+
+A single resume can be matched to multiple vacancies:
+
+```
+Resume: jane_smith.pdf
+
+Matched to:
+- Senior Python Developer (85% match)
+- Full Stack Developer (78% match)
+- Backend Engineer (82% match)
+```
+
+This is useful when:
+- Candidate is qualified for several roles
+- You're hiring for multiple similar positions
+- You want to compare fit across teams
+
+---
+
+### Resume Upload Checklist
+
+Before uploading resumes, use this checklist:
+
+**File Preparation**
+- [ ] Files are PDF or DOCX format
+- [ ] File size under 10 MB each
+- [ ] Filenames are descriptive (optional but helpful)
+- [ ] Files are not password-protected
+- [ ] Scanned docs have OCR (text-selectable)
+
+**Organization**
+- [ ] Know which vacancy to match to
+- [ ] Have source information (job board, referral, etc.)
+- [ ] Group resumes by job or source
+- [ ] Ready to review extractions
+
+**System Ready**
+- [ ] Vacancy is created and published
+- [ ] You have permission to upload resumes
+- [ ] Internet connection is stable
+- [ ] Time available to review results
+
+---
+
+### Common Upload Scenarios
+
+Here are common situations and how to handle them:
+
+**Scenario 1: Job Posting Just Closed, 50 Resumes Received**
+
+```
+1. Download all resumes from job board (LinkedIn, Indeed, etc.)
+2. Save to folder: "senior_dev_resumes_jan2024/"
+3. Verify all are PDF or DOCX
+4. Use batch upload in AgentHR
+5. Match all to "Senior Developer" vacancy
+6. Wait for analysis to complete (5-10 minutes for 50 resumes)
+7. View ranked candidates list
+8. Proceed with top 10 candidates
+```
+
+**Scenario 2: Employee Referral Walks In with Resume**
+
+```
+1. Save referral resume as PDF
+2. Upload immediately via single resume upload
+3. Match to appropriate vacancy
+4. Note referral source in comments
+5. Review match score and ranking
+6. Move to "Screening" stage if good fit
+```
+
+**Scenario 3: Resume from Recruiting Agency**
+
+```
+1. Agency sends 20 resumes via email
+2. Download all attachments
+3. Batch upload all 20 at once
+4. Match all to target vacancy
+5. Compare rankings to agency's recommendations
+6. Identify top candidates for interviews
+```
+
+**Scenario 4: Archived Resume from Last Year**
+
+```
+1. Find resume in old files or ATS
+2. Export/save as PDF
+3. Upload to AgentHR
+4. Match to current vacancy
+5. See if candidate is still good fit
+6. Reach out if ranking is high
+```
+
+---
+
+### Tips for Resume Management
+
+**Organization**
+- Create consistent naming conventions
+- Keep source information (where resume came from)
+- Tag resumes by status or stage
+- Archive old hires separately
+
+**Quality Control**
+- Spot-check first 5-10 extractions
+- Verify phone/email accuracy
+- Check skills are captured correctly
+- Address systematic issues early
+
+**Workflow**
+- Set daily/weekly times for uploads
+- Process in batches for efficiency
+- Review results immediately after upload
+- Move qualified candidates forward quickly
+
+**Data Hygiene**
+- Delete duplicates promptly
+- Remove withdrawn candidates
+- Update candidate info when provided
+- Maintain accurate vacancy links
+
+---
+
+### What's Next?
+
+Now that you've uploaded resumes and understand the analysis process, you're ready to evaluate candidates. In the next section, we'll cover [Understanding AI Match Scores](#understanding-ai-match-scores)—how the matching system works and how to interpret the scores you'll see.
