@@ -167,6 +167,61 @@ class EnhancedSkillMatcher:
 
         return SequenceMatcher(None, norm1, norm2).ratio()
 
+    def _try_synonym_match(
+        self,
+        resume_skills: List[str],
+        normalized_required: str,
+        synonyms_map: Dict[str, List[str]]
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Attempt a synonym match between resume skills and required skill.
+
+        Synonym matching checks if the required skill matches any resume skill
+        through the synonyms map. This provides medium-high confidence (0.85-0.95).
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+            normalized_required: Normalized name of the required skill
+            synonyms_map: Dictionary of skill synonyms
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> synonyms = {"SQL": ["SQL", "PostgreSQL", "MySQL"]}
+            >>> result = matcher._try_synonym_match(["Java", "PostgreSQL"], "sql", synonyms)
+            >>> result
+            ('PostgreSQL', 0.85, 'synonym')
+        """
+        # Build set of all variants for the required skill
+        all_variants = {normalized_required}
+
+        for canonical_name, synonym_list in synonyms_map.items():
+            normalized_canonical = self.normalize_skill_name(canonical_name)
+            if normalized_canonical == normalized_required:
+                all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
+            else:
+                for synonym in synonym_list:
+                    if self.normalize_skill_name(synonym) == normalized_required:
+                        all_variants.add(normalized_canonical)
+                        all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
+                        break
+
+        # Find matching resume skill
+        for resume_skill in resume_skills:
+            normalized_resume = self.normalize_skill_name(resume_skill)
+            if normalized_resume in all_variants:
+                # Calculate confidence based on match type
+                if normalized_resume == normalized_required:
+                    # Direct match after normalization
+                    return resume_skill, 0.95, "synonym"
+                else:
+                    # Synonym match
+                    return resume_skill, 0.85, "synonym"
+
+        return None
+
     def find_synonym_match(
         self,
         resume_skills: List[str],
@@ -194,32 +249,11 @@ class EnhancedSkillMatcher:
             ("PostgreSQL", 0.85)
         """
         normalized_required = self.normalize_skill_name(required_skill)
+        result = self._try_synonym_match(resume_skills, normalized_required, synonyms_map)
 
-        # Build set of all variants for the required skill
-        all_variants = {normalized_required}
-
-        for canonical_name, synonym_list in synonyms_map.items():
-            normalized_canonical = self.normalize_skill_name(canonical_name)
-            if normalized_canonical == normalized_required:
-                all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
-            else:
-                for synonym in synonym_list:
-                    if self.normalize_skill_name(synonym) == normalized_required:
-                        all_variants.add(normalized_canonical)
-                        all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
-                        break
-
-        # Find matching resume skill
-        for resume_skill in resume_skills:
-            normalized_resume = self.normalize_skill_name(resume_skill)
-            if normalized_resume in all_variants:
-                # Calculate confidence based on match type
-                if normalized_resume == normalized_required:
-                    # Direct match after normalization
-                    return resume_skill, 0.95
-                else:
-                    # Synonym match
-                    return resume_skill, 0.85
+        if result:
+            matched_skill, confidence, _ = result
+            return matched_skill, confidence
 
         return None
 
@@ -663,14 +697,14 @@ class EnhancedSkillMatcher:
             return result
 
         # Strategy 3: Synonym match
-        synonym_match = self.find_synonym_match(resume_skills, required_skill, synonyms_map)
+        synonym_match = self._try_synonym_match(resume_skills, normalized_required, synonyms_map)
         if synonym_match:
-            matched_skill, confidence = synonym_match
+            matched_skill, confidence, match_type = synonym_match
             result.update({
                 "matched": True,
                 "confidence": confidence,
                 "matched_as": matched_skill,
-                "match_type": "synonym"
+                "match_type": match_type
             })
             return result
 
