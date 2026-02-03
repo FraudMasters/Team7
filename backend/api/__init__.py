@@ -12,6 +12,7 @@ from . import (
     candidates,
     saved_searches,
     search,
+    websocket,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "candidates",
     "saved_searches",
     "search",
+    "websocket",
 ]

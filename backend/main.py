@@ -267,6 +267,7 @@ from api import (
     candidate_activities,
     search,
     notifications,
+    websocket,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -300,6 +301,7 @@ app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=[
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(websocket.router, tags=["WebSocket"])
 
 
 if __name__ == "__main__":
