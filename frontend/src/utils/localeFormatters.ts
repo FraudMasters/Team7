@@ -598,6 +598,95 @@ export function formatDuration(
 }
 
 /**
+ * Format a phone number with country code and proper grouping
+ *
+ * Formats a phone number into a standardized format with country code.
+ * The format is: +[countryCode] [areaCode] [prefix]-[lineNumber]
+ * Example: +1 (555) 123-4567
+ *
+ * @param phoneNumber - Phone number to format (can include various formats)
+ * @param locale - Locale code ('en' or 'ru')
+ * @returns Formatted phone number string
+ *
+ * @throws {Error} If phone number is invalid or locale is invalid
+ *
+ * @example
+ * ```ts
+ * formatPhoneNumber('15551234567', 'en')  // '+1 (555) 123-4567'
+ * formatPhoneNumber('+15551234567', 'en')  // '+1 (555) 123-4567'
+ * formatPhoneNumber('5551234567', 'en')    // '(555) 123-4567'
+ * formatPhoneNumber('15551234567', 'ru')  // '+1 (555) 123-4567'
+ * ```
+ */
+export function formatPhoneNumber(
+  phoneNumber: string,
+  locale: SupportedLanguage = 'en'
+): string {
+  try {
+    const normalizedLocale = _validateLocale(locale);
+
+    // Remove all non-digit characters
+    const cleaned = phoneNumber.replace(/\D/g, '');
+
+    if (cleaned.length === 0) {
+      throw new Error(`Invalid phone number: ${phoneNumber}`);
+    }
+
+    // Check if the number includes a country code (starts with 1-3 digits)
+    let countryCode = '';
+    let nationalNumber = cleaned;
+
+    // If number starts with country code format (e.g., 1 for US/Canada)
+    if (cleaned.length >= 11 && cleaned[0] === '1') {
+      countryCode = '1';
+      nationalNumber = cleaned.slice(1);
+    } else if (cleaned.length >= 11 && cleaned.startsWith('7')) {
+      // Russian country code
+      countryCode = '7';
+      nationalNumber = cleaned.slice(1);
+    } else if (cleaned.length >= 11 && cleaned.startsWith('44')) {
+      // UK country code
+      countryCode = '44';
+      nationalNumber = cleaned.slice(2);
+    }
+
+    // Format the national number
+    // US/Canada format: (555) 123-4567 (10 digits)
+    // Russian format: (555) 123-45-67 (10 digits)
+    // If number is too short, just return with minimal formatting
+    if (nationalNumber.length >= 10) {
+      const areaCode = nationalNumber.slice(0, 3);
+      const prefix = nationalNumber.slice(3, 6);
+      const lineNumber = nationalNumber.slice(6, 10);
+
+      if (countryCode) {
+        return `+${countryCode} (${areaCode}) ${prefix}-${lineNumber}`;
+      }
+      return `(${areaCode}) ${prefix}-${lineNumber}`;
+    } else if (nationalNumber.length >= 7) {
+      // Shorter numbers: 123-4567
+      const prefix = nationalNumber.slice(0, 3);
+      const lineNumber = nationalNumber.slice(3);
+
+      if (countryCode) {
+        return `+${countryCode} ${prefix}-${lineNumber}`;
+      }
+      return `${prefix}-${lineNumber}`;
+    } else {
+      // Very short numbers, just return with country code if present
+      if (countryCode) {
+        return `+${countryCode} ${nationalNumber}`;
+      }
+      return nationalNumber;
+    }
+  } catch (error) {
+    throw new Error(
+      `Failed to format phone number: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
  * Validate and normalize locale code
  *
  * @private
