@@ -10,6 +10,16 @@
 import type { SupportedLanguage } from '@/contexts/LanguageContext';
 
 /**
+ * Duration object for explicit time units
+ */
+export interface DurationObject {
+  days?: number;
+  hours?: number;
+  minutes?: number;
+  seconds?: number;
+}
+
+/**
  * Locale code mapping
  * Maps supported language codes to full locale strings for Intl API
  */
@@ -100,6 +110,28 @@ const CURRENCY_SYMBOLS: Record<string, Record<SupportedLanguage, string>> = {
   EUR: { en: '€', ru: '€' },
   RUB: { en: '₽', ru: '₽' },
   GBP: { en: '£', ru: '£' },
+} as const;
+
+/**
+ * Duration unit labels for each locale
+ * Includes singular, plural forms for proper pluralization
+ */
+const DURATION_UNIT_LABELS: Record<
+  SupportedLanguage,
+  Record<'day' | 'hour' | 'minute' | 'second', string[]>
+> = {
+  en: {
+    day: ['day', 'days'],
+    hour: ['h', 'h'],
+    minute: ['m', 'm'],
+    second: ['s', 's'],
+  },
+  ru: {
+    day: ['д', 'д'],
+    hour: ['ч', 'ч'],
+    minute: ['мин', 'мин'],
+    second: ['с', 'с'],
+  },
 } as const;
 
 /**
@@ -458,6 +490,109 @@ export function formatRelativeTime(
   } catch (error) {
     throw new Error(
       `Failed to format relative time: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Format a duration in a locale-aware compact format
+ *
+ * Formats a duration as seconds or a duration object into a compact string like '2h 30m', '1d 4h', or '45m'.
+ * This is ideal for displaying time durations in UI elements where space is limited.
+ *
+ * @param duration - Duration in seconds, or a DurationObject with explicit units
+ * @param locale - Locale code ('en' or 'ru')
+ * @returns Formatted duration string
+ *
+ * @throws {Error} If duration is invalid or locale is invalid
+ *
+ * @example
+ * ```ts
+ * // Using seconds
+ * formatDuration(9000, 'en')   // '2h 30m'
+ * formatDuration(9000, 'ru')   // '2 ч 30 мин'
+ * formatDuration(2700, 'en')   // '45m'
+ * formatDuration(2700, 'ru')   // '45 мин'
+ * formatDuration(30, 'en')     // '30s'
+ * formatDuration(30, 'ru')     // '30 с'
+ *
+ * // Using duration object
+ * formatDuration({ days: 1, hours: 4 }, 'en')  // '1d 4h'
+ * formatDuration({ days: 1, hours: 4 }, 'ru')  // '1 д 4 ч'
+ * formatDuration({ hours: 2, minutes: 30 }, 'en')  // '2h 30m'
+ * formatDuration({ hours: 2, minutes: 30 }, 'ru')  // '2 ч 30 мин'
+ * formatDuration({ minutes: 45 }, 'en')  // '45m'
+ * formatDuration({ minutes: 45 }, 'ru')  // '45 мин'
+ * ```
+ */
+export function formatDuration(
+  duration: number | DurationObject,
+  locale: SupportedLanguage = 'en'
+): string {
+  try {
+    const normalizedLocale = _validateLocale(locale);
+
+    // Parse duration into seconds and breakdown
+    let totalSeconds = 0;
+    let days = 0;
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
+
+    if (typeof duration === 'number') {
+      if (duration < 0) {
+        throw new Error(`Duration cannot be negative: ${duration}`);
+      }
+      if (!isFinite(duration)) {
+        throw new Error(`Duration must be finite: ${duration}`);
+      }
+      totalSeconds = Math.floor(duration);
+    } else if (typeof duration === 'object' && duration !== null) {
+      // Handle DurationObject
+      days = duration.days ?? 0;
+      hours = duration.hours ?? 0;
+      minutes = duration.minutes ?? 0;
+      seconds = duration.seconds ?? 0;
+
+      if (days < 0 || hours < 0 || minutes < 0 || seconds < 0) {
+        throw new Error('Duration values cannot be negative');
+      }
+
+      totalSeconds = days * 86400 + hours * 3600 + minutes * 60 + seconds;
+    } else {
+      throw new Error(`Invalid duration type: ${typeof duration}`);
+    }
+
+    // Break down total seconds into units
+    if (typeof duration === 'number') {
+      days = Math.floor(totalSeconds / 86400);
+      hours = Math.floor((totalSeconds % 86400) / 3600);
+      minutes = Math.floor((totalSeconds % 3600) / 60);
+      seconds = totalSeconds % 60;
+    }
+
+    // Build the formatted string
+    const labels = DURATION_UNIT_LABELS[normalizedLocale];
+    const parts: string[] = [];
+
+    if (days > 0) {
+      parts.push(`${days}${labels.day[0]}`);
+    }
+    if (hours > 0) {
+      parts.push(`${hours}${labels.hour[0]}`);
+    }
+    if (minutes > 0) {
+      parts.push(`${minutes}${labels.minute[0]}`);
+    }
+    if (seconds > 0 || parts.length === 0) {
+      // Show seconds if present, or if duration is zero
+      parts.push(`${seconds}${labels.second[0]}`);
+    }
+
+    return parts.join(' ');
+  } catch (error) {
+    throw new Error(
+      `Failed to format duration: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }
