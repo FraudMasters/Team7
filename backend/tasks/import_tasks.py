@@ -6,6 +6,7 @@ like Indeed, ZipRecruiter, and Glassdoor. It handles polling for new applicants,
 processing imported resumes, duplicate detection, and periodic scheduled imports.
 """
 import logging
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -20,6 +21,9 @@ from models import JobBoardIntegration, ImportLog, ImportJobStatus
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Default interval between polling cycles (minutes)
+POLLING_INTERVAL_MINUTES = 30
 
 
 @shared_task(
@@ -593,3 +597,260 @@ def process_imported_resume(
             "error": str(e),
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
+
+
+def get_active_integrations(db_session: AsyncSession) -> List[Dict[str, Any]]:
+    """
+    Retrieve all active (enabled) job board integrations from the database.
+
+    This function queries the database for all job board integrations that
+    are currently enabled and ready for polling.
+
+    Args:
+        db_session: Async database session for querying
+
+    Returns:
+        List of dictionaries containing integration data:
+        [
+            {
+                "id": "uuid",
+                "name": "Indeed",
+                "api_endpoint": "https://api.indeed.com",
+                "enabled": true,
+                "config": {"job_id": "12345"}
+            },
+            ...
+        ]
+
+    Example:
+        >>> async with async_session_maker() as db:
+        ...     integrations = await get_active_integrations(db)
+        ...     print(f"Found {len(integrations)} active integrations")
+        3
+    """
+    logger.info("Retrieving active job board integrations")
+
+    try:
+        # Query all enabled integrations
+        query = select(JobBoardIntegration).where(JobBoardIntegration.enabled == True)
+        result = await db_session.execute(query)
+        integrations = result.scalars().all()
+
+        integrations_data = []
+        for integration in integrations:
+            integration_info = {
+                "id": str(integration.id),
+                "name": integration.name,
+                "api_endpoint": integration.api_endpoint,
+                "enabled": integration.enabled,
+                "config": integration.config or {},
+            }
+            integrations_data.append(integration_info)
+
+        logger.info(f"Retrieved {len(integrations_data)} active integrations")
+
+        return integrations_data
+
+    except Exception as e:
+        logger.error(f"Error retrieving active integrations: {e}", exc_info=True)
+        return []
+
+
+@shared_task(
+    name="tasks.import_tasks.scheduled_poll_all_integrations",
+    bind=True,
+)
+def scheduled_poll_all_integrations(
+    self,
+) -> Dict[str, Any]:
+    """
+    Periodic task to poll all active job board integrations.
+
+    This is a scheduled task that runs periodically (e.g., every 30 minutes)
+    to automatically poll all enabled job board integrations for new applicants.
+    It spawns individual polling tasks for each integration and returns a summary.
+
+    Task Workflow:
+    1. Retrieve all active (enabled) job board integrations
+    2. Spawn individual poll_job_board task for each integration
+    3. Aggregate results from all polling tasks
+    4. Return summary of polling activity
+
+    Args:
+        self: Celery task instance (bind=True)
+
+    Returns:
+        Dictionary containing polling summary:
+        - total_integrations: Number of integrations polled
+        - successful_polls: Number of successful polling operations
+        - failed_polls: Number of failed polling operations
+        - total_applicants_found: Total applicants found across all integrations
+        - total_processing_time_ms: Total processing time
+        - integration_results: List of individual integration results
+        - status: Task status (completed/failed)
+        - timestamp: When the polling was initiated
+
+    Raises:
+        SoftTimeLimitExceeded: If task exceeds time limit
+        Exception: For database or processing errors
+
+    Example:
+        >>> # This would be scheduled via Celery beat
+        >>> # celery beat schedule: {
+        >>> #     'poll-all-integrations': {
+        >>> #         'task': 'tasks.import_tasks.scheduled_poll_all_integrations',
+        >>> #         'schedule': crontab(minute='*/30'),  # Every 30 minutes
+        >>> #     }
+        >>> # }
+    """
+    import asyncio
+
+    start_time = time.time()
+
+    logger.info("Starting scheduled polling of all active integrations")
+
+    async def _poll_all():
+        """Async function to perform polling of all integrations."""
+        async with async_session_maker() as db:
+            try:
+                # Step 1: Retrieve all active integrations
+                logger.info("Fetching active job board integrations")
+                integrations = await get_active_integrations(db)
+
+                if not integrations:
+                    logger.warning("No active integrations found, skipping polling")
+                    return {
+                        "total_integrations": 0,
+                        "successful_polls": 0,
+                        "failed_polls": 0,
+                        "total_applicants_found": 0,
+                        "integration_results": [],
+                        "status": "completed",
+                        "message": "No active integrations found",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+
+                logger.info(f"Found {len(integrations)} active integrations to poll")
+
+                # Step 2: Poll each integration
+                integration_results = []
+                total_applicants = 0
+                successful_polls = 0
+                failed_polls = 0
+
+                for integration in integrations:
+                    integration_id = integration.get("id")
+                    integration_name = integration.get("name", "unknown")
+
+                    logger.info(f"Polling integration: {integration_name} (ID: {integration_id})")
+
+                    try:
+                        # Import the poll_job_board task
+                        from tasks.import_tasks import poll_job_board
+
+                        # Trigger the polling task asynchronously
+                        # We use .apply_async() with throw=False to get result without blocking
+                        task_result = poll_job_board.apply_async(
+                            args=[integration_id],
+                            throw=False,
+                        )
+
+                        # Get the result (this will block until the task completes)
+                        poll_result = task_result.get(timeout=300)  # 5 minute timeout per integration
+
+                        if poll_result.get("status") == "completed":
+                            successful_polls += 1
+                            total_applicants += poll_result.get("applicants_found", 0)
+                            logger.info(
+                                f"Successfully polled {integration_name}: "
+                                f"{poll_result.get('applicants_found', 0)} applicants found"
+                            )
+                        else:
+                            failed_polls += 1
+                            logger.warning(
+                                f"Failed to poll {integration_name}: "
+                                f"{poll_result.get('error', 'Unknown error')}"
+                            )
+
+                        integration_results.append(
+                            {
+                                "integration_id": integration_id,
+                                "integration_name": integration_name,
+                                "status": poll_result.get("status"),
+                                "applicants_found": poll_result.get("applicants_found", 0),
+                                "applicants_processed": poll_result.get("applicants_processed", 0),
+                                "errors": poll_result.get("errors", []),
+                                "processing_time_ms": poll_result.get("processing_time_ms", 0),
+                            }
+                        )
+
+                    except Exception as e:
+                        failed_polls += 1
+                        error_msg = f"Error polling integration {integration_name}: {str(e)}"
+                        logger.error(error_msg, exc_info=True)
+                        integration_results.append(
+                            {
+                                "integration_id": integration_id,
+                                "integration_name": integration_name,
+                                "status": "failed",
+                                "applicants_found": 0,
+                                "applicants_processed": 0,
+                                "errors": [error_msg],
+                                "processing_time_ms": 0,
+                            }
+                        )
+
+                total_processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+                result = {
+                    "total_integrations": len(integrations),
+                    "successful_polls": successful_polls,
+                    "failed_polls": failed_polls,
+                    "total_applicants_found": total_applicants,
+                    "total_processing_time_ms": total_processing_time_ms,
+                    "integration_results": integration_results,
+                    "status": "completed",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+                logger.info(
+                    f"Scheduled polling completed: {successful_polls}/{len(integrations)} successful, "
+                    f"{total_applicants} total applicants found in {total_processing_time_ms}ms"
+                )
+
+                return result
+
+            except SoftTimeLimitExceeded:
+                logger.error(f"Task {self.request.id} exceeded time limit")
+                return {
+                    "total_integrations": 0,
+                    "successful_polls": 0,
+                    "failed_polls": 0,
+                    "total_applicants_found": 0,
+                    "total_processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                    "status": "failed",
+                    "error": "Scheduled polling exceeded maximum time limit",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+            except Exception as e:
+                logger.error(f"Error in scheduled polling: {e}", exc_info=True)
+                return {
+                    "total_integrations": 0,
+                    "successful_polls": 0,
+                    "failed_polls": 0,
+                    "total_applicants_found": 0,
+                    "total_processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                    "status": "failed",
+                    "error": str(e),
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+    # Run the async function in the sync context
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(_poll_all())

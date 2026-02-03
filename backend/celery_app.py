@@ -18,6 +18,7 @@ from tasks import (
     generate_scheduled_reports,
     process_all_pending_reports,
     poll_job_board,
+    scheduled_poll_all_integrations,
 )
 
 # Import model preloading to register the worker_ready signal handler
@@ -27,6 +28,10 @@ import tasks.model_preloading  # noqa: F401
 # Import cache warming to register periodic cache warming tasks
 # This ensures cache warming tasks are available for Celery beat
 import tasks.cache_warming  # noqa: F401
+
+# Import import_tasks to register periodic job board polling tasks
+# This ensures import tasks are available for Celery beat
+import tasks.import_tasks  # noqa: F401
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -294,6 +299,9 @@ __all__ = [
     "health_check_with_models",
     "warm_frequently_accessed_data",
     "periodic_cache_warming",
+    "poll_job_board",
+    "process_imported_resume",
+    "scheduled_poll_all_integrations",
     "get_task_status",
     "revoke_task",
 ]
