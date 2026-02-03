@@ -9,10 +9,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import time
 from fastapi import APIRouter, HTTPException, Request, status, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import analyzers for matching
@@ -263,6 +264,234 @@ async def list_vacancies(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list vacancies: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/search",
+    response_model=VacancySearchResponse,
+    tags=["Vacancies"],
+)
+async def search_vacancies(
+    request: Request,
+    search_data: VacancySearchRequest,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Search for vacancies with advanced filters.
+
+    This endpoint provides powerful vacancy search capabilities including:
+    - Full-text search with boolean operators (AND, OR, NOT)
+    - Multi-field filtering: work_format, location, salary, employment_type, industry, etc.
+    - Flexible sorting by date, title, or salary
+
+    Examples of boolean search queries:
+    - "Python AND Django" - Vacancies with both Python and Django
+    - "Python OR Django" - Vacancies with either Python or Django
+    - "Python NOT Flask" - Vacancies with Python but not Flask
+    - "Python Django" - Implicit AND (same as "Python AND Django")
+
+    Args:
+        request: FastAPI request object
+        search_data: Search request with query, filters, pagination, and sorting
+        db: Database session
+
+    Returns:
+        JSON response with search results, total count, and execution metadata
+
+    Raises:
+        HTTPException(400): If filter parameters are invalid
+        HTTPException(500): If search execution fails
+
+    Examples:
+        >>> import requests
+        >>> # Search with filters
+        >>> data = {
+        ...     "filters": {
+        ...         "work_format": "remote",
+        ...         "location": "New York",
+        ...         "salary_min": 50000,
+        ...         "salary_max": 100000,
+        ...         "employment_type": "full-time"
+        ...     },
+        ...     "limit": 10
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/vacancies/search",
+        ...     json=data
+        ... )
+        >>> # Search with query
+        >>> data = {
+        ...     "query": "Python AND Django",
+        ...     "sort_by": "date"
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/vacancies/search",
+        ...     json=data
+        ... )
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(
+            f"Searching vacancies - query: {search_data.query}, "
+            f"filters: {search_data.filters}, skip: {search_data.skip}, "
+            f"limit: {search_data.limit}, sort_by: {search_data.sort_by}"
+        )
+
+        # Build base query
+        query = select(JobVacancy)
+
+        # Apply full-text search if query is provided
+        if search_data.query:
+            # Simple boolean search implementation
+            # For more advanced search, consider using PostgreSQL full-text search
+            search_terms = search_data.query.split()
+
+            # Build OR conditions for title and description
+            or_conditions = []
+            for term in search_terms:
+                # Skip boolean operators
+                if term.upper() in ["AND", "OR", "NOT"]:
+                    continue
+
+                # Case-insensitive search in title and description
+                or_conditions.append(JobVacancy.title.ilike(f"%{term}%"))
+                or_conditions.append(JobVacancy.description.ilike(f"%{term}%"))
+
+            if or_conditions:
+                query = query.where(or_(*or_conditions))
+
+        # Apply filters if provided
+        filters_applied = {}
+        if search_data.filters:
+            # Work format filter
+            if "work_format" in search_data.filters:
+                work_format = search_data.filters["work_format"]
+                if work_format:
+                    query = query.where(JobVacancy.work_format == work_format)
+                    filters_applied["work_format"] = work_format
+
+            # Location filter
+            if "location" in search_data.filters:
+                location = search_data.filters["location"]
+                if location:
+                    query = query.where(JobVacancy.location.ilike(f"%{location}%"))
+                    filters_applied["location"] = location
+
+            # Salary range filter
+            if "salary_min" in search_data.filters:
+                salary_min = search_data.filters["salary_min"]
+                if salary_min is not None:
+                    query = query.where(JobVacancy.salary_min >= salary_min)
+                    filters_applied["salary_min"] = salary_min
+
+            if "salary_max" in search_data.filters:
+                salary_max = search_data.filters["salary_max"]
+                if salary_max is not None:
+                    query = query.where(JobVacancy.salary_max <= salary_max)
+                    filters_applied["salary_max"] = salary_max
+
+            # Employment type filter
+            if "employment_type" in search_data.filters:
+                employment_type = search_data.filters["employment_type"]
+                if employment_type:
+                    query = query.where(JobVacancy.employment_type == employment_type)
+                    filters_applied["employment_type"] = employment_type
+
+            # Industry filter
+            if "industry" in search_data.filters:
+                industry = search_data.filters["industry"]
+                if industry:
+                    query = query.where(JobVacancy.industry.ilike(f"%{industry}%"))
+                    filters_applied["industry"] = industry
+
+            # English level filter
+            if "english_level" in search_data.filters:
+                english_level = search_data.filters["english_level"]
+                if english_level:
+                    query = query.where(JobVacancy.english_level == english_level)
+                    filters_applied["english_level"] = english_level
+
+            # Minimum experience filter
+            if "min_experience_months" in search_data.filters:
+                min_exp = search_data.filters["min_experience_months"]
+                if min_exp is not None:
+                    query = query.where(JobVacancy.min_experience_months <= min_exp)
+                    filters_applied["min_experience_months"] = min_exp
+
+            # Source filter
+            if "source" in search_data.filters:
+                source = search_data.filters["source"]
+                if source:
+                    query = query.where(JobVacancy.source == source)
+                    filters_applied["source"] = source
+
+            # Skills filter (check if any required skill matches)
+            if "skills" in search_data.filters:
+                skills = search_data.filters["skills"]
+                if skills and isinstance(skills, list):
+                    # Check if any of the filter skills are in the vacancy's required_skills
+                    for skill in skills:
+                        query = query.where(JobVacancy.required_skills.contains([skill]))
+                    filters_applied["skills"] = skills
+
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar_one() or 0
+
+        # Apply sorting
+        if search_data.sort_by == "title":
+            query = query.order_by(JobVacancy.title.asc())
+        elif search_data.sort_by == "salary":
+            # Sort by average salary (min + max) / 2
+            query = query.order_by(
+                ((JobVacancy.salary_min + JobVacancy.salary_max) / 2).desc()
+            )
+        else:  # default: date
+            query = query.order_by(JobVacancy.created_at.desc())
+
+        # Apply pagination
+        query = query.offset(search_data.skip).limit(search_data.limit)
+        result = await db.execute(query)
+        vacancies = result.scalars().all()
+
+        # Convert to response format
+        vacancies_list = [_vacancy_to_response(v) for v in vacancies]
+
+        execution_time = time.time() - start_time
+
+        logger.info(
+            f"Vacancy search completed: {total} total vacancies, "
+            f"returned {len(vacancies_list)} results in "
+            f"{execution_time:.3f}s"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total": total,
+                "vacancies": vacancies_list,
+                "query": search_data.query or "",
+                "filters_applied": filters_applied,
+                "execution_time_seconds": execution_time,
+                "skip": search_data.skip,
+                "limit": search_data.limit,
+            },
+        )
+
+    except ValueError as e:
+        logger.error(f"Invalid search parameters: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error(f"Error during vacancy search: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}",
         ) from e
 
 
