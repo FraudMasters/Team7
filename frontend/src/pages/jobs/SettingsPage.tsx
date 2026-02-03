@@ -33,17 +33,10 @@ import {
 import { PageTransition } from '../../components/ui/PageTransition';
 import { useQuery } from '@tanstack/react-query';
 import { getLanguagePreference, updateLanguagePreference } from '../../api/preferences';
+import { NotificationPreferences } from '../../components/NotificationPreferences';
 
 export function SettingsPage() {
   const [language, setLanguage] = useState<'en' | 'ru'>('en');
-  const [notifications, setNotifications] = useState({
-    emailNewJobs: true,
-    emailApplicationUpdates: true,
-    emailMessages: false,
-    pushNewJobs: true,
-    pushApplicationUpdates: true,
-    pushMessages: true,
-  });
   const [privacy, setPrivacy] = useState({
     profileVisible: true,
     showSalary: false,
@@ -182,94 +175,7 @@ export function SettingsPage() {
                 </Typography>
               </Box>
 
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Email Notifications
-              </Typography>
-              <List dense>
-                <ListItem>
-                  <ListItemText primary="New job matches" secondary="Receive emails about new jobs" />
-                  <ListItemSecondaryAction>
-                    <Switch
-                      checked={notifications.emailNewJobs}
-                      onChange={(e) =>
-                        setNotifications({ ...notifications, emailNewJobs: e.target.checked })
-                      }
-                    />
-                  </ListItemSecondaryAction>
-                </ListItem>
-                <ListItem>
-                  <ListItemText
-                    primary="Application updates"
-                    secondary="Status changes on your applications"
-                  />
-                  <ListItemSecondaryAction>
-                    <Switch
-                      checked={notifications.emailApplicationUpdates}
-                      onChange={(e) =>
-                        setNotifications({
-                          ...notifications,
-                          emailApplicationUpdates: e.target.checked,
-                        })
-                      }
-                    />
-                  </ListItemSecondaryAction>
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="Messages from recruiters" />
-                  <ListItemSecondaryAction>
-                    <Switch
-                      checked={notifications.emailMessages}
-                      onChange={(e) =>
-                        setNotifications({ ...notifications, emailMessages: e.target.checked })
-                      }
-                    />
-                  </ListItemSecondaryAction>
-                </ListItem>
-              </List>
-
-              <Divider sx={{ my: 2 }} />
-
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Push Notifications
-              </Typography>
-              <List dense>
-                <ListItem>
-                  <ListItemText primary="New job matches" />
-                  <ListItemSecondaryAction>
-                    <Switch
-                      checked={notifications.pushNewJobs}
-                      onChange={(e) =>
-                        setNotifications({ ...notifications, pushNewJobs: e.target.checked })
-                      }
-                    />
-                  </ListItemSecondaryAction>
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="Application updates" />
-                  <ListItemSecondaryAction>
-                    <Switch
-                      checked={notifications.pushApplicationUpdates}
-                      onChange={(e) =>
-                        setNotifications({
-                          ...notifications,
-                          pushApplicationUpdates: e.target.checked,
-                        })
-                      }
-                    />
-                  </ListItemSecondaryAction>
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="Messages" />
-                  <ListItemSecondaryAction>
-                    <Switch
-                      checked={notifications.pushMessages}
-                      onChange={(e) =>
-                        setNotifications({ ...notifications, pushMessages: e.target.checked })
-                      }
-                    />
-                  </ListItemSecondaryAction>
-                </ListItem>
-              </List>
+              <NotificationPreferences />
             </Paper>
           </Grid>
 

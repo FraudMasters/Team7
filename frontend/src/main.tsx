@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider as MuiThemeProvider, CssBaseline } from '@mui/material';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider, useThemeContext } from './contexts/ThemeContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import QueryProvider from './providers/QueryProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
@@ -45,7 +46,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <LanguageProvider>
         <ThemeProvider>
           <QueryProvider>
-            <AppWithTheme />
+            <NotificationProvider>
+              <AppWithTheme />
+            </NotificationProvider>
           </QueryProvider>
         </ThemeProvider>
       </LanguageProvider>
