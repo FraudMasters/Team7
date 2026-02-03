@@ -17,6 +17,7 @@ from tasks import (
     batch_analyze_resumes,
     generate_scheduled_reports,
     process_all_pending_reports,
+    poll_job_board,
 )
 
 # Import model preloading to register the worker_ready signal handler
