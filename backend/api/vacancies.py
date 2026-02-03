@@ -6,7 +6,7 @@ and delete job vacancy requests that define the candidate profile they're lookin
 """
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status, Depends, Query
@@ -87,6 +87,13 @@ class VacancyResponse(BaseModel):
     source: Optional[str] = Field(None, description="Source")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+
+
+class VacancyListResponse(BaseModel):
+    """Response model for listing vacancies."""
+
+    total: int = Field(..., description="Total number of vacancies")
+    vacancies: list[VacancyResponse] = Field(..., description="List of vacancies")
 
 
 def _vacancy_to_response(vacancy: JobVacancy) -> dict:
