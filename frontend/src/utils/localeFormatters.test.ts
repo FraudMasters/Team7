@@ -625,6 +625,197 @@ describe('localeFormatters', () => {
     });
   });
 
+  describe('formatPhoneNumber', () => {
+    describe('US/Canada phone numbers', () => {
+      it('should format US phone number with country code (11 digits)', () => {
+        const result = formatPhoneNumber('15551234567', 'en');
+        expect(result).toBe('+1 (555) 123-4567');
+      });
+
+      it('should format US phone number with + prefix', () => {
+        const result = formatPhoneNumber('+15551234567', 'en');
+        expect(result).toBe('+1 (555) 123-4567');
+      });
+
+      it('should format US phone number without country code (10 digits)', () => {
+        const result = formatPhoneNumber('5551234567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should format US phone number with dashes', () => {
+        const result = formatPhoneNumber('555-123-4567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should format US phone number with spaces', () => {
+        const result = formatPhoneNumber('555 123 4567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should format US phone number with parentheses and dashes', () => {
+        const result = formatPhoneNumber('(555) 123-4567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should format US phone number with mixed formatting', () => {
+        const result = formatPhoneNumber('1 (555) 123-4567', 'en');
+        expect(result).toBe('+1 (555) 123-4567');
+      });
+    });
+
+    describe('Russian phone numbers', () => {
+      it('should format Russian phone number with country code', () => {
+        const result = formatPhoneNumber('75551234567', 'ru');
+        expect(result).toBe('+7 (555) 123-4567');
+      });
+
+      it('should format Russian phone number with + prefix', () => {
+        const result = formatPhoneNumber('+75551234567', 'ru');
+        expect(result).toBe('+7 (555) 123-4567');
+      });
+
+      it('should format Russian phone number without country code', () => {
+        const result = formatPhoneNumber('5551234567', 'ru');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should format Russian phone number in English locale', () => {
+        const result = formatPhoneNumber('75551234567', 'en');
+        expect(result).toBe('+7 (555) 123-4567');
+      });
+    });
+
+    describe('UK phone numbers', () => {
+      it('should format UK phone number with country code (44)', () => {
+        const result = formatPhoneNumber('445551234567', 'en');
+        expect(result).toBe('+44 (555) 123-4567');
+      });
+
+      it('should format UK phone number with + prefix', () => {
+        const result = formatPhoneNumber('+445551234567', 'en');
+        expect(result).toBe('+44 (555) 123-4567');
+      });
+
+      it('should format UK phone number without country code', () => {
+        const result = formatPhoneNumber('5551234567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+    });
+
+    describe('shorter phone numbers', () => {
+      it('should format 7-digit number with dashes', () => {
+        const result = formatPhoneNumber('5551234', 'en');
+        expect(result).toBe('555-1234');
+      });
+
+      it('should format 7-digit number with country code', () => {
+        const result = formatPhoneNumber('15551234', 'en');
+        expect(result).toBe('+1 555-1234');
+      });
+
+      it('should format very short number (less than 7 digits)', () => {
+        const result = formatPhoneNumber('555123', 'en');
+        expect(result).toBe('555123');
+      });
+
+      it('should format very short number with country code', () => {
+        const result = formatPhoneNumber('1555123', 'en');
+        expect(result).toBe('+1 555123');
+      });
+
+      it('should format 6-digit number', () => {
+        const result = formatPhoneNumber('123456', 'en');
+        expect(result).toBe('123456');
+      });
+    });
+
+    describe('phone numbers with various separators', () => {
+      it('should handle phone number with dots', () => {
+        const result = formatPhoneNumber('555.123.4567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should handle phone number with mixed separators', () => {
+        const result = formatPhoneNumber('555-123.4567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should handle phone number with multiple spaces', () => {
+        const result = formatPhoneNumber('555  123  4567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+    });
+
+    describe('edge cases', () => {
+      it('should handle phone number with extension digits (>10)', () => {
+        const result = formatPhoneNumber('1555123456789', 'en');
+        // Should only format first 10 digits of national number
+        expect(result).toBe('+1 (555) 123-4567');
+      });
+
+      it('should handle phone number with leading zeros', () => {
+        const result = formatPhoneNumber('05551234567', 'en');
+        expect(result).toBe('(555) 123-4567');
+      });
+
+      it('should handle single digit', () => {
+        const result = formatPhoneNumber('1', 'en');
+        expect(result).toBe('1');
+      });
+
+      it('should handle two digits', () => {
+        const result = formatPhoneNumber('12', 'en');
+        expect(result).toBe('12');
+      });
+
+      it('should handle three digits', () => {
+        const result = formatPhoneNumber('123', 'en');
+        expect(result).toBe('123');
+      });
+    });
+
+    describe('error handling', () => {
+      it('should throw error for empty string', () => {
+        expect(() => formatPhoneNumber('', 'en')).toThrow();
+      });
+
+      it('should throw error for string with no digits', () => {
+        expect(() => formatPhoneNumber('abc', 'en')).toThrow();
+      });
+
+      it('should throw error for string with only separators', () => {
+        expect(() => formatPhoneNumber('()- ', 'en')).toThrow();
+      });
+
+      it('should throw error for invalid locale', () => {
+        expect(() => formatPhoneNumber('5551234567', 'de' as SupportedLanguage)).toThrow();
+      });
+
+      it('should throw error for whitespace only', () => {
+        expect(() => formatPhoneNumber('   ', 'en')).toThrow();
+      });
+    });
+
+    describe('locale independence', () => {
+      it('should produce same format for same number in different locales', () => {
+        const resultEn = formatPhoneNumber('15551234567', 'en');
+        const resultRu = formatPhoneNumber('15551234567', 'ru');
+        // Phone format should be the same regardless of locale
+        expect(resultEn).toBe(resultRu);
+      });
+
+      it('should handle Russian number in English locale', () => {
+        const result = formatPhoneNumber('75551234567', 'en');
+        expect(result).toBe('+7 (555) 123-4567');
+      });
+
+      it('should handle US number in Russian locale', () => {
+        const result = formatPhoneNumber('15551234567', 'ru');
+        expect(result).toBe('+1 (555) 123-4567');
+      });
+    });
+  });
+
   describe('getSupportedLocales', () => {
     it('should return array of supported locales', () => {
       const result = getSupportedLocales();
