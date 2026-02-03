@@ -33,6 +33,7 @@ from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .job_board_integration import JobBoardIntegration
+from .imported_resume import ImportedResume, ImportStatus
 
 __all__ = [
     "Base",
@@ -76,4 +77,6 @@ __all__ = [
     "SearchAlert",
     "SearchHistory",
     "JobBoardIntegration",
+    "ImportedResume",
+    "ImportStatus",
 ]
