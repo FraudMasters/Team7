@@ -1853,3 +1853,394 @@ export interface SearchHistoryResponse {
   limit: number;
 }
 
+// ==================== Notification Types ====================
+
+/**
+ * Notification type enumeration
+ */
+export type NotificationType =
+  | 'candidate_applied'
+  | 'candidate_responded'
+  | 'resume_uploaded'
+  | 'candidate_moved'
+  | 'new_match'
+  | 'interview_scheduled'
+  | 'offer_sent'
+  | 'offer_accepted'
+  | 'offer_rejected'
+  | 'reminder'
+  | 'system'
+  | 'digest';
+
+/**
+ * Notification priority levels
+ */
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+/**
+ * Notification status
+ */
+export type NotificationStatus = 'pending' | 'sent' | 'delivered' | 'failed';
+
+/**
+ * Notification channels
+ */
+export type NotificationChannel = 'in_app' | 'email' | 'push' | 'sms';
+
+/**
+ * Base notification interface
+ */
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  action_url?: string;
+  action_label?: string;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  expires_at: string | null;
+  delivery_status: Record<NotificationChannel, NotificationStatus>;
+  aggregated_count?: number;
+}
+
+/**
+ * Notification list item
+ */
+export interface NotificationListItem {
+  id: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  action_url?: string;
+  action_label?: string;
+  is_read: boolean;
+  created_at: string;
+  aggregated_count?: number;
+}
+
+/**
+ * Notification response
+ */
+export interface NotificationResponse {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  title: string;
+  message: string;
+  data: Record<string, unknown> | null;
+  action_url: string | null;
+  action_label: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  expires_at: string | null;
+  delivery_status: Record<NotificationChannel, NotificationStatus>;
+  aggregated_count: number | null;
+}
+
+/**
+ * Notification list response
+ */
+export interface NotificationListResponse {
+  notifications: NotificationResponse[];
+  total_count: number;
+  unread_count: number;
+  filters_applied?: {
+    type?: NotificationType;
+    is_read?: boolean;
+    priority?: NotificationPriority;
+    date_from?: string;
+    date_to?: string;
+  };
+}
+
+/**
+ * Mark notification read request
+ */
+export interface MarkNotificationReadRequest {
+  notification_id: string;
+  is_read: boolean;
+}
+
+/**
+ * Mark notification read response
+ */
+export interface MarkNotificationReadResponse {
+  id: string;
+  is_read: boolean;
+  read_at: string | null;
+  message: string;
+}
+
+/**
+ * Mark all notifications read request
+ */
+export interface MarkAllReadRequest {
+  filter_by_type?: NotificationType;
+}
+
+/**
+ * Mark all notifications read response
+ */
+export interface MarkAllReadResponse {
+  updated_count: number;
+  message: string;
+}
+
+/**
+ * Delete notification request
+ */
+export interface DeleteNotificationRequest {
+  notification_id: string;
+}
+
+/**
+ * Delete notification response
+ */
+export interface DeleteNotificationResponse {
+  id: string;
+  message: string;
+}
+
+/**
+ * Notification settings for a specific type
+ */
+export interface NotificationTypeSettings {
+  enabled: boolean;
+  channels: {
+    in_app: boolean;
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+  digest_frequency: 'immediate' | 'hourly' | 'daily' | 'weekly' | 'never';
+  quiet_hours: {
+    enabled: boolean;
+    start_time: string; // HH:MM format
+    end_time: string; // HH:MM format
+    timezone: string;
+  };
+}
+
+/**
+ * Notification preferences (full user preferences)
+ */
+export interface NotificationPreferences {
+  user_id: string;
+  email: string;
+  preferences: Record<NotificationType, NotificationTypeSettings>;
+  global_settings: {
+    enable_all: boolean;
+    default_channels: {
+      in_app: boolean;
+      email: boolean;
+      push: boolean;
+      sms: boolean;
+    };
+    default_digest_frequency: 'immediate' | 'hourly' | 'daily' | 'weekly' | 'never';
+    timezone: string;
+  };
+  updated_at: string;
+}
+
+/**
+ * Notification preferences update request
+ */
+export interface NotificationPreferencesUpdate {
+  preferences?: Partial<Record<NotificationType, Partial<NotificationTypeSettings>>>;
+  global_settings?: Partial<NotificationPreferences['global_settings']>;
+}
+
+/**
+ * Notification preferences response
+ */
+export interface NotificationPreferencesResponse {
+  user_id: string;
+  email: string;
+  preferences: Record<NotificationType, NotificationTypeSettings>;
+  global_settings: NotificationPreferences['global_settings'];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * WebSocket message types
+ */
+export type WebSocketMessageType =
+  | 'notification'
+  | 'notification_ack'
+  | 'ping'
+  | 'pong'
+  | 'error';
+
+/**
+ * Base WebSocket message
+ */
+export interface WebSocketMessage {
+  type: WebSocketMessageType;
+  id: string;
+  timestamp: string;
+}
+
+/**
+ * WebSocket notification message
+ */
+export interface WebSocketNotificationMessage extends WebSocketMessage {
+  type: 'notification';
+  notification: NotificationListItem;
+}
+
+/**
+ * WebSocket acknowledgment message
+ */
+export interface WebSocketAckMessage extends WebSocketMessage {
+  type: 'notification_ack';
+  original_message_id: string;
+  status: 'received' | 'processed';
+}
+
+/**
+ * WebSocket ping message
+ */
+export interface WebSocketPingMessage extends WebSocketMessage {
+  type: 'ping';
+}
+
+/**
+ * WebSocket pong message
+ */
+export interface WebSocketPongMessage extends WebSocketMessage {
+  type: 'pong';
+}
+
+/**
+ * WebSocket error message
+ */
+export interface WebSocketErrorMessage extends WebSocketMessage {
+  type: 'error';
+  error: string;
+  code?: string;
+}
+
+/**
+ * Notification delivery tracking
+ */
+export interface NotificationDelivery {
+  id: string;
+  notification_id: string;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  recipient: string;
+  attempts: number;
+  last_attempt_at: string | null;
+  delivered_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Notification delivery response
+ */
+export interface NotificationDeliveryResponse {
+  id: string;
+  notification_id: string;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  recipient: string;
+  attempts: number;
+  last_attempt_at: string | null;
+  delivered_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Notification delivery list response
+ */
+export interface NotificationDeliveryListResponse {
+  deliveries: NotificationDeliveryResponse[];
+  total_count: number;
+  notification_id: string;
+}
+
+/**
+ * Digest notification content
+ */
+export interface DigestContent {
+  period_start: string;
+  period_end: string;
+  notification_count: number;
+  notifications: Array<{
+    type: NotificationType;
+    title: string;
+    count: number;
+  }>;
+  top_notifications: NotificationListItem[];
+}
+
+/**
+ * Digest notification response
+ */
+export interface DigestResponse {
+  id: string;
+  user_id: string;
+  digest_type: 'hourly' | 'daily' | 'weekly';
+  content: DigestContent;
+  created_at: string;
+  sent_at: string | null;
+}
+
+/**
+ * Unread notification count response
+ */
+export interface UnreadCountResponse {
+  count: number;
+  by_type: Record<NotificationType, number>;
+  by_priority: Record<NotificationPriority, number>;
+}
+
+/**
+ * Notification statistics response
+ */
+export interface NotificationStatisticsResponse {
+  total_sent: number;
+  total_delivered: number;
+  total_failed: number;
+  delivery_rate: number;
+  by_type: Record<NotificationType, number>;
+  by_channel: Record<NotificationChannel, number>;
+  period_start: string;
+  period_end: string;
+}
+
+/**
+ * Notification test request
+ */
+export interface NotificationTestRequest {
+  type: NotificationType;
+  channel: NotificationChannel;
+  recipient?: string;
+}
+
+/**
+ * Notification test response
+ */
+export interface NotificationTestResponse {
+  test_id: string;
+  type: NotificationType;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  message: string;
+  sent_at: string | null;
+}
+
