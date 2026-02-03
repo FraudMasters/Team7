@@ -31,6 +31,12 @@ from .notification_tasks import (
     send_email_notification,
     send_bulk_email_notifications,
 )
+from .notification_digest import (
+    send_hourly_notification_digest,
+    send_daily_notification_digest,
+    send_weekly_notification_digest,
+    send_notification_digest,
+)
 
 __all__ = [
     "analyze_resume_async",
@@ -52,4 +58,8 @@ __all__ = [
     "cleanup_old_audit_logs_task",
     "send_email_notification",
     "send_bulk_email_notifications",
+    "send_hourly_notification_digest",
+    "send_daily_notification_digest",
+    "send_weekly_notification_digest",
+    "send_notification_digest",
 ]
