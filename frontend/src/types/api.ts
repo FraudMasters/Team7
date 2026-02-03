@@ -1733,7 +1733,7 @@ export interface ActivityTypesResponse {
 export interface SavedSearchCreate {
   name: string;
   query: string;
-  filters?: Record<string, unknown>;
+  filters?: SearchFilters | VacancySearchFilters;
 }
 
 /**
@@ -1742,7 +1742,7 @@ export interface SavedSearchCreate {
 export interface SavedSearchUpdate {
   name?: string;
   query?: string;
-  filters?: Record<string, unknown>;
+  filters?: SearchFilters | VacancySearchFilters;
 }
 
 /**
@@ -1752,7 +1752,7 @@ export interface SavedSearchResponse {
   id: string;
   name: string;
   query: string;
-  filters: Record<string, unknown>;
+  filters: SearchFilters | VacancySearchFilters;
   created_at: string;
   updated_at: string;
 }
