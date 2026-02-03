@@ -87,6 +87,25 @@ class CSVExportRequest(BaseModel):
     format: Optional[str] = Field("standard", description="CSV format variant (e.g., standard, detailed)")
 
 
+class ExcelExportRequest(BaseModel):
+    """Request model for exporting a report to Excel with formatting."""
+
+    report_id: str = Field(..., description="Report identifier to export")
+    data: Dict = Field(..., description="Report data to include in the Excel file")
+    format: Optional[str] = Field("standard", description="Excel format variant (e.g., standard, detailed)")
+    include_charts: Optional[bool] = Field(True, description="Whether to include charts in the Excel file")
+    include_summary: Optional[bool] = Field(True, description="Whether to include a summary sheet")
+
+
+class ExcelExportResponse(BaseModel):
+    """Response model for Excel export."""
+
+    report_id: str = Field(..., description="Report identifier")
+    download_url: str = Field(..., description="URL to download the generated Excel file")
+    expires_at: str = Field(..., description="Expiration timestamp for download link")
+    file_size: Optional[int] = Field(None, description="File size in bytes")
+
+
 class ScheduleReportRequest(BaseModel):
     """Request model for scheduling automated reports."""
 
