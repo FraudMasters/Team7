@@ -43,6 +43,7 @@ import {
   Download as DownloadIcon,
   Schedule as ScheduleIcon,
   Email as EmailIcon,
+  TableChart as ExcelIcon,
 } from '@mui/icons-material';
 
 /**
@@ -122,7 +123,7 @@ interface ScheduleConfig {
  * Delivery configuration for scheduled reports
  */
 interface DeliveryConfig {
-  format: 'pdf' | 'csv' | 'both';
+  format: 'pdf' | 'csv' | 'excel' | 'both';
   include_charts: boolean;
   include_summary: boolean;
 }
@@ -248,6 +249,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<ReportFormData>({
@@ -618,6 +620,58 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   };
 
   /**
+   * Export report to Excel
+   */
+  const handleExportExcel = async () => {
+    if (selectedMetrics.length === 0) {
+      setError('Please select at least one metric before exporting');
+      return;
+    }
+
+    setExportingExcel(true);
+    setError(null);
+
+    try {
+      const reportData: ReportData = {
+        metrics: selectedMetrics.map((m) => m.id),
+        filters: {},
+      };
+
+      const response = await fetch('http://localhost:8000/api/reports/export/excel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          report_id: editingReport?.id || 'custom',
+          data: reportData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to export Excel: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Download the Excel file from the provided URL
+      if (result.download_url) {
+        const link = document.createElement('a');
+        link.href = result.download_url;
+        link.download = `report-${editingReport?.name || 'custom'}-${Date.now()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to export Excel';
+      setError(errorMessage);
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  /**
    * Submit form (create or update)
    */
   const handleSubmit = async () => {
@@ -929,6 +983,15 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
             disabled={selectedMetrics.length === 0 || exportingCsv}
           >
             {exportingCsv ? 'Exporting...' : 'Export CSV'}
+          </Button>
+          <Button
+            variant="outlined"
+            color="warning"
+            startIcon={exportingExcel ? <CircularProgress size={16} /> : <ExcelIcon />}
+            onClick={handleExportExcel}
+            disabled={selectedMetrics.length === 0 || exportingExcel}
+          >
+            {exportingExcel ? 'Exporting...' : 'Export Excel'}
           </Button>
           {editingReport && (
             <>
@@ -1515,7 +1578,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
                           ...scheduleFormData,
                           delivery_config: {
                             ...scheduleFormData.delivery_config,
-                            format: e.target.value as 'pdf' | 'csv' | 'both',
+                            format: e.target.value as 'pdf' | 'csv' | 'excel' | 'both',
                           },
                         })
                       }
@@ -1524,6 +1587,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
                     >
                       <MenuItem value="pdf">PDF</MenuItem>
                       <MenuItem value="csv">CSV</MenuItem>
+                      <MenuItem value="excel">Excel</MenuItem>
                       <MenuItem value="both">Both PDF and CSV</MenuItem>
                     </Select>
                   </FormControl>
