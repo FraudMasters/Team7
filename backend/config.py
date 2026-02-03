@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         celery_result_backend: Celery result backend URL
         backup_retention_days: Default backup retention period in days
         audit_log_retention_days: Default audit log retention period in days
+        indeed_api_key: Indeed API key for job aggregation
+        linkedin_api_key: LinkedIn API key for job aggregation
+        glassdoor_api_key: Glassdoor API key for job aggregation
     """
 
     model_config = SettingsConfigDict(
@@ -196,6 +199,24 @@ class Settings(BaseSettings):
         ge=1,
         le=365,
         description="Default audit log retention period in days",
+    )
+
+    # ==============================================
+    # Job Board API Configuration
+    # ==============================================
+    indeed_api_key: Optional[str] = Field(
+        default=None,
+        description="Indeed API key for job aggregation",
+    )
+
+    linkedin_api_key: Optional[str] = Field(
+        default=None,
+        description="LinkedIn API key for job aggregation",
+    )
+
+    glassdoor_api_key: Optional[str] = Field(
+        default=None,
+        description="Glassdoor API key for job aggregation",
     )
 
     # ==============================================
