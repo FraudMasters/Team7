@@ -10,8 +10,10 @@ from . import (
     candidate_notes,
     candidate_tags,
     candidates,
+    job_integrations,
     saved_searches,
     search,
+    webhooks,
 )
 
 __all__ = [
@@ -20,6 +22,8 @@ __all__ = [
     "candidate_notes",
     "candidate_tags",
     "candidates",
+    "job_integrations",
     "saved_searches",
     "search",
+    "webhooks",
 ]

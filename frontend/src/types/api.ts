@@ -1853,3 +1853,90 @@ export interface SearchHistoryResponse {
   limit: number;
 }
 
+// ==================== Job Integrations Types ====================
+
+/**
+ * Job board integration create request
+ */
+export interface JobBoardIntegrationCreate {
+  name: string;
+  api_endpoint: string;
+  api_key: string;
+  enabled?: boolean;
+  config?: Record<string, unknown>;
+}
+
+/**
+ * Job board integration update request
+ */
+export interface JobBoardIntegrationUpdate {
+  name?: string;
+  api_endpoint?: string;
+  api_key?: string;
+  enabled?: boolean;
+  config?: Record<string, unknown>;
+}
+
+/**
+ * Job board integration response
+ */
+export interface JobBoardIntegrationResponse {
+  id: string;
+  name: string;
+  api_endpoint: string;
+  api_key: string;
+  enabled: boolean;
+  config?: Record<string, unknown>;
+  last_sync_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Job board integration list response
+ */
+export interface JobBoardIntegrationListResponse {
+  integrations: JobBoardIntegrationResponse[];
+  total: number;
+}
+
+/**
+ * Import log response
+ */
+export interface ImportLogResponse {
+  id: string;
+  job_board_id: string | null;
+  job_board_name: string | null;
+  status: string;
+  records_processed: number | null;
+  records_succeeded: number | null;
+  records_failed: number | null;
+  error_message: string | null;
+  error_details: Record<string, unknown> | null;
+  import_metadata: Record<string, unknown> | null;
+  started_at: string | null;
+  completed_at: string | null;
+  retry_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Import log list response
+ */
+export interface ImportLogListResponse {
+  logs: ImportLogResponse[];
+  total: number;
+}
+
+/**
+ * Manual import trigger response
+ */
+export interface ManualImportTriggerResponse {
+  task_id: string;
+  integration_id: string;
+  integration_name: string;
+  message: string;
+  status: string;
+}
+

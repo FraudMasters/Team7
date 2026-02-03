@@ -27,6 +27,11 @@ from .backup_tasks import (
     backup_health_check_task,
 )
 from .audit_cleanup import cleanup_old_audit_logs_task
+from .import_tasks import (
+    poll_job_board,
+    process_imported_resume,
+    scheduled_poll_all_integrations,
+)
 
 __all__ = [
     "analyze_resume_async",
@@ -46,4 +51,7 @@ __all__ = [
     "sync_all_to_s3_task",
     "backup_health_check_task",
     "cleanup_old_audit_logs_task",
+    "poll_job_board",
+    "process_imported_resume",
+    "scheduled_poll_all_integrations",
 ]

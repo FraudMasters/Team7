@@ -101,6 +101,7 @@ const navSections: NavSection[] = [
       { label: 'Weights', path: '/recruiter/weights', icon: <TuneIcon /> },
       { label: 'Backups', path: '/recruiter/backups', icon: <BackupIcon /> },
       { label: 'Workflow', path: '/recruiter/workflow', icon: <TimelineIcon /> },
+      { label: 'Job Integrations', path: '/recruiter/integrations', icon: <CloudUploadIcon /> },
     ],
   },
 ];

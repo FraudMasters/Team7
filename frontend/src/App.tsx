@@ -46,6 +46,7 @@ import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
+import { JobIntegrationsPage } from './pages/recruiter/JobIntegrationsPage';
 
 /**
  * Main App Component
@@ -107,6 +108,7 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="integrations" element={<JobIntegrationsPage />} />
         </Route>
 
         {/* Catch-all route - redirect to landing */}
