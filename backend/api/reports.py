@@ -752,6 +752,136 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
         ) from e
 
 
+@router.post("/export/excel", tags=["Reports"])
+async def export_report_excel(request: CSVExportRequest) -> StreamingResponse:
+    """
+    Export analytics data to Excel format with formatting.
+
+    This endpoint generates an Excel (.xlsx) file from analytics metrics and filters,
+    with professional formatting including styled headers and conditional data bars.
+    The file is returned directly for download.
+
+    Args:
+        request: Excel export request with metrics and filters
+
+    Returns:
+        StreamingResponse with Excel file content
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If Excel generation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "metrics": ["time_to_hire", "resumes_processed"],
+        ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"}
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/reports/export/excel",
+        ...     json=data
+        ... )
+        >>> with open("report.xlsx", "wb") as f:
+        ...     f.write(response.content)
+    """
+    try:
+        logger.info(f"Generating Excel for metrics: {request.metrics}")
+
+        # Validate metrics list
+        if not request.metrics or len(request.metrics) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one metric must be provided",
+            )
+
+        # Import openpyxl for Excel generation
+        import io
+        from openpyxl import Workbook
+        from openpyxl.utils import get_column_letter
+
+        # Create a new workbook and worksheet
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Analytics Report"
+
+        # Write header row
+        headers = ["Metric", "Value", "Date", "Unit"]
+        ws.append(headers)
+
+        # Apply formatting to header row
+        format_excel_headers(ws, header_row=1)
+
+        # Sample data for metrics (similar to CSV export)
+        from datetime import datetime
+        sample_data = {
+            "time_to_hire": {"value": 15, "unit": "days"},
+            "resumes_processed": {"value": 150, "unit": "count"},
+            "match_rates": {"value": 85, "unit": "percentage"},
+            "interviews_scheduled": {"value": 25, "unit": "count"},
+            "offers_extended": {"value": 10, "unit": "count"},
+            "offers_accepted": {"value": 8, "unit": "count"},
+        }
+
+        # Write data rows
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        row_num = 2
+        numeric_values_col = "B"  # Column B will contain numeric values
+
+        for metric in request.metrics:
+            if metric in sample_data:
+                data = sample_data[metric]
+                ws.append([metric, data["value"], today, data["unit"]])
+            else:
+                ws.append([metric, 0, today, "N/A"])
+            row_num += 1
+
+        # Apply data bars to the Value column (Column B)
+        # Only apply if we have numeric data
+        if row_num > 2:
+            apply_data_bars(ws, numeric_values_col, min_row=2, max_row=row_num - 1)
+
+        # Auto-adjust column widths for better readability
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Save workbook to bytes buffer
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+        excel_content = excel_buffer.getvalue()
+        excel_buffer.close()
+
+        logger.info(f"Excel generated successfully for metrics: {request.metrics}")
+
+        # Return as downloadable Excel file
+        return StreamingResponse(
+            io.BytesIO(excel_content),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": "attachment; filename=analytics_export.xlsx",
+                "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating Excel: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate Excel: {str(e)}",
+        ) from e
+
+
 @router.post("/schedule", tags=["Reports"], response_model=ScheduleReportResponse)
 async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
     """
