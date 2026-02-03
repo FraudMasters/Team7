@@ -332,6 +332,36 @@ class EnhancedSkillMatcher:
 
         return best_match
 
+    def _try_direct_match(
+        self,
+        resume_skills: List[str],
+        normalized_required: str
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Attempt a direct match between resume skills and required skill.
+
+        Direct matching checks for exact normalized name matches,
+        which provides the highest confidence (1.0).
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+            normalized_required: Normalized name of the required skill
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> result = matcher._try_direct_match(['ReactJS', 'Python'], 'react')
+            >>> result
+            ('ReactJS', 1.0, 'direct')
+        """
+        for resume_skill in resume_skills:
+            if self.normalize_skill_name(resume_skill) == normalized_required:
+                return resume_skill, 1.0, "direct"
+
+        return None
+
     def _split_compound_skill(self, skill: str) -> List[str]:
         """
         Split compound skills like "C/C++", "Python, Django", "SQL & NoSQL"
@@ -425,15 +455,16 @@ class EnhancedSkillMatcher:
         normalized_required = self.normalize_skill_name(required_skill)
 
         # Strategy 1: Direct match
-        for resume_skill in resume_skills:
-            if self.normalize_skill_name(resume_skill) == normalized_required:
-                result.update({
-                    "matched": True,
-                    "confidence": 1.0,
-                    "matched_as": resume_skill,
-                    "match_type": "direct"
-                })
-                return result
+        direct_match = self._try_direct_match(resume_skills, normalized_required)
+        if direct_match:
+            matched_skill, confidence, match_type = direct_match
+            result.update({
+                "matched": True,
+                "confidence": confidence,
+                "matched_as": matched_skill,
+                "match_type": match_type
+            })
+            return result
 
         # Strategy 1.5: Compound skill match (e.g., "C/C++" contains "C")
         for resume_skill in resume_skills:
