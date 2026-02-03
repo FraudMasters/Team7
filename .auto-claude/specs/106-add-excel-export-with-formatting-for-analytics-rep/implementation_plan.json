@@ -1,0 +1,364 @@
+{
+  "feature": "Add Excel Export with Formatting for Analytics Reports",
+  "description": "Extend the PDF/CSV export functionality to include Excel (.xlsx) format with automatic formatting (headers, cell colors, data bars), leveraging existing export infrastructure.",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a new feature being added to the system. It follows the feature workflow because: (1) It adds new functionality (Excel export) alongside existing features (PDF/CSV export), (2) It involves both backend API and frontend UI changes, (3) The backend API must be implemented before the frontend can consume it, (4) No migration or removal of existing code is required.",
+  "phases": [
+    {
+      "id": "phase-1-backend-dependencies",
+      "name": "Backend Dependencies",
+      "type": "setup",
+      "description": "Add openpyxl library to backend requirements for Excel file generation",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Add openpyxl library to requirements.txt",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/requirements.txt"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pip list | grep openpyxl",
+            "expected": "openpyxl"
+          },
+          "status": "completed",
+          "notes": "openpyxl==3.1.5 already present in requirements.txt at line 30 with appropriate comment"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-backend-excel-export",
+      "name": "Backend Excel Export API",
+      "type": "implementation",
+      "description": "Implement Excel export endpoint with formatting capabilities in reports.py",
+      "depends_on": [
+        "phase-1-backend-dependencies"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create ExcelExportRequest and ExcelExportResponse Pydantic models",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/reports.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/reports.py:66-88"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from api.reports import ExcelExportRequest, ExcelExportResponse; print('Models imported successfully')\"",
+            "expected": "Models imported successfully"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Implement Excel formatting utility functions (header styles, cell colors, data bars)",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/reports.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/taxonomy_import_export.py:49-66"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from api.reports import format_excel_headers, apply_data_bars; print('Utilities imported successfully')\"",
+            "expected": "Utilities imported successfully"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Implement POST /export/excel endpoint with StreamingResponse",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/reports.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/reports.py:528-623",
+            "backend/api/taxonomy_import_export.py:69-150"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8000/api/reports/export/excel",
+            "body": {
+              "metrics": [
+                "time_to_hire",
+                "resumes_processed"
+              ],
+              "filters": {
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31"
+              }
+            },
+            "expected_status": 200,
+            "expected_headers": {
+              "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-frontend-integration",
+      "name": "Frontend Excel Export Integration",
+      "type": "implementation",
+      "description": "Add Excel export option to ReportBuilder component with format selection",
+      "depends_on": [
+        "phase-2-backend-excel-export"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Update ReportBuilder component to support Excel export format option",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/components/analytics/ReportBuilder.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/components/analytics/ReportBuilder.tsx:900-950"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/analytics/report-builder",
+            "checks": [
+              "Excel format option appears in export format selector",
+              "No console errors on component load"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Implement Excel export API call in ReportBuilder with file download handling",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/components/analytics/ReportBuilder.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/components/analytics/ReportBuilder.tsx:900-950",
+            "frontend/src/components/ComparisonControls.tsx:287-379"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/analytics/report-builder",
+            "checks": [
+              "Excel export button triggers download",
+              "Downloaded file has .xlsx extension",
+              "No console errors during export"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-testing",
+      "name": "Testing and Verification",
+      "type": "integration",
+      "description": "Test Excel export functionality end-to-end with various data scenarios",
+      "depends_on": [
+        "phase-2-backend-excel-export",
+        "phase-3-frontend-integration"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Create backend unit tests for Excel export endpoint",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/api/test_reports_excel_export.py"
+          ],
+          "patterns_from": [
+            "backend/tests/api/test_analytics.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/api/test_reports_excel_export.py -v",
+            "expected": "PASSED"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Create frontend integration test for Excel export in ReportBuilder",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/analytics/ReportBuilderExcelExport.test.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/analytics/ReportBuilder.test.tsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm test -- --ReportBuilderExcelExport",
+            "expected": "PASS"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "End-to-end verification of Excel export with formatted output",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Navigate to ReportBuilder page",
+              "Select metrics and filters",
+              "Choose Excel format from export options",
+              "Click export button",
+              "Verify .xlsx file downloads successfully",
+              "Open file in Excel and verify formatting (headers, colors, data bars)",
+              "Verify all requested metrics are present",
+              "Verify filters are correctly applied"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 4,
+    "total_subtasks": 8,
+    "services_involved": [
+      "backend",
+      "frontend"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-3-frontend-integration"
+          ],
+          "reason": "Frontend work can proceed in parallel with backend testing phase, as it only depends on backend API being complete"
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution recommended due to dependencies - frontend requires backend API completion"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 106 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "low",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "Excel export endpoint accepts metrics and filters",
+      "Generated .xlsx files have proper formatting (headers, colors, data bars)",
+      "Frontend ReportBuilder offers Excel export option",
+      "Downloaded Excel files contain correct data",
+      "All existing PDF/CSV export functionality remains working"
+    ],
+    "verification_steps": [
+      {
+        "name": "Backend Unit Tests",
+        "command": "cd backend && pytest tests/api/test_reports_excel_export.py -v",
+        "expected_outcome": "All tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Frontend Component Tests",
+        "command": "cd frontend && npm test -- --ReportBuilderExcelExport",
+        "expected_outcome": "All tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "API Endpoint Verification",
+        "command": "curl -X POST http://localhost:8000/api/reports/export/excel -H 'Content-Type: application/json' -d '{\"metrics\":[\"time_to_hire\"],\"filters\":{}}' -o test.xlsx && file test.xlsx",
+        "expected_outcome": "Excel file with valid MIME type",
+        "type": "manual",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Existing Export Functionality Regression Test",
+        "command": "cd backend && pytest tests/api/test_analytics.py -v",
+        "expected_outcome": "All existing tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "Low risk change - adds new Excel export endpoint without modifying existing PDF/CSV functionality. Requires unit tests for new endpoint and integration test for frontend integration. No security scanning needed as this is a data export feature with existing authentication patterns."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/api/test_reports_excel_export.py -v"
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "cd frontend && npm test -- --ReportBuilderExcelExport"
+      ],
+      "services_to_test": [
+        "backend",
+        "frontend"
+      ]
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": []
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:5173/analytics/report-builder",
+          "checks": [
+            "Excel export option available in format selector",
+            "Export button triggers download",
+            "Downloaded file has .xlsx extension",
+            "No console errors"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    }
+  },
+  "qa_signoff": null,
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "updated_at": "2026-02-03T22:56:59.279Z"
+}
