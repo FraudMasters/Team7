@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.notification import Notification, NotificationType
+from models.notification_preference import NotificationPreference, DigestFrequency
 from models.recruiter import Recruiter
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,55 @@ class UnreadCountResponse(BaseModel):
 
     recipient_id: str = Field(..., description="Recipient recruiter ID")
     unread_count: int = Field(..., description="Number of unread notifications")
+
+
+class NotificationPreferenceItem(BaseModel):
+    """Response model for a notification preference."""
+
+    id: str = Field(..., description="Unique identifier (preference ID)")
+    user_id: str = Field(..., description="User ID who owns this preference")
+    notification_type: str = Field(..., description="Notification type")
+    email_enabled: bool = Field(..., description="Whether email notifications are enabled")
+    in_app_enabled: bool = Field(..., description="Whether in-app notifications are enabled")
+    push_enabled: bool = Field(..., description="Whether push notifications are enabled")
+    sms_enabled: bool = Field(..., description="Whether SMS notifications are enabled")
+    digest_frequency: Optional[str] = Field(None, description="Digest frequency (immediate, hourly, daily, weekly, never)")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class NotificationPreferencesResponse(BaseModel):
+    """Response model for all notification preferences for a user."""
+
+    user_id: str = Field(..., description="User ID")
+    preferences: List[NotificationPreferenceItem] = Field(..., description="List of notification preferences")
+    total_preferences: int = Field(..., description="Total number of preferences")
+
+
+class UpdateNotificationPreferenceRequest(BaseModel):
+    """Request model for updating a notification preference."""
+
+    notification_type: str = Field(..., description="Notification type to update")
+    email_enabled: Optional[bool] = Field(None, description="Enable email notifications")
+    in_app_enabled: Optional[bool] = Field(None, description="Enable in-app notifications")
+    push_enabled: Optional[bool] = Field(None, description="Enable push notifications")
+    sms_enabled: Optional[bool] = Field(None, description="Enable SMS notifications")
+    digest_frequency: Optional[str] = Field(None, description="Digest frequency (immediate, hourly, daily, weekly, never)")
+
+
+class UpdateNotificationPreferenceResponse(BaseModel):
+    """Response model for updating a notification preference."""
+
+    id: str = Field(..., description="Preference ID")
+    user_id: str = Field(..., description="User ID")
+    notification_type: str = Field(..., description="Notification type")
+    email_enabled: bool = Field(..., description="Email notifications enabled")
+    in_app_enabled: bool = Field(..., description="In-app notifications enabled")
+    push_enabled: bool = Field(..., description="Push notifications enabled")
+    sms_enabled: bool = Field(..., description="SMS notifications enabled")
+    digest_frequency: Optional[str] = Field(None, description="Digest frequency")
+    updated_at: str = Field(..., description="Update timestamp")
+    message: str = Field(..., description="Success message")
 
 
 @router.get(
@@ -649,4 +699,287 @@ async def delete_notification(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete notification: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/preferences",
+    response_model=NotificationPreferencesResponse,
+    tags=["Notifications"],
+)
+async def get_notification_preferences(
+    request: Request,
+    user_id: str = Query(..., description="User ID to get preferences for"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get notification preferences for a user.
+
+    Returns all notification preferences for the specified user, including
+    enabled channels and digest frequencies for each notification type.
+
+    Args:
+        request: FastAPI request object
+        user_id: User UUID to get preferences for
+        db: Database session
+
+    Returns:
+        JSON response with list of notification preferences
+
+    Raises:
+        HTTPException(400): Invalid user_id format
+        HTTPException(404): User not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/notifications/preferences",
+        ...     params={"user_id": "abc-123-def"}
+        ... )
+    """
+    try:
+        logger.info(f"Fetching notification preferences for user: {user_id}")
+
+        # Parse user_id as UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid user_id format: {user_id}",
+            )
+
+        # Verify recruiter exists
+        recruiter_query = select(Recruiter).where(Recruiter.id == user_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
+
+        if not recruiter:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User not found: {user_id}",
+            )
+
+        # Get all notification preferences for the user
+        preferences_query = select(NotificationPreference).where(
+            NotificationPreference.user_id == user_uuid
+        )
+        preferences_result = await db.execute(preferences_query)
+        preferences = preferences_result.scalars().all()
+
+        # Convert to response format
+        preferences_list = []
+        for preference in preferences:
+            preferences_list.append({
+                "id": str(preference.id),
+                "user_id": str(preference.user_id),
+                "notification_type": preference.notification_type,
+                "email_enabled": preference.email_enabled,
+                "in_app_enabled": preference.in_app_enabled,
+                "push_enabled": preference.push_enabled,
+                "sms_enabled": preference.sms_enabled,
+                "digest_frequency": preference.digest_frequency,
+                "created_at": preference.created_at.isoformat() if preference.created_at else None,
+                "updated_at": preference.updated_at.isoformat() if preference.updated_at else None,
+            })
+
+        logger.info(
+            f"Retrieved {len(preferences_list)} notification preferences for user {user_id}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "user_id": user_id,
+                "preferences": preferences_list,
+                "total_preferences": len(preferences_list),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting notification preferences: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get notification preferences: {str(e)}",
+        ) from e
+
+
+@router.put(
+    "/preferences",
+    response_model=UpdateNotificationPreferenceResponse,
+    tags=["Notifications"],
+)
+async def update_notification_preference(
+    request: Request,
+    preference_data: UpdateNotificationPreferenceRequest,
+    user_id: str = Query(..., description="User ID to update preference for"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update notification preferences for a user.
+
+    Updates the notification preferences for a specific notification type.
+    If a preference doesn't exist for the user and notification type, it will
+    be created with default values for any unspecified fields.
+
+    Args:
+        request: FastAPI request object
+        preference_data: Preference updates (notification_type and enabled flags)
+        user_id: User UUID to update preferences for
+        db: Database session
+
+    Returns:
+        JSON response with updated notification preference
+
+    Raises:
+        HTTPException(400): Invalid data format
+        HTTPException(404): User not found
+        HTTPException(500): If update fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "notification_type": "candidate_stage_changed",
+        ...     "email_enabled": True,
+        ...     "in_app_enabled": True,
+        ...     "push_enabled": False,
+        ...     "digest_frequency": "immediate"
+        ... }
+        >>> response = requests.put(
+        ...     "http://localhost:8000/api/notifications/preferences",
+        ...     params={"user_id": "abc-123-def"},
+        ...     json=data
+        ... )
+    """
+    try:
+        logger.info(
+            f"Updating notification preference for user {user_id}, "
+            f"type: {preference_data.notification_type}"
+        )
+
+        # Parse user_id as UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid user_id format: {user_id}",
+            )
+
+        # Verify recruiter exists
+        recruiter_query = select(Recruiter).where(Recruiter.id == user_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
+
+        if not recruiter:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User not found: {user_id}",
+            )
+
+        # Validate digest frequency if provided
+        if preference_data.digest_frequency:
+            try:
+                DigestFrequency(preference_data.digest_frequency)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid digest_frequency: {preference_data.digest_frequency}. "
+                    f"Must be one of: immediate, hourly, daily, weekly, never",
+                )
+
+        # Check if preference already exists
+        existing_preference_query = select(NotificationPreference).where(
+            and_(
+                NotificationPreference.user_id == user_uuid,
+                NotificationPreference.notification_type == preference_data.notification_type
+            )
+        )
+        existing_result = await db.execute(existing_preference_query)
+        preference = existing_result.scalar_one_or_none()
+
+        if preference:
+            # Update existing preference
+            if preference_data.email_enabled is not None:
+                preference.email_enabled = preference_data.email_enabled
+            if preference_data.in_app_enabled is not None:
+                preference.in_app_enabled = preference_data.in_app_enabled
+            if preference_data.push_enabled is not None:
+                preference.push_enabled = preference_data.push_enabled
+            if preference_data.sms_enabled is not None:
+                preference.sms_enabled = preference_data.sms_enabled
+            if preference_data.digest_frequency is not None:
+                preference.digest_frequency = preference_data.digest_frequency
+
+            await db.commit()
+            await db.refresh(preference)
+
+            logger.info(
+                f"Updated notification preference {preference.id} "
+                f"for user {user_id}, type {preference_data.notification_type}"
+            )
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "id": str(preference.id),
+                    "user_id": str(preference.user_id),
+                    "notification_type": preference.notification_type,
+                    "email_enabled": preference.email_enabled,
+                    "in_app_enabled": preference.in_app_enabled,
+                    "push_enabled": preference.push_enabled,
+                    "sms_enabled": preference.sms_enabled,
+                    "digest_frequency": preference.digest_frequency,
+                    "updated_at": preference.updated_at.isoformat() if preference.updated_at else None,
+                    "message": "Notification preference updated successfully",
+                },
+            )
+        else:
+            # Create new preference with defaults for unspecified fields
+            new_preference = NotificationPreference(
+                user_id=user_uuid,
+                notification_type=preference_data.notification_type,
+                email_enabled=preference_data.email_enabled if preference_data.email_enabled is not None else True,
+                in_app_enabled=preference_data.in_app_enabled if preference_data.in_app_enabled is not None else True,
+                push_enabled=preference_data.push_enabled if preference_data.push_enabled is not None else False,
+                sms_enabled=preference_data.sms_enabled if preference_data.sms_enabled is not None else False,
+                digest_frequency=preference_data.digest_frequency,
+            )
+
+            db.add(new_preference)
+            await db.commit()
+            await db.refresh(new_preference)
+
+            logger.info(
+                f"Created notification preference {new_preference.id} "
+                f"for user {user_id}, type {preference_data.notification_type}"
+            )
+
+            return JSONResponse(
+                status_code=status.HTTP_201_CREATED,
+                content={
+                    "id": str(new_preference.id),
+                    "user_id": str(new_preference.user_id),
+                    "notification_type": new_preference.notification_type,
+                    "email_enabled": new_preference.email_enabled,
+                    "in_app_enabled": new_preference.in_app_enabled,
+                    "push_enabled": new_preference.push_enabled,
+                    "sms_enabled": new_preference.sms_enabled,
+                    "digest_frequency": new_preference.digest_frequency,
+                    "updated_at": new_preference.updated_at.isoformat() if new_preference.updated_at else None,
+                    "message": "Notification preference created successfully",
+                },
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating notification preference: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update notification preference: {str(e)}",
         ) from e
