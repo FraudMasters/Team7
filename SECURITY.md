@@ -2765,6 +2765,1686 @@ async def fetch_url(url: str):
 
 ---
 
+## Data Security & Encryption
+
+Protecting sensitive candidate and hiring data through encryption and secure data handling practices is critical for compliance and trust.
+
+### Data Classification
+
+Classify data based on sensitivity to apply appropriate security controls.
+
+| Classification | Data Types | Storage Requirements | Transmission Requirements |
+|----------------|------------|---------------------|---------------------------|
+| **Critical** | SSN, passport numbers, financial data | Encryption at rest required, strict access control | TLS 1.3, end-to-end encryption |
+| **Sensitive** | PII (names, emails, phones), resumes | Encryption at rest recommended | TLS 1.2+, secure protocols |
+| **Internal** | Ranking algorithms, business logic | Access controlled | TLS recommended |
+| **Public** | Marketing content, public job postings | Standard security | HTTPS required |
+
+### Encryption at Rest
+
+Protect data stored in databases, file systems, and backups.
+
+#### Database Encryption
+
+**PostgreSQL SSL/TLS**:
+
+```bash
+# DATABASE_URL with SSL requirement
+DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
+
+# Or verify certificate
+DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=verify-full&sslrootcert=/path/to/ca.crt
+```
+
+**Application-Level Encryption** (for highly sensitive fields):
+
+```python
+from cryptography.fernet import Fernet
+import base64
+import os
+from typing import Any
+
+class FieldEncryption:
+    """
+    Encrypt/decrypt sensitive fields at application level.
+
+    Use for: SSN, financial data, sensitive PII that needs extra protection.
+    """
+
+    def __init__(self, key: str = None):
+        """
+        Initialize encryption with key.
+
+        Args:
+            key: 32-byte URL-safe base64-encoded key.
+                 If None, reads from FIELD_ENCRYPTION_KEY env variable.
+        """
+        if key is None:
+            key = os.getenv("FIELD_ENCRYPTION_KEY")
+            if not key:
+                raise ValueError("FIELD_ENCRYPTION_KEY environment variable not set")
+
+        # Ensure key is properly formatted
+        if len(key) != 44:  # Fernet keys are 44 chars (base64 of 32 bytes)
+            raise ValueError("Invalid encryption key length")
+
+        self.cipher = Fernet(key.encode())
+
+    def encrypt(self, plaintext: str) -> str:
+        """
+        Encrypt plaintext string.
+
+        Args:
+            plaintext: String to encrypt
+
+        Returns:
+            Base64-encoded encrypted string
+        """
+        if plaintext is None:
+            return None
+
+        encrypted = self.cipher.encrypt(plaintext.encode())
+        return base64.urlsafe_b64encode(encrypted).decode()
+
+    def decrypt(self, ciphertext: str) -> str:
+        """
+        Decrypt ciphertext string.
+
+        Args:
+            ciphertext: Base64-encoded encrypted string
+
+        Returns:
+            Decrypted plaintext string
+        """
+        if ciphertext is None:
+            return None
+
+        encrypted = base64.urlsafe_b64decode(ciphertext.encode())
+        decrypted = self.cipher.decrypt(encrypted)
+        return decrypted.decode()
+
+
+# Usage in models
+field_encryptor = FieldEncryption()
+
+# Encrypting before storage
+candidate.ssn_encrypted = field_encryptor.encrypt(candidate_ssn)
+
+# Decrypting after retrieval
+candidate_ssn = field_encryptor.decrypt(candidate.ssn_encrypted)
+```
+
+**Generate Encryption Key**:
+
+```bash
+# Generate Fernet-compatible key (44 characters)
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Set as environment variable
+export FIELD_ENCRYPTION_KEY="<generated-key>"
+
+# Add to .env.production
+echo "FIELD_ENCRYPTION_KEY=<generated-key>" >> .env.production
+```
+
+**Column-Level Encryption with pgcrypto**:
+
+```sql
+-- Install extension
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Encrypt sensitive data
+INSERT INTO candidates (name, ssn_encrypted)
+VALUES (
+    'John Doe',
+    pgp_sym_encrypt('123-45-6789', 'encryption-key')
+);
+
+-- Decrypt when needed
+SELECT
+    name,
+    pgp_sym_decrypt(ssn_encrypted::bytea, 'encryption-key') AS ssn
+FROM candidates;
+```
+
+#### File Storage Encryption
+
+**Resume File Encryption**:
+
+```python
+import os
+from pathlib import Path
+from cryptography.fernet import Fernet
+
+class EncryptedFileStorage:
+    """
+    Handle encrypted storage of uploaded resumes.
+
+    Files are encrypted before storage and decrypted on retrieval.
+    """
+
+    def __init__(self, storage_path: str, encryption_key: str):
+        """
+        Initialize encrypted file storage.
+
+        Args:
+            storage_path: Base path for encrypted file storage
+            encryption_key: Fernet encryption key
+        """
+        self.storage_path = Path(storage_path)
+        self.storage_path.mkdir(parents=True, exist_ok=True)
+        self.cipher = Fernet(encryption_key)
+
+    def save_encrypted(self, file_content: bytes, filename: str) -> str:
+        """
+        Encrypt and save file.
+
+        Args:
+            file_content: Raw file content
+            filename: Original filename
+
+        Returns:
+            Path to encrypted file
+        """
+        # Encrypt content
+        encrypted_content = self.cipher.encrypt(file_content)
+
+        # Generate unique filename
+        import secrets
+        unique_name = f"{secrets.token_hex(16)}_{filename}"
+        file_path = self.storage_path / unique_name
+
+        # Save encrypted content
+        with open(file_path, 'wb') as f:
+            f.write(encrypted_content)
+
+        return str(file_path)
+
+    def read_encrypted(self, file_path: str) -> bytes:
+        """
+        Read and decrypt file.
+
+        Args:
+            file_path: Path to encrypted file
+
+        Returns:
+            Decrypted file content
+        """
+        with open(file_path, 'rb') as f:
+            encrypted_content = f.read()
+
+        return self.cipher.decrypt(encrypted_content)
+```
+
+#### Backup Encryption
+
+**Automated Encrypted Backups**:
+
+```bash
+#!/bin/bash
+# backup_database.sh - Encrypted database backup script
+
+# Configuration
+BACKUP_DIR="/backups/postgres"
+ENCRYPTION_KEY_FILE="/secure/backup_key.txt"
+RETENTION_DAYS=30
+
+# Generate backup filename with timestamp
+BACKUP_FILE="$BACKUP_DIR/db_backup_$(date +%Y%m%d_%H%M%S).sql.gz.gpg"
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+# Dump, compress, and encrypt database
+pg_dump "$DATABASE_URL" | \
+    gzip | \
+    gpg --cipher-algo AES256 --compress-algo 1 --symmetric \
+        --batch --passphrase-file "$ENCRYPTION_KEY_FILE" \
+        --output "$BACKUP_FILE"
+
+# Set file permissions
+chmod 600 "$BACKUP_FILE"
+
+# Delete old backups
+find "$BACKUP_DIR" -name "db_backup_*.sql.gz.gpg" -mtime +$RETENTION_DAYS -delete
+
+echo "Backup completed: $BACKUP_FILE"
+```
+
+**Restore from Encrypted Backup**:
+
+```bash
+# Decrypt and restore
+gpg --decrypt --batch --passphrase-file /secure/backup_key.txt \
+    /backups/postgres/db_backup_20260204_120000.sql.gz.gpg | \
+    gunzip | \
+    psql "$DATABASE_URL"
+```
+
+### Encryption in Transit
+
+Protect data as it travels between services and clients.
+
+#### TLS/SSL Configuration
+
+**Backend API (FastAPI/Uvicorn)**:
+
+```bash
+# Generate self-signed certificate for development
+openssl req -x509 -newkey rsa:4096 -nodes \
+    -keyout key.pem -out cert.pem -days 365 \
+    -subj "/CN=localhost"
+
+# Run with TLS
+uvicorn main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --ssl-keyfile key.pem \
+    --ssl-certfile cert.pem
+```
+
+**Production Certificate (Let's Encrypt)**:
+
+```bash
+# Install certbot
+apt-get install certbot
+
+# Generate certificate
+certbot certonly --standalone -d api.agenthr.com
+
+# Paths to certificates
+cert.pem = /etc/letsencrypt/live/api.agenthr.com/fullchain.pem
+key.pem = /etc/letsencrypt/live/api.agenthr.com/privkey.pem
+```
+
+**Docker Compose with TLS**:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  backend:
+    image: agenthr-backend:latest
+    ports:
+      - "443:8000"
+    volumes:
+      - ./certs:/certs:ro
+    command: >
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 8000
+      --ssl-keyfile /certs/key.pem
+      --ssl-certfile /certs/cert.pem
+```
+
+#### Database Connection Security
+
+**Require SSL for PostgreSQL**:
+
+```python
+# config.py
+DATABASE_URL: str = Field(
+    default="postgresql://user:pass@localhost:5432/db",
+    description="PostgreSQL connection URL"
+)
+
+@field_validator("DATABASE_URL")
+@classmethod
+def require_ssl_in_production(cls, v: str, info) -> str:
+    """Ensure SSL is enabled in production."""
+    settings = info.data
+    if settings.environment == "production" and "sslmode" not in v:
+        logger.warning("SSL not enabled for DATABASE_URL in production")
+        # Force SSL mode
+        if "?" in v:
+            v += "&sslmode=require"
+        else:
+            v += "?sslmode=require"
+    return v
+```
+
+**Verify SSL Certificates**:
+
+```bash
+# In production, verify certificates
+DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=verify-full&sslrootcert=/path/to/ca.crt"
+```
+
+#### Redis TLS
+
+**Enable Redis TLS**:
+
+```python
+# config.py
+REDIS_URL: str = Field(
+    default="redis://localhost:6379/0",
+    description="Redis connection URL"
+)
+
+# For production with TLS
+# redis_url: str = "rediss://localhost:6379/0?ssl_cert_reqs=required"
+```
+
+**Redis TLS Configuration**:
+
+```yaml
+# docker-compose.yml
+services:
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --tls-port 6379
+      --port 0
+      --tls-cert-file /etc/redis/tls/redis.crt
+      --tls-key-file /etc/redis/tls/redis.key
+      --tls-ca-cert-file /etc/redis/tls/ca.crt
+      --tls-auth-clients no
+    volumes:
+      - ./redis-tls:/etc/redis/tls:ro
+```
+
+### PII Data Handling
+
+Special handling for Personally Identifiable Information (PII).
+
+#### PII Detection
+
+```python
+import re
+from typing import List, Dict
+
+class PIIDetector:
+    """
+    Detect PII in text data for proper handling.
+    """
+
+    # PII patterns
+    PATTERNS = {
+        "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        "phone": r'\b\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b',
+        "ssn": r'\b\d{3}-\d{2}-\d{4}\b',
+        "credit_card": r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b',
+        "ip_address": r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b',
+        "passport": r'\b[A-Z]{1,2}\d{6,9}\b',
+    }
+
+    @classmethod
+    def detect_pii(cls, text: str) -> Dict[str, List[str]]:
+        """
+        Detect PII in text.
+
+        Args:
+            text: Text to scan for PII
+
+        Returns:
+            Dictionary of PII type to list of matches
+        """
+        findings = {}
+
+        for pii_type, pattern in cls.PATTERNS.items():
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                findings[pii_type] = matches
+
+        return findings
+
+    @classmethod
+    def contains_pii(cls, text: str) -> bool:
+        """
+        Check if text contains any PII.
+
+        Args:
+            text: Text to check
+
+        Returns:
+            True if PII detected, False otherwise
+        """
+        findings = cls.detect_pii(text)
+        return len(findings) > 0
+
+    @classmethod
+    def redact_pii(cls, text: str, replacement: str = "[REDACTED]") -> str:
+        """
+        Redact PII from text.
+
+        Args:
+            text: Text to redact
+            replacement: Replacement string
+
+        Returns:
+            Text with PII redacted
+        """
+        for pattern in cls.PATTERNS.values():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+        return text
+```
+
+#### PII Data Minimization
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class CandidatePII(BaseModel):
+    """
+    Candidate PII model with data minimization.
+    Only collect and store necessary PII.
+    """
+
+    # Required PII
+    full_name: str = Field(..., max_length=255)
+    email: str = Field(..., max_length=255)
+
+    # Optional PII - only collect if needed
+    phone: Optional[str] = Field(None, max_length=50)
+    address: Optional[str] = Field(None, max_length=500)
+
+    # Avoid collecting SSN unless absolutely necessary
+    ssn: Optional[str] = Field(None, max_length=11)  # Encrypted if collected
+
+    # Consider using tokenized IDs instead of PII
+    candidate_token: str = Field(..., description="Unique token for anonymous identification")
+
+
+class PublicCandidateView(BaseModel):
+    """
+    Public view with minimal PII exposure.
+    Used for APIs that don't need full PII.
+    """
+
+    id: int
+    initials: str  # Only initials, not full name
+    candidate_token: str  # Anonymous token
+    skills_summary: list[str]
+    experience_years: int
+    # No email, phone, or other identifying information
+```
+
+#### Data Retention Policy
+
+```python
+from datetime import datetime, timedelta
+from sqlalchemy import delete
+
+class DataRetentionPolicy:
+    """
+    Implement data retention policies for compliance.
+    """
+
+    # Retention periods
+    RESUME_RETENTION_YEARS = 7
+    APPLICATION_RETENTION_YEARS = 3
+    LOG_RETENTION_DAYS = 90
+
+    @staticmethod
+    async def delete_old_resumes(db: AsyncSession):
+        """
+        Delete resumes older than retention period.
+
+        Args:
+            db: Database session
+        """
+        cutoff_date = datetime.utcnow() - timedelta(
+            years=DataRetentionPolicy.RESUME_RETENTION_YEARS
+        )
+
+        # Soft delete (mark as deleted)
+        await db.execute(
+            update(Resume)
+            .where(Resume.created_at < cutoff_date)
+            .values(deleted_at=datetime.utcnow(), is_deleted=True)
+        )
+        await db.commit()
+
+    @staticmethod
+    async def purge_soft_deleted(db: AsyncSession):
+        """
+        Permanently delete soft-deleted records older than grace period.
+
+        Args:
+            db: Database session
+        """
+        grace_period = datetime.utcnow() - timedelta(days=30)
+
+        # Hard delete soft-deleted records
+        await db.execute(
+            delete(Resume)
+            .where(Resume.deleted_at < grace_period)
+        )
+        await db.commit()
+
+    @staticmethod
+    async def anonymize_old_applications(db: AsyncSession):
+        """
+        Anonymize old application data (keep analytics, remove PII).
+
+        Args:
+            db: Database session
+        """
+        cutoff_date = datetime.utcnow() - timedelta(
+            years=DataRetentionPolicy.APPLICATION_RETENTION_YEARS
+        )
+
+        # Replace PII with anonymized data
+        await db.execute(
+            update(Application)
+            .where(Application.created_at < cutoff_date)
+            .values(
+                candidate_name="[ANONYMIZED]",
+                candidate_email=f"anon-{Application.id}@anonymous.local",
+                candidate_phone=None
+            )
+        )
+        await db.commit()
+```
+
+### Data Masking for Development
+
+Never use real PII in development environments.
+
+```python
+from faker import Faker
+import random
+
+class DataMasker:
+    """
+    Mask/anonymize PII for development environments.
+    """
+
+    fake = Faker()
+
+    @classmethod
+    def mask_email(cls, email: str) -> str:
+        """Mask email address."""
+        username, domain = email.split("@")
+        return f"{username[:3]}***@{domain}"
+
+    @classmethod
+    def mask_phone(cls, phone: str) -> str:
+        """Mask phone number."""
+        return f"***-***-{phone[-4:]}"
+
+    @classmethod
+    def mask_name(cls, name: str) -> str:
+        """Mask person's name."""
+        parts = name.split()
+        if len(parts) == 2:
+            return f"{parts[0][0]}. {parts[1]}"
+        return "***"
+
+    @classmethod
+    def anonymize_database_dump(cls, input_file: str, output_file: str):
+        """
+        Anonymize a database dump for development use.
+
+        Args:
+            input_file: Path to SQL dump file
+            output_file: Path to anonymized dump file
+        """
+        with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
+            for line in infile:
+                # Replace emails
+                line = re.sub(
+                    r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}',
+                    lambda m: cls.fake.email(),
+                    line
+                )
+
+                # Replace names
+                line = re.sub(
+                    r"'([A-Z][a-z]+ [A-Z][a-z]+)'",
+                    lambda m: f"'{cls.fake.name()}'",
+                    line
+                )
+
+                # Replace phone numbers
+                line = re.sub(
+                    r'\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}',
+                    lambda m: cls.fake.phone_number(),
+                    line
+                )
+
+                outfile.write(line)
+```
+
+### Secure Data Destruction
+
+Permanently delete sensitive data when no longer needed.
+
+```python
+import os
+import random
+
+class SecureDataDestructor:
+    """
+    Securely delete sensitive data from disk and database.
+    """
+
+    @staticmethod
+    def secure_file_delete(file_path: str, passes: int = 3):
+        """
+        Securely delete file by overwriting multiple times.
+
+        Args:
+            file_path: Path to file to delete
+            passes: Number of overwrite passes
+        """
+        file_size = os.path.getsize(file_path)
+
+        with open(file_path, 'r+b') as f:
+            for pass_num in range(passes):
+                # Overwrite with random data
+                f.seek(0)
+                f.write(os.urandom(file_size))
+                f.flush()
+                os.fsync(f.fileno())
+
+                # Overwrite with zeros
+                f.seek(0)
+                f.write(b'\x00' * file_size)
+                f.flush()
+                os.fsync(f.fileno())
+
+        # Finally remove the file
+        os.remove(file_path)
+
+    @staticmethod
+    async def secure_pii_deletion(record_id: int, db: AsyncSession):
+        """
+        Securely delete PII record and associated files.
+
+        Args:
+            record_id: ID of record to delete
+            db: Database session
+        """
+        # Get record
+        resume = await db.get(Resume, record_id)
+        if not resume:
+            return
+
+        # Delete associated files securely
+        if resume.file_path:
+            SecureDataDestructor.secure_file_delete(resume.file_path)
+
+        # Overwrite sensitive fields in database before deletion
+        resume.candidate_name = "DELETED"
+        resume.candidate_email = f"deleted-{resume.id}@deleted.local"
+        resume.candidate_phone = None
+        await db.commit()
+
+        # Finally delete record
+        await db.delete(resume)
+        await db.commit()
+
+        # Log the deletion
+        logger.info(f"Securely deleted resume {record_id}")
+```
+
+### Data Security Checklist
+
+#### Encryption at Rest
+
+- [ ] Database uses SSL/TLS for connections
+- [ ] Sensitive PII fields encrypted at application level
+- [ ] File storage encrypted (or filesystem encryption enabled)
+- [ ] Backups encrypted before storage
+- [ ] Encryption keys stored securely (not in code)
+- [ ] Key rotation policy implemented
+- [ ] Multiple encryption keys for different data types
+
+#### Encryption in Transit
+
+- [ ] TLS 1.2+ enforced for all services
+- [ ] HTTP redirected to HTTPS
+- [ ] Certificate expiration monitored
+- [ ] Certificate auto-renewal configured
+- [ ] HSTS header enabled
+- [ ] Strong cipher suites only
+- [ ] Certificate pinning for mobile apps (if applicable)
+
+#### PII Handling
+
+- [ ] PII inventory maintained
+- [ ] PII detection implemented
+- [ ] Data minimization practiced (collect only necessary data)
+- [ ] Data classification implemented
+- [ ] PII access logged and audited
+- [ ] Right to erasure implemented (GDPR)
+- [ ] Data portability implemented (GDPR)
+- [ ] Consent management implemented
+- [ ] PII masked in development environment
+
+#### Data Retention
+
+- [ ] Retention policy documented
+- [ ] Auto-deletion of expired data implemented
+- [ ] Soft delete before hard delete
+- [ ] Backup retention policy defined
+- [ ] Log retention policy defined (90 days recommended)
+- [ ] Legal holds process defined
+
+#### Data Destruction
+
+- [ ] Secure file deletion implemented
+- [ ] Database records anonymized before deletion
+- [ ] Certificate/key revocation process
+- [ ] Backup destruction process
+- [ ] Destruction audit trail
+
+---
+
+## File Upload Security
+
+File uploads are a critical attack vector. The security scan identified several areas requiring attention.
+
+### Current Security Posture
+
+**✅ Implemented**:
+- File type validation by extension
+- MIME type validation
+- File size limits enforced (10MB default)
+- Unique filename generation with random bytes
+- Files stored outside web root
+- Path traversal prevention (using `Path(file.filename).name`)
+
+**⚠️ Needs Implementation**:
+- Magic number validation (file header checking)
+- Malware/virus scanning
+- Rate limiting on upload endpoint
+- File content sanitization (for PDF/DOCX)
+- Upload quota per user
+- Encryption of uploaded files at rest
+
+### Threat Model
+
+#### File Upload Attack Vectors
+
+| Attack Type | Description | Impact | Mitigation |
+|-------------|-------------|--------|------------|
+| **Malware Upload** | Upload executable malware or infected documents | Server compromise, data breach, ransomware | Magic number validation, malware scanning, sandboxed processing |
+| **Path Traversal** | Upload files to arbitrary directories | Server configuration overwrite, system compromise | Strip directory paths, validate filenames |
+| **DoS via Upload** | Upload massive files or file bomb | Storage exhaustion, service disruption | File size limits, per-user quotas, rate limiting |
+| **File Type Spoofing** | Rename malicious file as valid type | Bypass file type checks | Magic number validation, MIME verification |
+| **XSS via File Content** | Upload HTML/JS files with malicious scripts | Execute malicious code in victim's browser | Content-Type validation, Content-Disposition headers |
+| **XXE via XML Upload** | Upload XML with external entity references | Server-side request forgery, data exfiltration | Disable XML external entities, validate XML |
+
+### Comprehensive File Upload Security
+
+#### Implementation: Secure File Upload Handler
+
+`backend/api/upload.py`:
+
+```python
+import os
+import magic
+import hashlib
+from pathlib import Path
+from typing import Optional
+from fastapi import UploadFile, HTTPException, status
+import aiofiles
+import clamav
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Allowed file types and their magic numbers
+ALLOWED_FILE_TYPES = {
+    "application/pdf": {
+        "extensions": [".pdf"],
+        "magic_numbers": [b"%PDF-"],
+        "max_size_mb": 10
+    },
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+        "extensions": [".docx"],
+        "magic_numbers": [b"PK\x03\x04"],  # DOCX is a ZIP file
+        "max_size_mb": 10
+    },
+    "application/msword": {
+        "extensions": [".doc"],
+        "magic_numbers": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],  # OLE2 format
+        "max_size_mb": 10
+    },
+    "text/plain": {
+        "extensions": [".txt"],
+        "magic_numbers": None,  # No specific magic number for text
+        "max_size_mb": 1
+    },
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+        "extensions": [".xlsx"],
+        "magic_numbers": [b"PK\x03\x04"],
+        "max_size_mb": 5
+    }
+}
+
+# Dangerous file extensions to always block
+BLOCKED_EXTENSIONS = {
+    ".exe", ".bat", ".cmd", ".com", ".scr", ".pif", ".msi", ".dll",
+    ".vbs", ".vbe", ".js", ".jse", ".ws", ".wsf", ".wsc", ".wsh",
+    ".ps1", ".ps1xml", ".ps2", ".ps2xml", ".psc1", ".psc2",
+    ".msh", ".msh1", ".msh2", ".mshxml", ".msh1xml", ".msh2xml",
+    ".scf", ".lnk", ".inf", ".reg", ".docm", ".dotm", ".xlsm",
+    ".xltm", ".xlam", ".pptm", ".potm", ".ppam", ".ppsm", ".sldm"
+}
+
+
+class SecureFileUploader:
+    """
+    Secure file upload handler with comprehensive validation.
+    """
+
+    def __init__(
+        self,
+        upload_dir: str,
+        max_file_size_mb: int = 10,
+        enable_malware_scan: bool = True,
+        clamav_host: str = "localhost:3310"
+    ):
+        """
+        Initialize secure file uploader.
+
+        Args:
+            upload_dir: Directory for uploaded files (outside web root)
+            max_file_size_mb: Maximum file size in MB
+            enable_malware_scan: Enable ClamAV malware scanning
+            clamav_host: ClamAV scanner host:port
+        """
+        self.upload_dir = Path(upload_dir)
+        self.upload_dir.mkdir(parents=True, exist_ok=True)
+        self.max_file_size = max_file_size_mb * 1024 * 1024
+        self.enable_malware_scan = enable_malware_scan
+        self.clamav_host = clamav_host
+
+    async def validate_and_upload(
+        self,
+        file: UploadFile,
+        user_id: int
+    ) -> dict:
+        """
+        Validate and securely upload a file.
+
+        Args:
+            file: FastAPI UploadFile object
+            user_id: ID of user uploading the file
+
+        Returns:
+            Dictionary with file metadata
+
+        Raises:
+            HTTPException: If validation fails
+        """
+        # 1. Check file size
+        await self._validate_file_size(file)
+
+        # 2. Validate filename
+        self._validate_filename(file.filename)
+
+        # 3. Read file content
+        file_content = await file.read()
+
+        # 4. Validate magic numbers
+        declared_mime_type = file.content_type or "application/octet-stream"
+        await self._validate_magic_numbers(file_content, declared_mime_type)
+
+        # 5. Scan for malware
+        if self.enable_malware_scan:
+            await self._scan_for_malware(file_content)
+
+        # 6. Generate secure filename
+        secure_filename = self._generate_secure_filename(file.filename, user_id)
+
+        # 7. Save file
+        file_path = self.upload_dir / secure_filename
+        async with aiofiles.open(file_path, 'wb') as f:
+            await f.write(file_content)
+
+        # 8. Set secure permissions
+        os.chmod(file_path, 0o644)
+
+        # 9. Calculate file hash for integrity checking
+        file_hash = hashlib.sha256(file_content).hexdigest()
+
+        logger.info(
+            f"File uploaded successfully",
+            extra={
+                "user_id": user_id,
+                "filename": secure_filename,
+                "original_filename": file.filename,
+                "size": len(file_content),
+                "hash": file_hash
+            }
+        )
+
+        return {
+            "filename": secure_filename,
+            "original_filename": file.filename,
+            "file_path": str(file_path),
+            "file_size": len(file_content),
+            "content_type": declared_mime_type,
+            "file_hash": file_hash
+        }
+
+    async def _validate_file_size(self, file: UploadFile):
+        """
+        Validate file size is within limits.
+
+        Args:
+            file: UploadFile to validate
+
+        Raises:
+            HTTPException: If file too large
+        """
+        # Get file size
+        file.file.seek(0, os.SEEK_END)
+        file_size = file.file.tell()
+        file.file.seek(0)  # Reset pointer
+
+        if file_size > self.max_file_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File size {file_size} bytes exceeds maximum {self.max_file_size} bytes"
+            )
+
+        if file_size == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File is empty"
+            )
+
+    def _validate_filename(self, filename: str):
+        """
+        Validate filename is safe.
+
+        Args:
+            filename: Original filename
+
+        Raises:
+            HTTPException: If filename is suspicious
+        """
+        if not filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Filename is required"
+            )
+
+        # Check for path traversal
+        if ".." in filename or "/" in filename or "\\" in filename:
+            logger.warning(f"Path traversal attempt blocked: {filename}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid filename"
+            )
+
+        # Check for blocked extensions
+        file_ext = Path(filename).suffix.lower()
+        if file_ext in BLOCKED_EXTENSIONS:
+            logger.warning(f"Blocked file extension: {file_ext}")
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"File type {file_ext} is not allowed"
+            )
+
+        # Check for suspicious characters
+        if any(char in filename for char in ['\x00', '\n', '\r']):
+            logger.warning(f"Suspicious characters in filename: {filename}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid filename"
+            )
+
+    async def _validate_magic_numbers(
+        self,
+        file_content: bytes,
+        declared_mime_type: str
+    ):
+        """
+        Validate file content using magic numbers.
+
+        Args:
+            file_content: File content as bytes
+            declared_mime_type: MIME type declared by client
+
+        Raises:
+            HTTPException: If magic numbers don't match declared type
+        """
+        # Get declared file type config
+        file_config = ALLOWED_FILE_TYPES.get(declared_mime_type)
+        if not file_config:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"File type {declared_mime_type} is not allowed"
+            )
+
+        # Check magic numbers if defined for this type
+        if file_config["magic_numbers"]:
+            header = file_content[:8]  # Read first 8 bytes
+
+            magic_match = any(
+                header.startswith(magic)
+                for magic in file_config["magic_numbers"]
+            )
+
+            if not magic_match:
+                logger.warning(
+                    f"Magic number mismatch for {declared_mime_type}",
+                    extra={"header": header.hex()}
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail=f"File content does not match declared type {declared_mime_type}"
+                )
+
+    async def _scan_for_malware(self, file_content: bytes):
+        """
+        Scan file content for malware using ClamAV.
+
+        Args:
+            file_content: File content as bytes
+
+        Raises:
+            HTTPException: If malware detected
+        """
+        try:
+            # Import clamd module
+            import pyclamd
+
+            # Initialize ClamAV scanner
+            cd = pyclamd.ClamdUnixSocket()
+            if not cd.ping():
+                # Try TCP socket
+                cd = pyclamd.ClamdNetworkSocket(self.clamav_host.split(":")[0],
+                                                 int(self.clamav_host.split(":")[1]))
+                if not cd.ping():
+                    logger.error("ClamAV scanner not accessible")
+                    if self.enable_malware_scan:
+                        raise HTTPException(
+                            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Malware scanner unavailable"
+                        )
+                    return
+
+            # Scan file
+            result = cd.scan_stream(file_content)
+
+            if result and 'FOUND' in str(result):
+                logger.critical(
+                    f"Malware detected in upload",
+                    extra={"scan_result": result}
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Malware detected in uploaded file"
+                )
+
+            logger.info(f"Malware scan passed")
+
+        except ImportError:
+            logger.warning("pyclamd not installed - skipping malware scan")
+        except Exception as e:
+            logger.error(f"Malware scan error: {e}")
+            if self.enable_malware_scan:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Malware scanner error"
+                )
+
+    def _generate_secure_filename(self, original_filename: str, user_id: int) -> str:
+        """
+        Generate a secure, unique filename.
+
+        Args:
+            original_filename: Original filename
+            user_id: ID of user uploading
+
+        Returns:
+            Secure filename
+        """
+        # Get file extension
+        file_ext = Path(original_filename).suffix.lower()
+
+        # Generate unique components
+        import secrets
+        import time
+
+        timestamp = int(time.time())
+        random_bytes = secrets.token_hex(8)
+
+        # Construct secure filename
+        # Format: user_id-timestamp-random.extension
+        secure_filename = f"{user_id}-{timestamp}-{random_bytes}{file_ext}"
+
+        return secure_filename
+
+
+# Initialize uploader instance
+file_uploader = SecureFileUploader(
+    upload_dir="/var/uploads/resumes",
+    max_file_size_mb=10,
+    enable_malware_scan=True  # Disable in development
+)
+```
+
+#### Usage in FastAPI Endpoint
+
+`backend/api/routes/resumes.py`:
+
+```python
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from api.upload import SecureFileUploader, file_uploader
+from database import get_db
+
+router = APIRouter(prefix="/api/resumes", tags=["resumes"])
+
+
+@router.post("/upload")
+async def upload_resume(
+    file: UploadFile,
+    user_id: int,  # From authentication when implemented
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Upload a resume file with comprehensive security validation.
+
+    Security checks:
+    - File size validation
+    - Filename validation (path traversal prevention)
+    - Magic number validation
+    - Malware scanning
+    - Secure filename generation
+    """
+    try:
+        # Upload file with all security checks
+        file_metadata = await file_uploader.validate_and_upload(file, user_id)
+
+        # Create database record
+        resume = Resume(
+            candidate_name="",  # Extract from file content
+            file_path=file_metadata["file_path"],
+            file_hash=file_metadata["file_hash"],
+            uploaded_by=user_id
+        )
+        db.add(resume)
+        await db.commit()
+        await db.refresh(resume)
+
+        return {
+            "id": resume.id,
+            "filename": file_metadata["filename"],
+            "size": file_metadata["file_size"],
+            "status": "uploaded"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Upload error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="File upload failed"
+        )
+```
+
+### Malware Scanning Implementation
+
+#### ClamAV Setup
+
+**Docker Compose with ClamAV**:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  clamav:
+    image: clamav/clamav:latest
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    environment:
+      - CLAMAV_NO_MILTERD=true
+
+  backend:
+    image: agenthr-backend:latest
+    depends_on:
+      - clamav
+    environment:
+      - CLAMAV_HOST=clamav:3310
+      - ENABLE_MALWARE_SCAN=true
+
+volumes:
+  clamav_db:
+```
+
+**Update ClamAV Signatures**:
+
+```bash
+# In clamav container
+docker-compose exec clamav freshclam
+
+# Or run periodically via cron
+echo "0 */6 * * * docker-compose exec -T clamav freshclam" | crontab -
+```
+
+**Python ClamAV Client**:
+
+```python
+# backend/requirements.txt
+pyclamd==0.1.5  # ClamAV Python client
+```
+
+#### Alternative: Cloud-Based Malware Scanning
+
+**AWS Lambda + Amazon GuardDuty**:
+
+```python
+import boto3
+
+class AWSSecurityScanner:
+    """Use AWS services for malware scanning."""
+
+    def __init__(self):
+        self.lambda_client = boto3.client('lambda')
+
+    async def scan_file(self, file_content: bytes, filename: str) -> dict:
+        """
+        Scan file using AWS Lambda with GuardDuty integration.
+
+        Args:
+            file_content: File content
+            filename: Filename
+
+        Returns:
+            Scan results
+        """
+        # Invoke Lambda function for scanning
+        response = self.lambda_client.invoke(
+            FunctionName='malware-scanner',
+            Payload=json.dumps({
+                'file_content': base64.b64encode(file_content).decode(),
+                'filename': filename
+            })
+        )
+
+        result = json.loads(response['Payload'].read())
+
+        if result.get('threat_found'):
+            raise HTTPException(400, "Malware detected")
+
+        return result
+```
+
+### File Content Sanitization
+
+Sanitize document content to remove embedded threats.
+
+#### PDF Sanitization
+
+```python
+import PyPDF2
+from io import BytesIO
+
+class PDFSanitizer:
+    """Sanitize PDF files to remove embedded threats."""
+
+    @staticmethod
+    async def sanitize_pdf(pdf_content: bytes) -> bytes:
+        """
+        Sanitize PDF by removing JavaScript and embedded files.
+
+        Args:
+            pdf_content: Raw PDF content
+
+        Returns:
+            Sanitized PDF content
+        """
+        try:
+            pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_content))
+            pdf_writer = PyPDF2.PdfWriter()
+
+            # Copy pages without embedded files or JavaScript
+            for page in pdf_reader.pages:
+                pdf_writer.add_page(page)
+
+            # Remove metadata
+            pdf_writer.add_metadata({})
+
+            # Remove embedded files (if any)
+            if hasattr(pdf_reader, '/EmbeddedFiles'):
+                del pdf_writer._root_object['/EmbeddedFiles']
+
+            # Write sanitized PDF
+            output = BytesIO()
+            pdf_writer.write(output)
+            return output.getvalue()
+
+        except Exception as e:
+            logger.error(f"PDF sanitization error: {e}")
+            # If sanitization fails, reject file
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not sanitize PDF file"
+            )
+```
+
+#### DOCX Sanitization
+
+```python
+from docx import Document
+import zipfile
+
+class DOCXSanitizer:
+    """Sanitize DOCX files to remove macros and embedded threats."""
+
+    @staticmethod
+    async def sanitize_docx(docx_content: bytes) -> bytes:
+        """
+        Sanitize DOCX by removing macros and embedded objects.
+
+        Args:
+            docx_content: Raw DOCX content
+
+        Returns:
+            Sanitized DOCX content
+        """
+        try:
+            # DOCX is a ZIP file
+            with zipfile.ZipFile(BytesIO(docx_content), 'r') as zip_ref:
+                # Check for macros (vbaProject.bin)
+                if 'word/vbaProject.bin' in zip_ref.namelist():
+                    logger.warning("Macro detected in DOCX file")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Macros are not allowed in uploaded documents"
+                    )
+
+                # Check for embedded objects
+                embedded = [f for f in zip_ref.namelist() if 'oleObject' in f.lower()]
+                if embedded:
+                    logger.warning(f"Embedded objects found: {embedded}")
+                    # Option: Remove or reject
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Embedded objects are not allowed"
+                    )
+
+            # If safe, use python-docx to further sanitize
+            doc = Document(BytesIO(docx_content))
+
+            # Remove any existing macros
+            if doc.core_properties and hasattr(doc.core_properties, 'digital_signature'):
+                doc.core_properties.digital_signature = None
+
+            # Save sanitized document
+            output = BytesIO()
+            doc.save(output)
+            return output.getvalue()
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"DOCX sanitization error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not sanitize DOCX file"
+            )
+```
+
+### Rate Limiting for Uploads
+
+Prevent abuse through rate-limited file uploads.
+
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from fastapi import Request
+
+limiter = Limiter(key_func=get_remote_address)
+
+
+@router.post("/upload")
+@limiter.limit("10/hour")  # 10 uploads per hour per IP
+async def upload_resume(
+    request: Request,
+    file: UploadFile,
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload endpoint with rate limiting."""
+    # ... upload logic ...
+
+
+# Stricter limit for unauthenticated users (when auth is implemented)
+@router.post("/upload/public")
+@limiter.limit("3/hour")  # Only 3 uploads per hour for anonymous
+async def public_upload(
+    request: Request,
+    file: UploadFile,
+    db: AsyncSession = Depends(get_db)
+):
+    """Public upload with stricter rate limit."""
+    # ... upload logic ...
+```
+
+### User Upload Quotas
+
+Implement per-user upload quotas to prevent storage exhaustion.
+
+```python
+from datetime import datetime, timedelta
+
+class UploadQuotaManager:
+    """Manage user upload quotas."""
+
+    def __init__(self, daily_limit_mb: int = 100, monthly_limit_mb: int = 1000):
+        self.daily_limit = daily_limit_mb * 1024 * 1024
+        self.monthly_limit = monthly_limit_mb * 1024 * 1024
+
+    async def check_user_quota(self, user_id: int, db: AsyncSession) -> dict:
+        """
+        Check user's upload quota usage.
+
+        Args:
+            user_id: User ID
+            db: Database session
+
+        Returns:
+            Dictionary with quota usage
+
+        Raises:
+            HTTPException: If quota exceeded
+        """
+        # Get today's uploads
+        today = datetime.utcnow().date()
+        daily_uploads = await db.execute(
+            select(func.sum(Resume.file_size))
+            .where(Resume.uploaded_by == user_id)
+            .where(func.date(Resume.created_at) == today)
+        )
+        daily_total = daily_uploads.scalar() or 0
+
+        # Get this month's uploads
+        month_start = today.replace(day=1)
+        monthly_uploads = await db.execute(
+            select(func.sum(Resume.file_size))
+            .where(Resume.uploaded_by == user_id)
+            .where(Resume.created_at >= month_start)
+        )
+        monthly_total = monthly_uploads.scalar() or 0
+
+        return {
+            "daily_used": daily_total,
+            "daily_limit": self.daily_limit,
+            "daily_remaining": self.daily_limit - daily_total,
+            "monthly_used": monthly_total,
+            "monthly_limit": self.monthly_limit,
+            "monthly_remaining": self.monthly_limit - monthly_total
+        }
+
+    async def enforce_quota(self, user_id: int, file_size: int, db: AsyncSession):
+        """
+        Enforce quota limits before upload.
+
+        Args:
+            user_id: User ID
+            file_size: Size of file to upload
+            db: Database session
+
+        Raises:
+            HTTPException: If quota exceeded
+        """
+        quota = await self.check_user_quota(user_id, db)
+
+        if quota["daily_remaining"] < file_size:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Daily upload quota exceeded. {quota['daily_used'] / 1024 / 1024:.1f}MB used"
+            )
+
+        if quota["monthly_remaining"] < file_size:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Monthly upload quota exceeded. {quota['monthly_used'] / 1024 / 1024:.1f}MB used"
+            )
+
+
+# Initialize quota manager
+quota_manager = UploadQuotaManager(daily_limit_mb=100, monthly_limit_mb=1000)
+
+
+# Usage in upload endpoint
+@router.post("/upload")
+async def upload_resume(
+    file: UploadFile,
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload with quota enforcement."""
+    # Check quota
+    await quota_manager.enforce_quota(user_id, file.size, db)
+
+    # Proceed with upload
+    # ...
+```
+
+### Secure File Storage
+
+#### Directory Structure
+
+```bash
+/var/uploads/
+├── resumes/           # Resume files
+│   └── incoming/      # New uploads (quarantine)
+├── avatar/           # User avatars
+├── backups/          # Backup files
+└── temp/             # Temporary processing files
+```
+
+**Permissions**:
+
+```bash
+# Create upload directories
+sudo mkdir -p /var/uploads/resumes/incoming
+sudo mkdir -p /var/uploads/avatar
+sudo mkdir -p /var/uploads/backups
+sudo mkdir -p /var/uploads/temp
+
+# Set ownership (application user)
+sudo chown -R appuser:appgroup /var/uploads
+
+# Set permissions
+sudo chmod 755 /var/uploads
+sudo chmod 750 /var/uploads/resumes
+sudo chmod 750 /var/uploads/resumes/incoming
+
+# Ensure files are not executable
+find /var/uploads -type f -exec chmod 644 {} \;
+```
+
+#### Docker Volume Configuration
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  backend:
+    image: agenthr-backend:latest
+    volumes:
+      - upload_data:/uploads:rw
+    environment:
+      - UPLOAD_DIR=/uploads/resumes
+      - MAX_UPLOAD_SIZE_MB=10
+
+volumes:
+  upload_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/uploads
+```
+
+### File Upload Security Checklist
+
+#### Validation
+
+- [ ] File size limits enforced
+- [ ] File extension whitelist implemented
+- [ ] Magic number validation (file header checking)
+- [ ] MIME type validation
+- [ ] Filename sanitization (path traversal prevention)
+- [ ] Character encoding validation
+- [ ] Blocked dangerous extensions
+
+#### Malware Protection
+
+- [ ] ClamAV or similar malware scanner configured
+- [ ] Scanner signatures updated regularly
+- [ ] Scanning before file acceptance
+- [ ] Quarantine for suspicious files
+- [ ] Content sanitization for PDF/DOCX
+- [ ] Macro/embedded object detection
+
+#### Storage Security
+
+- [ ] Files stored outside web root
+- [ ] Unique filename generation
+- [ ] File permissions set correctly (644)
+- [ ] Directory permissions set correctly (755/750)
+- [ ] Encryption at rest for sensitive files
+- [ ] Regular cleanup of temp files
+- [ ] File integrity verification (hashing)
+
+#### Access Control
+
+- [ ] Upload endpoint requires authentication
+- [ ] Rate limiting per user/IP
+- [ ] Per-user upload quotas
+- [ ] Upload logging and monitoring
+- [ ] Failed upload attempt monitoring
+
+#### Processing Security
+
+- [ ] Sandboxed file processing environment
+- [ ] Resource limits for file processing
+- [ ] Timeout for file operations
+- [ ] Secure file deletion
+- [ ] No shell execution on uploaded files
+
+#### Monitoring & Alerting
+
+- [ ] Upload volume monitoring
+- [ ] Malware detection alerts
+- [ ] Quota exceeded alerts
+- [ ] Suspicious pattern detection
+- [ ] Regular security audit of uploaded files
+
+---
+
 **Last Updated**: 2026-02-04
 **Version**: 1.0.0
 **Maintainer**: Security Team
