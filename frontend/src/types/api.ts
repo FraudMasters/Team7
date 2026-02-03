@@ -1839,6 +1839,30 @@ export interface CandidateSearchResponse {
   limit: number;
 }
 
+/**
+ * Vacancy search request
+ */
+export interface VacancySearchRequest {
+  query?: string | null;
+  filters?: VacancySearchFilters | null;
+  skip?: number;
+  limit?: number;
+  sort_by?: string;
+}
+
+/**
+ * Vacancy search response
+ */
+export interface VacancySearchResponse {
+  total: number;
+  vacancies: Array<Record<string, unknown>>;
+  query: string;
+  filters_applied: Record<string, unknown>;
+  execution_time_seconds: number;
+  skip: number;
+  limit: number;
+}
+
 // ==================== Search History Types ====================
 
 /**
