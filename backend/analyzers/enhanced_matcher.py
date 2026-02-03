@@ -489,6 +489,76 @@ class EnhancedSkillMatcher:
 
         return None
 
+    def _try_context_match(
+        self,
+        resume_skills: List[str],
+        normalized_required: str,
+        context: Optional[str]
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Attempt a context-aware match between resume skills and required skill.
+
+        Context-aware matching considers the domain/industry to improve
+        matching accuracy. For example:
+        - "React" in "web_framework" context matches "ReactJS", "React.js"
+        - "React" in "mobile" context may NOT match "React Native" (different domain)
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+            normalized_required: Normalized name of the required skill
+            context: Optional context hint (e.g., "web_framework", "database", "mobile")
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> result = matcher._try_context_match(['ReactJS'], 'react', 'web_framework')
+            >>> result
+            ('ReactJS', 0.95, 'context')
+        """
+        if not context:
+            return None
+
+        normalized_context = self.normalize_skill_name(context)
+
+        # Context-specific matching rules
+        context_rules: Dict[str, Dict[str, List[str]]] = {
+            "web_framework": {
+                "react": ["react", "reactjs", "react.js", "reactjs"],
+                "vue": ["vue", "vue.js", "vuejs"],
+                "angular": ["angular", "angularjs", "angular.js"],
+            },
+            "database": {
+                "sql": ["sql", "postgresql", "mysql", "sqlite", "mssql"],
+                "nosql": ["mongodb", "cassandra", "dynamodb", "redis"],
+            },
+            "language": {
+                "javascript": ["javascript", "js", "ecmascript"],
+                "typescript": ["typescript", "ts"],
+            },
+        }
+
+        # Check if context has rules
+        if normalized_context not in context_rules:
+            return None
+
+        # Check if required skill has context rules
+        context_skill_map = context_rules[normalized_context]
+        if normalized_required not in context_skill_map:
+            return None
+
+        # Find matching resume skill
+        allowed_variants = context_skill_map[normalized_required]
+
+        for resume_skill in resume_skills:
+            normalized_resume = self.normalize_skill_name(resume_skill)
+            if normalized_resume in [self.normalize_skill_name(v) for v in allowed_variants]:
+                # High confidence for context-aware match
+                return resume_skill, 0.95, "context"
+
+        return None
+
     def match_with_context(
         self,
         resume_skills: List[str],
@@ -581,17 +651,16 @@ class EnhancedSkillMatcher:
             return result
 
         # Strategy 2: Context-aware match
-        if context:
-            context_match = self.find_context_match(resume_skills, required_skill, context)
-            if context_match:
-                matched_skill, confidence = context_match
-                result.update({
-                    "matched": True,
-                    "confidence": confidence,
-                    "matched_as": matched_skill,
-                    "match_type": "context"
-                })
-                return result
+        context_match = self._try_context_match(resume_skills, normalized_required, context)
+        if context_match:
+            matched_skill, confidence, match_type = context_match
+            result.update({
+                "matched": True,
+                "confidence": confidence,
+                "matched_as": matched_skill,
+                "match_type": match_type
+            })
+            return result
 
         # Strategy 3: Synonym match
         synonym_match = self.find_synonym_match(resume_skills, required_skill, synonyms_map)
