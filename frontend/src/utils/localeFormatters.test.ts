@@ -816,6 +816,501 @@ describe('localeFormatters', () => {
     });
   });
 
+  describe('formatAddress', () => {
+    describe('English locale formatting', () => {
+      it('should format complete address in English', () => {
+        const address = {
+          street: '123 Main Street',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/123 Main Street/);
+        expect(result).toMatch(/Springfield, IL 62701/);
+        expect(result).toMatch(/USA/);
+      });
+
+      it('should format address with street2 line in English', () => {
+        const address = {
+          street: '123 Main Street',
+          street2: 'Apt 4B',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/123 Main Street/);
+        expect(result).toMatch(/Apt 4B/);
+        expect(result).toMatch(/Springfield/);
+      });
+
+      it('should format partial address (street and city only) in English', () => {
+        const address = {
+          street: '456 Oak Avenue',
+          city: 'Moscow',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/456 Oak Avenue/);
+        expect(result).toMatch(/Moscow/);
+      });
+
+      it('should format address without street in English', () => {
+        const address = {
+          city: 'Chicago',
+          state: 'IL',
+          postalCode: '60601',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/Chicago, IL 60601/);
+      });
+
+      it('should format address with only street and country in English', () => {
+        const address = {
+          street: '789 Pine Road',
+          country: 'Canada',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/789 Pine Road/);
+        expect(result).toMatch(/Canada/);
+      });
+
+      it('should handle address with only city in English', () => {
+        const address = {
+          city: 'Boston',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBe('Boston');
+      });
+
+      it('should handle address with postal code and city but no state in English', () => {
+        const address = {
+          city: 'Seattle',
+          postalCode: '98101',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBeTruthy();
+        expect(result).toMatch(/Seattle/);
+        expect(result).toMatch(/98101/);
+      });
+    });
+
+    describe('Russian locale formatting', () => {
+      it('should format complete address in Russian', () => {
+        const address = {
+          street: '123 Main Street',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'ru');
+        // Russian format: country, postal code, city/state, street
+        const lines = result.split('\n');
+        expect(lines[0]).toBe('USA');
+        expect(lines[1]).toBe('62701');
+        expect(result).toMatch(/Springfield, IL/);
+        expect(result).toMatch(/123 Main Street/);
+      });
+
+      it('should format address with street2 in Russian', () => {
+        const address = {
+          street: '123 Main Street',
+          street2: 'Apt 4B',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).toMatch(/USA/);
+        expect(result).toMatch(/62701/);
+        expect(result).toMatch(/Springfield, IL/);
+        expect(result).toMatch(/123 Main Street/);
+        expect(result).toMatch(/Apt 4B/);
+      });
+
+      it('should format partial address in Russian', () => {
+        const address = {
+          street: '456 Oak Avenue',
+          city: 'Moscow',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).toMatch(/Moscow/);
+        expect(result).toMatch(/456 Oak Avenue/);
+      });
+
+      it('should format address without country in Russian', () => {
+        const address = {
+          postalCode: '101000',
+          city: 'Moscow',
+          street: 'Red Square',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).toMatch(/101000/);
+        expect(result).toMatch(/Moscow/);
+        expect(result).toMatch(/Red Square/);
+      });
+
+      it('should format address with only city in Russian', () => {
+        const address = {
+          city: 'Saint Petersburg',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).toBe('Saint Petersburg');
+      });
+
+      it('should handle address with postal code and city but no state in Russian', () => {
+        const address = {
+          city: 'Sochi',
+          postalCode: '354000',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).toBeTruthy();
+        expect(result).toMatch(/Sochi/);
+        expect(result).toMatch(/354000/);
+      });
+    });
+
+    describe('field ordering and separators', () => {
+      it('should use proper line breaks in English format', () => {
+        const address = {
+          street: '123 Main Street',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'en');
+        const lines = result.split('\n');
+        expect(lines.length).toBeGreaterThanOrEqual(2);
+        expect(lines[0]).toContain('123 Main Street');
+        expect(lines.some(line => line.includes('Springfield'))).toBe(true);
+      });
+
+      it('should use proper line breaks in Russian format', () => {
+        const address = {
+          street: '123 Main Street',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'ru');
+        const lines = result.split('\n');
+        expect(lines.length).toBeGreaterThanOrEqual(2);
+        expect(lines[0]).toBe('USA');
+        expect(lines[1]).toBe('62701');
+      });
+
+      it('should handle comma separator between city and state in English', () => {
+        const address = {
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/Springfield, IL/);
+      });
+
+      it('should handle comma separator between city and state in Russian', () => {
+        const address = {
+          city: 'Springfield',
+          state: 'IL',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).toMatch(/Springfield, IL/);
+      });
+    });
+
+    describe('whitespace handling', () => {
+      it('should trim whitespace from address fields in English', () => {
+        const address = {
+          street: '  123 Main Street  ',
+          city: '  Springfield  ',
+          state: 'IL',
+          postalCode: '62701',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).not.toMatch(/  123 Main Street  /);
+        expect(result).toMatch(/123 Main Street/);
+      });
+
+      it('should trim whitespace from address fields in Russian', () => {
+        const address = {
+          street: '  123 Main Street  ',
+          city: '  Springfield  ',
+          state: 'IL',
+        };
+        const result = formatAddress(address, 'ru');
+        expect(result).not.toMatch(/  123 Main Street  /);
+        expect(result).toMatch(/123 Main Street/);
+      });
+
+      it('should handle empty string values in address', () => {
+        const address = {
+          street: '123 Main Street',
+          city: '',
+          state: 'IL',
+          postalCode: '62701',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBeTruthy();
+        expect(result).toMatch(/123 Main Street/);
+        expect(result).toMatch(/IL/);
+      });
+    });
+
+    describe('minimal and edge case addresses', () => {
+      it('should handle address with only street', () => {
+        const address = {
+          street: '123 Main Street',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBe('123 Main Street');
+      });
+
+      it('should handle address with only city', () => {
+        const address = {
+          city: 'Boston',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBe('Boston');
+      });
+
+      it('should handle address with only state', () => {
+        const address = {
+          state: 'CA',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBe('CA');
+      });
+
+      it('should handle address with only postal code', () => {
+        const address = {
+          postalCode: '90210',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBe('90210');
+      });
+
+      it('should handle address with only country', () => {
+        const address = {
+          country: 'France',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toBe('France');
+      });
+
+      it('should handle address with street and street2 only', () => {
+        const address = {
+          street: '123 Main Street',
+          street2: 'Apt 4B',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/123 Main Street/);
+        expect(result).toMatch(/Apt 4B/);
+      });
+
+      it('should handle address with city and state only', () => {
+        const address = {
+          city: 'Denver',
+          state: 'CO',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/Denver, CO/);
+      });
+    });
+
+    describe('error handling', () => {
+      it('should throw error for null address', () => {
+        expect(() => formatAddress(null as any, 'en')).toThrow();
+      });
+
+      it('should throw error for undefined address', () => {
+        expect(() => formatAddress(undefined as any, 'en')).toThrow();
+      });
+
+      it('should throw error for empty object', () => {
+        expect(() => formatAddress({}, 'en')).toThrow();
+      });
+
+      it('should throw error for address with only empty strings', () => {
+        const address = {
+          street: '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: '',
+        };
+        expect(() => formatAddress(address, 'en')).toThrow();
+      });
+
+      it('should throw error for address with only whitespace', () => {
+        const address = {
+          street: '   ',
+          city: '   ',
+        };
+        expect(() => formatAddress(address, 'en')).toThrow();
+      });
+
+      it('should throw error for invalid locale', () => {
+        const address = {
+          street: '123 Main Street',
+        };
+        expect(() => formatAddress(address, 'de' as SupportedLanguage)).toThrow();
+      });
+
+      it('should throw error for non-object address', () => {
+        expect(() => formatAddress('invalid' as any, 'en')).toThrow();
+      });
+
+      it('should throw error for number address', () => {
+        expect(() => formatAddress(12345 as any, 'en')).toThrow();
+      });
+
+      it('should throw error for array address', () => {
+        expect(() => formatAddress([] as any, 'en')).toThrow();
+      });
+
+      it('should throw error for boolean address', () => {
+        expect(() => formatAddress(true as any, 'en')).toThrow();
+      });
+    });
+
+    describe('special characters and international addresses', () => {
+      it('should handle address with special characters', () => {
+        const address = {
+          street: "O'Connor Street",
+          city: "Saint-Jérôme",
+          state: 'QC',
+          postalCode: 'J7Z 0A1',
+          country: 'Canada',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/O'Connor/);
+        expect(result).toMatch(/Saint-Jérôme/);
+      });
+
+      it('should handle address with numbers and letters', () => {
+        const address = {
+          street: '12345A Main Street Suite 100',
+          city: 'New York',
+          state: 'NY',
+          postalCode: '10001',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/12345A Main Street Suite 100/);
+      });
+
+      it('should handle address with hyphens', () => {
+        const address = {
+          street: 'A-1 Main Street',
+          city: 'Niceville',
+          state: 'FL',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/A-1 Main Street/);
+      });
+
+      it('should handle address with apostrophes in both locales', () => {
+        const address = {
+          street: "St. John's Avenue",
+          city: "St. Paul's",
+        };
+        const resultEn = formatAddress(address, 'en');
+        const resultRu = formatAddress(address, 'ru');
+        expect(resultEn).toMatch(/St. John's/);
+        expect(resultRu).toMatch(/St. John's/);
+      });
+    });
+
+    describe('real-world address examples', () => {
+      it('should format US residential address in English', () => {
+        const address = {
+          street: '742 Evergreen Terrace',
+          city: 'Springfield',
+          state: 'OR',
+          postalCode: '97477',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/742 Evergreen Terrace/);
+        expect(result).toMatch(/Springfield, OR 97477/);
+      });
+
+      it('should format business address in English', () => {
+        const address = {
+          street: '350 Fifth Avenue, Suite 5100',
+          street2: 'Empire State Building',
+          city: 'New York',
+          state: 'NY',
+          postalCode: '10118',
+          country: 'USA',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/350 Fifth Avenue, Suite 5100/);
+        expect(result).toMatch(/Empire State Building/);
+        expect(result).toMatch(/New York, NY 10118/);
+      });
+
+      it('should format PO Box address in English', () => {
+        const address = {
+          street: 'PO Box 12345',
+          city: 'Los Angeles',
+          state: 'CA',
+          postalCode: '90001',
+        };
+        const result = formatAddress(address, 'en');
+        expect(result).toMatch(/PO Box 12345/);
+        expect(result).toMatch(/Los Angeles, CA 90001/);
+      });
+    });
+
+    describe('comparison between locales', () => {
+      it('should produce different field order for English vs Russian', () => {
+        const address = {
+          street: '123 Main Street',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'USA',
+        };
+        const resultEn = formatAddress(address, 'en');
+        const resultRu = formatAddress(address, 'ru');
+
+        // English should have street first
+        expect(resultEn.split('\n')[0]).toContain('123 Main Street');
+
+        // Russian should have country first
+        expect(resultRu.split('\n')[0]).toBe('USA');
+
+        // Results should not be identical
+        expect(resultEn).not.toBe(resultRu);
+      });
+
+      it('should handle same partial address in both locales', () => {
+        const address = {
+          city: 'Moscow',
+          street: 'Red Square',
+        };
+        const resultEn = formatAddress(address, 'en');
+        const resultRu = formatAddress(address, 'ru');
+
+        // Both should contain the same information
+        expect(resultEn).toMatch(/Moscow/);
+        expect(resultEn).toMatch(/Red Square/);
+        expect(resultRu).toMatch(/Moscow/);
+        expect(resultRu).toMatch(/Red Square/);
+
+        // But order should be different
+        expect(resultEn).not.toBe(resultRu);
+      });
+    });
+  });
+
   describe('getSupportedLocales', () => {
     it('should return array of supported locales', () => {
       const result = getSupportedLocales();
