@@ -25,3 +25,9 @@ export {
   COMMON_SHORTCUTS,
   type GlobalShortcutConfig,
 } from './useGlobalKeyboardShortcuts';
+
+export {
+  useWebSocket,
+  type UseWebSocketOptions,
+  type UseWebSocketReturn,
+} from './useWebSocket';
