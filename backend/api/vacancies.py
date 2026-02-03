@@ -12,7 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request, status, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import analyzers for matching
@@ -204,7 +204,7 @@ async def create_vacancy(
         ) from e
 
 
-@router.get("/", response_model=list[VacancyResponse], tags=["Vacancies"])
+@router.get("/", response_model=VacancyListResponse, tags=["Vacancies"])
 async def list_vacancies(
     request: Request,
     skip: int = 0,
@@ -230,7 +230,14 @@ async def list_vacancies(
         >>> vacancies = response.json()
     """
     try:
-        # Query vacancies from database
+        logger.info(f"Listing vacancies - skip: {skip}, limit: {limit}")
+
+        # Get total count
+        count_query = select(func.count()).select_from(JobVacancy)
+        count_result = await db.execute(count_query)
+        total = count_result.scalar() or 0
+
+        # Query vacancies from database with pagination
         query = select(JobVacancy).order_by(JobVacancy.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
         vacancies = result.scalars().all()
@@ -238,9 +245,14 @@ async def list_vacancies(
         # Convert to response format
         vacancies_list = [_vacancy_to_response(v) for v in vacancies]
 
+        logger.info(f"Retrieved {len(vacancies_list)} vacancies (total: {total})")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=vacancies_list,
+            content={
+                "total": total,
+                "vacancies": vacancies_list,
+            },
         )
 
     except Exception as e:
