@@ -25,6 +25,30 @@ from utils.metrics import get_metrics_registry
 
 logger = logging.getLogger(__name__)
 
+# WebSocket broadcaster function (will be imported at runtime to avoid circular imports)
+_broadcast_notification_func = None
+
+
+def set_broadcast_notification(func) -> None:
+    """
+    Register the WebSocket broadcast notification function.
+
+    This function is called during application startup to register
+    the WebSocket broadcaster, allowing the notification service to
+    push notifications to connected clients without creating a
+    circular import dependency.
+
+    Args:
+        func: Async function that takes a Notification and broadcasts it
+
+    Example:
+        >>> from api.websocket import broadcast_notification
+        >>> set_broadcast_notification(broadcast_notification)
+    """
+    global _broadcast_notification_func
+    _broadcast_notification_func = func
+    logger.info("WebSocket broadcast notification function registered")
+
 # Global notification service instance
 _notification_service: Optional["NotificationService"] = None
 
@@ -169,6 +193,9 @@ class NotificationService:
                 f"Notification created: id={notification.id}, "
                 f"type={notification_type}, recipient={recipient_id}"
             )
+
+            # Broadcast to WebSocket clients (non-blocking)
+            await self._broadcast_to_websocket(notification)
 
             return notification
 
@@ -711,6 +738,9 @@ class NotificationService:
                 await db.commit()
                 await db.refresh(existing)
 
+                # Broadcast the updated aggregated notification
+                await self._broadcast_to_websocket(existing)
+
                 return existing
 
             return None
@@ -743,6 +773,48 @@ class NotificationService:
             )
         except Exception as e:
             logger.debug(f"Failed to record metrics: {e}")
+
+    async def _broadcast_to_websocket(self, notification: Notification) -> None:
+        """
+        Broadcast a notification to connected WebSocket clients.
+
+        This method sends the notification to all active WebSocket connections
+        for the notification's recipient. If no broadcaster is registered or
+        no clients are connected, it fails silently.
+
+        Args:
+            notification: Notification object to broadcast
+        """
+        global _broadcast_notification_func
+
+        if _broadcast_notification_func is None:
+            logger.debug(
+                f"WebSocket broadcaster not registered, skipping broadcast "
+                f"for notification {notification.id}"
+            )
+            return
+
+        try:
+            # Broadcast the notification to connected clients
+            connections = await _broadcast_notification_func(notification)
+
+            if connections > 0:
+                logger.info(
+                    f"Notification {notification.id} broadcast to {connections} "
+                    f"WebSocket connection(s) for user {notification.recipient_id}"
+                )
+            else:
+                logger.debug(
+                    f"No active WebSocket connections for user {notification.recipient_id}, "
+                    f"notification {notification.id} will be delivered when user connects"
+                )
+
+        except Exception as e:
+            # Don't fail the notification creation if WebSocket broadcast fails
+            logger.error(
+                f"Failed to broadcast notification {notification.id} to WebSocket: {e}",
+                exc_info=True,
+            )
 
 
 def get_notification_service() -> NotificationService:

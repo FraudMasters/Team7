@@ -473,6 +473,26 @@ async def create_notification(
             f"Notification created: {notification.id} for recipient {notification_data.recipient_id}"
         )
 
+        # Broadcast to WebSocket clients
+        try:
+            from api.websocket import broadcast_notification
+            connections = await broadcast_notification(notification)
+            if connections > 0:
+                logger.info(
+                    f"Notification {notification.id} broadcast to {connections} "
+                    f"WebSocket connection(s)"
+                )
+            else:
+                logger.debug(
+                    f"No active WebSocket connections for user {notification_data.recipient_id}"
+                )
+        except Exception as broadcast_error:
+            # Don't fail the request if broadcast fails
+            logger.error(
+                f"Failed to broadcast notification {notification.id}: {broadcast_error}",
+                exc_info=True
+            )
+
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content={

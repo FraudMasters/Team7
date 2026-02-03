@@ -47,6 +47,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     settings.backup_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Backup directory: {settings.backup_dir}")
 
+    # Register WebSocket notification broadcaster with notification service
+    try:
+        from api.websocket import broadcast_notification
+        from services.notification_service import set_broadcast_notification
+        set_broadcast_notification(broadcast_notification)
+        logger.info("WebSocket notification broadcaster registered")
+    except Exception as e:
+        logger.warning(f"Failed to register WebSocket broadcaster: {e}")
+
     yield
 
     # Shutdown
