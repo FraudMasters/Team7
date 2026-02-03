@@ -496,6 +496,222 @@ async def search_vacancies(
 
 
 @router.get(
+    "/search",
+    response_model=VacancySearchResponse,
+    tags=["Vacancies"],
+)
+async def search_vacancies_get(
+    request: Request,
+    query: Optional[str] = Query(None, description="Search query with boolean operators"),
+    work_format: Optional[str] = Query(None, description="Work format: remote, office, hybrid"),
+    location: Optional[str] = Query(None, description="Job location"),
+    salary_min: Optional[int] = Query(None, ge=0, description="Minimum salary"),
+    salary_max: Optional[int] = Query(None, ge=0, description="Maximum salary"),
+    employment_type: Optional[str] = Query(None, description="Employment type: full-time, part-time, contract"),
+    industry: Optional[str] = Query(None, description="Industry sector"),
+    english_level: Optional[str] = Query(None, description="Required English level"),
+    min_experience_months: Optional[int] = Query(None, ge=0, description="Minimum experience in months"),
+    skills: Optional[str] = Query(None, description="Comma-separated list of required skills"),
+    source: Optional[str] = Query(None, description="Source of vacancy"),
+    skip: int = Query(0, ge=0, description="Number of results to skip"),
+    limit: int = Query(100, ge=1, le=200, description="Maximum number of results"),
+    sort_by: str = Query("date", description="Sort field: date, title, or salary"),
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Search for vacancies using GET request with query parameters.
+
+    This is an alternative to the POST endpoint that uses query parameters
+    instead of a JSON body. Useful for simple searches and browser-based queries.
+
+    Args:
+        request: FastAPI request object
+        query: Search query with boolean operators
+        work_format: Work format filter (remote, office, hybrid)
+        location: Location filter
+        salary_min: Minimum salary filter
+        salary_max: Maximum salary filter
+        employment_type: Employment type filter (full-time, part-time, contract)
+        industry: Industry sector filter
+        english_level: English level filter
+        min_experience_months: Minimum experience in months
+        skills: Comma-separated list of required skills
+        source: Source filter
+        skip: Number of results to skip (pagination)
+        limit: Maximum number of results to return
+        sort_by: Sort field (date, title, salary)
+        db: Database session
+
+    Returns:
+        JSON response with search results and metadata
+
+    Raises:
+        HTTPException(400): If filter parameters are invalid
+        HTTPException(500): If search execution fails
+
+    Examples:
+        >>> import requests
+        >>> # Search by work format and employment type
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/vacancies/search",
+        ...     params={"work_format": "remote", "employment_type": "full-time"}
+        ... )
+        >>> # Filter by salary range
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/vacancies/search",
+        ...     params={"salary_min": 50000, "salary_max": 100000}
+        ... )
+        >>> # Filter by skills
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/vacancies/search",
+        ...     params={"skills": "Python, Django, FastAPI"}
+        ... )
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(
+            f"GET search vacancies - query: {query}, work_format: {work_format}, "
+            f"employment_type: {employment_type}, location: {location}"
+        )
+
+        # Build base query
+        sql_query = select(JobVacancy)
+
+        # Apply full-text search if query is provided
+        if query:
+            # Simple boolean search implementation
+            search_terms = query.split()
+
+            # Build OR conditions for title and description
+            or_conditions = []
+            for term in search_terms:
+                # Skip boolean operators
+                if term.upper() in ["AND", "OR", "NOT"]:
+                    continue
+
+                # Case-insensitive search in title and description
+                or_conditions.append(JobVacancy.title.ilike(f"%{term}%"))
+                or_conditions.append(JobVacancy.description.ilike(f"%{term}%"))
+
+            if or_conditions:
+                sql_query = sql_query.where(or_(*or_conditions))
+
+        # Build filters from query parameters
+        filters_applied = {}
+
+        # Work format filter
+        if work_format:
+            sql_query = sql_query.where(JobVacancy.work_format == work_format)
+            filters_applied["work_format"] = work_format
+
+        # Location filter
+        if location:
+            sql_query = sql_query.where(JobVacancy.location.ilike(f"%{location}%"))
+            filters_applied["location"] = location
+
+        # Salary range filter
+        if salary_min is not None:
+            sql_query = sql_query.where(JobVacancy.salary_min >= salary_min)
+            filters_applied["salary_min"] = salary_min
+
+        if salary_max is not None:
+            sql_query = sql_query.where(JobVacancy.salary_max <= salary_max)
+            filters_applied["salary_max"] = salary_max
+
+        # Employment type filter
+        if employment_type:
+            sql_query = sql_query.where(JobVacancy.employment_type == employment_type)
+            filters_applied["employment_type"] = employment_type
+
+        # Industry filter
+        if industry:
+            sql_query = sql_query.where(JobVacancy.industry.ilike(f"%{industry}%"))
+            filters_applied["industry"] = industry
+
+        # English level filter
+        if english_level:
+            sql_query = sql_query.where(JobVacancy.english_level == english_level)
+            filters_applied["english_level"] = english_level
+
+        # Minimum experience filter
+        if min_experience_months is not None:
+            sql_query = sql_query.where(JobVacancy.min_experience_months <= min_experience_months)
+            filters_applied["min_experience_months"] = min_experience_months
+
+        # Source filter
+        if source:
+            sql_query = sql_query.where(JobVacancy.source == source)
+            filters_applied["source"] = source
+
+        # Skills filter (check if any required skill matches)
+        if skills:
+            skills_list = [s.strip() for s in skills.split(",")]
+            if skills_list:
+                # Check if any of the filter skills are in the vacancy's required_skills
+                for skill in skills_list:
+                    sql_query = sql_query.where(JobVacancy.required_skills.contains([skill]))
+                filters_applied["skills"] = skills_list
+
+        # Get total count
+        count_query = select(func.count()).select_from(sql_query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar_one() or 0
+
+        # Apply sorting
+        if sort_by == "title":
+            sql_query = sql_query.order_by(JobVacancy.title.asc())
+        elif sort_by == "salary":
+            # Sort by average salary (min + max) / 2
+            sql_query = sql_query.order_by(
+                ((JobVacancy.salary_min + JobVacancy.salary_max) / 2).desc()
+            )
+        else:  # default: date
+            sql_query = sql_query.order_by(JobVacancy.created_at.desc())
+
+        # Apply pagination
+        sql_query = sql_query.offset(skip).limit(limit)
+        result = await db.execute(sql_query)
+        vacancies = result.scalars().all()
+
+        # Convert to response format
+        vacancies_list = [_vacancy_to_response(v) for v in vacancies]
+
+        execution_time = time.time() - start_time
+
+        logger.info(
+            f"GET search completed: {total} total vacancies, "
+            f"returned {len(vacancies_list)} results in {execution_time:.3f}s"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total": total,
+                "vacancies": vacancies_list,
+                "query": query or "",
+                "filters_applied": filters_applied,
+                "execution_time_seconds": execution_time,
+                "skip": skip,
+                "limit": limit,
+            },
+        )
+
+    except ValueError as e:
+        logger.error(f"Invalid search parameters: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error(f"Error during vacancy search: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}",
+        ) from e
+
+
+@router.get(
     "/match-all",
     tags=["Vacancies"],
 )
