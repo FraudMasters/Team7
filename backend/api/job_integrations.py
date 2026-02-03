@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.job_board_integration import JobBoardIntegration
 from models.import_log import ImportLog, ImportJobStatus
+from tasks.import_tasks import poll_job_board
 
 logger = logging.getLogger(__name__)
 
@@ -683,4 +684,103 @@ async def list_import_logs(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list import logs: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/{integration_id}/trigger-import",
+    tags=["Job Integrations"],
+)
+async def trigger_manual_import(
+    request: Request,
+    integration_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Trigger a manual import for a specific job board integration.
+
+    This endpoint manually triggers the poll_job_board Celery task for the specified
+    integration, allowing users to import applicants on-demand without waiting for
+    the scheduled polling interval.
+
+    Args:
+        request: FastAPI request object
+        integration_id: UUID of the integration to trigger import for
+        db: Database session
+
+    Returns:
+        JSON response with task ID and status
+
+    Raises:
+        HTTPException(404): If integration not found
+        HTTPException(400): If integration is disabled
+        HTTPException(422): If invalid UUID format
+        HTTPException(500): If task trigger fails
+
+    Example:
+        >>> response = requests.post("http://localhost:8000/api/integrations/123/trigger-import")
+        >>> result = response.json()
+        >>> result["task_id"]
+        'abc-123-def'
+        >>> result["message"]
+        'Import task triggered successfully'
+    """
+    locale = _extract_locale(request)
+
+    try:
+        integration_uuid = UUID(integration_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid integration ID format",
+        )
+
+    query = select(JobBoardIntegration).where(JobBoardIntegration.id == integration_uuid)
+    result = await db.execute(query)
+    integration = result.scalar_one_or_none()
+
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Integration not found",
+        )
+
+    if not integration.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot trigger import for disabled integration. Please enable it first.",
+        )
+
+    try:
+        # Trigger the Celery task asynchronously
+        task = poll_job_board.apply_async(
+            args=[str(integration.id)],
+            kwargs={
+                "job_id": None,
+                "status_filter": None,
+                "from_date": None,
+            }
+        )
+
+        logger.info(
+            f"Triggered manual import for integration {integration_id} "
+            f"with Celery task ID: {task.id}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "task_id": task.id,
+                "integration_id": str(integration.id),
+                "integration_name": integration.name,
+                "message": "Import task triggered successfully",
+                "status": "pending",
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error triggering import for integration {integration_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger import task: {str(e)}",
         ) from e

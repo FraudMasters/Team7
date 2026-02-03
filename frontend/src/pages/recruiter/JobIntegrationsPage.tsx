@@ -25,6 +25,7 @@ import {
   Menu,
   MenuItem,
   Switch,
+  Snackbar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,6 +33,7 @@ import {
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
   CloudUpload as CloudUploadIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobIntegrationsClient } from '../../api/jobIntegrations';
@@ -47,6 +49,15 @@ export function JobIntegrationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<JobBoardIntegrationResponse | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   const {
     data: integrationsData,
@@ -76,6 +87,27 @@ export function JobIntegrationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job-integrations'] });
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await jobIntegrationsClient.triggerManualImport(id);
+    },
+    onSuccess: (data) => {
+      setSnackbar({
+        open: true,
+        message: `Import triggered for ${data.integration_name}. Task ID: ${data.task_id}`,
+        severity: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['job-integrations'] });
+    },
+    onError: (error: { detail?: string }) => {
+      setSnackbar({
+        open: true,
+        message: error.detail || 'Failed to trigger import',
+        severity: 'error',
+      });
     },
   });
 
@@ -122,6 +154,10 @@ export function JobIntegrationsPage() {
     if (selectedIntegration) {
       deleteMutation.mutate(selectedIntegration.id);
     }
+  };
+
+  const handleTriggerImport = (integrationId: string) => {
+    importMutation.mutate(integrationId);
   };
 
   const maskApiKey = (key: string): string => {
@@ -273,8 +309,22 @@ export function JobIntegrationsPage() {
                   )}
                 </Stack>
 
+                {/* Actions */}
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    size="small"
+                    startIcon={<SyncIcon />}
+                    onClick={() => handleTriggerImport(integration.id)}
+                    disabled={!integration.enabled || importMutation.isPending}
+                  >
+                    {importMutation.isPending ? 'Importing...' : 'Import Now'}
+                  </Button>
+                </Box>
+
                 {/* API Key (masked) */}
-                <Box sx={{ mt: 'auto' }}>
+                <Box sx={{ mt: 1 }}>
                   <Typography variant="caption" color="text.secondary">
                     API Key: {maskApiKey(integration.api_key)}
                   </Typography>
@@ -336,6 +386,14 @@ export function JobIntegrationsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success/Error Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+      />
     </Container>
   );
 }

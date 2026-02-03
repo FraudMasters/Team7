@@ -43,6 +43,7 @@ import type {
   JobBoardIntegrationListResponse,
   ImportLogResponse,
   ImportLogListResponse,
+  ManualImportTriggerResponse,
   ApiError,
 } from '@/types/api';
 
@@ -329,6 +330,37 @@ export class JobIntegrationsClient {
       const response: AxiosResponse<ImportLogListResponse> = await this.client.get(
         '/api/integrations/logs',
         { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Trigger a manual import for a specific job board integration
+   *
+   * This endpoint manually triggers the poll_job_board Celery task for the specified
+   * integration, allowing users to import applicants on-demand without waiting for
+   * the scheduled polling interval.
+   *
+   * @param integrationId - Integration ID
+   * @returns Response with task ID and status
+   * @throws ApiError if trigger fails
+   *
+   * @example
+   * ```ts
+   * const result = await jobIntegrationsClient.triggerManualImport('integration-uuid');
+   * console.log(result.task_id); // 'abc-123-def'
+   * console.log(result.message); // 'Import task triggered successfully'
+   * ```
+   */
+  async triggerManualImport(
+    integrationId: string
+  ): Promise<ManualImportTriggerResponse> {
+    try {
+      const response = await this.client.post(
+        `/api/integrations/${integrationId}/trigger-import`
       );
       return response.data;
     } catch (error) {

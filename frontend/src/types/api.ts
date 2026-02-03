@@ -1929,3 +1929,14 @@ export interface ImportLogListResponse {
   total: number;
 }
 
+/**
+ * Manual import trigger response
+ */
+export interface ManualImportTriggerResponse {
+  task_id: string;
+  integration_id: string;
+  integration_name: string;
+  message: string;
+  status: string;
+}
+
