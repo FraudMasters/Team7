@@ -68,6 +68,15 @@ interface Vacancy {
   updated_at: string;
 }
 
+/**
+ * Paginated response from vacancies list endpoint
+ * Matches backend VacancyListResponse model with total count
+ */
+interface VacancyListResponse {
+  total: number;
+  vacancies: Vacancy[];
+}
+
 // Zod validation schema for inline vacancy edit
 const vacancyEditSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -334,8 +343,8 @@ const VacancyList: React.FC = () => {
         throw new Error('Failed to fetch vacancies');
       }
 
-      const data: Vacancy[] = await response.json();
-      setVacancies(data);
+      const data: VacancyListResponse = await response.json();
+      setVacancies(data.vacancies);
     } catch (err) {
       setError(err instanceof Error ? err : 'Failed to fetch vacancies');
     } finally {
