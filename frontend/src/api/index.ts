@@ -13,6 +13,7 @@ export { candidateActivitiesClient, CandidateActivitiesClient } from './candidat
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
 export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
 export { candidateSearchClient, CandidateSearchClient } from './search';
+export { jobIntegrationsClient, JobIntegrationsClient } from './jobIntegrations';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -75,4 +76,10 @@ export type {
   CandidateSearchRequest,
   CandidateSearchResult,
   CandidateSearchResponse,
+  JobBoardIntegrationCreate,
+  JobBoardIntegrationUpdate,
+  JobBoardIntegrationResponse,
+  JobBoardIntegrationListResponse,
+  ImportLogResponse,
+  ImportLogListResponse,
 } from '@/types/api';
