@@ -1786,6 +1786,17 @@ export interface SearchFilters {
 }
 
 /**
+ * Search filter configuration for vacancy search
+ */
+export interface VacancySearchFilters {
+  work_format?: string;
+  location?: string;
+  salary_min?: number;
+  salary_max?: number;
+  employment_type?: string;
+}
+
+/**
  * Candidate search request
  */
 export interface CandidateSearchRequest {
