@@ -1642,6 +1642,765 @@ docker-compose logs -f celery-learning
 
 ---
 
+## Redis Caching Strategies
+
+Redis is a critical performance component in the AgentHR system, serving as both a cache for expensive operations and a message broker for Celery. Proper tuning ensures high cache hit rates while preventing memory exhaustion.
+
+### Redis Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Redis Cache Layer                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Cache Namespaces                        │  │
+│  ├──────────────────────────────────────────────────────┤  │
+│  │  candidate:   Resume profiles, candidate lists       │  │
+│  │  vacancy:     Job descriptions, requirements         │  │
+│  │  match:       Matching results, scores               │  │
+│  │  analytics:   Aggregated statistics, reports         │  │
+│  │  taxonomy:    Skills, industries, categories         │  │
+│  │  session:     User sessions, authentication          │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  Cache Key Format: {prefix}:{namespace}:{key}              │
+│  Example: agenthr:candidate:profile:abc-123-def            │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Celery Broker (DB 0)                    │  │
+│  │  - Task queues (analysis, learning, audit)           │  │
+│  │  - Task results storage                              │  │
+│  │  - Worker coordination                               │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  Memory Management:                                          │
+│  - Max memory: 512MB (configurable)                         │
+│  - Eviction policy: allkeys-lru                             │
+│  - Persistence: AOF enabled                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Current Redis Configuration
+
+**From `docker-compose.yml`:**
+
+```yaml
+redis:
+  image: redis:7-alpine
+  command: >
+    redis-server
+    --appendonly yes
+    --maxmemory 512mb
+    --maxmemory-policy allkeys-lru
+  deploy:
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 1G
+    reservations:
+      cpus: '0.5'
+      memory: 512M
+```
+
+**Configuration breakdown:**
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `--maxmemory` | 512mb | Maximum memory Redis can use before eviction |
+| `--maxmemory-policy` | allkeys-lru | Evict least recently used keys when memory limit reached |
+| `--appendonly` | yes | Enable AOF persistence for durability |
+| `memory limit` | 1G | Docker container memory limit (higher than Redis max) |
+| `cpu limit` | 1.0 | Maximum CPU cores Redis can use |
+
+**Cache service configuration (from `backend/services/cache_service.py`):**
+
+| Setting | Default Value | Description |
+|---------|---------------|-------------|
+| `key_prefix` | `agenthr` | Prefix for all cache keys |
+| `default_ttl` | 3600 (1 hour) | Default time-to-live for cached entries |
+| `max_connections` | 50 | Maximum connections in pool |
+| `enabled` | `True` | Whether caching is enabled |
+
+---
+
+## 1. Memory Limits and Eviction Policies
+
+### Understanding Redis Memory Management
+
+**Redis memory usage components:**
+
+```
+┌────────────────────────────────────────────────────────────┐
+│              Redis Memory Breakdown                        │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  Total Memory: 512MB (maxmemory setting)                  │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │  Dataset: ~400MB (78%)                             │   │
+│  │  - Cached ML model results                         │   │
+│  │  - Candidate profiles                              │   │
+│  │  - Match results                                   │   │
+│  │  - Analytics aggregations                          │   │
+│  ├────────────────────────────────────────────────────┤   │
+│  │  Overhead: ~100MB (20%)                            │   │
+│  │  - Key metadata (expirations, access counts)       │   │
+│  │  - Connection buffers                              │   │
+│  │  - Data structure overhead                         │   │
+│  └────────────────────────────────────────────────────┘   │
+│                                                            │
+│  When dataset + overhead > 512MB:                          │
+│  → Eviction policy activates                               │
+│  → Least recently used (LRU) keys removed                  │
+│  → Memory freed for new data                              │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Eviction Policies
+
+**Available eviction policies:**
+
+| Policy | Behavior | Use Case |
+|--------|----------|----------|
+| **noeviction** | Return errors when memory limit reached | Development/testing only |
+| **allkeys-lru** | Evict least recently used keys from all datasets | ✅ **Recommended for AgentHR** |
+| **volatile-lru** | Evict LRU keys with TTL set only | When some data must never be evicted |
+| **allkeys-random** | Evict random keys | Simple but less efficient |
+| **volatile-random** | Evict random keys with TTL set only | Rarely used |
+| **allkeys-lfu** | Evict least frequently used keys | When access frequency matters more than recency |
+| **volatile-lfu** | Evict LFU keys with TTL set only | Specialized use cases |
+| **volatile-ttl** | Evict keys with shortest TTL first | When TTL is the primary concern |
+
+**Why `allkeys-lru` is recommended:**
+
+- **Cache-intensive workload**: AgentHR primarily uses Redis for caching
+- **No critical data**: All cached data can be recomputed if needed
+- **Better hit rates**: LRU keeps frequently accessed data in memory
+- **No TTL management overhead**: Don't need to set TTL on every key
+
+### Memory Limit Sizing
+
+**Guidelines for setting `maxmemory`:**
+
+| Total System RAM | Recommended maxmemory | Rationale |
+|------------------|----------------------|-----------|
+| 2GB | 256mb | Conservative, leave room for OS and other services |
+| 4GB | 512mb | ✅ **Current default** - good balance |
+| 8GB | 1-2gb | More cache for larger datasets |
+| 16GB+ | 2-4gb | High-throughput systems |
+
+**Configuration examples:**
+
+```yaml
+# docker-compose.yml
+
+# Small system (2GB RAM)
+redis:
+  command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+
+# Medium system (4-8GB RAM) - Current default
+redis:
+  command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+  deploy:
+    resources:
+      limits:
+        memory: 1G
+
+# Large system (16GB+ RAM)
+redis:
+  command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+  deploy:
+    resources:
+      limits:
+        memory: 3G
+```
+
+### Monitoring Memory Usage
+
+**Check current memory usage:**
+
+```bash
+# View memory statistics
+docker-compose exec redis redis-cli INFO memory
+
+# Key metrics to watch:
+# - used_memory_human: Current memory usage (e.g., "400M")
+# - used_memory_peak_human: Peak memory usage
+# - used_memory_percentage: % of maxmemory used
+# - maxmemory_human: Configured memory limit
+
+# Quick check
+docker-compose exec redis redis-cli INFO memory | grep used_memory_human
+```
+
+**Target metrics:**
+
+| Metric | Target | Action |
+|--------|--------|--------|
+| **Memory usage** | < 80% of maxmemory | Normal operation |
+| **Memory usage** | 80-90% of maxmemory | Monitor closely, consider increasing limit |
+| **Memory usage** | > 90% of maxmemory | ⚠️ Increase maxmemory or reduce cache size |
+| **Eviction rate** | < 10 keys/sec | Normal |
+| **Eviction rate** | > 100 keys/sec | ⚠️ High eviction, cache churn - increase memory |
+
+**Set up monitoring alerts:**
+
+```python
+# backend/monitoring/redis_metrics.py
+from prometheus_client import Gauge
+
+redis_memory_usage = Gauge('redis_memory_bytes', 'Redis memory usage')
+redis_memory_max = Gauge('redis_memory_max_bytes', 'Redis max memory limit')
+redis_eviction_rate = Gauge('redis_evictions_total', 'Redis evictions')
+
+def update_redis_metrics():
+    """Update Redis metrics for Prometheus"""
+    import redis
+    r = redis.Redis(host='redis', port=6379)
+
+    info = r.info('memory')
+    redis_memory_usage.set(info['used_memory'])
+    redis_memory_max.set(info['maxmemory'])
+
+    stats = r.info('stats')
+    redis_eviction_rate.set(stats.get('evicted_keys', 0))
+```
+
+---
+
+## 2. Cache Patterns for Different Data Types
+
+### Cache Namespaces and Use Cases
+
+**AgentHR cache namespace organization:**
+
+```
+agenthr:candidate:{type}:{id}
+├─ profile:abc-123         → Candidate profile (TTL: 1 hour)
+├─ list:filter_hash        → Filtered candidate list (TTL: 30 min)
+└─ stats:daily:2024-02-04  → Daily statistics (TTL: 24 hours)
+
+agenthr:vacancy:{type}:{id}
+├─ details:vac-456         → Vacancy details (TTL: 1 hour)
+└─ requirements:vac-456    → Extracted requirements (TTL: 6 hours)
+
+agenthr:match:{type}:{resume_id}:{vacancy_id}
+├─ score:abc-123:vac-456   → Match score (TTL: 2 hours)
+└─ ranking:vac-456         → Ranked candidates for vacancy (TTL: 1 hour)
+
+agenthr:analytics:{type}:{params}
+├─ skills:popular          → Popular skills (TTL: 12 hours)
+└─ placements:monthly      → Monthly placement stats (TTL: 24 hours)
+
+agenthr:taxonomy:{type}:{id}
+├─ skill:python            → Skill taxonomy (TTL: 7 days)
+└─ industry:it             → Industry taxonomy (TTL: 7 days)
+
+agenthr:session:{user_id}
+└─ active:abc-123          → User session (TTL: 24 hours)
+```
+
+### Cache Pattern Examples
+
+**Pattern 1: Cache-Aside (Lazy Loading)**
+
+Most common pattern - load from cache, compute if miss.
+
+```python
+# backend/services/cache_service.py (simplified)
+from services.cache_service import get_cache_service
+
+def get_candidate_profile(candidate_id: str):
+    """Get candidate profile with cache-aside pattern"""
+    cache = get_cache_service()
+
+    # Try cache first
+    cached = cache.get('candidate', f'profile:{candidate_id}')
+    if cached:
+        logger.debug(f"Cache hit: candidate {candidate_id}")
+        return cached
+
+    # Cache miss - compute from database
+    logger.debug(f"Cache miss: candidate {candidate_id}")
+    profile = db.query(Candidate).filter_by(id=candidate_id).first()
+
+    if profile:
+        # Store in cache for next time
+        cache.set('candidate', f'profile:{candidate_id}', profile.to_dict(), ttl=3600)
+
+    return profile
+```
+
+**Pattern 2: Write-Through**
+
+Write to cache and database simultaneously.
+
+```python
+def update_candidate_profile(candidate_id: str, data: dict):
+    """Update candidate with write-through caching"""
+    cache = get_cache_service()
+
+    # Update database
+    profile = db.query(Candidate).filter_by(id=candidate_id).first()
+    profile.update(**data)
+    db.commit()
+
+    # Update cache immediately
+    cache.set('candidate', f'profile:{candidate_id}', profile.to_dict(), ttl=3600)
+
+    return profile
+```
+
+**Pattern 3: Write-Behind (Write-Back)**
+
+Queue writes and apply asynchronously (advanced pattern).
+
+```python
+from celery import shared_task
+
+@shared_task
+def invalidate_candidate_cache_async(candidate_id: str):
+    """Invalidate cache in background after database write"""
+    cache = get_cache_service()
+    cache.delete('candidate', f'profile:{candidate_id}')
+
+def update_candidate_profile_async(candidate_id: str, data: dict):
+    """Update candidate with cache invalidation in background"""
+    # Update database immediately
+    profile = db.query(Candidate).filter_by(id=candidate_id).first()
+    profile.update(**data)
+    db.commit()
+
+    # Invalidate cache asynchronously
+    invalidate_candidate_cache_async.delay(candidate_id)
+
+    return profile
+```
+
+**Pattern 4: Cache Invalidation on Updates**
+
+```python
+# backend/services/cache_service.py (existing helper)
+def invalidate_candidate_cache(candidate_id: str) -> int:
+    """
+    Invalidate all cache entries related to a specific candidate.
+
+    This removes:
+    - Candidate profile cache
+    - All candidate list caches that may include this candidate
+    """
+    cache = get_cache_service()
+    invalidated = 0
+
+    # Invalidate candidate profile
+    if cache.delete(CacheService.NAMESPACE_CANDIDATE, f"profile:{candidate_id}"):
+        invalidated += 1
+
+    # Invalidate all candidate list caches
+    invalidated += cache.delete_pattern(CacheService.NAMESPACE_CANDIDATE, "list:*")
+
+    return invalidated
+
+# Usage in application
+@app.put("/api/candidates/{candidate_id}")
+def update_candidate(candidate_id: str, data: CandidateUpdate):
+    """Update candidate and invalidate cache"""
+    # Update database
+    profile = update_candidate_in_db(candidate_id, data)
+
+    # Invalidate cache
+    invalidate_candidate_cache(candidate_id)
+
+    return profile
+```
+
+### TTL Configuration Guidelines
+
+**Recommended TTL by data type:**
+
+| Data Type | TTL | Rationale |
+|-----------|-----|-----------|
+| **Candidate profiles** | 1 hour (3600s) | Profiles change occasionally, medium freshness required |
+| **Candidate lists (filtered)** | 30 min (1800s) | Lists change frequently as candidates are added/updated |
+| **Match results** | 2 hours (7200s) | Matching scores are stable for moderate periods |
+| **Vacancy details** | 1 hour (3600s) | Similar to candidate profiles |
+| **Analytics aggregations** | 12-24 hours | Slow-changing, can tolerate staleness |
+| **Taxonomy data** | 7 days (604800s) | Rarely changes, long-lived cache |
+| **User sessions** | 24 hours | Security + convenience balance |
+| **ML model results** | 1 hour (3600s) | Recomputable but expensive |
+
+**Configuration:**
+
+```python
+# backend/services/cache_service.py
+class CacheService:
+    # Namespace-specific TTL defaults
+    NAMESPACE_TTL = {
+        'candidate': 3600,      # 1 hour
+        'vacancy': 3600,        # 1 hour
+        'match': 7200,          # 2 hours
+        'analytics': 43200,     # 12 hours
+        'taxonomy': 604800,     # 7 days
+        'session': 86400,       # 24 hours
+    }
+
+    def set(self, namespace: str, key: str, value: Any, ttl: Optional[int] = None):
+        """Set cache value with namespace-specific TTL"""
+        if ttl is None:
+            ttl = self.NAMESPACE_TTL.get(namespace, self.default_ttl)
+
+        # ... rest of implementation
+```
+
+---
+
+## 3. Cache Warming Strategies
+
+Cache warming preloads frequently accessed data to avoid cold start penalties.
+
+### When to Warm Cache
+
+**Cache warming scenarios:**
+
+| Scenario | Strategy | Example Data to Warm |
+|----------|----------|---------------------|
+| **Application startup** | Preload critical data | Popular candidates, active vacancies |
+| **Scheduled updates** | Refresh after data changes | After analytics aggregation runs |
+| **Deployments** | Warm after deployment | Rebuild cache from database |
+| **Low-traffic periods** | Prepare for peak load | Pre-warm before business hours |
+
+### Implementation Examples
+
+**Startup cache warming:**
+
+```python
+# backend/main.py (FastAPI startup)
+@app.on_event("startup")
+async def warm_cache():
+    """Warm cache on application startup"""
+    logger.info("Starting cache warming...")
+
+    cache = get_cache_service()
+
+    # Warm popular candidates (most accessed in last 24 hours)
+    popular_candidates = db.query(Candidate)\
+        .order_by(Candidate.last_accessed.desc())\
+        .limit(100)\
+        .all()
+
+    for candidate in popular_candidates:
+        cache.set('candidate', f'profile:{candidate.id}', candidate.to_dict(), ttl=3600)
+
+    logger.info(f"Warmed {len(popular_candidates)} candidate profiles")
+
+    # Warm active vacancies
+    active_vacancies = db.query(Vacancy)\
+        .filter(Vacancy.status == 'active')\
+        .all()
+
+    for vacancy in active_vacancies:
+        cache.set('vacancy', f'details:{vacancy.id}', vacancy.to_dict(), ttl=3600)
+
+    logger.info(f"Warmed {len(active_vacancies)} vacancy details")
+```
+
+**Celery task for scheduled warming:**
+
+```python
+# backend/tasks/cache_tasks.py
+from celery import shared_task
+
+@shared_task
+def warm_analytics_cache():
+    """Warm analytics cache after aggregation"""
+    cache = get_cache_service()
+
+    # Popular skills (computationally expensive)
+    popular_skills = get_popular_skills(limit=100)
+    cache.set('analytics', 'skills:popular', popular_skills, ttl=43200)
+
+    # Placement statistics
+    placements = get_placement_stats(days=30)
+    cache.set('analytics', 'placements:monthly', placements, ttl=86400)
+
+    logger.info("Analytics cache warmed")
+```
+
+**Manual cache warming script:**
+
+```bash
+# scripts/warm_cache.sh
+#!/bin/bash
+
+echo "Starting manual cache warm..."
+
+# Warm popular candidates
+curl -X POST http://localhost:8000/api/cache/warm/candidates \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 100}'
+
+# Warm active vacancies
+curl -X POST http://localhost:8000/api/cache/warm/vacancies
+
+echo "Cache warming complete"
+```
+
+### Cache Warming Best Practices
+
+**Do:**
+- Warm during low-traffic periods (e.g., 3 AM)
+- Prioritize frequently accessed data
+- Monitor memory usage during warming
+- Use batch operations for efficiency
+- Log warming progress
+
+**Don't:**
+- Warm entire database (defeats caching purpose)
+- Warm during peak traffic (adds load)
+- Forget to invalidate stale data
+- Overwhelm Redis with concurrent writes
+
+---
+
+## 4. Monitoring Cache Performance
+
+### Key Performance Indicators
+
+**Track these metrics:**
+
+| Metric | How to Measure | Target | Alert Threshold |
+|--------|----------------|--------|-----------------|
+| **Cache hit rate** | `(keyspace_hits / (keyspace_hits + keyspace_misses)) * 100` | > 80% | < 70% |
+| **Memory usage** | `used_memory / maxmemory * 100` | < 80% | > 90% |
+| **Eviction rate** | `evicted_keys per second` | < 10/sec | > 100/sec |
+| **Response time** | Redis command latency (p95) | < 1ms | > 5ms |
+| **Connection pool** | Active connections / max_connections | < 80% | > 90% |
+
+### Monitoring Commands
+
+**Real-time monitoring:**
+
+```bash
+# 1. Overall cache statistics
+docker-compose exec redis redis-cli INFO stats | grep -E '(keyspace_hits|keyspace_misses|evicted_keys)'
+
+# 2. Memory usage
+docker-compose exec redis redis-cli INFO memory | grep -E '(used_memory|maxmemory)'
+
+# 3. Calculate cache hit rate
+#!/bin/bash
+HITS=$(docker-compose exec redis redis-cli INFO stats | grep keyspace_hits | awk '{print $2}')
+MISSES=$(docker-compose exec redis redis-cli INFO stats | grep keyspace_misses | awk '{print $2}')
+TOTAL=$((HITS + MISSES))
+if [ $TOTAL -gt 0 ]; then
+  HIT_RATE=$(awk "BEGIN {printf \"%.2f\", ($HITS / $TOTAL) * 100}")
+  echo "Cache hit rate: ${HIT_RATE}%"
+else
+  echo "No cache activity yet"
+fi
+
+# 4. Monitor in real-time
+watch -n 1 'docker-compose exec redis redis-cli INFO stats | grep -E "(keyspace_hits|keyspace_misses)"'
+```
+
+**Grafana dashboard queries:**
+
+```promql
+# Cache hit rate
+(rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))) * 100
+
+# Memory usage percentage
+(redis_memory_used_bytes / redis_memory_max_bytes) * 100
+
+# Eviction rate
+rate(redis_evicted_keys_total[5m])
+
+# Command latency (p95)
+histogram_quantile(0.95, rate(redis_command_duration_seconds_bucket[5m]))
+```
+
+### Health Check Endpoint
+
+```python
+# backend/api/health.py
+from fastapi import APIResponse
+from services.cache_service import get_cache_service
+
+@app.get("/api/health/cache")
+def cache_health():
+    """Check Redis cache health"""
+    cache = get_cache_service()
+    health = cache.health_check()
+
+    status_code = 200 if health['status'] == 'healthy' else 503
+
+    # Add performance metrics
+    redis_client = cache.redis_client
+    if redis_client:
+        info = redis_client.info()
+        stats = redis_client.info('stats')
+
+        hits = stats.get('keyspace_hits', 0)
+        misses = stats.get('keyspace_misses', 0)
+        total = hits + misses
+
+        health.update({
+            'hit_rate': f"{(hits / total * 100):.2f}%" if total > 0 else "N/A",
+            'total_keys': health['key_count'],
+            'evicted_keys': stats.get('evicted_keys', 0),
+            'connections': redis_client.client_list().__len__(),
+        })
+
+    return JSONResponse(
+        status_code=status_code,
+        content=health
+    )
+```
+
+### Troubleshooting Cache Issues
+
+**Common cache problems:**
+
+| Issue | Symptoms | Diagnosis | Solution |
+|-------|----------|-----------|----------|
+| **Low cache hit rate** | High database load, slow API responses | Hit rate < 70% | Increase TTL, check cache key generation, warm cache |
+| **High memory usage** | Frequent evictions, OOM warnings | Memory > 90% of max | Increase maxmemory, reduce cache size, optimize data |
+| **Connection pool exhaustion** | "Connection pool exhausted" errors | Active connections ≈ max | Increase max_connections, check for connection leaks |
+| **Slow cache operations** | Cache API calls > 5ms | High latency | Check Redis CPU, reduce data size, use pipelining |
+| **Cache stampede** | Cache misses cause database overload | Many identical misses | Use cache locking, extend TTL, implement request coalescing |
+
+**Diagnostic script:**
+
+```bash
+#!/bin/bash
+# scripts/diagnose_cache.sh
+
+echo "=== Redis Cache Diagnostics ==="
+echo ""
+
+# 1. Basic info
+echo "1. Redis Version:"
+docker-compose exec redis redis-cli INFO server | grep redis_version
+
+echo ""
+echo "2. Memory Usage:"
+docker-compose exec redis redis-cli INFO memory | grep -E '(used_memory|maxmemory|used_memory_percentage)'
+
+echo ""
+echo "3. Cache Performance:"
+docker-compose exec redis redis-cli INFO stats | grep -E '(keyspace_hits|keyspace_misses|evicted_keys)'
+
+echo ""
+echo "4. Connected Clients:"
+docker-compose exec redis redis-cli CLIENT LIST | wc -l
+
+echo ""
+echo "5. Slowest Operations:"
+docker-compose exec redis redis-cli SLOWLOG GET 10
+
+echo ""
+echo "6. Key Distribution by Namespace:"
+for ns in candidate vacancy match analytics taxonomy session; do
+  count=$(docker-compose exec redis redis-cli --scan --pattern "agenthr:${ns}:*" | wc -l)
+  echo "  ${ns}: ${count} keys"
+done
+```
+
+---
+
+## Quick Reference: Redis Caching Strategies
+
+### Configuration Checklist
+
+- [ ] **maxmemory** set appropriately for system RAM (512mb default for 4GB systems)
+- [ ] **Eviction policy** configured to `allkeys-lru`
+- [ ] **Namespace separation** implemented for different data types
+- [ ] **TTL values** configured per data type (see guidelines above)
+- [ ] **Connection pooling** configured (max_connections: 50)
+- [ ] **Cache warming** implemented for critical data
+- [ ] **Monitoring** set up for hit rate, memory, evictions
+- [ ] **Health checks** configured and tested
+
+### Common Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| **Low hit rate (< 70%)** | TTL too short, cold cache, poor key design | Increase TTL, warm cache, check key generation |
+| **High eviction rate** | Memory limit too low | Increase maxmemory, reduce cached data size |
+| **OOM errors** | No memory limit set | Set maxmemory in redis command |
+| **Stale data** | TTL too long, invalidation missing | Reduce TTL, implement invalidation on updates |
+| **Cache avalanche** | All keys expire at once | Add random jitter to TTL (±10%) |
+| **Connection pool exhausted** | Too many concurrent requests, leaks | Increase max_connections, check for leaks |
+
+### Environment Variables
+
+```bash
+# .env - Redis Configuration
+REDIS_URL=redis://redis:6379/0
+REDIS_CACHE_ENABLED=true
+REDIS_CACHE_KEY_PREFIX=agenthr
+REDIS_CACHE_DEFAULT_TTL=3600
+REDIS_CACHE_MAX_CONNECTIONS=50
+
+# Memory limits (set in docker-compose.yml)
+REDIS_MAXMEMORY=512mb
+REDIS_MAXMEMORY_POLICY=allkeys-lru
+```
+
+### Docker Compose Configuration
+
+```yaml
+# docker-compose.yml
+services:
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+```
+
+### Monitoring Commands
+
+```bash
+# Check cache performance
+docker-compose exec redis redis-cli INFO stats | grep -E '(keyspace_hits|keyspace_misses|evicted_keys)'
+
+# Check memory usage
+docker-compose exec redis redis-cli INFO memory | grep used_memory_human
+
+# View cache keys by namespace
+docker-compose exec redis redis-cli --scan --pattern "agenthr:candidate:*"
+
+# Monitor in real-time
+watch -n 1 'docker-compose exec redis redis-cli INFO stats'
+
+# Health check
+curl http://localhost:8000/api/health/cache
+```
+
+---
+
 ## Related Documentation
 
 - [ML_PIPELINE.md](ML_PIPELINE.md) - Detailed ML/NLP pipeline documentation
