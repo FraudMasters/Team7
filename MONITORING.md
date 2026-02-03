@@ -638,6 +638,477 @@ All logs are labeled for easy filtering in Loki:
 
 ---
 
+## Log Querying with Loki
+
+Loki uses LogQL (Loki Query Language) for querying logs. LogQL is similar to PromQL but designed for log data.
+
+### LogQL Syntax Overview
+
+```
+{label selectors} |=|!|~ filter operators
+```
+
+**Components:**
+1. **Label Selectors** - Target specific log streams (like Prometheus)
+2. **Filter Operators** - Search within log content
+3. **Pipeline Operators** - Transform and parse log data
+
+### Label Selectors
+
+Label selectors work exactly like Prometheus, targeting log streams by labels:
+
+**Exact Match:**
+```logql
+{job="backend"}
+{service="backend", environment="production"}
+```
+
+**Regex Match:**
+```logql
+{job=~"backend.*"}
+{service=~"backend|frontend"}
+{level=~"ERROR|CRITICAL"}
+```
+
+**Not Equal:**
+```logql
+{job!="backend"}
+{service!="backend", level="ERROR"}
+```
+
+**Multiple Labels:**
+```logql
+{job="backend", level="ERROR"} |= "database"
+{job=~"celery.*", level=~"WARNING|ERROR"}
+```
+
+**Available Labels in AgentHR:**
+- `job`: backend, frontend, celery-worker
+- `service`: backend, frontend, celery
+- `environment`: production, development, test
+- `level`: INFO, WARNING, ERROR, CRITICAL, DEBUG
+- `module`: Python module name (e.g., analyzers.unified_matcher)
+- `correlation_id`: Request tracking identifier
+
+### Filter Operators
+
+Filter operators search within the log line content:
+
+**Line Filter (`|=`):** Contains string
+```logql
+{job="backend"} |= "error"
+{service="backend"} |= "timeout"
+```
+
+**Not Line Filter (`!=`):** Does not contain string
+```logql
+{job="backend"} != "debug"
+{service="backend"} != "health check"
+```
+
+**Regex Filter (`|~`):** Matches regex pattern
+```logql
+{job="backend"} |~ "error.*database"
+{service="backend"} |~ "\d{3,}ms"  # Find durations
+```
+
+**Not Regex Filter (`!~`):** Does not match regex
+```logql
+{job="backend"} !~ "200 OK"
+{service="backend"} !~ "^GET /health"
+```
+
+### Common Query Patterns
+
+#### 1. Query by Correlation ID
+
+Trace a single request through the system:
+
+```logql
+{job="backend"} |= "correlation_id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\""
+```
+
+Or search across all services:
+
+```logql
+{job=~"backend|frontend|celery"} |~ "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+```
+
+#### 2. Find Errors and Exceptions
+
+**All errors:**
+```logql
+{level="ERROR"}
+```
+
+**Errors by service:**
+```logql
+{job="backend", level="ERROR"}
+```
+
+**Exceptions with traceback:**
+```logql
+{job="backend"} |~ "Traceback|Exception|Error"
+```
+
+**HTTP 5xx errors:**
+```logql
+{job="backend"} |= "status_code=5"
+```
+
+#### 3. Performance Analysis
+
+**Slow operations (>1 second):**
+```logql
+{job="backend"} |~ "duration_ms.*[1-9][0-9]{3,}"
+```
+
+**Database query timing:**
+```logql
+{job="backend"} |~ "db_query_duration"
+```
+
+**Celery task runtime:**
+```logql
+{job="celery-worker"} |~ "task_runtime"
+```
+
+**API endpoint performance:**
+```logql
+{job="backend"} |~ "POST /api/resumes.*duration"
+```
+
+#### 4. Resume and Job Matching
+
+**Analyze specific resume:**
+```logql
+{job="backend"} |= "resume_id=\"uuid-123\""
+```
+
+**Job matching operations:**
+```logql
+{job="backend"} |~ "match_score|vacancy_id"
+```
+
+**ML model predictions:**
+```logql
+{job="backend"} |~ "model_name|prediction_type"
+```
+
+**Skill extraction:**
+```logql
+{job="backend"} |~ "keyword|skill_extraction"
+```
+
+#### 5. Celery Task Monitoring
+
+**Failed tasks:**
+```logql
+{job="celery-worker", level="ERROR"}
+```
+
+**Task status:**
+```logql
+{job="celery-worker"} |= "task.*success|task.*failed"
+```
+
+**Queue depth monitoring:**
+```logql
+{job="celery-worker"} |= "queue_length"
+```
+
+**Specific task by ID:**
+```logql
+{job="celery-worker"} |= "task_id=\"abc-123\""
+```
+
+#### 6. Database Queries
+
+**Slow queries:**
+```logql
+{job="backend"} |~ "db_query_duration.*[1-9][0-9]{3,}ms"
+```
+
+**Query by table:**
+```logql
+{job="backend"} |= "table=\"resumes\""
+```
+
+**Connection pool issues:**
+```logql
+{job="backend"} |~ "pool.*timeout|connection.*exhausted"
+```
+
+#### 7. Security and Authentication
+
+**Failed login attempts:**
+```logql
+{job="backend"} |~ "authentication.*failed|login.*failed"
+```
+
+**Authorization errors:**
+```logql
+{job="backend"} |~ "401|403|unauthorized|forbidden"
+```
+
+**User activity:**
+```logql
+{job="backend"} |= "user_id=\"123\""
+```
+
+### Advanced LogQL Features
+
+#### Log Parser Pipeline
+
+Extract and transform log data:
+
+**JSON Parser:**
+```logql
+{job="backend"} | json
+```
+
+Then extract fields:
+```logql
+{job="backend"} | json | line_format "{{.correlation_id}} - {{.message}}"
+```
+
+**Regex Parser:**
+```logql
+{job="backend"} | regexp "(?P<timestamp>\\d{4}-\\d{2}-\\d{2}) (?P<level>\\w+) (?P<message>.*)"
+```
+
+**Label Extraction:**
+```logql
+{job="backend"} | label_format level={{.level}}
+```
+
+#### Aggregation Operators
+
+**Count entries:**
+```logql
+count_over_time({job="backend"}[5m])
+```
+
+**Rate of log lines:**
+```logql
+rate({job="backend"}[5m])
+```
+
+**Sum values:**
+```logql
+sum_over_time({job="backend"} | json | unwrap duration_ms [5m])
+```
+
+**Percentiles:**
+```logql
+quantile_over_time(0.95, {job="backend"} | json | unwrap duration_ms [5m])
+```
+
+#### Time Ranges
+
+**Last 5 minutes:**
+```logql
+{job="backend"}[5m]
+```
+
+**Last 1 hour:**
+```logql
+{job="backend"}[1h]
+```
+
+**Custom range:**
+```logql
+{job="backend"}[30s]
+```
+
+### Performance Best Practices
+
+#### 1. Use Labels Effectively
+
+✅ **Good:** Filter by labels first
+```logql
+{job="backend", level="ERROR"}
+```
+
+❌ **Bad:** Filter everything by content
+```logql
+{} |= "ERROR"
+```
+
+#### 2. Avoid Expensive Regex
+
+✅ **Good:** Use string contains
+```logql
+{job="backend"} |= "error"
+```
+
+❌ **Bad:** Complex regex on all logs
+```logql
+{job="backend"} |~ ".*[Ee]rror.*"
+```
+
+#### 3. Limit Query Time Range
+
+✅ **Good:** Recent data
+```logql
+{job="backend"}[1h]
+```
+
+❌ **Bad:** Very large ranges
+```logql
+{job="backend"}[7d]
+```
+
+#### 4. Combine Filters
+
+✅ **Good:** Specific query
+```logql
+{job="backend", level="ERROR"} |= "database" |~ "timeout"
+```
+
+❌ **Bad:** Broad query
+```logql
+{} |= "error"
+```
+
+### Query Examples by Use Case
+
+#### Debugging Production Issues
+
+**1. User reports slow resume analysis:**
+```logql
+{job="backend"} |~ "resume_id=\"USER-RESUME-ID\""
+```
+
+Then check ML inference:
+```logql
+{job="backend"} |~ "resume_id=\"USER-RESUME-ID\"" |~ "inference|model"
+```
+
+**2. High error rate detected:**
+```logql
+{level="ERROR"}[5m]
+```
+
+Break down by service:
+```logql
+count_over_time({level="ERROR"}[5m]) by (job)
+```
+
+**3. Task queue backup:**
+```logql
+{job="celery-worker"} |= "queue_length"
+```
+
+Check worker status:
+```logql
+{job="celery-worker"} |~ "worker.*status"
+```
+
+#### Performance Analysis
+
+**1. P95 response time:**
+```logql
+{job="backend"} | json | unwrap duration_ms | quantile_over_time(0.95, [5m])
+```
+
+**2. Database bottleneck:**
+```logql
+{job="backend"} |~ "db_query_duration" | json | unwrap duration_ms
+```
+
+**3. ML model performance:**
+```logql
+{job="backend"} |~ "ml_inference_duration" | json | unwrap duration_ms
+```
+
+#### Security Auditing
+
+**1. Failed authentication:**
+```logql
+{job="backend"} |~ "auth.*failed|login.*failed"
+```
+
+**2. Unauthorized access attempts:**
+```logql
+{job="backend"} |= "401|403"
+```
+
+**3. Admin actions:**
+```logql
+{job="backend"} |~ "user.*admin|admin.*action"
+```
+
+### Loki API Queries
+
+Query Loki directly via HTTP API:
+
+**Basic query:**
+```bash
+curl -s -G http://localhost:3100/loki/api/v1/query \
+  --data-urlencode 'query={job="backend"} |= "error"' \
+  --data-urlencode 'limit=100' | jq '.'
+```
+
+**Query with time range:**
+```bash
+curl -s -G http://localhost:3100/loki/api/v1/query_range \
+  --data-urlencode 'query={job="backend", level="ERROR"}' \
+  --data-urlencode 'start=2024-01-15T00:00:00Z' \
+  --data-urlencode 'end=2024-01-15T23:59:59Z' \
+  --data-urlencode 'limit=1000' | jq '.'
+```
+
+**Query by label:**
+```bash
+curl -s http://localhost:3100/loki/api/v1/label/job/values | jq '.data[]'
+```
+
+### Grafana Integration
+
+**In Grafana Explore:**
+1. Navigate to Explore
+2. Select Loki datasource
+3. Enter LogQL query
+4. Use "Label filters" button for easy label selection
+5. Click "Run query"
+6. Logs appear with full context and correlation
+
+**Dashboard Panel Queries:**
+```logql
+{job="backend", level="ERROR"} | logfmt | line_format "{{.message}}"
+```
+
+**Table Panel:**
+```logql
+{job="backend"} | json | line_format "{{.timestamp}} {{.level}} {{.message}}"
+```
+
+### Troubleshooting Queries
+
+**Query returns no results:**
+1. Check label values exist:
+   ```bash
+   curl http://localhost:3100/loki/api/v1/labels | jq '.data[]'
+   ```
+2. Verify time range has data
+3. Check syntax (matching brackets, quotes)
+4. Test with broader query first
+
+**Query is slow:**
+1. Add more specific label selectors
+2. Reduce time range
+3. Avoid expensive regex patterns
+4. Use `| unwrap` for numeric operations instead of regex
+
+**Too many results:**
+1. Add more filters
+2. Reduce time range
+3. Use aggregation: `count_over_time()`
+4. Use `limit` parameter
+
+---
+
 ## Common Queries
 
 ### Grafana Logs (Loki)
