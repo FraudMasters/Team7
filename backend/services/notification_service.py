@@ -828,3 +828,43 @@ def get_notification_service() -> NotificationService:
     if _notification_service is None:
         _notification_service = NotificationService()
     return _notification_service
+
+
+# Module-level convenience functions for easier importing
+async def aggregate_notifications(
+    db: AsyncSession,
+    recipient_id: UUID,
+    notification_type: NotificationType,
+    time_window_seconds: int = 300,
+) -> List[Dict[str, Any]]:
+    """
+    Aggregate notifications of the same type within a time window.
+
+    This is a convenience wrapper around NotificationService.aggregate_notifications.
+    It groups similar notifications to prevent spam and reduce noise.
+
+    Args:
+        db: Database session
+        recipient_id: UUID of the recipient
+        notification_type: Type of notification to aggregate
+        time_window_seconds: Time window in seconds to look back (default: 5 minutes)
+
+    Returns:
+        List of aggregated notification groups with counts and details
+
+    Example:
+        >>> from services.notification_service import aggregate_notifications
+        >>> aggregated = await aggregate_notifications(
+        ...     db=session,
+        ...     recipient_id=user_uuid,
+        ...     notification_type=NotificationType.CANDIDATE_STAGE_CHANGED
+        ... )
+        >>> print(f"Aggregated {len(aggregated)} notification groups")
+    """
+    service = get_notification_service()
+    return await service.aggregate_notifications(
+        db=db,
+        recipient_id=recipient_id,
+        notification_type=notification_type,
+        time_window_seconds=time_window_seconds,
+    )
