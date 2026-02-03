@@ -784,3 +784,160 @@ async def trigger_manual_import(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to trigger import task: {str(e)}",
         ) from e
+
+
+@router.post(
+    "/logs/{log_id}/retry",
+    tags=["Job Integrations"],
+)
+async def retry_import(
+    request: Request,
+    log_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Retry a failed or partially completed import.
+
+    This endpoint allows retrying an import that previously failed or only partially
+    succeeded. It retrieves the original import log, extracts the job board integration
+    and parameters, and triggers a new import attempt with incremented retry count.
+
+    Args:
+        request: FastAPI request object
+        log_id: UUID of the import log to retry
+        db: Database session
+
+    Returns:
+        JSON response with new task ID and updated retry count
+
+    Raises:
+        HTTPException(404): If import log not found
+        HTTPException(400): If import cannot be retried (wrong status)
+        HTTPException(422): If invalid UUID format
+        HTTPException(500): If retry trigger fails
+
+    Example:
+        >>> response = requests.post("http://localhost:8000/api/integrations/logs/abc-123/retry")
+        >>> result = response.json()
+        >>> result["task_id"]
+        'new-task-id'
+        >>> result["retry_count"]
+        2
+    """
+    locale = _extract_locale(request)
+
+    try:
+        import_log_uuid = UUID(log_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid import log ID format",
+        )
+
+    # Fetch the import log
+    log_query = select(ImportLog).where(ImportLog.id == import_log_uuid)
+    log_result = await db.execute(log_query)
+    import_log = log_result.scalar_one_or_none()
+
+    if not import_log:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Import log not found",
+        )
+
+    # Check if import can be retried (only failed or partial imports)
+    if import_log.status not in [ImportJobStatus.FAILED, ImportJobStatus.PARTIAL]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot retry import with status '{import_log.status.value}'. Only failed or partial imports can be retried.",
+        )
+
+    # Check if retry count exceeds maximum
+    MAX_RETRIES = 5
+    if import_log.retry_count and import_log.retry_count >= MAX_RETRIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Import has already been retried {import_log.retry_count} times. Maximum retries ({MAX_RETRIES}) exceeded.",
+        )
+
+    # Fetch the associated job board integration
+    if not import_log.job_board_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Import log has no associated job board integration. Cannot retry.",
+        )
+
+    integration_query = select(JobBoardIntegration).where(
+        JobBoardIntegration.id == UUID(import_log.job_board_id)
+    )
+    integration_result = await db.execute(integration_query)
+    integration = integration_result.scalar_one_or_none()
+
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated job board integration not found. It may have been deleted.",
+        )
+
+    if not integration.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot retry import for disabled integration. Please enable it first.",
+        )
+
+    try:
+        # Extract original import parameters from metadata
+        job_id = None
+        status_filter = None
+        from_date = None
+
+        if import_log.import_metadata:
+            job_id = import_log.import_metadata.get("job_id")
+            status_filter = import_log.import_metadata.get("status_filter")
+            from_date = import_log.import_metadata.get("from_date")
+
+        # Increment retry count
+        import_log.retry_count = (import_log.retry_count or 0) + 1
+        import_log.status = ImportJobStatus.IN_PROGRESS
+        import_log.error_message = None
+        await db.commit()
+        await db.refresh(import_log)
+
+        # Trigger a new Celery task for the import
+        task = poll_job_board.apply_async(
+            args=[str(integration.id)],
+            kwargs={
+                "job_id": job_id,
+                "status_filter": status_filter,
+                "from_date": from_date,
+            }
+        )
+
+        logger.info(
+            f"Retrying import {log_id} (attempt #{import_log.retry_count}) "
+            f"for integration {integration.id} "
+            f"with new Celery task ID: {task.id}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "task_id": task.id,
+                "import_log_id": str(import_log.id),
+                "integration_id": str(integration.id),
+                "integration_name": integration.name,
+                "retry_count": import_log.retry_count,
+                "message": f"Import retry initiated (attempt #{import_log.retry_count})",
+                "status": "pending",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrying import {log_id}: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retry import: {str(e)}",
+        ) from e
