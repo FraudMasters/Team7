@@ -815,10 +815,838 @@ ENABLE_VECTOR_MATCHER=true
 
 ---
 
+## Celery Worker Tuning
+
+Celery workers handle all asynchronous processing in the AgentHR system, including resume analysis, ML model training, backups, and scheduled tasks. Proper tuning is critical for maximizing throughput and preventing queue backups.
+
+### Celery Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                        │
+│  (FastAPI submits tasks to queues)                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Redis Broker                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ analysis │  │ learning │  │  audit   │  │   default│   │
+│  │  queue   │  │  queue   │  │  queue   │  │   queue  │   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
+└───────┼────────────┼────────────┼────────────┼────────────┘
+        │            │            │            │
+        ▼            ▼            ▼            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Celery Workers                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ Worker 1     │  │ Worker 2     │  │ Worker N     │     │
+│  │ - analysis   │  │ - learning   │  │ - audit      │     │
+│  │ - learning   │  │ - audit      │  │ - default    │     │
+│  │ (concurrency)│  │ (concurrency)│  │ (concurrency)│     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Current Celery Configuration
+
+The system uses the following Celery configuration (from `backend/celery_config.py`):
+
+| Setting | Current Value | Description |
+|---------|---------------|-------------|
+| `broker_url` | `redis://redis:6379/0` | Redis as message broker |
+| `result_backend` | `redis://redis:6379/0` | Redis for task results |
+| `task_serializer` | `json` | JSON serialization |
+| `task_acks_late` | `True` | Ack after execution (reliability) |
+| `task_reject_on_worker_lost` | `True` | Requeue if worker dies |
+| `task_time_limit` | `3600` (1 hour) | Hard limit for tasks |
+| `task_soft_time_limit` | `3300` (55 min) | Soft limit for graceful shutdown |
+| `worker_prefetch_multiplier` | `1` | Disable prefetching |
+| `worker_max_tasks_per_child` | `100` | Restart after 100 tasks |
+| `task_default_priority` | `5` | Default task priority (0-9) |
+
+### 1. Concurrency Configuration
+
+Concurrency determines how many tasks a worker can process simultaneously. Proper configuration prevents CPU/memory exhaustion while maximizing throughput.
+
+#### Understanding Concurrency
+
+**What is concurrency?**
+- Number of parallel task processes per worker
+- Each concurrency unit = separate process
+- More concurrency = more parallel processing = more resource usage
+
+**Default concurrency:**
+```bash
+# Celery defaults to CPU count
+# 4-core CPU = 4 concurrent processes
+```
+
+#### Concurrency Tuning Guidelines
+
+**For ML-heavy workloads (resume analysis):**
+
+| CPU Cores | Recommended Concurrency | Workers | Total Processes | Memory Required |
+|-----------|------------------------|---------|-----------------|-----------------|
+| 2 | 1 | 1 | 1 | 1-2GB |
+| 4 | 2 | 1-2 | 2-4 | 2-4GB |
+| 8 | 2-4 | 2 | 4-8 | 4-8GB |
+| 16+ | 4 | 4 | 16 | 8-16GB |
+
+**Why lower concurrency for ML tasks?**
+- ML models are CPU-intensive (not I/O bound)
+- Each task loads models into memory (~500MB-1GB)
+- Too much concurrency causes CPU thrashing and OOM errors
+
+**For I/O-heavy workloads (emails, backups, database):**
+
+| CPU Cores | Recommended Concurrency | Workers | Total Processes |
+|-----------|------------------------|---------|-----------------|
+| 2 | 4 | 1 | 4 |
+| 4 | 8 | 1-2 | 8-16 |
+| 8 | 16 | 2 | 32 |
+| 16+ | 16-32 | 4 | 64-128 |
+
+**Why higher concurrency for I/O tasks?**
+- I/O tasks spend most time waiting (database, HTTP API)
+- CPU is idle during I/O wait
+- Higher concurrency keeps CPU utilized
+
+#### Configuration Examples
+
+**docker-compose.yml - Single worker with custom concurrency:**
+
+```yaml
+services:
+  celery-worker:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --max-tasks-per-child=100
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+```
+
+**Multiple workers (recommended for production):**
+
+```yaml
+services:
+  # Analysis worker (ML-heavy, low concurrency)
+  celery-analysis:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --queues=analysis
+      --hostname=analysis-worker@%h
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+  # Learning worker (I/O-heavy, higher concurrency)
+  celery-learning:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=learning
+      --hostname=learning-worker@%h
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+```
+
+#### Environment Variables
+
+**.env configuration:**
+
+```bash
+# Celery Worker Concurrency
+CELERY_WORKER_CONCURRENCY=2          # Number of processes per worker
+CELERY_WORKER_MAX_TASKS_PER_CHILD=100 # Restart worker after N tasks
+```
+
+**Dynamic configuration in code:**
+
+```python
+# backend/celery_config.py
+import os
+
+celery_config = {
+    # Calculate concurrency based on CPU count
+    # For ML-heavy tasks: use 50% of CPU cores
+    # For I/O tasks: use 200% of CPU cores
+    "worker_concurrency": int(os.cpu_count() * 0.5),
+    # ... rest of config
+}
+```
+
+#### Monitoring Concurrency
+
+**Check current worker concurrency:**
+
+```bash
+# Flower dashboard - http://localhost:5555
+# View:
+# - Worker count
+# - Concurrency per worker
+# - Active tasks
+# - Available processes
+
+# Or via Celery command
+docker-compose exec celery celery -A celery_app.celery_app inspect active
+```
+
+**Target metrics:**
+
+| Metric | Target | Action if Exceeded |
+|--------|--------|-------------------|
+| **CPU usage per worker** | < 80% | Reduce concurrency |
+| **Memory per worker** | < 80% of limit | Reduce concurrency or increase memory |
+| **Queue depth** | < 10 tasks | Add more workers |
+| **Task wait time** | < 30 seconds | Add workers or increase concurrency |
+
+---
+
+### 2. Prefetch Limits
+
+Prefetching determines how many tasks a worker reserves before processing. Proper tuning prevents task starvation and reduces memory usage.
+
+#### What is Prefetching?
+
+```
+Without Prefetch (multiplier=1):
+┌────────────────────────────────────────────────────────┐
+│  Worker pulls 1 task at a time                         │
+│  ┌──────┐                                              │
+│  │Task 1│ ← Processing now                            │
+│  └──────┘                                              │
+│  Queue: [Task 2] [Task 3] [Task 4]                     │
+└────────────────────────────────────────────────────────┘
+
+With Prefetch (multiplier=4):
+┌────────────────────────────────────────────────────────┐
+│  Worker pulls 4 tasks at once                          │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐                  │
+│  │Task 1│ │Task 2│ │Task 3│ │Task 4│ ← Reserved       │
+│  │Proc. │ │Wait  │ │Wait  │ │Wait  │                  │
+│  └──────┘ └──────┘ └──────┘ └──────┘                  │
+│  Queue: [Task 5] [Task 6]                              │
+└────────────────────────────────────────────────────────┘
+```
+
+**Benefits of prefetching:**
+- Reduces queue communication overhead
+- Improves throughput for short tasks
+- Worker always has tasks ready
+
+**Drawbacks of prefetching:**
+- Other workers may starve if one worker hogs tasks
+- Higher memory usage (reserved tasks held in memory)
+- Not suitable for long-running tasks
+
+#### Current Configuration
+
+**AgentHR configuration:**
+
+```python
+# backend/celery_config.py
+celery_config = {
+    "worker_prefetch_multiplier": 1,  # Disabled prefetching
+    # ...
+}
+```
+
+**Why prefetch is disabled:**
+- Resume analysis tasks are **long-running** (10-30 seconds)
+- Tasks are **CPU-intensive** (not I/O bound)
+- Prefetching would waste memory reserving tasks
+- Better to let workers pull tasks as needed
+
+#### When to Enable Prefetching
+
+**Enable prefetching (multiplier > 1) for:**
+
+| Task Type | Duration | Recommended Multiplier |
+|-----------|----------|------------------------|
+| **Short I/O tasks** | < 1 second | 4-8 |
+| **Database queries** | < 5 seconds | 2-4 |
+| **Email sending** | 1-3 seconds | 4 |
+| **API callbacks** | < 2 seconds | 4-8 |
+
+**Disable prefetching (multiplier = 1) for:**
+
+| Task Type | Duration | Recommended Multiplier |
+|-----------|----------|------------------------|
+| **ML processing** | 10-60 seconds | 1 |
+| **Resume analysis** | 10-30 seconds | 1 |
+| **Model training** | 5-60 minutes | 1 |
+| **Batch processing** | > 5 minutes | 1 |
+
+#### Configuration Examples
+
+**Enable prefetching for I/O worker:**
+
+```yaml
+# docker-compose.yml
+services:
+  celery-io-worker:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --prefetch-multiplier=4
+      --queues=io,emails,notifications
+    environment:
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=4
+```
+
+**Keep prefetch disabled for ML worker:**
+
+```yaml
+# docker-compose.yml
+services:
+  celery-ml-worker:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --prefetch-multiplier=1
+      --queues=analysis,ml
+    environment:
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=1
+```
+
+#### Environment Variables
+
+```bash
+# .env
+# Prefetch multiplier (1 = disabled, 4-8 = enabled for I/O tasks)
+CELERY_WORKER_PREFETCH_MULTIPLIER=1
+```
+
+#### Monitoring Prefetch Impact
+
+**Check if prefetching is causing issues:**
+
+```bash
+# Monitor queue distribution across workers
+curl -s http://localhost:5555/api/workers | jq '.'
+
+# Look for:
+# - One worker with many reserved tasks
+# - Other workers with no tasks
+# - This indicates prefetching is unfair
+
+# Check worker memory usage
+docker stats $(docker-compose ps -q celery)
+```
+
+**Signs prefetch multiplier is too high:**
+- One worker has many reserved tasks, others idle
+- High memory usage per worker
+- Queue appears empty but tasks aren't starting
+
+**Solution:** Reduce `worker_prefetch_multiplier` or set to 1
+
+---
+
+### 3. Queue Separation
+
+Queue separation ensures different task types are processed by dedicated workers, preventing resource conflicts and prioritization issues.
+
+#### Current Queue Architecture
+
+**Defined queues in `backend/celery_config.py`:**
+
+```python
+celery_config = {
+    "task_routes": {
+        # Resume analysis tasks
+        "tasks.analysis_task.analyze_resume_async": {"queue": "analysis"},
+        "tasks.analysis_task.*": {"queue": "analysis"},
+
+        # Learning and feedback tasks
+        "tasks.learning_tasks.aggregate_feedback_and_generate_synonyms": {"queue": "learning"},
+        "tasks.learning_tasks.review_and_activate_synonyms": {"queue": "learning"},
+        "tasks.learning_tasks.periodic_feedback_aggregation": {"queue": "learning"},
+        "tasks.learning_tasks.*": {"queue": "learning"},
+
+        # Performance monitoring tasks
+        "tasks.performance_monitoring.*": {"queue": "learning"},
+
+        # Model retraining tasks
+        "tasks.model_retraining.*": {"queue": "learning"},
+
+        # Audit and cleanup tasks
+        "tasks.audit_tasks.cleanup_old_audit_logs": {"queue": "audit"},
+        "tasks.audit_tasks.*": {"queue": "audit"},
+    },
+}
+```
+
+**Queue definitions:**
+
+| Queue | Purpose | Task Type | Resource Usage |
+|-------|---------|-----------|----------------|
+| **analysis** | Resume analysis | ML-heavy | CPU: High, Memory: High |
+| **learning** | Feedback aggregation, model training | Mixed | CPU: Medium, Memory: Medium |
+| **audit** | Log cleanup, maintenance | I/O-heavy | CPU: Low, Memory: Low |
+| **default** | Uncategorized tasks | Varies | Varies |
+
+#### Queue Separation Benefits
+
+**Without queue separation (all workers process all tasks):**
+
+```
+┌────────────────────────────────────────────────────────┐
+│  Problem: ML analysis tasks hog all workers             │
+│                                                         │
+│  Queue: [Analysis] [Analysis] [Analysis] [Email]       │
+│           ▼         ▼         ▼         ▼              │
+│  Worker 1: [Analysis - Processing...]                  │
+│  Worker 2: [Analysis - Processing...]                  │
+│  Worker 3: [Analysis - Processing...]                  │
+│  Worker 4: [Analysis - Processing...]                  │
+│                                                         │
+│  Result: Email task waits 30+ seconds                  │
+└────────────────────────────────────────────────────────┘
+```
+
+**With queue separation (dedicated workers per queue):**
+
+```
+┌────────────────────────────────────────────────────────┐
+│  Solution: Dedicated workers for each queue            │
+│                                                         │
+│  Analysis Queue: [Analysis] [Analysis] [Analysis]      │
+│                    ▼         ▼         ▼               │
+│           Analysis Worker 1, 2, 3 (ML-optimized)       │
+│                                                         │
+│  Email Queue:    [Email] [Email]                       │
+│                    ▼         ▼                         │
+│           Email Worker (I/O-optimized, high concurrency)│
+│                                                         │
+│  Result: Email processed immediately                   │
+└────────────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+- **Isolation**: Heavy tasks don't block light tasks
+- **Optimization**: Workers tuned for specific task types
+- **Priority**: Critical queues get dedicated resources
+- **Scaling**: Scale queues independently based on load
+
+#### Implementation Examples
+
+**Option 1: Single worker, multiple queues (simple setup)**
+
+```yaml
+# docker-compose.yml
+services:
+  celery-worker:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --queues=analysis,learning,audit,default
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+```
+
+**Option 2: Dedicated workers per queue (recommended for production)**
+
+```yaml
+# docker-compose.yml
+services:
+  # Analysis worker (ML-heavy, low concurrency, high memory)
+  celery-analysis:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --queues=analysis
+      --hostname=analysis-worker@%h
+      --max-tasks-per-child=50
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=1
+
+  # Learning worker (medium load, balanced concurrency)
+  celery-learning:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=learning
+      --hostname=learning-worker@%h
+      --max-tasks-per-child=100
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=2
+
+  # Audit worker (I/O-heavy, high concurrency, low resources)
+  celery-audit:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=audit
+      --hostname=audit-worker@%h
+      --max-tasks-per-child=200
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=4
+```
+
+#### Adding New Queues
+
+**Step 1: Define queue routing in celery_config.py**
+
+```python
+# backend/celery_config.py
+celery_config = {
+    "task_routes": {
+        # Add new queue for email notifications
+        "tasks.email_tasks.send_email_notification": {"queue": "emails"},
+        "tasks.email_tasks.*": {"queue": "emails"},
+        # ... existing routes
+    },
+}
+```
+
+**Step 2: Create dedicated worker in docker-compose.yml**
+
+```yaml
+# docker-compose.yml
+services:
+  celery-emails:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=8
+      --queues=emails
+      --hostname=email-worker@%h
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=4
+```
+
+**Step 3: Deploy and verify**
+
+```bash
+# Deploy new worker
+docker-compose up -d celery-emails
+
+# Verify queue is being processed
+curl -s http://localhost:5555/api/workers | jq '.'
+docker-compose logs -f celery-emails
+```
+
+#### Queue Monitoring
+
+**Monitor queue depths in Flower:**
+
+```bash
+# Flower dashboard - http://localhost:5555
+# Check each queue:
+# - Current queue depth
+# - Task processing rate
+# - Worker availability
+
+# Via API
+curl -s http://localhost:5555/api/queues | jq '.'
+```
+
+**Target queue depths:**
+
+| Queue | Target Depth | Action if Exceeded |
+|-------|--------------|-------------------|
+| **analysis** | < 5 | Add more analysis workers |
+| **learning** | < 10 | Add more learning workers |
+| **audit** | < 20 | Add more audit workers |
+| **emails** | < 50 | Add more email workers |
+
+---
+
+### 4. Task Priorities
+
+Task priorities ensure critical tasks are processed first when queues are backed up.
+
+#### Priority Configuration
+
+**Current configuration:**
+
+```python
+# backend/celery_config.py
+celery_config = {
+    "task_default_priority": 5,  # Default priority (0-9 scale)
+    # ...
+}
+```
+
+**Priority scale (0-9):**
+- **9**: Highest priority (urgent)
+- **7-8**: High priority
+- **5**: Default priority
+- **3-4**: Low priority
+- **0-2**: Lowest priority (background tasks)
+
+#### When to Use Priorities
+
+**Use high priorities (7-9) for:**
+- User-initiated resume analysis
+- Real-time user-facing operations
+- Time-sensitive notifications
+
+**Use default priority (5) for:**
+- Scheduled batch processing
+- Periodic maintenance tasks
+- Standard background operations
+
+**Use low priorities (0-2) for:**
+- Log cleanup
+- Backup operations
+- Data aggregation
+- Non-critical reports
+
+#### Implementation Examples
+
+**Define task with priority:**
+
+```python
+# backend/tasks/analysis_task.py
+from celery import shared_task
+
+@shared_task(bind=True, priority=7)  # High priority
+def analyze_resume_async(self, resume_id: str, ...):
+    """Urgent resume analysis"""
+    # Task implementation
+    pass
+
+@shared_task(bind=True, priority=2)  # Low priority
+def cleanup_old_logs(self, days: int = 30):
+    """Background log cleanup"""
+    # Task implementation
+    pass
+```
+
+**Override priority at runtime:**
+
+```python
+# Submit task with custom priority
+from tasks.analysis_task import analyze_resume_async
+
+# High priority analysis
+task = analyze_resume_async.apply_async(
+    args=['resume-123'],
+    priority=8  # Override default priority
+)
+
+# Low priority batch
+task = analyze_resume_async.apply_async(
+    args=['resume-456'],
+    priority=3  # Lower than default
+)
+```
+
+**Priority-based queue routing:**
+
+```python
+# backend/celery_config.py
+celery_config = {
+    "task_routes": {
+        # High-priority analysis tasks
+        "tasks.analysis_task.analyze_resume_async": {
+            "queue": "analysis",
+            "priority": 7
+        },
+        # Low-priority cleanup
+        "tasks.audit_tasks.cleanup_old_audit_logs": {
+            "queue": "audit",
+            "priority": 2
+        },
+    },
+}
+```
+
+#### Monitoring Priorities
+
+**Check task priorities in queue:**
+
+```bash
+# Via Redis CLI
+docker-compose exec redis redis-cli
+
+# List all tasks in analysis queue with priorities
+LPREFIX analysis
+# View all tasks (encoded, priority included)
+
+# Or via Flower
+curl -s http://localhost:5555/api/tasks | jq '.[] | {name: .name, args: .args, kwargs: .kwargs, priority: .priority}'
+```
+
+**Priority effectiveness metrics:**
+
+| Metric | How to Measure | Target |
+|--------|----------------|--------|
+| **High-priority task wait time** | Flower dashboard | < 5 seconds |
+| **Low-priority task wait time** | Flower dashboard | < 5 minutes |
+| **Priority inversion frequency** | Logs (low-priority before high-priority) | 0 |
+
+---
+
+## Quick Reference: Celery Worker Tuning
+
+### Configuration Checklist
+
+- [ ] **Concurrency set** based on task type (ML: low, I/O: high)
+- [ ] **Prefetch disabled** for long-running ML tasks (multiplier=1)
+- [ ] **Queue separation** configured for different task types
+- [ ] **Dedicated workers** for each major queue (analysis, learning, audit)
+- [ ] **Resource limits** set in docker-compose.yml
+- [ ] **Worker restart** configured (max_tasks_per_child)
+- [ ] **Priorities defined** for critical vs non-critical tasks
+- [ ] **Monitoring enabled** (Flower dashboard)
+
+### Common Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| **Queue backup** | Insufficient workers or low concurrency | Add more workers or increase concurrency |
+| **High memory usage** | Prefetch multiplier too high | Set `worker_prefetch_multiplier=1` |
+| **CPU at 100%** | Concurrency too high for ML tasks | Reduce concurrency to CPU count / 2 |
+| **Slow critical tasks** | No priority separation | Enable task priorities (7-9 for critical) |
+| **Worker starvation** | One queue consuming all resources | Separate queues with dedicated workers |
+| **OOM errors** | Memory limit too low or concurrency too high | Increase memory limit or reduce concurrency |
+
+### Environment Variables
+
+```bash
+# .env - Celery Worker Configuration
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+CELERY_WORKER_CONCURRENCY=2
+CELERY_WORKER_PREFETCH_MULTIPLIER=1
+CELERY_WORKER_MAX_TASKS_PER_CHILD=100
+CELERY_TASK_DEFAULT_PRIORITY=5
+
+# Queue-specific (set in docker-compose.yml)
+CELERY_QUEUES=analysis,learning,audit,default
+```
+
+### Docker Compose Example
+
+```yaml
+# Recommended production setup
+services:
+  celery-analysis:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --queues=analysis
+      --prefetch-multiplier=1
+      --max-tasks-per-child=50
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    environment:
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=1
+
+  celery-learning:
+    build: ./backend
+    command: >
+      celery -A celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=learning
+      --prefetch-multiplier=2
+      --max-tasks-per-child=100
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+```
+
+### Monitoring Commands
+
+```bash
+# Check worker status
+curl -s http://localhost:5555/api/workers | jq '.'
+
+# Check queue depths
+curl -s http://localhost:5555/api/queues | jq '.'
+
+# Check active tasks
+curl -s http://localhost:5555/api/tasks | jq '.'
+
+# Check worker resources
+docker stats $(docker-compose ps -q celery-*)
+
+# View worker logs
+docker-compose logs -f celery-analysis
+docker-compose logs -f celery-learning
+```
+
+---
+
 ## Related Documentation
 
 - [ML_PIPELINE.md](ML_PIPELINE.md) - Detailed ML/NLP pipeline documentation
 - [backend/analyzers/MATCHERS_GUIDE.md](backend/analyzers/MATCHERS_GUIDE.md) - Skill matching methods
+- [backend/docs/BACKGROUND_TASKS.md](backend/docs/BACKGROUND_TASKS.md) - Complete Celery task documentation
 - [SETUP.md](SETUP.md) - Initial setup and configuration
 - [monitoring/README.md](monitoring/README.md) - Monitoring setup and metrics
 - [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Complete configuration reference
