@@ -196,6 +196,185 @@ If you get stuck at any point:
 
 ---
 
-## Ready to Get Started?
+---
 
-Let's begin with [Getting Started](#getting-started) and learn how to access the platform and navigate your dashboard.
+## Getting Started
+
+Welcome to AgentHR! This section will help you access the platform, understand what you're seeing, and get comfortable with your dashboard. Let's get started.
+
+### Accessing the Platform
+
+#### How to Log In
+
+Accessing AgentHR is simple—just open your web browser and navigate to the platform URL provided by your system administrator. Typically, this will be something like:
+
+- **Company network**: `https://agenthr.yourcompany.com`
+- **Local development**: `http://localhost:3000`
+
+> **Note**: AgentHR works best on modern web browsers like Google Chrome, Mozilla Firefox, Microsoft Edge, or Safari. Make sure your browser is up to date for the best experience.
+
+#### First-Time Login
+
+If this is your first time using AgentHR:
+
+1. **Open your browser** and go to the AgentHR URL
+2. **Enter your credentials** (email and password provided by your administrator)
+3. **Click "Sign In"** or press Enter
+
+Once you're logged in, you'll see your main dashboard.
+
+#### Troubleshooting Login Issues
+
+| Problem | Solution |
+|---------|----------|
+| Forgot password | Click "Forgot Password" on the login page and follow the instructions |
+| Account locked | Contact your system administrator to unlock your account |
+| Page won't load | Try clearing your browser cache or using a different browser |
+| "Access denied" message | Verify you're using the correct URL and contact your admin if the issue persists |
+
+> **Need help?** If you can't log in after trying these solutions, contact your system administrator or IT support team.
+
+### Platform Overview
+
+Once you're logged in, you'll see that AgentHR is organized into **main sections** that follow your hiring workflow. Here's a quick overview of what's available:
+
+#### Main Navigation
+
+You'll find these options in the navigation menu (usually at the top or left side of the screen):
+
+| Section | What It's For | When You'll Use It |
+|---------|---------------|-------------------|
+| **Dashboard** | Your home base with quick stats and recent activity | Every time you log in |
+| **Vacancies** | Create and manage job postings | When you need to post a new job or update an existing one |
+| **Resumes** | Upload and view candidate resumes | When you receive resumes from applicants |
+| **Matching** | Compare candidates to job openings | When you want to see who matches a job best |
+| **Ranking** | View AI-ranked candidate lists | When you want to quickly identify top candidates |
+| **Kanban Board** | Visual pipeline management | When you're tracking candidates through the hiring process |
+| **Analytics** | Reports and hiring metrics | When you want to review performance and trends |
+
+#### Key Concepts to Understand
+
+Before we dive deeper, let's cover some important concepts:
+
+**Vacancies (Jobs)**
+A "vacancy" is simply a job opening you're trying to fill. Each vacancy has:
+- Job title and description
+- Required skills and qualifications
+- Location and salary information
+- A list of candidates who have applied
+
+**Resumes (Candidates)**
+When you upload a resume, AgentHR automatically extracts information like:
+- Name and contact details
+- Work experience
+- Education
+- Skills and certifications
+
+**Matching**
+Matching compares a candidate's resume to a job vacancy and calculates how well they fit. You'll see match scores from 0-100%.
+
+**Ranking**
+Ranking takes all candidates for a job and orders them from best to worst based on 13 different factors. The AI gives each candidate a recommendation level: Excellent, Good, Maybe, or Poor.
+
+**Kanban Board**
+A visual way to track where each candidate is in your hiring process. Candidates are represented as cards that you can drag between columns.
+
+#### What AgentHR Does (In Plain English)
+
+Here's the hiring process, **before and after** AgentHR:
+
+**Traditional Hiring:**
+1. Receive 100 resumes
+2. Spend hours reading each one
+3. Manually compare to job requirements
+4. Pick a few to interview
+5. Hope you didn't miss someone great
+
+**With AgentHR:**
+1. Upload 100 resumes (takes 5 minutes)
+2. AI analyzes and ranks them automatically
+3. Review top 10 candidates first
+4. See exactly why each candidate is ranked high or low
+5. Make confident decisions with data to back you up
+
+### Understanding Your Dashboard
+
+When you first log in, you'll see the **Dashboard**—your command center for hiring. Let's break down what you're looking at.
+
+#### Dashboard Sections
+
+Your dashboard typically displays:
+
+**1. Quick Stats**
+Key numbers at a glance:
+- **Active Vacancies** – How many jobs you're currently hiring for
+- **Total Resumes** – How many resumes are in the system
+- **Candidates in Pipeline** – How many people you're actively considering
+- **Recent Hires** – How many people you've hired this month
+
+> **Why this matters**: These numbers give you an instant snapshot of your hiring workload.
+
+**2. Recent Activity**
+A feed showing the latest actions:
+- Resumes recently uploaded
+- Candidates who moved to a new stage
+- New job postings created
+- Feedback submitted on rankings
+
+> **Why this matters**: Stay up to date on what's happening across all your jobs, especially when collaborating with a team.
+
+**3. Top Candidates**
+A list of the highest-ranked candidates across all your vacancies, usually showing:
+- Candidate name and current stage
+- Which job they applied for
+- Their match score or recommendation level
+
+> **Why this matters**: Quickly spot your best candidates without digging through lists.
+
+**4. Action Items**
+Tasks that need your attention:
+- Resumes waiting to be reviewed
+- Candidates who need to move to the next stage
+- Jobs that need updated requirements
+
+> **Why this matters**: Never miss an important task or follow-up.
+
+#### Customizing Your Dashboard
+
+Depending on your organization's setup, you may be able to:
+- **Rearrange widgets** – Click and drag to move sections around
+- **Filter by job** – View activity for specific vacancies only
+- **Set date ranges** – See activity from the past week, month, or custom period
+
+#### Next Steps from the Dashboard
+
+From your dashboard, you can quickly navigate to:
+
+| If you want to... | Click on... |
+|-------------------|-------------|
+| Post a new job | The "Vacancies" section and create a new vacancy |
+| Upload resumes | The "Resumes" section and use the upload button |
+| See who matches a job | The "Matching" section and select a vacancy |
+| Review top candidates | The "Ranking" section to see ranked lists |
+| Move candidates forward | The "Kanban Board" to update stages |
+| Check hiring metrics | The "Analytics" section for detailed reports |
+
+#### Dashboard Tips
+
+Here are some tips to make the most of your dashboard:
+
+✅ **Check it daily** – Spend 5 minutes each morning reviewing recent activity
+
+✅ **Watch the numbers** – If "Active Vacancies" is high, prioritize workload
+
+✅ **Follow up on action items** – Don't let candidates sit in one stage too long
+
+✅ **Spot trends** – If you're seeing lots of "Excellent" candidates, you might want to speed up interviews
+
+✅ **Use it as a launchpad** – Everything you need is one click away from the dashboard
+
+---
+
+### What's Next?
+
+Now that you know how to access AgentHR and understand your dashboard, you're ready to start using it! In the next section, we'll cover [Posting Job Vacancies](#posting-job-vacancies)—creating the job postings that candidates will be matched to.
