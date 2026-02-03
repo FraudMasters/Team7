@@ -265,6 +265,7 @@ from api import (
     candidate_tags,
     candidate_notes,
     candidate_activities,
+    job_integrations,
     search,
 )
 
@@ -297,6 +298,7 @@ app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=[
 app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["Candidate Tags"])
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
+app.include_router(job_integrations.router, prefix="/api/integrations", tags=["Job Integrations"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 
 
