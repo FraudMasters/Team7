@@ -33,6 +33,7 @@ from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .notification import Notification, NotificationType
+from .notification_preference import NotificationPreference, DigestFrequency
 
 __all__ = [
     "Base",
@@ -77,4 +78,6 @@ __all__ = [
     "SearchHistory",
     "Notification",
     "NotificationType",
+    "NotificationPreference",
+    "DigestFrequency",
 ]
