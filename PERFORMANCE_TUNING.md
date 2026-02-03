@@ -2401,6 +2401,1061 @@ curl http://localhost:8000/api/health/cache
 
 ---
 
+## PostgreSQL Optimization
+
+PostgreSQL is the primary data store for the AgentHR system, handling all persistent data for resumes, candidates, vacancies, analytics, and more. Proper optimization ensures fast query performance and efficient resource utilization.
+
+### PostgreSQL Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 Application Layer                            │
+│  (FastAPI + SQLAlchemy ORM)                                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Connection Pool (SQLAlchemy)                    │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  pool_size=10, max_overflow=20                        │   │
+│  │  pool_pre_ping=True (connection health checks)         │   │
+│  │  asyncpg driver (async PostgreSQL)                     │   │
+│  └──────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   PostgreSQL Server                          │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Query Executor (with plan cache)                     │   │
+│  │  ┌────────────────────────────────────────────────┐   │   │
+│  │  │  Index Scan (B-tree)                            │   │   │
+│  │  │  Sequential Scan (full table)                   │   │   │
+│  │  │  Bitmap Index Scan                             │   │   │
+│  │  └────────────────────────────────────────────────┘   │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │  Shared Buffers (cache: ~25% of RAM)                  │   │
+│  │  WAL (Write-Ahead Log)                                │   │
+│  │  Autovacuum (maintenance worker)                      │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Current PostgreSQL Configuration
+
+**From `backend/database.py`:**
+
+```python
+engine = create_async_engine(
+    settings.get_db_url_async(),
+    echo=settings.log_level == "DEBUG",
+    future=True,
+    pool_pre_ping=True,         # Verify connections before use
+    pool_size=10,               # Base pool size
+    max_overflow=20,            # Additional connections under load
+)
+```
+
+**Configuration breakdown:**
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `pool_size` | 10 | Number of persistent connections to maintain |
+| `max_overflow` | 20 | Additional connections allowed under load (max 30 total) |
+| `pool_pre_ping` | True | Test connections before using them (detect stale connections) |
+| `echo` | False | Log SQL queries (True for DEBUG) |
+| `future=True` | True | Use SQLAlchemy 2.0 style |
+
+**Connection monitoring:**
+The system includes automatic query performance monitoring via SQLAlchemy event listeners:
+- Tracks query execution time
+- Records metrics to Prometheus
+- Categorizes queries by operation (SELECT, INSERT, UPDATE, DELETE)
+
+---
+
+## 1. Indexing Strategies
+
+Indexes are the most impactful optimization for PostgreSQL. Proper indexes can improve query performance by 10-1000x.
+
+### Understanding Index Types
+
+**B-tree Index (Default)**
+
+- **Use for**: Equality and range queries
+- **Example**: `WHERE candidate_id = 'abc-123'` or `WHERE created_at > '2024-01-01'`
+- **Best for**: Most queries including foreign keys, dates, IDs
+
+```sql
+-- B-tree index (default)
+CREATE INDEX idx_resumes_candidate_id ON resumes(candidate_id);
+CREATE INDEX idx_vacancies_created_at ON vacancies(created_at);
+```
+
+**GIN Index (Generalized Inverted Index)**
+
+- **Use for**: JSON/JSONB columns, array columns, full-text search
+- **Example**: `WHERE skills @> '["Python"]'` or `WHERE text_vector @@ to_tsquery('engineer')`
+- **Best for**: Unstructured data, tag searches
+
+```sql
+-- GIN index for JSONB
+CREATE INDEX idx_candidates_skills ON candidates USING GIN (skills);
+
+-- GIN index for full-text search
+CREATE INDEX idx_resumes_text_vector ON resumes USING GIN (to_tsvector('english', resume_text));
+```
+
+**Partial Index**
+
+- **Use for**: Frequently queried subset of data
+- **Example**: `WHERE status = 'active'` (most queries only need active records)
+- **Benefit**: Smaller index size, faster maintenance
+
+```sql
+-- Partial index (only active vacancies)
+CREATE INDEX idx_active_vacancies ON vacancies(created_at)
+WHERE status = 'active';
+```
+
+**Composite Index**
+
+- **Use for**: Queries with multiple conditions
+- **Example**: `WHERE candidate_id = 'abc-123' AND created_at > '2024-01-01'`
+- **Column order**: Most selective column first
+
+```sql
+-- Composite index
+CREATE INDEX idx_matches_candidate_vacancy ON match_results(candidate_id, vacancy_id);
+```
+
+### Current Schema Index Recommendations
+
+**High-Priority Indexes**
+
+| Table | Column(s) | Type | Query Pattern |
+|-------|-----------|------|---------------|
+| **resumes** | `candidate_id` | B-tree | `WHERE candidate_id = ?` (get resumes for candidate) |
+| **parsed_resumes** | `resume_id` | B-tree | `WHERE resume_id = ?` (join with resumes) |
+| **resume_analyses** | `resume_id` | B-tree | `WHERE resume_id = ?` (get analysis for resume) |
+| **candidates** | `created_at` | B-tree | `ORDER BY created_at DESC` (list candidates) |
+| **job_vacancies** | `(status, created_at)` | Composite | `WHERE status = 'active' ORDER BY created_at` |
+| **match_results** | `(candidate_id, vacancy_id)` | Composite | `WHERE candidate_id = ? AND vacancy_id = ?` |
+| **match_results** | `match_score` | B-tree | `ORDER BY match_score DESC` (ranking) |
+| **candidates** | `skills` | GIN | `WHERE skills @> '["Python"]'` (skill search) |
+
+**Implementation script:**
+
+```sql
+-- File: backend/database/migrations/add_performance_indexes.py
+
+-- Resume table indexes
+CREATE INDEX IF NOT EXISTS idx_resumes_candidate_id ON resumes(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_resumes_created_at ON resumes(created_at DESC);
+
+-- Parsed resume indexes
+CREATE INDEX IF NOT EXISTS idx_parsed_resumes_resume_id ON parsed_resumes(resume_id);
+
+-- Candidate indexes
+CREATE INDEX IF NOT EXISTS idx_candidates_created_at ON candidates(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_candidates_skills ON candidates USING GIN (skills);
+
+-- Vacancy indexes
+CREATE INDEX IF NOT EXISTS idx_vacancies_status_created ON job_vacancies(status, created_at DESC);
+
+-- Match result indexes
+CREATE INDEX IF NOT EXISTS idx_match_results_candidate_vacancy ON match_results(candidate_id, vacancy_id);
+CREATE INDEX IF NOT EXISTS idx_match_results_score ON match_results(match_score DESC);
+
+-- Analysis result indexes
+CREATE INDEX IF NOT EXISTS idx_resume_analyses_resume_id ON resume_analyses(resume_id);
+CREATE INDEX IF NOT EXISTS idx_resume_analyses_created_at ON resume_analyses(created_at DESC);
+
+-- Full-text search index (if using text search)
+CREATE INDEX IF NOT EXISTS idx_resumes_fulltext ON resumes USING GIN (to_tsvector('english', resume_text));
+```
+
+### Index Maintenance
+
+**Check for missing indexes:**
+
+```sql
+-- Find tables with no indexes (except system tables)
+SELECT
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+    AND NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = pg_tables.schemaname
+        AND tablename = pg_tables.tablename
+    )
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+```
+
+**Find unused indexes:**
+
+```sql
+-- Indexes that haven't been used (safe to drop)
+SELECT
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan as index_scans,
+    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+    AND indexname NOT LIKE '%_pkey'
+ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+**Analyze index usage:**
+
+```sql
+-- Most frequently used indexes
+SELECT
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan as index_scans,
+    idx_tup_read as tuples_read,
+    idx_tup_fetch as tuples_fetched
+FROM pg_stat_user_indexes
+ORDER BY idx_scan DESC
+LIMIT 20;
+```
+
+### Index Best Practices
+
+**Do:**
+- Index foreign keys (joans will be faster)
+- Index columns used in WHERE clauses
+- Index columns used in ORDER BY
+- Use composite indexes for multi-column queries
+- Use partial indexes for filtered subsets
+- Run ANALYZE after creating indexes
+
+**Don't::**
+- Over-index (indexes slow down INSERT/UPDATE/DELETE)
+- Index low-cardinality columns (e.g., boolean flags)
+- Index columns rarely queried
+- Forget to monitor index usage
+- Create indexes without testing query plans
+
+**Index size monitoring:**
+
+```bash
+# Check index sizes
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT
+    tablename,
+    indexname,
+    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+FROM pg_stat_user_indexes
+ORDER BY pg_relation_size(indexrelid) DESC
+LIMIT 20;
+"
+```
+
+---
+
+## 2. Connection Pooling
+
+Connection pooling reuses database connections to avoid the overhead of establishing new connections for each query.
+
+### Current Pool Configuration
+
+**SQLAlchemy pool settings (from `database.py`):**
+
+```python
+engine = create_async_engine(
+    settings.get_db_url_async(),
+    pool_size=10,           # Base pool size
+    max_overflow=20,        # Additional connections under load
+    pool_pre_ping=True,     # Verify connections before use
+    pool_recycle=3600,      # Recycle connections after 1 hour
+)
+```
+
+**Pool behavior:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              SQLAlchemy Connection Pool                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Base Pool (pool_size=10):                                 │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                 │
+│  │Conn1│ │Conn2│ │Conn3│ │ ... │ │Conn10│                 │
+│  └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘ └───┬───┘                 │
+│     │       │       │       │       │                      │
+│     └───────┴───────┴───────┴───────┘                      │
+│                       │                                     │
+│                       ▼                                     │
+│            Available for requests                          │
+│                                                             │
+│  Overflow Pool (max_overflow=20):                          │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                 │
+│  │Conn11│ │Conn12│ │Conn13│ │ ... │ │Conn30│               │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘                 │
+│  Created on demand when base pool is exhausted              │
+│  Returned to overflow when not needed                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Pool Sizing Guidelines
+
+**Optimal pool size calculation:**
+
+```
+pool_size = (number of CPU cores) × (effective_spindle_count) × 2
+
+For most systems:
+pool_size = (CPU cores) × 2
+
+With async (FastAPI):
+pool_size = (CPU cores) × 4
+```
+
+**Recommended pool sizes by system size:**
+
+| System CPU | Concurrent Requests | pool_size | max_overflow | Max Connections |
+|------------|---------------------|-----------|--------------|-----------------|
+| 2 cores | 10 | 5 | 10 | 15 |
+| 4 cores | 50 | 10 | 20 | ✅ **30 (current)** |
+| 8 cores | 100 | 16 | 32 | 48 |
+| 16+ cores | 500+ | 32 | 64 | 96 |
+
+**Why pool_size=10 for 4-core system?**
+- Each connection runs in a separate thread/process
+- Too many connections cause context switching overhead
+- PostgreSQL has connection overhead (memory, process management)
+- Better to queue requests than overload the database
+
+### Connection Pool Configuration Examples
+
+**Small system (2 cores, low traffic):**
+
+```python
+# backend/database.py
+engine = create_async_engine(
+    settings.get_db_url_async(),
+    pool_size=5,            # Reduced for 2-core system
+    max_overflow=10,        # Allow bursts
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
+```
+
+**Large system (8+ cores, high traffic):**
+
+```python
+engine = create_async_engine(
+    settings.get_db_url_async(),
+    pool_size=20,           # Increased for 8-core system
+    max_overflow=30,        # Allow large bursts
+    pool_pre_ping=True,
+    pool_recycle=1800,      # Recycle more frequently
+    pool_timeout=30,        # Wait 30s for connection before error
+)
+```
+
+### Monitoring Connection Pool
+
+**Check active connections:**
+
+```bash
+# Active connections vs max
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT
+    count(*) AS active_connections,
+    (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') AS max_connections,
+    round(100.0 * count(*) / (SELECT setting::int FROM pg_settings WHERE name = 'max_connections'), 2) AS utilization_percent
+FROM pg_stat_activity
+WHERE state = 'active';
+"
+```
+
+**Connection distribution by state:**
+
+```bash
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT
+    state,
+    count(*) AS connections,
+    count(*) FILTER (WHERE query NOT LIKE '%pg_stat_activity%') AS active_queries
+FROM pg_stat_activity
+GROUP BY state
+ORDER BY count(*) DESC;
+"
+```
+
+**Target metrics:**
+
+| Metric | Target | Action |
+|--------|--------|--------|
+| **Active connections** | < 50% of pool | Normal |
+| **Pool utilization** | < 80% | Monitor |
+| **Pool utilization** | > 90% | Increase pool_size |
+| **Connection wait time** | < 100ms | Normal |
+| **Connection wait time** | > 500ms | Increase pool or reduce queries |
+
+### Connection Pool Best Practices
+
+**1. Use pool_pre_ping in production:**
+
+```python
+# Detects and replaces stale connections (e.g., DB restart)
+pool_pre_ping=True
+```
+
+**2. Set appropriate timeout:**
+
+```python
+pool_timeout=30  # Seconds to wait for connection before error
+```
+
+**3. Recycle connections periodically:**
+
+```python
+pool_recycle=3600  # Recycle after 1 hour (prevents connection leaks)
+```
+
+**4. Monitor pool exhaustion:**
+
+```python
+# Log warnings when pool is exhausted
+from sqlalchemy import event
+
+@event.listens_for(engine, "connect")
+def receive_connect(dbapi_conn, connection_record):
+    logger.debug(f"New connection created. Pool size: {engine.pool.size()}")
+
+@event.listens_for(engine, "checkout")
+def receive_checkout(dbapi_conn, connection_record, connection_proxy):
+    pool_size = engine.pool.size()
+    if pool_size >= engine.pool._max_overflow:
+        logger.warning(f"Connection pool exhausted! Size: {pool_size}")
+```
+
+**5. Use environment-specific settings:**
+
+```python
+# config.py
+import os
+
+def get_db_pool_settings():
+    """Return pool settings based on environment"""
+    if os.getenv("ENVIRONMENT") == "production":
+        return {
+            "pool_size": 20,
+            "max_overflow": 30,
+            "pool_recycle": 3600,
+        }
+    else:
+        return {
+            "pool_size": 5,
+            "max_overflow": 10,
+            "pool_recycle": 1800,
+        }
+```
+
+---
+
+## 3. Query Optimization
+
+Query optimization improves performance by ensuring queries use indexes efficiently and avoid expensive operations.
+
+### Query Analysis Tools
+
+**EXPLAIN ANALYZE**
+
+See how PostgreSQL executes queries:
+
+```sql
+-- Basic query plan
+EXPLAIN
+SELECT * FROM candidates WHERE created_at > '2024-01-01';
+
+-- Detailed plan with actual execution time
+EXPLAIN ANALYZE
+SELECT * FROM candidates WHERE created_at > '2024-01-01';
+
+-- Format with buffers (shows memory usage)
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM candidates WHERE created_at > '2024-01-01';
+```
+
+**Reading EXPLAIN output:**
+
+```
+─┬─ Index Scan using idx_candidates_created_at on candidates  (cost=0.42..1234.56 rows=1000 width=500) (actual time=0.123..45.678 rows=987 loops=1)
+ │                                           │
+ │                                           └─ Actual rows returned
+ │                         └─ Estimated rows
+ └─ Index used (GOOD!)
+```
+
+**Key indicators:**
+- ✅ **Index Scan**: Using index (fast)
+- ⚠️ **Seq Scan**: Full table scan (slow - need index)
+- ⚠️ **high cost**: Expensive query
+- ⚠️ **actual time >> estimated time**: Statistics out of date (run ANALYZE)
+
+### Common Query Performance Issues
+
+**Issue 1: N+1 Query Problem**
+
+```python
+# ❌ BAD: N+1 queries (1 query to get candidates + N queries for each candidate's skills)
+candidates = db.query(Candidate).all()
+for candidate in candidates:
+    skills = db.query(Skill).filter_by(candidate_id=candidate.id).all()  # Separate query per candidate!
+
+# ✅ GOOD: Use eager loading (2 queries total)
+from sqlalchemy.orm import selectinload
+
+candidates = db.query(Candidate)\
+    .options(selectinload(Candidate.skills))\
+    .all()  # Skills loaded in same query
+
+# Or use joined load for 1 query
+from sqlalchemy.orm import joinedload
+
+candidates = db.query(Candidate)\
+    .options(joinedload(Candidate.skills))\
+    .all()
+```
+
+**Issue 2: Missing WHERE clause indexes**
+
+```sql
+-- ❌ BAD: Full table scan (no index on email)
+SELECT * FROM candidates WHERE email = 'user@example.com';
+
+-- ✅ GOOD: Index scan
+CREATE INDEX idx_candidates_email ON candidates(email);
+SELECT * FROM candidates WHERE email = 'user@example.com';
+```
+
+**Issue 3: SELECT \***
+
+```python
+# ❌ BAD: Fetches all columns (more data transfer)
+candidates = db.query(Candidate).all()
+
+# ✅ GOOD: Fetch only needed columns
+candidates = db.query(Candidate.id, Candidate.name, Candidate.email).all()
+```
+
+**Issue 4: Unnecessary ORDER BY**
+
+```sql
+-- ❌ BAD: Expensive sort (no index)
+SELECT * FROM candidates ORDER BY name LIMIT 10;
+
+-- ✅ GOOD: Use index for sort
+CREATE INDEX idx_candidates_name ON candidates(name);
+SELECT * FROM candidates ORDER BY name LIMIT 10;
+```
+
+**Issue 5: Large IN clauses**
+
+```sql
+-- ❌ BAD: IN clause with thousands of values
+SELECT * FROM candidates WHERE id IN ('id1', 'id2', ..., 'id10000');
+
+-- ✅ GOOD: Use temporary table or CTE
+CREATE TEMP TABLE candidate_ids (id VARCHAR);
+COPY candidate_ids FROM '/tmp/ids.csv';
+SELECT c.* FROM candidates c JOIN candidate_ids ci ON c.id = ci.id;
+```
+
+### Query Optimization Techniques
+
+**1. Use appropriate indexes**
+
+```sql
+-- Create indexes for common query patterns
+CREATE INDEX idx_candidates_name_email ON candidates(name, email);
+CREATE INDEX idx_resumes_status_created ON resumes(status, created_at DESC);
+```
+
+**2. Use partial indexes for filtered queries**
+
+```sql
+-- Only index active vacancies (most queries)
+CREATE INDEX idx_active_vacancies ON vacancies(created_at)
+WHERE status = 'active';
+```
+
+**3. Use covering indexes (include columns)**
+
+```sql
+-- Include columns to avoid table lookup
+CREATE INDEX idx_match_results_covering ON match_results(candidate_id, vacancy_id)
+INCLUDE (match_score, created_at);
+```
+
+**4. Use CTEs for complex queries**
+
+```sql
+-- Common Table Expression (CTE) for readability
+WITH ranked_candidates AS (
+    SELECT
+        c.id,
+        c.name,
+        m.match_score,
+        RANK() OVER (ORDER BY m.match_score DESC) as rank
+    FROM candidates c
+    JOIN match_results m ON c.id = m.candidate_id
+    WHERE m.vacancy_id = 'vac-123'
+)
+SELECT * FROM ranked_candidates WHERE rank <= 10;
+```
+
+**5. Use materialized views for expensive aggregations**
+
+```sql
+-- Create materialized view (refreshed periodically)
+CREATE MATERIALIZED VIEW mv_candidate_stats AS
+SELECT
+    date_trunc('day', created_at) as date,
+    count(*) as new_candidates,
+    avg(EXTRACT(YEAR FROM AGE(NOW(), created_at))) as avg_age
+FROM candidates
+GROUP BY date_trunc('day', created_at);
+
+-- Refresh periodically
+REFRESH MATERIALIZED VIEW mv_candidate_stats;
+
+-- Query is instant (no computation)
+SELECT * FROM mv_candidate_stats ORDER BY date DESC LIMIT 30;
+```
+
+### Slow Query Logging
+
+**Enable slow query logging:**
+
+```sql
+-- Log queries taking longer than 1 second
+ALTER SYSTEM SET log_min_duration_statement = 1000;
+
+-- Reload configuration
+SELECT pg_reload_conf();
+```
+
+**View slow queries:**
+
+```bash
+# Check log file
+docker-compose exec db tail -f /var/log/postgresql/postgresql.log | grep "duration:"
+```
+
+**Find slow queries in pg_stat_statements:**
+
+```sql
+-- Enable pg_stat_statements extension
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- Find slowest queries
+SELECT
+    query,
+    calls,
+    total_exec_time / 1000 as total_time_seconds,
+    mean_exec_time / 1000 as avg_time_seconds,
+    stddev_exec_time / 1000 as stddev_time_seconds
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 20;
+```
+
+### Query Optimization Checklist
+
+Before marking queries as optimized, verify:
+
+- [ ] **All WHERE clauses indexed**: Columns in WHERE, JOIN, ORDER BY have indexes
+- [ ] **No N+1 queries**: Use eager loading (selectinload, joinedload)
+- [ ] **SELECT specific columns**: Avoid SELECT *
+- [ ] **EXPLAIN ANALYZE reviewed**: Query uses index scans, not seq scans
+- [ ] **No unnecessary ORDER BY**: Remove if not needed
+- [ ] **Pagination used**: LIMIT/OFFSET for large result sets
+- [ ] **Connection pooling enabled**: Reusing connections
+- [ ] **Prepared statements used**: Parameterized queries (SQLAlchemy does this)
+
+---
+
+## 4. Database Vacuuming and Maintenance
+
+PostgreSQL requires periodic maintenance to reclaim space and update statistics.
+
+### Understanding MVCC and Bloat
+
+**How PostgreSQL works (MVCC):**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              PostgreSQL MVCC (Multi-Version Concurrency)    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. UPDATE candidate SET name = 'New Name' WHERE id = 1    │
+│                                                             │
+│  ┌─────────────┐       ┌─────────────┐                     │
+│  │  OLD row    │       │  NEW row    │                     │
+│  │  (id=1)     │  ──▶  │  (id=1)     │                     │
+│  │  name=Old   │       │  name=New   │                     │
+│  │  (dead)     │       │  (live)     │                     │
+│  └─────────────┘       └─────────────┘                     │
+│        │                                                   │
+│        └─ Dead row remains until VACUUM                    │
+│                                                             │
+│  2. Over time, dead rows accumulate (table bloat)          │
+│  3. VACUUM removes dead rows and reclaims space            │
+│  4. ANALYZE updates query planning statistics              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Autovacuum Configuration
+
+**Current autovacuum settings (check):**
+
+```sql
+-- View autovacuum settings
+SELECT name, setting, unit, short_desc
+FROM pg_settings
+WHERE name LIKE 'autovacuum%'
+ORDER BY name;
+```
+
+**Recommended autovacuum tuning for AgentHR:**
+
+```sql
+-- Aggressive autovacuum for high-write tables
+ALTER TABLE candidates SET (
+    autovacuum_vacuum_scale_factor = 0.1,      -- Vacuum after 10% changes (default: 20%)
+    autovacuum_analyze_scale_factor = 0.05,    -- Analyze after 5% changes (default: 10%)
+    autovacuum_vacuum_threshold = 100           -- Min 100 rows before vacuum
+);
+
+ALTER TABLE resumes SET (
+    autovacuum_vacuum_scale_factor = 0.1,
+    autovacuum_analyze_scale_factor = 0.05
+);
+
+ALTER TABLE match_results SET (
+    autovacuum_vacuum_scale_factor = 0.2,      -- Higher threshold for high-traffic table
+    autovacuum_analyze_scale_factor = 0.1
+);
+```
+
+### Manual Vacuum and Analyze
+
+**When to run manually:**
+- After bulk data load/delete
+- Before major reporting periods
+- When autovacuum isn't keeping up
+- After schema changes
+
+**Commands:**
+
+```sql
+-- Standard vacuum (reclaims space, doesn't lock table)
+VACUUM candidates;
+
+-- Vacuum + analyze (reclaims space + updates statistics)
+VACUUM ANALYZE candidates;
+
+-- Full vacuum (locks table, rewrites file completely - use carefully!)
+VACUUM FULL candidates;  -- Only during maintenance window!
+
+-- Analyze only (update statistics without vacuum)
+ANALYZE candidates;
+```
+
+**Automated maintenance script:**
+
+```python
+# backend/tasks/maintenance_tasks.py
+from celery import shared_task
+
+@shared_task
+def weekly_maintenance():
+    """Run weekly database maintenance"""
+    import asyncio
+    from database import get_db
+    from sqlalchemy import text
+
+    async def run_maintenance():
+        async with get_db() as db:
+            # Vacuum frequently updated tables
+            await db.execute(text("VACUUM ANALYZE candidates"))
+            await db.execute(text("VACUUM ANALYZE resumes"))
+            await db.execute(text("VACUUM ANALYZE match_results"))
+
+            # Analyze all tables
+            await db.execute(text("ANALYZE"))
+
+        logger.info("Database maintenance completed")
+
+    asyncio.run(run_maintenance())
+```
+
+**Schedule with Celery Beat:**
+
+```python
+# celerybeat.py
+from celery.schedules import crontab
+
+beat_schedule = {
+    'weekly-db-maintenance': {
+        'task': 'tasks.maintenance_tasks.weekly_maintenance',
+        'schedule': crontab(hour=2, day_of_week=0),  # 2 AM every Sunday
+    },
+}
+```
+
+### Monitoring Database Bloat
+
+**Check table bloat:**
+
+```sql
+-- Create bloat monitoring function
+CREATE OR REPLACE FUNCTION estimate_table_bloat() RETURNS TABLE(
+    schemaname TEXT,
+    tablename TEXT,
+    table_size BIGINT,
+    bloat_size BIGINT,
+    bloat_percentage NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        schemaname,
+        tablename,
+        pg_total_relation_size(schemaname||'.'||tablename) as table_size,
+        pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename) as bloat_size,
+        100.0 * (pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) /
+            NULLIF(pg_total_relation_size(schemaname||'.'||tablename), 0) as bloat_percentage
+    FROM pg_tables
+    WHERE schemaname = 'public'
+    ORDER BY bloat_percentage DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Check bloat
+SELECT * FROM estimate_table_bloat();
+```
+
+**Target bloat levels:**
+
+| Table Type | Acceptable Bloat | Action Required |
+|------------|------------------|-----------------|
+| High-write (candidates, match_results) | < 20% | OK |
+| High-write (candidates, match_results) | 20-50% | Schedule vacuum |
+| High-write (candidates, match_results) | > 50% | ⚠️ Immediate vacuum needed |
+| Low-write (taxonomy, config) | < 10% | OK |
+| Low-write (taxonomy, config) | > 20% | Vacuum recommended |
+
+### Database Statistics
+
+**Update statistics after major changes:**
+
+```sql
+-- Analyze all tables
+ANALYZE;
+
+-- Analyze specific table
+ANALYZE candidates;
+
+-- Analyze specific column
+ANALYZE candidates (name, email);
+```
+
+**Check when statistics were last updated:**
+
+```sql
+SELECT
+    schemaname,
+    tablename,
+    last_autovacuum,
+    last_autoanalyze,
+    last_vacuum,
+    last_analyze,
+    autovacuum_count,
+    autoanalyze_count
+FROM pg_stat_user_tables
+ORDER BY last_analyze NULLS LAST;
+```
+
+### Reindexing
+
+**When to reindex:**
+- Index bloat > 30%
+- Slow queries despite correct indexes
+- After bulk data updates
+
+**Reindex commands:**
+
+```sql
+-- Reindex specific index (no locking!)
+REINDEX INDEX CONCURRENTLY idx_candidates_created_at;
+
+-- Reindex entire table (locks table - use during maintenance!)
+REINDEX TABLE candidates;  -- Only in maintenance window
+
+-- Reindex database (locks all tables - very careful!)
+REINDEX DATABASE agenthr;  -- Only in maintenance window!
+```
+
+**Check index bloat:**
+
+```sql
+-- Find bloated indexes
+SELECT
+    schemaname,
+    tablename,
+    indexname,
+    pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+    idx_scan,
+    idx_tup_read,
+    idx_tup_fetch
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+    AND indexname NOT LIKE '%_pkey'
+ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+---
+
+## Quick Reference: PostgreSQL Optimization
+
+### Configuration Checklist
+
+- [ ] **Indexes created** for all foreign keys, WHERE, JOIN, ORDER BY columns
+- [ ] **Connection pool sized** appropriately (pool_size=10, max_overflow=20 default)
+- [ ] **pool_pre_ping enabled** to detect stale connections
+- [ ] **Slow query logging** enabled (log_min_duration_statement=1000)
+- [ ] **Autovacuum tuned** for high-write tables
+- [ ] **pg_stat_statements enabled** for query analysis
+- [ ] **Regular VACUUM ANALYZE** scheduled (weekly)
+- [ ] **EXPLAIN ANALYZE** used for slow queries
+- [ ] **N+1 queries eliminated** using eager loading
+- [ ] **Monitoring** set up for connection pool, query performance
+
+### Common Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| **Slow query (< 1s)** | Missing index | Create index on WHERE/JOIN columns |
+| **Slow query (> 10s)** | Full table scan | Create index, check query plan |
+| **N+1 queries** | ORM lazy loading | Use selectinload/joinedload |
+| **High CPU usage** | Too many connections | Reduce pool_size, use PgBouncer |
+| **Disk I/O high** | Seq scans, no caching | Add indexes, increase shared_buffers |
+| **Table bloat** | Insufficient vacuum | Tune autovacuum, run manual VACUUM |
+| **Index bloat** | High write/delete | REINDEX INDEX CONCURRENTLY |
+| **Connection exhaustion** | Pool too small | Increase pool_size or max_overflow |
+| **Stale statistics** | No ANALYZE | Run ANALYZE after data changes |
+| **Lock contention** | Long transactions | Keep transactions short, use READ COMMITTED |
+
+### Environment Variables
+
+```bash
+# .env - PostgreSQL Configuration
+DATABASE_URL=postgresql://agenthr:password@db:5432/agenthr
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_RECYCLE=3600
+DB_ECHO=false  # Set to true for SQL query logging
+```
+
+### Docker Compose Configuration
+
+```yaml
+# docker-compose.yml
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=agenthr
+      - POSTGRES_USER=agenthr
+      - POSTGRES_PASSWORD=password
+      # Performance tuning
+      - shared_buffers=256MB          # 25% of RAM (1GB system)
+      - effective_cache_size=1GB       # 50-75% of RAM
+      - maintenance_work_mem=128MB     # For vacuum/analyze
+      - checkpoint_completion_target=0.9
+      - wal_buffers=16MB
+      - default_statistics_target=100  # Better query plans
+      - random_page_cost=1.1           # For SSD storage
+      - effective_io_concurrency=200   # For SSD storage
+      - work_mem=4MB                   # Per-operation memory
+      - min_wal_size=1GB
+      - max_wal_size=4GB
+      # Logging
+      - log_min_duration_statement=1000  # Log slow queries
+      - log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+      - log_checkpoints=on
+      - log_connections=on
+      - log_disconnections=on
+      - log_lock_waits=on
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+```
+
+### Monitoring Commands
+
+```bash
+# Check connection pool usage
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT count(*) as active_connections,
+    (SELECT setting::int FROM pg_settings WHERE name='max_connections') as max_connections
+FROM pg_stat_activity WHERE state='active';
+"
+
+# Check slow queries
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT query, calls, mean_exec_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+"
+
+# Check table bloat
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT schemaname, tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
+FROM pg_tables
+WHERE schemaname='public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+"
+
+# Check index usage
+docker-compose exec db psql -U agenthr -d agenthr -c "
+SELECT schemaname, tablename, indexname,
+    idx_scan as scans,
+    pg_size_pretty(pg_relation_size(indexrelid)) as size
+FROM pg_stat_user_indexes
+ORDER BY idx_scan ASC
+LIMIT 20;
+"
+
+# Run vacuum analyze
+docker-compose exec db psql -U agenthr -d agenthr -c "VACUUM ANALYZE;"
+```
+
+---
+
 ## Related Documentation
 
 - [ML_PIPELINE.md](ML_PIPELINE.md) - Detailed ML/NLP pipeline documentation
