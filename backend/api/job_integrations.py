@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.job_board_integration import JobBoardIntegration
+from models.import_log import ImportLog, ImportJobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,26 @@ class JobBoardIntegrationResponse(BaseModel):
     config: Optional[dict] = Field(None, description="Additional configuration")
     last_sync_at: Optional[str] = Field(None, description="Last successful sync timestamp")
     created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class ImportLogResponse(BaseModel):
+    """Response model for import log entry."""
+
+    id: str = Field(..., description="Unique identifier")
+    job_board_id: Optional[str] = Field(None, description="Job board integration ID")
+    job_board_name: Optional[str] = Field(None, description="Job board name")
+    status: str = Field(..., description="Import status")
+    records_processed: Optional[int] = Field(None, description="Total records processed")
+    records_succeeded: Optional[int] = Field(None, description="Successfully imported records")
+    records_failed: Optional[int] = Field(None, description="Failed records")
+    error_message: Optional[str] = Field(None, description="Error summary if failed")
+    error_details: Optional[dict] = Field(None, description="Detailed error information")
+    import_metadata: Optional[dict] = Field(None, description="Additional import metadata")
+    started_at: Optional[str] = Field(None, description="Import start timestamp")
+    completed_at: Optional[str] = Field(None, description="Import completion timestamp")
+    retry_count: Optional[int] = Field(None, description="Number of retry attempts")
+    created_at: str = Field(..., description="Log creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
 
 
@@ -559,4 +580,107 @@ async def toggle_integration(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to toggle integration: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/logs",
+    tags=["Job Integrations"],
+)
+async def list_import_logs(
+    request: Request,
+    skip: int = 0,
+    limit: int = 50,
+    status_filter: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    List import logs with pagination and optional status filtering.
+
+    Returns a paginated list of import logs showing the history of job board
+    import operations, including successes, failures, and partial imports.
+
+    Args:
+        request: FastAPI request object
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return (default: 50, max: 100)
+        status_filter: Optional filter by import status (success, failed, partial, skipped, in_progress)
+        db: Database session
+
+    Returns:
+        JSON response with list of import logs and total count
+
+    Raises:
+        HTTPException(422): If invalid status filter value provided
+        HTTPException(500): If database query fails
+
+    Example:
+        >>> response = requests.get("http://localhost:8000/api/integrations/logs?limit=10&status_filter=failed")
+        >>> logs = response.json()
+        >>> logs["total"]
+        5
+        >>> logs["logs"][0]["status"]
+        'failed'
+    """
+    # Validate limit
+    limit = min(limit, 100)
+
+    # Validate status filter if provided
+    valid_statuses = {s.value for s in ImportJobStatus}
+    if status_filter and status_filter not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid status '{status_filter}'. Valid values: {', '.join(sorted(valid_statuses))}"
+        )
+
+    try:
+        # Build base query with job board join
+        query = (
+            select(ImportLog, JobBoardIntegration)
+            .outerjoin(JobBoardIntegration, ImportLog.job_board_id == JobBoardIntegration.id)
+            .order_by(ImportLog.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        # Apply status filter if provided
+        if status_filter:
+            query = query.where(ImportLog.status == ImportJobStatus(status_filter))
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        # Convert to response format
+        logs_list = []
+        for import_log, job_board in rows:
+            logs_list.append({
+                "id": str(import_log.id),
+                "job_board_id": str(import_log.job_board_id) if import_log.job_board_id else None,
+                "job_board_name": job_board.name if job_board else None,
+                "status": import_log.status.value if isinstance(import_log.status, ImportJobStatus) else import_log.status,
+                "records_processed": import_log.records_processed,
+                "records_succeeded": import_log.records_succeeded,
+                "records_failed": import_log.records_failed,
+                "error_message": import_log.error_message,
+                "error_details": import_log.error_details,
+                "import_metadata": import_log.import_metadata,
+                "started_at": import_log.started_at,
+                "completed_at": import_log.completed_at,
+                "retry_count": import_log.retry_count,
+                "created_at": import_log.created_at.isoformat() if import_log.created_at else None,
+                "updated_at": import_log.updated_at.isoformat() if import_log.updated_at else None,
+            })
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"logs": logs_list, "total": len(logs_list)},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing import logs: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list import logs: {str(e)}",
         ) from e
