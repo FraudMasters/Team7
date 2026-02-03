@@ -13,6 +13,7 @@ from . import (
     job_integrations,
     saved_searches,
     search,
+    webhooks,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "job_integrations",
     "saved_searches",
     "search",
+    "webhooks",
 ]
