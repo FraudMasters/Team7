@@ -3145,7 +3145,139 @@ docker-compose logs prometheus | grep "error"
 # Check retention settings
 # In monitoring/prometheus/prometheus.yml:
 # --storage.tsdb.retention.time=15d
+
+# Check for high cardinality metrics
+# Navigate to http://localhost:9090/tsdb-status
+# Look for metrics with many unique label combinations
 ```
+
+**Problem: Scraping errors**
+```bash
+# Check target status
+# Navigate to http://localhost:9090/targets
+
+# Verify scrape configuration
+docker-compose exec prometheus cat /etc/prometheus/prometheus.yml
+
+# Test endpoint manually
+docker-compose exec backend curl http://localhost:8000/metrics | head -20
+```
+
+### Celery/Flower Issues
+
+**Problem: Workers not showing in Flower**
+```bash
+# Check if Celery workers are running
+docker-compose ps celery_worker
+
+# Check Celery logs
+docker-compose logs celery_worker | grep -i "ready"
+
+# Verify Flower can connect to Redis
+docker-compose logs flower | grep -i "connection"
+```
+
+**Problem: Tasks stuck in pending**
+```bash
+# Check if there are active workers
+docker-compose exec backend celery -A backend.celery_app inspect active
+
+# Check queue depth
+docker-compose exec backend celery -A backend.celery_app inspect active_queues
+
+# Clear stuck tasks (use with caution)
+docker-compose exec backend celery -A backend.celery_app purge
+```
+
+### Application Issues
+
+**Problem: High API error rates**
+
+**Diagnosis:**
+1. Check Grafana dashboard: http://localhost:3001/d/api-performance
+2. Look for 5xx errors in logs
+3. Check backend service health:
+   ```bash
+   docker-compose logs backend | tail -100
+   ```
+
+**Common fixes:**
+- Database connection issues: Check PostgreSQL is running
+- Out of memory: Scale backend service
+- ML model failures: Check models are downloaded
+
+**Problem: Slow ML inference**
+
+**Diagnosis:**
+```bash
+# Check ML task duration in Flower
+# Navigate to http://localhost:5555
+
+# Check system resources
+docker stats backend celery_worker
+```
+
+**Solutions:**
+- Increase Celery worker concurrency
+- Add more workers (horizontal scaling)
+- Enable model caching
+- Use GPU for inference (if available)
+
+### Network Issues
+
+**Problem: Services can't communicate**
+```bash
+# Check Docker network
+docker network ls
+docker network inspect resume-analysis_default
+
+# Test connectivity between containers
+docker-compose exec backend ping postgres
+docker-compose exec backend ping redis
+```
+
+**Problem: Port conflicts**
+```bash
+# Check what's using the port
+lsof -i :3001  # Grafana
+lsof -i :9090  # Prometheus
+
+# Change ports in .env file:
+# GRAFANA_PORT=3001
+# PROMETHEUS_PORT=9090
+```
+
+### Data Issues
+
+**Problem: Lost metrics after restart**
+
+**Cause:** Prometheus data is stored in ephemeral container by default
+
+**Solution:**
+```bash
+# Verify volume is mounted
+docker inspect resume-analysis_prometheus | grep -A 10 Mounts
+
+# Backup before maintenance
+docker-compose exec prometheus tar czf /tmp/backup.tar.gz /prometheus
+docker cp resume-analysis_prometheus:/tmp/backup.tar.gz ./prometheus-backup.tar.gz
+```
+
+**Problem: Logs not searchable**
+
+**Diagnosis:**
+```bash
+# Check Promtail is parsing logs correctly
+docker-compose logs promtail | grep "pipeline"
+
+# Verify labels are being extracted
+# In Grafana: Explore → Loki → Check label browser
+```
+
+**Solution:**
+- Adjust Promtail relabel configs
+- Check log format matches pipeline stages
+- Verify label values aren't high-cardinality
 
 ---
 
@@ -3188,16 +3320,150 @@ docker-compose logs prometheus | grep "error"
    ```yaml
    # Default: 15s
    # Recommended: 30s for production
+   # High-frequency metrics (dev): 15s
+   # Low-frequency metrics (prod): 60s
    scrape_interval: 30s
    ```
 
 2. **Reduce metrics cardinality**
-   - Avoid high-cardinality labels (like user_id)
+   - Avoid high-cardinality labels (like user_id, request_id)
    - Use sensible label combinations
+   - Limit unique label values to < 10,000 per metric
+   - Monitor cardinality at http://localhost:9090/tsdb-status
 
 3. **Recording rules**
    - Pre-compute expensive queries
    - Reduce dashboard load time
+   ```yaml
+   # In monitoring/prometheus/recording_rules.yml
+   groups:
+     - name: api_performance
+       rules:
+         - record: job:http_request_duration_seconds:p95
+           expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+   ```
+
+4. **Storage tuning**
+   ```yaml
+   # In docker-compose.yml for Prometheus
+   command:
+     - '--storage.tsdb.retention.time=30d'  # Keep 30 days of data
+     - '--storage.tsdb.retention.size=10GB'  # Max 10GB storage
+   ```
+
+### Application Performance Tuning
+
+1. **Backend (FastAPI) Optimization**
+   ```python
+   # Enable response compression
+   from fastapi.middleware.gzip import GZipMiddleware
+   app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+   # Use connection pooling for database
+   # In .env:
+   # DATABASE_POOL_SIZE=20
+   # DATABASE_MAX_OVERFLOW=10
+   ```
+
+2. **Celery Worker Optimization**
+   ```yaml
+   # In docker-compose.yml
+   celery_worker:
+     environment:
+       - CELERY_WORKER_PREFETCH_MULTIPLIER=4  # Default 4
+       - CELERY_WORKER_MAX_TASKS_PER_CHILD=1000  # Prevent memory leaks
+       - CELERY_WORKER_CONCURRENCY=4  # CPU cores * 2
+     deploy:
+       resources:
+         limits:
+           cpus: '2'
+           memory: 2G
+   ```
+
+3. **Database Query Optimization**
+   - Add indexes to frequently queried columns
+   - Use `explain analyze` to identify slow queries
+   - Enable query caching in PostgreSQL
+   ```sql
+   -- Check query performance
+   SELECT * FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;
+   ```
+
+4. **ML Pipeline Optimization**
+   - Cache SpaCy models in memory
+   - Use batch processing for multiple resumes
+   - Pre-load ML models on worker startup
+   ```python
+   # In backend/celery_app.py
+   @worker_init.connect
+   def preload_models(**kwargs):
+       preload_spacy_models()
+       preload_keyword_extractor()
+   ```
+
+### Log Optimization
+
+1. **Log level tuning**
+   ```python
+   # Development: DEBUG
+   # Production: INFO or WARNING
+   LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+   ```
+
+2. **Reduce log volume**
+   ```yaml
+   # In monitoring/promtail/config.yml
+   # Drop debug logs in production
+   - regex: 'level="debug"'
+     action: drop
+   ```
+
+3. **Structured logging**
+   ```python
+   # Use structured logs for better querying
+   logger.info(
+       "api_request",
+       extra={
+           "method": "POST",
+           "endpoint": "/api/resumes",
+           "duration_ms": 123,
+           "status": 200
+       }
+   )
+   ```
+
+### System Resource Tuning
+
+1. **Docker resource limits**
+   ```yaml
+   # In docker-compose.yml
+   services:
+     backend:
+       deploy:
+         resources:
+           limits:
+             cpus: '2'
+             memory: 4G
+           reservations:
+             cpus: '1'
+             memory: 2G
+   ```
+
+2. **PostgreSQL tuning**
+   ```bash
+   # In .env
+   POSTGRES_SHARED_BUFFERS=256MB
+   POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+   POSTGRES_MAX_CONNECTIONS=100
+   POSTGRES_WORK_MEM=4MB
+   ```
+
+3. **Redis tuning**
+   ```bash
+   # In .env
+   REDIS_MAXMEMORY=512mb
+   REDIS_MAXMEMORY_POLICY=allkeys-lru
+   ```
 
 ---
 
@@ -3235,6 +3501,459 @@ docker-compose pull grafana loki promtail prometheus
 # Restart services
 docker-compose up -d grafana loki promtail prometheus
 ```
+
+---
+
+## Best Practices
+
+### Monitoring Best Practices
+
+#### 1. Metric Design Principles
+
+**DO:**
+- Use descriptive metric names: `http_request_duration_seconds` (not `latency`)
+- Include units in metric names: `_bytes`, `_seconds`, `_percent`
+- Use consistent naming across services
+- Label dimensions (e.g., `endpoint`, `method`, `status`)
+
+**DON'T:**
+- Create high-cardinality labels (user IDs, request IDs)
+- Mix units in the same metric
+- Use duplicate metric names
+- Create too many metrics (< 10,000 per server)
+
+#### 2. Alert Design Principles
+
+**Set meaningful thresholds:**
+```yaml
+# Bad: Too sensitive
+alert: HighErrorRate
+expr: error_rate > 1%  # Fires constantly
+
+# Good: Actionable threshold
+alert: HighErrorRate
+expr: error_rate > 5%  # Indicates real problem
+for: 5m  # Wait 5 minutes before firing
+```
+
+**Use alert severity levels:**
+- **Critical:** Service down, data loss, security breach (page immediately)
+- **Warning:** Performance degradation, approaching limits (email within hour)
+- **Info:** Informational, no action needed (log only)
+
+**Write clear alert descriptions:**
+```yaml
+- alert: DatabaseConnectionFailed
+  annotations:
+    summary: "Database connection failed on {{ $labels.instance }}"
+    description: "Database has been unreachable for 5 minutes. Current connections: {{ $value }}"
+    runbook: "https://docs.example.com/runbooks/database-failure"
+```
+
+#### 3. Dashboard Design Principles
+
+**Organize by operational needs:**
+- **Strategic dashboards:** Business metrics (executives, daily review)
+- **Tactical dashboards:** Service health (operations team, hourly)
+- **Debugging dashboards:** Detailed metrics (developers, incident response)
+
+**Follow dashboard best practices:**
+- Limit to 5-7 panels per dashboard
+- Use consistent color schemes (green=good, red=bad)
+- Show current status prominently
+- Include context (comparisons to yesterday, last week)
+- Use annotations for deployments/incidents
+
+**Example dashboard structure:**
+```
+┌────────────────────────────────────────────────┐
+│           API Performance Overview             │
+├────────────────────────────────────────────────┤
+│  [Request Rate]  [P95 Latency]  [Error Rate] │
+│                                                │
+│  ┌─────────────────┐  ┌─────────────────┐   │
+│  │ Latency Trend   │  │ Error by Status │   │
+│  │ (last 24h)      │  │ (pie chart)     │   │
+│  └─────────────────┘  └─────────────────┘   │
+│                                                │
+│  ┌─────────────────────────────────────────┐ │
+│  │        Requests by Endpoint              │ │
+│  │  (top 10 by request rate)                │ │
+│  └─────────────────────────────────────────┘ │
+└────────────────────────────────────────────────┘
+```
+
+### Logging Best Practices
+
+#### 1. Log Level Usage
+
+```python
+# CRITICAL: Service unavailable, requires immediate action
+logger.critical("Database connection pool exhausted")
+
+# ERROR: Error occurred, but service continues
+logger.error(f"Failed to process resume {resume_id}: {error}")
+
+# WARNING: Unexpected but recoverable
+logger.warning(f"Retry {attempt}/3 for ML inference")
+
+# INFO: Normal operation, significant events
+logger.info(f"Resume analysis completed for {resume_id}")
+
+# DEBUG: Detailed diagnostics (disabled in production)
+logger.debug(f"ML pipeline step 3/5 complete")
+```
+
+#### 2. Structured Logging
+
+**Use structured fields instead of string parsing:**
+```python
+# Bad: Unstructured
+logger.info(f"User {user_id} uploaded resume {resume_id} of size {size_bytes}")
+
+# Good: Structured
+logger.info(
+    "resume_uploaded",
+    extra={
+        "user_id": user_id,
+        "resume_id": resume_id,
+        "size_bytes": size_bytes,
+        "file_type": "pdf"
+    }
+)
+```
+
+**This enables Loki queries like:**
+```logql
+{job="backend"} |= "resume_uploaded"
+| line_format "{{.user_id}}"
+| count by (user_id)
+```
+
+#### 3. Avoid Logging Pitfalls
+
+**Don't log sensitive data:**
+```python
+# Bad: Logs PII
+logger.info(f"User {email} logged in")
+
+# Good: Use user ID
+logger.info(f"User {user_id} logged in")
+```
+
+**Don't log in hot paths:**
+```python
+# Bad: Logs on every API call
+@app.get("/api/health")
+def health():
+    logger.debug("Health check called")  # Too verbose!
+    return {"status": "ok"}
+
+# Good: Use metrics instead
+from prometheus_client import Counter
+health_check_counter = Counter('health_check_total', 'Health checks')
+```
+
+### Alerting Best Practices
+
+#### 1. Alert Responsibly
+
+**The Golden Rule:** Every alert should be actionable
+- If you won't wake up for it, don't alert on it
+- If you can't fix it, don't alert on it (just monitor)
+- If it happens constantly, fix the root cause, don't alert
+
+#### 2. Use Alert Silencing Wisely
+
+**Set up mute timings for:**
+- Maintenance windows
+- Known quiet periods (holidays, off-hours)
+- Scheduled deployments
+
+```yaml
+# In Grafana alert configuration
+mute_timings:
+  - name: "Off-hours"
+    time_intervals:
+      - times:
+          - start_time: "18:00"
+            end_time: "08:00"
+        weekdays: ["monday:friday"]
+```
+
+#### 3. Create Runbooks
+
+**Every alert should have a runbook:**
+```markdown
+# Alert: HighAPIErrorRate
+
+## Summary
+API error rate exceeds 5% for 5 minutes
+
+## Diagnosis
+1. Check Grafana: http://localhost:3001/d/api-performance
+2. Check backend logs: `docker-compose logs backend | tail -100`
+3. Check database connectivity: `docker-compose exec backend pg_isready`
+
+## Possible Causes
+- Database connection issues
+- Out of memory
+- Deployment failure
+- External API outage
+
+## Resolution Steps
+1. If DB issue: Check postgres logs, restart if needed
+2. If OOM: Scale backend, check for memory leaks
+3. If deployment: Rollback to previous version
+4. If external API: Check status page, enable circuit breaker
+
+## Escalation
+- If not resolved in 15 minutes: Page on-call engineer
+- If impacting > 50% of users: Declare incident
+```
+
+### Performance Monitoring Best Practices
+
+#### 1. Establish Baselines
+
+**Measure normal operation:**
+```python
+# Track baseline metrics
+- API P95 latency: ~200ms
+- Error rate: < 0.1%
+- ML inference time: ~15s
+- Queue depth: < 10 tasks
+```
+
+**Use baselines for anomaly detection:**
+```yaml
+# Alert when deviation from baseline
+- alert: UnusualLatency
+  expr: |
+    http_request_duration_seconds:p95
+    > avg_over_time(http_request_duration_seconds:p95[7d]) * 2
+```
+
+#### 2. Use SLOs and SLIs
+
+**Define SLIs (Service Level Indicators):**
+- Availability: % of successful requests
+- Latency: P95 response time
+- Error rate: % of 5xx responses
+- Throughput: requests per second
+
+**Set SLOs (Service Level Objectives):**
+- Availability: 99.9% uptime (43 minutes/month downtime allowed)
+- Latency: P95 < 500ms
+- Error rate: < 0.1%
+- Data freshness: ML analysis complete in < 5 minutes
+
+**Create SLO-based alerts:**
+```yaml
+- alert: SLOBudgetBurn
+  expr: |
+    (1 - success_rate) > (1 - 0.999) / (30 * 24 * 60)
+  # Alert if burning error budget too fast
+```
+
+### Security Best Practices
+
+#### 1. Secure Grafana
+
+**Update default credentials:**
+```bash
+# In .env
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=your_secure_password_here
+```
+
+**Enable authentication:**
+```yaml
+# In monitoring/grafana/grafana.ini
+[auth.anonymous]
+enabled = false
+
+[auth.basic]
+enabled = true
+```
+
+#### 2. Restrict Network Access
+
+**Use reverse proxy in production:**
+```nginx
+location /grafana/ {
+    auth_basic "Restricted";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_pass http://localhost:3001/;
+}
+```
+
+**Firewall rules:**
+```bash
+# Only expose necessary ports
+ufw allow 80/tcp    # HTTP
+ufw allow 443/tcp   # HTTPS
+ufw deny 3001/tcp   # Grafana (internal only)
+ufw deny 9090/tcp   # Prometheus (internal only)
+```
+
+#### 3. Protect Sensitive Data
+
+**Don't log secrets:**
+```python
+# Bad
+logger.info(f"Connecting to DB with {DB_USER}:{DB_PASSWORD}")
+
+# Good
+logger.info(f"Connecting to DB as {DB_USER}")
+```
+
+**Use secret management:**
+```bash
+# Use Docker secrets or environment variables
+POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+```
+
+### Development Best Practices
+
+#### 1. Test Monitoring Configurations
+
+**Validate Prometheus queries:**
+```bash
+# Use Prometheus UI to test queries
+# Navigate to http://localhost:9090/graph
+
+# Test alert expressions
+expr: up{job="backend"} == 0
+```
+
+**Test alert rules:**
+```yaml
+# Use promtool to validate
+promtool check rules alert_rules.yml
+```
+
+#### 2. Version Control Configuration
+
+**Commit all monitoring configs:**
+```
+monitoring/
+├── grafana/
+│   ├── provisioning/
+│   │   ├── dashboards/
+│   │   ├── datasources/
+│   │   └── alerts/
+│   └── dashboards/  # JSON definitions
+├── prometheus/
+│   ├── prometheus.yml
+│   └── recording_rules.yml
+└── loki/
+    └── config.yml
+```
+
+**Use Git for change tracking:**
+```bash
+git add monitoring/
+git commit -m "Add ML inference latency alert"
+```
+
+#### 3. Document Custom Metrics
+
+**Create metric registry:**
+```markdown
+# Custom Metrics Documentation
+
+## backend_resume_analysis_duration_seconds
+**Type:** Histogram
+**Labels:** language, file_type, status
+**Description:** Time taken to analyze a resume
+**Expected range:** 5-60 seconds
+
+## backend_ml_inference_cache_hits_total
+**Type:** Counter
+**Labels:** model_name
+**Description:** Number of cache hits for ML models
+**Expected:** > 80% cache hit rate
+```
+
+#### 4. Monitor the Monitoring
+
+**Alert on monitoring system failures:**
+```yaml
+- alert: PrometheusDown
+  expr: up{job="prometheus"} == 0
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "Prometheus is down"
+```
+
+**Check monitoring health:**
+```bash
+# Create a health check dashboard
+- Prometheus target status
+- Loki log ingestion rate
+- Grafana data source connectivity
+- Alert evaluation timing
+```
+
+### Continuous Improvement
+
+#### 1. Regular Review Cadence
+
+**Weekly:**
+- Review alert fatigue (which alerts fired too often?)
+- Tune thresholds to reduce false positives
+- Update runbooks based on incidents
+
+**Monthly:**
+- Review dashboard usage (delete unused)
+- Add new metrics for features
+- Retire obsolete alerts
+- Review SLO compliance
+
+**Quarterly:**
+- Performance tuning (retention, scrape intervals)
+- Cost optimization (storage, compute)
+- Architecture review
+- Team training on monitoring tools
+
+#### 2. Learn from Incidents
+
+**Post-incident monitoring updates:**
+```markdown
+## Incident: ML Pipeline Outage (2024-01-15)
+
+### What happened
+ML inference slowed to 60s per resume (normal: 15s)
+
+### Root cause
+SpaCy models not cached in worker memory
+
+### Monitoring gaps
+- No alert for ML inference latency
+- No visibility into model cache hit rate
+
+### Action items
+- [x] Add SlowMLInference alert
+- [x] Add ml_inference_cache_hits metric
+- [x] Update runbook with model cache troubleshooting
+```
+
+#### 3. Share Knowledge
+
+**Create onboarding materials:**
+- Monitoring overview for new team members
+- Dashboard guide (which dashboard to check when)
+- Alert response procedures
+- Common queries and scripts
+
+**Run monitoring training:**
+- Quarterly training sessions
+- Lunch-and-learn on advanced topics
+- Documentation updates
+- Pair programming on monitoring tasks
 
 ---
 
