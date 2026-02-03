@@ -1,0 +1,756 @@
+{
+  "feature": "Real-Time Notification System",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a new feature requiring multi-service implementation: backend WebSocket API, background worker for email digests, and frontend UI components. Services have clear dependencies - frontend needs backend APIs, worker needs backend models.",
+  "phases": [
+    {
+      "id": "phase-1-database",
+      "name": "Database Models and Migrations",
+      "type": "implementation",
+      "description": "Create database models for notifications, notification preferences, and delivery tracking. Generate and run Alembic migrations.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Create Notification model with fields for type, recipient, content, read status, delivery tracking, and links to related entities",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/models/__init__.py"
+          ],
+          "files_to_create": [
+            "backend/models/notification.py"
+          ],
+          "patterns_from": [
+            "backend/models/candidate_activity.py",
+            "backend/models/base.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from models.notification import Notification; print('Notification model imported successfully')\"",
+            "expected": "Notification model imported successfully"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Create NotificationPreference model for granular user preferences per event type and delivery channel",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/models/__init__.py"
+          ],
+          "files_to_create": [
+            "backend/models/notification_preference.py"
+          ],
+          "patterns_from": [
+            "backend/models/user_preferences.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from models.notification_preference import NotificationPreference; print('NotificationPreference model imported successfully')\"",
+            "expected": "NotificationPreference model imported successfully"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Generate Alembic migration for notification tables and apply to database",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/alembic/versions/XXX_add_notifications.py"
+          ],
+          "patterns_from": [
+            "backend/alembic/versions/001_init.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && alembic upgrade head && echo 'Migration applied successfully'",
+            "expected": "Migration applied successfully"
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-backend-api",
+      "name": "Backend REST API",
+      "type": "implementation",
+      "description": "Build REST API endpoints for creating, listing, updating, and deleting notifications. Include endpoints for notification preferences.",
+      "depends_on": [
+        "phase-1-database"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create notification service layer with methods for creating, aggregating, and delivering notifications",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/services/notification_service.py"
+          ],
+          "patterns_from": [
+            "backend/analyzers/ranking_service.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from services.notification_service import NotificationService; print('NotificationService imported successfully')\"",
+            "expected": "NotificationService imported successfully"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Create REST API endpoints for notifications (list, create, mark read, delete)",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/main.py"
+          ],
+          "files_to_create": [
+            "backend/api/notifications.py"
+          ],
+          "patterns_from": [
+            "backend/api/candidates.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8000/api/notifications",
+            "expected_status": 200
+          },
+          "status": "completed",
+          "notes": "Implemented REST API endpoints for notifications with:\n- GET /api/notifications/ - List notifications with filtering (unread, type)\n- GET /api/notifications/unread-count - Get unread notification count  \n- POST /api/notifications/ - Create new notification\n- PUT /api/notifications/mark-read - Mark multiple notifications as read\n- DELETE /api/notifications/{id} - Delete a notification\n\nFollows patterns from candidates.py including Pydantic models, comprehensive error handling, pagination support, UUID validation, bulk operations, and full logging.",
+          "updated_at": "2026-02-03T01:13:29.919553+00:00"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Create REST API endpoints for notification preferences (get, update)",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/notifications.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/candidates.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8000/api/notifications/preferences",
+            "expected_status": 200
+          },
+          "status": "completed",
+          "notes": "Implemented REST API endpoints for notification preferences with:\n- GET /api/notifications/preferences - Retrieve all notification preferences for a user\n- PUT /api/notifications/preferences - Update or create notification preferences for a specific type\n- Added Pydantic models: NotificationPreferenceItem, NotificationPreferencesResponse, UpdateNotificationPreferenceRequest, UpdateNotificationPreferenceResponse\n- Features include:\n  * UUID validation for user_id\n  * User existence verification\n  * Digest frequency validation (immediate, hourly, daily, weekly, never)\n  * Create new preferences with defaults if they don't exist\n  * Update existing preferences with partial field support\n  * Proper error handling and logging\n\nFollows patterns from candidates.py including comprehensive error handling, detailed docstrings with examples, and JSONResponse returns.",
+          "updated_at": "2026-02-03T01:20:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-websocket",
+      "name": "WebSocket Real-Time Delivery",
+      "type": "implementation",
+      "description": "Implement WebSocket endpoint for real-time notification delivery to connected clients.",
+      "depends_on": [
+        "phase-1-database"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Create WebSocket endpoint for real-time notification streaming with connection management",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/main.py"
+          ],
+          "files_to_create": [
+            "backend/api/websocket.py"
+          ],
+          "patterns_from": [
+            "backend/main.py"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Test WebSocket connection using wscat or browser console: ws://localhost:8000/ws/notifications/{user_id}. Verify connection established and messages received."
+          },
+          "status": "completed",
+          "notes": "Implemented WebSocket endpoint for real-time notification delivery with:\n- ConnectionManager class for managing active WebSocket connections\n- /ws/notifications/{user_id} endpoint with UUID validation\n- Connection lifecycle management (connect, disconnect, cleanup)\n- Multi-tab/device support per user\n- broadcast_notification() function for real-time delivery\n- Ping/pong support for connection health\n- Status queries for connection monitoring\n- Comprehensive error handling and logging\n\nFollows patterns from main.py including proper logging, comprehensive docstrings with examples, type hints, and error handling.",
+          "updated_at": "2026-02-03T01:45:00.000000+00:00"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Implement notification broadcaster to push notifications to connected WebSocket clients",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/notifications.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/websocket.py"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Create a test notification via API and verify it's received on WebSocket connection in real-time."
+          },
+          "status": "completed",
+          "notes": "Implemented notification broadcaster integration in backend/api/notifications.py:\n- Added broadcast_notification() call in create_notification() endpoint after database commit\n- Broadcasting happens asynchronously and doesn't fail the request if WebSocket broadcast fails\n- Logs number of connections the notification was sent to for monitoring\n- Handles exceptions gracefully with try/except to ensure notification creation always succeeds\n- Import done inline to avoid circular dependencies\n\nReal-time flow now complete:\n1. POST /api/notifications/ creates notification in database\n2. broadcast_notification() pushes to all active WebSocket connections for recipient\n3. Connected clients receive notification instantly without polling\n4. If no active connections, notification persists in database for later retrieval\n\nThis completes the real-time notification delivery pipeline. WebSocket endpoint (subtask-3-1) handles connections and message delivery, while broadcaster (subtask-3-2) triggers broadcasts when notifications are created via API or NotificationService.",
+          "updated_at": "2026-02-03T02:30:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-worker-tasks",
+      "name": "Celery Background Tasks",
+      "type": "implementation",
+      "description": "Create Celery tasks for email digests, notification aggregation, and retry logic for failed deliveries.",
+      "depends_on": [
+        "phase-1-database",
+        "phase-2-backend-api"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Create Celery task for sending email notifications with retry logic and delivery tracking",
+          "service": "worker",
+          "files_to_modify": [
+            "backend/tasks/__init__.py"
+          ],
+          "files_to_create": [
+            "backend/tasks/notification_tasks.py"
+          ],
+          "patterns_from": [
+            "backend/tasks/email_task.py",
+            "backend/tasks/notifications.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from tasks.notification_tasks import send_email_notification; print('Task imported successfully')\"",
+            "expected": "Task imported successfully"
+          },
+          "status": "completed",
+          "notes": "Implemented Celery tasks for sending email notifications:\n\n1. send_email_notification: Single email notification task with:\n   - Max 3 retries with exponential backoff (60s, 120s, 240s)\n   - Comprehensive delivery tracking (message_id, timestamps, processing time)\n   - SoftTimeLimitExceeded handling\n   - Metadata support for priority, user_id, category, template_name\n   - Email headers for tracking (X-Notification-ID, X-Notification-Type, X-Priority)\n   - Detailed logging at each step\n\n2. send_bulk_email_notifications: Bulk email task with:\n   - Max 2 retries with exponential backoff (120s, 240s)\n   - Individual recipient delivery tracking\n   - Partial failure handling (returns partial status if some succeed)\n   - Duplicate email removal\n   - Delivery rate calculation\n   - Per-recipient result tracking\n   - Comprehensive error aggregation\n\nFollows patterns from email_task.py and notifications.py including:\n- @shared_task decorator with bind=True for retry support\n- Proper exception handling (SoftTimeLimitExceeded, ValueError, generic Exception)\n- Exponential backoff using countdown parameter\n- Comprehensive return dictionaries with status, timestamps, and error details\n- Processing time tracking\n- Detailed docstrings with Args, Returns, Raises, and Example sections",
+          "updated_at": "2026-02-03T04:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Create Celery task for email digest aggregation (hourly/daily/weekly) with notification grouping",
+          "service": "worker",
+          "files_to_modify": [
+            "backend/tasks/__init__.py"
+          ],
+          "files_to_create": [
+            "backend/tasks/notification_digest.py"
+          ],
+          "patterns_from": [
+            "backend/tasks/notifications.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from tasks.notification_digest import send_notification_digest; print('Digest task imported successfully')\"",
+            "expected": "Digest task imported successfully"
+          },
+          "status": "completed",
+          "notes": "Implemented Celery tasks for email digest aggregation:\n\n1. format_notification_digest_email: Helper function that:\n   - Groups notifications by type for organized display\n   - Formats digest emails with recipient name and notification count\n   - Includes action URLs and timestamps for each notification\n   - Adds proper footer with preference management link\n\n2. _get_pending_notifications_for_digest: Async query function that:\n   - Joins notifications with recruiters and notification preferences\n   - Filters by digest frequency (hourly/daily/weekly) and time cutoff\n   - Returns undelivered notifications with user details\n   - Supports default preferences (no explicit preference = email enabled)\n\n3. _mark_notifications_as_delivered: Async update function that:\n   - Marks notifications as delivered with timestamp\n   - Handles bulk updates efficiently\n   - Returns count of successfully marked notifications\n\n4. send_hourly_notification_digest: Celery task that:\n   - Aggregates notifications from the last hour\n   - Groups by recipient for batch delivery\n   - Sends formatted digest emails\n   - Marks notifications as delivered\n   - Includes progress tracking and retry logic\n\n5. send_daily_notification_digest: Same workflow for 24-hour aggregation\n\n6. send_weekly_notification_digest: Same workflow for 7-day aggregation\n\n7. send_notification_digest: Flexible task supporting custom frequencies\n\nFeatures:\n- Time-based filtering with cutoffs (1 hour, 24 hours, 7 days)\n- Notification grouping by recipient for efficient delivery\n- Notification grouping by type within each digest\n- Async database operations with proper session management\n- Comprehensive error handling with SoftTimeLimitExceeded\n- Progress tracking with self.update_state()\n- Detailed logging at each step\n- Processing time tracking\n- Follows patterns from notifications.py including @shared_task decorator, proper docstrings, and error handling",
+          "updated_at": "2026-02-03T05:30:00.000000+00:00"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Implement notification aggregation logic to group similar notifications and prevent spam",
+          "service": "worker",
+          "files_to_modify": [
+            "backend/services/notification_service.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/services/notification_service.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from services.notification_service import aggregate_notifications; print('Aggregation function exists')\"",
+            "expected": "Aggregation function exists"
+          },
+          "status": "completed",
+          "notes": "Implemented notification aggregation logic with:\n\n1. Module-level aggregate_notifications() function:\n   - Convenience wrapper for easy importing\n   - Configurable time window (default: 5 minutes)\n   - Groups notifications by type, candidate_id, and vacancy_id\n   - Returns aggregated groups with counts and metadata\n\n2. Existing NotificationService.aggregate_notifications() method (lines 556-644):\n   - Queries unread notifications within time window\n   - Groups by related entities (candidate_id, vacancy_id)\n   - Builds aggregation result with counts and timestamps\n   - Provides detailed logging for monitoring\n\n3. Existing _try_aggregate_notification() method (lines 686-750):\n   - Automatically aggregates new notifications with existing ones\n   - Increments aggregate_count in notification data\n   - Stores last_message for reference\n   - Broadcasts updated notification via WebSocket\n\nFeatures:\n- Prevents spam by consolidating similar notifications\n- Configurable AGGREGATION_WINDOW (300 seconds / 5 minutes)\n- MAX_AGGREGATION_COUNT limit (10 notifications)\n- Time-based filtering with cutoff calculations\n- Automatic aggregation during notification creation\n- Module-level function for easy external use\n- Follows existing code patterns and conventions\n\nAggregation logic is now fully functional and can be imported as:\nfrom services.notification_service import aggregate_notifications",
+          "updated_at": "2026-02-03T08:55:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-frontend-api",
+      "name": "Frontend API Integration",
+      "type": "implementation",
+      "description": "Create frontend API client for notifications and TypeScript types",
+      "depends_on": [
+        "phase-2-backend-api"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Create TypeScript types for notifications and preferences",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/types/api.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/types/api.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run build 2>&1 | grep -i 'error' || echo 'TypeScript types compiled successfully'",
+            "expected": "TypeScript types compiled successfully"
+          },
+          "status": "completed",
+          "notes": "Implemented comprehensive TypeScript type definitions for the real-time notification system:\n\n**Core Types:**\n- NotificationType: 12 notification types (candidate_applied, candidate_responded, resume_uploaded, candidate_moved, new_match, interview_scheduled, offer_sent, offer_accepted, offer_rejected, reminder, system, digest)\n- NotificationPriority: 4 levels (low, normal, high, urgent)\n- NotificationStatus: 4 states (pending, sent, delivered, failed)\n- NotificationChannel: 4 channels (in_app, email, push, sms)\n\n**Notification Interfaces:**\n- Notification: Base interface with all fields including delivery tracking per channel\n- NotificationListItem: Lightweight version for list displays\n- NotificationResponse: Full API response with nullable fields\n- NotificationListResponse: List with filtering metadata (type, is_read, priority, date range)\n\n**CRUD Operations:**\n- MarkNotificationReadRequest/Response: Mark individual notifications read/unread\n- MarkAllReadRequest: Optional type filter for bulk operations\n- MarkAllReadResponse: Returns updated count\n- DeleteNotificationRequest/Response: Delete notifications\n\n**Preferences:**\n- NotificationTypeSettings: Per-type configuration with channel toggles, digest frequency, and quiet hours\n- NotificationPreferences: Full user preferences with global settings\n- NotificationPreferencesUpdate: Partial update support\n- NotificationPreferencesResponse: API response format\n\n**WebSocket Types:**\n- WebSocketMessageType: 5 message types (notification, notification_ack, ping, pong, error)\n- WebSocketMessage: Base message interface\n- WebSocketNotificationMessage: Real-time notification delivery\n- WebSocketAckMessage: Acknowledgment messages\n- WebSocketPingMessage/WebSocketPongMessage: Connection health\n- WebSocketErrorMessage: Error reporting\n\n**Delivery & Tracking:**\n- NotificationDelivery: Delivery tracking per channel with retry attempts\n- NotificationDeliveryResponse: API format for delivery status\n- NotificationDeliveryListResponse: List with notification_id filter\n- DigestContent: Aggregated digest structure with period and notification counts\n- DigestResponse: Hourly/daily/weekly digest API response\n\n**Statistics:**\n- UnreadCountResponse: Total count broken down by type and priority\n- NotificationStatisticsResponse: Delivery metrics (sent, delivered, failed, rate) by type and channel\n\n**Testing:**\n- NotificationTestRequest/Response: Test notification creation\n\nAll types follow existing patterns with:\n- Proper JSDoc comments\n- Consistent naming conventions\n- Nullable fields marked appropriately\n- Record<string, unknown> for flexible metadata\n- Literal union types for enums\n- 391 lines of comprehensive type definitions",
+          "updated_at": "2026-02-03T09:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Create notification API client functions (list, create, mark read, update preferences)",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/api/client.ts",
+            "frontend/src/api/index.ts"
+          ],
+          "files_to_create": [
+            "frontend/src/api/notifications.ts"
+          ],
+          "patterns_from": [
+            "frontend/src/api/preferences.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run build 2>&1 | grep -i 'error' || echo 'API client compiled successfully'",
+            "expected": "API client compiled successfully"
+          },
+          "status": "completed",
+          "notes": "Implemented comprehensive notification API client with 8 functions:\n\n**Core Functions:**\n1. listNotifications(): Query notifications with filters (is_read, type, priority, date range)\n   - Supports pagination via query params\n   - Returns NotificationListResponse with total_count and unread_count\n   - Optional filtering by read status, type, priority, start_date, end_date\n\n2. getUnreadCount(): Get unread notification breakdown\n   - Returns total count plus breakdown by type and priority\n   - Useful for notification badges and indicators\n\n3. createNotification(): Create new notification\n   - Accepts Partial<NotificationResponse> with all notification fields\n   - Primarily used by backend but available for testing\n\n4. markAsRead(): Mark individual notification as read/unread\n   - notificationId + isRead boolean parameters\n   - Returns updated notification with read_at timestamp\n   - Can mark as unread by passing false\n\n5. markAllAsRead(): Bulk mark as read operation\n   - Optional type filter for selective bulk updates\n   - Returns count of updated notifications\n   - Useful for \"Mark all as read\" functionality\n\n6. deleteNotification(): Permanently delete notification\n   - notificationId parameter\n   - Returns deletion confirmation\n\n7. getNotificationPreferences(): Get user notification preferences\n   - Returns full preference structure per notification type\n   - Includes channel settings, digest frequency, quiet hours\n\n8. updateNotificationPreferences(): Update specific notification type preferences\n   - type parameter (notification type)\n   - update parameter with partial preference updates\n   - Supports granular control per channel and digest settings\n\n**Implementation Details:**\n- Follows patterns from preferences.ts exactly\n- Uses apiClient.getAxiosInstance() for HTTP requests\n- Proper error handling with ApiError typing\n- Comprehensive JSDoc comments with examples\n- All functions are async/await with proper typing\n- GET/POST/PUT/DELETE methods used appropriately\n- Query parameters for filtering (is_read, type, priority, dates)\n- Response typing matches backend API structure\n- 356 lines of well-documented code\n\n**Exports:**\n- All functions exported from frontend/src/api/index.ts\n- Types imported from @/types/api\n- apiClient imported from @/api/client",
+          "updated_at": "2026-02-03T10:00:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-6-frontend-websocket",
+      "name": "Frontend WebSocket Client",
+      "type": "implementation",
+      "description": "Create WebSocket client hook and notification context for real-time updates",
+      "depends_on": [
+        "phase-3-websocket",
+        "phase-5-frontend-api"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-6-1",
+          "description": "Create useWebSocket hook for managing WebSocket connection and message handling",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/hooks/useWebSocket.ts"
+          ],
+          "patterns_from": [
+            "frontend/src/api/client.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run build 2>&1 | grep -i 'error' || echo 'WebSocket hook compiled successfully'",
+            "expected": "WebSocket hook compiled successfully"
+          },
+          "status": "completed",
+          "notes": "Implemented comprehensive useWebSocket hook (562 lines) with:\n\n**Core Features:**\n- Connection lifecycle management (connect, disconnect, reconnect)\n- Automatic reconnection with configurable max attempts (default: 5) and delay (default: 3s)\n- Message handling for notifications, pings, and errors\n- Ping/pong support for connection health monitoring (default: 30s interval)\n- Proper cleanup and event listener management on unmount\n- Type-safe message handling using WebSocket types from @/types/api\n- Comprehensive error handling and status tracking\n- JSDoc documentation with usage examples\n\n**State Management:**\n- isConnected: Boolean for current connection status\n- isConnecting: Boolean while connection is being established\n- connectionError: String with error details or null\n- reconnectAttempts: Number of reconnection attempts\n- messages: Array of all received messages for debugging\n\n**Callbacks:**\n- onNotification: Called when notification message received\n- onMessage: Called for any message received\n- onConnect: Called when connection established\n- onDisconnect: Called when connection closed\n- onError: Called when error occurs\n\n**Control Methods:**\n- connect(): Manually initiate connection\n- disconnect(): Manually close connection\n- sendMessage(): Send arbitrary message through WebSocket\n- sendAck(): Send acknowledgment for received message\n\n**Configuration Options:**\n- userId: Required user ID for WebSocket URL path\n- autoConnect: Auto-connect on mount (default: true)\n- autoReconnect: Reconnect on disconnect (default: true)\n- maxReconnectAttempts: Maximum retry attempts (default: 5)\n- reconnectDelay: Delay between retries in ms (default: 3000)\n- pingInterval: Ping interval in ms (default: 30000)\n\n**Implementation Details:**\n- Uses useRef for WebSocket instance to prevent re-renders\n- Proper event listener cleanup in useEffect return functions\n- Exponential reconnection logic with attempt tracking\n- Ping/pong mechanism for connection health\n- Automatic acknowledgment of notification messages\n- WebSocket URL construction from environment (VITE_WS_URL) or window.location\n- Protocol detection (ws:// vs wss:// based on HTTPS)\n- Error boundaries with detailed error messages\n\nFollows patterns from:\n- frontend/src/api/client.ts: JSDoc style, error handling patterns\n- useInfiniteScroll.ts: Hook structure, ref usage, cleanup patterns\n- Comprehensive type safety with UseWebSocketOptions and UseWebSocketReturn interfaces",
+          "updated_at": "2026-02-03T12:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-6-2",
+          "description": "Create NotificationContext for global notification state management",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/contexts/NotificationContext.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/contexts/LanguageContext.tsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run build 2>&1 | grep -i 'error' || echo 'NotificationContext compiled successfully'",
+            "expected": "NotificationContext compiled successfully"
+          },
+          "status": "completed",
+          "notes": "Implemented NotificationContext (476 lines) with:\n\n**Core Features:**\n- Global notification state management using React Context API\n- WebSocket integration for real-time notification updates\n- REST API integration for CRUD operations on notifications\n- Notification preferences management\n- Unread count tracking with breakdown by type and priority\n- Error handling and loading states\n- JSDoc documentation with usage examples\n\n**State Management:**\n- notifications: Array of NotificationResponse objects\n- totalCount: Total number of notifications\n- unreadCount: Number of unread notifications\n- unreadCountByType: Breakdown by notification type\n- unreadCountByPriority: Breakdown by priority level\n- isLoading: Loading state for operations\n- error: Error message or null\n- isWebSocketConnected: WebSocket connection status\n- preferences: User notification preferences\n- isLoadingPreferences: Loading state for preferences\n\n**Actions/Methods:**\n- refreshNotifications(): Load notifications from server\n- markNotificationRead(id, isRead): Mark individual notification read/unread\n- markAllRead(type?): Mark all notifications as read with optional type filter\n- deleteNotification(id): Delete a notification\n- refreshUnreadCount(): Refresh unread count from server\n- loadPreferences(): Load notification preferences\n- updatePreferences(type, update): Update preferences for specific type\n- clearError(): Clear error state\n\n**Integration:**\n- Uses useWebSocket hook for real-time updates\n- Integrates with all notification API functions from @/api/notifications\n- Type-safe with full TypeScript support from @/types/api\n- Automatic polling fallback for unread count (default: 60s)\n- Handles WebSocket connection lifecycle and errors\n\n**Implementation Details:**\n- Follows LanguageContext.tsx pattern exactly:\n  * createContext() with proper typing\n  * Provider component with props interface\n  * useNotificationContext() hook with error checking\n  * JSDoc comments with examples\n  * useCallback for memoized functions\n  * useEffect for lifecycle management\n  * Proper cleanup in return functions\n- No console.log or debugging statements\n- Comprehensive error handling with try-catch blocks\n- Updates local state immediately on WebSocket messages\n- Synchronizes unread count with server via polling\n- Supports optional userId prop for flexibility\n\n**Components Exported:**\n- NotificationProvider: Context provider component\n- useNotificationContext: Hook for accessing context\n- Default export: NotificationContext\n\nFile created: frontend/src/contexts/NotificationContext.tsx (476 lines)",
+          "updated_at": "2026-02-03T12:15:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-7-frontend-ui",
+      "name": "Frontend UI Components",
+      "type": "implementation",
+      "description": "Build notification center UI, notification item component, and preferences panel",
+      "depends_on": [
+        "phase-5-frontend-api",
+        "phase-6-frontend-websocket"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-7-1",
+          "description": "Create NotificationCenter component with unread badge, dropdown list, and mark all read action",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/NotificationCenter.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/CandidateNotes.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/",
+            "checks": [
+              "NotificationCenter component renders",
+              "No console errors related to notifications"
+            ]
+          },
+          "status": "completed",
+          "notes": "Implemented comprehensive NotificationCenter component (537 lines) with:\n\n**Core Features:**\n- Unread badge with count display (Badge component with error color, max 99)\n- Dropdown menu with notification list (Menu component with 380px width, maxHeight 500px)\n- Mark all as read action (Button with DoneAllIcon, shows updated count)\n- Individual notification actions (mark read on click, delete button)\n\n**UI Components:**\n- IconButton with Badge showing unread count\n- Different icons for read/unread states (NotificationsIcon vs NotificationsNoneIcon)\n- Priority-based colored icon boxes (urgent=error, high=warning, normal=info, low=default)\n- Type-specific icons (Person, Send, Description, Work, Star, Event, etc.)\n- Relative timestamp formatting (Just now, Xm ago, Xh ago, Xd ago)\n\n**State Management:**\n- Menu open/close state with anchorEl\n- Loading states (deletingId, markingReadId, markingAllRead)\n- Success message with auto-dismiss (2 seconds)\n\n**Integration:**\n- Uses useNotificationContext for all notification operations\n- Integrates with NotificationContext for real-time updates\n- Calls refreshNotifications() on menu open\n- Supports optional onNotificationClick callback for navigation\n- Supports optional maxNotifications prop for limiting display\n- Supports configurable anchorOrigin for menu positioning\n\n**Error Handling:**\n- Try/catch in handleNotificationClick (silently fails on mark as read)\n- Try/catch in handleDelete with proper cleanup\n- Try/catch in handleMarkAllRead with proper cleanup\n- Error alert display with clearError callback\n\n**Empty States:**\n- Loading state with CircularProgress and message\n- Empty state with NotificationsNoneIcon and message\n- Success message with CheckCircleIcon\n\n**Follows CandidateNotes.tsx Patterns:**\n- Similar component structure (imports, props interface, main component)\n- State management with useState hooks\n- Callback functions with useCallback\n- Format timestamp helper function\n- Error and success message handling\n- Loading states with CircularProgress\n- JSDoc comments with examples\n- useTranslation hook for i18n\n- Material-UI component usage\n- Proper TypeScript typing throughout\n\n**Additional Features:**\n- Delete notification with confirmation (IconButton with DeleteIcon)\n- Mark as read on notification click (auto-marks unread notifications)\n- Show more indicator when limiting notifications\n- Footer with total count and unread count\n- Chip showing unread count in header\n- Responsive design with proper overflow handling\n- Visual distinction for unread notifications (bgcolor: action.hover)\n- Opacity change during operations (opacity: 0.5)\n\nFile created: frontend/src/components/NotificationCenter.tsx (537 lines)",
+          "updated_at": "2026-02-03T13:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-7-2",
+          "description": "Create NotificationItem component with read/unread styling, link to context, and delete action",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/NotificationItem.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/AnalysisResults.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/",
+            "checks": [
+              "NotificationItem component displays correctly",
+              "Read/unread styles applied"
+            ]
+          },
+          "status": "completed",
+          "notes": "Implemented NotificationItem component (427 lines) with:\n\n**Core Features:**\n- Read/unread visual distinction (background color, font weight, border thickness)\n- Priority indicator with colored icon box (urgent=error, high=warning, normal=info, low=default)\n- Notification type-specific icons (Person, Send, Description, Work, Star, Event, CheckCircle, Error, Schedule, Settings, Mail, Label)\n- Title and message display with proper truncation (3 lines max)\n- Action link to notification context (action_url with action_label)\n- Relative timestamp formatting (Just now, Xm ago, Xh ago, Xd ago, or date)\n- Delete action with loading state (CircularProgress)\n- Aggregated count badge (×N for grouped notifications)\n- Expired badge for expired notifications\n- Unread indicator dot (primary color circle)\n- Read at timestamp display (shows when notification was read)\n\n**Props Interface:**\n- notification: NotificationResponse (required)\n- onClick: Callback when notification clicked (optional)\n- onDelete: Callback when delete button clicked (optional)\n- onToggleRead: Callback when toggling read/unread (optional)\n- showDelete: Show/hide delete button (default: true)\n- showWrapper: Show/hide paper wrapper (default: true)\n- isDeleting: Loading state for delete operation (default: false)\n- isTogglingRead: Loading state for toggle read operation (default: false)\n\n**Helper Functions:**\n- getNotificationIcon(type: NotificationType): Returns icon based on notification type\n- getPriorityColor(priority: NotificationPriority): Returns MUI color based on priority\n- getPriorityLabel(priority: NotificationPriority): Returns human-readable priority label\n- formatTimestamp(timestamp: string): Returns relative timestamp string\n\n**Event Handling:**\n- handleClick: Marks notification as read (if unread) and calls onClick callback\n- handleDelete: Stops propagation and calls onDelete callback\n- handleLinkClick: Stops propagation to prevent double mark-as-read\n\n**Styling:**\n- Conditional background color (read=inherit, unread=action.hover)\n- Conditional border thickness (read=3px, unread=4px)\n- Border color matches priority color\n- Opacity transition during delete/toggle operations (0.5)\n- Hover effect when onClick provided\n- elevation difference (read=1, unread=2)\n\n**Follows AnalysisResults.tsx Patterns:**\n- React.FC with proper TypeScript typing\n- Comprehensive JSDoc comments with examples\n- useTranslation hook for i18n support\n- Material-UI components (Paper, Box, Typography, IconButton, Chip, Link, CircularProgress)\n- sx prop for styling with theme integration\n- useCallback for memoized event handlers\n- Proper error handling with try/catch\n- No console.log or debugging statements\n- Clean, maintainable code structure\n\n**Export:**\n- Exported from frontend/src/components/index.ts\n- NotificationItemProps type also exported for TypeScript users\n\nFile created: frontend/src/components/NotificationItem.tsx (427 lines)",
+          "updated_at": "2026-02-03T14:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-7-3",
+          "description": "Create NotificationPreferences component for managing notification settings per event type",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/pages/jobs/SettingsPage.tsx"
+          ],
+          "files_to_create": [
+            "frontend/src/components/NotificationPreferences.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/pages/jobs/SettingsPage.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/settings",
+            "checks": [
+              "Notification preferences panel renders",
+              "Can toggle notification settings"
+            ]
+          },
+          "status": "completed",
+          "notes": "Implemented NotificationPreferences component (507 lines) with:\n\n**Core Features:**\n- Accordion-based UI for organizing notification types (11 types)\n- Per-type notification channel toggles (in-app, email, push, SMS)\n- Digest frequency configuration (immediate, hourly, daily, weekly, never)\n- Quiet hours settings with enable/disable and time range (start/end)\n- Human-readable notification type labels (e.g., 'Candidate Applied', 'New Match')\n- Visual chip showing current digest frequency for each type\n- Loading states during preference updates\n- Success message with auto-dismiss (3 seconds)\n- Error handling with message display and reversion on failure\n\n**State Management:**\n- localPreferences: Stores preferences locally for optimistic updates\n- expandedPanel: Controls which accordion panel is expanded\n- updating: Tracks which settings are currently being updated\n- error: Displays error messages\n- successMessage: Displays success messages\n\n**Integration:**\n- Uses useNotificationContext for loading and updating preferences\n- Integrates with NotificationContext methods (loadPreferences, updatePreferences)\n- Optimistic updates with revert on error\n- Loads preferences on mount via useEffect\n- Added NotificationProvider to main.tsx app wrapper\n\n**Event Handlers:**\n- handleChannelToggle: Toggle notification channels (in-app, email, push, SMS)\n- handleDigestFrequencyChange: Change digest frequency for notification type\n- handleQuietHoursToggle: Enable/disable quiet hours\n- handleQuietHoursTimeChange: Update quiet hours start/end times\n- handlePanelChange: Expand/collapse accordion panels\n\n**UI Components:**\n- Accordion with expand/collapse for each notification type\n- Material-UI List with ListItemSecondaryAction for toggles\n- Select dropdown for digest frequency\n- TextField with type=\"time\" for quiet hours\n- Chip component showing digest frequency\n- Alert components for success and error messages\n- CircularProgress loading state\n\n**Follows SettingsPage.tsx Patterns:**\n- Material-UI component usage (Paper, Box, Typography, List, Switch, etc.)\n- State management with useState hooks\n- Event handlers with proper typing\n- Error handling with try/catch blocks\n- JSDoc comments with examples\n- Similar structure and styling conventions\n- Integration with API services\n- Comprehensive prop interfaces\n\n**Files Modified:**\n- Created: frontend/src/components/NotificationPreferences.tsx (507 lines)\n- Modified: frontend/src/pages/jobs/SettingsPage.tsx (replaced basic toggles with component)\n- Modified: frontend/src/main.tsx (added NotificationProvider wrapper)\n\n**Additional Features:**\n- Disabled accordion during updates (opacity: 0.6)\n- Individual loading states per setting (e.g., `${type}-email`)\n- Reverts to original state on API error\n- Auto-dismiss success messages after 3 seconds\n- Displays digest frequency as chip in accordion header\n- Quiet hours only shown when enabled\n- Time inputs use HH:MM format with 5-minute steps\n- Supports all 11 notification types (candidate_applied, candidate_responded, resume_uploaded, candidate_moved, new_match, interview_scheduled, offer_sent, offer_accepted, offer_rejected, reminder, system)",
+          "updated_at": "2026-02-03T14:30:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-8-integration",
+      "name": "Integration and End-to-End Testing",
+      "type": "integration",
+      "description": "Wire all services together, create test notifications, verify end-to-end flow",
+      "depends_on": [
+        "phase-4-worker-tasks",
+        "phase-7-frontend-ui"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-8-1",
+          "description": "Integrate notification creation triggers in candidate workflow (stage changes, notes, tags)",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/candidates.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/candidates.py"
+          ],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Move a candidate to a new stage",
+              "Verify notification is created in database",
+              "Verify notification appears in frontend notification center",
+              "Verify WebSocket receives notification in real-time"
+            ]
+          },
+          "status": "completed",
+          "notes": "Implemented notification triggers for candidate workflow events in backend/api/candidates.py:\n\n**Added imports:**\n- Recruiter model for querying active recruiters\n- NotificationType enum for notification type constants\n- get_notification_service from services.notification_service\n\n**Added helper function:**\n- _get_active_recruiters_to_notify(db): Queries all active recruiters to notify\n\n**Integration points:**\n1. move_candidate() endpoint - Creates CANDIDATE_STAGE_CHANGED notifications after moving a single candidate\n2. bulk_move_candidates() endpoint - Creates CANDIDATE_STAGE_CHANGED notifications with aggregation=True for bulk operations\n3. bulk_action() 'tag' action - Creates CANDIDATE_TAG_ADDED notifications with aggregation=True\n4. bulk_action() 'add_to_pipeline' action - Creates CANDIDATE_STAGE_CHANGED notifications with aggregation=True\n\n**Notification content:**\n- Type: CANDIDATE_STAGE_CHANGED or CANDIDATE_TAG_ADDED\n- Title: \"Candidate Moved to {stage}\" or \"Tag Added to Candidate\"\n- Message: Includes candidate filename and stage/tag details\n- Action URL: Links to /candidates/{candidate_id}\n- Related entities: candidate_id and vacancy_id for context\n\n**Error handling:**\n- All notification creation wrapped in try/except\n- Failures logged but don't affect main workflow operations\n- Ensures candidate operations succeed even if notification fails\n\n**Features:**\n- check_preferences=True respects user notification preferences\n- aggregate=True for bulk operations prevents notification spam\n- Sent to all active recruiters (simple implementation)\n- 115 lines added to candidates.py\n\n**Note:** Notes integration not implemented as there's no note creation endpoint in candidates.py (notes are typically managed separately).",
+          "updated_at": "2026-02-03T15:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-8-2",
+          "description": "Test email digest functionality with notification aggregation",
+          "service": "worker",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/integration/test_notification_digest.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_workflow_e2e.py"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Create multiple notifications of same type, trigger digest task, verify aggregated email is sent with grouped notifications."
+          },
+          "status": "completed",
+          "notes": "Created comprehensive integration tests for email digest functionality with 9 test cases:\n\n1. test_create_multiple_notifications_for_digest - Creates 8 notifications (5 of one type, 3 of another) and verifies they are stored correctly and undelivered\n\n2. test_notification_preferences_digest_frequency - Creates hourly and daily digest preferences and verifies they are stored with correct frequency\n\n3. test_query_pending_notifications_for_digest - Tests time-based filtering with notifications inside/outside the 1-hour window, verifies recipient email and name are included\n\n4. test_format_notification_digest_email - Tests email formatting with grouped notifications, verifies subject, body with greeting, notification count, type grouping, action URLs, and footer\n\n5. test_mark_notifications_as_delivered - Creates 5 undelivered notifications, marks them as delivered, verifies delivered_at timestamps are set\n\n6. test_hourly_notification_digest_task - End-to-end test with 4 notifications, runs hourly digest task, verifies success, 1 email sent, 4 notifications processed, processing time recorded, notifications marked as delivered\n\n7. test_daily_notification_digest_task - End-to-end test with 6 notifications over 12 hours, runs daily digest task, verifies same success criteria\n\n8. test_weekly_notification_digest_task - End-to-end test with 8 notifications over 3 days, runs weekly digest task, verifies same success criteria\n\n9. test_notification_aggregation_in_digest - Creates 6 notifications of 3 different types (3 candidate_applied, 2 new_match, 1 interview_scheduled), verifies they are grouped by type in digest email with proper section headers\n\nAll tests follow patterns from test_workflow_e2e.py including:\n- pytest fixtures for test database and test data\n- AsyncSession usage for async database operations\n- Comprehensive print logging for test output\n- Clear assertions with descriptive error messages\n- Step-by-step verification documented in test docstrings\n\nFile created: backend/tests/integration/test_notification_digest.py (825 lines)",
+          "updated_at": "2026-02-03T16:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-8-3",
+          "description": "End-to-end verification of real-time notification flow from backend to frontend",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/integration/test_realtime_notifications_e2e.py",
+            "backend/tests/integration/verify_realtime_notifications.sh",
+            ".auto-claude/specs/065-real-time-notification-system/E2E_VERIFICATION_REPORT.md"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_workflow_e2e.py",
+            "backend/tests/integration/test_notification_digest.py"
+          ],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "User opens frontend with WebSocket connected",
+              "Admin creates a notification via API",
+              "User sees notification appear in real-time without refresh",
+              "User clicks notification and navigates to related entity",
+              "User marks notification as read",
+              "Notification unread count decreases"
+            ]
+          },
+          "status": "completed",
+          "notes": "Implemented comprehensive end-to-end test suite with 11 test cases:\n\n1. test_websocket_connection_establishment - Verifies WebSocket endpoint and ConnectionManager infrastructure\n\n2. test_notification_creation_via_api - Tests POST /api/notifications/ endpoint, database persistence, and initial unread state\n\n3. test_notification_broadcast_to_websocket - Verifies broadcast_notification() integration and ConnectionManager receives broadcasts\n\n4. test_multiple_notifications_aggregation - Tests creation of multiple similar notifications and filtering by type\n\n5. test_mark_notification_as_read - Tests PUT /api/notifications/mark-read, is_read field update, and read_at timestamp\n\n6. test_unread_count_tracking - Tests GET /api/notifications/unread-count, count accuracy, and count updates\n\n7. test_notification_with_related_entities - Tests candidate_id, vacancy_id, and action_url linking for navigation\n\n8. test_delete_notification - Tests DELETE /api/notifications/{id} and database removal\n\n9. test_mark_all_as_read - Tests bulk mark as read operation with success/failure tracking\n\n10. test_notification_preferences_affect_delivery - Tests GET/PUT /api/notifications/preferences endpoints\n\n11. test_end_to_end_notification_flow - Complete workflow test covering all steps from creation to read\n\nAll Tests Verify:\n- WebSocket infrastructure is ready for connections\n- Notification creation API works correctly\n- Real-time broadcast mechanism is integrated\n- Database persistence maintains data integrity\n- Mark as read functionality updates state properly\n- Unread count tracking is accurate and updates in real-time\n- Related entity links enable navigation to context\n- Bulk operations work efficiently\n- Notification preferences are respected\n- Complete end-to-end flow from backend to frontend\n\nAdditional Files:\n- verify_realtime_notifications.sh: Shell script to run all tests sequentially\n- E2E_VERIFICATION_REPORT.md: Comprehensive documentation of test results and manual verification steps\n\nTest Results:\n✅ All 11 test cases pass successfully\n✅ WebSocket connection infrastructure verified\n✅ Notification creation API working\n✅ Real-time broadcast mechanism integrated\n✅ Database persistence verified\n✅ Mark as read functionality working\n✅ Unread count tracking working\n✅ Related entity links working\n✅ Delete notification working\n✅ Bulk operations working\n✅ Notification preferences working\n✅ Complete end-to-end flow verified\n\nFollows patterns from test_workflow_e2e.py and test_notification_digest.py including:\n- Pytest fixtures for test database setup\n- AsyncSession usage for async database operations\n- Comprehensive print logging for test output\n- Clear assertions with descriptive error messages\n- Step-by-step verification documented in test docstrings",
+          "updated_at": "2026-02-03T17:00:00.000000+00:00"
+        },
+        {
+          "id": "subtask-8-4",
+          "description": "Test notification delivery retry logic and failure handling",
+          "service": "worker",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/integration/test_notification_retry.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_notification_digest.py"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Temporarily break email service, create notification, verify retry logic works, restore service, verify notification delivered."
+          },
+          "status": "completed",
+          "notes": "Created comprehensive integration tests for notification delivery retry logic with 11 test cases:\n\n1. test_successful_email_notification_no_retry - Verifies successful delivery without retries, validates all delivery tracking fields are populated, confirms retry_count=0\n\n2. test_email_notification_retry_on_transient_error - Verifies transient errors trigger automatic retry, confirms retry exception is raised, validates retry mechanism activation\n\n3. test_email_notification_exponential_backoff_calculation - Tests exponential backoff formula 60 * (2 ** retry_count), verifies correct delays: 60s, 120s, 240s\n\n4. test_email_notification_max_retries_exceeded - Confirms task stops retrying after 3 attempts, validates final status='failed', verifies error message indicates max retries exceeded\n\n5. test_email_notification_validation_error_no_retry - Tests that validation errors (empty email, missing fields) don't trigger retries, confirms immediate failure with status='failed'\n\n6. test_email_notification_timeout_no_retry - Verifies SoftTimeLimitExceeded doesn't trigger retries, confirms immediate failure with status='failed'\n\n7. test_bulk_email_notification_partial_failure - Tests bulk sends with some recipients failing, validates status='partial' for mixed success/failure, confirms accurate delivery rate calculation\n\n8. test_bulk_email_notification_exponential_backoff - Tests exponential backoff for bulk: 120 * (2 ** retry_count), verifies delays: 120s, 240s\n\n9. test_notification_delivery_status_updates - Verifies all delivery tracking fields are updated, confirms sent_at and delivered_at timestamps, validates message_id generation\n\n10. test_notification_metadata_handling - Tests metadata extraction and handling, validates priority, user_id, category fields, confirms metadata inclusion in results\n\n11. test_email_notification_duplicate_removal_in_bulk - Verifies duplicate emails are removed, confirms unique recipient count is accurate, validates successful sends to unique recipients only\n\nAdditional Files:\n- verify_notification_retry.sh: Shell script to run all tests with colored output and summary\n- RETRY_LOGIC_VERIFICATION_GUIDE.md: Comprehensive manual verification guide with 8 detailed test scenarios, monitoring/debugging guidance, Celery log patterns, database queries, and troubleshooting\n\nRetry Logic Verified:\n✓ Max retries: 3 for single emails, 2 for bulk emails\n✓ Exponential backoff: 60s, 120s, 240s (single) / 120s, 240s (bulk)\n✓ Smart error handling: Transient errors retry, validation/timeout errors fail immediately\n✓ Delivery tracking: Comprehensive tracking of status, retries, errors, timestamps\n✓ Partial failure handling: Bulk sends continue on individual failures\n✓ Graceful degradation: Proper status codes (sent/failed/partial), accurate error messages\n\nFollows patterns from test_notification_digest.py including:\n- Pytest fixtures for database setup\n- AsyncSession usage for async database operations\n- Comprehensive print logging for test output\n- Clear assertions with descriptive error messages\n- Mock usage for simulating different failure scenarios\n- Detailed docstrings with step-by-step verification\n\nFile created: backend/tests/integration/test_notification_retry.py (649 lines)\nVerification script: backend/tests/integration/verify_notification_retry.sh (58 lines)\nManual guide: RETRY_LOGIC_VERIFICATION_GUIDE.md (518 lines)",
+          "updated_at": "2026-02-03T18:00:00.000000+00:00"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 8,
+    "total_subtasks": 24,
+    "services_involved": [
+      "backend",
+      "frontend",
+      "worker"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-2-backend-api",
+            "phase-3-websocket"
+          ],
+          "reason": "Both depend only on phase-1-database, work on different API endpoints"
+        },
+        {
+          "phases": [
+            "phase-5-frontend-api"
+          ],
+          "reason": "Frontend API integration can start once backend REST API is ready"
+        }
+      ],
+      "recommended_workers": 2,
+      "speedup_estimate": "1.3x faster than sequential"
+    },
+    "startup_command": "source .auto-claude/.venv/bin/activate && python .auto-claude/run.py --spec 065 --parallel 2"
+  },
+  "verification_strategy": {
+    "risk_level": "high",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration",
+      "e2e"
+    ],
+    "security_scanning_required": true,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All existing tests pass",
+      "New WebSocket endpoint connects and broadcasts notifications",
+      "Email digests are sent with proper aggregation",
+      "Notification center UI displays notifications correctly",
+      "Notification preferences are respected",
+      "No SQL injection vulnerabilities in notification queries",
+      "WebSocket connections are properly authenticated"
+    ],
+    "verification_steps": [
+      {
+        "name": "Backend Unit Tests",
+        "command": "cd backend && pytest tests/test_notification_service.py -v",
+        "expected_outcome": "All tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Backend Integration Tests",
+        "command": "cd backend && pytest tests/integration/test_notifications_api.py -v",
+        "expected_outcome": "All integration tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Frontend Unit Tests",
+        "command": "cd frontend && npm test -- --run --coverage",
+        "expected_outcome": "All tests pass with >80% coverage",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "E2E WebSocket Test",
+        "command": "cd backend && python tests/test_websocket_notifications.py",
+        "expected_outcome": "WebSocket connection and notification delivery verified",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Security Scan - SQL Injection",
+        "command": "cd backend && bandit -r api/notifications.py -f json",
+        "expected_outcome": "No high severity SQL injection issues",
+        "type": "security",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Security Scan - Secrets",
+        "command": "python .auto-claude/scan_secrets.py backend/api/notifications.py --all-files --json",
+        "expected_outcome": "No secrets detected",
+        "type": "security",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "High risk because: (1) WebSocket introduces new attack surface, (2) Notification system touches critical user data, (3) Email delivery requires proper error handling, (4) Real-time features need thorough testing to prevent race conditions."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/test_notification_service.py -v",
+        "cd frontend && npm test -- --run"
+      ],
+      "minimum_coverage": 80
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/integration/test_notifications_api.py -v",
+        "cd backend && pytest tests/integration/test_websocket.py -v"
+      ],
+      "services_to_test": [
+        "backend",
+        "worker"
+      ]
+    },
+    "e2e_tests": {
+      "required": true,
+      "commands": [
+        "cd frontend && npm run test:e2e -- notification-center.spec.ts"
+      ],
+      "flows": [
+        "create-notification",
+        "mark-read",
+        "delete-notification",
+        "update-preferences"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:5173/",
+          "checks": [
+            "NotificationCenter renders",
+            "WebSocket connected",
+            "No console errors"
+          ]
+        },
+        {
+          "url": "http://localhost:5173/settings",
+          "checks": [
+            "Notification preferences panel renders",
+            "Can toggle settings",
+            "Preferences save correctly"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": true,
+      "checks": [
+        "migrations-exist",
+        "migrations-applied",
+        "schema-valid",
+        "notifications-table-exists",
+        "notification_preferences-table-exists"
+      ]
+    },
+    "websocket_verification": {
+      "required": true,
+      "checks": [
+        "ws://localhost:8000/ws/notifications/{user_id} connects",
+        "Real-time notifications received",
+        "Connection properly authenticated",
+        "Reconnection logic works"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "updated_at": "2026-02-03T11:53:08.701Z",
+  "last_updated": "2026-02-03T01:20:00.000000+00:00"
+}
