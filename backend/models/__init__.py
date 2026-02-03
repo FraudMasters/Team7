@@ -32,6 +32,7 @@ from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
+from .notification import Notification, NotificationType
 
 __all__ = [
     "Base",
@@ -74,4 +75,6 @@ __all__ = [
     "SavedSearch",
     "SearchAlert",
     "SearchHistory",
+    "Notification",
+    "NotificationType",
 ]
