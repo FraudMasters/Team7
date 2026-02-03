@@ -693,24 +693,533 @@ container_memory_usage_bytes{container!="POD"}
 
 ## Alerting
 
-### Pre-configured Alerts
+### Alert Rules Overview
 
-Located in `monitoring/prometheus/alerts/`:
+The monitoring stack includes pre-configured alert rules in `monitoring/grafana/provisioning/alerts/alert_rules.yml`:
 
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| HighErrorRate | Error rate > 5% for 5m | Critical |
-| HighLatency | P95 latency > 2s for 5m | Warning |
-| HighMemoryUsage | Memory > 90% for 5m | Warning |
-| CeleryQueueFull | Queue length > 1000 | Warning |
-| DatabaseDown | PostgreSQL not responding | Critical |
+| Alert Group | Alerts | Severity |
+|-------------|--------|----------|
+| **API Performance** | HighAPIErrorRate, CriticalAPIErrorRate, HighAPILatency, CriticalAPILatency | Warning/Critical |
+| **Celery Tasks** | CeleryQueueBackup, CriticalCeleryQueueBackup, HighCeleryTaskFailureRate, CriticalCeleryTaskFailureRate, CeleryWorkersDown, SlowCeleryTasks | Warning/Critical |
+| **ML Inference** | SlowMLInference, CriticalMLInference | Warning/Critical |
+| **Database** | SlowDatabaseQueries, CriticalDatabaseQueries | Warning/Critical |
+| **System** | ServiceDown, HighMemoryUsage | Warning/Critical |
 
-### Alert Notifications
+**Total:** 16 alert rules across 5 groups
 
-Configure alerts in Grafana:
-1. Navigate to Alerting → Notification Channels
-2. Add channel (Slack, Email, PagerDuty, etc.)
-3. Link alert rules to notification channels
+### Alert Notification Channels
+
+Grafana supports multiple notification channels. Configure them via environment variables or the Grafana UI at http://localhost:3001/alerting/notifications.
+
+---
+
+## Email Alerts
+
+### Configuration
+
+Add the following environment variables to your `.env` file:
+
+```bash
+# SMTP Configuration
+GRAFANA_SMTP_HOST=smtp.gmail.com:587
+GRAFANA_SMTP_USER=your_email@gmail.com
+GRAFANA_SMTP_PASSWORD=your_app_password
+GRAFANA_SMTP_FROM_ADDRESS=grafana@yourdomain.com
+GRAFANA_SMTP_FROM_NAME=Grafana Alerts
+
+# Alert Recipient
+ALERT_EMAIL_ADDRESS=alerts@example.com
+```
+
+### Email Provider Examples
+
+#### Gmail
+
+```bash
+GRAFANA_SMTP_HOST=smtp.gmail.com:587
+GRAFANA_SMTP_USER=your_email@gmail.com
+GRAFANA_SMTP_PASSWORD=your_app_password  # Use an App Password, not your account password
+```
+
+**Creating a Gmail App Password:**
+1. Go to [Google Account Settings](https://myaccount.google.com/)
+2. Enable **2-Step Verification** (if not already enabled)
+3. Navigate to **Security** → **App Passwords**
+4. Select "Mail" and your device
+5. Generate and copy the 16-character password
+6. Paste into `GRAFANA_SMTP_PASSWORD`
+
+**⚠️ Important:** Gmail requires App Passwords for applications. Your regular password won't work.
+
+#### Outlook / Office365
+
+```bash
+GRAFANA_SMTP_HOST=smtp.office365.com:587
+GRAFANA_SMTP_USER=your_email@outlook.com
+GRAFANA_SMTP_PASSWORD=your_password
+```
+
+#### SendGrid
+
+```bash
+GRAFANA_SMTP_HOST=smtp.sendgrid.net:587
+GRAFANA_SMTP_USER=apikey
+GRAFANA_SMTP_PASSWORD=SG.your_api_key_here
+```
+
+#### AWS SES (Simple Email Service)
+
+```bash
+GRAFANA_SMTP_HOST=email-smtp.us-east-1.amazonaws.com:587
+GRAFANA_SMTP_USER=your_ses_smtp_username
+GRAFANA_SMTP_PASSWORD=your_ses_smtp_password
+```
+
+### Applying Email Configuration
+
+1. **Add to .env:**
+   ```bash
+   # Edit .env file
+   nano .env
+   ```
+
+2. **Restart Grafana:**
+   ```bash
+   docker-compose restart grafana
+   ```
+
+3. **Verify Configuration:**
+   - Go to http://localhost:3001/alerting/notifications
+   - Click on "email-alerts" contact point
+   - Click "Send test notification"
+   - Check your inbox for the test email
+
+---
+
+## Slack Alerts
+
+### Webhook Integration
+
+Slack notifications use Incoming Webhooks to post alerts to channels.
+
+#### Setup Steps
+
+1. **Create a Slack App**
+   - Go to https://api.slack.com/apps
+   - Click "Create New App"
+   - Select "From scratch"
+   - Name your app (e.g., "Grafana Alerts")
+   - Select your workspace
+
+2. **Enable Incoming Webhooks**
+   - Navigate to "Incoming Webhooks" in the app settings
+   - Toggle "Activate Incoming Webhooks" to On
+   - Click "Add New Webhook to Workspace"
+
+3. **Select Channel**
+   - Choose the channel where alerts should be posted
+   - Click "Allow"
+
+4. **Copy Webhook URL**
+   - Copy the webhook URL (looks like: `https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX`)
+   - Add to your `.env` file:
+   ```bash
+   ALERT_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+   ```
+
+5. **Restart Grafana:**
+   ```bash
+   docker-compose restart grafana
+   ```
+
+#### Customizing Slack Messages
+
+The webhook integration automatically formats alerts with:
+- Alert name and severity
+- Current value and threshold
+- Alert state (Firing/Resolved)
+- Direct link to the alert in Grafana
+- Timestamp
+
+To customize the message format, edit `monitoring/grafana/provisioning/alerting/contactpoints.yml`:
+
+```yaml
+slug: webhook-alerts
+settings:
+  url: ${ALERT_WEBHOOK_URL}
+  # Optional: Customize message format
+  # title: '{{ .Status }}: {{ .Labels.alertname }}'
+  # body: |
+  #   *Alert:* {{ .Labels.alertname }}
+  #   *Severity:* {{ .Labels.severity }}
+  #   *Value:* {{ .Value }}
+  #   *Details:* {{ .ExternalURL }}
+```
+
+---
+
+## PagerDuty Alerts
+
+### Configuration
+
+PagerDuty integration requires a Grafana plugin and API credentials.
+
+#### Setup Steps
+
+1. **Install PagerDuty Plugin** (if not pre-installed)
+   ```bash
+   # Access Grafana container
+   docker-compose exec grafana bash
+
+   # Install plugin
+   grafana-cli plugins install grafana-pagerduty-datasource
+
+   # Restart Grafana
+   exit
+   docker-compose restart grafana
+   ```
+
+2. **Get PagerDuty Credentials**
+   - Log into PagerDuty
+   - Go to **Integrations** → **API Access**
+   - Create a new API key or use existing one
+   - Note your PagerDuty account subdomain (e.g., `company.pagerduty.com`)
+
+3. **Configure in Grafana UI**
+   - Navigate to http://localhost:3001/alerting/notifications
+   - Click "Add contact point"
+   - Select "PagerDuty" from the dropdown
+   - Enter:
+     - **Name:** `pagerduty-alerts`
+     - **Integration Key:** Your PagerDuty integration key
+     - **Severity:** Map alert severities (Critical → High, Warning → Low)
+   - Click "Save"
+
+4. **Link Alerts to PagerDuty**
+   - Go to http://localhost:3001/alerting/rules
+   - For each alert rule, click "Edit"
+   - Under "Contact point", select "pagerduty-alerts"
+   - Save changes
+
+#### Alternative: Using Webhook with PagerDuty Events API
+
+If the plugin isn't available, use PagerDuty's Events v2 API:
+
+```bash
+# Add to .env
+PAGERDUTY_INTEGRATION_KEY=your_integration_key_here
+PAGERDUTY_API_URL=https://events.pagerduty.com/v2/enqueue
+```
+
+Then configure a webhook in Grafana pointing to the PagerDuty Events API with a custom payload format.
+
+---
+
+## Microsoft Teams Alerts
+
+### Webhook Integration
+
+#### Setup Steps
+
+1. **Create Incoming Webhook in Teams**
+   - Go to your Microsoft Team channel
+   - Click the "..." (ellipsis) next to the channel name
+   - Select **Connectors**
+   - Search for "Incoming Webhook"
+   - Click "Configure"
+   - Name it "Grafana Alerts" (optional: add an image)
+   - Click "Create"
+   - Copy the webhook URL
+
+2. **Configure in Grafana**
+   ```bash
+   # Add to .env
+   ALERT_WEBHOOK_URL=https://your-org.webhook.office.com/webhookb2/xxx/IncomingWebhook/yyy/zzz
+   ```
+
+3. **Restart Grafana**
+   ```bash
+   docker-compose restart grafana
+   ```
+
+#### Customizing Teams Messages
+
+Edit `monitoring/grafana/provisioning/alerting/contactpoints.yml` to format messages as Teams adaptive cards:
+
+```yaml
+settings:
+  url: ${ALERT_WEBHOOK_URL}
+  http_method: POST
+  # Custom JSON payload for Teams
+  # {
+  #   "type": "message",
+  #   "attachments": [
+  #     {
+  #       "contentType": "application/vnd.microsoft.card.adaptive",
+  #       "content": {
+  #         "type": "AdaptiveCard",
+  #         "body": [
+  #           {
+  #             "type": "TextBlock",
+  #             "text": "{{ .Labels.alertname }}",
+  #             "weight": "bolder",
+  #             "size": "medium"
+  #           }
+  #         ]
+  #       }
+  //     }
+  //   ]
+  // }
+```
+
+---
+
+## Discord Alerts
+
+### Webhook Integration
+
+#### Setup Steps
+
+1. **Create Discord Webhook**
+   - Open Discord Server Settings
+   - Go to **Integrations** → **Webhooks**
+   - Click "New Webhook"
+   - Select the channel
+   - Name it "Grafana Alerts"
+   - Copy the webhook URL
+
+2. **Configure in Grafana**
+   ```bash
+   # Add to .env
+   ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/xxx/yyy
+   ```
+
+3. **Restart Grafana**
+   ```bash
+   docker-compose restart grafana
+   ```
+
+#### Discord Message Formatting
+
+Discord supports embedded messages. Configure in `contactpoints.yml`:
+
+```yaml
+settings:
+  url: ${ALERT_WEBHOOK_URL}
+  # Discord embed format
+  # {
+  #   "embeds": [{
+  #     "title": "{{ .Labels.alertname }}",
+  #     "description": "{{ .Annotations.description }}",
+  #     "color": {{ if eq .Status "firing" }}16711680{{ else }}65280{{ end }},
+  #     "fields": [
+  #       {"name": "Severity", "value": "{{ .Labels.severity }}"},
+  #       {"name": "Value", "value": "{{ .Value }}"}
+  //     ]
+  //   }]
+  // }
+```
+
+---
+
+## Custom Webhook Endpoints
+
+For custom integrations, configure any HTTP endpoint as a notification target.
+
+### Configuration
+
+```bash
+# Add to .env
+ALERT_WEBHOOK_URL=https://your-custom-endpoint.com/alerts
+```
+
+### Webhook Payload Format
+
+Grafana sends the following JSON payload:
+
+```json
+{
+  "receiver": "webhook-alerts",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighAPIErrorRate",
+        "severity": "critical",
+        "job": "backend"
+      },
+      "annotations": {
+        "description": "API error rate is above 15%",
+        "summary": "Critical error rate detected"
+      },
+      "startsAt": "2024-01-15T10:30:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://localhost:3001/",
+      "fingerprint": "abc123"
+    }
+  ],
+  "groupLabels": {},
+  "commonLabels": {},
+  "commonAnnotations": {},
+  "externalURL": "http://localhost:3001/"
+}
+```
+
+### Custom Endpoint Requirements
+
+Your endpoint should:
+- Accept HTTP POST requests
+- Process JSON payloads
+- Return HTTP 2xx on success
+- Handle retries gracefully (Grafana retries on failure)
+
+---
+
+## Testing Alert Notifications
+
+### Test Email
+
+1. **Navigate to:** http://localhost:3001/alerting/notifications
+2. **Click:** "email-alerts" contact point
+3. **Click:** "Send test notification" button
+4. **Check:** Your email inbox (including spam folder)
+
+### Test Webhook (Slack/Discord/Teams)
+
+1. **Navigate to:** http://localhost:3000/alerting/notifications
+2. **Click:** "webhook-alerts" contact point
+3. **Click:** "Send test notification" button
+4. **Verify:** Message appears in your channel
+
+### Test Alert Rules
+
+Manually trigger alerts to verify end-to-end functionality:
+
+```bash
+# Test 1: Service Down Alert
+# Stop backend service
+docker-compose stop backend
+# Wait 2 minutes, check alert fires at: http://localhost:3001/alerting/rules
+# Restart backend
+docker-compose start backend
+
+# Test 2: High Error Rate Alert
+# Generate errors
+for i in {1..500}; do
+  curl -s http://localhost:8000/api/nonexistent-$i
+done
+# Wait 2 minutes, check "HighAPIErrorRate" alert
+```
+
+---
+
+## Notification Best Practices
+
+### 1. Use Appropriate Severity Levels
+
+- **Critical:** Service down, data loss, security breach
+- **Warning:** Performance degradation, high resource usage
+- **Info:** Routine tasks, capacity planning
+
+### 2. Set Up Multiple Channels
+
+```bash
+# Primary (immediate): Slack/Discord for critical
+# Secondary (follow-up): Email for warnings
+# Tertiary (documentation): PagerDuty for incidents
+```
+
+### 3. Configure Notification Policies
+
+Create routing rules in Grafana:
+
+1. Go to http://localhost:3001/alerting/routes
+2. Define routes based on labels:
+   ```
+   severity=critical → Slack + PagerDuty
+   severity=warning → Email
+   ```
+3. Set mute timings for maintenance windows
+
+### 4. Test Regularly
+
+- Weekly test notifications
+- Verify channel configurations
+- Update contact points as team changes
+
+### 5. Avoid Alert Fatigue
+
+- Tune thresholds to reduce false positives
+- Use meaningful alert descriptions
+- Group related alerts
+- Set appropriate `for` durations (wait time before firing)
+
+---
+
+## Troubleshooting Notifications
+
+### Emails Not Arriving
+
+**Check Grafana logs:**
+```bash
+docker-compose logs grafana | grep -i smtp
+```
+
+**Common issues:**
+- **Gmail:** Use App Password, not account password
+- **Firewall:** Ensure port 587 is not blocked
+- **Authentication:** Verify username/password are correct
+- **From Address:** Must match SMTP user for some providers
+
+**Test SMTP manually:**
+```bash
+docker-compose exec grafana nc -vz smtp.gmail.com 587
+```
+
+### Webhook Failures
+
+**Check webhook URL accessibility:**
+```bash
+# Test from Grafana container
+docker-compose exec grafana curl -X POST $ALERT_WEBHOOK_URL \
+  -H "Content-Type: application/json" \
+  -d '{"test": "message"}'
+```
+
+**Common issues:**
+- **Firewall:** Webhook URL blocked from container
+- **SSL:** Certificate validation errors
+- **Rate Limiting:** Service rejecting too many requests
+- **Expired Tokens:** Slack/Discord webhooks expire
+
+### Alert Not Firing
+
+**Verify in Prometheus:**
+1. Go to http://localhost:9090/alerts
+2. Check if alert is in "Pending" or "Firing" state
+3. Verify metric data exists
+
+**Check evaluation interval:**
+- Default: 30 seconds
+- Alert must be true for entire `for` duration before firing
+
+**Check notification linkage:**
+1. Go to http://localhost:3001/alerting/rules
+2. Click alert rule
+3. Verify "Contact point" is set
+4. Check "Notification policies" aren't blocking
+
+---
+
+## Alert Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `monitoring/grafana/provisioning/alerts/alert_rules.yml` | Alert rule definitions |
+| `monitoring/grafana/provisioning/alerting/contactpoints.yml` | Notification channels (email, webhook) |
+| `monitoring/grafana/provisioning/alerting/policies.yml` | Notification routing policies |
+| `monitoring/prometheus/prometheus.yml` | Prometheus alert configuration |
 
 ---
 
