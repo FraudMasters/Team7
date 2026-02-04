@@ -49,6 +49,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ErrorMessage, { ErrorType, ErrorAction } from '../components/ErrorMessage';
 import useKeyboardNavigation from '../hooks/useKeyboardNavigation';
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 
 interface Vacancy {
   id: string;
@@ -132,6 +133,12 @@ const VacancyList: React.FC = () => {
   const [limit] = useState<number>(20);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
+  // Infinite scroll hook - disabled when filters are active
+  const { ref: scrollRef, isNearBottom } = useInfiniteScroll({
+    threshold: 200,
+    enabled: !hasActiveFilters && hasMore && !loading && !loadingMore,
+  });
 
   // Filter vacancies based on search query and filters
   const filteredVacancies = vacancies.filter((vacancy) => {
@@ -333,6 +340,13 @@ const VacancyList: React.FC = () => {
       return prev;
     });
   }, [filteredVacancies.length]);
+
+  // Trigger load more when user scrolls near bottom
+  useEffect(() => {
+    if (isNearBottom && !hasActiveFilters && hasMore && !loading && !loadingMore) {
+      loadMore();
+    }
+  }, [isNearBottom, hasActiveFilters, hasMore, loading, loadingMore, loadMore]);
 
   useEffect(() => {
     fetchVacancies(0, limit);
@@ -1092,7 +1106,7 @@ const VacancyList: React.FC = () => {
               label: 'Retry',
               onClick: () => {
                 setError(null);
-                fetchVacancies();
+                fetchVacancies(0, limit);
               },
               primary: true,
             },
@@ -1137,12 +1151,35 @@ const VacancyList: React.FC = () => {
           </Button>
         </Paper>
       ) : (
-        <Grid2
-          container
-          spacing={{ xs: 2, sm: 3 }}
-          columns={{ xs: 1, sm: 2, md: 2, lg: 3 }}
+        <Box
+          ref={scrollRef}
+          sx={{
+            maxHeight: '70vh',
+            overflowY: 'auto',
+            pr: 1,
+            // Custom scrollbar styling for better UX
+            '&::-webkit-scrollbar': {
+              width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: 'background.paper',
+              borderRadius: 1,
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: 'action.hover',
+              borderRadius: 1,
+              '&:hover': {
+                backgroundColor: 'action.selected',
+              },
+            },
+          }}
         >
-          {filteredVacancies.map((vacancy, index) => (
+          <Grid2
+            container
+            spacing={{ xs: 2, sm: 3 }}
+            columns={{ xs: 1, sm: 2, md: 2, lg: 3 }}
+          >
+            {filteredVacancies.map((vacancy, index) => (
             <Grid2
               size={{ xs: 1, sm: 1, md: 1, lg: 1 }}
               key={vacancy.id}
@@ -1261,6 +1298,26 @@ const VacancyList: React.FC = () => {
             </Grid2>
           ))}
         </Grid2>
+
+        {/* Loading more indicator */}
+        {loadingMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={24} />
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+              Loading more vacancies...
+            </Typography>
+          </Box>
+        )}
+
+        {/* No more items indicator */}
+        {!hasMore && vacancies.length > 0 && !hasActiveFilters && (
+          <Box sx={{ textAlign: 'center', py: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {t('vacancyList.allItemsLoaded') || 'All vacancies loaded'}
+            </Typography>
+          </Box>
+        )}
+        </Box>
       )}
 
       {/* Delete Confirmation Dialog */}
