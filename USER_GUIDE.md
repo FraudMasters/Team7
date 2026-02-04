@@ -3633,3 +3633,426 @@ Here are common situations and how to handle them:
 ### What's Next?
 
 Now that you've uploaded resumes and understand the analysis process, you're ready to evaluate candidates. In the next section, we'll cover [Understanding AI Match Scores](#understanding-ai-match-scores)—how the matching system works and how to interpret the scores you'll see.
+
+---
+
+---
+
+## Using the Kanban Board
+
+The **Kanban board** is your visual command center for managing candidates through every stage of your hiring process. Instead of digging through spreadsheets or email threads, you can see exactly where each candidate stands in your pipeline—and move them forward with a simple drag and drop.
+
+This section shows you how to use the Kanban board to stay organized, collaborate with your team, and never lose track of a promising candidate.
+
+### Board Overview and Columns
+
+When you open the Kanban board, you'll see a set of **vertical columns**, each representing a stage in your hiring process. Every candidate appears as a **card** in one of these columns.
+
+#### The Six Columns
+
+| Column | Purpose | Typical Candidates |
+|--------|---------|-------------------|
+| **Applied** | New applications and uploaded resumes | All candidates initially start here |
+| **Screening** | Initial review in progress | Candidates being evaluated for fit |
+| **Interview** | Interview stage | Candidates scheduled for or已完成 interviews |
+| **Offer** | Offer extended/salary negotiation | Candidates receiving offers |
+| **Hired** | Successfully hired | Candidates who accepted offers |
+| **Rejected** | Not moving forward | Candidates declined at any stage |
+
+#### What You See on Each Card
+
+Every candidate card displays key information at a glance:
+
+```
+┌─────────────────────────────────┐
+│ 👤 John Smith                   │
+│ 📧 john@email.com               │
+│ 💼 Senior Software Engineer     │
+│ ⭐ Match: 87% (Excellent)       │
+│ 🎯 Skills: Python, Django, AWS  │
+│ 💭 Last activity: 2 hours ago   │
+│ [#] [#] [#]                    │
+└─────────────────────────────────┘
+```
+
+**Card Information:**
+- **Name** – Candidate's full name
+- **Contact** – Email address (clickable)
+- **Position** – Job vacancy applied for
+- **Match Score** – Overall fit percentage with color coding
+- **Top Skills** – 3 most relevant skills
+- **Activity** – Last status change time
+- **Tags** – Visual labels (customizable)
+- **Notes Indicator** – Shows if notes exist
+
+#### Board Features
+
+✅ **Real-time Updates** – Changes appear instantly for all users
+
+✅ **Column Counts** – See number of candidates in each stage
+
+✅ **Quick Search** – Filter candidates by name, skill, or status
+
+✅ **Bulk Actions** – Move multiple candidates at once
+
+✅ **Mobile Responsive** – Access on any device
+
+✅ **Color-Coded Scores** – Visual indicators for match levels
+
+### Moving Candidates Through Stages
+
+The core of the Kanban board is **moving candidates** from one stage to another as they progress through your hiring process.
+
+#### Drag-and-Drop Movement
+
+**Basic Move (Single Candidate)**
+
+```
+1. Click and hold on the candidate card
+2. Drag it to the target column
+3. Release to drop
+4. Confirm the status change (if prompted)
+```
+
+**Example: Moving from Screening to Interview**
+
+```
+Before:
+[Applied: 3] [Screening: 12] [Interview: 0]
+
+After:
+[Applied: 3] [Screening: 11] [Interview: 1]
+```
+
+#### Moving Multiple Candidates
+
+When you want to advance several candidates at once:
+
+```
+1. Click the checkbox on each candidate card
+2. Click "Move Selected" button (appears at top)
+3. Choose target column from dropdown
+4. Confirm bulk move
+```
+
+**Use Cases for Bulk Moves:**
+- After phone screens – Move all "pass" candidates to Interview
+- After final interviews – Move all to Offer or Rejected
+- Batch rejections – Move multiple declined candidates
+
+#### Automatic Status Tracking
+
+Every time you move a candidate, AgentHR automatically:
+
+✅ **Updates status timestamp**
+
+✅ **Records who made the change** (for team collaboration)
+
+✅ **Sends notifications** (if enabled for that stage)
+
+✅ **Updates analytics** (keeps your metrics accurate)
+
+✅ **Creates activity log entry** (full audit trail)
+
+#### Movement Best Practices
+
+**✅ DO:**
+- Move candidates promptly after decisions
+- Add notes when moving to Interview or Offer
+- Keep candidates in current stage until decisions are final
+- Use consistent criteria for each stage
+
+**❌ DON'T:**
+- Skip stages (e.g., Applied → Offer)
+- Move candidates backward without good reason
+- Leave candidates stalled in one stage too long
+- Move candidates without reviewing their profile first
+
+#### Stage Transition Guidelines
+
+**Applied → Screening**
+- Trigger: Resume uploaded or application received
+- Action: Quick review of minimum qualifications
+- Typical time: Within 24-48 hours
+
+**Screening → Interview**
+- Trigger: Phone screen completed, qualifications confirmed
+- Action: Schedule interview
+- Typical time: 3-7 days in screening
+
+**Interview → Offer**
+- Trigger: All interviews completed, team approves
+- Action: Prepare offer letter
+- Typical time: 1-3 days after final interview
+
+**Interview → Rejected**
+- Trigger: Interview feedback is negative
+- Action: Send rejection email
+- Typical time: Within 24 hours of decision
+
+**Offer → Hired**
+- Trigger: Candidate accepts offer
+- Action: Onboarding process
+- Typical time: Immediately upon acceptance
+
+**Any Stage → Rejected**
+- Trigger: Candidate withdraws or doesn't pass stage
+- Action: Record reason if helpful for analytics
+- Typical time: As soon as decision is made
+
+### Adding Notes and Tags
+
+The Kanban board isn't just for moving candidates—it's also a **collaboration tool** where you and your team can share insights and keep context organized.
+
+#### Adding Notes to Candidates
+
+**Why Add Notes?**
+- Remember interview feedback
+- Share observations with team
+- Track salary expectations
+- Note availability or scheduling preferences
+- Record red flags or concerns
+
+**How to Add a Note**
+
+```
+1. Click on the candidate card to open details
+2. Find the "Notes" section
+3. Click "Add Note"
+4. Type your note
+5. Click "Save"
+```
+
+**Note Examples:**
+
+```
+✅ Good Note:
+"Great phone screen. 5 years experience with Django,
+strong communication skills. Asked for $120k base.
+Available for onsite interview M-W."
+
+❌ Vague Note:
+"Seemed ok"
+```
+
+**Rich Text Notes Support:**
+- **Bold** important points
+- Create bullet lists for feedback
+- Add links to portfolio/work samples
+- Mention team members with @
+
+#### Notes Visibility
+
+- **All team members** can see notes on shared candidates
+- Notes are **timestamped** and **attributed** to author
+- Notes **cannot be edited** by others (append-only)
+- Deleted notes are **removed permanently**
+
+#### Using Tags
+
+**Tags are color-coded labels** that help you quickly identify and filter candidates.
+
+**Default Tags:**
+- 🔴 **Urgent** – Time-sensitive applications
+- 🟡 **Review** – Needs team discussion
+- 🟢 **Referral** – Employee referral
+- 🔵 **Remote** – Remote work candidate
+- 🟣 **Relocation** – Requires relocation assistance
+
+**Creating Custom Tags**
+
+```
+1. Open candidate card
+2. Click "Add Tag" button
+3. Enter tag name
+4. Choose color from palette
+5. Click "Create"
+```
+
+**Tag Examples by Use Case:**
+
+| Purpose | Tag Examples |
+|---------|--------------|
+| **Priority** | Hot, Urgent, Backlog |
+| **Source** | LinkedIn, Referral, Agency, Career Page |
+| **Status** | Offer Out, Counter Offer, Background Check |
+| **Skills** | Bilingual, Certified, Security Clearance |
+| **Process** | Second Interview, Team Fit, Salary Negotiation |
+
+#### Filtering with Tags
+
+**View Specific Candidate Groups:**
+
+```
+1. Click "Filter" button on Kanban board
+2. Select tag(s) to filter by
+3. Board shows only matching candidates
+4. Combine multiple tags for precise filtering
+```
+
+**Common Filter Combinations:**
+- `Referral` + `Interview` – Referred candidates in interviews
+- `Urgent` + `Screening` – Priority candidates needing review
+- `Remote` + `Offer` – Remote candidates with offers
+
+### Best Practices for Pipeline Management
+
+A well-maintained Kanban board is a **powerful hiring tool**. Here's how to get the most value from it.
+
+#### Daily Workflow
+
+**Start of Day (5-10 minutes):**
+```
+1. Review "Applied" column for new candidates
+2. Check "Interview" column for today's scheduled interviews
+3. Review any candidates stalled too long in one stage
+```
+
+**During the Day:**
+```
+1. Move candidates promptly after decisions
+2. Add notes while feedback is fresh
+3. Update tags as status changes
+4. Respond to team @mentions in notes
+```
+
+**End of Day (5 minutes):**
+```
+1. Ensure all decisions are recorded
+2. Check for candidates needing follow-up
+3. Confirm tomorrow's interview schedule
+```
+
+#### Column Health Monitoring
+
+Keep your pipeline flowing smoothly by watching for these patterns:
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| **Bottleneck** | 20+ candidates stuck in one stage | Schedule reviews, add team capacity |
+| **Ghosted Candidates** | No activity >7 days | Follow up or move to Rejected |
+| **Empty Pipeline** | Few candidates in early stages | Source more candidates, broaden criteria |
+| **High Rejection Rate** | Many in Rejected vs. Hired | Review job requirements, sourcing quality |
+| **Slow Time-to-Hire** | Candidates in process >30 days | Streamline interview process |
+
+#### Team Collaboration
+
+**Share Board Access:**
+- Give all hiring team members view access
+- Grant edit access to recruiters and hiring managers
+- Use notes to communicate decisions asynchronously
+- @mention team members for urgent input
+
+**Establish Conventions:**
+- Agree on stage criteria as a team
+- Use consistent tag naming
+- Standardize note formats for feedback
+- Set daily/weekly review times
+
+#### Analytics Integration
+
+The Kanban board **feeds your analytics dashboard**. Every move, status change, and tag update contributes to:
+
+- **Time-to-Hire** calculations
+- **Pipeline conversion** metrics
+- **Source effectiveness** tracking
+- **Bottleneck identification**
+
+Keep the board accurate to keep your analytics accurate.
+
+#### Mobile Usage Tips
+
+**On-the-Go Access:**
+- ✅ Quick status updates during interviews
+- ✅ View candidate details before meetings
+- ✅ Add immediate interview feedback notes
+- ✅ Check interview schedule
+- ⚠️ Bulk moves easier on desktop
+- ⚠age Complex edits better on larger screen
+
+#### Common Kanban Workflows
+
+**Workflow 1: Processing New Applications**
+
+```
+1. Check "Applied" column daily
+2. Quick scan of match scores and skills
+3. Click card to view full profile
+4. Move to "Screening" if meets minimum criteria
+5. Move to "Rejected" if clearly not a fit
+6. Add tag for source (LinkedIn, Referral, etc.)
+```
+
+**Workflow 2: Post-Interview Updates**
+
+```
+1. Interviewer adds feedback note immediately
+2. Schedule debrief meeting
+3. During debrief, review all interview notes
+4. Make decision as team
+5. Move to "Offer" or "Rejected"
+6. If "Offer," add salary expectations note
+```
+
+**Workflow 3: Offer Management**
+
+```
+1. Move candidate to "Offer" column
+2. Add note with offer details (salary, start date)
+3. Tag as "Offer Out"
+4. Monitor for response
+5. Move to "Hired" when accepted
+6. Move to "Rejected" if declined (record reason)
+```
+
+**Workflow 4: Weekly Pipeline Review**
+
+```
+1. Filter by each stage systematically
+2. Review candidates stalled >5 days
+3. Confirm next steps for each
+4. Update status or schedule follow-ups
+5. Remove outdated tags
+6. Identify candidates needing attention
+```
+
+#### Troubleshooting Board Issues
+
+**Issue: Can't move candidate to certain column**
+- Cause: Insufficient permissions or required field missing
+- Fix: Check with admin, ensure all required data is complete
+
+**Issue: Candidate disappeared from board**
+- Cause: Filtered out or deleted
+- Fix: Clear filters, check "All Candidates" view, contact admin
+
+**Issue: Tags not showing colors**
+- Cause: Too many custom tags or browser issue
+- Fix: Reduce tag count, refresh page, try different browser
+
+**Issue: Notes not saving**
+- Cause: Network issue or text too long
+- Fix: Check connection, shorten note, try again
+
+**Issue: Column counts seem wrong**
+- Cause: Active filter hiding some candidates
+- Fix: Clear all filters to see true counts
+
+### Kanban Board Quick Reference
+
+| Task | How |
+|------|-----|
+| **View candidate details** | Click on card |
+| **Move one candidate** | Drag card to new column |
+| **Move multiple candidates** | Check boxes → Move Selected → Choose column |
+| **Add note** | Open card → Notes section → Add Note |
+| **Add tag** | Open card → Add Tag → Enter name/color |
+| **Filter by tag** | Click Filter → Select tag(s) |
+| **Search candidate** | Use search bar at top |
+| **View activity history** | Open card → Activity tab |
+| **Undo move** | Open card → Activity → Revert change |
+| **Share candidate** | Open card → Share link |
+
+### What's Next?
+
+Now that you know how to manage your hiring pipeline with the Kanban board, you're ready to help the AI learn and improve. In the next section, we'll cover [Providing Feedback on Rankings](#providing-feedback-on-rankings)—how your input makes AgentHR smarter and more accurate for future hires.
