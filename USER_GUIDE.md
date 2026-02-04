@@ -6096,8 +6096,10 @@ The easiest way is to compare candidates who have already been matched to a vaca
 
 **Step 2: Select Candidates to Compare**
 
-1. Check the boxes next to the candidates you want to compare (2-10 candidates at a time)
+1. Check the boxes next to the candidates you want to compare (2-5 candidates at a time)
 2. Click the **Compare** button (usually at the top of the list)
+
+> **Note:** The system allows comparing up to 5 candidates at once for optimal readability. If you have more candidates, create multiple comparisons.
 
 **Step 3: Review the Comparison**
 
@@ -6107,6 +6109,16 @@ AgentHR will generate a side-by-side comparison showing:
 - Years of experience
 - Education level
 - Recommendation level
+
+**Step 4: Save, Share, or Export (Optional)**
+
+Once you've created your comparison, you have several options:
+
+- **Save Comparison**: Click **Save** to store this comparison for later access. You'll be prompted to enter a name (e.g., "Top 3 Candidates - Senior Python Developer"). Saved comparisons appear in your comparisons list and can be accessed anytime.
+
+- **Share Comparison**: Click **Share** to generate a shareable URL. Send this link to hiring managers or team members to collaborate on the decision. Anyone with the link can view the comparison (no login required for viewing).
+
+- **Export to PDF**: Click **Export PDF** to download a printable version of the comparison. This opens your browser's print dialog where you can save as PDF or print a hard copy.
 
 ---
 
@@ -6121,10 +6133,56 @@ You can also create comparisons from the main candidates list.
 
 **Step 2: Select Candidates and a Vacancy**
 
-1. Check the boxes next to 2-10 candidates
+1. Check the boxes next to 2-5 candidates
 2. Click **Compare Selected**
 3. Choose the **vacancy** you want to compare them against from the dropdown
 4. Click **Generate Comparison**
+
+---
+
+### Adding Notes During Comparison
+
+As you review candidates side-by-side, you can add notes to capture your thoughts and observations.
+
+**How Notes Work:**
+
+Below the comparison matrix, you'll see a **Recruiter Notes** section with a text area for each candidate. Simply type your notes and they'll be **automatically saved** as you type—no need to click a save button.
+
+**What to Track in Notes:**
+
+- **First impressions**: Initial reactions after reviewing the comparison
+- **Strengths**: What stands out as positive about this candidate
+- **Concerns**: Red flags or areas of concern
+- **Cultural fit**: Thoughts on how well they'd fit the team
+- **Follow-up questions**: Topics to explore in interviews
+- **Comparison notes**: How this candidate compares to others in the group
+
+**Example Notes:**
+
+```
+Candidate A: "Strong technical fit with all required skills.
+Limited Kubernetes experience but willing to learn. Would
+be great for team culture."
+
+Candidate B: "Has Python and PostgreSQL but missing FastAPI
+and Redis. May need significant training. Good backup option
+if budget is tight."
+
+Candidate C: "8 years experience is a plus, but salary
+expectations at top of range. Consider if budget allows."
+```
+
+**Benefits of Notes:**
+
+| Benefit | How It Helps |
+|---------|--------------|
+| **Capture fresh insights** | Document thoughts while details are fresh in your mind |
+| **Collaborate with team** | Share notes with hiring managers for joint decisions |
+| **Interview preparation** | Use notes to guide interview questions |
+| **Decision documentation** | Create a paper trail for hiring decisions |
+| **Future reference** | Review notes when comparing for similar roles |
+
+> **Note:** Notes are saved locally in your browser and will persist when you return to the comparison. They're associated with each candidate-vacancy pair.
 
 ---
 
@@ -6355,48 +6413,129 @@ Candidate B: Match 75%, 10 years experience, good match score
 
 ---
 
+### Saving and Sharing Comparisons
+
+AgentHR makes it easy to save your work and collaborate with your hiring team.
+
+#### Saving Comparisons
+
+**Why Save Comparisons?**
+
+| Use Case | Benefit |
+|----------|---------|
+| **Return later** | Access the comparison anytime from your comparisons list |
+| **Track decisions** | Document which candidates you compared for each role |
+| **Build a library** | Create a repository of comparisons for similar roles |
+| **Share easily** | Saved comparisons can be shared via URL |
+
+**How to Save a Comparison:**
+
+1. Complete your comparison by selecting 2-5 candidates
+2. Click the **Save** button in the comparison controls
+3. Enter a descriptive name for the comparison (e.g., "Top 3 Candidates - Senior Python Developer")
+4. Click **Save** to confirm
+
+**What Gets Saved:**
+
+- ✅ Selected candidates and their IDs
+- ✅ Vacancy information
+- ✅ Comparison name
+- ✅ Your recruiter notes (associated with each candidate)
+
+**Accessing Saved Comparisons:**
+
+1. Go to **Comparisons** in the main menu
+2. Find your saved comparison by name or date
+3. Click to open and review
+
+---
+
+#### Sharing Comparisons
+
+**Why Share Comparisons?**
+
+| Use Case | Benefit |
+|----------|---------|
+| **Get manager input** | Share with hiring managers for their feedback |
+| **Team collaboration** | Let team members weigh in on the decision |
+| **Present findings** | Show comparison results in meetings |
+| **Email discussions** | Include link in email threads about hiring |
+
+**How to Share a Comparison:**
+
+1. Create your comparison (or open a saved one)
+2. Click the **Share** button in the comparison controls
+3. A dialog will appear with a shareable URL
+4. Click the **Copy** button to copy the URL to your clipboard
+5. Paste the link in an email, Slack message, or document
+
+**Example Share URL:**
+```
+https://your-company.agenthr.com/recruiter/vacancies/abc-123/compare?candidates=cand-1,cand-2,cand-3
+```
+
+**Sharing Best Practices:**
+
+✅ **DO:** Add context when sharing (e.g., "Here are the top 3 candidates for the Senior Python Developer role. Please review by Friday.")
+
+✅ **DO:** Set a deadline for feedback (e.g., "Feedback needed by Wednesday 5pm")
+
+✅ **DO:** Specify what you're looking for (e.g., "Please focus on technical fit when reviewing")
+
+❌ **DON'T:** Share comparisons via public channels (use email or private messaging)
+
+❌ **DON'T:** Share comparisons with people who shouldn't have access to candidate information
+
+> **Security Note:** Anyone with the share link can view the comparison, even without logging in. Only share with trusted team members involved in the hiring process.
+
+---
+
 ### Exporting Comparison Results
 
-Once you've made a decision (or need input from others), you can export comparison results.
+Once you've made a decision (or need input from others), you can export comparison results to PDF or print hard copies for meetings.
 
 #### Why Export Comparisons?
 
 | Use Case | Benefit |
 |----------|---------|
-| **Share with hiring manager** | Get input from decision-makers |
-| **Present to team** | Collaborative decision-making |
-| **Document the decision** | Create a paper trail for HR |
-| **Compare later** | Reference when hiring for similar roles |
-| **Email candidates** | Remember details when reaching out |
+| **Print for meetings** | Have hard copies for hiring discussions |
+| **Archive for HR** | Create paper trail for hiring decisions |
+| **Offline review** | Review candidates without internet access |
+| **Email attachment** | Send comparison as PDF attachment |
 
-#### How to Export
+#### How to Export to PDF
 
-**Step 1: Click "Export"**
+**Step 1: Click "Export PDF"**
 
-In the comparison view, click the **Export** button (usually at the top right).
+In the comparison view, click the **Export PDF** button (usually in the comparison controls).
 
-**Step 2: Choose Export Format**
+**Step 2: Choose "Save as PDF"**
 
-| Format | Best For | Features |
-|--------|----------|----------|
-| **PDF** | Printing, sharing, archiving | Visual comparison grid, easy to read |
-| **CSV/Excel** | Data analysis, custom reports | Raw data for sorting/filtering |
-| **Email** | Quick sharing | Sends comparison directly to recipients |
+Your browser's print dialog will open:
+- **Destination**: Choose "Save as PDF" or "Microsoft Print to PDF"
+- **Pages**: Select "All" to include the full comparison
+- **Layout**: Portrait or Landscape (Landscape recommended for wider comparison tables)
 
-**Step 3: Select What to Include**
+**Step 3: Adjust Settings (Optional)**
 
-Choose which details to include in the export:
+- **Margins**: Choose "Default" or "None" for more space
+- **Background graphics**: Enable this option if you want colors and highlighting
+- **Headers and footers**: Disable to remove browser-added text
 
-- ✅ Candidate names and contact info
+**Step 4: Save the File**
+
+Click **Save** and choose a location for your PDF file.
+
+**What's Included in the Export:**
+
+- ✅ Comparison matrix with candidate details
 - ✅ Match scores and recommendations
 - ✅ Skills present and missing
 - ✅ Experience and education
-- ✅ Notes or comments you've added
-- ✅ Ranking position (if candidates are ranked)
+- ✅ Ranking positions
+- ❌ Recruiter notes (these are private to you)
 
-**Step 4: Generate and Download**
-
-Click **Generate Export** and download the file.
+> **Tip:** Open the PDF in a viewer before your meeting to ensure it printed correctly. Check that all columns are visible and text is readable.
 
 ---
 
@@ -6412,11 +6551,11 @@ Follow these tips to get the most out of comparisons:
 ✅ Good: Compare 3-5 candidates
 → Clear view of each candidate's strengths
 
-❌ Bad: Compare 10+ candidates
-→ Information overload, harder to decide
+❌ Bad: Compare 6+ candidates
+→ Not supported by system (max 5)
 ```
 
-**Solution**: If you have 10+ candidates, create multiple comparisons:
+**Solution**: If you have 6+ candidates, create multiple comparisons:
 - Comparison 1: Top 3 candidates by match score
 - Comparison 2: Next 3 candidates
 - Comparison 3: Final 3 candidates
@@ -6631,12 +6770,13 @@ The company interviews Candidates A, C, and D. All three perform well in intervi
 
 | Task | How To |
 |------|--------|
-| **Compare candidates** | Select 2-10 candidates → Click "Compare" |
+| **Compare candidates** | Select 2-5 candidates → Click "Compare" |
 | **Compare for vacancy** | Go to vacancy → Check candidates → Click "Compare" |
-| **Export comparison** | Click "Export" → Choose format (PDF/CSV) → Download |
-| **Add notes** | Click "Add Note" next to candidate → Enter text |
-| **Update comparison** | Click "Refresh" to include new candidates |
-| **Print comparison** | Export as PDF → Print or share via email |
+| **Add notes** | Type in the "Recruiter Notes" section → Auto-saves |
+| **Save comparison** | Click "Save" → Enter name → Click "Save" |
+| **Share comparison** | Click "Share" → Copy URL → Send to team |
+| **Export to PDF** | Click "Export PDF" → Choose "Save as PDF" → Save file |
+| **Update comparison** | Add/remove candidates → Comparison updates automatically |
 
 ---
 
@@ -6644,7 +6784,7 @@ The company interviews Candidates A, C, and D. All three perform well in intervi
 
 **Q: How many candidates can I compare at once?**
 
-A: Up to 10 candidates. If you have more, we recommend creating multiple comparisons of 3-5 candidates each.
+A: Up to 5 candidates. The system limits comparisons to 2-5 candidates for optimal readability. If you have more candidates, we recommend creating multiple comparisons of 3-5 candidates each, then comparing the winners from each group.
 
 ---
 
@@ -6695,6 +6835,18 @@ A: Update comparisons when:
 - You receive new feedback on candidates
 
 **Best practice**: Update comparisons **every 2-3 days** during active hiring to ensure you're seeing the latest candidates.
+
+---
+
+**Q: Is it safe to share comparison links?**
+
+A: Share links are **read-only** and don't allow editing, but anyone with the link can view the comparison (including candidate information). Only share with trusted team members involved in the hiring process. Avoid posting links in public channels like Slack channels with external members or public documents.
+
+---
+
+**Q: Do my recruiter notes get shared when I share a comparison?**
+
+A: No, recruiter notes are **private to you** and are not included in shared comparisons or exported PDFs. Notes are saved locally in your browser for your personal use.
 
 ---
 
