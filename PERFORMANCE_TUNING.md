@@ -5116,6 +5116,764 @@ Dashboard: Docker Container Metrics
 
 ---
 
+## Performance Monitoring
+
+Performance monitoring provides visibility into system behavior, enables early detection of issues, and validates optimization efforts. The AgentHR platform uses Prometheus, Grafana, and structured logging for comprehensive observability.
+
+### Overview
+
+The monitoring stack consists of four layers:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Monitoring Stack                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Application │  │  Metrics     │  │   Alerts     │     │
+│  │  Instrument  │  │  Collection  │  │  & Paging    │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+└─────────┼─────────────────┼──────────────────┼─────────────┘
+          │                 │                  │
+          ▼                 ▼                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Data Flow                                 │
+│  App → Prometheus → Grafana Dashboards → Alertmanager       │
+│       ↓               ↓                    ↓                 │
+│   Metrics Store   Visualization       Alert Routing         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | Purpose | Technology |
+|-----------|---------|------------|
+| **Metrics Collection** | Capture performance data | Prometheus + FastAPI middleware |
+| **Visualization** | Real-time dashboards | Grafana with pre-built dashboards |
+| **Logging** | Structured event tracking | Python structlog + JSON output |
+| **Tracing** | Request flow tracking | Correlation IDs + distributed tracing |
+| **Alerting** | Proactive issue detection | Alertmanager with PagerDuty/Slack |
+
+## Metrics Collection (Prometheus)
+
+Prometheus collects time-series metrics from all services, providing the foundation for performance monitoring and alerting.
+
+### Key Metrics to Track
+
+#### Application Performance Metrics
+
+```promql
+# Request duration (p95, p99)
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+# Request rate by endpoint
+rate(http_requests_total[5m])
+
+# Error rate
+rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+
+# Active Celery tasks
+celery_tasks_active
+```
+
+#### Database Performance Metrics
+
+```promql
+# Connection pool usage
+pg_stat_database_numbackends / pg_settings_max_connections
+
+# Slow query rate
+rate(pg_stat_statements_calls[5m])
+
+# Transaction rate
+rate(pg_stat_database_xact_commit[5m])
+
+# Cache hit ratio
+sum(rate(cache_hits_total[5m])) / (sum(rate(cache_hits_total[5m])) + sum(rate(cache_misses_total[5m])))
+```
+
+#### Cache Performance Metrics
+
+```promql
+# Redis memory usage
+redis_memory_used_bytes / redis_memory_max_bytes
+
+# Cache hit rate
+sum(rate(redis_cache_hits_total[5m])) / sum(rate(redis_cache_operations_total[5m]))
+
+# Cache eviction rate
+rate(redis_evicted_keys_total[5m])
+```
+
+#### ML Model Performance Metrics
+
+```promql
+# Model loading time
+histogram_quantile(0.95, ml_model_load_duration_seconds)
+
+# Inference time by model
+histogram_quantile(0.95, rate(ml_inference_duration_seconds_bucket{model=~".+"}[5m]))
+
+# Model cache hit rate
+ml_model_cache_hits / (ml_model_cache_hits + ml_model_cache_misses)
+```
+
+### Prometheus Configuration
+
+The `prometheus.yml` configuration defines scrape targets and intervals:
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'backend'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'celery'
+    static_configs:
+      - targets: ['celery-exporter:9540']
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+```
+
+### Custom Metrics
+
+Add custom metrics in FastAPI using the `prometheus_client` library:
+
+```python
+from prometheus_client import Counter, Histogram, Gauge
+import time
+
+# Define metrics
+resume_analysis_duration = Histogram(
+    'resume_analysis_duration_seconds',
+    'Time spent analyzing resume',
+    ['model_type', 'language']
+)
+
+active_tasks = Gauge(
+    'celery_tasks_active',
+    'Number of currently executing Celery tasks'
+)
+
+cache_operations = Counter(
+    'cache_operations_total',
+    'Total cache operations',
+    ['operation', 'cache_name']
+)
+
+# Use in code
+@router.post("/api/resumes/analyze")
+async def analyze_resume(file: UploadFile):
+    start_time = time.time()
+    try:
+        result = await analyze(file)
+        return result
+    finally:
+        duration = time.time() - start_time
+        resume_analysis_duration.labels(
+            model_type='keybert',
+            language='en'
+        ).observe(duration)
+```
+
+## Grafana Dashboards
+
+Grafana provides real-time visualization of metrics through pre-configured dashboards.
+
+### Available Dashboards
+
+| Dashboard | Purpose | Key Panels |
+|-----------|---------|------------|
+| **Application Overview** | High-level system health | Request rate, error rate, latency heatmap |
+| **API Performance** | Endpoint-specific metrics | Response time, throughput, status codes |
+| **Database Performance** | PostgreSQL metrics | Connection pool, query performance, locks |
+| **Cache Performance** | Redis effectiveness | Hit rate, memory usage, eviction rate |
+| **Celery Tasks** | Background job processing | Queue depth, task duration, worker utilization |
+| **ML Model Performance** | Model metrics | Load time, inference time, cache hit rate |
+| **Resource Utilization** | Container metrics | CPU, memory, disk I/O per container |
+
+### Accessing Dashboards
+
+```bash
+# Start Grafana (if not running)
+docker-compose up -d grafana
+
+# Access Grafana web UI
+open http://localhost:3000
+
+# Default credentials
+Username: admin
+Password: admin (change on first login)
+```
+
+### Creating Custom Dashboards
+
+1. **Navigate**: Dashboards → New → Import
+2. **Enter Dashboard ID** (if importing from Grafana.com)
+3. **Or create from scratch**: New Dashboard → Add Panel
+4. **Configure Panel**: Select metric, visualization type, and thresholds
+
+Example panel configuration:
+
+```json
+{
+  "title": "API Response Time (p95)",
+  "targets": [
+    {
+      "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+      "legendFormat": "{{endpoint}}"
+    }
+  ],
+  "type": "graph",
+  "yaxes": [
+    {
+      "format": "s",
+      "label": "Response Time"
+    }
+  ],
+  "alert": {
+    "conditions": [
+      {
+        "evaluator": {
+          "params": [0.5],
+          "type": "gt"
+        },
+        "operator": {
+          "type": "and"
+        },
+        "query": {
+          "params": ["A", "5m", "now"]
+        },
+        "reducer": {
+          "params": [],
+          "type": "avg"
+        },
+        "type": "query"
+      }
+    ]
+  }
+}
+```
+
+## Logging and Tracing
+
+Structured logging with correlation IDs enables end-to-end request tracing across services.
+
+### Log Structure
+
+Logs are structured as JSON for easy parsing and analysis:
+
+```json
+{
+  "timestamp": "2025-01-15T10:30:45.123Z",
+  "level": "info",
+  "logger": "app.routers.resumes",
+  "message": "Resume analysis completed",
+  "context": {
+    "resume_id": "123e4567-e89b-12d3-a456-426614174000",
+    "correlation_id": "abc-123-def",
+    "duration_ms": 2450,
+    "model": "keybert",
+    "language": "en",
+    "file_size": 1024000
+  },
+  "tags": ["resume_analysis", "ml_inference"]
+}
+```
+
+### Correlation ID Tracking
+
+Correlation IDs trace requests across API, Celery workers, and external services:
+
+```python
+import uuid
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class CorrelationIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        # Get existing correlation ID or generate new one
+        correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+
+        # Add to request state
+        request.state.correlation_id = correlation_id
+
+        # Process request
+        response = await call_next(request)
+
+        # Add to response headers
+        response.headers["X-Correlation-ID"] = correlation_id
+
+        return response
+
+# Use in logging
+logger.info(
+    "Processing resume analysis",
+    extra={"correlation_id": request.state.correlation_id}
+)
+```
+
+### Log Aggregation and Querying
+
+```bash
+# View logs for all services
+docker-compose logs -f --tail=100
+
+# View logs for specific service
+docker-compose logs -f backend
+
+# Filter logs by correlation ID
+docker-compose logs backend | grep "abc-123-def"
+
+# Filter logs by level
+docker-compose logs backend | grep '"level": "error"'
+
+# Export logs for analysis
+docker-compose logs --no-color > logs/export.json
+```
+
+### Performance Logging
+
+Key performance-related log patterns:
+
+```python
+# Log slow operations
+if duration > SLOW_THRESHOLD:
+    logger.warning(
+        "Slow operation detected",
+        extra={
+            "operation": "resume_analysis",
+            "duration_ms": duration,
+            "threshold_ms": SLOW_THRESHOLD,
+            "correlation_id": correlation_id
+        }
+    )
+
+# Log cache misses
+logger.info(
+    "Cache miss",
+    extra={
+        "cache_name": "candidates",
+        "key": candidate_id,
+        "reason": "expired"
+    }
+)
+
+# Log database query performance
+logger.debug(
+    "Database query executed",
+    extra={
+        "query": query.statement,
+        "duration_ms": query_duration,
+        "rows_affected": row_count
+    }
+)
+```
+
+## Performance Benchmarking
+
+Regular benchmarking establishes performance baselines and detects regressions.
+
+### pytest-benchmark Integration
+
+The platform includes automated performance benchmarks using `pytest-benchmark`:
+
+```bash
+# Run all performance benchmarks
+docker-compose exec backend pytest tests/performance/ \
+    --benchmark-only \
+    --benchmark-json=benchmark_results.json
+
+# Run specific benchmark group
+docker-compose exec backend pytest tests/performance/ \
+    -k "candidate_list" \
+    --benchmark-only
+
+# Compare against baseline
+docker-compose exec backend pytest tests/performance/ \
+    --benchmark-only \
+    --benchmark-compare-filename=baseline.json
+```
+
+### Performance Targets
+
+| Endpoint | Metric | Target | Regression Threshold |
+|----------|--------|--------|----------------------|
+| `GET /api/candidates/` | p95 latency | < 200ms | +20% |
+| `GET /api/candidates/{id}` | p95 latency | < 50ms | +20% |
+| `GET /api/vacancies/{id}/matches` | p95 latency | < 500ms | +20% |
+| `GET /api/analytics/key-metrics` | p95 latency | < 300ms | +20% |
+| Cache GET | p95 latency | < 5ms | +20% |
+| Cache SET | p95 latency | < 5ms | +20% |
+
+### Manual Benchmarking
+
+For ad-hoc performance testing:
+
+```bash
+# Benchmark with Apache Bench
+ab -n 1000 -c 10 http://localhost:8000/api/candidates/
+
+# Benchmark with wrk
+wrk -t4 -c100 -d30s http://localhost:8000/api/candidates/
+
+# Measure cache performance
+docker-compose exec backend python -c "
+from services.cache_service import get_cache_service
+import time
+
+cache = get_cache_service()
+data = {'test': 'data' * 1000}
+
+# Benchmark SET
+start = time.time()
+for _ in range(1000):
+    cache.set('test', 'key', data, 3600)
+set_time = (time.time() - start) / 1000
+print(f'SET: {set_time * 1000:.2f}ms avg')
+
+# Benchmark GET
+start = time.time()
+for _ in range(1000):
+    cache.get('test', 'key')
+get_time = (time.time() - start) / 1000
+print(f'GET: {get_time * 1000:.2f}ms avg')
+"
+```
+
+### Monitoring Overhead
+
+Monitoring adds minimal overhead when properly configured:
+
+| Component | Overhead | Mitigation |
+|-----------|----------|------------|
+| **Prometheus middleware** | 1-2ms per request | Efficient metric aggregation |
+| **Correlation ID** | < 1ms per request | UUID generation optimization |
+| **Structured logging** | 1-3ms per request | Async logging + buffer sizing |
+| **DB query metrics** | < 0.5ms per query | Connection pooling |
+| **Total** | **3-6ms per request** | **< 5% of typical response time** |
+
+Validate monitoring overhead:
+
+```bash
+./monitoring/validate-monitoring-overhead.sh
+```
+
+Expected results:
+- ✅ Overhead: < 5%
+- ✅ CPU: < 50%
+- ✅ Memory increase: < 50 MiB
+- ✅ No memory leaks
+
+### Troubleshooting Monitoring Issues
+
+#### High Overhead (> 5%)
+
+If monitoring overhead exceeds 5% of response time:
+
+```bash
+# Check current overhead
+./monitoring/validate-monitoring-overhead.sh
+
+# Reduce log level to WARNING
+# In .env: LOG_LEVEL=WARNING
+
+# Implement metric sampling
+# Track every 10th request instead of all
+```
+
+Solutions:
+- **Reduce log level**: Set `LOG_LEVEL=WARNING` or `ERROR` in `.env`
+- **Sample metrics**: Configure Prometheus to scrape less frequently or track fewer metrics
+- **Fewer histogram buckets**: Reduce bucket count in histogram metrics
+- **Check for blocking I/O**: Ensure logging and metrics collection are async
+
+#### Memory Leaks
+
+If monitoring causes memory growth over time:
+
+```bash
+# Monitor memory usage
+docker stats $(docker-compose ps -q backend)
+
+# Check for growing metric label cardinality
+curl -s http://localhost:9090/api/v1/label/__name__/values | jq '. | length'
+```
+
+Solutions:
+- **Verify correlation ID cleanup**: Ensure correlation IDs are removed from logs after request completion
+- **Check DB connection pooling**: Verify connections are properly returned to pool
+- **Review log buffer sizes**: Reduce buffer sizes if logs accumulate in memory
+- **Monitor label cardinality**: High cardinality labels (like user IDs) can cause memory bloat
+
+#### High CPU Usage (> 50%)
+
+If monitoring causes high CPU utilization:
+
+```bash
+# Profile CPU usage
+docker-compose exec backend python -m cProfile -s cumulative -m uvicorn app.main:app
+
+# Check metric computation overhead
+curl -s http://localhost:9090/api/v1/query?query=rate(http_request_duration_seconds_sum[5m]) | jq .
+```
+
+Solutions:
+- **Implement metric sampling**: Only track metrics for a percentage of requests
+- **Reduce logging verbosity**: Use DEBUG only during development, WARNING in production
+- **Check string formatting**: Pre-format strings outside hot paths; avoid f-strings in logs
+- **Verify async operations**: Ensure metrics collection doesn't block request processing
+
+## Alert Setup
+
+Alerts proactively notify you of performance issues before they impact users.
+
+### AlertManager Configuration
+
+Configure alert routing in `alertmanager.yml`:
+
+```yaml
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+
+  routes:
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+
+    - match:
+        severity: warning
+      receiver: 'slack'
+
+receivers:
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: '<YOUR-PAGERDUTY-KEY>'
+
+  - name: 'slack'
+    slack_configs:
+      - api_url: '<YOUR-SLACK-WEBHOOK>'
+        channel: '#alerts'
+```
+
+### Critical Alerts
+
+Define alerts for critical performance issues:
+
+```yaml
+groups:
+  - name: performance_critical
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m])
+          / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.endpoint }}"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      # Slow response time
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Slow response time on {{ $labels.endpoint }}"
+          description: "p95 latency is {{ $value }}s"
+
+      # Database connection pool exhaustion
+      - alert: DatabasePoolExhausted
+        expr: |
+          pg_stat_database_numbackends
+          / pg_settings_max_connections > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of connections used"
+
+      # Redis memory high
+      - alert: RedisMemoryHigh
+        expr: |
+          redis_memory_used_bytes
+          / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis memory usage critical"
+          description: "{{ $value | humanizePercentage }} of max memory"
+
+      # Celery queue backup
+      - alert: CeleryQueueBackup
+        expr: |
+          celery_queue_length{queue="analysis"}
+          > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery queue backup detected"
+          description: "{{ $value }} tasks pending"
+```
+
+### Warning Alerts
+
+Early warning alerts for potential issues:
+
+```yaml
+groups:
+  - name: performance_warning
+    interval: 1m
+    rules:
+      # Gradual slowdown
+      - alert: GradualSlowdown
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Response time degrading"
+          description: "p95 latency increased to {{ $value }}s"
+
+      # Cache hit rate low
+      - alert: LowCacheHitRate
+        expr: |
+          sum(rate(cache_hits_total[5m]))
+          / (sum(rate(cache_hits_total[5m]))
+             + sum(rate(cache_misses_total[5m]))) < 0.7
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cache hit rate below 70%"
+          description: "Current hit rate: {{ $value | humanizePercentage }}"
+
+      # Memory usage trending high
+      - alert: MemoryUsageTrendingHigh
+        expr: |
+          predict_linear(container_memory_usage_bytes[1h], 3600)
+          > container_spec_memory_limit_bytes * 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory usage trending toward limit"
+          description: "Will exceed limit in 1 hour at current rate"
+```
+
+### Alert Testing
+
+Test alerts to ensure proper configuration:
+
+```bash
+# Test alert rules
+docker-compose exec prometheus promtool check config \
+    /etc/prometheus/prometheus.yml
+
+# Test alertmanager config
+docker-compose exec alertmanager amtool check-config \
+    /etc/alertmanager/alertmanager.yml
+
+# Trigger test alert
+curl -XPOST http://localhost:9093/api/v1/alerts -d '[
+  {
+    "labels": {
+      "alertname": "TestAlert",
+      "severity": "warning"
+    },
+    "annotations": {
+      "description": "This is a test alert"
+    }
+  }
+]'
+```
+
+## Quick Reference: Performance Monitoring
+
+### Essential Commands
+
+```bash
+# Check Prometheus targets
+curl http://localhost:9090/api/v1/targets | jq .
+
+# Query current metrics
+curl -s 'http://localhost:9090/api/v1/query?query=up' | jq .
+
+# Check alert status
+curl http://localhost:9090/api/v1/alerts | jq .
+
+# View recent logs
+docker-compose logs --tail=100 backend | jq -r 'select(.level=="error")'
+
+# Test alert delivery
+./monitoring/test-alerts.sh
+
+# Run performance benchmarks
+docker-compose exec backend pytest tests/performance/ --benchmark-only
+
+# Validate monitoring overhead
+./monitoring/validate-monitoring-overhead.sh
+```
+
+### Key Dashboards
+
+| Dashboard | URL | Purpose |
+|-----------|-----|---------|
+| **Application Overview** | http://localhost:3000/d/application | System health overview |
+| **API Performance** | http://localhost:3000/d/api-performance | Endpoint metrics |
+| **Database** | http://localhost:3000/d/database | PostgreSQL performance |
+| **Cache** | http://localhost:3000/d/cache | Redis hit rate, memory |
+| **Celery** | http://localhost:3000/d/celery | Task processing metrics |
+
+### Performance Checklist
+
+- [ ] Prometheus scraping all targets (check `/targets`)
+- [ ] Grafana dashboards displaying data
+- [ ] AlertManager routing alerts correctly
+- [ ] Monitoring overhead < 5%
+- [ ] Benchmark baseline established
+- [ ] Critical alerts configured and tested
+- [ ] Log aggregation working
+- [ ] Correlation IDs present in logs
+- [ ] Performance targets documented
+
+## Related Documentation
+
+- [monitoring/README.md](monitoring/README.md) - Complete monitoring setup guide
+- [monitoring/PERFORMANCE_QUICK_REFERENCE.md](monitoring/PERFORMANCE_QUICK_REFERENCE.md) - Quick validation commands
+- [backend/tests/performance/](backend/tests/performance/) - Performance benchmark suite
+
+---
+
 ## Troubleshooting Performance Issues
 
 Comprehensive guide to diagnosing and resolving common performance bottlenecks in the AgentHR platform.
