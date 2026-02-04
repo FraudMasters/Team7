@@ -155,7 +155,9 @@
             "command": "/bin/grep -c 'github\\.' .github/workflows/lighthouse.yml || echo '0'",
             "expected": "0 (no github. references found)"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Replaced secrets.GITHUB_TOKEN with secrets.GITEA_TOKEN in lighthouse.yml (line 43). Environment variable name LHCI_GITHUB_APP_TOKEN unchanged as it's required by the lighthouse-ci-action. Verification confirms 0 github. references remain.",
+          "updated_at": "2026-02-04T21:20:00.000000+00:00"
         },
         {
           "id": "subtask-3-4",
@@ -171,7 +173,9 @@
             "command": "/bin/grep -c 'github\\.' .github/workflows/performance-tests.yml || echo '0'",
             "expected": "0 (no github. references found)"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Verified performance-tests.yml has no github.* context references (count = 0). File was already in correct state with no GITHUB_TOKEN or other github.* references. No changes needed to workflow file.",
+          "updated_at": "2026-02-04T21:25:00.000000+00:00"
         },
         {
           "id": "subtask-3-5",
@@ -376,6 +380,6 @@
   "qa_signoff": null,
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-02-04T21:15:00.000000Z",
+  "updated_at": "2026-02-04T18:12:26.364Z",
   "last_updated": "2026-02-04T21:15:00.000000+00:00"
 }
