@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
+from services.graphiti_service import get_graphiti_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -43,10 +44,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     settings.models_cache_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Models cache directory: {settings.models_cache_path}")
 
+    # Initialize Graphiti service
+    try:
+        graphiti_service = get_graphiti_service()
+        await graphiti_service.initialize()
+        logger.info("Graphiti service initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Graphiti service: {e}")
+        logger.warning("Graph features will be unavailable")
+
     yield
 
     # Shutdown
     logger.info("Shutting down Resume Analysis API")
+
+    # Close Graphiti service
+    try:
+        graphiti_service = get_graphiti_service()
+        await graphiti_service.close()
+        logger.info("Graphiti service closed successfully")
+    except Exception as e:
+        logger.error(f"Error closing Graphiti service: {e}")
 
 
 # Create FastAPI application
