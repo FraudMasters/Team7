@@ -434,6 +434,43 @@ class EnhancedSkillMatcher:
 
         return None
 
+    def _create_match_result(
+        self,
+        matched: bool,
+        confidence: float,
+        matched_as: Optional[str],
+        match_type: str
+    ) -> Dict[str, Any]:
+        """
+        Create a standardized match result dictionary.
+
+        Helper method to ensure consistent result dictionary structure
+        across all matching strategies.
+
+        Args:
+            matched: Whether a match was found
+            confidence: Confidence score (0.0-1.0)
+            matched_as: The actual skill name from resume that matched
+            match_type: Type of match ('direct', 'context', 'synonym', 'fuzzy', 'compound', 'language_hierarchy', 'none')
+
+        Returns:
+            Dictionary with standardized match result structure
+
+        Example:
+            >>> matcher = EnhancedSkillMatcher()
+            >>> result = matcher._create_match_result(True, 1.0, 'Python', 'direct')
+            >>> result['matched']
+            True
+            >>> result['confidence']
+            1.0
+        """
+        return {
+            "matched": matched,
+            "confidence": confidence,
+            "matched_as": matched_as,
+            "match_type": match_type,
+        }
+
     def _split_compound_skill(self, skill: str) -> List[str]:
         """
         Split compound skills like "C/C++", "Python, Django", "SQL & NoSQL"
@@ -671,15 +708,8 @@ class EnhancedSkillMatcher:
             >>> result['confidence']
             0.95
         """
-        result: Dict[str, Any] = {
-            "matched": False,
-            "confidence": 0.0,
-            "matched_as": None,
-            "match_type": "none",
-        }
-
         if not resume_skills or not required_skill:
-            return result
+            return self._create_match_result(False, 0.0, None, "none")
 
         # Load synonyms if not already loaded
         synonyms_map = self.load_synonyms()
@@ -690,77 +720,41 @@ class EnhancedSkillMatcher:
         direct_match = self._try_direct_match(resume_skills, normalized_required)
         if direct_match:
             matched_skill, confidence, match_type = direct_match
-            result.update({
-                "matched": True,
-                "confidence": confidence,
-                "matched_as": matched_skill,
-                "match_type": match_type
-            })
-            return result
+            return self._create_match_result(True, confidence, matched_skill, match_type)
 
         # Strategy 1.5: Compound skill match (e.g., "C/C++" contains "C")
         compound_match = self._try_compound_match(resume_skills, normalized_required)
         if compound_match:
             matched_skill, confidence, match_type = compound_match
-            result.update({
-                "matched": True,
-                "confidence": confidence,
-                "matched_as": matched_skill,
-                "match_type": match_type
-            })
-            return result
+            return self._create_match_result(True, confidence, matched_skill, match_type)
 
         # Strategy 1.75: Language hierarchy match (e.g., C++ implies C)
         hierarchy_match = self._try_language_hierarchy_match(resume_skills, normalized_required)
         if hierarchy_match:
             matched_skill, confidence, match_type = hierarchy_match
-            result.update({
-                "matched": True,
-                "confidence": confidence,
-                "matched_as": matched_skill,
-                "match_type": match_type
-            })
-            return result
+            return self._create_match_result(True, confidence, matched_skill, match_type)
 
         # Strategy 2: Context-aware match
         context_match = self._try_context_match(resume_skills, normalized_required, context)
         if context_match:
             matched_skill, confidence, match_type = context_match
-            result.update({
-                "matched": True,
-                "confidence": confidence,
-                "matched_as": matched_skill,
-                "match_type": match_type
-            })
-            return result
+            return self._create_match_result(True, confidence, matched_skill, match_type)
 
         # Strategy 3: Synonym match
         synonym_match = self._try_synonym_match(resume_skills, normalized_required, synonyms_map)
         if synonym_match:
             matched_skill, confidence, match_type = synonym_match
-            result.update({
-                "matched": True,
-                "confidence": confidence,
-                "matched_as": matched_skill,
-                "match_type": match_type
-            })
-            return result
+            return self._create_match_result(True, confidence, matched_skill, match_type)
 
         # Strategy 4: Fuzzy match
         if use_fuzzy:
             fuzzy_match = self._try_fuzzy_match(resume_skills, required_skill)
             if fuzzy_match:
                 matched_skill, confidence, match_type = fuzzy_match
-                result.update({
-                    "matched": True,
-                    "confidence": confidence,
-                    "matched_as": matched_skill,
-                    "match_type": match_type
-                })
-                return result
+                return self._create_match_result(True, confidence, matched_skill, match_type)
 
         # No match found
-        return result
+        return self._create_match_result(False, 0.0, None, "none")
 
     def match_multiple(
         self,
