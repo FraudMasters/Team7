@@ -4648,4 +4648,542 @@ However, consider that all feedback—even corrections—helps the system learn.
 
 ### What's Next?
 
-Now that you understand how to provide feedback that makes AgentHR smarter, you're ready to dive into the data. In the next section, we'll cover the [Analytics Dashboard](#analytics-dashboard)—how to use metrics and insights to continuously improve your hiring process and make better, data-driven decisions.
+Now that you understand how to provide feedback that makes AgentHR smarter, you're ready to dive into the data. In the next section, we'll cover the [Analytics Dashboard](#8-analytics-dashboard)—how to use metrics and insights to continuously improve your hiring process and make better, data-driven decisions.
+
+---
+
+## 8. Analytics Dashboard
+
+### Why Analytics Matter for Hiring
+
+Data-driven hiring isn't just a buzzword—it's a competitive advantage. The Analytics Dashboard gives you **visibility into what's working** and **what isn't** in your recruitment process, helping you:
+
+✅ **Make informed decisions** based on actual data, not gut feelings
+
+✅ **Identify bottlenecks** that slow down your hiring
+
+✅ **Track your team's performance** over time
+
+✅ **Prove the value** of your recruiting efforts to management
+
+✅ **Continuously improve** by seeing the impact of changes you make
+
+#### The ROI of Analytics
+
+Consider this example:
+
+> **Your company** typically takes 45 days to hire a new software engineer. After reviewing analytics, you discover that candidates from employee referrals are hired in 28 days on average (37% faster), stay longer, and perform better.
+>
+> **Action:** You launch an employee referral program and increase referral bonuses.
+>
+> **Result:** Within 3 months, your average time-to-hire drops to 32 days, saving 13 days per hire. For 10 hires per year, that's 130 days of productivity gained—and positions filled faster.
+
+#### What You'll Find in the Analytics Dashboard
+
+The dashboard is organized into **four main sections**:
+
+| Section | What It Shows | Why It Matters |
+|---------|---------------|----------------|
+| **Key Metrics** | High-level overview of your hiring health | Quick pulse check on your recruiting performance |
+| **Recruitment Funnel** | How candidates flow through each stage | Identify where you're losing good candidates |
+| **Performance Metrics** | Detailed stats like time-to-hire, source effectiveness | Understand efficiency and find opportunities |
+| **Skill Demand** | Most requested skills across your job postings | Align your sourcing and training strategies |
+
+---
+
+### Accessing the Analytics Dashboard
+
+#### How to Navigate to Analytics
+
+You can access the Analytics Dashboard from several places:
+
+**Option 1: From the Main Menu**
+
+```
+1. Click "Analytics" in the left sidebar
+2. The dashboard opens with the last 30 days of data by default
+```
+
+**Option 2: From the Recruiter Dashboard**
+
+```
+1. Go to your Recruiter Dashboard (home page)
+2. Click the "View Full Analytics" button in the "Quick Stats" section
+```
+
+**Option 3: From a Specific Vacancy**
+
+```
+1. Navigate to Vacancies → Select a vacancy
+2. Click the "Analytics" tab
+3. View analytics specific to that vacancy only
+```
+
+#### Setting Your Date Range
+
+By default, analytics show the **last 30 days**. You can adjust this to focus on different time periods:
+
+**Using Preset Ranges**
+
+```
+Top of dashboard → Click "Date Range" dropdown → Select preset:
+├── Last 7 days (for recent trends)
+├── Last 30 days (default - good balance)
+├── Last 90 days (quarterly view)
+├── This month (current month to date)
+├── Last month (previous full month)
+├── This quarter (current quarter to date)
+├── This year (year-to-date)
+└── Custom range (select specific dates)
+```
+
+**Using Custom Date Range**
+
+```
+1. Click "Date Range" dropdown
+2. Select "Custom Range"
+3. Choose start date and end date
+4. Click "Apply"
+```
+
+> **Tip:** Compare similar time periods (e.g., Q1 this year vs. Q1 last year) to see trends and seasonality.
+
+**What Date Range Should I Use?**
+
+| Goal | Recommended Range | Why |
+|------|-------------------|-----|
+| **Daily monitoring** | Last 7 days | See immediate impact of recent changes |
+| **Regular check-ins** | Last 30 days | Balanced view, smooths out daily fluctuations |
+| **Quarterly reviews** | Last 90 days or This quarter | Align with business reporting cycles |
+| **Year-over-year comparisons** | Same period last year | Identify growth trends and seasonal patterns |
+| **Full-year analysis** | This year or Last 12 months | Comprehensive view for strategic planning |
+
+---
+
+### Key Metrics Explained
+
+The **Key Metrics** section is your at-a-glance health check for recruiting. It displays three critical metrics on cards that update in real-time.
+
+#### Metric 1: Time-to-Hire
+
+**What It Measures:**
+
+Time-to-hire is the **number of days** from when a candidate applies to when they accept your job offer. It's a measure of how efficiently you move candidates through your pipeline.
+
+**What You'll See:**
+
+```
+┌─────────────────────────────────┐
+│  ⏱️  Time-to-Hire                │
+│                                │
+│  Average: 32.5d                 │
+│  Median: 28d                    │
+│  Range: 14d - 65d               │
+│  25th-75th %: 22d - 45d         │
+└─────────────────────────────────┘
+```
+
+**Understanding the Numbers:**
+
+| Statistic | What It Means | How to Use It |
+|-----------|---------------|---------------|
+| **Average** | The mean time across all hires | Overall efficiency benchmark |
+| **Median** | The middle value (half faster, half slower) | More reliable if you have outliers (e.g., one 90-day hire) |
+| **Range** | Fastest and slowest hire | Shows your best-case and worst-case scenarios |
+| **25th-75th %** | The middle 50% of hires | "Normal" hiring time for most roles |
+
+**What's a Good Time-to-Hire?**
+
+| Industry | Average Time-to-Hire | Good | Needs Improvement |
+|----------|---------------------|------|-------------------|
+| **Technology** | 30-45 days | <30 days | >50 days |
+| **Healthcare** | 40-60 days | <45 days | >70 days |
+| **Retail/Hospitality** | 15-30 days | <20 days | >40 days |
+| **Finance** | 35-50 days | <40 days | >60 days |
+| **General SMB** | 30-45 days | <35 days | >55 days |
+
+> **Note:** These are general benchmarks. Your "good" time depends on role complexity, location, and company size.
+
+**Why Time-to-Hire Matters:**
+
+Longer time-to-hire means:
+- **Higher costs** (positions stay open longer, productivity lost)
+- **Losing top candidates** to faster competitors
+- **Team burnout** from overwork while roles are unfilled
+- **Missed business opportunities** due to lack of capacity
+
+**Improving Your Time-to-Hire:**
+
+| If Your Time-to-Hire Is... | Likely Causes | Actions to Take |
+|----------------------------|---------------|-----------------|
+| **<20 days (very fast)** | - Rushing decisions<br>- Offering to first candidate<br>- Insufficient screening | - Ensure quality isn't suffering<br>- Check new hire retention rates<br>- Verify candidates are properly vetted |
+| **20-40 days (healthy)** | - Balanced process<br>- Good communication<br>- Efficient scheduling | - Maintain current practices<br>- Document what's working<br>- Share with team |
+| **40-60 days (slow)** | - Too many interview rounds<br>- Slow decision-making<br>- Scheduling delays | - Reduce interview stages (aim for 3-4 max)<br>- Set decision deadlines<br>- Use scheduling tools |
+| **>60 days (very slow)** | - Unclear requirements<br>- Approval bottlenecks<br>- Low offer acceptance rate | - Clarify job requirements upfront<br>- Empower hiring managers to decide<br>- Improve offer process and speed |
+
+---
+
+#### Metric 2: Resumes Processed
+
+**What It Measures:**
+
+The total number of resumes AgentHR has **analyzed and extracted data from** during your selected time period. This shows your recruiting activity volume.
+
+**What You'll See:**
+
+```
+┌─────────────────────────────────┐
+│  📄 Resumes Processed            │
+│                                │
+│  Total: 1,247                   │
+│  This Month: 423                │
+│  This Week: 87                  │
+│  Avg/Day: 14.1                  │
+└─────────────────────────────────┘
+```
+
+**Understanding the Numbers:**
+
+| Statistic | What It Means | How to Use It |
+|-----------|---------------|---------------|
+| **Total** | All resumes processed in date range | Overall activity volume |
+| **This Month** | Resumes processed this calendar month | Track monthly progress toward goals |
+| **This Week** | Resumes processed this week (Mon-Sun) | Short-term activity monitoring |
+| **Avg/Day** | Total days ÷ Total resumes | Consistency of workflow |
+
+**Why This Metric Matters:**
+
+More resumes processed = more candidates in your pipeline = better chances of finding great hires. But **quality matters more than quantity**—processing 1,000 unqualified resumes isn't better than processing 50 highly-qualified ones.
+
+**Using Resume Processing Data:**
+
+| Scenario | What to Check | Action |
+|----------|---------------|--------|
+| **Spikes in processing** | Sudden increase in resumes | - Did you post a new job?<br>- Is a referral campaign running?<br>- Prepare for increased screening workload |
+| **Drops in processing** | Sudden decrease in resumes | - Did a job posting expire?<br>- Is sourcing paused?<br>- Check if applications are stuck |
+| **Consistent daily rate** | Stable inflow of candidates | - Good sign of healthy pipeline<br>- Plan workload based on average |
+| **Zero for several days** | No new resumes | - Urgent: Check all job postings<br>- Verify application system working<br>- Restart sourcing efforts |
+
+**Benchmark: Resumes Per Hire**
+
+| Role Level | Resumes Processed Per Hire (Typical) |
+|------------|--------------------------------------|
+| **Entry-level** | 50-100 resumes per hire |
+| **Mid-level** | 100-200 resumes per hire |
+| **Senior-level** | 200-500 resumes per hire |
+| **Executive** | 500+ resumes per hire |
+
+> **Example:** If you're hiring mid-level roles and process 150 resumes per month, you can expect ~1 hire per month (150 ÷ 150 = 1). Want 3 hires per month? You need ~450 resumes per month.
+
+---
+
+#### Metric 3: Match Rates
+
+**What It Measures:**
+
+The **percentage of candidates** who match your job requirements at a "good" or "excellent" level (match score ≥60%). This tells you how well your job postings attract qualified candidates.
+
+**What You'll See:**
+
+```
+┌─────────────────────────────────┐
+│  📈 Match Rates                  │
+│                                │
+│  Overall: 34.2%                 │
+│  Avg Confidence: 71.5%          │
+│  High Confidence: 426           │
+│  Low Confidence: 821            │
+└─────────────────────────────────┘
+```
+
+**Understanding the Numbers:**
+
+| Statistic | What It Means | How to Use It |
+|-----------|---------------|---------------|
+| **Overall** | % of candidates with match score ≥60% | Quality of applicants for your roles |
+| **Avg Confidence** | Average match score across all candidates (0-100%) | Overall alignment between applicants and requirements |
+| **High Confidence** | Number of candidates with score ≥80% ("Excellent") | Your top-tier candidate pool |
+| **Low Confidence** | Number of candidates with score <60% ("Maybe" or "Poor") | Candidates unlikely to be a good fit |
+
+**What's a Good Match Rate?**
+
+| Match Rate | Interpretation | Action |
+|------------|----------------|--------|
+| **<20%** | Poor - job posting not attracting qualified candidates | - Revise job requirements (too strict?)<br>- Improve job description (clearer?)<br>- Change sourcing channels |
+| **20-30%** | Below Average - room for improvement | - Analyze what qualified candidates have in common<br>- Adjust job posting keywords<br>- Target sourcing better |
+| **30-50%** | Good - healthy balance of quality and quantity | - Continue current approach<br>- Monitor for changes<br>- A/B test small improvements |
+| **>50%** | Excellent - strong candidate alignment | - Consider if requirements are too broad<br>- Verify quality matches scores<br>- Share success with team |
+
+**Why Match Rates Vary:**
+
+| Factor | Impact on Match Rate | Example |
+|--------|---------------------|---------|
+| **Job requirements specificity** | More specific = lower match rate (but higher quality) | "React + TypeScript + 5 years" = 25% match<br>"Web developer" = 60% match |
+| **Sourcing channel** | Targeted channels = higher match rate | LinkedIn (targeted) = 40% match<br>- General job board = 20% match |
+| **Location** | Remote-friendly = higher match rate | "Remote" = 50% match<br>"San Francisco only" = 25% match |
+| **Salary transparency** | Listed salary = higher match rate | Salary shown = 35% match<br>- No salary = 25% match |
+
+**Real-World Example: Improving Match Rates**
+
+```
+BEFORE:
+Job Title: "Senior Full Stack Developer"
+Requirements: 15+ specific technologies
+Match Rate: 18% (of 250 resumes)
+
+PROBLEM: Requirements too narrow, scaring away qualified candidates
+
+ACTION:
+- Reduced requirements to 5 "must-have" + 5 "nice-to-have"
+- Added salary range
+- Expanded location to "Remote or Hybrid"
+
+AFTER (3 months later):
+Requirements: 5 must-have skills clearly listed
+Match Rate: 42% (of 380 resumes)
+Quality of top 10 candidates: Higher (more real-world experience)
+
+RESULT: More applicants, better matches, 2 hires in 45 days vs. 0 hires in 90 days
+```
+
+---
+
+### Understanding Your Recruitment Funnel
+
+The **Recruitment Funnel** visualizes how candidates flow through each stage of your hiring process. It shows you **where candidates enter**, **where they drop off**, and **which stages have bottlenecks**.
+
+#### What the Funnel Shows
+
+```
+                    YOUR RECRUITMENT FUNNEL
+                    (Last 30 Days)
+
+    ┌─────────────────────────────────────────────────────┐
+    │                                                     │
+    │  📤 Resumes Uploaded     1,250  (100%)             │
+    │        │                                            │
+    │        ▼ (95% pass rate)                            │
+    │                                                     │
+    │  📄 Resumes Processed    1,188  (95%)              │
+    │        │                                            │
+    │        ▼ (68% pass rate)                            │
+    │                                                     │
+    │  👥 Candidates Matched    808   (65%)              │
+    │        │                                            │
+    │        ▼ (45% pass rate)                            │
+    │                                                     │
+    │  ⭐ Shortlisted           364   (29%)              │
+    │        │                                            │
+    │        ▼ (60% pass rate)                            │
+    │                                                     │
+    │  💬 Interviewed           218   (17%)              │
+    │        │                                            │
+    │        ▼ (40% pass rate)                            │
+    │                                                     │
+    │  🎉 Hired                 87    (7%)               │
+    │                                                     │
+    │  OVERALL HIRE RATE: 7%                             │
+    └─────────────────────────────────────────────────────┘
+```
+
+#### Funnel Stages Explained
+
+| Stage | What It Means | Where It Comes From |
+|-------|---------------|---------------------|
+| **Resumes Uploaded** | Total resumes added to AgentHR | Manual uploads, batch imports, candidate applications |
+| **Resumes Processed** | Successfully analyzed by AI | AgentHR extracts data, validates, indexes |
+| **Candidates Matched** | Matched to at least one vacancy (score ≥40%) | Automatic matching when resume and vacancy exist |
+| **Shortlisted** | Marked as "Good" or "Excellent" (score ≥60%) | Manual shortlist or auto-shortlist by score |
+| **Interviewed** | Moved to "Interview" stage on Kanban board | Recruiter action after screening |
+| **Hired** | Moved to "Hired" stage on Kanban board | Offer accepted and candidate hired |
+
+#### Conversion Rates: What's Normal?
+
+**Pass Rate** = Percentage of candidates who move from one stage to the next.
+
+**Overall Hire Rate** = Percentage of uploaded resumes that result in a hire.
+
+| Conversion Rate | Typical Range | Good | Needs Attention |
+|-----------------|---------------|------|-----------------|
+| **Upload → Processed** | 95-99% | >98% | <95% (check file formats, quality) |
+| **Processed → Matched** | 50-70% | >60% | <50% (job requirements too narrow?) |
+| **Matched → Shortlisted** | 30-50% | >40% | <30% (screening too strict?) |
+| **Shortlisted → Interviewed** | 50-70% | >60% | <50% (scheduling delays? too many shortlisted?) |
+| **Interviewed → Hired** | 30-50% | >40% | <30% (offer issues? candidate quality?) |
+| **Overall Hire Rate** | 5-15% | >10% | <5% (review entire funnel) |
+
+#### Analyzing Funnel Drop-Offs
+
+**Where Are You Losing Candidates?**
+
+**Problem: Huge drop from Processed → Matched (low match rate)**
+
+```
+Processed: 1,000
+Matched:   300    (30% - LOW!)
+
+ISSUE: Your job requirements don't match applicant qualifications
+
+CAUSES:
+- Job description too specific (15+ required skills)
+- Missing important keywords in job posting
+- Sourcing from wrong channels
+- Unrealistic requirements
+
+SOLUTIONS:
+- Reduce "must-have" skills to 3-5 maximum
+- Add "nice-to-have" skills section
+- Rewrite job description with clear language
+- Target different sourcing channels
+```
+
+**Problem: Huge drop from Interviewed → Hired**
+
+```
+Interviewed: 100
+Hired:        15    (15% - LOW!)
+
+ISSUE: Candidates aren't accepting offers or fail in interviews
+
+CAUSES:
+- Salary not competitive (candidates decline offers)
+- Job not as described (candidates withdraw)
+- Interview process too long (candidates accept other offers)
+
+SOLUTIONS:
+- Research market salaries and adjust compensation
+- Clarify role expectations earlier in process
+- Streamline interview process (max 3-4 rounds)
+- Survey candidates who declined offers for feedback
+```
+
+#### Funnel Health Checklist
+
+Use this checklist to diagnose funnel issues:
+
+```
+□ Upload → Processed: <95% pass rate?
+  □ Check resume file formats (use PDF/DOCX)
+  □ Verify resumes aren't scanned images
+
+□ Processed → Matched: <50% pass rate?
+  □ Review job requirements (are they realistic?)
+  □ Check job description for missing keywords
+
+□ Interviewed → Hired: <30% pass rate?
+  □ Research and adjust salary ranges
+  □ Streamline interview process
+```
+
+---
+
+### Using Data to Improve Hiring
+
+Collecting data is useless unless you **act on it**. Here's how to turn analytics insights into concrete improvements.
+
+#### The Analytics-Driven Improvement Cycle
+
+```
+1. MEASURE    → Review dashboard weekly/monthly
+2. IDENTIFY   → Pinpoint bottlenecks and opportunities
+3. HYPOTHESIZE→ "If we change X, Y will improve"
+4. ACT        → Implement the change
+5. TRACK      → Monitor metrics for 30-90 days
+6. EVALUATE   → Did it work? Yes = keep, No = try something else
+```
+
+#### Real-World Improvement Stories
+
+**Story 1: Cutting Time-to-Hire in Half**
+
+```
+PROBLEM: Software Engineer roles took 60+ days to fill
+
+ANALYTICS REVEALED:
+- Screening → Interview stage: 18 days (bottleneck!)
+- Scheduling emails took 3-4 days back-and-forth
+
+ACTION TAKEN:
+1. Implemented automated scheduling tool
+2. Reduced interview rounds from 5 to 3
+
+RESULT (90 days later):
+- Time-to-hire: 60d → 31d (48% reduction!)
+- Offer acceptance rate: 60% → 75%
+```
+
+**Story 2: Improving Hire Rate through Better Job Postings**
+
+```
+PROBLEM: Marketing Coordinator role received 300+ resumes,
+         but only 2% matched requirements
+
+ANALYTICS REVEALED:
+- Overall match rate: 18% (very low)
+- Job requirements: 20+ specific skills
+
+ACTION TAKEN:
+1. Reduced "required" skills from 20 to 5
+2. Added salary range
+
+RESULT (60 days later):
+- Match rate: 18% → 41% (127% improvement!)
+- Hires made: 2 in 45 days (vs. 0 in previous 90 days)
+```
+
+#### Quick Wins: Easy Improvements
+
+| Analytics Finding | Quick Win | Expected Impact |
+|-------------------|-----------|-----------------|
+| **Low match rate (<25%)** | Simplify job requirements to 5 must-haves | +10-20% match rate |
+| **Slow screening** | Use AI rankings to prioritize top 20% | -40% screening time |
+| **Low offer acceptance** | Research market rates, adjust salary | +15-30% acceptance |
+
+#### Setting Up Your Analytics Routine
+
+**Weekly (15 minutes):**
+```
+□ Check Key Metrics cards
+□ Review time-to-hire
+□ Scan funnel for unusual drop-offs
+```
+
+**Monthly (30-45 minutes):**
+```
+□ Review all metrics vs. previous month
+□ Analyze funnel by stage
+□ Compare source effectiveness
+```
+
+---
+
+### Analytics Dashboard FAQ
+
+**Q: How often should I check analytics?**
+
+**A:** It depends on your hiring volume:
+- **Low (1-2 hires/month):** Monthly
+- **Medium (3-10 hires/month):** Weekly
+- **High (10+ hires/month):** Weekly + deep dive monthly
+
+**Q: What's the single most important metric to watch?**
+
+**A:** **Time-to-hire** is the most critical metric because it directly impacts costs, candidate quality, and team morale.
+
+---
+
+### Analytics Dashboard Quick Reference
+
+| Task | How |
+|------|-----|
+| **View dashboard** | Click "Analytics" in left sidebar |
+| **Change date range** | Click "Date Range" dropdown → Select preset |
+| **Check time-to-hire** | Look at "Time-to-Hire" card in Key Metrics |
+| **Review funnel** | Scroll to "Recruitment Funnel" section |
+| **Generate report** | Click "Generate Report" button → Export as PDF |
+
+---
+
+### What's Next?
+
+Now that you know how to use the Analytics Dashboard to measure and improve your hiring process, you're ready to become a power user. In the next section, we'll cover [Advanced Search and Filtering](#9-advanced-search-and-filtering)—how to find exactly the right candidates with precision search queries and smart filters.
