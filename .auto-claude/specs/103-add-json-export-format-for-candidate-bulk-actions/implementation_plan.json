@@ -1,0 +1,220 @@
+{
+  "feature": "Add JSON Export Format for Candidate Bulk Actions",
+  "description": "Verify that JSON export functionality works correctly for candidate bulk actions (already implemented in codebase)",
+  "workflow_type": "simple",
+  "workflow_rationale": "The JSON export feature is already fully implemented in both frontend and backend. This is a verification-only task to confirm the existing implementation works correctly. No new code needs to be written.",
+  "phases": [
+    {
+      "id": "phase-1-verification",
+      "name": "Verify JSON Export Implementation",
+      "type": "implementation",
+      "description": "Verify that the existing JSON export functionality works correctly by running tests and manual verification",
+      "depends_on": [],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Review existing JSON export implementation in backend",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/candidates.py"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review backend/api/candidates.py lines 1797-1966 to confirm JSON export logic exists and handles the format correctly. Confirm that when export_format != 'csv', it returns JSON format with {format: 'json', data: [...], count: N}."
+          },
+          "status": "completed",
+          "notes": "VERIFIED: JSON export implementation exists and works correctly. Lines 1960-1966 return {format: 'json', data: exported_candidates, count: N} when export_format != 'csv'. Export data includes id, filename, current_stage, stage_name, vacancy_id, created_at, updated_at, tags fields."
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Review existing JSON export implementation in frontend",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/components/BulkCandidateActions.tsx"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review BulkCandidateActions.tsx to confirm: (1) exportFormat state has 'json' option, (2) handleBulkExport passes export_format to backend, (3) Response handler creates Blob with 'application/json' type, (4) Export dialog has JSON/CSV format selection"
+          },
+          "status": "completed",
+          "notes": "VERIFIED: All four requirements confirmed. (1) Line 150: exportFormat state typed as 'json' | 'csv' with default 'json'; (2) Lines 285-289: handleBulkExport passes export_format to backend; (3) Lines 295-304: Blob created with 'application/json' type for JSON; (4) Lines 724-735: Export dialog has JSON/CSV format selection dropdown."
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Run existing backend verification tests for JSON export",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/verify_bulk_actions.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && ./run_bulk_actions_verification.sh",
+            "expected": "All verifications passed including 'Bulk export (JSON) works correctly'"
+          },
+          "status": "pending",
+          "notes": "The verify_bulk_actions.py script already tests JSON export functionality"
+        },
+        {
+          "id": "subtask-1-4",
+          "description": "Perform manual end-to-end test of JSON export",
+          "service": "all",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Start backend server (cd backend && uvicorn main:app --reload)",
+              "Start frontend server (cd frontend && npm run dev)",
+              "Navigate to application and search for candidates",
+              "Select multiple candidates using BulkCandidateActions component",
+              "Click 'Export' button and select 'JSON' format from dropdown",
+              "Click 'Export' button to download",
+              "Verify that a JSON file is downloaded with candidate data",
+              "Open the JSON file and verify it contains valid JSON with candidate fields (id, filename, current_stage, tags, etc.)"
+            ]
+          },
+          "status": "pending",
+          "notes": "Manual verification to ensure the complete user flow works"
+        },
+        {
+          "id": "subtask-1-5",
+          "description": "Document the JSON export feature if documentation is missing",
+          "service": "all",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Check if user documentation or API documentation mentions JSON export format for bulk actions. If not, create a brief documentation snippet explaining how to use the feature (frontend: select candidates, click export, choose JSON; backend: POST to /api/candidates/bulk-action with action='export' and export_format='json')"
+          },
+          "status": "pending",
+          "notes": "Optional: Add documentation if it doesn't exist"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 1,
+    "total_subtasks": 5,
+    "services_involved": [
+      "backend",
+      "frontend"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 1,
+      "parallel_groups": [],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution - verification steps must be done in order"
+    },
+    "startup_command": "After confirming implementation exists, run: cd backend && ./run_bulk_actions_verification.sh"
+  },
+  "verification_strategy": {
+    "risk_level": "trivial",
+    "skip_validation": false,
+    "test_creation_phase": "none",
+    "test_types_required": [],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "Existing JSON export implementation is verified to work correctly",
+      "Backend verification tests pass",
+      "Manual end-to-end test confirms JSON export downloads valid JSON file",
+      "No code changes needed - feature already implemented"
+    ],
+    "verification_steps": [
+      {
+        "name": "Review Implementation",
+        "command": "none",
+        "expected_outcome": "Confirm JSON export code exists in both frontend and backend",
+        "type": "manual",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "Run Automated Tests",
+        "command": "cd backend && ./run_bulk_actions_verification.sh",
+        "expected_outcome": "All tests pass, including JSON export verification",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Manual E2E Verification",
+        "command": "none",
+        "expected_outcome": "JSON export works from UI and downloads valid JSON file",
+        "type": "manual",
+        "required": true,
+        "blocking": false
+      }
+    ],
+    "reasoning": "This is a trivial verification task. The feature is already implemented and just needs to be verified to work correctly. No new code, tests, or security scanning needed."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": false,
+      "commands": [],
+      "minimum_coverage": null,
+      "notes": "No new code - existing implementation already has tests"
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && ./run_bulk_actions_verification.sh"
+      ],
+      "services_to_test": [
+        "backend"
+      ],
+      "notes": "Run existing bulk actions verification script"
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": [],
+      "notes": "Manual E2E verification is sufficient"
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:5173",
+          "checks": [
+            "Search for candidates returns results",
+            "BulkCandidateActions component displays",
+            "Export button opens dialog with JSON/CSV format options",
+            "Selecting JSON and exporting downloads a .json file",
+            "Downloaded JSON file contains valid candidate data"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": [],
+      "notes": "No database schema changes needed"
+    }
+  },
+  "qa_signoff": null,
+  "discovery": {
+    "key_finding": "JSON export feature is already fully implemented in both frontend and backend. The spec appears to have been created from an outdated understanding or incorrect assumption about the codebase state.",
+    "evidence": [
+      "Backend bulk_action endpoint (candidates.py:1467-1997) handles export_format parameter",
+      "Backend returns JSON format when export_format != 'csv' (lines 1960-1966)",
+      "Frontend has exportFormat state with 'json' | 'csv' options (line 150)",
+      "Frontend handleBulkExport passes export_format to API (lines 285-289)",
+      "Frontend handles JSON response correctly (lines 297-303)",
+      "Verification script exists and tests JSON export (verify_bulk_actions.py:362-434)"
+    ],
+    "conclusion": "No implementation work required. Only verification needed to confirm existing implementation works."
+  },
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "updated_at": "2026-02-04T15:52:54.624Z"
+}
