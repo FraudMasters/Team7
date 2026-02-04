@@ -32,9 +32,8 @@ from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
-from .job_board_integration import JobBoardIntegration
-from .imported_resume import ImportedResume, ImportStatus
-from .import_log import ImportLog, ImportJobStatus
+from .notification import Notification, NotificationType
+from .notification_preference import NotificationPreference, DigestFrequency
 
 __all__ = [
     "Base",
@@ -77,9 +76,8 @@ __all__ = [
     "SavedSearch",
     "SearchAlert",
     "SearchHistory",
-    "JobBoardIntegration",
-    "ImportedResume",
-    "ImportStatus",
-    "ImportLog",
-    "ImportJobStatus",
+    "Notification",
+    "NotificationType",
+    "NotificationPreference",
+    "DigestFrequency",
 ]

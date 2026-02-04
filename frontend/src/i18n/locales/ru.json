@@ -395,7 +395,13 @@
     "forbidden": "Доступ запрещен.",
     "serverError": "Ошибка сервера. Пожалуйста, попробуйте позже.",
     "validationError": "Ошибка проверки. Пожалуйста, проверьте введенные данные.",
-    "timeout": "Время запроса истекло. Пожалуйста, попробуйте снова."
+    "timeout": "Время запроса истекло. Пожалуйста, попробуйте снова.",
+    "linkedin": {
+      "authFailed": "Ошибка аутентификации LinkedIn. Пожалуйста, попробуйте снова.",
+      "accessDenied": "Доступ запрещен. Пожалуйста, авторизуйте приложение для использования функций LinkedIn.",
+      "networkError": "Ошибка сети. Пожалуйста, проверьте подключение и попробуйте снова.",
+      "urlGenerationFailed": "Не удалось создать URL авторизации LinkedIn. Пожалуйста, попробуйте снова."
+    }
   },
   "validation": {
     "required": "{{field}} обязательно для заполнения",
@@ -732,6 +738,35 @@
     "relevance": "Релевантность",
     "quality": "Качество",
     "viewResource": "Открыть"
+  },
+  "linkedin": {
+    "title": "Интеграция с LinkedIn",
+    "auth": {
+      "connect": "Подключить LinkedIn",
+      "connecting": "Подключение...",
+      "success": "Успешно подключено к LinkedIn!",
+      "helpText": "Вы будете перенаправлены на LinkedIn для авторизации доступа к вашему профилю.",
+      "learnMore": "Узнать больше"
+    },
+    "disconnect": "Отключить",
+    "import": {
+      "title": "Импорт профиля LinkedIn",
+      "helpText": "Введите URL профиля LinkedIn для импорта информации о кандидате в AgentHR.",
+      "urlLabel": "URL профиля LinkedIn",
+      "urlHelper": "Вставьте полный URL профиля LinkedIn (например, https://www.linkedin.com/in/username)",
+      "importButton": "Импортировать профиль",
+      "importing": "Импорт профиля...",
+      "importAnother": "Импортировать еще один",
+      "success": "Профиль {{profileId}} успешно импортирован!",
+      "profileUrl": "URL профиля",
+      "progress": "{{percent}}% завершено",
+      "footerText": "Убедитесь, что профиль публичный или у вас есть авторизованный доступ для его просмотра.",
+      "errors": {
+        "urlRequired": "URL LinkedIn обязателен",
+        "invalidFormat": "Неверный формат URL LinkedIn. Используйте: https://www.linkedin.com/in/username",
+        "importFailed": "Не удалось импортировать профиль LinkedIn. Попробуйте еще раз."
+      }
+    }
   },
   "matchingWeights": {
     "title": "Веса алгоритма сопоставления",

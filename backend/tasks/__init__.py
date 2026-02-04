@@ -3,7 +3,7 @@ Celery tasks module for async processing.
 
 This module provides Celery task definitions for long-running operations
 like resume analysis, job matching, batch processing, ML learning tasks,
-report generation, automated backups, and audit log cleanup.
+report generation, automated backups, audit log cleanup, and email notifications.
 """
 from .analysis_task import analyze_resume_async, batch_analyze_resumes
 from .learning_tasks import (
@@ -27,10 +27,15 @@ from .backup_tasks import (
     backup_health_check_task,
 )
 from .audit_cleanup import cleanup_old_audit_logs_task
-from .import_tasks import (
-    poll_job_board,
-    process_imported_resume,
-    scheduled_poll_all_integrations,
+from .notification_tasks import (
+    send_email_notification,
+    send_bulk_email_notifications,
+)
+from .notification_digest import (
+    send_hourly_notification_digest,
+    send_daily_notification_digest,
+    send_weekly_notification_digest,
+    send_notification_digest,
 )
 
 __all__ = [
@@ -51,7 +56,10 @@ __all__ = [
     "sync_all_to_s3_task",
     "backup_health_check_task",
     "cleanup_old_audit_logs_task",
-    "poll_job_board",
-    "process_imported_resume",
-    "scheduled_poll_all_integrations",
+    "send_email_notification",
+    "send_bulk_email_notifications",
+    "send_hourly_notification_digest",
+    "send_daily_notification_digest",
+    "send_weekly_notification_digest",
+    "send_notification_digest",
 ]

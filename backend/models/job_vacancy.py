@@ -3,7 +3,7 @@ JobVacancy model for storing job vacancy descriptions
 """
 from typing import Optional
 
-from sqlalchemy import JSON, String, Text
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -15,6 +15,7 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
 
     Attributes:
         id: UUID primary key
+        organization_id: Organization that owns this job vacancy
         title: Job title
         description: Full job description
         required_skills: JSON array of required skills
@@ -30,6 +31,9 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "job_vacancies"
 
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     required_skills: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
@@ -61,4 +65,4 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<JobVacancy(id={self.id}, title={self.title})>"
+        return f"<JobVacancy(id={self.id}, org={self.organization_id}, title={self.title})>"

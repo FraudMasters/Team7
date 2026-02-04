@@ -41,6 +41,8 @@ import {
   Compare as CompareIcon,
   ViewColumn as KanbanIcon,
   Upload as UploadIcon,
+  Payments as PaymentsIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 280;
@@ -96,12 +98,18 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'Salary & Compensation',
+    items: [
+      { label: 'Salary Benchmarking', path: '/recruiter/salary-benchmarking', icon: <PaymentsIcon /> },
+      { label: 'Compensation Analysis', path: '/recruiter/compensation-analysis', icon: <TrendingUpIcon /> },
+    ],
+  },
+  {
     title: 'Settings',
     items: [
       { label: 'Weights', path: '/recruiter/weights', icon: <TuneIcon /> },
       { label: 'Backups', path: '/recruiter/backups', icon: <BackupIcon /> },
       { label: 'Workflow', path: '/recruiter/workflow', icon: <TimelineIcon /> },
-      { label: 'Job Integrations', path: '/recruiter/integrations', icon: <CloudUploadIcon /> },
     ],
   },
 ];
@@ -115,6 +123,7 @@ const RecruiterLayout: React.FC = () => {
     Resumes: false,
     Search: false,
     Analytics: false,
+    'Salary & Compensation': false,
     Settings: false,
   });
 

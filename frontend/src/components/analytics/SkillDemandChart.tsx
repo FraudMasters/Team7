@@ -53,6 +53,8 @@ interface SkillDemandChartProps {
   endDate?: string;
   /** Maximum number of skills to display */
   limit?: number;
+  /** Optional refresh key to trigger manual refresh */
+  refreshKey?: number;
 }
 
 /**
@@ -79,6 +81,7 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
   startDate,
   endDate,
   limit = 20,
+  refreshKey,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +113,7 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
 
   useEffect(() => {
     fetchSkillDemand();
-  }, [apiUrl, startDate, endDate, limit]);
+  }, [apiUrl, startDate, endDate, limit, refreshKey]);
 
   /**
    * Export skill demand data as CSV

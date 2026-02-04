@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Typography, Box, Tabs, Tab, Container } from '@mui/material';
+import { Typography, Box, Tabs, Tab, Container, Button } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Event as EventIcon } from '@mui/icons-material';
 import AnalysisResults from '@components/AnalysisResults';
 import VacancyMatchResults from '@components/VacancyMatchResults';
+import { InterviewScheduler } from '@components/InterviewScheduler';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { ErrorState } from '../../components/ui/ErrorState';
 
@@ -21,6 +23,7 @@ const CandidateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
 
   if (!id) {
     return (
@@ -56,11 +59,37 @@ const CandidateDetailPage: React.FC = () => {
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="candidate details tabs">
           <Tab label="Analysis" />
           <Tab label="Vacancy Matches" />
+          <Tab label="Schedule Interview" />
         </Tabs>
       </Box>
 
       {activeTab === 0 && <AnalysisResults resumeId={id} />}
       {activeTab === 1 && <VacancyMatchResults resumeId={id} />}
+      {activeTab === 2 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+          <Typography variant="h6" gutterBottom>
+            Schedule an Interview
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Select date, time, and interviewers to schedule an interview for this candidate
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<EventIcon />}
+            onClick={() => setSchedulerOpen(true)}
+            size="large"
+          >
+            Open Interview Scheduler
+          </Button>
+          {schedulerOpen && (
+            <InterviewScheduler
+              candidateId={id}
+              onCancel={() => setSchedulerOpen(false)}
+              onSuccess={() => setSchedulerOpen(false)}
+            />
+          )}
+        </Box>
+      )}
     </Container>
     </PageTransition>
   );

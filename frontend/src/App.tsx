@@ -46,7 +46,11 @@ import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
-import { JobIntegrationsPage } from './pages/recruiter/JobIntegrationsPage';
+
+// LinkedIn Integration Pages
+import LinkedInAuthPage from './pages/recruiter/LinkedInAuthPage';
+import LinkedInImportPage from './pages/recruiter/LinkedInImportPage';
+import LinkedInSearchPage from './pages/recruiter/LinkedInSearchPage';
 
 /**
  * Main App Component
@@ -108,7 +112,11 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
-          <Route path="integrations" element={<JobIntegrationsPage />} />
+          <Route path="linkedin">
+            <Route path="auth" element={<LinkedInAuthPage />} />
+            <Route path="import" element={<LinkedInImportPage />} />
+            <Route path="search" element={<LinkedInSearchPage />} />
+          </Route>
         </Route>
 
         {/* Catch-all route - redirect to landing */}

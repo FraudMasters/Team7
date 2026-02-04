@@ -49,6 +49,14 @@ class AuditActionType(str, enum.Enum):
     DATA_EXPORTED = "data_exported"
     REPORT_GENERATED = "report_generated"
 
+    # Integration operations
+    INTEGRATION_CREATED = "integration_created"
+    INTEGRATION_UPDATED = "integration_updated"
+    INTEGRATION_DELETED = "integration_deleted"
+    INTEGRATION_VIEWED = "integration_viewed"
+    INTEGRATION_TESTED = "integration_tested"
+    INTEGRATION_SYNCED = "integration_synced"
+
     # System operations
     SETTINGS_UPDATED = "settings_updated"
     BACKUP_CREATED = "backup_created"

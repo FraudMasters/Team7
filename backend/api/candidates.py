@@ -31,10 +31,38 @@ from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
+from models.recruiter import Recruiter
+from models import NotificationType
+
+from services.notification_service import get_notification_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _get_active_recruiters_to_notify(db: AsyncSession) -> List[UUID]:
+    """
+    Get all active recruiters to notify about candidate events.
+
+    This is a simple implementation that notifies all active recruiters.
+    In the future, this could be refined to notify only recruiters
+    in a specific organization or based on other criteria.
+
+    Args:
+        db: Database session
+
+    Returns:
+        List of recruiter UUIDs who should receive notifications
+    """
+    try:
+        query = select(Recruiter.id).where(Recruiter.is_active == True)
+        result = await db.execute(query)
+        recruiter_ids = result.scalars().all()
+        return list(recruiter_ids)
+    except Exception as e:
+        logger.error(f"Error getting active recruiters: {e}", exc_info=True)
+        return []
 
 
 # Response Models
@@ -806,6 +834,28 @@ async def move_candidate(
         db.add(analytics_event)
         await db.commit()
 
+        # Create notifications for all active recruiters
+        try:
+            notification_service = get_notification_service()
+            recruiter_ids = await _get_active_recruiters_to_notify(db)
+
+            for recipient_id in recruiter_ids:
+                await notification_service.create_notification(
+                    db=db,
+                    recipient_id=recipient_id,
+                    notification_type=NotificationType.CANDIDATE_STAGE_CHANGED,
+                    title=f"Candidate Moved to {new_stage_name}",
+                    message=f"Candidate '{resume.filename}' has been moved from '{previous_stage}' to '{new_stage_name}'",
+                    candidate_id=candidate_uuid,
+                    vacancy_id=vacancy_uuid,
+                    action_url=f"/candidates/{candidate_id}",
+                    check_preferences=True,
+                    aggregate=False,
+                )
+        except Exception as e:
+            # Don't fail the request if notification creation fails
+            logger.error(f"Error creating notification for stage change: {e}", exc_info=True)
+
         logger.info(
             f"Candidate {candidate_id} moved from {previous_stage} to {new_stage_name}"
         )
@@ -1007,6 +1057,28 @@ async def bulk_move_candidates(
                 )
                 db.add(analytics_event)
                 await db.commit()
+
+                # Create notifications for all active recruiters
+                try:
+                    notification_service = get_notification_service()
+                    recruiter_ids = await _get_active_recruiters_to_notify(db)
+
+                    for recipient_id in recruiter_ids:
+                        await notification_service.create_notification(
+                            db=db,
+                            recipient_id=recipient_id,
+                            notification_type=NotificationType.CANDIDATE_STAGE_CHANGED,
+                            title=f"Candidate Moved to {new_stage_name}",
+                            message=f"Candidate '{resume.filename}' has been moved from '{previous_stage}' to '{new_stage_name}'",
+                            candidate_id=candidate_uuid,
+                            vacancy_id=vacancy_uuid,
+                            action_url=f"/candidates/{candidate_id}",
+                            check_preferences=True,
+                            aggregate=True,
+                        )
+                except Exception as e:
+                    # Don't fail the request if notification creation fails
+                    logger.error(f"Error creating notification for bulk stage change: {e}", exc_info=True)
 
                 results.append({
                     "resume_id": resume_id,
@@ -1619,6 +1691,27 @@ async def bulk_action(
                     db.add(activity)
                     await db.commit()
 
+                    # Create notifications for all active recruiters
+                    try:
+                        notification_service = get_notification_service()
+                        recruiter_ids = await _get_active_recruiters_to_notify(db)
+
+                        for recipient_id in recruiter_ids:
+                            await notification_service.create_notification(
+                                db=db,
+                                recipient_id=recipient_id,
+                                notification_type=NotificationType.CANDIDATE_TAG_ADDED,
+                                title=f"Tag Added to Candidate",
+                                message=f"Tag '{bulk_data.tag_name}' was added to candidate '{resume.filename}'",
+                                candidate_id=candidate_uuid,
+                                action_url=f"/candidates/{candidate_id}",
+                                check_preferences=True,
+                                aggregate=True,
+                            )
+                    except Exception as e:
+                        # Don't fail the request if notification creation fails
+                        logger.error(f"Error creating notification for tag addition: {e}", exc_info=True)
+
                     results.append({
                         "resume_id": resume_id,
                         "success": True,
@@ -1769,6 +1862,28 @@ async def bulk_action(
                     )
                     db.add(analytics_event)
                     await db.commit()
+
+                    # Create notifications for all active recruiters
+                    try:
+                        notification_service = get_notification_service()
+                        recruiter_ids = await _get_active_recruiters_to_notify(db)
+
+                        for recipient_id in recruiter_ids:
+                            await notification_service.create_notification(
+                                db=db,
+                                recipient_id=recipient_id,
+                                notification_type=NotificationType.CANDIDATE_STAGE_CHANGED,
+                                title=f"Candidate Added to Pipeline",
+                                message=f"Candidate '{resume.filename}' has been added to '{new_stage_name}' stage",
+                                candidate_id=candidate_uuid,
+                                vacancy_id=vacancy_uuid,
+                                action_url=f"/candidates/{candidate_id}",
+                                check_preferences=True,
+                                aggregate=True,
+                            )
+                    except Exception as e:
+                        # Don't fail the request if notification creation fails
+                        logger.error(f"Error creating notification for add to pipeline: {e}", exc_info=True)
 
                     results.append({
                         "resume_id": resume_id,

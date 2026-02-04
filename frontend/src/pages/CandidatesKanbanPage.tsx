@@ -41,6 +41,7 @@ import {
   Label as LabelIcon,
   DeleteSweep as DeleteSweepIcon,
   DragIndicator as DragIndicatorIcon,
+  Business as BusinessIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +51,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import VirtualKanbanBoard from '../components/VirtualKanbanBoard';
 import ErrorMessage, { CandidateLoadFailedError, CandidateMoveFailedError, BatchActionFailedError } from '../components/ErrorMessage';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { orgScopedFetch } from '@/api/organizationScopedFetch';
 
 interface Candidate {
   id: string;
@@ -87,6 +90,7 @@ const CandidatesKanbanPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { currentOrganization } = useOrganizationContext();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'lg'));
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
@@ -322,14 +326,15 @@ const CandidatesKanbanPage: React.FC = () => {
 
   useEffect(() => {
     fetchCandidates();
-  }, []);
+  }, [currentOrganization]);
 
   const fetchCandidates = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/resumes/?limit=100');
+      // Use organization-scoped fetch to include X-Organization-ID header
+      const response = await orgScopedFetch('/api/candidates/', undefined, !currentOrganization);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -766,6 +771,51 @@ const CandidatesKanbanPage: React.FC = () => {
   };
 
   const selectedCount = selectedCandidateIds.size;
+
+  // Show message if no organization is selected
+  if (!currentOrganization) {
+    return (
+      <ErrorBoundary
+        onError={(error, errorInfo) => {
+          console.error('CandidatesKanban error:', error, errorInfo);
+        }}
+      >
+        <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
+          <Paper
+            sx={{
+              p: 6,
+              textAlign: 'center',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <BusinessIcon
+              sx={{
+                fontSize: 64,
+                color: 'text.disabled',
+                mb: 2,
+              }}
+            />
+            <Typography variant="h5" gutterBottom fontWeight={600}>
+              No Organization Selected
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 500, mx: 'auto' }}>
+              Please select an organization from the switcher in the header to view and manage candidates.
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<BusinessIcon />}
+              onClick={() => navigate('/organizations')}
+              sx={{ mt: 2 }}
+            >
+              Manage Organizations
+            </Button>
+          </Paper>
+        </Box>
+      </ErrorBoundary>
+    );
+  }
 
   if (loading) {
     return (

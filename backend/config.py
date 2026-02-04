@@ -34,9 +34,10 @@ class Settings(BaseSettings):
         celery_result_backend: Celery result backend URL
         backup_retention_days: Default backup retention period in days
         audit_log_retention_days: Default audit log retention period in days
-        indeed_api_key: Indeed API key for job aggregation
-        linkedin_api_key: LinkedIn API key for job aggregation
-        glassdoor_api_key: Glassdoor API key for job aggregation
+        linkedin_client_id: LinkedIn OAuth 2.0 client ID
+        linkedin_client_secret: LinkedIn OAuth 2.0 client secret
+        linkedin_redirect_uri: LinkedIn OAuth 2.0 redirect URI
+        linkedin_api_version: LinkedIn API version
     """
 
     model_config = SettingsConfigDict(
@@ -202,21 +203,31 @@ class Settings(BaseSettings):
     )
 
     # ==============================================
-    # Job Board API Configuration
+    # LinkedIn Integration Configuration
     # ==============================================
-    indeed_api_key: Optional[str] = Field(
+    linkedin_client_id: Optional[str] = Field(
         default=None,
-        description="Indeed API key for job aggregation",
+        description="LinkedIn OAuth 2.0 client ID",
     )
 
-    linkedin_api_key: Optional[str] = Field(
+    linkedin_client_secret: Optional[str] = Field(
         default=None,
-        description="LinkedIn API key for job aggregation",
+        description="LinkedIn OAuth 2.0 client secret",
     )
 
-    glassdoor_api_key: Optional[str] = Field(
+    linkedin_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/linkedin/callback",
+        description="LinkedIn OAuth 2.0 redirect URI",
+    )
+
+    linkedin_api_version: str = Field(
+        default="v2",
+        description="LinkedIn API version",
+    )
+
+    linkedin_token_encryption_key: Optional[str] = Field(
         default=None,
-        description="Glassdoor API key for job aggregation",
+        description="Fernet encryption key for LinkedIn OAuth tokens (32 bytes, URL-safe base64-encoded)",
     )
 
     # ==============================================

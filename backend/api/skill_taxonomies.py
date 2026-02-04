@@ -21,6 +21,8 @@ from database import get_db
 from models.skill_taxonomy import SkillTaxonomy
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from middleware.auth import TokenData, get_current_token, require_any_role
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -84,6 +86,7 @@ class SkillTaxonomyListResponse(BaseModel):
 async def create_skill_taxonomies(
     request: SkillTaxonomyCreate,
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(require_any_role("Admin", "Recruiter")),
 ) -> JSONResponse:
     """
     Create skill taxonomy entries for an industry.
@@ -177,6 +180,7 @@ async def list_skill_taxonomies(
     industry: Optional[str] = Query(None, description="Filter by industry sector"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(get_current_token),
 ) -> JSONResponse:
     """
     List skill taxonomy entries with optional filters.
@@ -236,6 +240,7 @@ async def list_skill_taxonomies(
 async def get_skill_taxonomy(
     taxonomy_id: str,
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(get_current_token),
 ) -> JSONResponse:
     """
     Get a specific skill taxonomy entry by ID.
@@ -294,6 +299,7 @@ async def update_skill_taxonomy(
     taxonomy_id: str,
     request: SkillTaxonomyUpdate,
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(require_any_role("Admin", "Recruiter")),
 ) -> JSONResponse:
     """
     Update a skill taxonomy entry.
@@ -367,6 +373,7 @@ async def update_skill_taxonomy(
 async def delete_skill_taxonomy(
     taxonomy_id: str,
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(require_any_role("Admin", "Recruiter")),
 ) -> JSONResponse:
     """
     Delete a skill taxonomy entry.
@@ -419,6 +426,7 @@ async def delete_skill_taxonomy(
 async def delete_skill_taxonomies_by_industry(
     industry: str,
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(require_any_role("Admin", "Recruiter")),
 ) -> JSONResponse:
     """
     Delete all skill taxonomy entries for a specific industry.
@@ -457,6 +465,7 @@ async def delete_skill_taxonomies_by_industry(
 async def load_industry_taxonomy(
     industry: str,
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(require_any_role("Admin", "Recruiter")),
 ) -> JSONResponse:
     """
     Load predefined skills for an industry.
@@ -554,6 +563,7 @@ async def load_industry_taxonomy(
 @router.post("/load/it", tags=["Skill Taxonomies"])
 async def load_it_taxonomy(
     db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(require_any_role("Admin", "Recruiter")),
 ) -> JSONResponse:
     """
     Load comprehensive IT taxonomy from JSON file.

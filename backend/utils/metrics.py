@@ -42,6 +42,7 @@ class MetricsRegistry:
         celery_queue_length: Gauge for task queue depth
         ml_inference_duration_seconds: Histogram for ML model inference timing
         ml_predictions_total: Counter for total ML predictions
+        health_check_status: Gauge for health check status of system components
 
     Example:
         >>> registry = MetricsRegistry()
@@ -180,6 +181,14 @@ class MetricsRegistry:
         self.system_cpu_usage_percent = Gauge(
             "system_cpu_usage_percent",
             "System CPU usage percentage",
+            registry=self._registry,
+        )
+
+        # Health Check Metrics
+        self.health_check_status = Gauge(
+            "health_check_status",
+            "Health check status of system components (1=healthy, 0=unhealthy)",
+            ["component"],  # components: database, redis, celery, ml_models, api
             registry=self._registry,
         )
 
@@ -408,6 +417,26 @@ class MetricsRegistry:
             logger.debug(f"Updated loaded models: {model_type} = {count}")
         except Exception as e:
             logger.error(f"Error updating loaded models metric: {e}", exc_info=True)
+
+    def update_health_check_status(self, component: str, status: bool) -> None:
+        """
+        Update health check status metric.
+
+        Args:
+            component: Component name (database, redis, celery, ml_models, api)
+            status: Health status (True=healthy, False=unhealthy)
+
+        Example:
+            >>> registry = MetricsRegistry()
+            >>> registry.update_health_check_status("database", True)
+        """
+        try:
+            # Convert boolean to 1 (healthy) or 0 (unhealthy)
+            value = 1 if status else 0
+            self.health_check_status.labels(component=component).set(value)
+            logger.debug(f"Updated health check status: {component} = {value}")
+        except Exception as e:
+            logger.error(f"Error updating health check status metric: {e}", exc_info=True)
 
 
 # Singleton instance for global access

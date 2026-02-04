@@ -147,7 +147,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
   // Export and tag states
   const [isExporting, setIsExporting] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'pdf' | 'zip'>('json');
   const [exportSuccess, setExportSuccess] = useState(false);
 
   const [isTagging, setIsTagging] = useState(false);
@@ -282,49 +282,77 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
     setTagResults(null);
 
     try {
-      const response = await apiClient.post<BulkActionResponse>('/api/candidates/bulk-action', {
-        action: 'export',
-        resume_ids: selectedIds,
-        export_format: exportFormat,
-      });
+      // For PDF and ZIP, we expect binary file response
+      if (exportFormat === 'pdf' || exportFormat === 'zip') {
+        const response = await apiClient.post('/api/candidates/bulk-action', {
+          action: 'export',
+          resume_ids: selectedIds,
+          export_format: exportFormat,
+        }, {
+          responseType: 'blob',
+        });
 
-      const data = response.data;
-
-      if (data.export_data) {
-        // Download the file
-        const blob = new Blob(
-          [
-            exportFormat === 'csv'
-              ? data.export_data.data
-              : JSON.stringify(data.export_data.data, null, 2)
-          ],
-          {
-            type: exportFormat === 'csv' ? 'text/csv' : 'application/json',
-          }
-        );
+        // Download the binary file
+        const blob = new Blob([response.data], {
+          type: exportFormat === 'pdf' ? 'application/pdf' : 'application/zip',
+        });
 
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `candidates_export.${exportFormat}`;
+        link.download = `candidates_export_${selectedIds.length}.${exportFormat}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
         setExportSuccess(true);
-      }
-
-      // Show results summary
-      if (data.failed > 0) {
-        setError(
-          t('bulkActions.exportPartialSuccess', {
-            success: data.successful,
-            failed: data.failed,
-          })
-        );
       } else {
-        setExportSuccess(true);
+        // JSON and CSV exports
+        const response = await apiClient.post<BulkActionResponse>('/api/candidates/bulk-action', {
+          action: 'export',
+          resume_ids: selectedIds,
+          export_format: exportFormat,
+        });
+
+        const data = response.data;
+
+        if (data.export_data) {
+          // Download the file
+          const blob = new Blob(
+            [
+              exportFormat === 'csv'
+                ? data.export_data.data
+                : JSON.stringify(data.export_data.data, null, 2)
+            ],
+            {
+              type: exportFormat === 'csv' ? 'text/csv' : 'application/json',
+            }
+          );
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `candidates_export.${exportFormat}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          setExportSuccess(true);
+        }
+
+        // Show results summary
+        if (data.failed > 0) {
+          setError(
+            t('bulkActions.exportPartialSuccess', {
+              success: data.successful,
+              failed: data.failed,
+            })
+          );
+        } else {
+          setExportSuccess(true);
+        }
       }
 
       // Clear dialog
@@ -726,11 +754,13 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
             <Select
               labelId="export-format-label"
               value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')}
+              onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv' | 'pdf' | 'zip')}
               label={t('bulkActions.exportDialog.format')}
             >
               <MenuItem value="json">JSON</MenuItem>
               <MenuItem value="csv">CSV</MenuItem>
+              <MenuItem value="pdf">PDF</MenuItem>
+              <MenuItem value="zip">ZIP</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

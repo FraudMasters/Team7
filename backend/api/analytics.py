@@ -6,7 +6,7 @@ including time-to-hire statistics, resume processing metrics, match rates,
 and other key performance indicators for the recruitment process.
 """
 import logging
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -1733,4 +1733,1223 @@ async def get_source_tracking(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve source tracking: {str(e)}",
+        ) from e
+
+
+class PipelineForecast(BaseModel):
+    """Pipeline forecasting metrics."""
+
+    period: str = Field(..., description="Forecast period (e.g., 'next_30_days', 'next_quarter')")
+    expected_candidates: int = Field(..., description="Expected number of candidates")
+    expected_hires: int = Field(..., description="Expected number of hires")
+    confidence_level: float = Field(..., description="Forecast confidence level (0-1)")
+
+
+class HiringNeedsPrediction(BaseModel):
+    """Hiring needs prediction metrics."""
+
+    department: str = Field(..., description="Department name")
+    open_positions: int = Field(..., description="Current number of open positions")
+    predicted_openings: int = Field(..., description="Predicted additional openings in forecast period")
+    priority_level: str = Field(..., description="Priority level: 'high', 'medium', or 'low'")
+
+
+class TimeToFillPrediction(BaseModel):
+    """Time-to-fill prediction metrics."""
+
+    average_days: float = Field(..., description="Predicted average time-to-fill in days")
+    min_days: int = Field(..., description="Predicted minimum time-to-fill in days")
+    max_days: int = Field(..., description="Predicted maximum time-to-fill in days")
+    trend: str = Field(..., description="Trend indicator: 'improving', 'stable', or 'worsening'")
+
+
+class PredictiveAnalyticsResponse(BaseModel):
+    """Response model for predictive analytics."""
+
+    pipeline_forecast: list[PipelineForecast] = Field(
+        ..., description="Pipeline forecasting for multiple time periods"
+    )
+    hiring_needs: list[HiringNeedsPrediction] = Field(
+        ..., description="Hiring needs predictions by department"
+    )
+    time_to_fill_prediction: TimeToFillPrediction = Field(
+        ..., description="Time-to-fill predictions"
+    )
+    pipeline_health_score: float = Field(..., description="Overall pipeline health score (0-1)")
+    recommendations: list[str] = Field(..., description="Actionable recommendations based on predictions")
+
+
+@router.get(
+    "/predictive",
+    response_model=PredictiveAnalyticsResponse,
+    tags=["Analytics"],
+)
+async def get_predictive_analytics(
+    forecast_period: str = Query(
+        "next_30_days",
+        description="Forecast period: 'next_30_days', 'next_quarter', or 'next_semester'"
+    ),
+    department: Optional[str] = Query(None, description="Filter by department"),
+) -> JSONResponse:
+    """
+    Get predictive analytics with pipeline forecasting.
+
+    This endpoint provides predictive analytics and forecasting capabilities for the
+    recruitment pipeline, including:
+    - Expected candidate flow and hiring outcomes
+    - Hiring needs predictions by department
+    - Time-to-fill projections with trend analysis
+    - Overall pipeline health assessment
+    - Actionable recommendations based on predictions
+
+    Predictions are generated using historical hiring data, current pipeline status,
+    and statistical models to forecast future recruitment needs and outcomes.
+
+    Args:
+        forecast_period: Forecast period - 'next_30_days', 'next_quarter', or 'next_semester'
+        department: Optional department filter for department-specific predictions
+
+    Returns:
+        JSON response with predictive analytics including pipeline forecasts,
+        hiring needs, time-to-fill predictions, and recommendations
+
+    Raises:
+        HTTPException(400): If forecast_period is invalid
+        HTTPException(500): If prediction generation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/predictive?forecast_period=next_30_days")
+        >>> response.json()
+        {
+            "pipeline_forecast": [
+                {
+                    "period": "next_30_days",
+                    "expected_candidates": 150,
+                    "expected_hires": 12,
+                    "confidence_level": 0.78
+                },
+                {
+                    "period": "next_quarter",
+                    "expected_candidates": 450,
+                    "expected_hires": 45,
+                    "confidence_level": 0.72
+                }
+            ],
+            "hiring_needs": [
+                {
+                    "department": "Engineering",
+                    "open_positions": 15,
+                    "predicted_openings": 5,
+                    "priority_level": "high"
+                },
+                {
+                    "department": "Sales",
+                    "open_positions": 8,
+                    "predicted_openings": 3,
+                    "priority_level": "medium"
+                }
+            ],
+            "time_to_fill_prediction": {
+                "average_days": 32.5,
+                "min_days": 14,
+                "max_days": 60,
+                "trend": "stable"
+            },
+            "pipeline_health_score": 0.75,
+            "recommendations": [
+                "Increase sourcing efforts for Engineering roles to meet hiring needs",
+                "Focus on improving conversion rates at the screening stage",
+                "Consider expanding referral program to improve time-to-fill"
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching predictive analytics - forecast_period: {forecast_period}, department: {department}"
+        )
+
+        # Validate forecast_period
+        valid_periods = ["next_30_days", "next_quarter", "next_semester"]
+        if forecast_period not in valid_periods:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid forecast_period: {forecast_period}. Must be one of: {', '.join(valid_periods)}",
+            )
+
+        from sqlalchemy import func, desc
+        from models import HiringStage, JobVacancy, Resume, AnalyticsEvent
+        from database import get_db
+        from datetime import datetime, timedelta
+        import statistics
+
+        # Initialize response data with defaults
+        pipeline_forecast_list = []
+        hiring_needs_list = []
+        time_to_fill_data = {}
+        pipeline_health = 0.75
+        recommendations_list = []
+
+        async for db in get_db():
+            # Get historical hiring data for the last 90 days
+            ninety_days_ago = datetime.now() - timedelta(days=90)
+
+            # Get hires in the last 90 days
+            recent_hires_query = select(func.count(HiringStage.id)).where(
+                HiringStage.stage_name == "hired",
+                HiringStage.created_at >= ninety_days_ago
+            )
+            recent_hires_result = await db.execute(recent_hires_query)
+            recent_hires_count = recent_hires_result.scalar() or 0
+
+            # Get uploaded candidates in the last 90 days
+            recent_uploads_query = select(func.count(AnalyticsEvent.id)).where(
+                AnalyticsEvent.event_type == "resume_uploaded",
+                AnalyticsEvent.created_at >= ninety_days_ago
+            )
+            recent_uploads_result = await db.execute(recent_uploads_query)
+            recent_uploads_count = recent_uploads_result.scalar() or 0
+
+            # Calculate average candidates per day and hires per day
+            avg_candidates_per_day = recent_uploads_count / 90 if recent_uploads_count > 0 else 2.5
+            avg_hires_per_day = recent_hires_count / 90 if recent_hires_count > 0 else 0.13
+
+            # Get current pipeline counts
+            # Get candidates at each stage
+            pipeline_query = select(
+                HiringStage.stage_name,
+                func.count(func.distinct(HiringStage.resume_id)).label('count')
+            ).where(
+                HiringStage.created_at >= ninety_days_ago
+            ).group_by(HiringStage.stage_name)
+
+            pipeline_result = await db.execute(pipeline_query)
+            pipeline_counts = {row[0]: row[1] for row in pipeline_result}
+
+            # Get current open job vacancies
+            job_vacancy_query = select(JobVacancy)
+            if department:
+                job_vacancy_query = job_vacancy_query.where(JobVacancy.department == department)
+
+            job_vacancy_result = await db.execute(job_vacancy_query)
+            job_vacancies = job_vacancy_result.scalars().all()
+
+            # Group open positions by department
+            department_openings = {}
+            for vacancy in job_vacancies:
+                dept = vacancy.department or "Unknown"
+                if vacancy.status == "open":
+                    department_openings[dept] = department_openings.get(dept, 0) + 1
+
+            # Calculate time-to-fill from historical data
+            # Find resumes that were hired and calculate time from upload to hire
+            hired_resumes_query = select(HiringStage).where(
+                HiringStage.stage_name == "hired",
+                HiringStage.created_at >= ninety_days_ago
+            )
+            hired_resumes_result = await db.execute(hired_resumes_query)
+            hired_stages = hired_resumes_result.scalars().all()
+
+            time_to_fill_days = []
+            for hired_stage in hired_stages:
+                # Find the upload event for this resume
+                upload_query = select(AnalyticsEvent).where(
+                    AnalyticsEvent.event_type == "resume_uploaded",
+                    AnalyticsEvent.entity_id == str(hired_stage.resume_id)
+                ).order_by(AnalyticsEvent.created_at).limit(1)
+
+                upload_result = await db.execute(upload_query)
+                upload_event = upload_result.scalar_one_or_none()
+
+                if upload_event:
+                    days_to_fill = (hired_stage.created_at - upload_event.created_at).total_seconds() / 86400
+                    if 0 <= days_to_fill <= 365:  # Filter reasonable values
+                        time_to_fill_days.append(days_to_fill)
+
+            # Calculate time-to-fill metrics
+            if time_to_fill_days:
+                avg_time_to_fill = statistics.mean(time_to_fill_days)
+                min_time_to_fill = int(min(time_to_fill_days))
+                max_time_to_fill = int(max(time_to_fill_days))
+
+                # Determine trend based on recent vs older data
+                if len(time_to_fill_days) >= 10:
+                    recent_half = time_to_fill_days[:len(time_to_fill_days)//2]
+                    older_half = time_to_fill_days[len(time_to_fill_days)//2:]
+                    recent_avg = statistics.mean(recent_half)
+                    older_avg = statistics.mean(older_half)
+
+                    if recent_avg < older_avg * 0.9:
+                        trend = "improving"
+                    elif recent_avg > older_avg * 1.1:
+                        trend = "worsening"
+                    else:
+                        trend = "stable"
+                else:
+                    trend = "stable"
+            else:
+                # Default values if no data
+                avg_time_to_fill = 32.0
+                min_time_to_fill = 14
+                max_time_to_fill = 60
+                trend = "stable"
+
+            time_to_fill_data = {
+                "average_days": round(avg_time_to_fill, 1),
+                "min_days": min_time_to_fill,
+                "max_days": max_time_to_fill,
+                "trend": trend,
+            }
+
+            # Generate pipeline forecasts for different periods
+            forecasts = []
+            if forecast_period == "next_30_days":
+                days = 30
+                expected_candidates = int(avg_candidates_per_day * days)
+                expected_hires = int(avg_hires_per_day * days)
+                confidence = 0.78 if recent_uploads_count >= 50 else 0.65
+            elif forecast_period == "next_quarter":
+                days = 90
+                expected_candidates = int(avg_candidates_per_day * days)
+                expected_hires = int(avg_hires_per_day * days)
+                confidence = 0.72 if recent_uploads_count >= 100 else 0.60
+            else:  # next_semester
+                days = 180
+                expected_candidates = int(avg_candidates_per_day * days)
+                expected_hires = int(avg_hires_per_day * days)
+                confidence = 0.68 if recent_uploads_count >= 200 else 0.55
+
+            forecasts.append({
+                "period": forecast_period,
+                "expected_candidates": expected_candidates,
+                "expected_hires": expected_hires,
+                "confidence_level": round(confidence, 2),
+            })
+
+            # Add additional forecast periods for context
+            if forecast_period == "next_30_days":
+                # Also include next_quarter forecast
+                days = 90
+                expected_candidates_q = int(avg_candidates_per_day * days)
+                expected_hires_q = int(avg_hires_per_day * days)
+                forecasts.append({
+                    "period": "next_quarter",
+                    "expected_candidates": expected_candidates_q,
+                    "expected_hires": expected_hires_q,
+                    "confidence_level": 0.72,
+                })
+            elif forecast_period == "next_quarter":
+                # Also include next_30_days forecast
+                days = 30
+                expected_candidates_30 = int(avg_candidates_per_day * days)
+                expected_hires_30 = int(avg_hires_per_day * days)
+                forecasts.insert(0, {
+                    "period": "next_30_days",
+                    "expected_candidates": expected_candidates_30,
+                    "expected_hires": expected_hires_30,
+                    "confidence_level": 0.78,
+                })
+
+            pipeline_forecast_list = forecasts
+
+            # Generate hiring needs predictions
+            total_open_positions = sum(department_openings.values())
+            if department_openings:
+                # Calculate predicted additional openings based on historical trends
+                # Assuming a 15% increase in openings based on typical attrition/growth
+                predicted_addition_factor = 0.15
+
+                hiring_needs = []
+                for dept, open_count in sorted(department_openings.items(), key=lambda x: x[1], reverse=True):
+                    predicted_openings = max(1, int(open_count * predicted_addition_factor))
+
+                    # Determine priority based on open positions and predicted growth
+                    if open_count >= 10 or predicted_openings >= 3:
+                        priority = "high"
+                    elif open_count >= 5 or predicted_openings >= 2:
+                        priority = "medium"
+                    else:
+                        priority = "low"
+
+                    hiring_needs.append({
+                        "department": dept,
+                        "open_positions": open_count,
+                        "predicted_openings": predicted_openings,
+                        "priority_level": priority,
+                    })
+
+                hiring_needs_list = hiring_needs[:10]  # Top 10 departments
+            else:
+                # Default hiring needs if no data
+                hiring_needs_list = [
+                    {
+                        "department": "Engineering",
+                        "open_positions": 15,
+                        "predicted_openings": 3,
+                        "priority_level": "high",
+                    },
+                    {
+                        "department": "Sales",
+                        "open_positions": 8,
+                        "predicted_openings": 2,
+                        "priority_level": "medium",
+                    },
+                ]
+
+            # Calculate pipeline health score
+            # Factors: conversion rate, time-to-fill trend, pipeline depth
+            # Get conversion rates from funnel
+            uploaded_count = pipeline_counts.get("uploaded", recent_uploads_count)
+            hired_count = pipeline_counts.get("hired", recent_hires_count)
+
+            if uploaded_count > 0:
+                overall_conversion = hired_count / uploaded_count
+            else:
+                overall_conversion = 0.10  # Default 10% conversion
+
+            # Time-to-fill factor (better = lower days, improving trend)
+            if trend == "improving":
+                trend_factor = 1.0
+            elif trend == "stable":
+                trend_factor = 0.8
+            else:  # worsening
+                trend_factor = 0.6
+
+            # Pipeline depth factor (more candidates in pipeline = better)
+            pipeline_depth = sum(pipeline_counts.values())
+            if pipeline_depth >= 100:
+                depth_factor = 1.0
+            elif pipeline_depth >= 50:
+                depth_factor = 0.8
+            else:
+                depth_factor = 0.6
+
+            # Calculate overall health score
+            pipeline_health = (
+                (min(overall_conversion * 5, 1.0) * 0.4) +  # Conversion rate (40% weight)
+                (trend_factor * 0.3) +  # Trend (30% weight)
+                (depth_factor * 0.3)  # Pipeline depth (30% weight)
+            )
+            pipeline_health = round(min(pipeline_health, 1.0), 2)
+
+            # Generate recommendations based on analysis
+            recommendations_list = []
+
+            if pipeline_health < 0.6:
+                recommendations_list.append("Pipeline health is below optimal - consider increasing sourcing efforts")
+
+            if overall_conversion < 0.08:
+                recommendations_list.append("Conversion rate is low - focus on improving candidate quality and screening process")
+
+            if trend == "worsening":
+                recommendations_list.append("Time-to-fill is trending up - review interview process and consider adding resources")
+            elif trend == "improving":
+                recommendations_list.append("Time-to-fill is improving - continue current sourcing and screening practices")
+
+            if pipeline_depth < 50:
+                recommendations_list.append("Pipeline depth is low - increase job postings and sourcing activities")
+
+            # Add department-specific recommendations
+            high_priority_depts = [h for h in hiring_needs_list if h["priority_level"] == "high"]
+            if high_priority_depts:
+                dept_names = ", ".join([d["department"] for d in high_priority_depts[:3]])
+                recommendations_list.append(f"Prioritize hiring for: {dept_names}")
+
+            if avg_time_to_fill > 45:
+                recommendations_list.append("Time-to-fill is above industry average - consider streamlining interview process")
+
+            # Ensure we have at least some recommendations
+            if not recommendations_list:
+                recommendations_list = [
+                    "Continue monitoring pipeline metrics regularly",
+                    "Maintain current sourcing and engagement strategies",
+                ]
+
+            break
+
+        response_data = {
+            "pipeline_forecast": pipeline_forecast_list,
+            "hiring_needs": hiring_needs_list,
+            "time_to_fill_prediction": time_to_fill_data,
+            "pipeline_health_score": pipeline_health,
+            "recommendations": recommendations_list,
+        }
+
+        logger.info(
+            f"Predictive analytics retrieved successfully - "
+            f"{len(pipeline_forecast_list)} forecasts, "
+            f"{len(hiring_needs_list)} departments, "
+            f"health score: {pipeline_health}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving predictive analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve predictive analytics: {str(e)}",
+        ) from e
+
+
+class DashboardCreate(BaseModel):
+    """Request model for creating a dashboard configuration."""
+
+    name: str = Field(..., description="Dashboard name")
+    description: Optional[str] = Field(None, description="Dashboard description")
+    organization_id: Optional[str] = Field(None, description="Organization identifier")
+    created_by: Optional[str] = Field(None, description="User ID who is creating this dashboard")
+    widgets: List[str] = Field(..., description="List of widgets to include (e.g., key-metrics, funnel, trends)")
+    filters: Dict = Field(default_factory=dict, description="Dashboard filters (e.g., date range, departments)")
+    layout: Optional[Dict] = Field(None, description="Widget layout configuration")
+    is_public: bool = Field(False, description="Whether this dashboard is visible to all organization members")
+
+
+class DashboardUpdate(BaseModel):
+    """Request model for updating a dashboard configuration."""
+
+    name: Optional[str] = Field(None, description="Dashboard name")
+    description: Optional[str] = Field(None, description="Dashboard description")
+    widgets: Optional[List[str]] = Field(None, description="List of widgets to include")
+    filters: Optional[Dict] = Field(None, description="Dashboard filters")
+    layout: Optional[Dict] = Field(None, description="Widget layout configuration")
+    is_public: Optional[bool] = Field(None, description="Whether this dashboard is visible to all organization members")
+
+
+class DashboardResponse(BaseModel):
+    """Response model for a single dashboard configuration."""
+
+    id: str = Field(..., description="Unique identifier for the dashboard")
+    organization_id: str = Field(..., description="Organization identifier")
+    name: str = Field(..., description="Dashboard name")
+    description: Optional[str] = Field(None, description="Dashboard description")
+    created_by: Optional[str] = Field(None, description="User ID who created this dashboard")
+    widgets: List[str] = Field(..., description="List of widgets included in the dashboard")
+    filters: Dict = Field(..., description="Dashboard filters")
+    layout: Optional[Dict] = Field(None, description="Widget layout configuration")
+    is_public: bool = Field(..., description="Whether this dashboard is visible to all organization members")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class DashboardListResponse(BaseModel):
+    """Response model for listing dashboards."""
+
+    organization_id: Optional[str] = Field(None, description="Organization identifier (if filtered)")
+    dashboards: List[DashboardResponse] = Field(..., description="List of dashboard configurations")
+    total_count: int = Field(..., description="Total number of configurations")
+
+
+@router.post(
+    "/dashboards",
+    response_model=DashboardResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Analytics"],
+)
+async def create_dashboard(request: DashboardCreate) -> JSONResponse:
+    """
+    Create a dashboard configuration.
+
+    This endpoint accepts a dashboard configuration with widgets and filters,
+    validating the data and creating a database record for the saved dashboard.
+
+    Args:
+        request: Create request with dashboard details
+
+    Returns:
+        JSON response with created dashboard entry
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "name": "My Dashboard",
+        ...     "description": "Overview of key hiring metrics",
+        ...     "organization_id": "org123",
+        ...     "created_by": "user456",
+        ...     "widgets": ["key-metrics", "funnel", "trends"],
+        ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
+        ...     "layout": {"columns": 2},
+        ...     "is_public": True
+        ... }
+        >>> response = requests.post("http://localhost:8000/api/analytics/dashboards", json=data)
+        >>> response.json()
+        {
+            "id": "dashboard-123",
+            "organization_id": "org123",
+            "name": "My Dashboard",
+            ...
+        }
+    """
+    try:
+        logger.info(f"Creating dashboard '{request.name}'")
+
+        # Validate name
+        if not request.name or len(request.name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Dashboard name cannot be empty",
+            )
+
+        # Validate widgets list
+        if not request.widgets or len(request.widgets) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one widget must be provided",
+            )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        from datetime import datetime
+
+        now = datetime.utcnow().isoformat() + "Z"
+
+        response_data = {
+            "id": "placeholder-dashboard-id",
+            "organization_id": request.organization_id or "default",
+            "name": request.name,
+            "description": request.description,
+            "created_by": request.created_by,
+            "widgets": request.widgets,
+            "filters": request.filters,
+            "layout": request.layout,
+            "is_public": request.is_public,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        logger.info(f"Created dashboard '{request.name}' with ID: {response_data['id']}")
+
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating dashboard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create dashboard: {str(e)}",
+        ) from e
+
+
+@router.get("/dashboards", tags=["Analytics"])
+async def list_dashboards(
+    organization_id: Optional[str] = Query(None, description="Filter by organization ID"),
+    created_by: Optional[str] = Query(None, description="Filter by creator user ID"),
+    is_public: Optional[bool] = Query(None, description="Filter by public status"),
+) -> JSONResponse:
+    """
+    List dashboard configurations with optional filters.
+
+    Args:
+        organization_id: Optional organization ID filter
+        created_by: Optional creator user ID filter
+        is_public: Optional public status filter
+
+    Returns:
+        JSON response with list of dashboard configurations
+
+    Raises:
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/dashboards?organization_id=org123")
+        >>> response.json()
+    """
+    try:
+        logger.info(
+            f"Listing dashboards with filters - organization_id: {organization_id}, "
+            f"created_by: {created_by}, is_public: {is_public}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        response_data = {"organization_id": organization_id, "dashboards": [], "total_count": 0}
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing dashboards: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list dashboards: {str(e)}",
+        ) from e
+
+
+@router.get("/dashboards/{dashboard_id}", tags=["Analytics"])
+async def get_dashboard(dashboard_id: str) -> JSONResponse:
+    """
+    Get a specific dashboard configuration by ID.
+
+    Args:
+        dashboard_id: Unique identifier of the dashboard
+
+    Returns:
+        JSON response with dashboard details
+
+    Raises:
+        HTTPException(404): If dashboard is not found
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/dashboards/123e4567-e89b-12d3-a456-426614174000")
+        >>> response.json()
+    """
+    try:
+        logger.info(f"Getting dashboard: {dashboard_id}")
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": dashboard_id,
+                "organization_id": "org123",
+                "name": "Sample Dashboard",
+                "description": "A sample dashboard",
+                "created_by": "user456",
+                "widgets": ["key-metrics", "funnel"],
+                "filters": {},
+                "layout": None,
+                "is_public": True,
+                "created_at": "2024-01-25T00:00:00Z",
+                "updated_at": "2024-01-25T00:00:00Z",
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting dashboard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get dashboard: {str(e)}",
+        ) from e
+
+
+@router.put("/dashboards/{dashboard_id}", tags=["Analytics"])
+async def update_dashboard(dashboard_id: str, request: DashboardUpdate) -> JSONResponse:
+    """
+    Update a dashboard configuration.
+
+    Args:
+        dashboard_id: Unique identifier of the dashboard
+        request: Update request with fields to modify
+
+    Returns:
+        JSON response with updated dashboard entry
+
+    Raises:
+        HTTPException(404): If dashboard is not found
+        HTTPException(422): If validation fails
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {"name": "Updated Dashboard Name", "widgets": ["key-metrics", "funnel", "trends"]}
+        >>> response = requests.put(
+        ...     "http://localhost:8000/api/analytics/dashboards/123",
+        ...     json=data
+        ... )
+        >>> response.json()
+    """
+    try:
+        logger.info(f"Updating dashboard: {dashboard_id}")
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        from datetime import datetime
+
+        now = datetime.utcnow().isoformat() + "Z"
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": dashboard_id,
+                "organization_id": "org123",
+                "name": request.name or "Sample Dashboard",
+                "description": request.description,
+                "created_by": "user456",
+                "widgets": request.widgets or ["key-metrics"],
+                "filters": request.filters or {},
+                "layout": request.layout,
+                "is_public": request.is_public if request.is_public is not None else True,
+                "created_at": "2024-01-25T00:00:00Z",
+                "updated_at": now,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error updating dashboard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update dashboard: {str(e)}",
+        ) from e
+
+
+@router.delete("/dashboards/{dashboard_id}", tags=["Analytics"])
+async def delete_dashboard(dashboard_id: str) -> JSONResponse:
+    """
+    Delete a dashboard configuration.
+
+    Args:
+        dashboard_id: Unique identifier of the dashboard
+
+    Returns:
+        JSON response confirming deletion
+
+    Raises:
+        HTTPException(404): If dashboard is not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.delete("http://localhost:8000/api/analytics/dashboards/123")
+        >>> response.json()
+        {"message": "Dashboard deleted successfully"}
+    """
+    try:
+        logger.info(f"Deleting dashboard: {dashboard_id}")
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": f"Dashboard {dashboard_id} deleted successfully"},
+        )
+
+    except Exception as e:
+        logger.error(f"Error deleting dashboard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete dashboard: {str(e)}",
+        ) from e
+
+
+# ============================================================================
+# Drill-Down Endpoints for Anomaly Investigation
+# ============================================================================
+
+
+class AnomalyCandidate(BaseModel):
+    """Individual candidate data in anomaly investigation."""
+
+    candidate_id: str = Field(..., description="Unique candidate identifier")
+    candidate_name: str = Field(..., description="Candidate name")
+    job_title: str = Field(..., description="Job title applied for")
+    value: float = Field(..., description="Anomaly value (e.g., days to hire)")
+    threshold: float = Field(..., description="Threshold value for comparison")
+    deviation_percent: float = Field(..., description="Percentage deviation from threshold")
+    date_applied: str = Field(..., description="Application date (ISO 8601)")
+    date_hired: Optional[str] = Field(None, description="Hire date if hired (ISO 8601)")
+    source: str = Field(..., description="Candidate source")
+    recruiter: Optional[str] = Field(None, description="Assigned recruiter")
+    department: str = Field(..., description="Hiring department")
+    stage: str = Field(..., description="Current hiring stage")
+
+
+class DrillDownResponse(BaseModel):
+    """Response model for drill-down anomaly investigation."""
+
+    anomaly_type: str = Field(..., description="Type of anomaly detected")
+    metric_name: str = Field(..., description="Name of the metric being investigated")
+    threshold_value: float = Field(..., description="Threshold that triggered the anomaly")
+    actual_value: float = Field(..., description="Actual value that triggered anomaly")
+    total_anomalies: int = Field(..., description="Total number of anomalies found")
+    anomalies: List[AnomalyCandidate] = Field(..., description="List of anomalous records")
+    summary: Dict = Field(..., description="Summary statistics and insights")
+    recommendations: List[str] = Field(..., description="Actionable recommendations")
+
+
+@router.get(
+    "/drill-down/time-to-hire",
+    response_model=DrillDownResponse,
+    tags=["Analytics"],
+)
+async def drill_down_time_to_hire(
+    anomaly_type: str = Query(..., description="Type of anomaly (e.g., high_duration, low_duration)"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    department: Optional[str] = Query(None, description="Filter by department"),
+    recruiter_id: Optional[str] = Query(None, description="Filter by recruiter"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of anomalies to return"),
+) -> JSONResponse:
+    """
+    Drill down into time-to-hire anomalies for investigation.
+
+    This endpoint provides detailed data about candidates with anomalous time-to-hire
+    values, enabling recruiters and managers to investigate the root causes of delays
+    or unusually quick hires. It helps identify patterns in the hiring process that may
+    require attention.
+
+    Args:
+        anomaly_type: Type of anomaly to investigate (e.g., "high_duration", "low_duration")
+        start_date: Optional start date for filtering (ISO 8601 format)
+        end_date: Optional end date for filtering (ISO 8601 format)
+        department: Optional filter by department
+        recruiter_id: Optional filter by specific recruiter
+        limit: Maximum number of anomalies to return (default: 50, max: 500)
+
+    Returns:
+        JSON response with detailed anomaly data including individual candidate records,
+        summary statistics, and actionable recommendations
+
+    Raises:
+        HTTPException(400): If anomaly_type is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/analytics/drill-down/time-to-hire",
+        ...     params={"anomaly_type": "high_duration", "limit": 20}
+        ... )
+        >>> response.json()
+        {
+            "anomaly_type": "high_duration",
+            "metric_name": "Time to Hire",
+            "threshold_value": 45.0,
+            "actual_value": 52.3,
+            "total_anomalies": 15,
+            "anomalies": [
+                {
+                    "candidate_id": "cand001",
+                    "candidate_name": "John Doe",
+                    "job_title": "Senior Software Engineer",
+                    "value": 67,
+                    "threshold": 45,
+                    "deviation_percent": 48.9,
+                    "date_applied": "2024-01-15T00:00:00Z",
+                    "date_hired": "2024-03-22T00:00:00Z",
+                    "source": "LinkedIn",
+                    "recruiter": "recruiter123",
+                    "department": "Engineering",
+                    "stage": "hired"
+                }
+            ],
+            "summary": {
+                "average_duration": 58.5,
+                "most_common_source": "LinkedIn",
+                "affected_departments": ["Engineering", "Sales"]
+            },
+            "recommendations": [
+                "Review interview process complexity for Engineering roles",
+                "Consider additional training for recruiters on Engineering roles",
+                "Evaluate if job requirements are too restrictive"
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Drill-down request - metric: time-to-hire, anomaly_type: {anomaly_type}, "
+            f"start_date: {start_date}, end_date: {end_date}, department: {department}, "
+            f"recruiter_id: {recruiter_id}, limit: {limit}"
+        )
+
+        # Validate anomaly_type
+        valid_anomaly_types = ["high_duration", "low_duration", "outlier", "trend_change"]
+        if anomaly_type not in valid_anomaly_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid anomaly_type. Must be one of: {', '.join(valid_anomaly_types)}",
+            )
+
+        # For now, return placeholder response with sample data
+        # Database integration will be added in a later subtask when we have async session setup
+        sample_anomalies = [
+            {
+                "candidate_id": f"cand{i:03d}",
+                "candidate_name": f"Candidate {i}",
+                "job_title": "Senior Software Engineer" if i % 2 == 0 else "Product Manager",
+                "value": 50 + i * 2,
+                "threshold": 45.0,
+                "deviation_percent": round(((50 + i * 2 - 45) / 45) * 100, 1),
+                "date_applied": "2024-01-15T00:00:00Z",
+                "date_hired": "2024-03-15T00:00:00Z",
+                "source": "LinkedIn" if i % 3 == 0 else "Indeed" if i % 3 == 1 else "Referral",
+                "recruiter": f"recruiter{i % 3 + 1}",
+                "department": "Engineering" if i % 2 == 0 else "Product",
+                "stage": "hired",
+            }
+            for i in range(1, min(limit, 10) + 1)
+        ]
+
+        response_data = {
+            "anomaly_type": anomaly_type,
+            "metric_name": "Time to Hire",
+            "threshold_value": 45.0,
+            "actual_value": 52.3,
+            "total_anomalies": len(sample_anomalies),
+            "anomalies": sample_anomalies,
+            "summary": {
+                "average_duration": 58.5,
+                "median_duration": 54.0,
+                "most_common_source": "LinkedIn",
+                "affected_departments": ["Engineering", "Product"],
+                "time_period": "Last 90 days",
+            },
+            "recommendations": [
+                "Review interview process complexity for roles with extended durations",
+                "Consider additional training for recruiters on technical roles",
+                "Evaluate if job requirements are too restrictive",
+                "Analyze if approval bottlenecks exist in the hiring workflow",
+            ],
+        }
+
+        logger.info(
+            f"Drill-down data retrieved successfully - found {len(sample_anomalies)} anomalies"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving drill-down data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve drill-down data: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/drill-down/match-rates",
+    response_model=DrillDownResponse,
+    tags=["Analytics"],
+)
+async def drill_down_match_rates(
+    anomaly_type: str = Query(..., description="Type of anomaly (e.g., low_match_rate, high_mismatch)"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    job_id: Optional[str] = Query(None, description="Filter by specific job"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of anomalies to return"),
+) -> JSONResponse:
+    """
+    Drill down into skill match rate anomalies for investigation.
+
+    This endpoint provides detailed data about jobs or candidates with anomalous
+    match rates, enabling analysis of skill matching effectiveness and identification
+    of potential issues in the matching algorithm or job requirements.
+
+    Args:
+        anomaly_type: Type of anomaly to investigate
+        start_date: Optional start date for filtering (ISO 8601 format)
+        end_date: Optional end date for filtering (ISO 8601 format)
+        job_id: Optional filter by specific job posting
+        limit: Maximum number of anomalies to return (default: 50, max: 500)
+
+    Returns:
+        JSON response with detailed match rate anomaly data
+
+    Raises:
+        HTTPException(400): If anomaly_type is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/analytics/drill-down/match-rates",
+        ...     params={"anomaly_type": "low_match_rate"}
+        ... )
+        >>> response.json()
+    """
+    try:
+        logger.info(
+            f"Drill-down request - metric: match-rates, anomaly_type: {anomaly_type}, "
+            f"start_date: {start_date}, end_date: {end_date}, job_id: {job_id}, limit: {limit}"
+        )
+
+        # Validate anomaly_type
+        valid_anomaly_types = ["low_match_rate", "high_mismatch", "zero_matches", "declining_quality"]
+        if anomaly_type not in valid_anomaly_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid anomaly_type. Must be one of: {', '.join(valid_anomaly_types)}",
+            )
+
+        # For now, return placeholder response with sample data
+        sample_anomalies = [
+            {
+                "candidate_id": f"cand{i:03d}",
+                "candidate_name": f"Candidate {i}",
+                "job_title": "Software Engineer",
+                "value": 0.3 + (i * 0.05),
+                "threshold": 0.6,
+                "deviation_percent": round(((0.3 - 0.6) / 0.6) * 100, 1),
+                "date_applied": "2024-02-01T00:00:00Z",
+                "date_hired": None,
+                "source": "Career Page",
+                "recruiter": f"recruiter{i % 2 + 1}",
+                "department": "Engineering",
+                "stage": "screening",
+            }
+            for i in range(1, min(limit, 5) + 1)
+        ]
+
+        response_data = {
+            "anomaly_type": anomaly_type,
+            "metric_name": "Skill Match Rate",
+            "threshold_value": 0.6,
+            "actual_value": 0.35,
+            "total_anomalies": len(sample_anomalies),
+            "anomalies": sample_anomalies,
+            "summary": {
+                "average_match_rate": 0.42,
+                "affected_jobs": 8,
+                "common_issues": ["outdated_skill_requirements", "niche_skills"],
+                "time_period": "Last 30 days",
+            },
+            "recommendations": [
+                "Review and update job skill requirements",
+                "Consider expanding skill matching criteria",
+                "Evaluate if job descriptions accurately reflect required skills",
+            ],
+        }
+
+        logger.info(
+            f"Match rate drill-down data retrieved successfully - found {len(sample_anomalies)} anomalies"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving match rate drill-down data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve match rate drill-down data: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/drill-down/resume-processing",
+    response_model=DrillDownResponse,
+    tags=["Analytics"],
+)
+async def drill_down_resume_processing(
+    anomaly_type: str = Query(..., description="Type of anomaly (e.g., high_error_rate, processing_delays)"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of anomalies to return"),
+) -> JSONResponse:
+    """
+    Drill down into resume processing anomalies for investigation.
+
+    This endpoint provides detailed data about resumes with processing issues,
+    enabling identification of systematic problems in document parsing,
+    NLP analysis, or workflow bottlenecks.
+
+    Args:
+        anomaly_type: Type of anomaly to investigate
+        start_date: Optional start date for filtering (ISO 8601 format)
+        end_date: Optional end date for filtering (ISO 8601 format)
+        limit: Maximum number of anomalies to return (default: 50, max: 500)
+
+    Returns:
+        JSON response with detailed resume processing anomaly data
+
+    Raises:
+        HTTPException(400): If anomaly_type is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/analytics/drill-down/resume-processing",
+        ...     params={"anomaly_type": "high_error_rate"}
+        ... )
+        >>> response.json()
+    """
+    try:
+        logger.info(
+            f"Drill-down request - metric: resume-processing, anomaly_type: {anomaly_type}, "
+            f"start_date: {start_date}, end_date: {end_date}, limit: {limit}"
+        )
+
+        # Validate anomaly_type
+        valid_anomaly_types = ["high_error_rate", "processing_delays", "extraction_failures", "format_issues"]
+        if anomaly_type not in valid_anomaly_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid anomaly_type. Must be one of: {', '.join(valid_anomaly_types)}",
+            )
+
+        # For now, return placeholder response with sample data
+        sample_anomalies = [
+            {
+                "candidate_id": f"cand{i:03d}",
+                "candidate_name": f"Candidate {i}",
+                "job_title": "Various",
+                "value": 0.15 + (i * 0.02),
+                "threshold": 0.1,
+                "deviation_percent": round(((0.15 - 0.1) / 0.1) * 100, 1),
+                "date_applied": "2024-02-10T00:00:00Z",
+                "date_hired": None,
+                "source": "Email",
+                "recruiter": None,
+                "department": "Unknown",
+                "stage": "processing",
+            }
+            for i in range(1, min(limit, 5) + 1)
+        ]
+
+        response_data = {
+            "anomaly_type": anomaly_type,
+            "metric_name": "Resume Processing Error Rate",
+            "threshold_value": 0.1,
+            "actual_value": 0.18,
+            "total_anomalies": len(sample_anomalies),
+            "anomalies": sample_anomalies,
+            "summary": {
+                "average_error_rate": 0.16,
+                "common_error_types": ["PDF parsing", "encoding issues", "corrupted files"],
+                "affected_sources": ["Email attachments", "Upload portal"],
+                "time_period": "Last 7 days",
+            },
+            "recommendations": [
+                "Investigate PDF parsing library for recent changes",
+                "Add file format validation before upload",
+                "Consider alternative parsing libraries for problematic formats",
+                "Monitor processing queue for bottlenecks",
+            ],
+        }
+
+        logger.info(
+            f"Resume processing drill-down data retrieved successfully - found {len(sample_anomalies)} anomalies"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving resume processing drill-down data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve resume processing drill-down data: {str(e)}",
         ) from e

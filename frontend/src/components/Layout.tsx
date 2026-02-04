@@ -39,6 +39,7 @@ import {
 import LanguageSwitcher from './LanguageSwitcher';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 import { useGlobalKeyboardShortcuts, COMMON_SHORTCUTS } from '@/hooks/useGlobalKeyboardShortcuts';
+import { useOrganizationContext } from '@/contexts/OrganizationContext';
 
 /**
  * Layout Component
@@ -55,6 +56,7 @@ const Layout: React.FC<LayoutProps> = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { organization, getLogoUrl } = useOrganizationContext();
 
   // Responsive breakpoints
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -238,7 +240,22 @@ const Layout: React.FC<LayoutProps> = () => {
           <Toolbar disableGutters sx={{ px: { xs: 1, sm: 2 } }}>
             {/* Logo / Brand */}
             <Box sx={{ display: 'flex', alignItems: 'center', mr: { xs: 1, sm: 2, md: 4 } }}>
-              <ResumeIcon sx={{ mr: 1, fontSize: { xs: 24, sm: 28, md: 32 } }} />
+              {getLogoUrl() ? (
+                <Box
+                  component="img"
+                  src={getLogoUrl() || undefined}
+                  alt={organization?.name || 'Logo'}
+                  sx={{
+                    mr: 1,
+                    height: { xs: 28, sm: 32, md: 36 },
+                    width: 'auto',
+                    maxHeight: 40,
+                    objectFit: 'contain',
+                  }}
+                />
+              ) : (
+                <ResumeIcon sx={{ mr: 1, fontSize: { xs: 24, sm: 28, md: 32 } }} />
+              )}
               <Typography
                 variant={isMobile ? 'body1' : 'h6'}
                 component={Link}
@@ -255,7 +272,7 @@ const Layout: React.FC<LayoutProps> = () => {
                   fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' },
                 }}
               >
-                {t('appName')}
+                {organization?.name || t('appName')}
               </Typography>
             </Box>
 

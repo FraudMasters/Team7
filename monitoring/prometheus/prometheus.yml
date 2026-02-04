@@ -14,6 +14,7 @@ alerting:
 # Load alert rules
 rule_files:
   - '/etc/prometheus/alert_rules.yml'
+  - '/etc/prometheus/backup_alert_rules.yml'
 
 scrape_configs:
   # Prometheus self-monitoring

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { createTheme, Theme } from '@mui/material/styles';
+import { useOrganizationContext } from './OrganizationContext';
 
 /**
  * Supported theme modes for the application
@@ -86,17 +87,22 @@ const getInitialThemeMode = (): ThemeMode => {
 };
 
 /**
- * Create Material-UI theme based on mode
+ * Create Material-UI theme based on mode and organization branding
  */
-const createAppTheme = (mode: ThemeMode): Theme => {
+const createAppTheme = (
+  mode: ThemeMode,
+  primaryColor?: string,
+  secondaryColor?: string,
+  fontFamily?: string
+): Theme => {
   return createTheme({
     palette: {
       mode,
       primary: {
-        main: '#1976d2',
+        main: primaryColor || '#1976d2',
       },
       secondary: {
-        main: '#dc004e',
+        main: secondaryColor || '#dc004e',
       },
       success: {
         main: '#2e7d32', // Green for matched skills
@@ -114,7 +120,7 @@ const createAppTheme = (mode: ThemeMode): Theme => {
       },
     },
     typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: fontFamily || '"Roboto", "Helvetica", "Arial", sans-serif',
       h4: {
         fontWeight: 600,
       },
@@ -164,6 +170,7 @@ const ThemeContext = createContext<ThemeState | undefined>(undefined);
  *
  * Manages application theme state and provides theme toggling functionality.
  * Handles theme changes and persists theme preference to localStorage.
+ * Integrates with organization branding to use custom colors and fonts.
  *
  * @param props - Provider props
  * @returns Theme context provider
@@ -172,6 +179,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   children,
   initialThemeMode,
 }) => {
+  const { branding, loading: brandingLoading } = useOrganizationContext();
+
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     // Use initialThemeMode if provided, otherwise get from storage/system
     if (initialThemeMode) {
@@ -180,7 +189,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     return getInitialThemeMode();
   });
 
-  const [theme, setTheme] = useState<Theme>(() => createAppTheme(themeMode));
+  const [theme, setTheme] = useState<Theme>(() =>
+    createAppTheme(
+      themeMode,
+      branding?.primary_color,
+      branding?.secondary_color,
+      branding?.font_family
+    )
+  );
 
   /**
    * Update HTML data-theme attribute when theme changes
@@ -189,6 +205,22 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeMode);
   }, [themeMode]);
+
+  /**
+   * Recreate theme when branding changes
+   */
+  useEffect(() => {
+    if (!brandingLoading && branding) {
+      setTheme(
+        createAppTheme(
+          themeMode,
+          branding.primary_color,
+          branding.secondary_color,
+          branding.font_family
+        )
+      );
+    }
+  }, [branding, brandingLoading, themeMode]);
 
   /**
    * Toggle between light and dark mode
