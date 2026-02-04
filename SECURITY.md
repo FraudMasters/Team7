@@ -5650,6 +5650,2237 @@ async def security_middleware(request: Request, call_next):
 
 ---
 
+## Compliance & Data Privacy
+
+### Overview
+
+The AgentHR Resume Analysis System processes **personally identifiable information (PII)** and must comply with various data protection regulations depending on the jurisdictions where candidates and organizations operate. Non-compliance can result in significant fines, legal liability, and reputational damage.
+
+### Applicable Regulations
+
+#### GDPR (General Data Protection Regulation) - EU/UK
+
+**Scope**: Applies to processing of personal data of EU/UK residents, regardless of where the processing occurs.
+
+**Key Requirements**:
+
+| Requirement | Description | Implementation |
+|-------------|-------------|----------------|
+| **Lawful Basis** | Must have a legal basis for processing (e.g., consent, contract) | Processing based on recruitment contract with candidates |
+| **Data Minimization** | Collect only data necessary for stated purpose | Only collect resume data relevant to hiring decisions |
+| **Purpose Limitation** | Use data only for stated, explicit purposes | Resume data used solely for recruitment assessment |
+| **Transparency** | Inform individuals what data is collected and how it's used | Privacy policy with clear data usage description |
+| **Data Subject Rights** | Grant specific rights to individuals | Implemented data access, correction, deletion endpoints |
+| **Data Portability** | Provide data in machine-readable format | Export candidate data in JSON/CSV format |
+| **Right to Erasure** | Delete data on request ("right to be forgotten") | Implemented candidate data deletion functionality |
+| **Data Breach Notification** | Notify authorities within 72 hours | Incident response plan with breach notification procedures |
+| **Data Protection by Design** | Build privacy into system architecture | Privacy impact assessments conducted |
+| **DPIA (Data Protection Impact Assessment)** | Required for high-risk processing | DPIA completed for resume analysis and ranking |
+
+**Potential Fines**:
+- **Standard violations**: Up to €10 million or 2% of global revenue (whichever is higher)
+- **Serious violations**: Up to €20 million or 4% of global revenue (whichever is higher)
+
+#### CCPA (California Consumer Privacy Act) - California, USA
+
+**Scope**: Applies to processing of personal data of California residents.
+
+**Key Requirements**:
+
+| Requirement | Description | Implementation |
+|-------------|-------------|----------------|
+| **Right to Know** | Inform consumers what data is collected | Privacy policy details data collection practices |
+| **Right to Delete** | Delete personal data on request | Implemented deletion endpoint for California residents |
+| **Right to Opt-Out** | Opt-out of data sale (if applicable) | System does not sell personal data |
+| **Right to Non-Discrimination** | Not discriminate for exercising rights | No penalty for accessing/deleting data |
+| **Data Access** | Provide specific categories of data collected | Data access request endpoint implemented |
+
+**Potential Fines**: Up to $7,500 per intentional violation.
+
+#### Other Jurisdictions
+
+| Regulation | Jurisdiction | Key Requirements |
+|------------|--------------|------------------|
+| **PIPEDA** | Canada | Consent, purpose limitation, access rights, breach notification |
+| **LGPD** | Brazil | Similar to GDPR - legal basis, data subject rights, DPIA |
+| **PDPA** | Singapore | Consent, access, correction, protection obligations |
+| **POPIA** | South Africa | Conditions for lawful processing, data subject rights |
+
+### Data Retention Policies
+
+The system implements **configurable data retention** through environment variables to comply with data minimization principles.
+
+#### Configuration Settings
+
+```python
+# From backend/config.py
+backup_retention_days = 30          # Backup retention (default: 30 days)
+audit_log_retention_days = 90       # Audit log retention (default: 90 days)
+```
+
+#### Retention Schedule
+
+| Data Type | Retention Period | Legal Basis | Deletion Method |
+|-----------|------------------|-------------|-----------------|
+| **Candidate Resumes** | 2 years after hiring decision | Contractual necessity | Automated soft-delete + hard purge |
+| **Candidate PII** | 2 years after last activity | Legal compliance requirement | Soft-delete (marked as deleted) |
+| **Audit Logs** | 90 days (configurable) | Legal compliance requirement | Automated log rotation + purge |
+| **Database Backups** | 30 days (configurable) | Recovery & compliance | Automated backup rotation |
+| **Application Logs** | 30 days | Operational need | Automated log rotation |
+| **Session Data** | 24 hours | Operational necessity | Automatic session expiration |
+| **Cache Data** | 7 days | Performance optimization | Automatic cache eviction |
+
+#### Data Deletion Process
+
+**Soft Delete** (Immediate):
+- Mark records as deleted in database
+- Remove from search results and API responses
+- Retain in database for backup/audit purposes
+
+**Hard Delete** (After Retention Period):
+```python
+# Automated deletion process (runs weekly)
+def cleanup_expired_data():
+    """
+    Delete expired data based on retention policies.
+    """
+    # 1. Delete candidates older than retention period
+    delete_candidates_older_than(days=730)  # 2 years
+
+    # 2. Delete audit logs older than retention period
+    delete_audit_logs_older_than(days=settings.audit_log_retention_days)
+
+    # 3. Delete old backups
+    delete_backups_older_than(days=settings.backup_retention_days)
+
+    # 4. Log deletion actions
+    log_data_deletion(action="cleanup", timestamp=now())
+```
+
+#### Data Subject Rights Implementation
+
+**Right to Access (DSAR)**:
+```bash
+# API Endpoint
+GET /api/candidates/{id}/data-export
+
+# Response: JSON with all personal data
+{
+  "candidate_id": "uuid",
+  "personal_info": { ... },
+  "resume_data": { ... },
+  "assessment_results": [ ... ],
+  "audit_log": [ ... ]
+}
+```
+
+**Right to Erasure**:
+```bash
+# API Endpoint
+DELETE /api/candidates/{id}
+
+# Action:
+# 1. Soft-delete immediately (data inaccessible)
+# 2. Schedule hard-delete after compliance period (if required)
+# 3. Log deletion action in audit trail
+# 4. Confirm deletion to data subject
+```
+
+**Right to Rectification**:
+```bash
+# API Endpoint
+PUT /api/candidates/{id}
+
+# Allows candidates to update their personal information
+```
+
+**Right to Portability**:
+```bash
+# API Endpoint
+GET /api/candidates/{id}/export
+
+# Provides data in machine-readable format (JSON, CSV, XML)
+```
+
+### Privacy by Design & Default
+
+#### Architecture Principles
+
+1. **Data Minimization**: Collect only data required for hiring assessment
+2. **Purpose Limitation**: Use data only for recruitment purposes
+3. **Storage Limitation**: Retain data only as long as necessary
+4. **Security by Default**: Enable all security features automatically
+5. **Transparency**: Clear privacy notices and consent mechanisms
+
+#### Privacy Impact Assessment (PIA)
+
+**PIA Checklist**:
+- [ ] Data flows documented
+- [ ] Data subjects identified (candidates, recruiters)
+- [ ] Processing purposes documented
+- [ ] Legal basis identified (contract, consent, legal obligation)
+- [ ] Privacy risks assessed (unauthorized access, data breach)
+- [ ] Mitigation measures implemented (encryption, access control)
+- [ ] Data subject rights supported (access, deletion, portability)
+- [ ] Third-party processor risks assessed (LLM providers, cloud services)
+- [ ] International data transfer risks addressed (EU-US data transfers)
+- [ ] DPIA completed for high-risk processing (AI-based ranking)
+
+#### Third-Party Data Processors
+
+**LLM Providers** (OpenAI, Anthropic, Google, Z.ai):
+- **Data Usage**: Resume text sent for ATS scoring and analysis
+- **Data Retention**: Verify provider's data retention policy
+- **Data Processing Agreement (DPA)**: Execute DPA with each provider
+- **Data Location**: Ensure EU data remains in EU (if required)
+- **Data Deletion**: Request deletion of data from provider systems
+
+**S3 Backup Storage** (if enabled):
+- **Data Encryption**: Server-side encryption enabled
+- **Access Control**: Bucket access restricted to specific IAM roles
+- **Data Location**: Choose appropriate AWS region for compliance
+- **Data Deletion**: Implement versioning with lifecycle policies
+
+### Privacy Policy Requirements
+
+The privacy policy must include:
+
+**Required Disclosures**:
+1. **Data Controller Identity**: Organization responsible for data processing
+2. **Data Collected**: Types of personal data collected (name, email, resume)
+3. **Processing Purposes**: Why data is collected (recruitment, assessment)
+4. **Legal Basis**: Legal basis for processing (contract, consent)
+5. **Data Recipients**: Who has access to data (recruiters, LLM providers)
+6. **Data Transfers**: International data transfers (if applicable)
+7. **Data Retention**: How long data is retained (2 years for resumes)
+8. **Data Subject Rights**: Rights of individuals (access, deletion, portability)
+9. **Contact Information**: How to contact data protection officer
+10. **Complaint Rights**: Right to lodge complaint with supervisory authority
+
+**Sample Privacy Notice**:
+```markdown
+## Privacy Policy for AgentHR Resume Analysis
+
+### What Data We Collect
+We collect personal information you provide when submitting your resume,
+including:
+- Contact information (name, email, phone)
+- Professional information (work history, education)
+- Resume documents (PDF, DOCX)
+
+### How We Use Your Data
+Your data is used solely for recruitment purposes:
+- Assessing your qualifications for open positions
+- Ranking your resume against job requirements
+- Communicating with you about the hiring process
+
+### Legal Basis
+We process your data based on:
+- **Contract**: Pre-contractual steps for potential employment
+- **Legitimate Interest**: Assessing your suitability for the role
+
+### Data Retention
+Your data is retained for **2 years** after the hiring decision,
+then automatically deleted.
+
+### Your Rights
+You have the right to:
+- **Access**: Request a copy of your data
+- **Rectify**: Update incorrect information
+- **Erase**: Request deletion of your data
+- **Portability**: Receive your data in a structured format
+- **Object**: Object to processing based on legitimate interest
+
+### Contact
+For privacy inquiries, contact: privacy@company.com
+For complaints, contact your local data protection authority.
+```
+
+### Compliance Checklist
+
+#### GDPR Compliance
+
+- [ ] **Legal Basis Identified**: Documented legal basis for all processing (contract, consent, legitimate interest)
+- [ ] **Records of Processing Activities (ROPA)**: Maintained and up-to-date
+- [ ] **Data Protection Impact Assessment (DPIA)**: Completed for AI-based ranking
+- [ ] **Data Subject Rights Implemented**:
+  - [ ] Right to access (DSAR endpoint)
+  - [ ] Right to erasure (deletion endpoint)
+  - [ ] Right to rectification (update endpoint)
+  - [ ] Right to portability (export endpoint)
+  - [ ] Right to object (objection tracking)
+  - [ ] Right to restrict processing (data marking)
+- [ ] **Privacy Policy Published**: Includes all required disclosures
+- [ ] **Cookie Consent**: Cookie banner implemented (if tracking candidates)
+- [ ] **Breach Notification**: 72-hour notification process documented
+- [ ] **Data Protection Officer (DPO)**: Appointed (if required by scale)
+- [ ] **Data Processing Agreements (DPA)**: Signed with all third-party processors
+- [ ] **Data Encryption**: At-rest and in-transit encryption implemented
+- [ ] **Access Control**: Role-based access control (RBAC) implemented
+- [ ] **Audit Logging**: All data access logged
+- [ ] **Data Retention**: Configurable retention policies implemented
+- [ ] **Data Deletion**: Automated deletion process configured
+- [ ] **International Data Transfers**: Adequacy decisions or SCCs in place
+- [ ] **Privacy by Design**: PIA conducted for all features
+- [ ] **Staff Training**: Data protection training completed for all staff
+
+#### CCPA Compliance
+
+- [ ] **Privacy Policy Updated**: Includes CCPA-specific disclosures
+- [ ] **Data Collection Notice**: "Do Not Sell My Info" link (if applicable)
+- [ ] **Right to Know**: Data access request endpoint available
+- [ ] **Right to Delete**: Deletion request endpoint available
+- [ ] **Right to Opt-Out**: Opt-out mechanism (if selling data)
+- [ ] **Non-Discrimination**: No penalties for exercising rights
+- [ ] **Request Verification**: Identity verification process for requests
+- [ ] **Response Timeframes**: Respond within 45 days
+- [ ] **Data Categories**: List categories of data collected
+- [ ] **Third-Party Disclosure**: Disclose data sharing with third parties
+
+#### Data Security Standards
+
+- [ ] **ISO 27001**: Information security management system (if required)
+- [ ] **SOC 2**: Service organization controls (if required)
+- [ ] **NIST Framework**: Cybersecurity framework alignment
+- [ ] **Penetration Testing**: Annual security assessment
+- [ ] **Vulnerability Scanning**: Quarterly vulnerability scans
+- [ ] **Security Awareness Training**: Annual training for all staff
+
+---
+
+## Incident Response
+
+### Overview
+
+A well-defined **incident response plan** is critical for minimizing the impact of security breaches, data leaks, and other security incidents. This section outlines the procedures, roles, and communication channels for effective incident response.
+
+### Incident Response Team
+
+#### Roles & Responsibilities
+
+| Role | Responsibilities | Contact (Example) |
+|------|------------------|-------------------|
+| **Incident Response Lead** | Overall coordination, decision-making, escalation | security-lead@company.com |
+| **Security Analyst** | Technical investigation, containment, forensics | security@company.com |
+| **Legal Counsel** | Legal advice, regulatory notification, liability | legal@company.com |
+| **Communications Lead** | External communication, PR, stakeholder management | pr@company.com |
+| **Data Protection Officer (DPO)** | GDPR/CCPA compliance, data subject notifications | dpo@company.com |
+| **DevOps Engineer** | System recovery, patches, configuration changes | devops@company.com |
+| **Executive Sponsor** | Business impact assessment, high-level decisions | cto@company.com |
+
+#### Escalation Matrix
+
+**Severity 1 - Critical** (Escalate Immediately):
+- Confirmed data breach involving PII
+- Ransomware or active system compromise
+- Complete service unavailability (>1 hour)
+
+**Severity 2 - High** (Escalate within 1 hour):
+- Suspected unauthorized access to candidate data
+- Malware detected in production systems
+- Partial service unavailability
+
+**Severity 3 - Medium** (Escalate within 4 hours):
+- Failed login attempts spike
+- Potential vulnerability exploitation
+- Minor data exposure (non-sensitive)
+
+**Severity 4 - Low** (Escalate within 24 hours):
+- Policy violations
+- Minor security misconfigurations
+- Failed compliance audit items
+
+### Incident Classification
+
+#### Incident Types
+
+| Category | Examples | Severity |
+|----------|----------|----------|
+| **Data Breach** | Unauthorized access to candidate PII, database exfiltration | Critical |
+| **Malware/Ransomware** | Malicious software detected, files encrypted | Critical |
+| **DDoS Attack** | Denial of service, service unavailable | High |
+| **Unauthorized Access** | Invalid login attempts, credential stuffing | High |
+| **Insider Threat** | Data exfiltration by employee, privilege abuse | High |
+| **Vulnerability Exploit** | Known CVE exploited in production | High |
+| **Misconfiguration** | S3 bucket public, debug logging enabled | Medium |
+| **Compliance Violation** | GDPR/CCPA non-compliance finding | Medium |
+| **Social Engineering** | Phishing attack on staff | Medium |
+
+#### Severity Levels
+
+**Critical (Severity 1)**:
+- Immediate business impact
+- Data breach affecting >100 records
+- Regulatory reporting required
+- Service unavailable >1 hour
+
+**High (Severity 2)**:
+- Significant business impact
+- Potential data breach
+- Security control bypassed
+- Service degradation
+
+**Medium (Severity 3)**:
+- Limited business impact
+- Security policy violation
+- No confirmed data exposure
+- Service remains available
+
+**Low (Severity 4)**:
+- Minimal business impact
+- Process improvement needed
+- No immediate threat
+- Document and monitor
+
+### Incident Response Process
+
+Follow the **NIST Incident Response Lifecycle**: Preparation → Detection → Containment → Eradication → Recovery → Lessons Learned
+
+#### Phase 1: Preparation
+
+**Objective**: Be prepared before an incident occurs.
+
+**Preparation Checklist**:
+- [ ] Incident response plan documented and distributed
+- [ ] Incident response team (IRT) trained and contact list available
+- [ ] Communication channels established (Slack, email, phone)
+- [ ] Incident response tools deployed and tested:
+  - [ ] SIEM for log analysis
+  - [ ] EDR for endpoint detection
+  - [ ] Network monitoring tools
+  - [ ] Forensic imaging tools
+  - [ ] Secure communication channels (Signal, Wickr)
+- [ ] Backup and recovery procedures tested
+- [ ] Escalation procedures documented
+- [ ] Legal notification templates prepared
+- [ ] Regulatory reporting requirements documented (GDPR 72h, CCPA 30 days)
+- [ ] PR and customer communication templates ready
+
+**Pre-Configured Alert Rules**:
+```yaml
+# Example Prometheus/Loki alert rules
+alerts:
+  - name: BruteForceAttack
+    condition: rate(failed_logins[5m]) > 10
+    severity: high
+    action: "Block IP, notify IRT"
+
+  - name: DatabaseAnomaly
+    condition: rate(db_queries[1h]) > 10000
+    severity: critical
+    action: "Investigate potential data exfiltration"
+
+  - name: MalwareDetected
+    condition: count(malware_scan_result="positive") > 0
+    severity: critical
+    action: "Isolate system, notify IRT"
+
+  - name: UnauthorizedAccess
+    condition: auth_failures_by_user > 50
+    severity: high
+    action: "Lock account, notify user"
+```
+
+#### Phase 2: Detection & Analysis
+
+**Objective**: Detect incidents and determine scope/impact.
+
+**Detection Sources**:
+- **Automated Alerts**: SIEM, EDR, intrusion detection systems
+- **User Reports**: Phishing reports, suspicious activity
+- **Monitoring**: Grafana dashboards, log analysis
+- **Threat Intelligence**: CVE feeds, security advisories
+
+**Analysis Steps**:
+
+1. **Verify the Incident**:
+   ```bash
+   # Is this a real security incident?
+   - Review alert details
+   - Correlate with other alerts
+   - Check for false positives
+   - Confirm anomaly
+   ```
+
+2. **Determine Scope**:
+   ```bash
+   # What systems/data are affected?
+   - Check database access logs
+   - Review authentication logs
+   - Scan for malware on endpoints
+   - Analyze network traffic
+   - Identify affected accounts
+   ```
+
+3. **Assess Impact**:
+   ```bash
+   # What is the business impact?
+   - Number of records exposed
+   - Sensitivity of data (PII, financial)
+   - Regulatory reporting requirements
+   - Customer/stakeholder impact
+   - Service availability impact
+   ```
+
+4. **Classify Severity**:
+   ```bash
+   # Based on impact and scope
+   - Critical: Data breach, service down
+   - High: Potential breach, service degraded
+   - Medium: Policy violation, limited impact
+   - Low: Process improvement, minimal impact
+   ```
+
+**Investigation Commands** (Examples):
+```bash
+# Check for suspicious login attempts
+grep "Failed password" /var/log/auth.log | tail -100
+
+# Check database access logs
+grep "SELECT.*candidates" /var/log/postgresql/postgresql.log | tail -100
+
+# Check for malware scan results
+cat /var/log/clamav/clamd.log | grep "FOUND"
+
+# Check network connections
+netstat -tulpn | grep ESTABLISHED
+
+# Check for recently modified files
+find /var/www -mtime -1 -ls
+
+# Check systemd service status
+systemctl status backend-api
+systemctl status postgresql
+```
+
+#### Phase 3: Containment
+
+**Objective**: Stop the incident from spreading and minimize damage.
+
+**Containment Strategies**:
+
+**Immediate Actions** (All Severities):
+```bash
+# 1. Preserve evidence (before any changes)
+mkdir -p /tmp/incident-$(date +%Y%m%d)
+cp /var/log/auth.log /tmp/incident-$(date +%Y%m%d)/
+cp /var/log/postgresql/*.log /tmp/incident-$(date +%Y%m%d)/
+iptables -L -n > /tmp/incident-$(date +%Y%m%d)/iptables.txt
+
+# 2. Document current state
+ps aux > /tmp/incident-$(date +%Y%m%d)/ps.txt
+netstat -tulpn > /tmp/incident-$(date +%Y%m%d)/netstat.txt
+```
+
+**Short-Term Containment** (Stop the bleeding):
+```bash
+# For DDoS attacks:
+# Enable rate limiting
+iptables -A INPUT -p tcp --dport 8000 -m limit --limit 10/second -j ACCEPT
+
+# For brute force attacks:
+# Block suspicious IPs
+iptables -A INPUT -s 192.0.2.0/24 -j DROP
+
+# For unauthorized access:
+# Disable compromised accounts
+UPDATE users SET active=false WHERE id='compromised-user-id';
+
+# For malware:
+# Isolate affected system
+iptables -A OUTPUT -p tcp --dport 80,443 -j DROP  # Block outbound
+
+# For database breach:
+# Enable read-only mode
+ALTER DATABASE resume_analysis SET default_transaction_read_only = on;
+```
+
+**Long-Term Containment** (Prevent recurrence):
+- Reset all passwords for affected systems
+- Revoke and reissue API keys
+- Patch exploited vulnerabilities
+- Implement additional security controls
+- Route traffic through WAF/DDoS protection
+
+#### Phase 4: Eradication
+
+**Objective**: Remove the root cause of the incident.
+
+**Eradication Steps**:
+
+1. **Identify Root Cause**:
+   - Vulnerability that was exploited
+   - Malware that was executed
+   - Misconfiguration that allowed access
+   - Phishing email that was clicked
+
+2. **Remove Threat**:
+   ```bash
+   # Delete malware files
+   rm -f /tmp/malicious-file.exe
+
+   # Remove malicious accounts
+   DELETE FROM users WHERE email='attacker@evil.com';
+
+   # Patch vulnerability
+   apt-get update && apt-get upgrade -y
+
+   # Fix misconfiguration
+   # Edit config files to secure settings
+   ```
+
+3. **Verify Removal**:
+   - Re-scan for malware
+   - Verify vulnerability patched
+   - Confirm no backdoors installed
+   - Check for persistence mechanisms (cron jobs, systemd services)
+
+4. **Document Findings**:
+   - Root cause analysis report
+   - Timeline of events
+   - Attack reconstruction
+   - Lessons learned
+
+#### Phase 5: Recovery
+
+**Objective**: Restore normal operations and verify security.
+
+**Recovery Steps**:
+
+1. **Restore from Backup** (if needed):
+   ```bash
+   # Verify backup integrity before restore
+   sha256sum backup.sql.gz
+
+   # Restore database
+   gunzip -c backup.sql.gz | psql resume_analysis
+
+   # Restore application files
+   rsync -av /backup/app/ /var/www/html/
+   ```
+
+2. **Change Credentials**:
+   ```bash
+   # Reset all admin passwords
+   # Reissue API keys
+   # Rotate database passwords
+   # Update service account credentials
+   ```
+
+3. **Patch & Harden**:
+   ```bash
+   # Apply security updates
+   apt-get update && apt-get upgrade -y
+
+   # Implement additional security controls
+   # (e.g., 2FA, IP whitelisting, enhanced monitoring)
+   ```
+
+4. **Monitor for Recurrence**:
+   - Increase logging verbosity
+   - Set up additional alerts
+   - Monitor for suspicious activity
+   - Conduct post-incident review
+
+5. **Gradual Restoration**:
+   - Bring systems online one at a time
+   - Monitor each system before proceeding
+   - Verify data integrity
+   - Test functionality
+
+#### Phase 6: Lessons Learned (Post-Incident Activity)
+
+**Objective**: Improve security posture and prevent recurrence.
+
+**Post-Incident Timeline**:
+- **Day 1-2**: Root cause analysis draft
+- **Day 3-7**: Complete incident report
+- **Day 7-14**: Implement corrective actions
+- **Day 30**: Review effectiveness of changes
+
+**Incident Report Template**:
+```markdown
+# Security Incident Report
+
+## Executive Summary
+- Incident date/time:
+- Incident type:
+- Severity level:
+- Business impact:
+- Status:
+
+## Incident Timeline
+| Time | Event | Action Taken |
+|------|-------|--------------|
+| 2024-02-01 14:30 | Alert triggered | Investigated by Security Analyst |
+| 2024-02-01 14:45 | Incident confirmed | IRT activated |
+| 2024-02-01 15:00 | Containment started | Blocked malicious IPs |
+| 2024-02-01 16:00 | Eradication completed | Removed malware |
+| 2024-02-01 18:00 | Recovery completed | Systems restored |
+
+## Root Cause Analysis
+- Initial vector: [Phishing email / Vulnerability exploit / Misconfiguration]
+- Vulnerability: [CVE-XXXX-XXXX or description]
+- Exploited by: [Attacker TTPs]
+- Why it wasn't detected earlier: [Gap in monitoring]
+
+## Impact Assessment
+- Data affected: [Number of records, data types]
+- Systems affected: [List of systems]
+- Users affected: [Number of users]
+- Regulatory impact: [GDPR notification required, etc.]
+- Financial impact: [Estimated costs]
+
+## Corrective Actions Taken
+- Immediate: [Actions during incident]
+- Short-term: [Actions within 1 week]
+- Long-term: [Actions within 1 month]
+
+## Lessons Learned
+- What worked well: [Successful aspects of response]
+- What didn't work: [Challenges faced]
+- Recommendations: [Process improvements]
+
+## Action Items
+- [ ] Update incident response plan (add new scenario)
+- [ ] Implement additional monitoring for [specific threat]
+- [ ] Conduct security training on [topic]
+- [ ] Patch [vulnerability] across all systems
+```
+
+### Communication Procedures
+
+#### Internal Communication
+
+**Notification Channels**:
+- **Urgent**: Phone call, SMS, Slack #incidents channel
+- **High**: Email + Slack #incidents
+- **Medium/Low**: Email + ticketing system
+
+**Stakeholder Communication**:
+
+| Stakeholder | When to Notify | Who Notifies | What to Include |
+|-------------|----------------|--------------|-----------------|
+| **IRT Members** | Immediately (Severity 1-2) | Automated Alert | Incident type, severity, initial details |
+| **Executive Team** | Within 1 hour (Severity 1-2) | Incident Lead | Business impact, escalation status, ETA |
+| **Legal Counsel** | Immediately (data breach) | Incident Lead | Legal exposure, regulatory requirements |
+| **IT Operations** | Within 1 hour | Incident Lead | Systems affected, containment actions |
+| **HR** | If insider threat | Incident Lead | Employee involved, investigation status |
+
+#### External Communication
+
+**Regulatory Notification**:
+
+| Regulation | Timeframe | Authority | Contact |
+|------------|-----------|-----------|---------|
+| **GDPR** | 72 hours | Supervisory Authority | Your local DPA |
+| **CCPA** | No requirement, but recommended | California Attorney General | N/A |
+| **UK GDPR** | 72 hours | ICO | icocasework@ico.org.uk |
+
+**Data Subject Notification**:
+
+**When Required** (GDPR):
+- Data breach likely to result in risk to rights/freedoms
+- Must notify "without undue delay" (typically within 72 hours)
+
+**Notification Template**:
+```markdown
+Subject: Important Notice About Your Personal Data
+
+Dear [Candidate Name],
+
+We are writing to inform you about a security incident that may have involved your personal information.
+
+What Happened:
+On [date], we discovered [describe incident].
+
+What Information Was Affected:
+[List types of data: name, email, resume, etc.]
+
+What We Are Doing:
+We have [containment actions]. We are working with [law enforcement/regulators].
+
+What You Can Do:
+[Recommend steps: monitor accounts, change passwords, etc.]
+
+Who to Contact:
+If you have questions, contact: [contact details]
+
+We sincerely apologize for any inconvenience or concern this may cause.
+
+[Company Name]
+```
+
+**Customer/Client Communication**:
+- **Severity 1-2**: Notify within 24 hours
+- **Severity 3-4**: Notify within 1 week (if any impact)
+
+### Legal & Regulatory Requirements
+
+#### GDPR Breach Notification
+
+**72-Hour Notification** (to Supervisory Authority):
+1. **Nature of Breach**: Categories and approximate number of data subjects concerned
+2. **Contact Details**: DPO contact information
+3. **Consequences**: Likely consequences of the breach
+4. **Measures Taken**: Measures taken to address breach and mitigate adverse effects
+
+**Documentation Required** (even if not notified):
+- Facts relating to the breach
+- Effects of the breach
+- Remedial action taken
+
+#### CCPA Breach Notification
+
+**30-Day Notification** (if required):
+- No specific breach notification requirement in CCPA
+- Follow California Civil Code 1798.82
+- Notify if encrypted data is accessed/lost
+
+#### Documentation & Evidence
+
+**Evidence to Preserve**:
+- System logs (auth, access, error logs)
+- Network traffic captures
+- Database query logs
+- Audit logs
+- Incident response timeline
+- Communication logs
+- Root cause analysis report
+- Remediation actions taken
+
+**Evidence Chain of Custody**:
+```bash
+# Create forensic image
+dd if=/dev/sdb of=/tmp/evidence.img bs=4k conv=noerror,sync
+
+# Calculate checksums
+sha256sum /tmp/evidence.img > /tmp/evidence.img.sha256
+
+# Document evidence collection
+echo "$(date): Collected evidence image from /dev/sdb" >> /tmp/evidence-chain.txt
+```
+
+### Incident Response Drills
+
+**Tabletop Exercises** (Quarterly):
+- Simulate data breach scenario
+- Walk through incident response steps
+- Identify gaps in procedures
+- Practice communication procedures
+
+**Red Team Exercises** (Annually):
+- Simulated attack by security team
+- Test detection and response capabilities
+- Identify security gaps
+- Validate incident response procedures
+
+**Fire Drills** (Semi-Annually):
+- Unannounced incident simulation
+- Test response time and procedures
+- Evaluate team readiness
+
+### Incident Response Checklist
+
+#### Preparation Checklist
+- [ ] Incident response plan documented and approved
+- [ ] IRT contact list up-to-date
+- [ ] Communication channels established
+- [ ] Monitoring and alerting configured
+- [ ] Backup and recovery tested
+- [ ] Legal notification templates prepared
+- [ ] PR communication templates ready
+- [ ] Forensic tools available
+- [ ] Incident response training completed
+- [ ] Tabletop exercise conducted (within last 6 months)
+
+#### Response Checklist (During Incident)
+- [ ] Incident detected and verified
+- [ ] Severity assessed
+- [ ] IRT notified
+- [ ] Scope determined (systems, data, users affected)
+- [ ] Containment initiated
+- [ ] Evidence preserved
+- [ ] Root cause identified
+- [ ] Eradication completed
+- [ ] Recovery initiated
+- [ ] Systems restored and verified
+- [ ] Monitoring enhanced post-incident
+
+#### Post-Incident Checklist
+- [ ] Root cause analysis completed
+- [ ] Incident report written and distributed
+- [ ] Regulatory notifications sent (if required)
+- [ ] Data subject notifications sent (if required)
+- [ ] Executive briefing delivered
+- [ ] Lessons learned documented
+- [ ] Corrective actions implemented
+- [ ] Security controls updated
+- [ ] Policies updated
+- [ ] Training updated (if needed)
+- [ ] Incident response plan updated
+- [ ] Follow-up review scheduled (30 days)
+
+---
+
+## Security Testing
+
+### Overview
+
+**Security testing** is essential for identifying vulnerabilities before attackers can exploit them. This section provides a comprehensive security testing checklist covering automated scans, manual testing, penetration testing, and continuous security validation.
+
+### Testing Strategy
+
+The system follows a **defense-in-depth testing approach**:
+
+| Testing Type | Frequency | Scope | Automation |
+|--------------|-----------|-------|------------|
+| **SAST** | Every commit | Source code | Automated (CI/CD) |
+| **SCA** | Daily | Dependencies | Automated |
+| **DAST** | Weekly | Running application | Automated |
+| **Container Scanning** | Every build | Docker images | Automated |
+| **Infrastructure Scanning** | Daily | Cloud/Server config | Automated |
+| **Penetration Testing** | Annually | Full system | Manual |
+| **Red Team Exercises** | Annually | Full system (attacks) | Manual |
+
+### 1. Static Application Security Testing (SAST)
+
+**Objective**: Find security vulnerabilities in source code before deployment.
+
+#### Automated SAST Tools
+
+**Bandit** (Python):
+```bash
+# Run in CI/CD pipeline
+bandit -r backend/ -f json -o bandit-report.json
+
+# Exit on high-severity findings
+bandit -r backend/ -lll
+```
+
+**Semgrep** (Multi-language):
+```bash
+# Custom security rules
+semgrep --config=security-tests/semgrep-rules/ backend/
+
+# Check for common vulnerabilities
+semgrep --config=auto backend/
+```
+
+**PyLint with Security Checks**:
+```bash
+pylint --enable=W0102,W0611,W0702,E1120 backend/
+```
+
+#### Security Checks to Implement
+
+**SQL Injection Prevention**:
+```python
+# ❌ BAD - String concatenation
+query = f"SELECT * FROM candidates WHERE id = {user_id}"
+
+# ✅ GOOD - Parameterized query
+query = "SELECT * FROM candidates WHERE id = %s"
+cursor.execute(query, (user_id,))
+```
+
+**XSS Prevention**:
+```python
+# ❌ BAD - Unsanitized output
+return HttpResponse(f"<div>{user_input}</div>")
+
+# ✅ GOOD - Escaped output
+from html import escape
+return HttpResponse(f"<div>{escape(user_input)}</div>")
+```
+
+**Path Traversal Prevention**:
+```python
+# ❌ BAD - Unvalidated path
+file_path = f"/uploads/{filename}"
+
+# ✅ GOOD - Validated path
+from pathlib import Path
+upload_dir = Path("/uploads")
+file_path = (upload_dir / filename).resolve()
+if not file_path.is_relative_to(upload_dir):
+    raise ValueError("Invalid filename")
+```
+
+**Hardcoded Secrets Detection**:
+```bash
+# Use gitleaks to detect secrets in code
+gitleaks detect --source . --report-format json --report-path gitleaks-report.json
+```
+
+#### SAST Checklist
+
+- [ ] **SQL Injection**: All database queries use parameterized queries or ORM
+- [ ] **XSS**: All user output is HTML-escaped
+- [ ] **CSRF**: All state-changing operations have CSRF tokens
+- [ ] **Authentication**: Password hashing (bcrypt/argon2), never store plaintext
+- [ ] **Authorization**: Every endpoint checks user permissions
+- [ ] **Path Traversal**: File paths are validated and sanitized
+- [ ] **Command Injection**: No shell commands with user input
+- [ ] **Insecure Deserialization**: Validate serialized data
+- [ ] **Hardcoded Secrets**: No API keys, passwords, tokens in code
+- [ ] **Error Messages**: No sensitive data in error messages
+- [ ] **Logging**: No sensitive data (passwords, tokens) in logs
+- [ ] **Cryptographic Issues**: Use up-to-date algorithms (AES-256, SHA-256)
+
+---
+
+### 2. Software Composition Analysis (SCA)
+
+**Objective**: Identify vulnerabilities in dependencies and third-party libraries.
+
+#### Automated Dependency Scanning
+
+**Safety** (Python dependencies):
+```bash
+# Check for vulnerable dependencies
+safety check --json > safety-report.json
+
+# Scan requirements files
+safety check -r requirements.txt
+```
+
+**Pip Audit** (Python):
+```bash
+# Audit installed packages
+pip-audit --format json --output pip-audit-report.json
+
+# Audit requirements files
+pip-audit --requirement requirements.txt
+```
+
+**Dependabot** (GitHub):
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+```
+
+**Trivy** (Multi-language):
+```bash
+# Scan Python dependencies
+trivy fs --format json --output trivy-deps.json --security-checks vuln,license backend/
+
+# Scan for vulnerabilities and license issues
+trivy config . --security-checks vuln,config,license
+```
+
+#### SCA Best Practices
+
+1. **Automated Scanning**:
+   - Run in CI/CD pipeline on every commit
+   - Fail build for high/critical vulnerabilities
+   - Generate SBOM (Software Bill of Materials)
+
+2. **Dependency Updates**:
+   - Subscribe to security advisories
+   - Update dependencies regularly (monthly)
+   - Use Dependabot/Renovate for automated PRs
+
+3. **Vulnerability Triageage**:
+   - Prioritize based on CVSS score and exploitability
+   - Check if vulnerable code is actually used
+   - Assess impact on application functionality
+
+4. **License Compliance**:
+   - Scan for problematic licenses (GPL, AGPL)
+   - Maintain license inventory
+   - Ensure compliance with open-source licenses
+
+#### SCA Checklist
+
+- [ ] **Automated Scanning**: SCA integrated into CI/CD pipeline
+- [ ] **Vulnerability Alerts**: Configured for all dependencies
+- [ ] **CVSS Scoring**: Vulnerabilities assessed by severity
+- [ ] **Remediation Timeline**:
+  - [ ] Critical (9.0-10.0): Patch within 48 hours
+  - [ ] High (7.0-8.9): Patch within 1 week
+  - [ ] Medium (4.0-6.9): Patch within 1 month
+  - [ ] Low (0.1-3.9): Patch in next release cycle
+- [ ] **Dependency Inventory**: List of all dependencies and versions
+- [ ] **License Inventory**: All licenses documented and compliant
+- [ ] **SBOM**: Software Bill of Materials generated
+- [ ] **Vulnerable Code Usage**: Verify vulnerable functions are not called
+- [ ] **Update Policy**: Regular dependency updates scheduled
+- [ ] **Transitive Dependencies**: All indirect dependencies scanned
+
+---
+
+### 3. Dynamic Application Security Testing (DAST)
+
+**Objective**: Find vulnerabilities in running applications.
+
+#### Automated DAST Tools
+
+**OWASP ZAP** (Zed Attack Proxy):
+```bash
+# Automated scan in CI/CD
+zap-baseline.py -t http://localhost:8000 -r zap-report.html
+
+# API scan
+zap-api-scan.py -t http://localhost:8000/openapi.json -f openapi -r zap-api-report.html
+```
+
+**Nuclei** (Vulnerability scanner):
+```bash
+# Scan running application
+nuclei -u http://localhost:8000 -t /path/to/nuclei-templates/ -severity critical,high,medium -o nuclei-report.txt
+
+# Scan with specific templates
+nuclei -u http://localhost:8000 -t cves/ -o nuclei-cves.txt
+```
+
+**SQLMap** (SQL injection testing):
+```bash
+# Test for SQL injection (authorize with your own testing environment only!)
+sqlmap -u "http://localhost:8000/api/candidates?id=1" --batch --dbms=postgresql --level=1 --risk=1
+```
+
+#### Manual DAST Testing
+
+**Authentication & Authorization Testing**:
+```bash
+# Test for broken authentication
+# 1. Try accessing protected endpoints without authentication
+curl http://localhost:8000/api/candidates -H "Authorization:"
+
+# 2. Try accessing other users' data
+curl http://localhost:8000/api/candidates/USER_ID_2 -H "Authorization: Bearer USER_1_TOKEN"
+
+# 3. Test privilege escalation
+# (Admin user accessing recruiter-only endpoints, etc.)
+```
+
+**Input Validation Testing**:
+```bash
+# Test for SQL injection
+curl -X POST http://localhost:8000/api/candidates/search \
+  -H "Content-Type: application/json" \
+  -d '{"vacancy_id": "1 OR 1=1--"}'
+
+# Test for XSS
+curl -X POST http://localhost:8000/api/candidates \
+  -H "Content-Type: application/json" \
+  -d '{"name": "<script>alert(\"XSS\")</script>"}'
+
+# Test for command injection
+curl -X POST http://localhost:8000/api/upload \
+  -F "file=@test.pdf; filename=$(whoami)"
+```
+
+**API Security Testing**:
+```bash
+# Test for rate limiting
+for i in {1..1000}; do curl http://localhost:8000/api/candidates; done
+
+# Test for mass assignment
+curl -X PUT http://localhost:8000/api/users/1 \
+  -H "Content-Type: application/json" \
+  -d '{"is_admin": true}'
+
+# Test for IDOR (Insecure Direct Object Reference)
+curl http://localhost:8000/api/candidates/OTHER_USER_ID
+```
+
+#### DAST Checklist
+
+- [ ] **Authentication Tested**:
+  - [ ] Weak passwords allowed
+  - [ ] Session fixation
+  - [ ] Logout functionality
+  - [ ] Session timeout
+- [ ] **Authorization Tested**:
+  - [ ] Horizontal privilege escalation (access other users' data)
+  - [ ] Vertical privilege escalation (regular user → admin)
+  - [ ] Missing authorization on API endpoints
+  - [ ] Bypassing authorization checks
+- [ ] **Input Validation Tested**:
+  - [ ] SQL injection on all input fields
+  - [ ] XSS on all input/output fields
+  - [ ] Command injection
+  - [ ] Path traversal
+  - [ ] LDAP injection
+  - [ ] XXE (XML External Entity)
+- [ ] **API Security Tested**:
+  - [ ] Rate limiting enforced
+  - [ ] Mass assignment prevented
+  - [ ] IDOR vulnerabilities
+  - [ ] Excessive data exposure
+  - [ ] Improper asset management
+- [ ] **Session Management Tested**:
+  - [ ] Session timeout configured
+  - [ ] Secure cookies (HttpOnly, Secure, SameSite)
+  - [ ] Session fixation prevented
+  - [ ] Logout invalidates session
+- [ ] **Error Handling Tested**:
+  - [ ] Stack traces not exposed
+  - [ ] Sensitive data not in error messages
+  - [ ] Custom error pages
+
+---
+
+### 4. Container Security Testing
+
+**Objective**: Ensure Docker images and containers are secure.
+
+#### Container Image Scanning
+
+**Trivy**:
+```bash
+# Scan Docker image for vulnerabilities
+trivy image agenthr-backend:latest --format json --output trivy-image.json
+
+# Scan with severity filtering
+trivy image agenthr-backend:latest --severity HIGH,CRITICAL
+
+# Scan for vulnerabilities and misconfigurations
+trivy image agenthr-backend:latest --security-checks vuln,config,secret
+```
+
+**Grype** (Anchore):
+```bash
+# Scan Docker image
+grype agenthr-backend:latest -o json -f grype-report.json
+
+# Scan by severity
+grype agenthr-backend:latest --fail-on high
+```
+
+#### Dockerfile Security Best Practices
+
+```dockerfile
+# ✅ GOOD - Secure Dockerfile
+FROM python:3.11-slim
+
+# Use non-root user
+RUN adduser --disabled-password --gecos '' appuser
+
+# Install security updates
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first (better caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY --chown=appuser:appuser . /app
+WORKDIR /app
+
+# Switch to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Minimal attack surface
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+#### Container Security Checklist
+
+- [ ] **Base Image**: Use minimal, official images (alpine, slim)
+- [ ] **Non-Root User**: Container runs as non-privileged user
+- [ ] **Image Scanning**: All images scanned for vulnerabilities
+- [ ] **No Secrets**: No secrets in Dockerfile or image layers
+- [ ] **Minimal Packages**: Only necessary packages installed
+- [ ] **Security Updates**: Base images updated regularly
+- [ ] **File Permissions**: Sensitive files have restricted permissions
+- [ ] **Network**: Containers isolated, minimal exposed ports
+- [ ] **Resource Limits**: CPU/memory limits configured
+- [ ] **Read-Only**: Container filesystem read-only where possible
+- [ ] **Health Checks**: Health check endpoints configured
+- [ ] **Signatures**: Images signed (Docker Content Trust)
+
+---
+
+### 5. Infrastructure Security Testing
+
+**Objective**: Validate cloud and server configurations.
+
+#### Infrastructure as Code (IaC) Scanning
+
+**Terraform Security Scanning**:
+```bash
+# Scan Terraform files
+tfsec . --format json --output tfsec-report.json
+
+# Check for misconfigurations
+checkov -d . -o json > checkov-report.json
+```
+
+**Kubernetes Configuration Scanning**:
+```bash
+# Scan Kubernetes manifests
+kube-score score k8s/*.yaml --output-format cm-aware
+
+# Check for security issues
+kubesec scan k8s/deployment.yaml
+```
+
+#### Cloud Security Scanning
+
+**AWS Security Hub** (if using AWS):
+```bash
+# Run security checks
+aws securityhub get-findings --severity_normalized HIGH
+
+# Enable CIS benchmarks
+aws securityhub enable-security-hub --enable-standards \
+  arn:aws:securityhub:::standards/aws-foundational-security-best-practices/v/1.0.0
+```
+
+#### Infrastructure Security Checklist
+
+- [ ] **S3 Buckets**: No public access, encryption enabled
+- [ ] **Databases**: No public access, encryption at rest/transit
+- [ ] **IAM Roles**: Least privilege, no hardcoded credentials
+- [ ] **Security Groups**: Minimal ports, IP whitelisting
+- [ ] **TLS**: All communications encrypted (HTTPS, WSS)
+- [ ] **Secrets Management**: Secrets stored in vault (not env vars)
+- [ ] **Monitoring**: CloudWatch, logs, metrics configured
+- [ ] **Backup**: Automated backups, recovery tested
+- [ ] **CIS Benchmarks**: Aligned with CIS hardening guides
+
+---
+
+### 6. Penetration Testing
+
+**Objective**: Manual, comprehensive security assessment by security professionals.
+
+#### Penetration Testing Scope
+
+**In-Scope**:
+- Backend API (`*.api.example.com`)
+- Frontend application (`app.example.com`)
+- Admin panel (`admin.example.com`)
+- Authentication mechanisms
+- File upload functionality
+- Database security
+- API endpoints
+
+**Out-of-Scope** (typically):
+- Third-party services (LLM providers, S3 storage)
+- Physical security
+- Social engineering
+- Denial of service attacks
+
+#### Penetration Testing Methodology
+
+1. **Reconnaissance**:
+   - Information gathering
+   - DNS enumeration
+   - Technology stack identification
+
+2. **Scanning**:
+   - Vulnerability scanning
+   - Port scanning
+   - Service enumeration
+
+3. **Exploitation**:
+   - Attempt to exploit vulnerabilities
+   - Test authentication bypass
+   - Test authorization bypass
+
+4. **Post-Exploitation**:
+   - Determine impact
+   - Lateral movement
+   - Data exfiltration
+
+5. **Reporting**:
+   - Document findings
+   - Prioritize by risk
+   - Provide remediation guidance
+
+#### Penetration Testing Checklist
+
+- [ ] **Planning**: Scope, rules of engagement, timelines defined
+- [ ] **Vendor Selection**: Reputable, certified penetration testing firm
+- [ ] **Testing Schedule**: Annual or after major changes
+- [ ] **Authorization**: Written authorization for testing
+- [ ] **Communication**: Point of contact established
+- [ ] **Testing Types**:
+  - [ ] Black box (no prior knowledge)
+  - [ ] Gray box (some knowledge, like user credentials)
+  - [ ] White box (full knowledge, including source code)
+- [ ] **Findings Report**: Detailed vulnerabilities with CVSS scores
+- [ ] **Remediation**: Fix all high/critical findings
+- [ ] **Re-testing**: Verify fixes within 30 days
+- [ ] **Executive Summary**: High-level overview for management
+
+---
+
+### 7. Continuous Security Monitoring
+
+**Objective**: Ongoing security validation and threat detection.
+
+#### Security Monitoring Stack
+
+**Prometheus + Grafana** (Metrics):
+```yaml
+# Security-related metrics
+- Failed authentication attempts
+- Rate of API requests per user
+- Database query volume
+- File upload count and size
+- System resource usage
+```
+
+**Loki** (Log Aggregation):
+```yaml
+# Security logs to monitor
+- Authentication logs
+- Authorization failures
+- Database access logs
+- API error logs
+- System logs
+```
+
+**AlertManager** (Alerting):
+```yaml
+# Security alerts
+groups:
+  - name: security
+    rules:
+      - alert: BruteForceAttack
+        expr: rate(failed_logins[5m]) > 10
+        annotations:
+          summary: "Brute force attack detected"
+          description: "{{ $value }} failed logins per second"
+
+      - alert: DatabaseAnomaly
+        expr: rate(db_queries[1h]) > 10000
+        annotations:
+          summary: "Unusual database activity"
+```
+
+#### Continuous Monitoring Checklist
+
+- [ ] **Metrics**: Security metrics collected and visualized
+- [ ] **Alerts**: Configured for suspicious activity
+- [ ] **Logs**: All security-relevant logs centralized
+- [ ] **Dashboards**: Grafana dashboards for security monitoring
+- [ ] **Threat Intelligence**: CVE feeds integrated
+- [ ] **Baseline**: Normal behavior baseline established
+- [ ] **Anomaly Detection**: Automated detection of anomalies
+- [ ] **Response**: Incident response team notified of alerts
+
+---
+
+### 8. Security Testing Checklist (Summary)
+
+#### Automated Testing (CI/CD)
+- [ ] **SAST**: Runs on every commit (Bandit, Semgrep)
+- [ ] **SCA**: Runs daily (Safety, Pip-Audit)
+- [ ] **Secret Scanning**: Runs on every commit (Gitleaks)
+- [ ] **Container Scanning**: Runs on every build (Trivy)
+- [ ] **IaC Scanning**: Runs on infrastructure changes (tfsec, checkov)
+
+#### Manual Testing (Periodic)
+- [ ] **Penetration Testing**: Annual (external vendor)
+- [ ] **Red Team Exercise**: Annual (internal team)
+- [ ] **Security Review**: Before major releases
+- [ ] **Architecture Review**: Quarterly
+- [ ] **Code Review**: Security-focused peer review
+
+#### Documentation
+- [ ] **Testing Plan**: Documented testing schedule
+- [ ] **Test Results**: All test results archived
+- [ ] **Remediation Tracker**: Vulnerability tracking and remediation
+- [ ] **Security Reports**: Quarterly security assessment reports
+
+---
+
+## Vulnerability Disclosure
+
+### Overview
+
+A **vulnerability disclosure policy** (VDP) provides clear guidelines for security researchers to report security vulnerabilities responsibly. This encourages the security community to help improve the system's security while protecting both researchers and the organization.
+
+### Disclosure Policy
+
+#### Reporting Security Vulnerabilities
+
+**We Welcome Responsible Disclosure**:
+
+If you discover a security vulnerability in the AgentHR Resume Analysis System, we encourage you to report it to us responsibly. We appreciate your help in keeping our users and their data safe.
+
+#### How to Report
+
+**Reporting Channels**:
+
+| Method | Contact | Response Time | Use For |
+|--------|---------|---------------|---------|
+| **Email** | security@company.com | 24 hours | All vulnerability reports |
+| **PGP Key** | Available at: https://company.com/pgp-key.txt | 24 hours | Encrypted reports |
+| **HackerOne** | https://hackerone.com/company | 48 hours | Coordinated disclosure |
+| **Bug Bounty** | https://company.com/bug-bounty | 48 hours | Paid bug bounty program |
+
+**Report Format**:
+
+Please include the following information in your report:
+
+```markdown
+Subject: Security Vulnerability Report - [Vulnerability Name]
+
+## Vulnerability Summary
+- Vulnerability Type: [SQL Injection / XSS / etc.]
+- Severity: [Critical / High / Medium / Low]
+- Affected Components: [API endpoint, URL, module]
+
+## Vulnerability Description
+[Describe the vulnerability in detail]
+
+## Steps to Reproduce
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+[Include proof of concept: code snippets, screenshots, videos]
+
+## Impact
+[Describe the impact: data exposure, privilege escalation, etc.]
+
+## Suggested Fix (Optional)
+[If you have a suggestion for how to fix it]
+
+## Additional Information
+- Your name/handle: [Optional - for credit]
+- Your preferred contact method: [Email, Twitter, etc.]
+```
+
+#### What to Expect
+
+**Our Commitment**:
+
+- **Response Time**: We will acknowledge your report within 24-48 hours
+- **Updates**: We will provide regular updates on remediation progress
+- **Timeline**: We aim to fix critical vulnerabilities within 7 days, high within 14 days
+- **Credit**: We will credit you in our security advisories (if you wish)
+- **Safe Harbor**: We will not pursue legal action if you follow this policy
+
+**Remediation Timeline**:
+
+| Severity | Initial Response | Fix Timeline | Public Disclosure |
+|----------|------------------|--------------|-------------------|
+| **Critical** | 24 hours | 7 days | After fix deployed |
+| **High** | 48 hours | 14 days | After fix deployed |
+| **Medium** | 3 days | 30 days | After fix deployed |
+| **Low** | 7 days | 90 days | Next release |
+
+### Safe Harbor
+
+**What We Ask**:
+
+To qualify for safe harbor under this policy, please:
+
+1. **Don't Break the System**:
+   - [ ] Do not access, modify, or delete data that is not yours
+   - [ ] Do not use automated tools at high rates (causing DoS)
+   - [ ] Do not disrupt service for other users
+   - [ ] Do not test on users' data without consent
+
+2. **Respect Privacy**:
+   - [ ] Only access data you have created for testing
+   - [ ] Do not exfiltrate PII or confidential data
+   - [ ] Do not share data with third parties
+   - [ ] Delete test data after reporting
+
+3. **Responsible Disclosure**:
+   - [ ] Report vulnerabilities through official channels
+   - [ ] Provide reasonable time for remediation before public disclosure
+   - [ ] Do not exploit the vulnerability for any malicious purpose
+   - [ ] Do not sell or trade vulnerability information
+
+**What We Promise**:
+
+- **No Legal Action**: We will not pursue legal action if you follow this policy
+- **Credit**: We will acknowledge your contribution (with your permission)
+- **Bug Bounty**: We may offer monetary rewards for qualifying vulnerabilities (see below)
+- **Swag**: We may send company swag as a thank you
+
+### Out of Scope (Not Eligible)
+
+The following are **out of scope** and do not qualify for safe harbor or bug bounty:
+
+- **Third-Party Vulnerabilities**: Issues in LLM providers, cloud services, libraries
+- **Social Engineering**: Phishing, impersonation, social manipulation
+- **Physical Security**: Physical access to offices, servers, devices
+- **Denial of Service**: DoS/DDoS attacks that disrupt service
+- **Spam**: Sending unsolicited emails to users
+- **UI/UX Bugs**: Visual issues, typos, usability problems
+- **Known Issues**: Vulnerabilities already publicly disclosed
+- **Missing Best Practices**: Missing security headers, lack of hardening (informational only)
+
+### Bug Bounty Program
+
+**Rewards** (if applicable):
+
+| Severity | Reward Range | Example Vulnerabilities |
+|----------|--------------|--------------------------|
+| **Critical** | $1,000 - $5,000 | SQL injection, authentication bypass, data breach |
+| **High** | $500 - $1,000 | XSS, CSRF, privilege escalation |
+| **Medium** | $100 - $500 | Information disclosure, security misconfiguration |
+| **Low** | $50 - $100 | Missing headers, minor info disclosure |
+
+**Bounty Qualification Criteria**:
+
+- [ ] **First to Report**: Only the first reporter receives bounty
+- [ ] **Technical Detail**: Provide clear reproduction steps and impact
+- [ ] **Original Research**: Not previously reported or known
+- [ ] **In Scope**: Vulnerability is within scope (see above)
+- [ ] **Responsible**: Followed safe harbor guidelines
+- [ ] **No Exploitation**: No data accessed, modified, or exfiltrated
+- [ ] **Remediation Confirmed**: Vendor confirmed and reproduced the vulnerability
+
+**Reward Disbursement**:
+
+- **Method**: PayPal, wire transfer, or donation to charity
+- **Timeline**: Within 30 days of vulnerability fix
+- **Tax**: Recipient responsible for any applicable taxes
+- **Credit**: Name/handle credited in security advisory (optional)
+
+### Coordinated Vulnerability Disclosure (CVD)
+
+**Disclosure Process**:
+
+1. **Report Received**: Vulnerability reported by researcher
+2. **Triage & Validation**: Security team validates vulnerability (24-48 hours)
+3. **Remediation**: Development team fixes vulnerability (7-90 days, depending on severity)
+4. **Testing**: Internal testing and verification of fix
+5. **Deployment**: Fix deployed to production
+6. **Disclosure**: Public security advisory published
+
+**Security Advisory Template**:
+
+```markdown
+# Security Advisory: [Vulnerability Title]
+
+## Summary
+[Brief description of the vulnerability]
+
+## Affected Versions
+- [All versions before X.Y.Z]
+- [Versions A.B.C through D.E.F]
+
+## Patched Versions
+- [Version X.Y.Z or later]
+
+## Vulnerability Details
+- **CVE ID**: [CVE-YYYY-NNNN] (if assigned)
+- **CWE ID**: [CWE-NNN] (Common Weakness Enumeration)
+- **Severity**: [CVSS 3.1 Score / Severity Level]
+- **Impact**: [Description of impact]
+- **Attack Vector**: [Description of how to exploit]
+
+## Proof of Concept
+[Description of how to reproduce (sanitized)]
+
+## Credits
+Discovered by: [Researcher name/handle]
+Reported on: [Date]
+
+## Recommendations
+[Upgrade to patched version or apply workaround]
+
+## References
+- [Commit/PR with fix]
+- [Related documentation]
+- [Other resources]
+
+## Timeline
+- [Date] - Vulnerability reported
+- [Date] - Vulnerability confirmed
+- [Date] - Patch released
+- [Date] - Advisory published
+```
+
+**Disclosure Timing**:
+
+- **Critical**: Publish advisory 7 days after fix (or after exploit appears in the wild)
+- **High**: Publish advisory 14 days after fix
+- **Medium**: Publish advisory 30 days after fix
+- **Low**: Publish advisory with next release notes
+
+### Security Acknowledgments
+
+**Hall of Fame** (optional):
+
+We recognize the contributions of security researchers who have helped make our system more secure:
+
+| Researcher | Vulnerabilities | Date |
+|------------|-----------------|------|
+| @researcher1 | SQL Injection in search API | 2024-01-15 |
+| @securitypro | XSS in candidate profile | 2024-02-20 |
+| @hacker123 | CSRF in vacancy creation | 2024-03-10 |
+
+### Contact Information
+
+**Security Team**:
+- **Email**: security@company.com
+- **PGP Key**: https://company.com/pgp-key.txt
+- **Key Fingerprint**: `XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX`
+
+**General Inquiries**:
+- **Email**: info@company.com
+- **Website**: https://company.com
+- **Twitter**: @company
+
+### Vulnerability Disclosure Checklist
+
+- [ ] **Policy Published**: Vulnerability disclosure policy published on website
+- [ ] **Reporting Email**: security@ email address configured and monitored
+- [ ] **PGP Key**: Public PGP key available for encrypted reports
+- [ ] **Response SLA**: 24-48 hour initial response time commitment
+- [ ] **Safe Harbor**: Legal safe harbor for responsible disclosure documented
+- [ ] **Remediation Timeline**: Defined fix timelines by severity
+- [ ] **Bug Bounty**: Bug bounty program rules and rewards (if applicable)
+- [ ] **HackerOne Program**: HackerOne or similar platform setup (if applicable)
+- [ ] **Security Advisories**: Template for security advisories prepared
+- [ ] **Credit Policy**: Researcher credit and acknowledgment policy
+- [ ] **Scope Documentation**: Clear in-scope and out-of-scope documentation
+- [ ] **Response Team**: Security team designated and trained
+- [ ] **Escalation**: Escalation process for critical vulnerabilities
+- [ ] **Legal Review**: Policy reviewed by legal counsel
+- [ ] **Regular Updates**: Policy reviewed and updated annually
+
+---
+
+## Security Checklist
+
+### Overview
+
+This comprehensive **security checklist** consolidates all security requirements and best practices into a single, actionable checklist. Use this to verify security posture before production deployments, after major changes, or for periodic security assessments.
+
+### Quick Reference Checklist
+
+#### Critical Security Controls (Must Have)
+
+- [ ] **Authentication**: Multi-factor authentication (MFA) for admin access
+- [ ] **Password Policy**: Strong password requirements (12+ chars, complexity)
+- [ ] **Password Hashing**: bcrypt/argon2 with minimum 12 rounds
+- [ ] **TLS/HTTPS**: All communications encrypted (TLS 1.3)
+- [ ] **Database Encryption**: Encryption at rest for sensitive data
+- [ ] **Input Validation**: All user input validated and sanitized
+- [ ] **SQL Injection**: Parameterized queries or ORM only
+- [ ] **XSS Prevention**: HTML encoding for all user output
+- [ ] **CSRF Protection**: CSRF tokens on all state-changing operations
+- [ ] **Access Control**: Role-based access control (RBAC) implemented
+- [ ] **Audit Logging**: All security-relevant events logged
+- [ ] **Error Handling**: No sensitive data in error messages
+- [ ] **Dependencies**: All dependencies scanned for vulnerabilities
+- [ ] **Secrets Management**: No hardcoded secrets, use vault
+- [ ] **Backup**: Automated backups with restoration tested
+- [ ] **Monitoring**: Security metrics and alerting configured
+
+### Comprehensive Security Checklist
+
+#### 1. Authentication & Authorization
+
+**Password Policy**:
+- [ ] Minimum 12 characters
+- [ ] Require uppercase, lowercase, numbers, special characters
+- [ ] Password history (prevent reuse of last 5 passwords)
+- [ ] Account lockout after 5 failed attempts (15-minute lockout)
+- [ ] Password expiration (90 days) - *Note: NIST now recommends no expiration unless compromised*
+- [ ] Password strength meter on user-facing forms
+
+**Password Storage**:
+- [ ] Passwords hashed using bcrypt or argon2
+- [ ] Minimum work factor 12 for bcrypt
+- [ ] Unique salt per password (automatic with bcrypt/argon2)
+- [ ] No password encryption (hashing only)
+- [ ] No password hashing with MD5, SHA1, SHA256 (use bcrypt/argon2)
+
+**Multi-Factor Authentication (MFA)**:
+- [ ] MFA required for admin accounts
+- [ ] MFA optional for regular users (recommended)
+- [ ] TOTP-based (Google Authenticator, Authy) supported
+- [ ] Backup codes provided
+- [ ] MFA bypass recovery process documented
+
+**Session Management**:
+- [ ] Session timeout after 30 minutes of inactivity
+- [ ] Secure cookie flags: HttpOnly, Secure, SameSite=Strict
+- [ ] Session ID regeneration after login
+- [ ] Logout functionality invalidates session
+- [ ] No session fixation vulnerabilities
+
+**Authorization**:
+- [ ] Role-based access control (RBAC) implemented
+- [ ] Principle of least privilege enforced
+- [ ] Authorization checks on every API endpoint
+- [ ] No privilege escalation vulnerabilities
+- [ ] No direct object reference (IDOR) vulnerabilities
+- [ ] Admin-only endpoints properly protected
+
+#### 2. Data Security
+
+**Encryption at Rest**:
+- [ ] Database encryption enabled (PostgreSQL: pgcrypto)
+- [ ] File storage encrypted (LUKS, EBS encryption)
+- [ ] Backup files encrypted
+- [ ] Encryption key management system (AWS KMS, HashiCorp Vault)
+- [ ] AES-256 encryption algorithm used
+
+**Encryption in Transit**:
+- [ ] TLS 1.3 enforced (minimum TLS 1.2)
+- [ ] HTTPS for all web traffic
+- [ ] Database connections encrypted (PostgreSQL SSL)
+- [ ] API calls encrypted (HTTPS, not HTTP)
+- [ ] Certificate management and renewal automated
+- [ ] HSTS header enabled
+
+**PII Data Protection**:
+- [ ] Data minimization (only collect necessary data)
+- [ ] Data retention policy implemented (2 years for resumes)
+- [ ] Automated deletion after retention period
+- [ ] Right to erasure implemented (GDPR)
+- [ ] Right to access implemented (DSAR endpoint)
+- [ ] Data masking in logs (no passwords, tokens in logs)
+
+**Data Backup**:
+- [ ] Automated daily backups
+- [ ] Backup retention: 30 days (configurable)
+- [ ] Backup encryption enabled
+- [ ] Backup off-site storage (S3, remote server)
+- [ ] Backup restoration tested quarterly
+- [ ] Backup integrity verification (checksums)
+
+#### 3. Application Security
+
+**Input Validation**:
+- [ ] All user input validated on server-side
+- [ ] Allow-list approach (not block-list)
+- [ ] Length limits enforced on all inputs
+- [ ] Type validation (integer, string, email, etc.)
+- [ ] File upload validation (type, size, content)
+- [ ] Path traversal prevention
+
+**Output Encoding**:
+- [ ] HTML encoding for all user output in web pages
+- [ ] JavaScript encoding for data in scripts
+- [ ] URL encoding for data in URLs
+- [ ] JSON encoding for API responses
+- [ ] No unescaped user input in responses
+
+**SQL Injection Prevention**:
+- [ ] Parameterized queries only (no string concatenation)
+- [ ] ORM used (SQLAlchemy) with safe query methods
+- [ ] No dynamic SQL with user input
+- [ ] Database principle of least privilege (no dba user for app)
+- [ ] SQL injection tested in penetration test
+
+**XSS Prevention**:
+- [ ] Content Security Policy (CSP) header enabled
+- [ ] X-XSS-Protection header enabled
+- [ ] HTML escaping for all user output
+- [ ] No `innerHTML` with user input
+- [ ] DOM-based XSS tested
+- [ ] XSS tested in penetration test
+
+**CSRF Prevention**:
+- [ ] CSRF tokens on all state-changing operations
+- [ ] Token validated on server-side
+- [ ] SameSite cookie attribute set
+- [ ] CSRF token refreshed on login
+- [ ] CSRF tested in penetration test
+
+**File Upload Security**:
+- [ ] File type validation (by content, not extension)
+- [ ] File size limit enforced (max 10MB)
+- [ ] Virus/malware scanning implemented
+- [ ] Uploaded files stored outside webroot
+- [ ] Random filename generated on upload
+- [ ] File execution prevented (no execute permission)
+
+#### 4. API Security
+
+**Authentication**:
+- [ ] API key or token-based authentication
+- [ ] JWT tokens signed and verified
+- [ ] Token expiration enforced (short-lived tokens)
+- [ ] Token refresh mechanism implemented
+- [ ] Invalid tokens revoked
+
+**Rate Limiting**:
+- [ ] Rate limiting on all public endpoints
+- [ ] Rate limiting on authentication endpoints
+- [ ] Different limits per user role
+- [ ] Rate limit exceeded returns 429 status
+- [ ] Distributed rate limiting (Redis-based)
+
+**API Versioning**:
+- [ ] API versioning strategy (/api/v1/, /api/v2/)
+- [ ] Deprecation policy for old versions
+- [ ] Breaking changes documented in changelog
+
+**API Security Headers**:
+- [ ] `X-Content-Type-Options: nosniff`
+- [ ] `X-Frame-Options: DENY`
+- [ ] `X-XSS-Protection: 1; mode=block`
+- [ ] `Strict-Transport-Security: max-age=31536000`
+- [ ] `Content-Security-Policy` configured
+- [ ] `Referrer-Policy: strict-origin-when-cross-origin`
+
+**Input Validation (API)**:
+- [ ] Request schema validation (Pydantic)
+- [ ] JSON validation
+- [ ] Type validation
+- [ ] SQL injection tested
+- [ ] Mass assignment prevented
+
+#### 5. Network Security
+
+**Firewall Configuration**:
+- [ ] Only necessary ports open (80, 443, 22 for SSH)
+- [ ] SSH restricted to specific IPs (firewall rule)
+- [ ] Database not accessible from internet
+- [ ] Intrusion detection/prevention system (IDS/IPS)
+- [ ] DDoS protection enabled (Cloudflare, AWS Shield)
+
+**TLS Configuration**:
+- [ ] TLS 1.3 preferred, TLS 1.2 minimum
+- [ ] Strong cipher suites only
+- [ ] Certificate signed by trusted CA
+- [ ] Certificate expiration monitored
+- [ ] Certificate renewal automated (Let's Encrypt)
+
+**Network Segmentation**:
+- [ ] Docker network isolation
+- [ ] Database on private network
+- [ ] Redis on private network
+- [ ] No inter-container communication unless required
+
+#### 6. Logging & Monitoring
+
+**Audit Logging**:
+- [ ] All authentication attempts logged
+- [ ] All authorization failures logged
+- [ ] All data access logged
+- [ ] All configuration changes logged
+- [ ] Audit log retention: 90 days (configurable)
+- [ ] Audit logs tamper-evident (append-only, signed)
+
+**Security Monitoring**:
+- [ ] Failed login attempts monitored and alerted
+- [ ] Brute force attack detection (>10 failures in 5 minutes)
+- [ ] Anomaly detection (unusual API usage, data access)
+- [ ] Security metrics dashboard (Grafana)
+- [ ] Real-time alerting (Prometheus AlertManager)
+
+**Log Security**:
+- [ ] No sensitive data in logs (passwords, tokens, PII)
+- [ ] Log access controlled
+- [ ] Log aggregation (Loki, ELK)
+- [ ] Log retention configured (30 days for app logs)
+- [ ] Log rotation configured
+
+#### 7. Dependency Management
+
+**Vulnerability Scanning**:
+- [ ] Automated SAST in CI/CD (Bandit, Semgrep)
+- [ ] Automated SCA in CI/CD (Safety, pip-audit)
+- [ ] Dependency scanning daily
+- [ ] Zero-day vulnerability monitoring
+- [ ] CVSS scores for vulnerabilities
+
+**Dependency Updates**:
+- [ ] Regular dependency updates (monthly)
+- [ ] Dependabot or Renovate configured
+- [ ] Security patches applied within SLA:
+  - [ ] Critical: 48 hours
+  - [ ] High: 1 week
+  - [ ] Medium: 1 month
+- [ ] Outdated dependencies monitored
+
+**Third-Party Risk Assessment**:
+- [ ] Security assessment for all third-party services
+- [ ] Data Processing Agreements (DPA) signed
+- [ ] GDPR compliance verified for EU data processors
+- [ ] Service level agreements (SLA) reviewed
+
+#### 8. Infrastructure Security
+
+**Container Security**:
+- [ ] Docker images scanned (Trivy)
+- [ ] Minimal base images used (alpine, slim)
+- [ ] Containers run as non-root user
+- [ ] No secrets in Dockerfiles or images
+- [ ] Container resource limits configured
+
+**Cloud Security** (if applicable):
+- [ ] S3 buckets not publicly accessible
+- [ ] IAM roles follow least privilege
+- [ ] Security groups minimal access
+- [ ] CloudTrail enabled (AWS)
+- [ ] CIS benchmarks compliance
+
+**Server Hardening**:
+- [ ] SSH key-based authentication only (no passwords)
+- [ ] SSH root login disabled
+- [ ] Unnecessary services disabled
+- [ ] System updates applied regularly
+- [ ] CIS hardening guidelines followed
+
+#### 9. Compliance
+
+**GDPR Compliance**:
+- [ ] Legal basis for processing documented
+- [ ] Records of Processing Activities (ROPA) maintained
+- [ ] Data Protection Impact Assessment (DPIA) completed
+- [ ] Data subject rights implemented:
+  - [ ] Right to access (DSAR endpoint)
+  - [ ] Right to erasure (deletion endpoint)
+  - [ ] Right to rectification (update endpoint)
+  - [ ] Right to portability (export endpoint)
+  - [ ] Right to object (objection tracking)
+- [ ] Privacy policy published
+- [ ] Cookie consent implemented (if applicable)
+- [ ] Data breach notification process (72 hours)
+- [ ] Data Protection Officer (DPO) appointed (if required)
+
+**CCPA Compliance**:
+- [ ] Privacy policy includes CCPA disclosures
+- [ ] Right to know implemented (data access)
+- [ ] Right to delete implemented
+- [ ] Right to opt-out implemented (if selling data)
+- [ ] Do Not Sell My Info link (if applicable)
+- [ ] Non-discrimination policy documented
+
+**Data Retention**:
+- [ ] Data retention policy documented
+- [ ] Retention periods configured:
+  - [ ] Candidate resumes: 2 years
+  - [ ] Audit logs: 90 days
+  - [ ] Backups: 30 days
+  - [ ] Application logs: 30 days
+- [ ] Automated deletion process
+- [ ] Deletion logging
+
+#### 10. Incident Response
+
+**Incident Response Plan**:
+- [ ] Incident response plan documented
+- [ ] Incident response team (IRT) established
+- [ ] Roles and responsibilities defined
+- [ ] Escalation procedures documented
+- [ ] Communication channels established
+- [ ] Incident classification severity levels defined
+
+**Incident Response Tools**:
+- [ ] SIEM integration (Splunk, ELK)
+- [ ] EDR (Endpoint Detection and Response)
+- [ ] Forensic imaging tools
+- [ ] Secure communication channels (Signal)
+- [ ] Incident tracking system (Jira, tickets)
+
+**Incident Response Testing**:
+- [ ] Tabletop exercises conducted (quarterly)
+- [ ] Penetration testing conducted (annually)
+- [ ] Red team exercises conducted (annually)
+- [ ] Incident response drills (semi-annually)
+
+#### 11. Vulnerability Management
+
+**Vulnerability Disclosure**:
+- [ ] Vulnerability disclosure policy published
+- [ ] Security email address (security@) configured
+- [ ] PGP key available for encrypted reports
+- [ ] Bug bounty program (optional)
+- [ ] Safe harbor policy documented
+- [ ] Security advisories template prepared
+
+**Penetration Testing**:
+- [ ] Annual penetration testing scheduled
+- [ ] External penetration testing firm selected
+- [ ] Scope defined (in-scope and out-of-scope)
+- [ ] Rules of engagement documented
+- [ ] Findings remediated within SLA
+- [ ] Re-testing to verify fixes
+
+**Vulnerability Remediation**:
+- [ ] Vulnerability tracking system
+- [ ] Remediation SLA defined by severity
+- [ ] Patch management process
+- [ ] Emergency patching procedure for critical CVEs
+- [ ] Vulnerability disclosure process for fixed issues
+
+#### 12. Security Training & Awareness
+
+**Staff Training**:
+- [ ] Security awareness training for all staff (annual)
+- [ ] Phishing simulations conducted (quarterly)
+- [ ] Secure coding training for developers
+- [ ] GDPR/CCPA training for relevant staff
+- [ ] Incident response training for IRT
+
+**Documentation**:
+- [ ] Security policies documented and distributed
+- [ ] Security procedures documented
+- [ ] Playbooks for common incidents
+- [ ] Architecture decision records (ADRs)
+- [ ] Runbooks for operational tasks
+
+#### 13. DevSecOps & CI/CD Security
+
+**Pipeline Security**:
+- [ ] SAST integrated into CI/CD (every commit)
+- [ ] SCA integrated into CI/CD (daily)
+- [ ] Secret scanning in CI/CD (every commit)
+- [ ] Container image scanning in CI/CD (every build)
+- [ ] Infrastructure-as-code scanning (every deploy)
+
+**Deployment Security**:
+- [ ] Immutable infrastructure
+- [ ] Blue-green deployments
+- [ ] Automated rollback capability
+- [ ] Pre-production security testing
+- [ ] Production access restricted (no direct deployment)
+
+**Change Management**:
+- [ ] Change approval process
+- [ ] Change risk assessment
+- [ ] Change documentation
+- [ ] Rollback plans for all changes
+
+#### 14. Physical Security (if on-premise)
+
+**Data Center Security**:
+- [ ] Physical access controls (badges, biometrics)
+- [ ] Visitor logs and escorts required
+- [ ] Video surveillance
+- [ ] Environmental controls (fire suppression, temperature)
+- [ ] Backup power (UPS, generator)
+
+**Device Security**:
+- [ ] Workstations encrypted (BitLocker, FileVault)
+- [ ] Lost device remote wipe capability
+- [ ] USB port blocked or controlled
+- [ ] Screen lock required after 5 minutes
+- [ ] Secure disposal of old equipment
+
+### Pre-Production Deployment Checklist
+
+Use this checklist **before deploying to production**:
+
+**Critical Items** (Must Pass):
+- [ ] All high and critical vulnerabilities fixed
+- [ ] Penetration testing completed and findings addressed
+- [ ] Security review approved
+- [ ] Audit logging enabled and tested
+- [ ] TLS/HTTPS configured and verified
+- [ ] Database encryption enabled
+- [ ] Backup and restore tested
+- [ ] Monitoring and alerting configured
+- [ ] Incident response team notified
+- [ ] Legal and compliance review completed
+
+**Important Items** (Should Pass):
+- [ ] SAST and SCA scans passing
+- [ ] Security headers configured
+- [ ] Rate limiting configured
+- [ ] Input validation tested
+- [ ] Error handling tested
+- [ ] Authentication and authorization tested
+- [ ] API security tested
+- [ ] Dependencies up-to-date
+- [ ] Docker images scanned
+- [ ] Infrastructure security verified
+
+**Nice to Have**:
+- [ ] Bug bounty program launched
+- [ ] Security training completed for new features
+- [ ] Documentation updated
+- [ ] Security advisory prepared for new features
+- [ ] Threat model updated
+
+### Periodic Security Review Checklist
+
+Use this checklist **periodically** (quarterly or semi-annually):
+
+- [ ] Security posture review
+- [ ] Vulnerability assessment completed
+- [ ] Penetration testing scheduled or completed
+- [ ] Compliance audit (GDPR, CCPA)
+- [ ] Access review (revoke unnecessary access)
+- [ ] Dependency audit (update or remove unused dependencies)
+- [ ] Security policy review and update
+- [ ] Incident response plan review and update
+- [ ] Security training refresher
+- [ ] Threat model update for new features
+
+---
+
+## Appendix
+
+### Useful Security Resources
+
+**Standards & Frameworks**:
+- **OWASP Top 10**: https://owasp.org/www-project-top-ten/
+- **CIS Benchmarks**: https://www.cisecurity.org/cis-benchmarks/
+- **NIST Cybersecurity Framework**: https://www.nist.gov/cyberframework
+- **ISO 27001**: Information security management standard
+- **SOC 2**: Service organization controls
+- **PCI DSS**: Payment card industry security standards
+
+**Vulnerability Databases**:
+- **CVE**: https://cve.mitre.org/
+- **NVD**: https://nvd.nist.gov/
+- **CWE**: https://cwe.mitre.org/
+- **Exploit-DB**: https://www.exploit-db.com/
+
+**Security Tools**:
+- **OWASP ZAP**: https://www.zaproxy.org/
+- **Burp Suite**: https://portswigger.net/burp
+- **Metasploit**: https://www.metasploit.com/
+- **Nmap**: https://nmap.org/
+- **Wireshark**: https://www.wireshark.org/
+
+**Learning Resources**:
+- **OWASP Cheat Sheets**: https://cheatsheetseries.owasp.org/
+- **Web Security Academy**: https://portswigger.net/web-security
+- **SANS Security Resources**: https://www.sans.org/
+- **Coursera Cybersecurity**: https://www.coursera.org/browse/cybersecurity
+
+### Security Metrics to Track
+
+**Vulnerability Management**:
+- Mean time to detect (MTTD) vulnerabilities
+- Mean time to remediate (MTTR) vulnerabilities
+- Vulnerability backlog count by severity
+- Percentage of dependencies up-to-date
+
+**Incident Response**:
+- Mean time to detect (MTTD) incidents
+- Mean time to respond (MTTR) incidents
+- Number of incidents per month
+- Time to restore service
+
+**Security Posture**:
+- Percentage of systems with security agents installed
+- Number of failed login attempts per week
+- Number of security exceptions granted
+- Security training completion rate
+
+**Compliance**:
+- GDPR/CCPA policy compliance percentage
+- Data subject request response time
+- Data breach notification timeliness
+- Audit findings remediation rate
+
+---
+
 **Last Updated**: 2026-02-04
 **Version**: 1.0.0
 **Maintainer**: Security Team
