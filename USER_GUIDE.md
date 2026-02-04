@@ -7752,4 +7752,1013 @@ Remember: AgentHR is here to make your job easier, not more complicated. If some
 
 ## 12. Troubleshooting
 
+**Solving Common Problems Step-by-Step**
+
+This section provides detailed solutions to the most common issues HR recruiters encounter when using AgentHR. Each problem includes a systematic approach to diagnose and resolve the issue.
+
+---
+
+### Quick Troubleshooting Checklist
+
+Before diving into specific issues, try these **universal fixes** first:
+
+1. **Refresh the page** – Press F5 or Ctrl+R (Cmd+R on Mac)
+2. **Clear your browser cache** – Old data can cause unexpected behavior
+3. **Check your internet connection** – Slow or unstable connections affect performance
+4. **Try a different browser** – Rule out browser-specific issues
+5. **Verify you're logged in** – Sessions can time out after inactivity
+6. **Check for system notifications** – Look for maintenance alerts or outage notices
+
+If these quick fixes don't solve your problem, find your specific issue below.
+
+---
+
+### Resume Upload Issues
+
+#### **Problem: "File Upload Failed" Error**
+
+**Symptoms:**
+- Upload progress bar stops or disappears
+- Error message appears after selecting file
+- File appears to upload but doesn't show in list
+
+**Diagnosis & Solutions:**
+
+**Step 1: Verify File Format**
+- AgentHR only accepts **PDF** and **DOCX** formats
+- Check file extension: `.pdf`, `.docx`
+- ❌ Not supported: `.doc`, `.txt`, `.rtf`, `.jpg`, `.png`
+
+**Step 2: Check File Size**
+- Maximum file size: **10 MB**
+- Large files with many images may timeout
+- Compress PDF if needed (use Adobe Acrobat or free online tools)
+- Remove unnecessary images from resume
+
+**Step 3: Verify File Integrity**
+- Open the file on your computer first
+- Ensure file isn't corrupted
+- Re-save the file if it shows errors
+- Try opening on a different device to confirm
+
+**Step 4: Check Browser Compatibility**
+- Use updated browsers: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+- Disable browser extensions that block uploads
+- Try incognito/private mode
+- Allow popups and file uploads for AgentHR domain
+
+**Step 5: Network Issues**
+- Unstable internet causes upload failures
+- Check upload speed (minimum 5 Mbps recommended)
+- Try during off-peak hours
+- Use wired connection instead of WiFi if possible
+- Switch to mobile hotspot as a test
+
+**Step 6: Check Storage Quota**
+- Account may have reached storage limit
+- Check account settings for storage usage
+- Delete old/archived resumes if at limit
+- Contact admin to increase quota
+
+**✅ When Fixed:**
+- File appears in "Resumes" list
+- Status shows "Analyzing" → "Analyzed" (within 30 seconds)
+- Resume details are extractable
+
+**🔴 If Still Not Fixed:**
+- Contact support with: file type, size, browser type, error message screenshot
+
+---
+
+#### **Problem: Resume Uploads But Never Analyzes**
+
+**Symptoms:**
+- Resume shows in list with status "Analyzing..." for a long time
+- No skills or experience extracted after 2+ minutes
+- Progress spinner keeps spinning
+
+**Diagnosis & Solutions:**
+
+**Step 1: Check Analysis Queue**
+- System processes resumes sequentially
+- High volume = longer wait times
+- Check if multiple uploads are ahead in queue
+- Wait up to 2 minutes for complex resumes
+
+**Step 2: Verify Resume Quality**
+- **Scanned PDFs** can't be analyzed (must be text-based)
+- **Image-based resumes** aren't supported
+- **Password-protected files** can't be read
+- **Heavily formatted resumes** may have extraction issues
+
+**Test Resume Quality:**
+- Open PDF and try to select text with cursor
+- If you can't select text, it's an image/scanned document
+- Re-create resume from original source
+
+**Step 3: Check Resume Content**
+- Resumes with **minimal content** may fail analysis
+- Must have recognizable sections (experience, skills, education)
+- Highly non-standard formats may not parse correctly
+- Resumes in unsupported languages (currently: English and Russian)
+
+**Step 4: System Load**
+- Check if system is under heavy load
+- Try uploading during off-peak hours
+- Contact admin if delay exceeds 5 minutes consistently
+
+**Step 5: Re-upload the File**
+- Sometimes upload completes but processing fails silently
+- Delete the stuck upload
+- Re-upload the same file
+- If fails again, issue is with the resume itself
+
+**✅ When Fixed:**
+- Status changes to "Analyzed"
+- Skills, experience, and education are displayed
+- Resume can be matched to vacancies
+
+**🔴 If Still Not Fixed:**
+- Try converting DOCX to PDF (or vice versa)
+- Simplify resume formatting
+- Contact support with the resume file for testing
+
+---
+
+### Analysis Taking Too Long
+
+#### **Problem: Slow Resume Processing or Ranking**
+
+**Symptoms:**
+- Single resume takes more than 2 minutes to analyze
+- Ranking operations take a long time
+- System seems sluggish overall
+
+**Diagnosis & Solutions:**
+
+**Step 1: Understand Normal Processing Times**
+- **Single resume analysis**: 10-30 seconds (normal)
+- **Batch upload (10 resumes)**: 2-3 minutes (normal)
+- **AI ranking**: 5-15 seconds per candidate (normal)
+- **Vector matching**: 10-20 seconds (normal)
+
+**Step 2: Check Resume Complexity**
+- Resumes with **many pages** take longer (10+ pages)
+- Resumes with **unusual formatting** slow parsing
+- **Multiple languages** in one resume cause delays
+- **Images and graphics** increase processing time
+
+**Step 3: Check System Load**
+- Time of day affects performance
+- **Peak hours**: 9 AM - 5 PM weekdays
+- **Off-peak**: Evenings and weekends
+- Multiple users processing simultaneously slows system
+
+**Step 4: Network Latency**
+- High latency (ping > 100ms) causes delays
+- Check your internet speed at speedtest.net
+- **Recommended**: Download 25+ Mbps, Upload 5+ Mbps
+- VPN connections can slow things down
+
+**Step 5: Browser Performance**
+- Old browsers process JavaScript slowly
+- Too many open tabs consume memory
+- Browser extensions can interfere
+- **Recommended**: Close unused tabs, use latest browser
+
+**Step 6: Optimize Your Workflow**
+- Upload resumes in smaller batches (10-20 at a time)
+- Don't trigger multiple operations simultaneously
+- Wait for one operation to complete before starting next
+- Use off-peak hours for large batch operations
+
+**✅ When Fixed:**
+- Analysis completes within expected timeframes
+- System feels responsive
+- No timeout errors
+
+**🔴 If Still Not Fixed:**
+- Report to admin with operation details and timing
+- May indicate server performance issue
+- Check if there's a system maintenance window
+
+---
+
+#### **Problem: Matching or Ranking Operations Timeout**
+
+**Symptoms:**
+- Match operation spins and then fails
+- "Operation timed out" error
+- Partial results only
+
+**Diagnosis & Solutions:**
+
+**Step 1: Check Vacancy Complexity**
+- Job descriptions with **many required skills** (20+) take longer
+- Complex matching criteria increase processing time
+- Try simplifying required skills list temporarily
+- Split complex requirements into multiple searches
+
+**Step 2: Resume Pool Size**
+- Matching against **1000+ resumes** takes longer
+- Use filters to narrow candidate pool first
+- Search by specific criteria before matching
+- Filter by experience, location, or education first
+
+**Step 3: Concurrent Operations**
+- Multiple users matching simultaneously slows system
+- Wait for other operations to complete
+- Coordinate with team if needed
+- Use staggered scheduling
+
+**Step 4: Vector Search Issues**
+- Vector matching is computationally intensive
+- First-time matching for new resumes takes longer
+- Subsequent matches use cached vectors
+- Allow extra time for first match
+
+**Step 5: Timeout Settings**
+- System has default timeouts (usually 60 seconds)
+- Large operations may exceed this
+- Try in smaller chunks
+- Contact admin if timeout is too aggressive
+
+**✅ When Fixed:**
+- Operations complete within 30-60 seconds
+- Full results returned without errors
+- Multiple consecutive operations work smoothly
+
+**🔴 If Still Not Fixed:**
+- May need server optimization
+- Contact admin with specific operation timing details
+- Consider scheduling large batch operations for off-hours
+
+---
+
+### Match Scores Seem Wrong
+
+#### **Problem: Low Scores For Qualified Candidates**
+
+**Symptoms:**
+- Candidate clearly has required skills but score < 40%
+- Excellent candidate shows "Poor" recommendation
+- Scores don't match manual evaluation
+
+**Diagnosis & Solutions:**
+
+**Step 1: Understand How Scores Are Calculated**
+- Match scores are **NOT just about skills**
+- **13 different factors** contribute to ranking
+- Low experience can lower score despite having all skills
+- Context matters (skill mentioned vs. skill used in work)
+
+**Step 2: Check Each Matching Method Separately**
+- View the **three match scores**: Keyword, TF-IDF, Vector
+- **Keyword score**: Exact skill matches
+- **TF-IDF score**: Weighted important skills
+- **Vector score**: Contextual understanding
+
+**Diagnose:**
+- **Low keyword, high vector**: Skills phrased differently
+- **High keyword, low vector**: Skills listed but not in meaningful context
+- **All low**: Genuine mismatch or resume issue
+
+**Step 3: Verify Job Posting Requirements**
+- Are **required skills** listed correctly?
+- Is **minimum experience** realistic?
+- Are requirements overly specific?
+- **Example**: "React 18.2.0" is too specific; "React 18+" is better
+
+**Step 4: Check Resume Presentation**
+- Skills must be in **recognizable sections**
+- Skills buried in lengthy paragraphs may be missed
+- Non-standard section headers confuse parser
+- **Tip**: Use standard headers like "Skills", "Experience", "Education"
+
+**Step 5: Experience Requirements**
+- **Experience months matter**: Candidate with 12 months won't match 24-month requirement
+- **Experience relevance**: General experience may not count as specific
+- **Recent experience**: Old experience may not count toward requirements
+
+**Step 6: Factor Breakdown Analysis**
+- Click into candidate's **detailed view**
+- Review **feature importance** breakdown
+- See exactly which factors contributed to score
+- Identify which specific factors lowered score
+
+**Example Breakdown:**
+- Skills match ratio: 90% ✅
+- Experience months: 12/60 required (20%) ❌
+- Experience relevance: Low (30%) ❌
+- Education: Good (80%) ✅
+- **Result**: Score dragged down by experience factors
+
+**Step 7: Adjust Job Requirements**
+If scores consistently seem wrong:
+1. Lower minimum experience requirements
+2. Reduce number of required skills
+3. Make skills "preferred" instead of "required"
+4. Broaden skill requirements (e.g., "Python" instead of "Python 3.11")
+
+**✅ When Fixed:**
+- Scores align better with manual evaluation
+- Qualified candidates appear in "Good" or "Excellent" ranges
+- Factor breakdown shows reasonable scores
+
+**🔴 If Still Not Fixed:**
+- Issue may be with resume formatting or extraction
+- Review extracted data to ensure parsing was accurate
+- Contact support if extraction is consistently wrong
+
+---
+
+#### **Problem: High Scores For Unqualified Candidates**
+
+**Symptoms:**
+- Candidate clearly lacks skills but score > 70%
+- Poor candidate shows "Excellent" or "Good" recommendation
+- Keywords gaming the system
+
+**Diagnosis & Solutions:**
+
+**Step 1: Check for Keyword Stuffing**
+- Some resumes list every skill imaginable
+- Look for skills without supporting experience
+- Check if skills are in relevant context
+
+**Example Red Flag:**
+```
+Skills: Python, Java, C++, JavaScript, TypeScript, Go, Rust, Ruby,
+PHP, Swift, Kotlin, Scala, R, MATLAB, SAS, SQL, NoSQL, MongoDB,
+PostgreSQL, MySQL, Redis, Elasticsearch...
+```
+- 20+ skills without corresponding experience is suspicious
+- **High keyword score** but **low vector score** indicates this issue
+
+**Step 2: Analyze Factor Breakdown**
+- Look at **feature importance** details
+- Check if **vector score** is high or low
+- High vector + high keyword = legitimate match
+- High keyword + low vector = likely keyword stuffing
+
+**Step 3: Verify Experience Claims**
+- Does work history support skill claims?
+- Are skills used in actual projects?
+- Look for specific achievements, not just skill lists
+- Check dates for experience consistency
+
+**Step 4: Education Mismatch**
+- Some candidates score high on education but lack practical skills
+- Check if experience requirements are being met
+- Education shouldn't outweigh experience for senior roles
+
+**Step 5: Recent Experience Missing**
+- Candidate has skills but not recent experience
+- **Freshness score** penalizes outdated skills
+- Check if last relevant experience is > 5 years old
+- Consider if "recent experience" requirement is needed
+
+**Step 6: Test Match Settings**
+- Try adjusting match sensitivity
+- Increase weight on experience over skills
+- Lower impact of education for technical roles
+- Configure custom scoring weights (if available)
+
+**✅ When Fixed:**
+- High-scoring candidates are genuinely qualified
+- Keyword-stuffed resumes score lower
+- Experience and skills align with scores
+
+**🔴 If Still Not Fixed:**
+- May need to adjust scoring algorithm weights
+- Provide feedback on poor rankings to improve model
+- Contact admin for custom weight configuration
+
+---
+
+### Can't Find Candidates
+
+#### **Problem: Candidates Missing From Search Results**
+
+**Symptoms:**
+- Candidate exists but doesn't appear in search
+- Know candidate's name but search returns nothing
+- Candidate disappeared from list
+
+**Diagnosis & Solutions:**
+
+**Step 1: Check Search Filters**
+- Most common cause: **over-filtering**
+- Clear all filters and search again
+- Check each filter:
+  - **Date range**: Too narrow?
+  - **Vacancy**: Looking at wrong job posting?
+  - **Stage**: Candidate in "Rejected" but you're viewing "Active"?
+  - **Score range**: Minimum score too high?
+  - **Experience range**: Requirements too strict?
+
+**Step 2: Verify Search Terms**
+- Are you **spelling correctly**?
+- Try **partial matches** (e.g., "Java" instead of "Java Developer")
+- Use **broader terms** (e.g., "Dev" instead of "Developer")
+- Check for **typos** in candidate name
+
+**Step 3: Check Pipeline Stage**
+- Candidate may be in **archived or closed** stages
+- Toggle "Show rejected" or "Show hired"
+- Check **"All Candidates"** view instead of vacancy-specific
+- Verify candidate wasn't accidentally deleted
+
+**Step 4: Verify Correct Vacancy**
+- Candidates are **vacancy-specific**
+- Make sure you're searching the right job posting
+- Try **"All Vacancies"** search
+- Check if candidate was matched to a different vacancy
+
+**Step 5: Check Analysis Status**
+- Unanalyzed resumes won't appear in searches
+- Verify resume status is **"Analyzed"**
+- Still showing "Analyzing"? Wait for completion
+- Failed analysis? Re-upload the resume
+
+**Step 6: Permissions**
+- Some candidates may be **restricted to certain users**
+- Verify you have access to the vacancy
+- Check if candidate is owned by another recruiter
+- Contact admin for permissions if needed
+
+**Step 7: Pagination**
+- Candidate might be on **another page**
+- Check page numbers at bottom of list
+- Increase **results per page** (if available)
+- Use sorting to bring candidates to top
+
+**Step 8: Browser Issues**
+- **Cache** showing old data
+- **Incognito mode** to rule out cache issues
+- **Different browser** to rule out browser-specific bugs
+- **Refresh page** after changing filters
+
+**✅ When Fixed:**
+- Candidate appears in expected search results
+- Filters work as expected
+- All accessible candidates are visible
+
+**🔴 If Still Not Fixed:**
+- Check candidate ID and search directly (if URL search available)
+- Verify candidate exists in database (contact admin)
+- May be a database sync issue
+
+---
+
+#### **Problem: Kanban Board Not Showing Candidates**
+
+**Symptoms:**
+- Kanban board columns are empty
+- New candidates not appearing
+- Board not updating after status changes
+
+**Diagnosis & Solutions:**
+
+**Step 1: Verify Candidates Are Matched**
+- **Only matched candidates** appear on Kanban
+- Check "Matching" section first
+- Upload → **Analyze** → **Match** → then appears on Kanban
+- Unmatched resumes won't show up
+
+**Step 2: Check Kanban Filters**
+- Board may be filtered by:
+  - **Vacancy**: Are you viewing the right job posting?
+  - **Date range**: Too narrow?
+  - **User**: Showing only your candidates?
+  - **Stage**: Some stages hidden?
+- Clear all Kanban filters
+- Reset to default view
+
+**Step 3: Refresh the Board**
+- **Manual refresh**: Press F5 or Ctrl+R
+- **Auto-refresh**: May be disabled (check settings)
+- Real-time updates may have a delay (up to 30 seconds)
+
+**Step 4: Check Browser Cache**
+- Old cached data can cause display issues
+- **Clear cache** specifically for AgentHR domain
+- **Hard refresh**: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
+- Try incognito/private mode
+
+**Step 5: Verify Candidates Exist**
+- Go to "Candidates" list view
+- Search for candidate by name
+- If found in list but not on Kanban: filter or view issue
+- If not found in list: candidate doesn't exist
+
+**Step 6: Board Configuration**
+- Check if **stages are configured** correctly
+- Verify columns haven't been **hidden or removed**
+- Reset board layout to default
+- Check admin settings for board configuration
+
+**Step 7: Browser Compatibility**
+- **Supported browsers**: Chrome, Firefox, Safari, Edge (latest versions)
+- **Not supported**: Internet Explorer, old browser versions
+- Disable extensions that might interfere
+- Enable JavaScript (required for Kanban)
+
+**Step 8: Network Connectivity**
+- Intermittent connection causes display issues
+- Check internet stability
+- Try different network (WiFi vs. wired)
+- VPNs can sometimes cause issues
+
+**✅ When Fixed:**
+- Matched candidates appear in appropriate columns
+- Board updates when status changes
+- All candidates are visible
+
+**🔴 If Still Not Fixed:**
+- May be a JavaScript error (check browser console)
+- Contact admin with browser type and screenshot
+- Try on a different device to isolate issue
+
+---
+
+### Performance Issues
+
+#### **Problem: Platform Is Slow or Unresponsive**
+
+**Symptoms:**
+- Pages take long time to load
+- Buttons don't respond immediately
+- Frequent loading spinners
+- Browser freezes or crashes
+
+**Diagnosis & Solutions:**
+
+**Step 1: Identify Scope of Slowness**
+
+**Is everything slow?**
+- Other websites also slow → **Your internet connection**
+- Only AgentHR slow → **AgentHR-specific issue**
+
+**Is it specific pages?**
+- Dashboard slow → **Data aggregation issue**
+- Candidate list slow → **Too much data loading**
+- Matching slow → **Computational complexity**
+- Kanban slow → **Real-time update overhead**
+
+**Step 2: Check Internet Connection**
+- Run speed test: **speedtest.net**
+- **Minimum requirements**:
+  - Download: 10 Mbps
+  - Upload: 2 Mbps
+  - Latency: < 100ms
+- If below minimum: contact ISP or try different network
+
+**Step 3: Check Server Status**
+- AgentHR may be experiencing high load
+- Check for **maintenance notifications**
+- Ask colleagues if they also experience slowness
+- Contact admin to check server metrics
+
+**Step 4: Browser Issues**
+
+**Too many tabs open:**
+- Close unnecessary tabs
+- AgentHR works best with < 10 open tabs
+- Each tab consumes memory and CPU
+
+**Browser extensions:**
+- Ad blockers can interfere
+- Privacy extensions break functionality
+- **Test**: Try incognito mode (extensions disabled)
+- **Fix**: Whitelist AgentHR or disable problematic extensions
+
+**Outdated browser:**
+- Check browser version
+- Update to latest version
+- Old browsers have poor JavaScript performance
+
+**Browser cache:**
+- Old cached files cause issues
+- Clear cache for AgentHR domain
+- Hard refresh: Ctrl+Shift+R
+
+**Step 5: System Resources**
+- Check **CPU and memory usage**
+- Close other applications consuming resources
+- Restart browser if memory usage is high
+- Restart computer if overall system is slow
+
+**Step 6: AgentHR-Specific Optimizations**
+
+**Large candidate lists:**
+- Use filters to narrow results
+- Don't load "All Candidates" at once
+- Use pagination effectively
+- Export data if you need offline access
+
+**Complex searches:**
+- Simplify search criteria
+- Use one filter at a time
+- Avoid combining multiple complex filters
+- Save frequent searches for quick access
+
+**Batch operations:**
+- Don't upload 100+ resumes at once
+- Process in batches of 10-20
+- Wait for completion before next batch
+- Use off-peak hours for large batches
+
+**Step 7: Device-Specific Issues**
+
+**Old computer:**
+- AgentHR requires modern hardware
+- **Minimum**: 4GB RAM, dual-core CPU
+- **Recommended**: 8GB RAM, quad-core CPU
+- Consider upgrading if using old hardware
+
+**Mobile device:**
+- Mobile browsers are slower
+- Use desktop or laptop for best experience
+- Mobile app may have better performance (if available)
+
+**✅ When Fixed:**
+- Pages load within 2-3 seconds
+- Operations complete within expected timeframes
+- No browser freezing or crashes
+
+**🔴 If Still Not Fixed:**
+- Report specific slow pages to admin
+- Include timing: "Dashboard takes 30 seconds to load"
+- May need server optimization or database indexing
+
+---
+
+### Error Messages
+
+#### **Problem: Understanding and Fixing Error Messages**
+
+AgentHR displays specific error messages to help diagnose issues. Here are the most common errors and how to resolve them.
+
+---
+
+**"File not found" or "Resume not found"**
+
+**Cause:** Resume ID is incorrect or resume was deleted
+
+**Solutions:**
+1. Verify resume ID is correct
+2. Check if resume was deleted by another user
+3. Resume may not have finished analyzing (wait and retry)
+4. Search for candidate by name to get correct ID
+5. Re-upload resume if permanently deleted
+
+---
+
+**"Vacancy not found"**
+
+**Cause:** Vacancy ID is incorrect or vacancy was deleted
+
+**Solutions:**
+1. Verify vacancy ID is correct
+2. Check if vacancy was archived or deleted
+3. Verify you have permission to view this vacancy
+4. Check vacancy list for correct ID
+5. Contact admin if vacancy should exist but doesn't
+
+---
+
+**"Invalid file type"**
+
+**Cause:** Trying to upload unsupported file format
+
+**Solutions:**
+1. **Supported formats**: PDF, DOCX only
+2. ❌ Not supported: DOC, TXT, RTF, JPG, PNG
+3. **Convert DOC to DOCX**:
+   - Open in Word
+   - "Save As" → "Word Document (.docx)"
+4. **Convert images to PDF**:
+   - Print to PDF from image viewer
+   - Use online converter tools
+5. **Verify file extension** (sometimes .doc files are mislabeled)
+
+---
+
+**"Analysis in progress"**
+
+**Cause:** Trying to match/resume before analysis completed
+
+**Solutions:**
+1. **Wait** for analysis to complete (usually 10-30 seconds)
+2. Check resume status in list
+3. Status must be **"Analyzed"** before matching
+4. If stuck on "Analyzing" > 2 minutes:
+   - May be a processing error
+   - Try deleting and re-uploading
+   - Contact support if issue persists
+
+---
+
+**"Permission denied" or "Access denied"**
+
+**Cause:** You don't have permission to perform this action
+
+**Solutions:**
+1. Verify you're **logged into correct account**
+2. Check if you have **required role/permissions**
+3. Some actions are **admin-only** (e.g., deleting vacancies)
+4. Resource may be **owned by another user**
+5. Contact admin to request access if needed
+
+---
+
+**"Resume already exists"**
+
+**Cause:** Trying to upload duplicate resume
+
+**Solutions:**
+1. Check if resume was already uploaded
+2. Search by candidate name to verify
+3. If updating existing resume, delete old one first
+4. Use "Update" feature instead of re-uploading (if available)
+5. Rename file if it's actually a different version
+
+---
+
+**"Required field missing"**
+
+**Cause:** Form submitted without required information
+
+**Solutions:**
+1. Check which fields are marked **required** (usually red asterisk *)
+2. Common required fields:
+   - Vacancy: title, description, required skills
+   - Resume: file upload
+3. Fill all required fields
+4. Check for validation errors (red outlines or messages)
+5. Ensure no required fields were accidentally deleted
+
+---
+
+**"Invalid skill format"**
+
+**Cause:** Skills not in correct format
+
+**Solutions:**
+1. Skills should be **comma-separated** values
+2. ✅ Correct: "python, django, postgresql"
+3. ❌ Incorrect: "python/django/postgresql"
+4. ❌ Incorrect: "python and django and postgresql"
+5. Avoid special characters or numbers in skill names
+6. Use plain text, no quotes or parentheses
+
+---
+
+**"Rate limit exceeded"**
+
+**Cause:** Too many requests in short time period
+
+**Solutions:**
+1. **Wait 1-2 minutes** before retrying
+2. You're performing operations too quickly
+3. Slow down: wait between operations
+4. Batch operations instead of rapid individual actions
+5. If you need high throughput, contact admin
+
+---
+
+**"Database connection error"**
+
+**Cause:** Cannot connect to AgentHR database
+
+**Solutions:**
+1. **Temporary issue** – wait 1 minute and retry
+2. Check your internet connection
+3. May be system maintenance (check notifications)
+4. Try refreshing the page
+5. Contact admin if persists > 5 minutes
+
+---
+
+**"500 Internal Server Error"**
+
+**Cause:** Unexpected server error
+
+**Solutions:**
+1. **Try again** – often temporary
+2. **Refresh page** and retry action
+3. **Different browser** to rule out browser issue
+4. **Note what you were doing** when error occurred
+5. **Report to admin** with:
+   - Exact error message
+   - What action you were performing
+   - Time of error
+   - Browser type and version
+
+---
+
+### Contacting Support
+
+When you've exhausted all troubleshooting steps and still can't resolve an issue, it's time to contact support.
+
+---
+
+#### **Before Contacting Support**
+
+**Gather This Information:**
+
+1. **Your Account Details**
+   - Username/email
+   - Account type (if applicable)
+   - Organization name
+
+2. **Issue Details**
+   - **Exact error message** (screenshot if possible)
+   - **What you were trying to do**
+   - **What happened instead**
+   - **Steps to reproduce** the problem
+
+3. **System Information**
+   - **Browser**: Chrome, Firefox, Safari, Edge (include version)
+   - **Operating System**: Windows, macOS, Linux
+   - **Device**: Desktop, laptop, mobile
+   - **Internet connection**: WiFi, wired, mobile data
+
+4. **Timing Information**
+   - **When** the issue started (date/time)
+   - **Is it intermittent** or always happening?
+   - **Does it affect** all users or just you?
+
+5. **What You've Tried**
+   - List troubleshooting steps you've attempted
+   - Results of each step
+   - This helps avoid repeating steps
+
+---
+
+#### **How to Contact Support**
+
+**Option 1: In-App Support (Best)**
+- Look for **"Help"** or **"Support"** button
+- Usually in header or settings menu
+- Automatically includes your account details
+- Fastest response time
+
+**Option 2: Email**
+- Send to your organization's support email
+- Include all information from "Before Contacting Support" above
+- Use descriptive subject line:
+  - ✅ Good: "Urgent: Can't upload resumes – Error 500"
+  - ❌ Bad: "Help needed" or "Question"
+
+**Option 3: Admin Direct Contact**
+- For urgent issues, contact your system administrator directly
+- Use for: account access, permissions, system-wide outages
+- Include error screenshots if possible
+
+**Option 4: Documentation**
+- Check **official documentation** for technical details
+- May have solutions not covered in this user guide
+- Useful for API or advanced feature issues
+
+---
+
+#### **Response Time Expectations**
+
+| Issue Severity | Response Time | Examples |
+|----------------|---------------|----------|
+| **Critical** | 1-2 hours | System down, can't work at all |
+| **High** | 4-8 hours | Can't upload resumes, matching broken |
+| **Medium** | 1-2 business days | Minor bugs, performance issues |
+| **Low** | 3-5 business days | Feature requests, UI improvements |
+
+**Critical Issues:**
+- Entire system inaccessible
+- Data loss or corruption
+- Security concerns
+- Multiple users affected
+
+**High Priority:**
+- Core functionality broken (uploading, matching)
+- Can't complete essential work tasks
+- Error messages preventing workflow
+
+**Medium Priority:**
+- Performance slower than usual
+- Minor bugs with workarounds available
+- Feature not working as expected
+
+**Low Priority:**
+- UI improvements or suggestions
+- Documentation clarifications
+- Feature requests
+
+---
+
+#### **What to Expect From Support**
+
+**Support Will:**
+1. Acknowledge your issue within expected response time
+2. Ask clarifying questions if needed
+3. Provide solution or workaround
+4. Estimate fix time for bugs
+5. Follow up to confirm issue is resolved
+
+**Support May Ask You To:**
+1. Provide screenshots or screen recordings
+2. Reproduce issue while they watch (remote session)
+3. Try specific troubleshooting steps
+4. Test a proposed fix
+5. Provide more details about your workflow
+
+**Support Will NOT:**
+1. Judge you for asking questions (no question is too basic!)
+2. Share your data or issue with others without permission
+3. Charge for support (if you have a support contract)
+4. Ask for your password (never share this!)
+
+---
+
+#### **Escalation Path**
+
+**If Issue Isn't Resolved:**
+
+**Level 1: Initial Support**
+- First response from support team
+- Basic troubleshooting
+- Most issues resolved here
+
+**Level 2: Technical Support**
+- If Level 1 can't resolve
+- More technical investigation
+- May involve developers
+
+**Level 3: Engineering Team**
+- Complex or systemic issues
+- May require code changes
+- Longer resolution time
+
+**When to Escalate:**
+- Issue persists > 1 week without resolution
+- Proposed solutions don't work
+- Issue severity increases
+- Business impact is significant
+
+---
+
+#### **Tips for Faster Support**
+
+**✅ Do:**
+- Include **screenshots** of error messages
+- Provide **specific steps** to reproduce
+- Share **browser and system** details
+- Describe **business impact** (why it's urgent)
+- **Follow up** if you don't hear back in expected time
+
+**❌ Don't:**
+- Say "it doesn't work" without details
+- Assume support can see your screen
+- Forget to mention what you've already tried
+- Send multiple emails about the same issue (wait for response)
+- Expect immediate response for non-critical issues
+
+---
+
+#### **Common Support FAQs**
+
+**Q: How quickly will I get a response?**
+A: Depends on severity. Critical issues within hours, minor issues within days.
+
+**Q: Will I lose my data while support troubleshoots?**
+A: No, support will never delete your data without explicit permission and backup.
+
+**Q: Can support help me use the platform better?**
+A: Yes! Support can answer usage questions, not just bug reports.
+
+**Q: What if support can't reproduce my issue?**
+A: They may request a screen-sharing session or more detailed logs.
+
+**Q: Is there a phone number to call?**
+A: This depends on your organization's support contract. Check with your admin.
+
+**Q: Can I request new features?**
+A: Absolutely! Support collects feature requests for the product team.
+
+---
+
+#### **Self-Service Resources**
+
+Before contacting support, check these resources:
+
+1. **This User Guide** – Comprehensive how-to documentation
+2. **FAQ Section** – Quick answers to common questions
+3. **Glossary** – Definitions of terms
+4. **Admin Documentation** – For technical setup and configuration
+5. **Release Notes** – New features and bug fixes in each version
+
+---
+
+**Remember:** Support is there to help you succeed. Don't hesitate to reach out – that's what they're for! Providing clear, detailed information helps them help you faster.
+
 ---
