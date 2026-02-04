@@ -8761,4 +8761,193 @@ Before contacting support, check these resources:
 
 **Remember:** Support is there to help you succeed. Don't hesitate to reach out – that's what they're for! Providing clear, detailed information helps them help you faster.
 
+------
+
+## 13. Glossary of Terms
+
+**Quick Reference for Technical and Recruitment Terminology**
+
+Welcome to the AgentHR glossary! This section provides simple, plain-English definitions for technical terms, recruitment jargon, and platform-specific concepts you might encounter while using AgentHR.
+
 ---
+
+### A-I Terms
+
+| Term | Simple Definition | Example |
+|------|------------------|---------|
+| **API** | A way for different software systems to "talk" to each other. Think of it as a waiter that takes requests between your computer and AgentHR's servers. | When you upload a resume, the API carries it to our servers and brings back the results. |
+| **Algorithm** | A set of step-by-step instructions that a computer follows to solve a problem. Like a recipe for baking a cake, but for data. | AgentHR's matching algorithm follows steps to compare resumes to job requirements. |
+| **Artificial Intelligence (AI)** | Computer systems that can perform tasks that usually require human intelligence, like understanding text or making decisions. | AgentHR uses AI to "read" and understand resumes like a human recruiter would. |
+| **Asynchronous** | A fancy way of saying "happens in the background." You can do other things while the system works on a task. | Resume analysis happens asynchronously—you can navigate away while it processes. |
+| **Authentication** | The process of verifying who you are, like showing your ID at a security checkpoint. | Logging in with your username and password is authentication. |
+| **Candidate Profile** | All the information AgentHR has extracted from a candidate's resume—skills, experience, education, etc. | A candidate profile might show "5 years experience, Python expert, Bachelor's degree." |
+| **Cloud-Based** | Software that runs on the internet instead of on your computer's hard drive. | AgentHR is cloud-based, so you can access it from any device with internet. |
+| **Confidence Score** | A number (0-100%) that shows how sure the AI is about its recommendation. | A 95% confidence score means the AI is very sure this candidate is a good match. |
+| **CSV** | A simple file format for storing data in rows and columns, like a spreadsheet. | You can export candidates to CSV to open in Excel. |
+| **Database** | An organized collection of data that computers can easily search and update. | All resumes and vacancies are stored in AgentHR's database. |
+| **Deep Learning** | A type of AI that learns patterns from huge amounts of data, similar to how humans learn from experience. | AgentHR uses deep learning to recognize skills mentioned in different ways. |
+| **Endpoint** | A specific URL where an API function lives. Like a specific door in a building. | The upload endpoint is where you send resume files. |
+| **Feature** | A piece of information or characteristic that the AI considers when making decisions. | Skills, experience, and education are all features used in ranking. |
+| **Feature Importance** | A measure of how much each feature (like skills or experience) affects the final ranking score. | If skills have 40% importance, they're a major factor in ranking decisions. |
+| **JSON** | A structured format for data that computers can easily read and write. | When AgentHR sends match results, it uses JSON format. |
+| **Keyword** | A specific word or phrase that the system looks for in resumes or job descriptions. | "Python" and "project management" are examples of keywords. |
+| **Latency** | The time it takes for the system to respond to your request. Lower is better. | If ranking has 200ms latency, it takes just 0.2 seconds to get results. |
+| **Machine Learning (ML)** | AI that improves automatically through experience and data, without being explicitly programmed for every case. | The ranking model learns which candidates lead to successful hires and adjusts accordingly. |
+| **Match Score** | A percentage (0-100%) showing how well a candidate's resume fits a job's requirements. | A match score of 85% means the candidate matches 85% of the job requirements. |
+| **Model** | A trained AI system that makes predictions or decisions based on input data. | AgentHR's ranking model predicts which candidates will be good hires. |
+| **Natural Language Processing (NLP)** | AI technology that helps computers understand, interpret, and generate human language. | NLP lets AgentHR read resumes and extract meaning from unstructured text. |
+| **Pagination** | Splitting large amounts of data into separate pages so it's easier to view. | Instead of showing 500 candidates at once, AgentHR shows 50 per page. |
+| **Parse** | To analyze data and break it down into structured parts. AgentHR "parses" resumes to extract name, skills, experience, etc. | When you upload a resume, AgentHR parses it to find the candidate's skills. |
+| **Pipeline** | Your recruitment workflow—the stages candidates move through from application to hire. | Your pipeline might be: Applied → Screening → Interview → Offer → Hired. |
+| **Precision** | How accurate the system is. In hiring, it means "of all candidates recommended, how many were actually good?" | High precision means most recommended candidates are truly qualified. |
+| **Prediction** | An estimate or forecast made by the AI based on patterns in data. | The ranking model predicts which candidates are most likely to succeed. |
+| **Rank Score** | A number (usually 0-1 or 0-100%) that represents how well a candidate fits a position, relative to other candidates. | A rank score of 0.87 (or 87%) means this candidate is in the top tier. |
+| **Recall** | How comprehensive the system is. In hiring, it means "of all good candidates, how many did the system find?" | High recall means the system didn't miss many qualified candidates. |
+| **Semantic Search** | Search that understands the meaning of words, not just exact matches. It knows "JS" and "JavaScript" are the same thing. | Semantic search finds "React.js" experience even when the job says "React JS." |
+| **Sentiment Analysis** | AI that detects emotions or attitudes in text (positive, negative, neutral). | Not currently used in AgentHR, but could analyze candidate cover letters for tone. |
+| **Skill Gap** | Skills that a candidate is missing compared to what a job requires. | If a job requires Docker but the candidate doesn't have it, that's a skill gap. |
+| **Structured Data** | Data organized in a fixed format, like a table with columns. | A spreadsheet where each row is a candidate and columns are name, skills, etc. |
+| **Synchronous** | Happening in real-time—you have to wait for the task to complete before doing anything else. | Uploading a small file might feel synchronous because it happens so quickly. |
+| **Taxonomy** | A system of classification or grouping. | Skill taxonomies group related skills (like "Python" under "Programming Languages"). |
+| **TF-IDF** | A fancy way of saying "how important is this word in this document compared to all documents?" | TF-IDF helps identify that "machine learning" is important in a data science job description. |
+| **Token** | A small piece of data used to authenticate you, like a digital ticket. | After logging in, you might get a token that proves you're authenticated for your session. |
+| **Training Data** | The data used to teach an AI model how to make predictions. | AgentHR's ranking model was trained on thousands of past hiring decisions. |
+| **Unstructured Data** | Data without a predefined format, like free text. | Resumes are unstructured data—each one looks different. |
+| **User Interface (UI)** | What you see and interact with on the screen—buttons, menus, forms, etc. | The dashboard, Kanban board, and candidate cards are all part of the UI. |
+| **Vector** | In AI, a mathematical representation of text that captures meaning. Similar concepts have similar vectors. | "Python" and "programming" have similar vectors, so the AI knows they're related. |
+| **Vector Similarity** | A measure of how similar two pieces of text are in meaning, based on their vector representations. | Vector similarity knows that "software engineer" and "developer" are similar roles. |
+
+---
+
+### Recruitment Terms
+
+| Term | Simple Definition | Example |
+|------|------------------|---------|
+| **Applicant** | Someone who has submitted their resume or expressed interest in a job. | You received 50 applicants for your Python Developer position. |
+| **Application** | The act of applying for a job, or the materials a candidate submits (resume, cover letter, etc.). | Her application included a resume, portfolio, and cover letter. |
+| **ATS (Applicant Tracking System)** | Software that helps companies manage job applications and track candidates through the hiring process. | AgentHR is an ATS with AI-powered ranking features. |
+| **Background Check** | Verifying a candidate's history (employment, education, criminal record, etc.) before hiring. | You run a background check after making a job offer. |
+| **Candidate** | Someone being considered for a job. Not all applicants become candidates—only those you review seriously. | You have 15 candidates you're actively considering. |
+| **Cold Outreach** | Contacting potential candidates who haven't applied for a job (like via LinkedIn). | Cold outreach can find passive candidates who aren't actively looking. |
+| **Compensation Package** | The total value offered to an employee: salary + benefits + bonuses + perks. | The compensation package includes salary, health insurance, and stock options. |
+| **Cover Letter** | A letter from a candidate explaining why they're a good fit for the job. | The candidate's cover letter showed genuine enthusiasm for the company. |
+| **CV (Curriculum Vitae)** | A detailed document listing a person's education, work experience, and qualifications. Similar to a resume but often longer. | In academic and research fields, candidates submit CVs instead of resumes. |
+| **EEO (Equal Employment Opportunity)** | Laws and policies ensuring all candidates have fair access to jobs regardless of race, gender, age, etc. | AgentHR's fairness features help maintain EEO compliance. |
+| **Entry-Level** | A job requiring little or no professional experience. | An entry-level sales job might accept candidates with no prior sales experience. |
+| **Executive Search** | Recruiting for high-level positions like CEOs, VPs, and C-suite executives. | Executive search requires specialized expertise and confidentiality. |
+| **Funnel** | The recruitment process viewed as a funnel: many applicants at the top, few hires at the bottom. | Your funnel: 100 applicants → 30 screened → 10 interviews → 3 offers → 1 hire. |
+| **Headhunter** | A recruiter who actively seeks out candidates for specific positions, often for competitor companies. | A headhunter might contact top performers at other companies. |
+| **Hiring Manager** | The person who makes the final hiring decision and manages the new employee. | The Engineering VP is the hiring manager for developer positions. |
+| **Job Board** | A website where employers post jobs and job seekers search and apply. | LinkedIn, Indeed, and Glassdoor are popular job boards. |
+| **Job Description (JD)** | A document listing the duties, responsibilities, and requirements of a job. | Your JD says the role requires Python, 3 years experience, and a degree. |
+| **Job Posting** | A public advertisement for an open position, usually on job boards or company websites. | Your job posting for "Marketing Manager" went live on Monday. |
+| **Job Requirements** | The skills, experience, and qualifications a candidate must have to be considered. | Job requirements: Bachelor's degree, 5 years experience, fluent in Spanish. |
+| **Kanban** | A visual method for managing work, using columns to represent stages. | AgentHR's Kanban board shows candidates in columns: Applied, Screening, Interview, etc. |
+| **KPI (Key Performance Indicator)** | Measurable values that show how well you're achieving goals. | Time-to-hire and quality-of-hire are recruiting KPIs. |
+| **Offer** | A formal proposal to hire a candidate, including salary, benefits, and other terms. | You extended an offer to your top candidate after the final interview. |
+| **Onboarding** | The process of integrating a new employee into the company (training, paperwork, meeting team, etc.). | Onboarding takes place after a candidate accepts the offer. |
+| **Passive Candidate** | Someone who isn't actively job hunting but might be open to the right opportunity. | Many employed developers are passive candidates. |
+| **Pipeline** | The group of candidates you're actively considering for current or future roles. | You keep a pipeline of 20 qualified developers for when roles open up. |
+| **Portal** | A website or platform where candidates can apply for jobs and track their application status. | Candidates use the AgentHR portal to upload resumes and check status. |
+| **Qualifications** | The skills, education, experience, or attributes that make someone suitable for a job. | A PhD in physics is a qualification for a research scientist role. |
+| **Recruiter** | A professional whose job is to find, screen, and hire candidates. | Internal recruiters work for one company; external recruiters work for multiple clients. |
+| **Recruitment** | The overall process of finding and hiring new employees. | Your recruitment process takes an average of 30 days. |
+| **Referral** | A candidate recommended by a current employee. | Employee referrals are often high-quality hires. |
+| **Resume** | A document summarizing a person's education, work experience, skills, and achievements. | Candidates submit resumes (or CVs) when applying for jobs. |
+| **Sourcing** | Actively finding and reaching out to potential candidates, especially for hard-to-fill roles. | Sourcing involves searching LinkedIn, GitHub, and other platforms. |
+| **Screening** | The initial review of candidates to determine if they meet basic requirements. | Screening resumes typically takes 6 seconds per resume (without AI). |
+| **Shortlist** | A narrowed-down list of the best candidates to interview. | Your shortlist includes the top 5 candidates out of 50 applicants. |
+| **Time-to-Fill** | The time from when a job is posted to when an offer is accepted. | Your average time-to-fill is 45 days. |
+| **Time-to-Hire** | The time from when a candidate applies to when they accept an offer. | Time-to-hire measures how efficient your selection process is. |
+| **Talent Pool** | A database of potential candidates for future roles. | You maintain a talent pool of past applicants who weren't hired but are strong. |
+| **Underqualified** | A candidate who doesn't meet the minimum requirements for a job. | An entry-level dev is underqualified for a senior architect role. |
+| **Overqualified** | A candidate who exceeds the job requirements, which might lead to boredom or high turnover. | A former CTO might be overqualified for a mid-level developer role. |
+| **Vacancy** | An open position that needs to be filled. Also called a "requisition" or "job opening." | You have 3 vacancies: one for sales, two for engineering. |
+| **Work Sample** | A test or example of a candidate's actual work, used to evaluate skills. | A coding challenge or writing portfolio are work samples. |
+| **Workforce Planning** | Strategically forecasting hiring needs based on business goals. | Workforce planning helps you know when to start recruiting for upcoming projects. |
+
+---
+
+### Platform-Specific Terms
+
+| Term | Simple Definition | Example |
+|------|------------------|---------|
+| **AgentHR** | The name of this AI-powered hiring platform. | AgentHR helps you rank candidates automatically. |
+| **Activity Feed** | A log showing all actions taken on a candidate (notes, moves, tags, etc.). | The activity feed shows you moved Maria to "Interview" stage yesterday. |
+| **Batch Operations** | Performing an action on multiple candidates at once instead of one-by-one. | Batch move 5 candidates to "Screening" with one click. |
+| **Bulk Upload** | Uploading many resumes at the same time instead of individually. | You can bulk upload 50 resumes in a single action. |
+| **Candidate Card** | The visual display of candidate information on the dashboard. | Click a candidate card to see full details. |
+| **Candidate Comparison** | A feature that shows two or more candidates side-by-side for easy comparison. | Use candidate comparison to choose between your top 3 finalists. |
+| **Column (Kanban)** | A vertical section on the Kanban board representing a hiring stage. | Your columns are: Applied, Screening, Interview, Offer, Hired. |
+| **Comparison Report** | A detailed document showing how multiple candidates stack up against each other. | Export a comparison report to share with the hiring manager. |
+| **Dashboard** | The main screen showing overview statistics, recent activity, and quick actions. | The dashboard shows you have 15 new resumes to review. |
+| **Document Parsing** | The process of extracting information from resume files into structured data. | Document parsing identifies name, contact info, skills, and work history. |
+| **Excellent Match** | A candidate with a match score of 80% or higher. Top recommendation. | This candidate is an excellent match—schedule an interview immediately! |
+| **Experiment Group** | In A/B testing, which version of the ranking model a candidate was evaluated with. | Some candidates are ranked with the "control" model, others with "treatment." |
+| **Feature Contribution** | How much each feature (skills, experience, etc.) contributed to a candidate's rank score. | Feature contribution shows skills were 40% of this candidate's high score. |
+| **Fair Rank** | A ranking mode that reduces bias and ensures equal opportunity for all candidates. | Enable fair rank to improve diversity in your hiring. |
+| **Feedback Loop** | The process of telling AgentHR whether its recommendations were helpful, which helps it improve. | Submitting feedback after each hire creates a feedback loop. |
+| **Filter** | A tool to narrow down candidates based on specific criteria (skills, location, experience, etc.). | Filter candidates to show only those with Python experience. |
+| **Good Match** | A candidate with a match score between 60-79%. Strong recommendation. | A good match candidate is worth interviewing. |
+| **ID / UUID** | A unique identifier for each resume, vacancy, or ranking. Like a Social Security number for data. | Each resume has a unique ID that never changes. |
+| **Interview Prep** | A feature that generates interview questions based on the candidate's resume and the job requirements. | Use interview prep to generate tailored technical questions. |
+| **Job Vacancy** | A specific open position you're hiring for within AgentHR. | Create a job vacancy for each role you're filling. |
+| **Kanban Board** | A visual board with columns that shows candidates in each stage of your pipeline. | The Kanban board shows 8 candidates in "Interview" stage. |
+| **Maybe Match** | A candidate with a match score between 40-59%. Potential worth reviewing. | A maybe match might be worth a phone screen to learn more. |
+| **Move** | The action of changing a candidate's stage on the Kanban board. | Move a candidate from "Screening" to "Interview" after a successful call. |
+| **Notes** | Text comments you can add to a candidate's profile for yourself or your team. | Add notes about what the candidate said in the phone screen. |
+| **Poor Match** | A candidate with a match score below 40%. Not recommended for the role. | A poor match probably isn't worth your time to review. |
+| **Rank Position** | Where a candidate falls in the ranked list (1st, 2nd, 3rd, etc.). | Rank position 1 means this candidate scored highest. |
+| **Ranking** | Ordering candidates from best to worst fit based on AI analysis. | Ranking helps you focus on top candidates first. |
+| **Recommendation Level** | A simple categorization: Excellent, Good, Maybe, or Poor. | The recommendation level makes it easy to quickly categorize candidates. |
+| **Resume Analysis** | The automatic process of examining a resume to extract key information. | Resume analysis happens in the background after upload. |
+| **Resume ID** | The unique identifier for a specific resume in the system. | Use the resume ID when matching candidates to vacancies. |
+| **Search History** | A record of all searches you've performed, so you can easily repeat them. | Check search history to rerun last week's candidate search. |
+| **Saved Search** | A search query you've saved to run again later with one click. | Create a saved search for "Python developers with 5+ years experience." |
+| **Skill Extraction** | Identifying and pulling out skills mentioned in a resume. | Skill extraction found this candidate knows Python, SQL, and React. |
+| **Skill Gap Analysis** | Identifying which required skills a candidate is missing. | Skill gap analysis shows the candidate lacks Kubernetes experience. |
+| **Stage** | A column on the Kanban board representing a step in your hiring process. | Your stages might be: Applied, Screening, Interview, Offer, Hired. |
+| **Stages** | Multiple steps in your recruitment pipeline (Applied → Screening → Interview, etc.). | Customize your stages to match your hiring workflow. |
+| **Status** | The current state of a resume or analysis process (pending, analyzed, etc.). | Resume status shows "analyzed" when extraction is complete. |
+| **Tags** | Labels you can add to candidates to categorize or remember them. | Tag candidates as "remote option," "referred by John," or "follow up next month." |
+| **Thirteen Factors** | The 13 criteria AgentHR uses to rank candidates (skills, experience, education, etc.). | Review the thirteen factors to understand why a candidate ranked high. |
+| **Timeline View** | A view showing how long candidates have spent in each stage. | Use timeline view to identify bottlenecks in your hiring process. |
+| **Unified Matching** | AgentHR's recommended matching method that combines three techniques for best accuracy. | Always use unified matching for the most accurate results. |
+| **Vacancy ID** | The unique identifier for a specific job opening in the system. | Use the vacancy ID to get ranked candidates for that position. |
+| **Weights** | How much importance is given to different factors in matching or ranking. | Increase weights for skills if they're more important than experience. |
+| **Workflow** | Your customized hiring process represented in AgentHR. | Your workflow stages reflect how your company hires. |
+
+---
+
+### Quick Category Reference
+
+**Technical Terms (A-I):** Computer science and data terminology
+
+**Recruitment Terms:** HR and hiring industry language
+
+**Platform Terms:** Specific to AgentHR's features and interface
+
+---
+
+### Tips for Using This Glossary
+
+1. **Bookmark this page** for quick reference when you encounter unfamiliar terms
+2. **Use Ctrl+F (or Cmd+F)** to search this page for specific words
+3. **Check the FAQ** first—glossary is for definitions, FAQ is for "how-to" questions
+4. **Ask your team** if you're unsure about a term not in this glossary
+5. **Suggest additions**—if a term confused you, it probably confused others too
+
+---
+
+### Still Confused?
+
+If a term isn't in this glossary or you'd like more clarification:
+
+1. **Check context** – The term might make more sense in the section where you encountered it
+2. **Search online** – A quick web search can provide more detailed explanations
+3. **Ask support** – Support teams love explaining things in plain language
+4. **Request an addition** – Let the AgentHR team know if this glossary is missing important terms
+
+---
+
+**Remember:** There's no such thing as a dumb question. Technical jargon can be confusing, and this glossary exists to help you use AgentHR confidently, even if you're not technical!
