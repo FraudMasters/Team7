@@ -335,28 +335,63 @@ const VacancyList: React.FC = () => {
   }, [filteredVacancies.length]);
 
   useEffect(() => {
-    fetchVacancies();
-  }, []);
+    fetchVacancies(0, limit);
+  }, [limit]);
 
-  const fetchVacancies = async () => {
-    setLoading(true);
-    setError(null);
+  /**
+   * Fetch vacancies with pagination support
+   * @param skip - Number of records to skip
+   * @param limit - Maximum number of records to return
+   * @param append - Whether to append results to existing vacancies (for load more)
+   */
+  const fetchVacancies = async (skip: number, limit: number, append: boolean = false) => {
+    // Set appropriate loading state
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
-      const response = await fetch('/api/vacancies/');
+      const response = await fetch(`/api/vacancies/?skip=${skip}&limit=${limit}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch vacancies');
       }
 
       const data: VacancyListResponse = await response.json();
-      setVacancies(data.vacancies);
+
+      // Update vacancies list
+      if (append) {
+        setVacancies((prev) => [...prev, ...data.vacancies]);
+      } else {
+        setVacancies(data.vacancies);
+      }
+
+      // Update pagination state
+      setSkip(skip + limit);
+      setHasMore(skip + limit < data.total);
     } catch (err) {
       setError(err instanceof Error ? err : 'Failed to fetch vacancies');
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
+
+  /**
+   * Load more vacancies when scrolling near bottom
+   */
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || loading) {
+      return;
+    }
+    fetchVacancies(skip, limit, true);
+  }, [loadingMore, hasMore, loading, skip, limit]);
 
   const handleDeleteClick = (id: string) => {
     setVacancyToDelete(id);
