@@ -4056,3 +4056,596 @@ Keep the board accurate to keep your analytics accurate.
 ### What's Next?
 
 Now that you know how to manage your hiring pipeline with the Kanban board, you're ready to help the AI learn and improve. In the next section, we'll cover [Providing Feedback on Rankings](#providing-feedback-on-rankings)—how your input makes AgentHR smarter and more accurate for future hires.
+
+---
+
+## 7. Providing Feedback on Rankings
+
+### Why Your Feedback Matters
+
+AgentHR uses artificial intelligence to rank candidates, but **your feedback is what makes it smarter**. Think of it like training a new team member—the more you guide them, the better they become at understanding what you're looking for.
+
+#### The Continuous Improvement Cycle
+
+```
+You rank candidates → AI makes recommendations → You provide feedback →
+AI learns → Next recommendations are better → Repeat
+```
+
+Every time you tell AgentHR whether a ranking was helpful or not, the system learns:
+
+✅ **What skills actually matter** for your specific roles
+
+✅ **Which factors** (experience, education, skills) are most important to you
+
+✅ **When the AI gets it right** so it can do more of that
+
+✅ **When the AI gets it wrong** so it can correct course
+
+#### Real-World Impact
+
+Consider this example:
+
+> **Your company** hired a "Good" candidate (68% score) instead of an "Excellent" one (85% score). Why? Because the "Good" candidate had industry-specific experience that wasn't captured in the skills list.
+>
+> **Your feedback:** "The 68% candidate was a better fit because they had healthcare experience, even though their skills score was lower."
+>
+> **Result:** AgentHR learns that for your healthcare roles, industry experience matters more than perfect skill matching. Future rankings for similar roles will weight experience more heavily.
+
+#### Feedback Benefits Everyone
+
+Your feedback doesn't just help you—it helps the entire system:
+
+| For You | For Your Team | For the AI |
+|---------|---------------|------------|
+| More accurate rankings | Consistent hiring standards | Better understanding of your needs |
+| Less time reviewing wrong candidates | Shared knowledge of what works | Improved recommendations over time |
+| Hiring decisions aligned with reality | Data-driven discussions | Reduced bias in rankings |
+| Faster time-to-hire | Better quality of hires | Continuous learning |
+
+---
+
+### How to Submit Feedback
+
+Providing feedback is quick and straightforward. You can submit feedback at any point in the hiring process, from initial ranking to final hiring decision.
+
+#### When to Provide Feedback
+
+You can (and should) provide feedback at multiple stages:
+
+| Stage | When | What to Share |
+|-------|------|---------------|
+| **After reviewing rankings** | You've looked at the top 10 candidates | Were the rankings helpful? Did the right candidates rise to the top? |
+| **After interviews** | You've interviewed 1-3 candidates | How did the interview compare to the AI assessment? Any surprises? |
+| **After hiring decision** | You've made an offer (or decided not to) | Who did you hire and why? How did this compare to the AI ranking? |
+| **After onboarding** | New hire has been in role 1-3 months | Was the AI assessment accurate long-term? Any missed strengths/weaknesses? |
+
+#### Finding the Feedback Option
+
+Feedback options appear in several places:
+
+**Option 1: From Candidate Rankings Page**
+
+```
+1. Navigate to the vacancy you're hiring for
+2. Click the "Rankings" tab
+3. Look for the "Provide Feedback" button (top right of rankings table)
+4. Click and select feedback type
+```
+
+**Option 2: From Individual Candidate Card**
+
+```
+1. Open any candidate card from Kanban board or search results
+2. Click the "Feedback" tab in the candidate detail view
+3. Select the feedback type and complete the form
+4. Submit
+```
+
+**Option 3: After Moving Candidates on Kanban Board**
+
+```
+1. Move a candidate to "Hired" or "Rejected" column
+2. A feedback prompt will appear automatically
+3. Take 30 seconds to answer the quick questions
+4. Submit (or skip if not relevant)
+```
+
+#### Types of Feedback You Can Provide
+
+**1. Ranking-Level Feedback**
+
+Tell AgentHR how helpful the overall ranking was for a vacancy:
+
+| Question | Options | When to Use |
+|----------|---------|-------------|
+| **Were the rankings accurate?** | Very Accurate / Somewhat Accurate / Not Accurate | After you've reviewed top candidates |
+| **Did top-ranked candidates deserve to be at the top?** | Yes / Mostly / No | After interviews or hiring decision |
+| **What would improve rankings?** | Free text | Anytime rankings seem off |
+
+**2. Candidate-Level Feedback**
+
+Provide specific feedback on individual candidates:
+
+| Feedback Type | Description | Example |
+|---------------|-------------|---------|
+| **Hired** | You made an offer and candidate accepted | "Hired - great cultural fit, strong technical skills" |
+| **Offer Declined** | Candidate declined your offer | "Offer declined - accepted higher salary elsewhere" |
+| **Rejected** | You decided not to hire this candidate | "Rejected - lacked communication skills needed" |
+| **Not a Match** | Candidate not suitable for role | "Not a match - looking for more senior role" |
+| **Promoted** | Internal candidate promoted to role | "Promoted from within - already knew our systems" |
+| **Withdrew** | Candidate withdrew from consideration | "Withdrew - accepted another offer" |
+
+**3. Factor-Level Feedback**
+
+Tell AgentHR which factors were most important for your decision:
+
+| Factor | When to Select This |
+|--------|---------------------|
+| **Skills Match** | Candidate's skills were the main reason for hiring/rejecting |
+| **Experience** | Years or type of experience was the deciding factor |
+| **Education** | Degree or certifications mattered most |
+| **Cultural Fit** | Soft skills and personality were the key factor |
+| **Salary Expectations** | Compensation alignment drove the decision |
+| **Availability** | Start date or schedule availability was critical |
+| **Location** | Remote/on-site/physical location was the main factor |
+| **Other** | None of the above—add explanation in comments |
+
+#### Step-by-Step: Submitting Complete Feedback
+
+Let's walk through a complete feedback submission after you've hired someone:
+
+**Step 1: Navigate to the Vacancy**
+
+```
+Go to Vacancies → Click on the role you hired for
+```
+
+**Step 2: Open Rankings and Click Feedback**
+
+```
+Click Rankings tab → Click "Provide Feedback" button
+```
+
+**Step 3: Answer the Ranking-Level Questions**
+
+```
+Q1: Were the rankings accurate?
+→ Select: "Somewhat Accurate"
+
+Q2: Did the hired candidate appear in the top 5?
+→ Select: "Yes (ranked #3)"
+
+Q3: What would improve future rankings?
+→ Enter: "Weight industry experience more heavily for this role"
+```
+
+**Step 4: Select the Hired Candidate**
+
+```
+From the list of ranked candidates, click the person you hired
+```
+
+**Step 5: Provide Candidate-Level Feedback**
+
+```
+Q: What was the outcome?
+→ Select: "Hired"
+
+Q: How did AI ranking compare to reality?
+→ Select: "Accurate - ranking matched final decision"
+
+Q: What was the primary reason?
+→ Select: "Experience"
+
+Q: Additional comments?
+→ Enter: "Candidate had 5 years healthcare experience, which was more important than the specific framework skills listed in job description"
+```
+
+**Step 6: Submit**
+
+```
+Click "Submit Feedback"
+```
+
+**That's it!** The entire process takes 1-2 minutes.
+
+---
+
+### What Happens With Your Feedback
+
+Once you submit feedback, AgentHR goes to work learning from your input. Here's what happens behind the scenes.
+
+#### Immediate Effects
+
+**1. Feedback Confirmation**
+
+You'll see an immediate confirmation:
+
+```
+✅ Feedback received! Thank you for helping improve AgentHR.
+Your input will be used to refine future rankings for this role type.
+```
+
+**2. Feedback Log**
+
+All feedback is logged and available for review:
+
+```
+Navigate to: Vacancies → [Select Vacancy] → Feedback History tab
+```
+
+You can view:
+- All feedback submitted for this vacancy
+- When feedback was submitted
+- What candidates it was about
+- What outcomes were reported
+
+#### Short-Term Effects (Hours to Days)
+
+**3. Re-Ranking Request**
+
+For vacancies still actively hiring, you can request updated rankings based on new feedback:
+
+```
+Rankings tab → "Update Rankings" button → Confirm
+```
+
+The system will:
+- Incorporate your latest feedback
+- Re-rank all candidates for that vacancy
+- Show updated scores and recommendations
+
+> **Note:** Re-ranking typically takes 5-10 minutes for a vacancy with 50 candidates.
+
+**4. Adjusted Feature Weights**
+
+The AI adjusts the importance (weights) of the 13 ranking factors based on your feedback:
+
+| Your Feedback Says | AI Adjusts |
+|-------------------|------------|
+| "Skills match matters most" | Increases weight for `skills_match_ratio` and `keyword_score` |
+| "Experience trumps everything" | Increases weight for `experience_months` and `experience_relevance` |
+| "Recent experience is key" | Increases weight for `recent_experience` |
+| "Education matters less" | Decreases weight for `education_level` |
+| "Culture fit is critical" | (Future) Will incorporate soft skill assessment |
+
+These adjustments are **vacancy-specific** first, then propagate to similar roles.
+
+#### Medium-Term Effects (Weeks)
+
+**5. Pattern Recognition**
+
+As you provide more feedback, AgentHR identifies patterns in your hiring decisions:
+
+```
+Example Pattern Detected:
+For Senior Software Engineer roles:
+  - Industry experience matters 2x more than skills list
+  - Recent experience (<2 years) weighted 3x more heavily
+  - Education level has minimal impact
+  - Title similarity is a strong predictor of fit
+```
+
+**6. Vacancy Clustering**
+
+The system groups similar vacancies and learns from all of them:
+
+```
+Cluster: "Customer Support Roles"
+  - Customer Support Representative
+  - Technical Support Specialist
+  - Client Success Manager
+
+Feedback from any of these vacancies improves rankings for all.
+```
+
+#### Long-Term Effects (Months)
+
+**7. Personalized Rankings**
+
+Over time, AgentHR develops a deep understanding of **your organization's hiring preferences**:
+
+- What makes someone successful at your company
+- Which skills are truly required vs. nice-to-have
+- How experience requirements translate to actual performance
+- What "cultural fit" means for your team
+
+**8. Improved Prediction Accuracy**
+
+The system gets better at predicting who you'll actually hire:
+
+| After 1 Month | After 3 Months | After 6 Months |
+|---------------|----------------|----------------|
+| Learning your preferences | Recognizing patterns | Highly personalized |
+| 60-70% accuracy | 75-85% accuracy | 85-95% accuracy |
+
+> **Accuracy** = The candidate you actually hire appears in the top 5 of AI rankings
+
+#### Feedback Quality Matters
+
+Not all feedback is equally valuable. Here's how to make your feedback count:
+
+✅ **Specific feedback is better than general**
+   - Good: "Industry experience mattered more than framework skills"
+   - Less Helpful: "Rankings were okay"
+
+✅ **Outcome-based feedback is best**
+   - Good: "Hired the #3 ranked candidate because..."
+   - Less Helpful: "Rankings seemed reasonable"
+
+✅ **Consistent feedback builds learning**
+   - Good: Always providing feedback after hiring decisions
+   - Less Helpful: One feedback submission every few months
+
+✅ **Honest feedback helps**
+   - Good: "The top-ranked candidate was actually a poor fit because..."
+   - Less Helpful: Only reporting positive outcomes
+
+---
+
+### Feedback Best Practices
+
+#### DO: Provide Regular Feedback
+
+| Frequency | Impact |
+|-----------|--------|
+| **After every hire** | Maximum learning, fastest improvement |
+| **After 50% of hires** | Steady improvement, good balance |
+| **Occasionally** | Minimal impact on rankings |
+| **Never** | No personalization, generic rankings only |
+
+**Recommended:** Aim to provide feedback for at least 50% of your hiring decisions.
+
+#### DO: Be Specific About Why
+
+Instead of just saying who you hired, explain the reasoning:
+
+| Vague Feedback | Specific Feedback |
+|----------------|-------------------|
+| "Hired this person" | "Hired this person because they had 3 years of industry experience that wasn't captured in skills list" |
+| "Rankings were off" | "Rankings were off because they weighted technical skills too heavily; communication skills were more important" |
+| "Good candidate" | "Good candidate because their recent project experience was directly relevant to our needs" |
+
+#### DO: Report Both Positive and Negative Outcomes
+
+Tell AgentHR when it gets things right **and** when it gets them wrong:
+
+| Positive Feedback | Negative Feedback |
+|-------------------|-------------------|
+| "AI ranking was accurate - we hired the #1 candidate" | "We hired the #12 candidate because the top-ranked lacked leadership experience" |
+| "Recommendation was spot-on" | "Poor recommendation - candidate wasn't actually qualified" |
+| "Score matched our assessment" | "Score was way off - candidate much stronger than 45% rating" |
+
+#### DO: Factor in the "Why"
+
+When feedback doesn't match the ranking, explain the discrepancy:
+
+**Example 1: Better Than Ranked**
+```
+Feedback: "We hired the #8 ranked candidate (score: 62%) instead of the #1 candidate (score: 85%).
+Why: The #8 candidate had managed teams of 10+, which was crucial for this senior role.
+The #1 candidate had great skills but no management experience."
+```
+
+**Example 2: Worse Than Ranked**
+```
+Feedback: "The #2 ranked candidate (score: 78%) performed poorly in interviews.
+Why: Strong resume but weak communication skills. Rankings should account for soft skills better."
+```
+
+#### DON'T: Submit Rushed or Incomplete Feedback
+
+Taking an extra minute to be thorough pays off:
+
+❌ **Too brief:** "Hired #3"
+
+✅ **Better:** "Hired #3 - their consulting experience meant they could hit the ground running, which was more important than the specific tech skills that ranked #1 higher."
+
+#### DON'T: Assume AI Knows Your Context
+
+AgentHR doesn't know your unique situation unless you tell it:
+
+| Context to Share | Example |
+|------------------|---------|
+| **Internal candidates** | "This was an internal promotion, so we valued institutional knowledge over skills match" |
+| **Urgent hire** | "We needed someone immediately, so availability was the top factor" |
+| **Career changer** | "Candidate was transitioning careers - their transferable skills were more relevant than their direct experience" |
+| **Budget constraints** | "Salary expectations ruled out higher-ranked candidates" |
+| **Unique requirements** | "This role requires fluency in Portuguese, which wasn't in the job description but is essential" |
+
+---
+
+### Real-World Feedback Examples
+
+Here are complete examples of feedback that helps AgentHR learn:
+
+#### Example 1: Hiring a Lower-Ranked Candidate
+
+```
+VACANCY: Senior Marketing Manager
+RANKING PROVIDED: 45 candidates ranked
+
+HIRED: Candidate #7 (Score: 72%, Recommendation: Good)
+NOT HIRED: Candidate #1 (Score: 88%, Recommendation: Excellent)
+
+FEEDBACK SUBMITTED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Overall Ranking Accuracy: Somewhat Accurate
+
+Did the hired candidate appear in the top 5? No (ranked #7)
+
+What would improve future rankings?
+"Weight management experience more heavily than specific channel expertise.
+For senior roles, track record of results matters more than tools used."
+
+HIRED CANDIDATE FEEDBACK:
+Outcome: Hired
+How did AI ranking compare to reality? Somewhat Accurate
+Primary reason: Experience
+Comments: "Candidate had 8 years managing teams of 5+ marketers,
+including budget authority. The higher-ranked candidates had better
+SEO/SEM skills but no management experience. For a senior role,
+leadership is more critical than tactical skills."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPACT: Future senior marketing roles will weight management experience
+more heavily than tactical channel skills.
+```
+
+#### Example 2: Hiring the Top-Ranked Candidate
+
+```
+VACANCY: Junior Software Developer
+RANKING PROVIDED: 32 candidates ranked
+
+HIRED: Candidate #1 (Score: 91%, Recommendation: Excellent)
+
+FEEDBACK SUBMITTED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Overall Ranking Accuracy: Very Accurate
+
+Did the hired candidate appear in the top 5? Yes (ranked #1)
+
+What would improve future rankings?
+"Rankings were excellent - the top 3 were all strong candidates.
+No changes needed."
+
+HIRED CANDIDATE FEEDBACK:
+Outcome: Hired
+How did AI ranking compare to reality? Very Accurate
+Primary reason: Skills Match
+Comments: "The top-ranked candidate had exactly the skills we needed
+(Python, FastAPI, PostgreSQL) and a relevant portfolio project.
+The AI correctly identified that their skills were a perfect match.
+Great job on this ranking!"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPACT: Reinforces that skills matching is working well for junior
+developer roles. No changes to weighting needed.
+```
+
+#### Example 3: Rejecting All Ranked Candidates
+
+```
+VACANCY: Sales Director
+RANKING PROVIDED: 18 candidates ranked
+
+HIRED: None - reopened search
+
+FEEDBACK SUBMITTED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Overall Ranking Accuracy: Not Accurate
+
+Did the hired candidate appear in the top 5? N/A (none hired)
+
+What would improve future rankings?
+"The rankings focused too much on years of experience and not enough
+on actual sales performance. Top-ranked candidates had long titles
+but mediocre quota attainment. We need to see track record of
+exceeding targets, not just time in role."
+
+OVERALL FEEDBACK:
+Outcome: Reopened Search
+How did AI ranking compare to reality? Not Accurate
+Primary reason: Other
+Comments: "None of the top 10 had demonstrated quota over-achievement.
+For sales roles, performance metrics (percent of quota attained,
+Presidents Club wins, etc.) should be weighted more heavily than
+years of experience or title progression."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPACT: Future sales role rankings will look for performance
+indicators (quota attainment, awards) rather than just years of
+experience.
+```
+
+---
+
+### Feedback FAQ
+
+**Q: How often should I provide feedback?**
+
+**A:** Aim for at least 50% of your hiring decisions. The more feedback you provide, the faster AgentHR learns. After every hire is ideal, but even occasional feedback helps. Think of it like training a new team member—regular guidance is better than no guidance.
+
+---
+
+**Q: What if I don't have time to provide detailed feedback?**
+
+**A:** Even quick feedback is valuable! A 30-second submission (selecting "Hired" and the primary reason) is still helpful. If you're really pressed for time, you can always come back later and add more detail using the Feedback History tab.
+
+---
+
+**Q: Will my feedback negatively affect a candidate's ranking?**
+
+**A:** No, feedback doesn't retroactively change rankings for that specific candidate. Instead, it helps the AI learn for future candidates and future vacancies. Your feedback is about teaching the system, not punishing individual candidates.
+
+---
+
+**Q: What if I disagree with the AI ranking but don't have a clear reason why?**
+
+**A:** That's okay! You can still provide feedback:
+
+```
+Outcome: Not sure / Other
+Comments: "Top-ranked candidates didn't feel right, but I can't pinpoint why.
+Maybe something about communication style or cultural fit that's not captured in the data."
+```
+
+This feedback still helps by signaling that something important is missing from the ranking factors.
+
+---
+
+**Q: Do other companies' feedback affect my rankings?**
+
+**A:** No, your feedback only affects your organization's rankings. However, feedback across all customers helps improve the core AI algorithms for everyone. Think of it as: your personal feedback personalizes your rankings; aggregated feedback improves the underlying system for all users.
+
+---
+
+**Q: How long until I see feedback reflected in rankings?**
+
+**A:** It depends on the type of feedback:
+
+| Feedback Type | When You'll See Impact |
+|---------------|------------------------|
+| **Re-ranking request** | Immediate (5-10 minutes) |
+| **Similar vacancy** | Next time you rank candidates for similar role |
+| **New vacancy in same cluster** | Within 1-2 weeks |
+| **Completely different role** | May take several feedback submissions to see pattern |
+
+---
+
+**Q: Can I change or delete feedback I submitted?**
+
+**A:** Yes, you can edit or remove feedback:
+
+```
+Navigate to: Vacancies → [Select Vacancy] → Feedback History tab
+→ Find the feedback entry → Click "Edit" or "Delete"
+```
+
+However, consider that all feedback—even corrections—helps the system learn. If you realize earlier feedback was inaccurate, submitting a correction is more helpful than deleting it.
+
+---
+
+**Q: What if the AI never seems to learn from my feedback?**
+
+**A:** This can happen if:
+
+1. **Inconsistent feedback:** The system receives conflicting signals (e.g., sometimes you hire based on skills, other times on experience)
+2. **Insufficient feedback:** You've provided fewer than 5-10 feedback submissions
+3. **Complex preferences:** Your hiring criteria are nuanced or contradictory
+
+**Solution:** Focus on providing consistent, specific feedback about your most common hiring scenarios. Over time, patterns will emerge.
+
+---
+
+### What's Next?
+
+Now that you understand how to provide feedback that makes AgentHR smarter, you're ready to dive into the data. In the next section, we'll cover the [Analytics Dashboard](#analytics-dashboard)—how to use metrics and insights to continuously improve your hiring process and make better, data-driven decisions.
