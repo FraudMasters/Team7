@@ -6855,3 +6855,901 @@ A: No, recruiter notes are **private to you** and are not included in shared com
 Now that you know how to compare candidates side-by-side and make data-driven hiring decisions, you're ready to tackle common questions and troubleshoot issues. In the next section, we'll cover [Frequently Asked Questions](#11-frequently-asked-questions)—everything you've ever wanted to know about AgentHR, from understanding the AI to troubleshooting common problems.
 
 ---
+
+---
+
+## 11. Frequently Asked Questions
+
+This section answers the most common questions HR recruiters and hiring managers have about using AgentHR. Questions are organized by category so you can quickly find what you need.
+
+---
+
+### Understanding the AI
+
+These questions address how AgentHR's AI works and what you need to know about artificial intelligence in hiring.
+
+#### **Q: Is AgentHR's AI actually "artificial intelligence"? What does that mean?**
+
+**A:** Yes, AgentHR uses machine learning (a type of AI) to analyze resumes and predict which candidates will be good fits for your jobs. Think of it as a very smart assistant that:
+
+- **Reads resumes like a human would** – It extracts names, skills, experience, and education automatically
+- **Understands context** – It knows that "JS" and "JavaScript" are the same thing, or that "3 years of Python" means programming experience, not snake handling 🐍
+- **Learns from patterns** – It analyzes thousands of resumes to identify what makes candidates successful
+- **Makes predictions** – It estimates how well a candidate fits a job based on many factors
+
+Unlike simple keyword matching, AgentHR's AI uses **machine learning models** trained on real-world hiring data to make more sophisticated decisions.
+
+---
+
+#### **Q: Will AgentHR replace human recruiters?**
+
+**A:** No, AgentHR is designed to **assist** you, not replace you. Here's why human judgment is still essential:
+
+| What AgentHR Does Best | What Humans Do Best |
+|------------------------|---------------------|
+| Quickly screen hundreds of resumes | Assess cultural fit |
+| Calculate objective match scores | Evaluate communication skills |
+| Identify top candidates efficiently | Make nuanced judgments |
+| Provide data-driven insights | Build relationships with candidates |
+| Reduce bias in initial screening | Negotiate salaries and offers |
+
+**Think of AgentHR as a powerful filter** – it saves you time by identifying the best candidates, but you still make the final hiring decision.
+
+---
+
+#### **Q: How does the AI "learn" and improve over time?**
+
+**A:** AgentHR's AI improves through two main mechanisms:
+
+**1. Machine Learning Model Training**
+
+The ranking model was trained on a dataset of resumes and hiring outcomes. It learned patterns like:
+- Which skills correlate with job success
+- How much experience matters for different roles
+- Which education levels are appropriate for which positions
+
+**2. Continuous Feedback Loop**
+
+When you submit feedback on rankings (telling AgentHR whether its recommendations were helpful), the system uses this information to:
+- Identify areas where the model is inaccurate
+- Fine-tune feature weights for your specific hiring needs
+- Improve future recommendations
+
+**The more you use AgentHR and provide feedback, the better it gets at understanding your hiring preferences.**
+
+---
+
+#### **Q: Is the AI biased against certain groups of people?**
+
+**A:** AgentHR includes features to **reduce bias** in hiring:
+
+**Built-in Fairness Features:**
+- **Blind screening option** – Can hide names, photos, and personal details during initial review
+- **Fairness-aware ranking** – Optional bias mitigation that equalizes opportunities across demographic groups
+- **Objective criteria** – Rankings based on skills and experience, not subjective factors
+
+**However, AI can inherit biases from training data.** To minimize this:
+
+✅ **Do:** Review top candidates personally before making decisions
+✅ **Do:** Consider diverse backgrounds and non-traditional career paths
+✅ **Do:** Use rankings as one factor, not the only factor
+✅ **Do:** Provide feedback when recommendations seem off
+
+❌ **Don't:** Rely solely on AI scores without human review
+❌ **Don't:** Assume AI is completely neutral – it's a tool that needs oversight
+
+---
+
+#### **Q: Can candidates "game" the system to get higher scores?**
+
+**A:** It's difficult to game AgentHR effectively because:
+
+- **Multiple matching methods** – Keyword stuffing doesn't help when TF-IDF and vector similarity are also used
+- **13 ranking factors** – Optimizing for one factor (like skills) won't guarantee a high score if other factors (like experience relevance) are weak
+- **Context understanding** – The AI knows when skills are mentioned meaningfully vs. just listed
+
+**Red flags that may indicate gaming:**
+- Unusually high keyword density
+- Skills listed without context or experience
+- Formatting that tries to hide weaknesses
+- Generic job descriptions copied from job postings
+
+**If you suspect a resume is trying to game the system:**
+- Review the resume manually
+- Check if skills are backed by real experience
+- Verify claims during interviews
+- Provide feedback that the ranking seemed inflated
+
+---
+
+#### **Q: How accurate are the AI's predictions?**
+
+**A:** AgentHR's accuracy varies depending on several factors:
+
+**High Accuracy Scenarios:**
+- ✅ Technical roles with clear skill requirements (e.g., Python Developer)
+- ✅ Well-defined job postings with specific required skills
+- ✅ Candidates with straightforward career paths
+- ✅ Industries with standard skill sets
+
+**Lower Accuracy Scenarios:**
+- ⚠️ Creative or leadership roles where soft skills matter more
+- ⚠️ Career changers with transferable skills
+- ⚠️ Very specialized or niche positions
+- ⚠️ Poorly written job postings or resumes
+
+**Typical Performance:**
+- **Top 20% of ranked candidates** – ~80% are usually worth interviewing
+- **"Poor" recommendations** – ~90% are genuinely not good fits
+- **Borderline cases** (40-60%) – Require human judgment
+
+**Remember:** AI predictions are probabilities, not certainties. Always verify with your own judgment.
+
+---
+
+### Resumes and Matching
+
+These questions cover uploading resumes, what happens during analysis, and how matching works.
+
+#### **Q: What file formats can I upload?**
+
+**A:** AgentHR supports two resume formats:
+
+| Format | Recommended For | Notes |
+|--------|-----------------|-------|
+| **PDF** | Most resumes | Best format – preserves formatting, widely used |
+| **DOCX** | Microsoft Word users | Also fully supported |
+
+**❌ Not supported:**
+- DOC (older Word format – convert to DOCX or PDF)
+- TXT, RTF, HTML, or other text formats
+- Image files (JPG, PNG) – Use OCR tools or request PDF version
+- Scanned documents – Must be text-searchable PDFs
+
+**💡 Tip:** If you receive resumes in unsupported formats, ask candidates to resubmit as PDF.
+
+---
+
+#### **Q: Is there a file size limit for uploads?**
+
+**A:** Yes, there are limits to ensure smooth performance:
+
+- **Maximum file size:** 10 MB per resume
+- **Recommended size:** Under 2 MB for faster processing
+
+**If a file is too large:**
+- Ask candidate to compress images in the resume
+- Request a version without excessive formatting or embedded images
+- Convert to a more efficient PDF format
+
+---
+
+#### **Q: What happens after I upload a resume? How long does analysis take?**
+
+**A:** Here's the process:
+
+**Step 1: Upload** (Immediate)
+- File is uploaded to the server
+- You receive a resume ID
+- Status shows "pending"
+
+**Step 2: Analysis** (5-15 seconds typically)
+- AI extracts text from the PDF/DOCX
+- Parses structured data (contact info, skills, experience)
+- Identifies key information
+- Status changes to "analyzed"
+
+**Step 3: Ready for Matching**
+- Once analyzed, you can match the resume to vacancies
+- If you try to match before analysis is complete, you'll get an error
+
+**💡 Tip:** Upload resumes in batches and wait ~30 seconds before starting matching. This allows the system to process all of them.
+
+---
+
+#### **Q: Do I need to wait for analysis to complete before uploading more resumes?**
+
+**A:** No! You can upload multiple resumes consecutively without waiting. Each resume is processed independently in the background.
+
+**Efficient workflow:**
+1. Upload Resume 1 → immediately get ID
+2. Upload Resume 2 → immediately get ID
+3. Upload Resume 3 → immediately get ID
+4. Wait 30 seconds
+5. Start matching all resumes
+
+This is much faster than waiting for each one individually.
+
+---
+
+#### **Q: What if the AI extracts incorrect information from a resume?**
+
+**A:** Extraction errors can happen. Common issues:
+
+| Issue | Example | Solution |
+|-------|---------|----------|
+| **Missed skills** | Skill listed in non-standard format | Manually review; consider adding to job's "nice-to-have" skills |
+| **Wrong experience dates** | Confusing date format | Contact candidate to clarify; you can edit in some cases |
+| **Missed certifications** | Certification in unusual section | Note this manually during review |
+| **Incorrect contact info** | Typos in parsing | Get correct info from resume PDF directly |
+
+**If extraction is consistently wrong:**
+- Check if the resume has unusual formatting
+- Verify you uploaded the correct file
+- Report the issue to your system administrator
+
+**💡 Tip:** You can still match and rank candidates even if some extraction is imperfect – the AI is quite robust to minor errors.
+
+---
+
+#### **Q: Can I edit resume information after it's been extracted?**
+
+**A:** This depends on your organization's AgentHR configuration:
+
+**Some organizations allow:**
+- Adding missing skills
+- Correcting contact information
+- Updating work history details
+
+**Some organizations have read-only resume data:**
+- To maintain data integrity
+- To preserve original resume information
+- For compliance reasons
+
+**Check with your system administrator** about editing permissions in your setup.
+
+---
+
+#### **Q: How do the three matching methods work together?**
+
+**A:** AgentHR uses **three complementary methods** and combines them:
+
+**1. Keyword Matching (Exact Skills)**
+- Checks if required skills appear in the resume
+- Simple yes/no for each skill
+- Example: If you require "Python," does the resume mention "Python"?
+
+**2. TF-IDF Matching (Weighted Relevance)**
+- Weights skills by rarity (unusual skills count more)
+- Considers how prominently skills are mentioned
+- Example: "Kubernetes" mentioned multiple times scores higher than once
+
+**3. Vector Similarity (Understanding Meaning)**
+- Uses AI embeddings to understand semantic similarity
+- Knows that "JS" = "JavaScript" and "react.js" = "React"
+- Can recognize related concepts
+
+**How they combine:**
+```
+Overall Match Score = (Keyword Score × 25%) + (TF-IDF Score × 35%) + (Vector Score × 40%)
+```
+
+**Why use all three?**
+- Keyword ensures core requirements are met
+- TF-IDF highlights candidates with relevant expertise
+- Vector catches candidates who use different terminology
+
+---
+
+#### **Q: What's the difference between a "match score" and a "rank score"?**
+
+**A:** Great question! These are often confused:
+
+**Match Score (0-100%)**
+- **What it measures:** How well a resume matches a vacancy's requirements
+- **What it considers:** Skills, experience, education
+- **When you see it:** During initial matching
+- **Example:** "This candidate matches 78% of the job requirements"
+
+**Rank Score (0.0-1.0)**
+- **What it measures:** Overall quality after considering 13 factors
+- **What it considers:** Match score + 12 additional factors (resume completeness, skill rarity, experience relevance, etc.)
+- **When you see it:** After ranking candidates
+- **Example:** "This candidate ranks 0.87 and is 'Excellent' quality"
+
+**Key difference:**
+- Match = "Do they have the skills?" (one dimension)
+- Rank = "Are they a good candidate overall?" (13 dimensions)
+
+---
+
+#### **Q: Why do two candidates with the same skills have different match scores?**
+
+**A:** Several factors can cause this:
+
+**1. Experience Requirements**
+- Candidate A: Has the skills but only 1 year of experience (job requires 3 years)
+- Candidate B: Has the skills and 5 years of experience
+- Result: Candidate B scores higher
+
+**2. Skill Prominence**
+- Candidate A: Skills mentioned briefly
+- Candidate B: Skills featured prominently in multiple projects
+- Result: Candidate B scores higher (TF-IDF weighting)
+
+**3. Resume Completeness**
+- Candidate A: Missing contact info, incomplete work history
+- Candidate B: Complete resume with all details
+- Result: Candidate B scores higher
+
+**4. Education Level**
+- Candidate A: Bachelor's degree
+- Candidate B: Master's degree
+- Result: Candidate B scores higher (if education is a ranking factor)
+
+**💡 Tip:** Click on a candidate's details to see the factor breakdown and understand exactly why they scored as they did.
+
+---
+
+### Rankings and Scores
+
+These questions explain ranking scores, recommendation levels, and how to interpret the results.
+
+#### **Q: What are the 13 factors that influence rankings?**
+
+**A:** AgentHR uses 13 factors to rank candidates:
+
+| Factor | What It Measures | Weight |
+|--------|-----------------|--------|
+| **1. Skills Match Ratio** | Percentage of required skills candidate has | High |
+| **2. Experience Months** | Total months of relevant experience | High |
+| **3. Experience Relevance** | How closely experience aligns with job | High |
+| **4. Education Level** | Degree level (Bachelor's, Master's, PhD) | Medium |
+| **5. Match Score** | Overall match from three matching methods | High |
+| **6. Resume Completeness** | How complete the resume is | Low |
+| **7. Skill Rarity** | How rare/valuable the candidate's skills are | Medium |
+| **8. Recent Experience** | How recent the relevant experience is | Medium |
+| **9. Certifications** | Relevant professional certifications | Low |
+| **10. Career Progression** | Evidence of growth and promotions | Low |
+| **11. Industry Experience** | Experience in the same industry | Low |
+| **12. Role Match** | Experience in similar role | Medium |
+| **13. Keywords Match** | Additional keyword matching | Low |
+
+**💡 Tip:** Use the "Feature Importance" view to see which factors contributed most to a specific candidate's ranking.
+
+---
+
+#### **Q: What do the recommendation levels actually mean?**
+
+**A:** AgentHR assigns four recommendation levels:
+
+**Excellent (Score ≥ 80%)**
+- 🎯 **Meaning:** Top-tier candidate
+- ✅ **Action:** Strongly recommend for interview
+- 📊 **Likelihood:** High probability of being a good fit
+- 💡 **Note:** These are your "must interview" candidates
+
+**Good (Score 60-79%)**
+- 👍 **Meaning:** Strong candidate
+- ✅ **Action:** Recommend for interview
+- 📊 **Likelihood:** Good probability of being a good fit
+- 💡 **Note:** Most successful hires come from this group
+
+**Maybe (Score 40-59%)**
+- 🤔 **Meaning:** Potential match with caveats
+- ⚠️ **Action:** Review carefully before deciding
+- 📊 **Likelihood:** 50/50 chance – depends on your needs
+- 💡 **Note:** Look at factor breakdown to see what's missing
+
+**Poor (Score < 40%)**
+- ❌ **Meaning:** Not a good fit for this role
+- ✅ **Action:** Generally skip unless there's a compelling reason
+- 📊 **Likelihood:** Low probability of success
+- 💡 **Note:** May be great for a different role
+
+---
+
+#### **Q: Should I ever interview a "Poor" recommended candidate?**
+
+**A:** Generally, no – but there are exceptions:
+
+**Consider interviewing "Poor" candidates if:**
+- ✅ They come with a **strong referral** from a trusted employee
+- ✅ They have an **exceptional portfolio** or achievements not captured in the resume
+- ✅ They're **career changers** with valuable transferable skills
+- ✅ You're **expanding the role** and need different skills than listed
+- ✅ They show **exceptional passion** or cultural alignment
+
+**Otherwise, "Poor" recommendations are usually accurate** – the candidate is genuinely missing critical requirements.
+
+**💡 Tip:** If you frequently find good candidates in the "Poor" category, your job posting requirements may be too strict or misaligned with what you actually need.
+
+---
+
+#### **Q: Why might a high match score have a low rank score?**
+
+**A:** This is common and happens because ranking considers more than just skills:
+
+**Example:**
+- **Candidate A:** Has all required skills (90% match) but only 6 months experience → Rank score: 0.55 ("Maybe")
+- **Candidate B:** Has most required skills (75% match) but 8 years experience → Rank score: 0.82 ("Excellent")
+
+**Why Candidate A ranks lower despite higher match:**
+- Experience is below requirement
+- Experience relevance may be low (junior projects vs. professional work)
+- Resume may be incomplete
+- Other factors (career progression, education) may be weak
+
+**💡 Tip:** Don't just look at match scores. The rank score considers the **full picture** of candidate quality.
+
+---
+
+#### **Q: How do I interpret the "confidence" level shown with rankings?**
+
+**A:** Confidence indicates how certain the AI is about its prediction:
+
+**High Confidence (> 0.80)**
+- AI is very sure about the ranking
+- Candidate clearly fits or doesn't fit the profile
+- You can trust the recommendation more
+
+**Medium Confidence (0.50-0.80)**
+- AI is moderately sure
+- Candidate has some mixed signals
+- Use as guidance but verify with your own judgment
+
+**Low Confidence (< 0.50)**
+- AI is uncertain
+- Candidate may be unusual (career changer, unique background)
+- **Definitely** review personally and don't rely solely on the score
+
+**Factors that affect confidence:**
+- How much data the AI has about similar candidates
+- How typical or unusual the candidate's profile is
+- How complete the resume information is
+
+---
+
+#### **Q: Can I customize which factors are most important for my hiring?**
+
+**A:** This depends on your organization's AgentHR configuration:
+
+**Standard Configuration:**
+- Pre-set weights for the 13 factors
+- Optimized for general hiring scenarios
+
+**Enterprise/Custom Configuration:**
+- May allow adjusting factor weights
+- Example: Weight experience more heavily than education for technical roles
+- Example: Weight certifications more heavily for healthcare roles
+
+**To adjust weights:**
+- Contact your system administrator
+- May require access to configuration settings
+- Changes affect all rankings for your organization
+
+**💡 Tip:** If you need different weights for different roles (e.g., design vs. engineering), create separate job templates rather than constantly adjusting weights.
+
+---
+
+#### **Q: How do I know if the AI's ranking is accurate for my company?**
+
+**A:** Track the correlation between rankings and actual hiring outcomes:
+
+**Steps to validate:**
+
+**1. Track Initial Rankings**
+- Save the rank score and recommendation for each interviewed candidate
+- Note which factors contributed most to their ranking
+
+**2. Track Actual Outcomes**
+- Who got hired?
+- Who performed well in the role?
+- Who left quickly or didn't work out?
+
+**3. Compare After 3-6 Months**
+- Are "Excellent" candidates performing well?
+- Are "Poor" candidates actually poor fits?
+- Which factors best predicted success?
+
+**4. Provide Feedback**
+- Submit feedback through the ranking feedback feature
+- This helps the AI learn your company's specific patterns
+
+**Signs rankings are working well:**
+- Most hires come from "Excellent" and "Good" categories
+- "Poor" recommendations rarely get hired
+- Hired candidates perform well and stay long-term
+
+**Signs rankings need adjustment:**
+- Many successful hires came from "Maybe" or "Poor"
+- "Excellent" candidates often don't work out
+- Rankings don't correlate with interview performance
+
+---
+
+### Account and Settings
+
+These questions cover user accounts, preferences, and platform configuration.
+
+#### **Q: How do I change my password or account settings?**
+
+**A:** Navigate to your account settings:
+
+**Steps:**
+1. Click your **profile icon** or **name** (usually top-right corner)
+2. Select **"Settings"** or **"Account Settings"** from the dropdown
+3. Make changes to:
+   - Password (requires entering current password)
+   - Email address
+   - Notification preferences
+   - Display name
+4. Click **"Save"** or **"Update"**
+
+**If you forget your password:**
+- Click "Forgot Password" on the login page
+- Check your email for password reset instructions
+- Follow the link to create a new password
+
+---
+
+#### **Q: What notification options are available?**
+
+**A:** AgentHR can send notifications for various events:
+
+**Email Notifications:**
+- ✅ New resumes uploaded
+- ✅ Candidates moved to new stages
+- ✅ Ranking completed
+- ✅ Weekly hiring summary
+- ✅ Feedback reminders
+
+**In-Platform Notifications:**
+- ✅ Real-time activity feed
+- ✅ Action items (candidates needing review)
+- ✅ System announcements
+
+**Customize notifications:**
+1. Go to **Settings → Notifications**
+2. Toggle notifications on/off for each event type
+3. Choose frequency (immediate, daily digest, weekly summary)
+4. Save preferences
+
+**💡 Tip:** During active hiring, enable immediate notifications. When not hiring, switch to weekly summaries to reduce inbox clutter.
+
+---
+
+#### **Q: Can I see my activity history or past actions?**
+
+**A:** Yes, AgentHR tracks your activity:
+
+**Where to find activity history:**
+
+**1. Dashboard Activity Feed**
+- Recent actions visible on dashboard
+- Last 50 actions typically shown
+
+**2. Candidate Activity Log**
+- Each candidate has an activity history
+- Shows who moved them, when, and any notes added
+- Useful for team collaboration
+
+**3. Analytics Section**
+- Aggregate statistics over time
+- Hiring trends, time-to-fill metrics
+- Comparison of your performance to benchmarks
+
+**What's tracked:**
+- Resumes uploaded
+- Vacancies created
+- Candidates moved between stages
+- Feedback submitted
+- Searches performed
+- Comparisons created
+
+**💡 Tip:** Use activity logs to audit your hiring process or onboard new recruiters by showing them past hiring patterns.
+
+---
+
+#### **Q: Is my hiring data private and secure?**
+
+**A:** AgentHR takes data security seriously:
+
+**Security Measures:**
+- 🔒 **Encryption** – Data encrypted in transit and at rest
+- 🔒 **Access controls** – Only authorized users can access your data
+- 🔒 **Audit logs** – All access is logged and monitored
+- 🔒 **Regular backups** – Data backed up to prevent loss
+- 🔒 **Compliance** – Complies with data protection regulations (GDPR, etc.)
+
+**Data Privacy:**
+- Candidate data is only accessible to your organization
+- Resumes are stored securely and never shared externally
+- You control data retention (how long to keep candidate data)
+- Candidates can request data deletion if needed
+
+**Best practices:**
+- Don't share passwords or login credentials
+- Log out when using shared computers
+- Only share candidate info with authorized team members
+- Delete old candidate data regularly if not needed
+
+**For specific security policies:** Contact your system administrator or review your organization's data privacy agreement.
+
+---
+
+#### **Q: Can I import or export my data?**
+
+**A:** Yes, AgentHR supports data import/export:
+
+**Export Options:**
+- **CSV export** – Download candidate lists, rankings, or analytics
+- **PDF export** – Export comparisons and reports
+- **Resume download** – Download original resume files
+
+**Import Options:**
+- **Bulk resume upload** – Upload multiple resumes at once (via API or batch upload)
+- **CSV import** – Import candidate data from other ATS systems
+- **Vacancy templates** – Import job posting templates
+
+**To export data:**
+1. Navigate to the section (Candidates, Analytics, etc.)
+2. Click **"Export"** or **"Download"**
+3. Choose format (CSV, PDF)
+4. Select date range or filters
+5. Click **"Generate Export"**
+
+**💡 Tip:** Regularly export your hiring data for backup or analysis in external tools like Excel.
+
+---
+
+### Troubleshooting Common Issues
+
+These questions address common problems and how to resolve them.
+
+#### **Q: Resume upload is stuck or taking forever. What should I do?**
+
+**A:** If upload is stuck:
+
+**First, try these quick fixes:**
+1. **Check your internet connection** – Slow connection can cause timeouts
+2. **Refresh the page** – Sometimes the upload completes but the UI doesn't update
+3. **Check file size** – Is it under 10 MB?
+4. **Verify file format** – Must be PDF or DOCX
+
+**If still stuck:**
+1. **Try uploading a different resume** – Is the problem with this specific file or all uploads?
+2. **Check if the file is password protected** – Remove password protection first
+3. **Clear your browser cache** – Old cached data can sometimes cause issues
+4. **Try a different browser** – Chrome, Firefox, Edge, or Safari
+
+**If the problem persists:**
+- Contact your system administrator
+- There may be a server-side issue or temporary outage
+
+---
+
+#### **Q: Resume status shows "pending" and won't change to "analyzed".**
+
+**A:** This means the background analysis hasn't completed:
+
+**What to do:**
+
+**1. Wait a bit longer**
+- Most resumes analyze in 5-15 seconds
+- High server load can extend this to 1-2 minutes
+- Check back after 2 minutes
+
+**2. Check if analysis service is running**
+- Contact your system administrator
+- The analysis worker may need to be restarted
+
+**3. Verify the file is readable**
+- Can you open the PDF/DOCX file?
+- Is the file corrupted?
+- Try uploading a fresh copy of the file
+
+**4. Check server status**
+- If you have access, check if the backend service is healthy
+- Visit `/health` endpoint (if API access is available)
+
+**💡 Tip:** If multiple resumes are stuck, it's likely a server issue, not a problem with individual files.
+
+---
+
+#### **Q: Match scores seem wrong – candidate has all the skills but scores low.**
+
+**A:** Several possible causes:
+
+**1. Check the three matching scores separately**
+- Is the keyword score high but vector score low?
+- This suggests skills are present but context is off
+- Example: "Python" mentioned as a hobby, not work experience
+
+**2. Verify experience requirements**
+- Does candidate meet minimum experience (in months)?
+- Even with all skills, low experience reduces score
+
+**3. Check job posting requirements**
+- Are required skills listed correctly?
+- Is the minimum experience set appropriately?
+- Try temporarily lowering requirements to see the effect
+
+**4. Look at the factor breakdown**
+- Click into the candidate's details
+- See exactly which factors contributed to the score
+- Identify which factors are lowering the score
+
+**5. Consider skill context**
+- Skills may be listed but not substantiated with experience
+- Skills may be outdated (e.g., "React 15" when job wants "React 18+")
+
+**💡 Tip:** If scores consistently seem wrong, your job posting requirements may need adjustment.
+
+---
+
+#### **Q: I can't find candidates I know are in the system.**
+
+**A:** Try these solutions:
+
+**1. Check filters**
+- Are search filters too restrictive?
+- Clear all filters and try again
+- Reset to default view
+
+**2. Check the correct vacancy**
+- Candidates are associated with specific vacancies
+- Make sure you're looking at the right job posting
+- Try searching across all vacancies
+
+**3. Verify search terms**
+- Are you spelling names or skills correctly?
+- Try partial matches (e.g., "Java" instead of "JavaScript")
+- Use broader search terms
+
+**4. Check pipeline stage**
+- Candidates may be in "Rejected" or "Hired" stages
+- Toggle visibility of all stages
+- Look in "All Candidates" view
+
+**5. Check permissions**
+- Some candidates may be restricted to certain users
+- Verify you have access to the vacancy
+- Contact admin if you think you should have access
+
+---
+
+#### **Q: The Kanban board isn't updating or showing candidates.**
+
+**A:** Try these troubleshooting steps:
+
+**1. Refresh the page**
+- Classic first step – often resolves temporary glitches
+- Press F5 or Ctrl+R (Cmd+R on Mac)
+
+**2. Check your filters**
+- Kanban may be filtered by date range, vacancy, or stage
+- Clear filters to show all candidates
+- Check if you're looking at the correct time period
+
+**3. Verify candidates have been matched**
+- Only candidates who have been matched to a vacancy appear on Kanban
+- Upload resumes → match to vacancy → then they appear
+- Check the "Matching" section first
+
+**4. Check browser compatibility**
+- Use a modern, updated browser
+- Try incognito/private mode to rule out extensions
+- Disable browser extensions that might interfere
+
+**5. Clear browser cache**
+- Old cached data can cause display issues
+- Clear cache and cookies for the AgentHR site
+- Restart browser
+
+---
+
+#### **Q: Analytics show incorrect or no data.**
+
+**A:** Common causes and fixes:
+
+**1. Not enough data yet**
+- Analytics require historical data to calculate trends
+- New accounts may show "Insufficient data"
+- Wait until you have more hiring activity
+
+**2. Date range issues**
+- Check the selected date range
+- Try expanding to "All time" or last 12 months
+- Verify you've had hiring activity in that period
+
+**3. No tracking enabled**
+- Ensure candidates are being moved through stages
+- Rankings must be generated for analytics to track
+- Submit feedback to improve analytics accuracy
+
+**4. Filters too restrictive**
+- Analytics may be filtered by specific vacancies or teams
+- Try "All vacancies" or broader filters
+- Reset filters to default
+
+**5. Cache or browser issues**
+- Clear browser cache
+- Try a different browser
+- Use incognito/private mode
+
+---
+
+#### **Q: I'm getting error messages when trying to perform actions.**
+
+**A:** Error messages usually indicate specific issues:
+
+**Common error types:**
+
+**"File not found" or "Resume not found"**
+- Resume ID is incorrect
+- Resume was deleted
+- Resume didn't finish analyzing
+
+**"Vacancy not found"**
+- Vacancy ID is incorrect
+- Vacancy was deleted
+- You don't have permission to view this vacancy
+
+**"Invalid file type"**
+- Trying to upload unsupported format
+- Must be PDF or DOCX
+- Convert file and try again
+
+**"Analysis in progress"**
+- Trying to match before analysis completed
+- Wait 30 seconds and try again
+- Check resume status is "analyzed"
+
+**"Permission denied"**
+- You don't have access to this resource
+- Contact admin for permissions
+- Ensure you're logged into correct account
+
+**💡 Tip:** When contacting support, include the exact error message – this helps diagnose the issue faster.
+
+---
+
+#### **Q: The platform is slow or unresponsive. What can I do?**
+
+**A:** Performance issues can have several causes:
+
+**If entire platform is slow:**
+- **Check your internet speed** – Slow connection affects all web apps
+- **Check server status** – May be a temporary outage (contact admin)
+- **Try during off-peak hours** – High traffic can slow things down
+
+**If specific pages are slow:**
+- **Clear browser cache** – Old cached data can cause issues
+- **Disable browser extensions** – Some extensions interfere with web apps
+- **Try a different browser** – Rule out browser-specific issues
+
+**If operations are slow:**
+- **Large uploads** – Resume uploads take time based on file size and internet speed
+- **Batch operations** – Processing many candidates takes longer
+- **Complex searches** – Searches with many filters take more time
+
+**To improve performance:**
+- Close unnecessary browser tabs
+- Ensure browser is updated to latest version
+- Use wired internet connection instead of WiFi if possible
+- Limit concurrent operations (don't upload 100 resumes at once)
+
+---
+
+### Still Have Questions?
+
+If you didn't find your question answered here:
+
+1. **Search this guide** – Use Ctrl+F (Cmd+F on Mac) to search for keywords
+2. **Check the [Troubleshooting section](#12-troubleshooting)** – More detailed solutions for common issues
+3. **Review the [Glossary](#13-glossary-of-terms)** – Look up unfamiliar terms
+4. **Contact your system administrator** – For technical issues and account access
+5. **Check the main documentation** – Technical guides and API docs for advanced usage
+
+---
+
+Remember: AgentHR is here to make your job easier, not more complicated. If something seems confusing or overly complex, that's a sign you may need additional training or that there's an issue that needs to be addressed. Don't hesitate to ask for help!
+
+---
+
+---
+
+## 12. Troubleshooting
+
+---
