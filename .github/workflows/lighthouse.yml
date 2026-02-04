@@ -40,4 +40,4 @@ jobs:
           uploadArtifacts: true
           temporaryPublicStorage: true
         env:
-          LHCI_GITHUB_APP_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          LHCI_GITEA_APP_TOKEN: ${{ secrets.GITEA_TOKEN }}
