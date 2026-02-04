@@ -6054,3 +6054,652 @@ Skills: React, Angular
 Now that you know how to find exactly the right candidates with advanced search and filtering, you're ready to compare them side-by-side to make the final decision. In the next section, we'll cover [Comparing Candidates Side-by-Side](#10-comparing-candidates-side-by-side)—how to view multiple candidates together, understand their relative strengths, and export comparison results for your hiring team.
 
 ---
+
+---
+
+## 10. Comparing Candidates Side-by-Side
+
+**Making Confident Hiring Decisions with Visual Comparisons**
+
+When you've narrowed your search to a handful of promising candidates, the hardest part is deciding which one is the best fit. AgentHR's **Candidate Comparison feature** lets you view multiple candidates side-by-side, making it easy to compare their skills, experience, and match scores—all in one place.
+
+### What Is Candidate Comparison?
+
+Candidate comparison is exactly what it sounds like: **viewing multiple candidates together** to see how they stack up against each other for a specific job opening. Instead of switching between individual candidate profiles or trying to remember details from different resumes, you see everything at once.
+
+**The Benefits of Side-by-Side Comparison:**
+
+| ✅ **Benefit** | **Why It Matters** |
+|----------------|-------------------|
+| **See relative strengths** | Quickly identify which candidate excels in which area |
+| **Spot skill gaps** | See at a glance which skills are missing from each candidate |
+| **Compare match scores** | Understand how each candidate ranks for the same vacancy |
+| **Make data-driven decisions** | Base your choice on facts, not gut feeling |
+| **Share with hiring team** | Export comparisons to get input from stakeholders |
+| **Save time** | No more switching back and forth between profiles |
+
+---
+
+### Creating a Candidate Comparison
+
+There are two ways to create a candidate comparison:
+
+#### Method 1: From a Vacancy (Recommended)
+
+The easiest way is to compare candidates who have already been matched to a vacancy.
+
+**Step 1: Navigate to the Vacancy**
+
+1. Go to **Vacancies** in the main menu
+2. Click on the vacancy you want to hire for (e.g., "Senior Python Developer")
+3. You'll see a list of candidates who have been matched to this role
+
+**Step 2: Select Candidates to Compare**
+
+1. Check the boxes next to the candidates you want to compare (2-10 candidates at a time)
+2. Click the **Compare** button (usually at the top of the list)
+
+**Step 3: Review the Comparison**
+
+AgentHR will generate a side-by-side comparison showing:
+- Match scores for each candidate
+- Skills each candidate has (and doesn't have)
+- Years of experience
+- Education level
+- Recommendation level
+
+---
+
+#### Method 2: From the Candidates List
+
+You can also create comparisons from the main candidates list.
+
+**Step 1: Go to Candidates**
+
+1. Navigate to **Candidates** in the main menu
+2. Use **Search & Filters** to find candidates you want to compare
+
+**Step 2: Select Candidates and a Vacancy**
+
+1. Check the boxes next to 2-10 candidates
+2. Click **Compare Selected**
+3. Choose the **vacancy** you want to compare them against from the dropdown
+4. Click **Generate Comparison**
+
+---
+
+### Understanding the Comparison View
+
+The comparison view is designed to give you a clear, visual overview of how candidates stack up. Here's how to read it:
+
+#### The Comparison Grid
+
+Candidates appear as **columns**, and comparison criteria appear as **rows**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Senior Python Developer Vacancy                                │
+├─────────────────────┬──────────────┬──────────────┬─────────────┤
+│                     │ Candidate A   │ Candidate B  │ Candidate C │
+├─────────────────────┼──────────────┼──────────────┼─────────────┤
+│ Overall Match Score │ 92% ⭐       │ 78% ✓        │ 65% ○       │
+├─────────────────────┼──────────────┼──────────────┼─────────────┤
+│ Recommendation      │ Excellent    │ Good         │ Maybe       │
+├─────────────────────┼──────────────┼──────────────┼─────────────┤
+│ Experience          │ 6 years      │ 4 years      │ 8 years     │
+├─────────────────────┼──────────────┼──────────────┼─────────────┤
+│ Education           │ Master's     │ Bachelor's   │ Bachelor's  │
+├─────────────────────┼──────────────┼──────────────┼─────────────┤
+│ Skills Present      │ Python,      │ Python,      │ Python,     │
+│                     │ FastAPI,     │ Django,      │ Flask,      │
+│                     │ PostgreSQL,  │ PostgreSQL   │ MySQL       │
+│                     │ Redis        │              │             │
+├─────────────────────┼──────────────┼──────────────┼─────────────┤
+│ Skills Missing      │ Kubernetes   │ FastAPI,     │ FastAPI,    │
+│                     │              │ Redis,       │ PostgreSQL, │
+│                     │              │ Kubernetes   │ Redis,      │
+│                     │              │              │ Kubernetes  │
+└─────────────────────┴──────────────┴──────────────┴─────────────┘
+```
+
+---
+
+#### How to Interpret the Comparison
+
+**1. Overall Match Score**
+
+The match score shows how well each candidate fits the vacancy:
+
+| Score | Color | Meaning | Action |
+|-------|-------|---------|--------|
+| **80-100%** | 🟢 Green | Excellent fit | Prioritize for interviews |
+| **60-79%** | 🟡 Yellow | Good fit | Consider for interviews |
+| **40-59%** | 🟠 Orange | Potential fit | Review carefully |
+| **0-39%** | 🔴 Red | Poor fit | Likely not a match |
+
+**2. Recommendation Level**
+
+AgentHR assigns each candidate a recommendation based on multiple factors:
+
+| Recommendation | Description |
+|----------------|-------------|
+| **Excellent** | Top candidate—strongly recommended for interview |
+| **Good** | Solid candidate—recommended for interview |
+| **Maybe** | Possible fit—review before deciding |
+| **Poor** | Unlikely to be a good match |
+
+**3. Skills Present vs. Skills Missing**
+
+This section shows you exactly which skills each candidate has and which they're missing:
+
+- **Skills Present**: Skills the candidate has that match the vacancy requirements
+- **Skills Missing**: Required skills the candidate doesn't have
+
+**How to Use This:**
+
+✅ **If all candidates have missing skills**: Consider whether those skills are truly required or "nice-to-have"
+
+✅ **If only one candidate has a critical skill**: That candidate may be worth prioritizing
+
+✅ **If candidates have different skill sets**: Decide which skills matter most for the role
+
+**Example:**
+
+```
+Vacancy: Senior Python Developer
+Required Skills: Python, FastAPI, PostgreSQL, Redis, Kubernetes
+
+Candidate A: Missing only Kubernetes → Best fit (4/5 skills)
+Candidate B: Missing FastAPI, Redis, Kubernetes → Good fit (2/5 skills)
+Candidate C: Missing FastAPI, PostgreSQL, Redis, Kubernetes → Poor fit (1/5 skill)
+```
+
+**4. Experience and Education**
+
+Compare candidates' experience and education at a glance:
+
+- **Experience**: Total years of relevant experience
+- **Education**: Highest degree earned
+
+**Decision Tips:**
+
+| Situation | Consideration |
+|-----------|----------------|
+| **Candidate A: 6 years, Master's** vs **Candidate B: 8 years, Bachelor's** | More experience vs. higher education—what matters more for this role? |
+| **Candidate C: 2 years, PhD** vs **Candidate D: 4 years, Bachelor's** | PhD may indicate deep expertise, but less practical experience |
+| **All candidates similar experience** | Look at skills, education, and match score to differentiate |
+
+---
+
+### Making Your Decision
+
+Once you've reviewed the comparison, here's how to choose the right candidate:
+
+#### Step 1: Prioritize Must-Have Skills
+
+Identify which skills are **non-negotiable**:
+
+```
+Example: Senior Python Developer
+
+Must-Have Skills (Required):
+- Python (all candidates have this ✓)
+- PostgreSQL (Candidate C missing → eliminate)
+
+Nice-to-Have Skills (Preferred):
+- Redis (Candidates A & B missing, but acceptable)
+- Kubernetes (all candidates missing—not a dealbreaker)
+
+Winner: Candidate A or B (have PostgreSQL)
+```
+
+#### Step 2: Consider Experience vs. Education
+
+Decide what matters more for this role:
+
+| Role Priority | Best Choice |
+|---------------|-------------|
+| **Hands-on experience matters most** | Candidate with most years, even with lower education |
+| **Theoretical knowledge matters** | Candidate with advanced degree, even with less experience |
+| **Both matter equally** | Balance experience and education |
+
+#### Step 3: Factor in Match Score and Recommendation
+
+Let AI insights inform your decision:
+
+- **Excellent recommendation + 80%+ match**: Strongly consider this candidate
+- **Good recommendation + 60-79% match**: Viable candidate, review carefully
+- **Maybe recommendation + 40-59% match**: Proceed with caution
+- **Poor recommendation + <40% match**: Likely not the right fit
+
+#### Step 4: Trust Your Judgment
+
+AI scores and match percentages are tools to help you decide—not replace your judgment. Consider:
+
+- **Cultural fit**: Does the candidate seem aligned with your company culture?
+- **Potential**: Does the candidate show growth potential?
+- **Unique strengths**: Does the candidate bring something special?
+- **Red flags**: Any concerns from resumes or profiles?
+
+---
+
+### Comparison Scenarios
+
+Here are common scenarios and how to use comparisons to make decisions:
+
+#### Scenario 1: The "All-Star" vs. The "Well-Rounded" Candidate
+
+```
+Candidate A (All-Star):
+- Match Score: 95%
+- Skills: Python, FastAPI, PostgreSQL, Redis, Kubernetes (all required skills)
+- Experience: 3 years
+- Education: Bachelor's
+- Recommendation: Excellent
+
+Candidate B (Well-Rounded):
+- Match Score: 78%
+- Skills: Python, Django, PostgreSQL (missing FastAPI, Redis, Kubernetes)
+- Experience: 7 years
+- Education: Master's
+- Recommendation: Good
+```
+
+**Decision Framework:**
+
+| Choose Candidate A if: | Choose Candidate B if: |
+|------------------------|------------------------|
+| You need specific skills now | You value breadth of experience |
+| Role requires cutting-edge tech | Role requires mentoring juniors |
+| Willing to train less experienced | You need someone who can hit ground running |
+| Candidate shows high potential | You value stability and track record |
+
+---
+
+#### Scenario 2: Three Similar Candidates
+
+When candidates have similar scores, dig deeper:
+
+```
+Candidate A: Match 85%, Experience 5y, Skills: Python, FastAPI, PostgreSQL
+Candidate B: Match 83%, Experience 5y, Skills: Python, FastAPI, PostgreSQL
+Candidate C: Match 84%, Experience 5y, Skills: Python, FastAPI, PostgreSQL
+```
+
+**How to Differentiate:**
+
+1. **Look at skill proficiency**: Does one candidate list "advanced" vs. "intermediate"?
+2. **Check portfolio/GitHub**: Has one candidate built impressive projects?
+3. **Review experience details**: Has one worked at more reputable companies?
+4. **Consider soft skills**: Does one mention leadership or collaboration?
+5. **Check additional skills**: Does one have bonus skills (e.g., Docker, CI/CD)?
+
+---
+
+#### Scenario 3: The Experience Trade-Off
+
+```
+Candidate A: Match 90%, 2 years experience, excellent match score
+Candidate B: Match 75%, 10 years experience, good match score
+```
+
+**Decision Matrix:**
+
+| Choose Candidate A (Junior) if: | Choose Candidate B (Senior) if: |
+|--------------------------------|----------------------------------|
+| Budget is limited | Budget allows for senior hire |
+| Willing to mentor and train | Need someone to work independently |
+| Role is growing/evolving | Role is well-established |
+| Candidate shows exceptional promise | Need someone to mentor others |
+| Long-term investment mindset | Need immediate results |
+
+---
+
+### Exporting Comparison Results
+
+Once you've made a decision (or need input from others), you can export comparison results.
+
+#### Why Export Comparisons?
+
+| Use Case | Benefit |
+|----------|---------|
+| **Share with hiring manager** | Get input from decision-makers |
+| **Present to team** | Collaborative decision-making |
+| **Document the decision** | Create a paper trail for HR |
+| **Compare later** | Reference when hiring for similar roles |
+| **Email candidates** | Remember details when reaching out |
+
+#### How to Export
+
+**Step 1: Click "Export"**
+
+In the comparison view, click the **Export** button (usually at the top right).
+
+**Step 2: Choose Export Format**
+
+| Format | Best For | Features |
+|--------|----------|----------|
+| **PDF** | Printing, sharing, archiving | Visual comparison grid, easy to read |
+| **CSV/Excel** | Data analysis, custom reports | Raw data for sorting/filtering |
+| **Email** | Quick sharing | Sends comparison directly to recipients |
+
+**Step 3: Select What to Include**
+
+Choose which details to include in the export:
+
+- ✅ Candidate names and contact info
+- ✅ Match scores and recommendations
+- ✅ Skills present and missing
+- ✅ Experience and education
+- ✅ Notes or comments you've added
+- ✅ Ranking position (if candidates are ranked)
+
+**Step 4: Generate and Download**
+
+Click **Generate Export** and download the file.
+
+---
+
+### Best Practices for Candidate Comparison
+
+Follow these tips to get the most out of comparisons:
+
+#### ✅ DO: Compare 3-5 Candidates at a Time
+
+**Why?** Comparing more than 5 candidates becomes overwhelming and hard to digest.
+
+```
+✅ Good: Compare 3-5 candidates
+→ Clear view of each candidate's strengths
+
+❌ Bad: Compare 10+ candidates
+→ Information overload, harder to decide
+```
+
+**Solution**: If you have 10+ candidates, create multiple comparisons:
+- Comparison 1: Top 3 candidates by match score
+- Comparison 2: Next 3 candidates
+- Comparison 3: Final 3 candidates
+
+Then compare the winners from each group.
+
+---
+
+#### ✅ DO: Compare Candidates for the Same Vacancy
+
+**Why?** Comparing candidates for different roles is like comparing apples and oranges.
+
+```
+✅ Good: Compare 3 candidates for "Senior Python Developer" vacancy
+→ Meaningful comparison
+
+❌ Bad: Compare Python developer + Data scientist + Project manager
+→ Not comparable—different roles, different requirements
+```
+
+---
+
+#### ✅ DO: Update Comparisons After New Matches
+
+**Why?** As new resumes are uploaded and matched, your comparison may change.
+
+```
+1. Create comparison with 5 candidates
+2. Two days later, 3 new candidates are matched
+3. Update comparison to include top 8 candidates
+→ Ensure you're seeing the best options
+```
+
+---
+
+#### ✅ DO: Add Notes During Comparison
+
+**Why?** Capture your thoughts while details are fresh.
+
+```
+Candidate A: "Strong technical fit, but limited experience"
+Candidate B: "Great culture fit, willing to learn missing skills"
+Candidate C: "Overqualified—may leave for better offer"
+```
+
+These notes help when:
+- Discussing with hiring manager
+- Making final decision
+- Providing feedback to candidates
+- Documenting the hiring process
+
+---
+
+#### ❌ DON'T: Rely Solely on Match Scores
+
+**Why?** Match scores are one piece of the puzzle—not the whole picture.
+
+```
+Match Score 90% + Poor communication skills = Bad hire
+Match Score 75% + Excellent communication skills = Great hire
+```
+
+**Consider the whole candidate:**
+- Skills (present and missing)
+- Experience quality (not just years)
+- Education relevance
+- Cultural fit
+- Communication skills
+- Potential for growth
+
+---
+
+#### ❌ DON'T: Compare Too Early
+
+**Why?** If you haven't matched candidates to a vacancy yet, you're comparing on incomplete information.
+
+```
+✅ Good workflow:
+1. Upload resumes
+2. Match to vacancy
+3. Rank candidates
+4. THEN compare top 5 candidates
+
+❌ Bad workflow:
+1. Upload resumes
+2. Compare candidates before matching
+→ Meaningless comparison—you don't know who fits the role
+```
+
+---
+
+#### ❌ DON'T: Ignore Missing Skills
+
+**Why?** Missing skills may be dealbreakers—or they may not matter.
+
+```
+Vacancy: Senior Python Developer
+Required Skills: Python, FastAPI, PostgreSQL, Redis
+
+Candidate has: Python, Django, PostgreSQL (missing FastAPI, Redis)
+
+Questions to ask:
+- Can we train FastAPI? (if yes, proceed)
+- Is Redis critical? (if no, proceed)
+- Is Django acceptable instead of FastAPI? (if yes, proceed)
+```
+
+**If missing skills are dealbreakers**, eliminate the candidate early.
+**If missing skills are learnable**, consider the candidate's potential.
+
+---
+
+### Real-World Example: Comparing Candidates
+
+Let's walk through a real example of comparing candidates for a **Senior Python Developer** role.
+
+#### The Vacancy
+
+```
+Title: Senior Python Developer
+Required Skills:
+- Python
+- FastAPI
+- PostgreSQL
+- Redis
+- Kubernetes (optional but preferred)
+
+Minimum Experience: 5 years
+Education: Bachelor's degree (Master's preferred)
+Location: Remote
+Salary: $120,000 - $150,000
+```
+
+#### The Candidates
+
+After matching and ranking, we have **5 top candidates**. Let's compare them:
+
+| Criteria | Candidate A | Candidate B | Candidate C | Candidate D | Candidate E |
+|----------|-------------|-------------|-------------|-------------|-------------|
+| **Match Score** | **92%** ⭐ | 78% ✓ | 85% ✓ | 71% ○ | 64% ○ |
+| **Recommendation** | Excellent | Good | Good | Good | Maybe |
+| **Experience** | 6 years | 4 years | 8 years | 5 years | 7 years |
+| **Education** | Master's | Bachelor's | Bachelor's | Master's | PhD |
+| **Skills Present** | Python, FastAPI, PostgreSQL, Redis | Python, Django, PostgreSQL | Python, FastAPI, PostgreSQL, Redis | Python, FastAPI, PostgreSQL | Python, Flask, PostgreSQL |
+| **Skills Missing** | Kubernetes | FastAPI, Redis, Kubernetes | Kubernetes | Redis, Kubernetes | FastAPI, Redis, Kubernetes |
+| **Salary Expectation** | $140k | $130k | $150k | $135k | $160k |
+
+---
+
+#### The Analysis
+
+**Candidate A: The Front-Runner** ✅
+
+- **Strengths**: Highest match score (92%), has all required skills, Master's degree
+- **Weaknesses**: Missing Kubernetes (optional but nice-to-have)
+- **Verdict**: **Excellent candidate**—prioritize for interview
+- **Action**: Schedule interview first; check if Kubernetes can be learned
+
+**Candidate B: The Junior Contender** ⚠️
+
+- **Strengths**: Good match score (78%), has Python and PostgreSQL, within budget
+- **Weaknesses**: Missing 3 critical skills (FastAPI, Redis, Kubernetes), only 4 years experience
+- **Verdict**: **Viable if budget is tight**—but may need significant training
+- **Action**: Interview if A, C, D decline; assess learning agility
+
+**Candidate C: The Veteran** 🎖️
+
+- **Strengths**: Most experience (8 years), high match score (85%), has all required skills
+- **Weaknesses**: Missing Kubernetes, expects top of salary range ($150k)
+- **Verdict**: **Strong candidate**—interview if budget allows
+- **Action**: Interview second; discuss salary expectations and Kubernetes training
+
+**Candidate D: The Balanced Option** ⚖️
+
+- **Strengths**: Good match score (71%), Master's degree, reasonable salary ($135k)
+- **Weaknesses**: Missing Redis and Kubernetes, less experience than A and C
+- **Verdict**: **Solid backup**—interview if top choices decline
+- **Action**: Interview third; assess if Redis skills are critical
+
+**Candidate E: The Specialist** 🔬
+
+- **Strengths**: PhD (deep expertise), 7 years experience, has Python and PostgreSQL
+- **Weaknesses**: Lowest match score (64%), missing 3 critical skills, highest salary expectation ($160k)
+- **Verdict**: **Niche fit**—consider if role requires research/theory
+- **Action**: Interview only if role involves R&D or specialized work
+
+---
+
+#### The Decision
+
+**Ranking for Interviews:**
+
+1. **Candidate A** (92% match, all skills, reasonable salary) → Interview first
+2. **Candidate C** (85% match, all skills, most experience) → Interview second
+3. **Candidate D** (71% match, most skills, reasonable salary) → Interview third
+4. **Candidate B** (78% match, budget option) → Interview if others decline
+5. **Candidate E** (64% match, specialist) → Interview only for specialized role
+
+**Final Choice:**
+
+- **If budget allows**: Hire **Candidate A** (best fit, willing to learn Kubernetes)
+- **If budget is tight**: Hire **Candidate C** (experienced, negotiate salary) or **Candidate D** (balanced option)
+- **If role is R&D-focused**: Consider **Candidate E** (PhD, deep expertise)
+
+**Outcome:**
+
+The company interviews Candidates A, C, and D. All three perform well in interviews, but Candidate A demonstrates exceptional problem-solving skills and cultural fit. The company extends an offer to Candidate A at $145k, which they accept. Kubernetes training is provided during onboarding.
+
+---
+
+### Comparison Quick Reference
+
+| Task | How To |
+|------|--------|
+| **Compare candidates** | Select 2-10 candidates → Click "Compare" |
+| **Compare for vacancy** | Go to vacancy → Check candidates → Click "Compare" |
+| **Export comparison** | Click "Export" → Choose format (PDF/CSV) → Download |
+| **Add notes** | Click "Add Note" next to candidate → Enter text |
+| **Update comparison** | Click "Refresh" to include new candidates |
+| **Print comparison** | Export as PDF → Print or share via email |
+
+---
+
+### Common Comparison Questions
+
+**Q: How many candidates can I compare at once?**
+
+A: Up to 10 candidates. If you have more, we recommend creating multiple comparisons of 3-5 candidates each.
+
+---
+
+**Q: Can I compare candidates for different vacancies?**
+
+A: No, comparisons are vacancy-specific. Each comparison shows how candidates match to **one** vacancy. To compare candidates across different roles, create separate comparisons for each vacancy.
+
+---
+
+**Q: What if two candidates have identical match scores?**
+
+A: Look deeper at:
+- **Skills proficiency**: One may list "advanced" vs. "intermediate"
+- **Experience quality**: Companies worked at, projects led
+- **Education**: Master's vs. Bachelor's
+- **Additional skills**: Bonus skills like Docker, CI/CD
+- **Cultural fit**: Soft skills, communication, leadership
+
+---
+
+**Q: Should I always choose the candidate with the highest match score?**
+
+A: Not necessarily. Consider:
+- **Budget**: Top candidate may expect higher salary
+- **Experience**: Lower match but more experience may be better
+- **Potential**: Lower match but exceptional growth potential
+- **Cultural fit**: Lower match but better team alignment
+
+**Match scores are a guide—not a rule.** Use them to shortlist, then decide based on the full picture.
+
+---
+
+**Q: Can I save comparisons and view them later?**
+
+A: Yes! Each comparison has a unique ID. You can:
+- Bookmark the comparison URL
+- Export as PDF for offline reference
+- Access from "Comparisons" in the main menu
+
+---
+
+**Q: How often should I update comparisons?**
+
+A: Update comparisons when:
+- New resumes are uploaded and matched
+- Vacancy requirements change
+- Candidates move to different hiring stages
+- You receive new feedback on candidates
+
+**Best practice**: Update comparisons **every 2-3 days** during active hiring to ensure you're seeing the latest candidates.
+
+---
+
+### What's Next?
+
+Now that you know how to compare candidates side-by-side and make data-driven hiring decisions, you're ready to tackle common questions and troubleshoot issues. In the next section, we'll cover [Frequently Asked Questions](#11-frequently-asked-questions)—everything you've ever wanted to know about AgentHR, from understanding the AI to troubleshooting common problems.
+
+---
