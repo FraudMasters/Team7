@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   Box,
@@ -269,6 +270,15 @@ const CandidateSourceAttribution: React.FC<CandidateSourceAttributionProps> = ({
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              component={Link}
+              to="/recruiter/analytics/source-tracking"
+              startIcon={<SourceIcon />}
+              size="small"
+            >
+              View Vacancy Sources
+            </Button>
             <Button
               variant={autoRefreshEnabled ? 'contained' : 'outlined'}
               startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}

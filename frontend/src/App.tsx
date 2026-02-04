@@ -47,6 +47,10 @@ import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
 
+// Analytics Components
+import SourceTracking from './components/analytics/SourceTracking';
+import CandidateSourceAttribution from './components/analytics/CandidateSourceAttribution';
+
 /**
  * Main App Component
  *
@@ -107,6 +111,8 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="analytics/source-tracking" element={<SourceTracking />} />
+          <Route path="analytics/candidate-source-attribution" element={<CandidateSourceAttribution />} />
         </Route>
 
         {/* Catch-all route - redirect to landing */}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   Box,
@@ -19,6 +20,7 @@ import {
   Refresh as RefreshIcon,
   AccessTime as ClockIcon,
   Business as SourceIcon,
+  TrendingUp as AttributionIcon,
 } from '@mui/icons-material';
 
 /**
@@ -207,9 +209,20 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSourceTracking} size="small">
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              component={Link}
+              to="/recruiter/analytics/candidate-source-attribution"
+              startIcon={<AttributionIcon />}
+              size="small"
+            >
+              View Candidate Attribution
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSourceTracking} size="small">
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         {/* Summary Stats */}
