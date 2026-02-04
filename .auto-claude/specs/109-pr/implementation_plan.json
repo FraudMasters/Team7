@@ -67,7 +67,9 @@
             "type": "manual",
             "instructions": "Review INVESTIGATION.md root cause section confirms path filters prevent job execution on PRs with non-matching files"
           },
-          "status": "completed"
+          "status": "completed",
+          "notes": "Verified path filters cause 'no jobs were run' error. Added Root Cause Verification section to INVESTIGATION.md with:\n1. Path filter blocking mechanism explanation\n2. Evidence from workflow files (lighthouse.yml, performance-tests.yml)\n3. Impact analysis tables showing which files cause failures\n4. Proposed fix approach: Remove paths: filters from pull_request triggers",
+          "updated_at": "2026-02-04T18:01:23.257270+00:00"
         },
         {
           "id": "subtask-2-2",
@@ -83,7 +85,9 @@
             "type": "manual",
             "instructions": "Review INVESTIGATION.md Gitea migration section confirms all required syntax changes"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Added comprehensive 'Gitea Actions Syntax Compatibility Requirements' section to INVESTIGATION.md with:\n1. Critical syntax changes table (github.* → gitea.* mappings)\n2. Token references (GITHUB_TOKEN → GITEA_TOKEN)\n3. Function calls (startsWith, contains, toJSON with updated context)\n4. File-by-file migration checklist for all 3 workflows\n5. Third-party actions compatibility status\n6. Automated migration commands\n7. Validation commands\n8. Summary of requirements and verification checklist",
+          "updated_at": "2026-02-04T18:10:00.000000+00:00"
         }
       ]
     },
@@ -368,5 +372,6 @@
   "qa_signoff": null,
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-02-04T17:59:37.805Z"
+  "updated_at": "2026-02-04T18:01:59.953Z",
+  "last_updated": "2026-02-04T18:01:23.257288+00:00"
 }

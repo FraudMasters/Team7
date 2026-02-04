@@ -452,6 +452,219 @@ grep -rn 'github\.' .github/workflows/
 
 ---
 
+## Gitea Actions Syntax Compatibility Requirements (subtask-2-2)
+
+This section confirms ALL required syntax changes for migrating workflows from GitHub Actions to Gitea Actions.
+
+### Critical Syntax Changes Required
+
+#### 1. Context Variables - MUST REPLACE ALL
+
+**Find Pattern:** `grep -rn 'github\.' .github/workflows/`
+
+| Current (GitHub) | Required (Gitea) | Files Affected | Priority |
+|------------------|------------------|----------------|----------|
+| `github.event_name` | `gitea.event_name` | deploy.yml, lighthouse.yml, performance-tests.yml | CRITICAL |
+| `github.ref` | `gitea.ref` | deploy.yml | CRITICAL |
+| `github.repository` | `gitea.repository` | deploy.yml | CRITICAL |
+| `github.repository_owner` | `gitea.repository_owner` | deploy.yml | CRITICAL |
+| `github.event.*` | `gitea.event.*` | all workflows | CRITICAL |
+| `github.sha` | `gitea.sha` | all workflows | HIGH |
+| `github.actor` | `gitea.actor` | all workflows | MEDIUM |
+| `context.repo.owner` | `gitea.repository_owner` | deploy.yml | CRITICAL |
+| `context.repo.repo` | `gitea.repository` | deploy.yml | CRITICAL |
+
+#### 2. Token References - MUST REPLACE
+
+**Find Pattern:** `grep -rn 'GITHUB_TOKEN' .github/workflows/`
+
+| Current (GitHub) | Required (Gitea) | Usage |
+|------------------|------------------|-------|
+| `secrets.GITHUB_TOKEN` | `secrets.GITEA_TOKEN` | Auto-provided authentication token |
+
+**Note:** Gitea automatically provides `GITEA_TOKEN`. GitHub's `GITHUB_TOKEN` will NOT work in Gitea.
+
+#### 3. Function Calls - UPDATE CONTEXT VARIABLES
+
+**Find Pattern:** `grep -rn 'startsWith(github\.' .github/workflows/`
+
+| Current (GitHub) | Required (Gitea) |
+|------------------|------------------|
+| `startsWith(github.ref, 'refs/heads/main')` | `startsWith(gitea.ref, 'refs/heads/main')` |
+| `contains(github.event.files, 'path')` | `contains(gitea.event.files, 'path')` |
+| `toJSON(github.event)` | `toJSON(gitea.event)` |
+
+### File-by-File Migration Checklist
+
+#### `.github/workflows/deploy.yml`
+
+**Changes Required:**
+- [ ] Replace `github.event_name` → `gitea.event_name`
+- [ ] Replace `github.ref` → `gitea.ref` (in conditional checks)
+- [ ] Replace `github.repository` → `gitea.repository`
+- [ ] Replace `context.repo.owner` → `gitea.repository_owner`
+- [ ] Replace `context.repo.repo` → `gitea.repository`
+- [ ] Replace any `secrets.GITHUB_TOKEN` → `secrets.GITEA_TOKEN`
+
+**Example:**
+```yaml
+# BEFORE (GitHub - INCOMPATIBLE)
+if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+owner: ${{ context.repo.owner }}
+repo: ${{ context.repo.repo }}
+
+# AFTER (Gitea - COMPATIBLE)
+if: gitea.ref == 'refs/heads/main' || startsWith(gitea.ref, 'refs/tags/v')
+owner: ${{ gitea.repository_owner }}
+repo: ${{ gitea.repository }}
+```
+
+#### `.github/workflows/lighthouse.yml`
+
+**Changes Required:**
+- [ ] Remove `paths:` filter from `pull_request:` trigger
+- [ ] Replace any `github.event_name` → `gitea.event_name` (if present)
+- [ ] Replace any `secrets.GITHUB_TOKEN` → `secrets.GITEA_TOKEN`
+
+**Example:**
+```yaml
+# BEFORE (GitHub - INCOMPATIBLE)
+pull_request:
+  branches: [main, develop]
+  paths:
+    - 'frontend/**'
+    - '.github/workflows/lighthouse.yml'
+
+# AFTER (Gitea - COMPATIBLE)
+pull_request:
+  branches: [main, develop]
+# No paths filter - workflow runs on all PRs
+```
+
+#### `.github/workflows/performance-tests.yml`
+
+**Changes Required:**
+- [ ] Remove `paths:` filter from `pull_request:` trigger
+- [ ] Replace any `github.event_name` → `gitea.event_name` (if present)
+- [ ] Replace any `secrets.GITHUB_TOKEN` → `secrets.GITEA_TOKEN`
+
+**Example:**
+```yaml
+# BEFORE (GitHub - INCOMPATIBLE)
+pull_request:
+  branches: [main, develop]
+  paths:
+    - 'backend/**'
+    - '.github/workflows/performance-tests.yml'
+
+# AFTER (Gitea - COMPATIBLE)
+pull_request:
+  branches: [main, develop]
+# No paths filter - workflow runs on all PRs
+```
+
+### Third-Party Actions Compatibility Status
+
+| Action | Used In | Compatibility Status | Action Required |
+|--------|---------|---------------------|-----------------|
+| `amondnet/vercel-action@v25` | deploy.yml | ⚠️ UNCERTAIN | Test in Gitea; may need native script replacement |
+| `treosh/lighthouse-ci-action@v9` | lighthouse.yml | ⚠️ UNCERTAIN | Test in Gitea; may need Lighthouse CLI replacement |
+| `actions/checkout@v3` | all workflows | ✅ COMPATIBLE | Should work in Gitea |
+| `actions/setup-python@v4` | performance-tests.yml | ✅ COMPATIBLE | Should work in Gitea |
+| `actions/setup-node@v3` | lighthouse.yml | ✅ COMPATIBLE | Should work in Gitea |
+
+**Recommendation:** Test third-party actions in Gitea before relying on them. Have fallback scripts ready.
+
+### Automated Migration Commands
+
+**Find all incompatible syntax:**
+```bash
+# Find all github. context references
+grep -rn 'github\.' .github/workflows/
+
+# Find GITHUB_TOKEN references
+grep -rn 'GITHUB_TOKEN' .github/workflows/
+
+# Find context.repo pattern
+grep -rn 'context\.repo\.' .github/workflows/
+
+# Find paths filters on pull_request
+grep -A 5 'pull_request:' .github/workflows/*.yml | grep -B 2 'paths:'
+```
+
+**Batch replace (use with caution, verify changes):**
+```bash
+# Replace github. with gitea. in workflow files
+find .github/workflows -name '*.yml' -exec sed -i 's/github\./gitea./g' {} \;
+
+# Replace GITHUB_TOKEN with GITEA_TOKEN
+find .github/workflows -name '*.yml' -exec sed -i 's/GITHUB_TOKEN/GITEA_TOKEN/g' {} \;
+
+# Replace context.repo.owner with gitea.repository_owner
+find .github/workflows -name '*.yml' -exec sed -i 's/context\.repo\.owner/gitea.repository_owner/g' {} \;
+
+# Replace context.repo.repo with gitea.repository
+find .github/workflows -name '*.yml' -exec sed -i 's/context\.repo\.repo/gitea.repository/g' {} \;
+```
+
+### Validation After Migration
+
+**Verify no GitHub-specific syntax remains:**
+```bash
+# Should return 0
+grep -rch 'github\.' .github/workflows/ | grep -v 'gitea\.' | wc -l
+
+# Should return 0
+grep -rch 'GITHUB_TOKEN' .github/workflows/ | wc -l
+
+# Should return 0
+grep -rch 'context\.repo\.' .github/workflows/ | wc -l
+```
+
+**Verify YAML syntax is valid:**
+```bash
+# Check each workflow file
+for file in .github/workflows/*.yml; do
+  echo "Checking $file..."
+  python3 -c "import yaml; yaml.safe_load(open('$file'))" && echo "✅ Valid" || echo "❌ Invalid"
+done
+```
+
+### Summary of Requirements
+
+**Total Changes Required:**
+- **3 files** to modify (deploy.yml, lighthouse.yml, performance-tests.yml)
+- **~8-12** context variable replacements per file (varies by file complexity)
+- **1-2** token references per file
+- **2** path filters to remove (one in lighthouse.yml, one in performance-tests.yml)
+
+**Estimated Effort:** 15-30 minutes to apply all changes and verify
+
+**Migration Priority:**
+1. **CRITICAL:** `github.*` → `gitea.*` (workflows will fail without this)
+2. **CRITICAL:** Remove `paths:` filters (causes "no jobs were run")
+3. **HIGH:** Test third-party actions compatibility
+4. **MEDIUM:** Update documentation with Gitea-specific notes
+
+### Verification Checklist
+
+Use this checklist to confirm ALL required changes are documented:
+
+- [ ] All `github.event_name` → `gitea.event_name` mappings documented
+- [ ] All `github.ref` → `gitea.ref` mappings documented
+- [ ] All `github.repository` → `gitea.repository` mappings documented
+- [ ] All `github.repository_owner` → `gitea.repository_owner` mappings documented
+- [ ] All `context.repo.*` → `gitea.*` mappings documented
+- [ ] All `secrets.GITHUB_TOKEN` → `secrets.GITEA_TOKEN` mappings documented
+- [ ] Path filter removal approach documented
+- [ ] Third-party actions compatibility assessed
+- [ ] Automated migration commands provided
+- [ ] Validation commands provided
+
+**Status:** ✅ All required syntax changes documented above.
+
+---
+
 ## Proposed Fix Strategy
 
 ### Phase 1: Remove Path Filters (Critical)
