@@ -4338,6 +4338,784 @@ useEffect(() => {
 
 ---
 
+## Docker Resource Tuning
+
+Docker resource tuning ensures optimal performance and resource utilization for all containers. Proper resource limits prevent resource starvation, improve stability, and enable predictable performance under load.
+
+### Overview
+
+The AgentHR platform uses Docker Compose with explicit resource constraints for each service:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Docker Resource Management                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   CPU Limits │  │ Memory Limits│  │  Healthchecks│     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Service Resource Allocation                    │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐  │
+│  │  Backend  │ │  Celery   │ │PostgreSQL │ │   Redis   │  │
+│  │   4-8G    │ │   6-12G   │ │   1-2G    │ │  512M-1G  │  │
+│  └───────────┘ └───────────┘ └───────────┘ └───────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Performance Characteristics
+
+| Resource Type | Impact | Configuration |
+|---------------|--------|---------------|
+| **CPU Limits** | High (Processing) | Prevents CPU contention, ensures fair scheduling |
+| **Memory Limits** | High (Stability) | Prevents OOM kills, enables predictable behavior |
+| **CPU Reservations** | Medium (Performance) | Guarantees minimum CPU allocation |
+| **Memory Reservations** | Medium (Performance) | Ensures minimum memory availability |
+| **Healthchecks** | High (Reliability) | Automatic restart on failure, load balancing |
+
+---
+
+## 1. CPU and Memory Limits
+
+### Current Resource Allocation
+
+The docker-compose.yml defines explicit resource limits for all services:
+
+**Configuration:** `docker-compose.yml`
+
+```yaml
+services:
+  # PostgreSQL Database
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+  # Celery Worker (ML Processing)
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 12G
+        reservations:
+          cpus: '3.0'
+          memory: 6G
+```
+
+### Understanding Limits vs Reservations
+
+| Resource Type | Limits | Reservations |
+|---------------|--------|--------------|
+| **Purpose** | Maximum resources a container can use | Minimum resources guaranteed to container |
+| **When enforced** | When container exceeds limit | When scheduling containers |
+| **Effect** | Throttling/OOM kill if exceeded | Pre-allocates resources on host |
+| **Use case** | Prevent resource starvation | Ensure performance baseline |
+
+**Example:**
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '4.0'      # Container can use up to 4 CPU cores
+      memory: 8G       # Container can use up to 8GB RAM
+    reservations:
+      cpus: '2.0'      # Container guaranteed 2 CPU cores
+      memory: 4G       # Container guaranteed 4GB RAM
+```
+
+### Resource Allocation by Service
+
+| Service | CPU Limit | Memory Limit | CPU Reservation | Memory Reservation | Profile |
+|---------|-----------|--------------|-----------------|-------------------|---------|
+| **postgres** | 2.0 | 2G | 1.0 | 1G | Database |
+| **redis** | 1.0 | 1G | 0.5 | 512M | Cache |
+| **backend** | 4.0 | 8G | 2.0 | 4G | API Server |
+| **celery_worker** | 6.0 | 12G | 3.0 | 6G | ML Worker |
+| **celery_beat** | 1.0 | 512M | 0.5 | 256M | Scheduler |
+| **grafana** | 1.0 | 1G | 0.5 | 512M | Monitoring |
+| **prometheus** | 1.0 | 2G | 0.5 | 1G | Metrics |
+| **loki** | 1.0 | 1G | 0.5 | 512M | Logging |
+
+### Monitoring Resource Usage
+
+Monitor container resource usage in real-time:
+
+```bash
+# Live resource usage for all containers
+docker stats
+
+# Resource usage for specific service
+docker stats resume_analysis_backend
+
+# Formatted output (no streaming)
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+```
+
+**Example Output:**
+
+```
+NAME                    CPU %     MEM USAGE / LIMIT   MEM %
+resume_analysis_celery_worker   180.5%    8.2GiB / 12GiB      68.3%
+resume_analysis_backend         45.2%     3.1GiB / 8GiB       38.7%
+resume_analysis_postgres        12.8%     1.4GiB / 2GiB       70.1%
+resume_analysis_redis           2.1%      385MiB / 1GiB       38.5%
+resume_analysis_grafana         5.4%      487MiB / 1GiB       48.7%
+```
+
+### Adjusting Resource Limits
+
+#### When to Increase Limits
+
+**Symptoms that indicate limits are too low:**
+
+1. **CPU Throttling**: Container consistently at 100% CPU
+2. **OOM Kills**: Container exits with code 137
+3. **Slow Performance**: Increased response times
+4. **Celery Backups**: Tasks queue up faster than processing
+
+```bash
+# Check for OOM kills
+docker logs resume_analysis_backend 2>&1 | grep -i "out of memory"
+
+# Check CPU throttling
+docker inspect resume_analysis_backend | jq '.[0].State.Status'
+```
+
+#### When to Decrease Limits
+
+**Symptoms that indicate limits are too high:**
+
+1. **Underutilization**: Consistently low CPU/memory usage
+2. **Resource Waste**: Other services starved for resources
+3. **Cost**: Paying for unused resources in cloud environments
+
+```bash
+# Check average resource usage over time
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | \
+  grep resume_analysis
+```
+
+### Resource Tuning Guidelines
+
+#### For Development Environments
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '2.0'      # Lower for dev machines
+      memory: 4G       # Reduce for local development
+    reservations:
+      cpus: '1.0'
+      memory: 2G
+```
+
+#### For Production Environments
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '8.0'      # Higher for production workloads
+      memory: 16G      # More headroom for ML processing
+    reservations:
+      cpus: '4.0'      # Guarantee performance
+      memory: 8G
+```
+
+#### For Resource-Constrained Environments
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '1.0'      # Minimal CPU
+      memory: 2G       # Minimal memory
+    reservations:
+      cpus: '0.5'
+      memory: 1G
+```
+
+---
+
+## 2. Container Optimization
+
+### Healthcheck Configuration
+
+Healthchecks enable Docker to automatically restart unhealthy containers and remove them from load balancer rotation.
+
+**Best Practices:**
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U postgres"]  # Command to check health
+  interval: 10s                                    # Run check every 10 seconds
+  timeout: 5s                                      # Fail if check takes > 5 seconds
+  retries: 5                                       # Mark unhealthy after 5 consecutive failures
+  start_period: 30s                                # Grace period on startup
+```
+
+**Healthcheck Examples by Service:**
+
+```yaml
+# PostgreSQL
+postgres:
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+# Redis
+redis:
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+# Backend API
+backend:
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+```
+
+### Container Restart Policies
+
+Configure automatic restart on failure:
+
+```yaml
+restart: unless-stopped  # Restart on failure unless manually stopped
+```
+
+**Restart Policy Options:**
+
+| Policy | Behavior | Use Case |
+|--------|----------|----------|
+| `no` | Don't restart | Debugging, one-off tasks |
+| `on-failure` | Restart on non-zero exit | Production services |
+| `always` | Always restart | Critical services |
+| `unless-stopped` | Restart unless manually stopped | Long-running services |
+
+### Dependency Management
+
+Use healthchecks for service dependencies:
+
+```yaml
+services:
+  backend:
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+```
+
+**Benefits:**
+- Backend waits for database to be healthy before starting
+- Prevents startup errors from uninitialized dependencies
+- Enables graceful startup order
+
+### Volume Optimization
+
+Optimize volume mounts for better performance:
+
+```yaml
+volumes:
+  # Use named volumes for data persistence
+  - backend_models:/app/models_cache
+
+  # Bind mounts for development (live reload)
+  - ./backend:/app
+
+  # Read-only bind mounts (security + performance)
+  - ./testdata:/app/testdata:ro
+
+  # Use tmpfs for temporary data
+  - tmpfs:/tmp
+```
+
+**Performance Tips:**
+
+1. **Named Volumes**: Faster than bind mounts on Mac/Windows
+2. **Read-Only**: Prevents accidental writes, enables caching
+3. **Tmpfs**: Stores temporary data in memory (very fast)
+
+### Network Optimization
+
+```yaml
+networks:
+  resume_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+```
+
+**Network Best Practices:**
+
+1. **Use custom networks**: Better isolation and performance
+2. **DNS resolution**: Containers can resolve each other by name
+3. **Bridge driver**: Best for most use cases
+4. **Avoid host network**: Security risk, no isolation
+
+---
+
+## 3. Environment-Specific Tuning
+
+### Development Environment
+
+**Goals:** Fast feedback, lower resource usage, easier debugging
+
+```yaml
+# docker-compose.dev.yml
+services:
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./backend:/app  # Live reload
+
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+        reservations:
+          cpus: '1.5'
+          memory: 3G
+    command: celery -A celery_app.celery_app worker --loglevel=debug --concurrency=2
+```
+
+**Usage:**
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+### Production Environment
+
+**Goals:** Maximum performance, high availability, resource efficiency
+
+```yaml
+# docker-compose.prod.yml
+services:
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 16G
+        reservations:
+          cpus: '4.0'
+          memory: 8G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - WORKERS=4
+
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '12.0'
+          memory: 24G
+        reservations:
+          cpus: '6.0'
+          memory: 12G
+      replicas: 2  # Multiple workers for high availability
+    command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=8
+```
+
+**Usage:**
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Resource-Constrained Environment
+
+**Goals:** Fit within limited resources, maintain functionality
+
+```yaml
+# docker-compose.low-resource.yml
+services:
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    environment:
+      - WORKERS=1
+      - ML_BATCH_SIZE=4  # Reduce batch size
+
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    command: celery -A celery_app.celery_app worker --concurrency=1 --prefetch-multiplier=1
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    environment:
+      - shared_buffers=128MB
+      - effective_cache_size=512MB
+```
+
+---
+
+## 4. Performance Tuning for Different Workloads
+
+### High-Throughput Scenario
+
+**Use Case:** Processing many resumes quickly (bulk uploads, batch processing)
+
+```yaml
+services:
+  # Scale Celery workers horizontally
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 12G
+        reservations:
+          cpus: '3.0'
+          memory: 6G
+      replicas: 4  # 4 workers for parallel processing
+    command: celery -A celery_app.celery_app worker --concurrency=4 --prefetch-multiplier=4
+
+  # Increase backend capacity
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 16G
+        reservations:
+          cpus: '4.0'
+          memory: 8G
+      replicas: 2
+```
+
+### Low-Latency Scenario
+
+**Use Case:** Interactive use, need fast response times
+
+```yaml
+services:
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 12G
+        reservations:
+          cpus: '4.0'
+          memory: 8G
+    environment:
+      - WORKERS=4  # More workers for concurrent requests
+      - KEEP_ALIVE=30
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G  # More cache for faster responses
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+```
+
+### Memory-Intensive ML Workloads
+
+**Use Case:** Large models, complex NLP processing
+
+```yaml
+services:
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 24G  # Large memory for ML models
+        reservations:
+          cpus: '4.0'
+          memory: 12G
+    environment:
+      - ML_BATCH_SIZE=8  # Larger batches for efficiency
+      - MODEL_CACHE_SIZE=10  # Cache more models
+    command: celery -A celery_app.celery_app worker --concurrency=2  # Lower concurrency, more memory per task
+```
+
+---
+
+## 5. Troubleshooting Resource Issues
+
+### Common Symptoms and Solutions
+
+#### Container Exits with Code 137
+
+**Symptom:** Container keeps restarting, logs show exit code 137
+
+**Cause:** Out of memory (OOM) killed
+
+**Solution:** Increase memory limit
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 16G  # Increase from 8G
+```
+
+#### Container CPU Usage Always at 100%
+
+**Symptom:** CPU throttling, slow response times
+
+**Cause:** CPU limit too low
+
+**Solution:** Increase CPU limit
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '8.0'  # Increase from 4.0
+```
+
+#### Intermittent Slowdowns
+
+**Symptom:** Performance varies, sometimes fast, sometimes slow
+
+**Cause:** Resource contention, no reservations set
+
+**Solution:** Add CPU/memory reservations
+
+```yaml
+deploy:
+  resources:
+    reservations:
+      cpus: '2.0'   # Guarantee minimum resources
+      memory: 4G
+```
+
+#### Startup Failures
+
+**Symptom:** Container exits immediately after starting
+
+**Cause:** Dependency not ready, missing healthcheck
+
+**Solution:** Add healthcheck and dependency
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 30s
+
+depends_on:
+  postgres:
+    condition: service_healthy
+```
+
+### Diagnostic Commands
+
+```bash
+# Check container resource usage
+docker stats --no-stream
+
+# Inspect container resource limits
+docker inspect resume_analysis_backend | jq '.[0].HostConfig.Memory'
+
+# Check OOM kills
+docker events --filter 'type=oom' --since 1h
+
+# View healthcheck status
+docker inspect resume_analysis_backend | jq '.[0].State.Health'
+
+# Check restart count
+docker inspect resume_analysis_backend | jq '.[0].RestartCount'
+
+# View container logs for errors
+docker logs resume_analysis_backend --tail 100
+```
+
+---
+
+## 6. Monitoring and Alerting
+
+### Key Metrics to Monitor
+
+| Metric | Tool | Alert Threshold |
+|--------|------|-----------------|
+| **CPU Usage** | cAdvisor/Prometheus | > 80% for 5 minutes |
+| **Memory Usage** | cAdvisor/Prometheus | > 85% for 5 minutes |
+| **OOM Kills** | Docker events | Any occurrence |
+| **Container Restarts** | Docker/Healthchecks | > 3 in 10 minutes |
+| **Healthcheck Status** | Docker | Any unhealthy service |
+
+### Prometheus Metrics
+
+The cAdvisor container collects Docker resource metrics:
+
+```yaml
+# cAdvisor is already configured in docker-compose.yml
+cadvisor:
+  image: gcr.io/cadvisor/cadvisor:v0.49.1
+  ports:
+    - "8080:8080"
+  volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+```
+
+**Key Metrics:**
+
+- `container_cpu_usage_seconds_total`
+- `container_memory_usage_bytes`
+- `container_memory_max_usage_bytes`
+- `container_spec_memory_limit_bytes`
+
+### Grafana Dashboards
+
+Use the pre-configured Grafana dashboards for monitoring:
+
+```
+URL: http://localhost:3001
+Dashboard: Docker Container Metrics
+```
+
+**Alerts to Configure:**
+
+1. **High CPU Alert**: Container CPU > 80% for 5 minutes
+2. **High Memory Alert**: Container memory > 85% for 5 minutes
+3. **OOM Kill Alert**: Container killed due to OOM
+4. **Unhealthy Service Alert**: Healthcheck fails > 3 times
+
+---
+
+## Quick Reference: Docker Resource Tuning
+
+### Resource Allocation Checklist
+
+- [ ] All services have CPU limits defined
+- [ ] All services have memory limits defined
+- [ ] All services have CPU reservations defined
+- [ ] All services have memory reservations defined
+- [ ] Healthchecks configured for all critical services
+- [ ] Restart policies configured appropriately
+- [ ] Dependencies use healthcheck conditions
+- [ ] Resource limits match workload requirements
+
+### Common Resource Limits
+
+| Environment | Backend | Celery Worker | PostgreSQL | Redis |
+|-------------|---------|---------------|------------|-------|
+| **Development** | 2-4 CPU, 4-8G | 3-6 CPU, 6-12G | 1-2 CPU, 1-2G | 0.5-1 CPU, 512M-1G |
+| **Production** | 4-8 CPU, 8-16G | 6-12 CPU, 12-24G | 2-4 CPU, 2-4G | 1-2 CPU, 1-2G |
+| **Low Resource** | 1-2 CPU, 2-4G | 2-4 CPU, 4-8G | 0.5-1 CPU, 512M-1G | 0.25-0.5 CPU, 256M-512M |
+
+### Performance Targets
+
+| Metric | Target | Maximum |
+|--------|--------|---------|
+| **CPU Usage** | < 70% | < 90% |
+| **Memory Usage** | < 75% | < 90% |
+| **Container Restarts** | 0/hour | < 3/hour |
+| **Healthcheck Pass Rate** | 100% | > 95% |
+| **OOM Kills** | 0 | 0 |
+
+### Common Issues and Solutions
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| **OOM Kill** | Container exits with code 137 | Increase memory limit |
+| **CPU Throttling** | CPU at 100%, slow response | Increase CPU limit |
+| **Slow Startup** | Long wait before service ready | Adjust healthcheck start_period |
+| **Resource Starvation** | One service slows others | Set reservations |
+| **High Memory Usage** | Memory near limit | Optimize application, increase limit |
+
+---
+
 ## Related Documentation
 
 - [ML_PIPELINE.md](ML_PIPELINE.md) - Detailed ML/NLP pipeline documentation
