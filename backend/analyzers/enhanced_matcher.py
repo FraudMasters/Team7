@@ -11,9 +11,9 @@ string comparison to include:
 """
 import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ class EnhancedSkillMatcher:
         self,
         normalized_required: str,
         synonyms_map: Dict[str, List[str]]
-    ) -> set:
+    ) -> Set[str]:
         """
         Build a set of all skill variants (synonyms) for a required skill.
 
@@ -488,7 +488,8 @@ class EnhancedSkillMatcher:
             matched: Whether a match was found
             confidence: Confidence score (0.0-1.0)
             matched_as: The actual skill name from resume that matched
-            match_type: Type of match ('direct', 'context', 'synonym', 'fuzzy', 'compound', 'language_hierarchy', 'none')
+            match_type: Type of match (e.g., 'direct', 'context', 'synonym',
+                        'fuzzy', 'compound', 'language_hierarchy', 'none')
 
         Returns:
             Dictionary with standardized match result structure
