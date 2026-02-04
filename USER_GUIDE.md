@@ -20,7 +20,7 @@ Welcome! This guide is written specifically for HR recruiters and hiring manager
 
 3. [Uploading and Managing Resumes](#uploading-and-managing-resumes)
    - [Supported File Formats](#supported-file-formats)
-   - [Uploading Single Resumes](#uploadloading-single-resumes)
+   - [Uploading Single Resumes](#uploading-single-resumes)
    - [Batch Upload for Multiple Resumes](#batch-upload-for-multiple-resumes)
    - [What Happens During Resume Analysis](#what-happens-during-resume-analysis)
 
@@ -3968,7 +3968,7 @@ Keep the board accurate to keep your analytics accurate.
 - ✅ Add immediate interview feedback notes
 - ✅ Check interview schedule
 - ⚠️ Bulk moves easier on desktop
-- ⚠age Complex edits better on larger screen
+- ⚠️ Complex edits better on larger screen
 
 #### Common Kanban Workflows
 
