@@ -194,33 +194,70 @@ class EnhancedSkillMatcher:
             >>> result
             ('PostgreSQL', 0.85, 'synonym')
         """
-        # Build set of all variants for the required skill
+        all_variants = self._build_synonym_variants(normalized_required, synonyms_map)
+
+        # Find matching resume skill
+        for resume_skill in resume_skills:
+            normalized_resume = self.normalize_skill_name(resume_skill)
+            if normalized_resume not in all_variants:
+                continue
+
+            # Calculate confidence based on match type
+            if normalized_resume == normalized_required:
+                return resume_skill, 0.95, "synonym"
+            return resume_skill, 0.85, "synonym"
+
+        return None
+
+    def _build_synonym_variants(
+        self,
+        normalized_required: str,
+        synonyms_map: Dict[str, List[str]]
+    ) -> set:
+        """
+        Build a set of all skill variants (synonyms) for a required skill.
+
+        Args:
+            normalized_required: Normalized name of the required skill
+            synonyms_map: Dictionary of skill synonyms
+
+        Returns:
+            Set of all normalized skill names that are equivalent to the required skill
+        """
         all_variants = {normalized_required}
 
         for canonical_name, synonym_list in synonyms_map.items():
             normalized_canonical = self.normalize_skill_name(canonical_name)
             if normalized_canonical == normalized_required:
                 all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
-            else:
-                for synonym in synonym_list:
-                    if self.normalize_skill_name(synonym) == normalized_required:
-                        all_variants.add(normalized_canonical)
-                        all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
-                        break
+                continue
 
-        # Find matching resume skill
-        for resume_skill in resume_skills:
-            normalized_resume = self.normalize_skill_name(resume_skill)
-            if normalized_resume in all_variants:
-                # Calculate confidence based on match type
-                if normalized_resume == normalized_required:
-                    # Direct match after normalization
-                    return resume_skill, 0.95, "synonym"
-                else:
-                    # Synonym match
-                    return resume_skill, 0.85, "synonym"
+            # Check if any synonym matches the required skill
+            if self._synonym_list_contains(synonym_list, normalized_required):
+                all_variants.add(normalized_canonical)
+                all_variants.update([self.normalize_skill_name(s) for s in synonym_list])
 
-        return None
+        return all_variants
+
+    def _synonym_list_contains(
+        self,
+        synonym_list: List[str],
+        normalized_required: str
+    ) -> bool:
+        """
+        Check if any synonym in a list matches the required skill.
+
+        Args:
+            synonym_list: List of synonym strings
+            normalized_required: Normalized skill name to match
+
+        Returns:
+            True if any synonym matches, False otherwise
+        """
+        return any(
+            self.normalize_skill_name(synonym) == normalized_required
+            for synonym in synonym_list
+        )
 
     def find_synonym_match(
         self,
@@ -534,13 +571,34 @@ class EnhancedSkillMatcher:
             ('C/C++', 0.9, 'compound')
         """
         for resume_skill in resume_skills:
-            parts = self._split_compound_skill(resume_skill)
-            if len(parts) > 1:
-                for part in parts:
-                    if self.normalize_skill_name(part) == normalized_required:
-                        return resume_skill, 0.9, "compound"
+            if self._compound_skill_contains(resume_skill, normalized_required):
+                return resume_skill, 0.9, "compound"
 
         return None
+
+    def _compound_skill_contains(
+        self,
+        compound_skill: str,
+        normalized_required: str
+    ) -> bool:
+        """
+        Check if a compound skill contains the required skill.
+
+        Args:
+            compound_skill: A potentially compound skill like "C/C++"
+            normalized_required: Normalized name of the required skill
+
+        Returns:
+            True if the compound skill contains the required skill, False otherwise
+        """
+        parts = self._split_compound_skill(compound_skill)
+        if len(parts) <= 1:
+            return False
+
+        return any(
+            self.normalize_skill_name(part) == normalized_required
+            for part in parts
+        )
 
     def _try_language_hierarchy_match(
         self,
@@ -579,22 +637,48 @@ class EnhancedSkillMatcher:
         if normalized_required not in c_related:
             return None
 
+        # Special case for 'c' - need to exclude C# variants
+        if normalized_required == 'c':
+            return self._match_c_language(resume_skills)
+
+        acceptable_variants = [self.normalize_skill_name(v) for v in c_related[normalized_required]]
+
         for resume_skill in resume_skills:
             normalized_resume = self.normalize_skill_name(resume_skill)
+            if normalized_resume in acceptable_variants:
+                return resume_skill, 0.95, 'language_hierarchy'
 
-            # Check if resume skill is in the list of acceptable variants
-            if normalized_resume in [self.normalize_skill_name(v) for v in c_related[normalized_required]]:
-                # Special case: if required is 'c', match 'c++' but NOT 'c#'
-                if normalized_required == 'c':
-                    if 'c#' in normalized_resume or 'csharp' in normalized_resume or 'c sharp' in normalized_resume:
-                        continue
-                    # Match 'c++' or 'c/c++' as 'c'
-                    if normalized_resume in ['c++', 'c/c++']:
-                        return resume_skill, 0.85, 'language_hierarchy'
+        return None
 
-                # Match exact variants
-                if normalized_resume in c_related[normalized_required]:
-                    return resume_skill, 0.95, 'language_hierarchy'
+    def _match_c_language(
+        self,
+        resume_skills: List[str]
+    ) -> Optional[Tuple[str, float, str]]:
+        """
+        Match C language variants, excluding C#.
+
+        C++ implies C, but C# doesn't. This helper handles the special case.
+
+        Args:
+            resume_skills: List of skills extracted from the resume
+
+        Returns:
+            Tuple of (matched_skill, confidence, match_type) if found, None otherwise
+        """
+        for resume_skill in resume_skills:
+            normalized = self.normalize_skill_name(resume_skill)
+
+            # Exclude C# variants
+            if 'c#' in normalized or 'csharp' in normalized or 'c sharp' in normalized:
+                continue
+
+            # Match C++ or C/C++ as C with lower confidence
+            if normalized in ['c++', 'c/c++']:
+                return resume_skill, 0.85, 'language_hierarchy'
+
+            # Match exact C
+            if normalized == 'c':
+                return resume_skill, 0.95, 'language_hierarchy'
 
         return None
 
