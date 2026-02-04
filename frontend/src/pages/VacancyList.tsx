@@ -127,6 +127,12 @@ const VacancyList: React.FC = () => {
   const [dateToFilter, setDateToFilter] = useState<string>('');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
+  // Pagination state
+  const [skip, setSkip] = useState<number>(0);
+  const [limit] = useState<number>(20);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
   // Filter vacancies based on search query and filters
   const filteredVacancies = vacancies.filter((vacancy) => {
     // Search query filter
