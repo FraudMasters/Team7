@@ -1,6 +1,6 @@
 import React from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Box, Paper, Typography, Card, CardContent } from '@mui/material';
+import { Box, Paper, Typography, Card, CardContent } from '@/components/ui';
 
 export interface Column {
   id: string;
@@ -23,9 +23,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <Box
-        sx={{
+        css={{
           display: 'flex',
-          gap: 2,
+          gap: '16px',
           overflowX: 'auto',
           height: '100%',
         }}
@@ -33,9 +33,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
         {columns.map((column) => (
           <Box
             key={column.id}
-            sx={{
-              minWidth: 280,
-              maxWidth: 320,
+            css={{
+              minWidth: '280px',
+              maxWidth: '320px',
               flex: '0 0 auto',
               display: 'flex',
               flexDirection: 'column',
@@ -43,11 +43,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
           >
             {/* Column Header */}
             <Paper
-              sx={{
-                p: 2,
-                mb: 2,
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
+              css={{
+                padding: '16px',
+                marginBottom: '8px',
+                backgroundColor: '$primary',
+                color: '$primaryContrastText',
               }}
             >
               <Typography variant="h6" fontWeight={600}>
@@ -64,12 +64,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
                 <Box
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  sx={{
+                  css={{
                     flex: 1,
-                        minHeight: 200,
-                    bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'background.default',
-                    borderRadius: 1,
-                    p: 1,
+                    minHeight: '200px',
+                    backgroundColor: snapshot.isDraggingOver ? '$hover' : '$background',
+                    borderRadius: '4px',
+                    padding: '8px',
                   }}
                 >
                   {column.candidates.map((candidate: any, index: number) => (
@@ -83,18 +83,18 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          sx={{
-                            mb: 1,
-                            boxShadow: snapshot.isDragging ? 8 : 1,
+                          css={{
+                            marginBottom: '4px',
+                            boxShadow: snapshot.isDragging ? '0 4px 20px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.12)',
                             transform: snapshot.isDragging ? 'rotate(3deg)' : 'none',
                           }}
                         >
-                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <CardContent css={{ padding: '16px' }}>
                             <Typography variant="subtitle2" fontWeight={600}>
                               {candidate.name || candidate.filename || 'Unknown'}
                             </Typography>
                             {candidate.email && (
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography variant="caption" color="secondary">
                                 {candidate.email}
                               </Typography>
                             )}

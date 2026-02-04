@@ -3,11 +3,9 @@ import {
   Box,
   CircularProgress,
   Skeleton,
-  SkeletonProps,
   Typography,
-  useTheme,
-  alpha,
-} from '@mui/material';
+} from '@/components/ui';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
 
 export type LoadingSpinnerVariant =
   | 'spinner'
@@ -61,7 +59,12 @@ export interface LoadingSpinnerProps {
   /**
    * Additional props to pass to Skeleton components
    */
-  skeletonProps?: SkeletonProps;
+  skeletonProps?: {
+    animation?: 'pulse' | 'wave' | false;
+    variant?: 'text' | 'circular' | 'rectangular';
+    width?: string | number;
+    height?: string | number;
+  };
 }
 
 /**
@@ -106,12 +109,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   customSkeleton,
   skeletonProps,
 }) => {
-  const theme = useTheme();
+  const theme = useEmotionTheme();
 
   // Common skeleton animation props
-  const skeletonBaseProps: SkeletonProps = {
-    animation: 'wave',
-    ...skeletonProps,
+  const baseAnimation = skeletonProps?.animation || 'wave';
+
+  // Helper function to get background color with opacity
+  const getBgColor = (opacity: number) => {
+    return `rgba(0, 0, 0, ${opacity})`;
   };
 
   // Simple circular progress spinner
@@ -136,7 +141,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {message && (
           <Typography
             variant="body2"
-            color="text.secondary"
+            color="secondary"
             sx={{ textAlign: 'center' }}
           >
             {message}
@@ -185,44 +190,44 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
             key={index}
             sx={{
               p: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.5),
+              bgcolor: getBgColor(0.05),
               borderRadius: 1,
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              border: `1px solid ${getBgColor(0.1)}`,
             }}
           >
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="rectangular"
               height={60}
               sx={{ mb: 2 }}
             />
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="text"
               width="60%"
               sx={{ mb: 1 }}
             />
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="text"
               width="80%"
               sx={{ mb: 2 }}
             />
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="rectangular"
                 width={60}
                 height={24}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="rectangular"
                 width={60}
                 height={24}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="rectangular"
                 width={60}
                 height={24}
@@ -246,31 +251,31 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               alignItems: 'center',
               gap: 2,
               p: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.5),
+              bgcolor: getBgColor(0.05),
               borderRadius: 1,
             }}
           >
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="circular"
               width={48}
               height={48}
             />
             <Box sx={{ flex: 1 }}>
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="70%"
                 sx={{ mb: 1 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="40%"
               />
             </Box>
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="rectangular"
               width={80}
               height={32}
@@ -291,16 +296,16 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
             display: 'flex',
             gap: 2,
             p: 2,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: alpha(theme.palette.action.hover, 0.5),
+            borderBottom: `1px solid ${theme.colors.divider}`,
+            bgcolor: getBgColor(0.05),
           }}
         >
-          <Skeleton {...skeletonBaseProps} variant="text" width="20%" />
-          <Skeleton {...skeletonBaseProps} variant="text" width="25%" />
-          <Skeleton {...skeletonBaseProps} variant="text" width="15%" />
-          <Skeleton {...skeletonBaseProps} variant="text" width="15%" />
-          <Skeleton {...skeletonBaseProps} variant="text" width="15%" />
-          <Skeleton {...skeletonBaseProps} variant="text" width="10%" />
+          <Skeleton animation={baseAnimation} variant="text" width="20%" />
+          <Skeleton animation={baseAnimation} variant="text" width="25%" />
+          <Skeleton animation={baseAnimation} variant="text" width="15%" />
+          <Skeleton animation={baseAnimation} variant="text" width="15%" />
+          <Skeleton animation={baseAnimation} variant="text" width="15%" />
+          <Skeleton animation={baseAnimation} variant="text" width="10%" />
         </Box>
         {/* Table rows */}
         {Array.from({ length: count }).map((_, index) => (
@@ -310,15 +315,15 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               display: 'flex',
               gap: 2,
               p: 2,
-              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+              borderBottom: `1px solid ${getBgColor(0.12)}`,
             }}
           >
-            <Skeleton {...skeletonBaseProps} variant="text" width="20%" />
-            <Skeleton {...skeletonBaseProps} variant="text" width="25%" />
-            <Skeleton {...skeletonBaseProps} variant="text" width="15%" />
-            <Skeleton {...skeletonBaseProps} variant="text" width="15%" />
-            <Skeleton {...skeletonBaseProps} variant="text" width="15%" />
-            <Skeleton {...skeletonBaseProps} variant="text" width="10%" />
+            <Skeleton animation={baseAnimation} variant="text" width="20%" />
+            <Skeleton animation={baseAnimation} variant="text" width="25%" />
+            <Skeleton animation={baseAnimation} variant="text" width="15%" />
+            <Skeleton animation={baseAnimation} variant="text" width="15%" />
+            <Skeleton animation={baseAnimation} variant="text" width="15%" />
+            <Skeleton animation={baseAnimation} variant="text" width="10%" />
           </Box>
         ))}
       </Box>
@@ -347,13 +352,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {Array.from({ length: 5 }).map((_, index) => (
           <Box key={index}>
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="text"
               width="30%"
               sx={{ mb: 1 }}
             />
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="rectangular"
               height={56}
               sx={{ borderRadius: 1 }}
@@ -363,14 +368,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {/* Form actions */}
         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="rectangular"
             width={120}
             height={36}
             sx={{ borderRadius: 1 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="rectangular"
             width={120}
             height={36}
@@ -388,14 +393,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {/* Page header */}
         <Box sx={{ mb: 4 }}>
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="40%"
             height={40}
             sx={{ mb: 2 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="rectangular"
             width="100%"
             height={100}
@@ -419,25 +424,25 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               key={index}
               sx={{
                 p: 2,
-                bgcolor: alpha(theme.palette.background.paper, 0.5),
+                bgcolor: getBgColor(0.05),
                 borderRadius: 1,
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                border: `1px solid ${getBgColor(0.1)}`,
               }}
             >
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="rectangular"
                 height={120}
                 sx={{ mb: 2 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="70%"
                 sx={{ mb: 1 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="50%"
               />
@@ -454,21 +459,21 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
       <Box sx={{ width: '100%', p: 3 }}>
         {/* Page Header Skeleton */}
         <Skeleton
-          {...skeletonBaseProps}
+          animation={baseAnimation}
           variant="text"
           width="40%"
           height={48}
           sx={{ mb: 1 }}
         />
         <Skeleton
-          {...skeletonBaseProps}
+          animation={baseAnimation}
           variant="text"
           width="70%"
           height={24}
           sx={{ mb: 1 }}
         />
         <Skeleton
-          {...skeletonBaseProps}
+          animation={baseAnimation}
           variant="text"
           width="50%"
           height={20}
@@ -489,7 +494,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           {/* Upload Icon Skeleton */}
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="circular"
               width={64}
               height={64}
@@ -498,7 +503,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
           {/* Title Skeleton */}
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="40%"
             sx={{ mx: 'auto', mb: 1 }}
@@ -507,7 +512,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
           {/* Subtitle Skeleton */}
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="60%"
             sx={{ mx: 'auto', mb: 2 }}
@@ -516,14 +521,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
           {/* Chips Skeleton */}
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mb: 3 }}>
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width={60} height={32} />
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width={60} height={32} />
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width={100} height={32} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width={60} height={32} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width={60} height={32} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width={100} height={32} />
           </Box>
 
           {/* Button Skeleton */}
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width={160} height={40} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width={160} height={40} />
           </Box>
         </Box>
 
@@ -537,28 +542,28 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           }}
         >
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="30%"
             height={28}
             sx={{ mb: 2 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="95%"
             height={20}
             sx={{ mb: 1 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="95%"
             height={20}
             sx={{ mb: 1 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="80%"
             height={20}
@@ -575,14 +580,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {/* Page Header */}
         <Box sx={{ mb: 3 }}>
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="30%"
             height={40}
             sx={{ mb: 1 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="50%"
             height={20}
@@ -590,9 +595,9 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         </Box>
 
         {/* Tabs Skeleton */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 3, borderBottom: `1px solid ${theme.palette.divider}`, pb: 2 }}>
-          <Skeleton {...skeletonBaseProps} variant="rectangular" width={100} height={32} />
-          <Skeleton {...skeletonBaseProps} variant="rectangular" width={140} height={32} />
+        <Box sx={{ display: 'flex', gap: 2, mb: 3, borderBottom: `1px solid ${theme.colors.divider}`, pb: 2 }}>
+          <Skeleton animation={baseAnimation} variant="rectangular" width={100} height={32} />
+          <Skeleton animation={baseAnimation} variant="rectangular" width={140} height={32} />
         </Box>
 
         {/* Analysis Sections */}
@@ -601,13 +606,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           <Box
             sx={{
               p: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.5),
+              bgcolor: getBgColor(0.05),
               borderRadius: 1,
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              border: `1px solid ${getBgColor(0.1)}`,
             }}
           >
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="text"
               width="25%"
               height={28}
@@ -625,15 +630,15 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
                     gap: 2,
                   }}
                 >
-                  <Skeleton {...skeletonBaseProps} variant="circular" width={24} height={24} />
+                  <Skeleton animation={baseAnimation} variant="circular" width={24} height={24} />
                   <Box sx={{ flex: 1 }}>
                     <Skeleton
-                      {...skeletonBaseProps}
+                      animation={baseAnimation}
                       variant="text"
                       width="70%"
                       sx={{ mb: 1 }}
                     />
-                    <Skeleton {...skeletonBaseProps} variant="text" width="90%" />
+                    <Skeleton animation={baseAnimation} variant="text" width="90%" />
                   </Box>
                 </Box>
               ))}
@@ -644,13 +649,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           <Box
             sx={{
               p: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.5),
+              bgcolor: getBgColor(0.05),
               borderRadius: 1,
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              border: `1px solid ${getBgColor(0.1)}`,
             }}
           >
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="text"
               width="20%"
               height={28}
@@ -660,7 +665,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               {Array.from({ length: 8 }).map((_, index) => (
                 <Skeleton
                   key={index}
-                  {...skeletonBaseProps}
+                  animation={baseAnimation}
                   variant="rectangular"
                   width={60 + Math.random() * 40}
                   height={28}
@@ -673,20 +678,20 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           <Box
             sx={{
               p: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.5),
+              bgcolor: getBgColor(0.05),
               borderRadius: 1,
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              border: `1px solid ${getBgColor(0.1)}`,
             }}
           >
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="text"
               width="30%"
               height={28}
               sx={{ mb: 2 }}
             />
             <Skeleton
-              {...skeletonBaseProps}
+              animation={baseAnimation}
               variant="rectangular"
               width="100%"
               height={80}
@@ -704,7 +709,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
       <Box sx={{ width: '100%', p: 3 }}>
         {/* Back Button Skeleton */}
         <Skeleton
-          {...skeletonBaseProps}
+          animation={baseAnimation}
           variant="rectangular"
           width={100}
           height={36}
@@ -725,20 +730,20 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
             <Box sx={{ flex: 1 }}>
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="60%"
                 height={36}
                 sx={{ mb: 1 }}
               />
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={100} height={24} />
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={90} height={24} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={100} height={24} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={90} height={24} />
               </Box>
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Skeleton {...skeletonBaseProps} variant="rectangular" width={80} height={36} />
-              <Skeleton {...skeletonBaseProps} variant="rectangular" width={80} height={36} />
+              <Skeleton animation={baseAnimation} variant="rectangular" width={80} height={36} />
+              <Skeleton animation={baseAnimation} variant="rectangular" width={80} height={36} />
             </Box>
           </Box>
 
@@ -747,26 +752,26 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
             {/* Description */}
             <Box>
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="30%"
                 height={24}
                 sx={{ mb: 1 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="100%"
                 sx={{ mb: 0.5 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="100%"
                 sx={{ mb: 0.5 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="80%"
               />
@@ -775,27 +780,27 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
             {/* Sidebar */}
             <Box>
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="40%"
                 height={24}
                 sx={{ mb: 1 }}
               />
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={70} height={28} />
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={80} height={28} />
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={65} height={28} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={70} height={28} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={80} height={28} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={65} height={28} />
               </Box>
 
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="50%"
                 height={24}
                 sx={{ mb: 1, mt: 2 }}
               />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="rectangular"
                 width="100%"
                 height={56}
@@ -815,14 +820,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {/* Page Header */}
         <Box sx={{ mb: 4 }}>
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="40%"
             height={40}
             sx={{ mb: 1 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="60%"
             height={20}
@@ -853,18 +858,18 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Skeleton {...skeletonBaseProps} variant="circular" width={24} height={24} sx={{ mr: 1 }} />
-                <Skeleton {...skeletonBaseProps} variant="text" width="70%" height={20} />
+                <Skeleton animation={baseAnimation} variant="circular" width={24} height={24} sx={{ mr: 1 }} />
+                <Skeleton animation={baseAnimation} variant="text" width="70%" height={20} />
               </Box>
-              <Skeleton {...skeletonBaseProps} variant="text" width="40%" height={32} sx={{ mb: 0.5 }} />
-              <Skeleton {...skeletonBaseProps} variant="text" width="60%" height={16} />
+              <Skeleton animation={baseAnimation} variant="text" width="40%" height={32} sx={{ mb: 0.5 }} />
+              <Skeleton animation={baseAnimation} variant="text" width="60%" height={16} />
             </Box>
           ))}
         </Box>
 
         {/* Quick Actions */}
         <Skeleton
-          {...skeletonBaseProps}
+          animation={baseAnimation}
           variant="text"
           width="30%"
           height={24}
@@ -892,14 +897,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
                 minHeight: 120,
               }}
             >
-              <Skeleton {...skeletonBaseProps} variant="circular" width={40} height={40} sx={{ mb: 2 }} />
+              <Skeleton animation={baseAnimation} variant="circular" width={40} height={40} sx={{ mb: 2 }} />
               <Skeleton
-                {...skeletonBaseProps}
+                animation={baseAnimation}
                 variant="text"
                 width="70%"
                 sx={{ mb: 1 }}
               />
-              <Skeleton {...skeletonBaseProps} variant="text" width="90%" height={16} />
+              <Skeleton animation={baseAnimation} variant="text" width="90%" height={16} />
             </Box>
           ))}
         </Box>
@@ -914,14 +919,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         {/* Page Header */}
         <Box sx={{ mb: 3 }}>
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="35%"
             height={40}
             sx={{ mb: 1 }}
           />
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="text"
             width="65%"
             height={20}
@@ -940,7 +945,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         >
           {/* Search Input */}
           <Skeleton
-            {...skeletonBaseProps}
+            animation={baseAnimation}
             variant="rectangular"
             width="100%"
             height={56}
@@ -949,13 +954,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
           {/* Filters Row */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Skeleton {...skeletonBaseProps} variant="text" width="15%" height={20} />
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width="30%" height={40} />
+            <Skeleton animation={baseAnimation} variant="text" width="15%" height={20} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width="30%" height={40} />
 
-            <Skeleton {...skeletonBaseProps} variant="text" width="20%" height={20} />
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width={100} height={32} />
+            <Skeleton animation={baseAnimation} variant="text" width="20%" height={20} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width={100} height={32} />
 
-            <Skeleton {...skeletonBaseProps} variant="rectangular" width={120} height={40} sx={{ ml: 'auto' }} />
+            <Skeleton animation={baseAnimation} variant="rectangular" width={120} height={40} sx={{ ml: 'auto' }} />
           </Box>
         </Box>
 
@@ -975,42 +980,42 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               }}
             >
               {/* Avatar/Icon */}
-              <Skeleton {...skeletonBaseProps} variant="circular" width={56} height={56} />
+              <Skeleton animation={baseAnimation} variant="circular" width={56} height={56} />
 
               {/* Candidate Info */}
               <Box sx={{ flex: 1 }}>
                 <Skeleton
-                  {...skeletonBaseProps}
+                  animation={baseAnimation}
                   variant="text"
                   width="40%"
                   height={24}
                   sx={{ mb: 0.5 }}
                 />
                 <Skeleton
-                  {...skeletonBaseProps}
+                  animation={baseAnimation}
                   variant="text"
                   width="60%"
                   height={20}
                   sx={{ mb: 1 }}
                 />
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Skeleton {...skeletonBaseProps} variant="rectangular" width={60} height={24} />
-                  <Skeleton {...skeletonBaseProps} variant="rectangular" width={75} height={24} />
-                  <Skeleton {...skeletonBaseProps} variant="rectangular" width={55} height={24} />
+                  <Skeleton animation={baseAnimation} variant="rectangular" width={60} height={24} />
+                  <Skeleton animation={baseAnimation} variant="rectangular" width={75} height={24} />
+                  <Skeleton animation={baseAnimation} variant="rectangular" width={55} height={24} />
                 </Box>
               </Box>
 
               {/* Match Score */}
               <Box sx={{ textAlign: 'right' }}>
                 <Skeleton
-                  {...skeletonBaseProps}
+                  animation={baseAnimation}
                   variant="text"
                   width={60}
                   height={32}
                   sx={{ mb: 0.5 }}
                 />
                 <Skeleton
-                  {...skeletonBaseProps}
+                  animation={baseAnimation}
                   variant="text"
                   width={80}
                   height={20}
@@ -1019,8 +1024,8 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
               {/* Actions */}
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={36} height={36} />
-                <Skeleton {...skeletonBaseProps} variant="rectangular" width={36} height={36} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={36} height={36} />
+                <Skeleton animation={baseAnimation} variant="rectangular" width={36} height={36} />
               </Box>
             </Box>
           ))}

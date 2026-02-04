@@ -950,6 +950,136 @@ async def test_search_performance_simple_query(client: AsyncClient, large_datase
     print(f"✓ Found {data['total']} candidates")
 
 
+@pytest.mark.asyncio
+@pytest.mark.performance
+async def test_semantic_search_performance(client: AsyncClient, sample_candidates):
+    """
+    Performance test: Verify semantic search completes in under 2 seconds.
+
+    This test verifies that semantic search (with vector similarity matching)
+    meets the <2 second performance requirement from the spec.
+
+    Semantic search is more computationally expensive than full-text search
+    because it requires:
+    - Loading candidate resume text
+    - Computing vector embeddings
+    - Calculating similarity scores
+    - Sorting by semantic relevance
+
+    Even with these additional operations, performance should remain under 2 seconds.
+    """
+    import time
+
+    print("\n=== Performance Test: Semantic Search ===")
+
+    # Execute semantic search with timing
+    start_time = time.time()
+
+    response = await client.post(
+        "/api/search/candidates",
+        json={
+            "query": "Python Developer",
+            "use_semantic_search": True,
+            "filters": {
+                "min_experience_years": 3,
+            },
+            "limit": 50,
+        }
+    )
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    print(f"Semantic search execution time: {execution_time:.3f} seconds")
+
+    # Verify response
+    assert response.status_code == 200, f"Semantic search failed with status {response.status_code}"
+    data = response.json()
+
+    # Verify semantic search was enabled
+    assert "semantic_search_enabled" in data
+    assert data["semantic_search_enabled"] is True, "Semantic search was not enabled"
+
+    # Verify semantic scores are present
+    if len(data["candidates"]) > 0:
+        candidate = data["candidates"][0]
+        assert "semantic_score" in candidate, "Semantic score missing from results"
+        print(f"Sample semantic score: {candidate.get('semantic_score')}")
+
+    print(f"Total matching candidates: {data['total']}")
+    print(f"Results returned: {len(data['candidates'])}")
+    print(f"Server-reported execution time: {data['execution_time_seconds']:.3f}s")
+    print(f"Semantic search enabled: {data['semantic_search_enabled']}")
+    print(f"Average semantic score: {data.get('avg_semantic_score', 'N/A')}")
+
+    # CRITICAL ASSERTION: Semantic search must complete in under 2 seconds
+    assert execution_time < 2.0, \
+        f"PERFORMANCE CRITICAL: Semantic search took {execution_time:.3f}s, " \
+        f"exceeding 2 second requirement"
+
+    # Also verify server-reported time is reasonable
+    assert data['execution_time_seconds'] < 2.0, \
+        f"Server-reported time {data['execution_time_seconds']:.3f}s exceeds 2 seconds"
+
+    print(f"\n✓ SEMANTIC SEARCH PERFORMANCE TEST PASSED")
+    print(f"✓ Semantic search completed in {execution_time:.3f}s (< 2.0s requirement)")
+    print(f"✓ Semantic scores calculated for {len(data['candidates'])} candidates")
+    print(f"✓ Average semantic similarity: {data.get('avg_semantic_score', 'N/A')}")
+
+
+@pytest.mark.asyncio
+@pytest.mark.performance
+async def test_csv_export_performance(client: AsyncClient, sample_candidates):
+    """
+    Performance test: Verify CSV export completes in under 2 seconds.
+
+    This test verifies that exporting search results to CSV format
+    meets the <2 second performance requirement.
+    """
+    import time
+
+    print("\n=== Performance Test: CSV Export ===")
+
+    # Execute CSV export with timing
+    start_time = time.time()
+
+    response = await client.post(
+        "/api/search/export",
+        json={
+            "query": "Python",
+            "limit": 100,
+        }
+    )
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    print(f"CSV export execution time: {execution_time:.3f} seconds")
+
+    # Verify response
+    assert response.status_code == 200, f"CSV export failed with status {response.status_code}"
+
+    # Verify content type
+    assert response.headers["content-type"] == "text/csv; charset=utf-8", \
+        f"Wrong content type: {response.headers.get('content-type')}"
+
+    # Parse CSV to verify structure
+    csv_content = response.text
+    lines = csv_content.split('\n')
+
+    print(f"CSV file size: {len(csv_content)} bytes")
+    print(f"CSV rows: {len(lines)}")
+
+    # CRITICAL ASSERTION: CSV export must complete in under 2 seconds
+    assert execution_time < 2.0, \
+        f"PERFORMANCE CRITICAL: CSV export took {execution_time:.3f}s, " \
+        f"exceeding 2 second requirement"
+
+    print(f"\n✓ CSV EXPORT PERFORMANCE TEST PASSED")
+    print(f"✓ CSV export completed in {execution_time:.3f}s (< 2.0s requirement)")
+    print(f"✓ Exported {len(lines)-1} candidates (excluding header)")
+
+
 # ============================================================================
 # Bulk Actions Tests
 # ============================================================================

@@ -12,13 +12,8 @@ import {
   CardContent,
   Divider,
   Alert,
-} from '@mui/material';
-import {
-  Assessment as AssessmentIcon,
-  School as LearningIcon,
-  CheckCircle as CheckedIcon,
-  RadioButtonUnchecked as UncheckedIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { PageTransition } from '../../components/ui/PageTransition';
 
 interface Skill {

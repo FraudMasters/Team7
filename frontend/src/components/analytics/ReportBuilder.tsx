@@ -25,25 +25,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  Save as SaveIcon,
-  FolderOpen as OpenIcon,
-  ArrowUpward as UpIcon,
-  ArrowDownward as DownIcon,
-  ChevronRight as RightIcon,
-  Remove as RemoveIcon,
-  Description as ReportIcon,
-  PictureAsPdf as PdfIcon,
-  Download as DownloadIcon,
-  Schedule as ScheduleIcon,
-  Email as EmailIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Available metric definition

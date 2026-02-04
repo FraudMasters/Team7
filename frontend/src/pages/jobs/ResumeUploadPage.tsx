@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Typography, Box, Paper, Stepper, Step, StepLabel } from '@mui/material';
+import { Typography, Box, Paper, Stepper, Step, StepLabel } from '@/components/ui';
 import ResumeUploader from '@components/ResumeUploader';
 
 /**

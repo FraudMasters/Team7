@@ -12,15 +12,8 @@ import {
   AlertTitle,
   Stack,
   Chip,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  Balance as FairnessIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon,
-  Analytics as MetricsIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { fairness } from '@/api/fairness';
 import type {
   FairnessSummary,
@@ -51,7 +44,6 @@ function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | '
     case 'medium':
       return 'warning';
     case 'high':
-      return 'error';
     case 'critical':
       return 'error';
     default:
@@ -66,14 +58,14 @@ function getSeverityIcon(severity: string) {
   switch (severity.toLowerCase()) {
     case 'none':
     case 'low':
-      return <CheckIcon />;
+      return <Icon name="check-circle" size={20} />;
     case 'medium':
-      return <WarningIcon />;
+      return <Icon name="alert-triangle" size={20} />;
     case 'high':
     case 'critical':
-      return <ErrorIcon />;
+      return <Icon name="alert-circle" size={20} />;
     default:
-      return <MetricsIcon />;
+      return <Icon name="bar-chart" size={20} />;
   }
 }
 
@@ -152,10 +144,10 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <Typography variant="h6" color="secondary">
           Loading fairness metrics...
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -170,7 +162,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchFairnessData} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchFairnessData} startIcon={<Icon name="refresh-cw" size={16} />}>
             Retry
           </Button>
         }
@@ -186,7 +178,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
   }
 
   const hasIssues = summary.models_with_issues > 0;
-  const scoreColor = summary.overall_fairness_score >= 0.8 ? 'success.main' : summary.overall_fairness_score >= 0.6 ? 'warning.main' : 'error.main';
+  const scoreColor = summary.overall_fairness_score >= 0.8 ? 'success' : summary.overall_fairness_score >= 0.6 ? 'warning' : 'error';
 
   return (
     <Stack spacing={3}>
@@ -196,7 +188,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
           <Typography variant="h5" fontWeight={600}>
             Fairness Monitoring Dashboard
           </Typography>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchFairnessData} size="small">
+          <Button variant="outlined" startIcon={<Icon name="refresh-cw" size={16} />} onClick={fetchFairnessData} size="small">
             Refresh
           </Button>
         </Box>
@@ -218,9 +210,11 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
             >
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <FairnessIcon
-                    fontSize="large"
-                    sx={{ mr: 1, color: scoreColor }}
+                  <Icon
+                    name="balance"
+                    size={24}
+                    color={scoreColor}
+                    style={{ marginRight: '8px' }}
                   />
                   <Typography variant="h6" fontWeight={600}>
                     Overall Fairness
@@ -228,7 +222,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="secondary">
                     Fairness Score
                   </Typography>
                   <Typography
@@ -242,7 +236,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
 
                 <Stack spacing={1}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       Models Monitored
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
@@ -250,25 +244,25 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       Models with Issues
                     </Typography>
                     <Typography
                       variant="body2"
                       fontWeight={600}
-                      color={hasIssues ? 'warning.main' : 'success.main'}
+                      color={hasIssues ? 'warning' : 'success'}
                     >
                       {summary.models_with_issues}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       Recent Alerts
                     </Typography>
                     <Typography
                       variant="body2"
                       fontWeight={600}
-                      color={summary.recent_alerts > 0 ? 'error.main' : 'text.primary'}
+                      color={summary.recent_alerts > 0 ? 'error' : 'muted'}
                     >
                       {summary.recent_alerts}
                     </Typography>
@@ -284,7 +278,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
               variant="outlined"
               sx={{
                 height: '100%',
-                borderColor: 'primary.main',
+                borderColor: 'primary',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
@@ -294,17 +288,17 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
             >
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <MetricsIcon fontSize="large" sx={{ mr: 1, color: 'primary.main' }} />
+                  <Icon name="bar-chart" size={24} color="primary" style={{ marginRight: '8px' }} />
                   <Typography variant="h6" fontWeight={600}>
                     Protected Attributes
                   </Typography>
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="secondary">
                     Attributes Analyzed
                   </Typography>
-                  <Typography variant="h4" fontWeight={700} color="primary.main">
+                  <Typography variant="h4" fontWeight={700} color="primary">
                     {summary.protected_attributes_analyzed.length}
                   </Typography>
                 </Box>
@@ -330,7 +324,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
               variant="outlined"
               sx={{
                 height: '100%',
-                borderColor: alerts.length > 0 ? 'error.main' : 'success.main',
+                borderColor: alerts.length > 0 ? 'error' : 'success',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
@@ -341,15 +335,9 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   {alerts.length > 0 ? (
-                    <ErrorIcon
-                      fontSize="large"
-                      sx={{ mr: 1, color: 'error.main' }}
-                    />
+                    <Icon name="alert-circle" size={24} color="error" style={{ marginRight: '8px' }} />
                   ) : (
-                    <CheckIcon
-                      fontSize="large"
-                      sx={{ mr: 1, color: 'success.main' }}
-                    />
+                    <Icon name="check-circle" size={24} color="success" style={{ marginRight: '8px' }} />
                   )}
                   <Typography variant="h6" fontWeight={600}>
                     Active Alerts
@@ -357,13 +345,13 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="secondary">
                     Unacknowledged
                   </Typography>
                   <Typography
                     variant="h4"
                     fontWeight={700}
-                    color={alerts.length > 0 ? 'error.main' : 'success.main'}
+                    color={alerts.length > 0 ? 'error' : 'success'}
                   >
                     {alerts.length}
                   </Typography>
@@ -371,26 +359,26 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
 
                 <Stack spacing={1}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       Critical
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="error.main">
+                    <Typography variant="body2" fontWeight={600} color="error">
                       {alerts.filter((a) => a.severity === 'critical').length}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       High
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="error.main">
+                    <Typography variant="body2" fontWeight={600} color="error">
                       {alerts.filter((a) => a.severity === 'high').length}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       Medium
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="warning.main">
+                    <Typography variant="body2" fontWeight={600} color="warning">
                       {alerts.filter((a) => a.severity === 'medium').length}
                     </Typography>
                   </Box>
@@ -413,14 +401,14 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                 key={alert.alert_id}
                 variant="outlined"
                 sx={{
-                  borderColor: `${getSeverityColor(alert.severity)}.main`,
+                  borderColor: getSeverityColor(alert.severity),
                   borderLeft: 4,
-                  borderLeftColor: `${getSeverityColor(alert.severity)}.main`,
+                  borderLeftColor: getSeverityColor(alert.severity),
                 }}
               >
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
-                    <Box sx={{ mr: 1, mt: 0.5, color: `${getSeverityColor(alert.severity)}.main` }}>
+                    <Box sx={{ mr: 1, mt: 0.5, color: getSeverityColor(alert.severity) }}>
                       {getSeverityIcon(alert.severity)}
                     </Box>
                     <Box sx={{ flex: 1 }}>
@@ -434,22 +422,22 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                           color={getSeverityColor(alert.severity)}
                         />
                       </Box>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="secondary" gutterBottom>
                         {alert.description}
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           Model: <strong>{alert.model_name}</strong>
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           Attribute: <strong>{alert.protected_attribute}</strong>
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           Value: <strong>{alert.current_value.toFixed(3)}</strong> (threshold: {alert.threshold_value.toFixed(3)})
                         </Typography>
                       </Box>
                       <Box sx={{ mt: 1 }}>
-                        <Typography variant="caption" color="info.main">
+                        <Typography variant="caption" color="info">
                           💡 {alert.recommendation}
                         </Typography>
                       </Box>
@@ -474,9 +462,9 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                 key={metric.metric_id}
                 variant="outlined"
                 sx={{
-                  borderColor: 'warning.main',
+                  borderColor: 'warning',
                   borderLeft: 4,
-                  borderLeftColor: 'warning.main',
+                  borderLeftColor: 'warning',
                 }}
               >
                 <CardContent sx={{ py: 1.5 }}>
@@ -485,15 +473,15 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
                       <Typography variant="subtitle2" fontWeight={600}>
                         {metric.metric_type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="secondary">
                         {metric.model_name} • {metric.protected_attribute}
                       </Typography>
                     </Box>
                     <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" fontWeight={600} color="warning.main">
+                      <Typography variant="body2" fontWeight={600} color="warning">
                         {metric.metric_value.toFixed(3)}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="secondary">
                         Threshold: {metric.threshold.toFixed(3)}
                       </Typography>
                     </Box>
@@ -508,11 +496,11 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
       {/* No Issues Message */}
       {alerts.length === 0 && metrics.length === 0 && (
         <Paper elevation={2} sx={{ p: 4, textAlign: 'center' }}>
-          <CheckIcon sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Icon name="check-circle" size={60} color="success" style={{ marginBottom: '16px' }} />
+          <Typography variant="h6" color="secondary" gutterBottom>
             All Systems Fair
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="secondary">
             No fairness issues detected across all monitored models and protected attributes.
           </Typography>
         </Paper>

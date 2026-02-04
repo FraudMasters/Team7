@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { VitePWA } from 'vite-plugin-pwa';
+import { pwaConfig } from '../vite-plugin-pwa.config.js';
 
 // Backend API URL from environment or default
 // Inside Docker, use 'backend' service name. Outside, use localhost.
@@ -9,7 +11,10 @@ const API_URL = process.env.VITE_API_URL ||
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA(pwaConfig)
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -106,6 +111,8 @@ export default defineConfig({
       'axios',
       'i18next',
       'react-i18next',
+      'workbox-window',
+      'vite-plugin-pwa',
     ],
   },
   test: {

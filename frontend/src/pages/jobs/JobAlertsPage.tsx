@@ -23,15 +23,8 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Divider,
-} from '@mui/material';
-import {
-  Notifications as NotificationsIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Email as EmailIcon,
-  NotificationsActive as PushIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { PageTransition } from '../../components/ui/PageTransition';
 
 interface JobAlert {

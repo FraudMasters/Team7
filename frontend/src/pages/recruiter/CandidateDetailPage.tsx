@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Typography, Box, Tabs, Tab, Container, Button } from '@mui/material';
+import { Typography, Box, Tabs, Tab, Container, useMediaQuery, useTheme } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Event as EventIcon } from '@mui/icons-material';
 import AnalysisResults from '@components/AnalysisResults';
 import VacancyMatchResults from '@components/VacancyMatchResults';
-import { InterviewScheduler } from '@components/InterviewScheduler';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { ErrorState } from '../../components/ui/ErrorState';
 
@@ -18,17 +16,20 @@ import { ErrorState } from '../../components/ui/ErrorState';
  * - Experience summary
  * - Vacancy match results with skill highlighting
  * - Best match recommendation
+ *
+ * Mobile-optimized with responsive layout, scrollable tabs, and touch-friendly interactions
  */
 const CandidateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
-  const [schedulerOpen, setSchedulerOpen] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   if (!id) {
     return (
       <PageTransition>
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
           <ErrorState
             title="Candidate Not Found"
             message="No candidate ID provided. Please select a valid candidate from the candidates list."
@@ -45,52 +46,73 @@ const CandidateDetailPage: React.FC = () => {
 
   return (
     <PageTransition>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
-          Candidate Details
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Resume ID: {id}
-        </Typography>
-      </Box>
-
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange} aria-label="candidate details tabs">
-          <Tab label="Analysis" />
-          <Tab label="Vacancy Matches" />
-          <Tab label="Schedule Interview" />
-        </Tabs>
-      </Box>
-
-      {activeTab === 0 && <AnalysisResults resumeId={id} />}
-      {activeTab === 1 && <VacancyMatchResults resumeId={id} />}
-      {activeTab === 2 && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
-          <Typography variant="h6" gutterBottom>
-            Schedule an Interview
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Select date, time, and interviewers to schedule an interview for this candidate
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<EventIcon />}
-            onClick={() => setSchedulerOpen(true)}
-            size="large"
+      <Container
+        maxWidth="lg"
+        sx={{
+          py: { xs: 2, sm: 4 },
+          px: { xs: 1, sm: 2 },
+          maxWidth: { xs: '100%', sm: 'lg' },
+          overflowX: 'hidden'
+        }}
+      >
+        <Box
+          sx={{
+            mb: { xs: 2, sm: 3 },
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%'
+          }}
+        >
+          <Typography
+            variant={isMobile ? "h5" : "h4"}
+            component="h1"
+            gutterBottom
+            fontWeight={600}
+            sx={{
+              fontSize: { xs: '1.5rem', sm: '2.125rem' }
+            }}
           >
-            Open Interview Scheduler
-          </Button>
-          {schedulerOpen && (
-            <InterviewScheduler
-              candidateId={id}
-              onCancel={() => setSchedulerOpen(false)}
-              onSuccess={() => setSchedulerOpen(false)}
-            />
-          )}
+            Candidate Details
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+            Resume ID: {id}
+          </Typography>
         </Box>
-      )}
-    </Container>
+
+        <Box
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+            mb: { xs: 2, sm: 3 },
+            width: '100%'
+          }}
+        >
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            aria-label="candidate details tabs"
+            variant={isMobile ? "fullWidth" : "standard"}
+            centered={!isMobile}
+            sx={{
+              minHeight: { xs: 48, sm: 48 },
+              '& .MuiTab-root': {
+                minHeight: { xs: 48, sm: 48 },
+                minWidth: { xs: 80, sm: 160 },
+                fontSize: { xs: '0.875rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 2 }
+              }
+            }}
+          >
+            <Tab label="Analysis" />
+            <Tab label="Vacancy Matches" />
+          </Tabs>
+        </Box>
+
+        <Box sx={{ width: '100%', overflowX: 'hidden' }}>
+          {activeTab === 0 && <AnalysisResults resumeId={id} />}
+          {activeTab === 1 && <VacancyMatchResults resumeId={id} />}
+        </Box>
+      </Container>
     </PageTransition>
   );
 };

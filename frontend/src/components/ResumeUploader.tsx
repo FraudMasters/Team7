@@ -9,14 +9,8 @@ import {
   Alert,
   Chip,
   Stack,
-} from '@mui/material';
-import {
-  CloudUpload as UploadIcon,
-  Description as FileIcon,
-  Delete as DeleteIcon,
-  CheckCircle as SuccessIcon,
-  Error as ErrorIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * File upload state interface
@@ -360,13 +354,13 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
           p: 4,
           border: '2px dashed',
           borderColor: isDragging
-            ? 'primary.main'
+            ? 'primary'
             : uploadState.error
-              ? 'error.main'
+              ? 'error'
               : uploadState.success
-                ? 'success.main'
-                : 'divider',
-          bgcolor: isDragging ? 'action.hover' : 'background.paper',
+                ? 'success'
+                : 'border',
+          bgcolor: isDragging ? 'hover' : 'background',
           transition: 'all 0.2s ease-in-out',
           cursor: uploadState.uploading ? 'wait' : 'pointer',
           position: 'relative',
@@ -377,7 +371,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
         {uploadState.error && (
           <Alert
             severity="error"
-            icon={<ErrorIcon />}
+            icon={<Icon name="error" />}
             sx={{ mb: 2 }}
             action={
               !uploadState.uploading && (
@@ -400,7 +394,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
         {uploadState.success && (
           <Alert
             severity="success"
-            icon={<SuccessIcon />}
+            icon={<Icon name="check-circle" />}
             sx={{ mb: 2 }}
             action={
               <Button
@@ -430,10 +424,11 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
                 mb: 2,
               }}
             >
-              <UploadIcon
+              <Icon
+                name="cloud-upload"
                 sx={{
                   fontSize: 64,
-                  color: isDragging ? 'primary.main' : 'action.disabled',
+                  color: isDragging ? 'primary' : 'disabled',
                   transition: 'color 0.2s',
                 }}
               />
@@ -452,7 +447,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
             <Typography
               variant="body2"
               align="center"
-              color="text.secondary"
+              color="secondary"
               paragraph
             >
               {uploadState.uploading
@@ -485,7 +480,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
                 <Button
                   variant="contained"
                   size="large"
-                  startIcon={<UploadIcon />}
+                  startIcon={<Icon name="cloud-upload" />}
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
@@ -508,17 +503,17 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
               alignItems="center"
               justifyContent="center"
             >
-              <FileIcon color="action" />
-              <Typography variant="body2" color="text.primary">
+              <Icon name="file-text" color="action" />
+              <Typography variant="body2" color="primary">
                 <strong>{uploadState.file.name}</strong>
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="secondary">
                 ({formatFileSize(uploadState.file.size)})
               </Typography>
               {!uploadState.uploading && (
                 <Button
                   size="small"
-                  startIcon={<DeleteIcon />}
+                  startIcon={<Icon name="trash-2" />}
                   onClick={handleReset}
                   color="error"
                 >
@@ -540,7 +535,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
             <Typography
               variant="body2"
               align="center"
-              color="text.secondary"
+              color="secondary"
               sx={{ mt: 1 }}
             >
               {uploadState.progress}%
@@ -553,7 +548,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
       {!uploadState.success && (
         <Typography
           variant="caption"
-          color="text.secondary"
+          color="secondary"
           align="center"
           display="block"
           sx={{ mt: 2 }}

@@ -32,8 +32,10 @@ from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
-from .notification import Notification, NotificationType
-from .notification_preference import NotificationPreference, DigestFrequency
+from .salary_benchmark import SalaryBenchmark
+from .salary_history import SalaryHistory
+from .salary_offer import SalaryOffer
+from .cost_of_living import CostOfLivingIndex
 
 __all__ = [
     "Base",
@@ -76,8 +78,8 @@ __all__ = [
     "SavedSearch",
     "SearchAlert",
     "SearchHistory",
-    "Notification",
-    "NotificationType",
-    "NotificationPreference",
-    "DigestFrequency",
+    "SalaryBenchmark",
+    "SalaryHistory",
+    "SalaryOffer",
+    "CostOfLivingIndex",
 ]

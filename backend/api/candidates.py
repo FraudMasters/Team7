@@ -31,38 +31,13 @@ from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
-from models.recruiter import Recruiter
-from models import NotificationType
-
-from services.notification_service import get_notification_service
+from models.user import User
+from models.role import UserRole
+from middleware.auth import get_current_active_user, require_role
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-async def _get_active_recruiters_to_notify(db: AsyncSession) -> List[UUID]:
-    """
-    Get all active recruiters to notify about candidate events.
-
-    This is a simple implementation that notifies all active recruiters.
-    In the future, this could be refined to notify only recruiters
-    in a specific organization or based on other criteria.
-
-    Args:
-        db: Database session
-
-    Returns:
-        List of recruiter UUIDs who should receive notifications
-    """
-    try:
-        query = select(Recruiter.id).where(Recruiter.is_active == True)
-        result = await db.execute(query)
-        recruiter_ids = result.scalars().all()
-        return list(recruiter_ids)
-    except Exception as e:
-        logger.error(f"Error getting active recruiters: {e}", exc_info=True)
-        return []
 
 
 # Response Models
@@ -256,6 +231,7 @@ async def list_candidates(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     List all candidates (resumes) with their current workflow stages.
@@ -518,6 +494,7 @@ async def get_candidate(
     request: Request,
     candidate_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get a specific candidate's current stage information.
@@ -691,6 +668,7 @@ async def move_candidate(
     candidate_id: str,
     stage_data: MoveCandidateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Move a candidate to a different workflow stage.
@@ -834,28 +812,6 @@ async def move_candidate(
         db.add(analytics_event)
         await db.commit()
 
-        # Create notifications for all active recruiters
-        try:
-            notification_service = get_notification_service()
-            recruiter_ids = await _get_active_recruiters_to_notify(db)
-
-            for recipient_id in recruiter_ids:
-                await notification_service.create_notification(
-                    db=db,
-                    recipient_id=recipient_id,
-                    notification_type=NotificationType.CANDIDATE_STAGE_CHANGED,
-                    title=f"Candidate Moved to {new_stage_name}",
-                    message=f"Candidate '{resume.filename}' has been moved from '{previous_stage}' to '{new_stage_name}'",
-                    candidate_id=candidate_uuid,
-                    vacancy_id=vacancy_uuid,
-                    action_url=f"/candidates/{candidate_id}",
-                    check_preferences=True,
-                    aggregate=False,
-                )
-        except Exception as e:
-            # Don't fail the request if notification creation fails
-            logger.error(f"Error creating notification for stage change: {e}", exc_info=True)
-
         logger.info(
             f"Candidate {candidate_id} moved from {previous_stage} to {new_stage_name}"
         )
@@ -891,6 +847,7 @@ async def bulk_move_candidates(
     request: Request,
     bulk_data: BulkMoveCandidatesRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Bulk move multiple candidates to a different workflow stage.
@@ -1058,28 +1015,6 @@ async def bulk_move_candidates(
                 db.add(analytics_event)
                 await db.commit()
 
-                # Create notifications for all active recruiters
-                try:
-                    notification_service = get_notification_service()
-                    recruiter_ids = await _get_active_recruiters_to_notify(db)
-
-                    for recipient_id in recruiter_ids:
-                        await notification_service.create_notification(
-                            db=db,
-                            recipient_id=recipient_id,
-                            notification_type=NotificationType.CANDIDATE_STAGE_CHANGED,
-                            title=f"Candidate Moved to {new_stage_name}",
-                            message=f"Candidate '{resume.filename}' has been moved from '{previous_stage}' to '{new_stage_name}'",
-                            candidate_id=candidate_uuid,
-                            vacancy_id=vacancy_uuid,
-                            action_url=f"/candidates/{candidate_id}",
-                            check_preferences=True,
-                            aggregate=True,
-                        )
-                except Exception as e:
-                    # Don't fail the request if notification creation fails
-                    logger.error(f"Error creating notification for bulk stage change: {e}", exc_info=True)
-
                 results.append({
                     "resume_id": resume_id,
                     "success": True,
@@ -1135,6 +1070,7 @@ async def get_candidates_for_vacancy(
     vacancy_id: str,
     limit: int = Query(50, ge=1, le=200, description="Maximum candidates to return"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get ranked candidates for a specific vacancy.
@@ -1246,6 +1182,7 @@ async def get_stage_metrics(
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get stage metrics including time in stage and drop-off rates.
@@ -1544,6 +1481,7 @@ async def bulk_action(
     request: Request,
     bulk_data: BulkActionRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Perform bulk actions on search results.
@@ -1690,27 +1628,6 @@ async def bulk_action(
                     )
                     db.add(activity)
                     await db.commit()
-
-                    # Create notifications for all active recruiters
-                    try:
-                        notification_service = get_notification_service()
-                        recruiter_ids = await _get_active_recruiters_to_notify(db)
-
-                        for recipient_id in recruiter_ids:
-                            await notification_service.create_notification(
-                                db=db,
-                                recipient_id=recipient_id,
-                                notification_type=NotificationType.CANDIDATE_TAG_ADDED,
-                                title=f"Tag Added to Candidate",
-                                message=f"Tag '{bulk_data.tag_name}' was added to candidate '{resume.filename}'",
-                                candidate_id=candidate_uuid,
-                                action_url=f"/candidates/{candidate_id}",
-                                check_preferences=True,
-                                aggregate=True,
-                            )
-                    except Exception as e:
-                        # Don't fail the request if notification creation fails
-                        logger.error(f"Error creating notification for tag addition: {e}", exc_info=True)
 
                     results.append({
                         "resume_id": resume_id,
@@ -1862,28 +1779,6 @@ async def bulk_action(
                     )
                     db.add(analytics_event)
                     await db.commit()
-
-                    # Create notifications for all active recruiters
-                    try:
-                        notification_service = get_notification_service()
-                        recruiter_ids = await _get_active_recruiters_to_notify(db)
-
-                        for recipient_id in recruiter_ids:
-                            await notification_service.create_notification(
-                                db=db,
-                                recipient_id=recipient_id,
-                                notification_type=NotificationType.CANDIDATE_STAGE_CHANGED,
-                                title=f"Candidate Added to Pipeline",
-                                message=f"Candidate '{resume.filename}' has been added to '{new_stage_name}' stage",
-                                candidate_id=candidate_uuid,
-                                vacancy_id=vacancy_uuid,
-                                action_url=f"/candidates/{candidate_id}",
-                                check_preferences=True,
-                                aggregate=True,
-                            )
-                    except Exception as e:
-                        # Don't fail the request if notification creation fails
-                        logger.error(f"Error creating notification for add to pipeline: {e}", exc_info=True)
 
                     results.append({
                         "resume_id": resume_id,

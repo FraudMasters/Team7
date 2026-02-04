@@ -11,8 +11,8 @@ import {
   Select,
   MenuItem,
   InputLabel,
-} from '@mui/material';
-import { Search as SearchIcon, WorkOutline as WorkIcon } from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
 import { useApplications } from '../../hooks/useApplications';
 import { ApplicationCard } from '../../components/jobs/ApplicationCard';
 import { PageTransition } from '../../components/ui/PageTransition';
@@ -49,7 +49,7 @@ export function MyApplicationsPage() {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           My Applications
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           Track your job application progress
         </Typography>
       </Box>
@@ -69,8 +69,8 @@ export function MyApplicationsPage() {
           placeholder="Search applications..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+          inputProps={{
+            startAdornment: <Icon name="search" size={20} color="secondary" sx={{ mr: 1 }} />,
           }}
           sx={{ flexGrow: 1, minWidth: 200 }}
         />
@@ -90,8 +90,8 @@ export function MyApplicationsPage() {
           </Select>
         </FormControl>
         <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <WorkIcon color="primary" />
-          <Typography variant="body2" color="text.secondary">
+          <Icon name="briefcase" size={20} color="primary" />
+          <Typography variant="body2" color="secondary">
             {data?.total || 0} total
           </Typography>
         </Box>
@@ -101,7 +101,7 @@ export function MyApplicationsPage() {
       {data && data.applications.length > 0 && (
         <Paper sx={{ p: 2, mb: 4 }}>
           <Stack direction="row" spacing={2} flexWrap="wrap">
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="secondary">
               Summary:
             </Typography>
             <Typography variant="body2" sx={{ minWidth: 80 }}>
@@ -134,11 +134,11 @@ export function MyApplicationsPage() {
         />
       ) : filteredApplications.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <WorkIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Icon name="briefcase" size={64} color="secondary" sx={{ mb: 2 }} />
+          <Typography variant="h6" color="secondary" gutterBottom>
             {searchTerm || filters.status ? 'No applications match your search' : 'No applications yet'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             {searchTerm || filters.status
               ? 'Try adjusting your search terms'
               : 'Start applying to jobs to track them here'}
@@ -148,7 +148,7 @@ export function MyApplicationsPage() {
               variant="body2"
               color="primary"
               sx={{ cursor: 'pointer', textDecoration: 'underline' }}
-              component="a"
+              as="a"
               href="/jobs"
             >
               Browse Jobs

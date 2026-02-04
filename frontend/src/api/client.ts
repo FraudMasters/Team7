@@ -4,7 +4,7 @@
  * This module provides a typed Axios client for communicating with the
  * backend resume analysis service. Handles resume upload, analysis,
  * job matching, skill taxonomies, custom synonyms, feedback, model versions,
- * resume comparisons, LinkedIn integration, and health check endpoints.
+ * resume comparisons, and health check endpoints.
  *
  * @example
  * ```ts
@@ -36,12 +36,6 @@
  *   match_id: 'match123',
  *   skill: 'React',
  *   was_correct: true,
- * });
- *
- * // LinkedIn integration
- * const auth = await apiClient.getLinkedInAuthUrl();
- * const profile = await apiClient.importLinkedInProfile({
- *   linkedin_url: 'https://www.linkedin.com/in/johndoe'
  * });
  * ```
  */
@@ -119,14 +113,6 @@ import type {
   CandidateListItem,
   MoveCandidateRequest,
   MoveCandidateResponse,
-  LinkedInAuthUrlRequest,
-  LinkedInAuthUrlResponse,
-  LinkedInCallbackRequest,
-  LinkedInCallbackResponse,
-  LinkedInProfileImportRequest,
-  LinkedInProfileImportResponse,
-  LinkedInSearchResponse,
-  LinkedInImportHistoryResponse,
 } from '@/types/api';
 
 /**
@@ -2151,217 +2137,6 @@ export class ApiClient {
       throw this.transformError(error);
     }
   }
-
-  // ==================== LinkedIn Integration ====================
-
-  /**
-   * Generate LinkedIn OAuth 2.0 authorization URL
-   *
-   * This endpoint generates a LinkedIn authorization URL that users should be
-   * redirected to for granting permission to access their LinkedIn profile.
-   *
-   * @param scopes - Optional list of OAuth scopes to request
-   * @param forceLogin - Force user to re-login even if already authenticated
-   * @returns Authorization URL and state parameter
-   * @throws ApiError if URL generation fails
-   *
-   * @example
-   * ```ts
-   * const auth = await apiClient.getLinkedInAuthUrl();
-   * // Redirect user to auth.auth_url
-   * // Store auth.state for callback verification
-   * ```
-   *
-   * @example
-   * ```ts
-   * const auth = await apiClient.getLinkedInAuthUrl(
-   *   ['r_liteprofile', 'r_emailaddress'],
-   *   true
-   * );
-   * ```
-   */
-  async getLinkedInAuthUrl(
-    scopes?: string[],
-    forceLogin: boolean = false
-  ): Promise<LinkedInAuthUrlResponse> {
-    try {
-      const params: Record<string, string | boolean> = {};
-      if (scopes && scopes.length > 0) {
-        params.scopes = scopes.join(',');
-      }
-      if (forceLogin) {
-        params.force_login = true;
-      }
-
-      const response: AxiosResponse<LinkedInAuthUrlResponse> = await this.client.get(
-        '/api/linkedin/auth/url',
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Process LinkedIn OAuth callback and exchange code for access token
-   *
-   * This endpoint handles the callback from LinkedIn after user authorization.
-   * It exchanges the authorization code for an access token.
-   *
-   * @param request - Callback data including code and state parameters
-   * @returns Access token information
-   * @throws ApiError if token exchange fails
-   *
-   * @example
-   * ```ts
-   * const token = await apiClient.processLinkedInCallback({
-   *   code: 'authorization-code-from-linkedin',
-   *   state: 'state-from-auth-url-step'
-   * });
-   * console.log(token.access_token);
-   * ```
-   */
-  async processLinkedInCallback(
-    request: LinkedInCallbackRequest
-  ): Promise<LinkedInCallbackResponse> {
-    try {
-      const response: AxiosResponse<LinkedInCallbackResponse> = await this.client.post(
-        '/api/linkedin/auth/callback',
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Import a LinkedIn profile into AgentHR
-   *
-   * Fetches profile data from LinkedIn and creates a resume record
-   * with the imported information. The profile is automatically analyzed and scored.
-   *
-   * @param request - Profile import data (URL or profile ID)
-   * @returns Import status and profile/resume IDs
-   * @throws ApiError if import fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.importLinkedInProfile({
-   *   linkedin_url: 'https://www.linkedin.com/in/johndoe'
-   * });
-   * console.log(result.resume_id);
-   * ```
-   */
-  async importLinkedInProfile(
-    request: LinkedInProfileImportRequest
-  ): Promise<LinkedInProfileImportResponse> {
-    try {
-      const response: AxiosResponse<LinkedInProfileImportResponse> = await this.client.post(
-        '/api/linkedin/import',
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Search for candidates on LinkedIn
-   *
-   * Searches LinkedIn for candidates matching the specified criteria.
-   * Results can be imported directly into AgentHR.
-   *
-   * @param keywords - Optional search keywords
-   * @param skills - Optional list of required skills
-   * @param location - Optional location filter
-   * @param industry - Optional industry filter
-   * @param experienceLevel - Optional experience level filter
-   * @param limit - Maximum results to return (1-50, default 10)
-   * @returns Search results
-   * @throws ApiError if search fails
-   *
-   * @example
-   * ```ts
-   * const results = await apiClient.searchLinkedInProfiles({
-   *   keywords: 'software engineer',
-   *   skills: ['python', 'react'],
-   *   location: 'San Francisco',
-   *   limit: 20
-   * });
-   * ```
-   */
-  async searchLinkedInProfiles(
-    keywords?: string,
-    skills?: string[],
-    location?: string,
-    industry?: string,
-    experienceLevel?: string,
-    limit: number = 10
-  ): Promise<LinkedInSearchResponse> {
-    try {
-      const params: Record<string, string | number> = {};
-      if (keywords) params.keywords = keywords;
-      if (skills && skills.length > 0) {
-        params.skills = skills.join(',');
-      }
-      if (location) params.location = location;
-      if (industry) params.industry = industry;
-      if (experienceLevel) params.experience_level = experienceLevel;
-      if (limit !== 10) params.limit = limit;
-
-      const response: AxiosResponse<LinkedInSearchResponse> = await this.client.get(
-        '/api/linkedin/search',
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Get LinkedIn import history
-   *
-   * Returns a paginated list of all LinkedIn profiles that have been imported,
-   * including timestamps and status information.
-   *
-   * @param skip - Number of records to skip (default: 0)
-   * @param limit - Maximum records to return (default: 100, max: 500)
-   * @returns Import history with total count and paginated results
-   * @throws ApiError if history retrieval fails
-   *
-   * @example
-   * ```ts
-   * // Get first 50 import records
-   * const history = await apiClient.getLinkedInImportHistory(0, 50);
-   * console.log(history.total_imports);
-   * ```
-   *
-   * @example
-   * ```ts
-   * // Get next page with pagination
-   * const history = await apiClient.getLinkedInImportHistory(50, 50);
-   * ```
-   */
-  async getLinkedInImportHistory(
-    skip: number = 0,
-    limit: number = 100
-  ): Promise<LinkedInImportHistoryResponse> {
-    try {
-      const params: Record<string, number> = { skip, limit };
-
-      const response: AxiosResponse<LinkedInImportHistoryResponse> = await this.client.get(
-        '/api/linkedin/history',
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 }
 
 // Extend AxiosRequestConfig to include metadata
@@ -2380,6 +2155,205 @@ declare module 'axios' {
  * Use this singleton instance for all API calls.
  */
 export const apiClient = new ApiClient();
+
+// ==================== React Query Integration ====================
+
+/**
+ * React Query integration utilities
+ *
+ * Provides query key factories and fetcher functions for seamless
+ * integration with @tanstack/react-query for offline-enabled data fetching.
+ *
+ * @example
+ * ```tsx
+ * import { useQuery } from '@tanstack/react-query';
+ * import { queryKeys, fetchers } from '@/api/client';
+ *
+ * function CandidateList() {
+ *   const { data, isLoading, error } = useQuery({
+ *     queryKey: queryKeys.candidates.all(),
+ *     queryFn: fetchers.listCandidates,
+ *   });
+ *
+ *   if (isLoading) return <div>Loading...</div>;
+ *   if (error) return <div>Error: {error.message}</div>;
+ *   return <div>{data?.map(c => <div key={c.id}>{c.name}</div>)}</div>;
+ * }
+ * ```
+ */
+
+/**
+ * Query key factories for React Query
+ *
+ * Provides consistent query keys for cache invalidation and refetching.
+ */
+export const queryKeys = {
+  /**
+   * Candidate query keys
+   */
+  candidates: {
+    /**
+     * All candidates query key
+     * @param filters - Optional filters object
+     * @returns Query key array
+     *
+     * @example
+     * ```ts
+     * queryKey: queryKeys.candidates.all({ stage: 'interview' })
+     * ```
+     */
+    all: (filters?: { stage?: string; vacancy?: string }) =>
+      ['candidates', 'list', filters] as const,
+
+    /**
+     * Single candidate query key
+     * @param id - Candidate ID
+     * @returns Query key array
+     *
+     * @example
+     * ```ts
+     * queryKey: queryKeys.candidates.detail('candidate-123')
+     * ```
+     */
+    detail: (id: string) => ['candidates', 'detail', id] as const,
+  },
+
+  /**
+   * Resume query keys
+   */
+  resumes: {
+    /**
+     * All resumes query key
+     * @param params - Optional query parameters
+     * @returns Query key array
+     *
+     * @example
+     * ```ts
+     * queryKey: queryKeys.resumes.all({ limit: 100 })
+     * ```
+     */
+    all: (params?: { limit?: number; skip?: number }) =>
+      ['resumes', 'list', params] as const,
+
+    /**
+     * Single resume query key
+     * @param id - Resume ID
+     * @returns Query key array
+     *
+     * @example
+     * ```ts
+     * queryKey: queryKeys.resumes.detail('resume-123')
+     * ```
+     */
+    detail: (id: string) => ['resumes', 'detail', id] as const,
+  },
+
+  /**
+   * Workflow stages query keys
+   */
+  workflowStages: {
+    /**
+     * All workflow stages query key
+     * @param filters - Optional filters
+     * @returns Query key array
+     *
+     * @example
+     * ```ts
+     * queryKey: queryKeys.workflowStages.all({ organizationId: 'org-123' })
+     * ```
+     */
+    all: (filters?: { organizationId?: string; isActive?: boolean }) =>
+      ['workflow-stages', 'list', filters] as const,
+
+    /**
+     * Single workflow stage query key
+     * @param stageId - Stage ID
+     * @returns Query key array
+     *
+     * @example
+     * ```ts
+     * queryKey: queryKeys.workflowStages.detail('stage-123')
+     * ```
+     */
+    detail: (stageId: string) => ['workflow-stages', 'detail', stageId] as const,
+  },
+};
+
+/**
+ * Query fetcher functions for React Query
+ *
+ * Provides typed fetcher functions that work with the API client.
+ */
+export const fetchers = {
+  /**
+   * Fetch all candidates
+   * @param params - Query parameters
+   * @returns Promise resolving to candidate list
+   *
+   * @example
+   * ```ts
+   * const { data } = useQuery({
+   *   queryKey: queryKeys.candidates.all(),
+   *   queryFn: () => fetchers.listCandidates({ stage: 'interview' }),
+   * });
+   * ```
+   */
+  listCandidates: (params?: {
+    stageId?: string;
+    vacancyId?: string;
+    skip?: number;
+    limit?: number;
+  }) => apiClient.listCandidates(params?.stageId, params?.vacancyId, params?.skip, params?.limit),
+
+  /**
+   * Fetch single candidate by ID
+   * @param id - Candidate ID
+   * @returns Promise resolving to candidate details
+   *
+   * @example
+   * ```ts
+   * const { data } = useQuery({
+   *   queryKey: queryKeys.candidates.detail('candidate-123'),
+   *   queryFn: () => fetchers.getCandidate('candidate-123'),
+   * });
+   * ```
+   */
+  getCandidate: (id: string) => apiClient.getCandidate(id),
+
+  /**
+   * Fetch all workflow stages
+   * @param params - Query parameters
+   * @returns Promise resolving to workflow stages list
+   *
+   * @example
+   * ```ts
+   * const { data } = useQuery({
+   *   queryKey: queryKeys.workflowStages.all({ organizationId: 'org-123' }),
+   *   queryFn: () => fetchers.listWorkflowStages('org-123', true),
+   * });
+   * ```
+   */
+  listWorkflowStages: (
+    organizationId?: string,
+    isActive?: boolean,
+    isDefault?: boolean
+  ) => apiClient.listWorkflowStages(organizationId, isActive, isDefault),
+
+  /**
+   * Fetch single workflow stage by ID
+   * @param stageId - Stage ID
+   * @returns Promise resolving to workflow stage details
+   *
+   * @example
+   * ```ts
+   * const { data } = useQuery({
+   *   queryKey: queryKeys.workflowStages.detail('stage-123'),
+   *   queryFn: () => fetchers.getWorkflowStage('stage-123'),
+   * });
+   * ```
+   */
+  getWorkflowStage: (stageId: string) => apiClient.getWorkflowStage(stageId),
+};
 
 /**
  * Export API client class for custom instances

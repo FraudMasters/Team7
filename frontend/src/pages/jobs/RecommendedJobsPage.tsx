@@ -8,12 +8,8 @@ import {
   Chip,
   Button,
   CircularProgress,
-} from '@mui/material';
-import {
-  Recommend as RecommendIcon,
-  AutoAwesome as AIIcon,
-  TrendingUp as TrendingUpIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 import { JobCard } from '../../components/jobs/JobCard';

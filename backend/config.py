@@ -34,10 +34,6 @@ class Settings(BaseSettings):
         celery_result_backend: Celery result backend URL
         backup_retention_days: Default backup retention period in days
         audit_log_retention_days: Default audit log retention period in days
-        linkedin_client_id: LinkedIn OAuth 2.0 client ID
-        linkedin_client_secret: LinkedIn OAuth 2.0 client secret
-        linkedin_redirect_uri: LinkedIn OAuth 2.0 redirect URI
-        linkedin_api_version: LinkedIn API version
     """
 
     model_config = SettingsConfigDict(
@@ -203,31 +199,30 @@ class Settings(BaseSettings):
     )
 
     # ==============================================
-    # LinkedIn Integration Configuration
+    # JWT Configuration for Authentication
     # ==============================================
-    linkedin_client_id: Optional[str] = Field(
-        default=None,
-        description="LinkedIn OAuth 2.0 client ID",
+    secret_key: str = Field(
+        default="change-this-secret-key-in-production",
+        description="Secret key for JWT token signing (CHANGE IN PRODUCTION)",
     )
 
-    linkedin_client_secret: Optional[str] = Field(
-        default=None,
-        description="LinkedIn OAuth 2.0 client secret",
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT algorithm for token signing",
     )
 
-    linkedin_redirect_uri: str = Field(
-        default="http://localhost:8000/api/v1/linkedin/callback",
-        description="LinkedIn OAuth 2.0 redirect URI",
+    access_token_expire_minutes: int = Field(
+        default=30,
+        ge=5,
+        le=1440,
+        description="Access token expiration time in minutes",
     )
 
-    linkedin_api_version: str = Field(
-        default="v2",
-        description="LinkedIn API version",
-    )
-
-    linkedin_token_encryption_key: Optional[str] = Field(
-        default=None,
-        description="Fernet encryption key for LinkedIn OAuth tokens (32 bytes, URL-safe base64-encoded)",
+    refresh_token_expire_days: int = Field(
+        default=7,
+        ge=1,
+        le=30,
+        description="Refresh token expiration time in days",
     )
 
     # ==============================================

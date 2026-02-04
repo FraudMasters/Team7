@@ -6,16 +6,20 @@ This module provides endpoints for:
 - Filtering candidates by skills, experience, education, location, languages
 - Range filters for experience years, match score, and date ranges
 - Sorting by relevance, date, or experience
+- Semantic search using vector embeddings for enhanced relevance
 - Search history tracking and retrieval
 
 Leverages PostgreSQL full-text search for fast, flexible queries.
 """
+import csv
+import io
+import json
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +42,7 @@ class SearchRequest(BaseModel):
     skip: int = Field(0, ge=0, description="Number of results to skip (pagination)")
     limit: int = Field(100, ge=1, le=200, description="Maximum number of results to return")
     sort_by: str = Field("relevance", description="Sort field: relevance, date, or experience")
+    use_semantic_search: Optional[bool] = Field(None, description="Enable semantic similarity search using vector embeddings")
 
 
 class FilterRequest(BaseModel):
@@ -86,6 +91,8 @@ class SearchResponse(BaseModel):
     execution_time_seconds: float = Field(..., description="Time taken to execute search")
     skip: int = Field(..., description="Number of results skipped")
     limit: int = Field(..., description="Maximum number of results returned")
+    semantic_search_enabled: Optional[bool] = Field(None, description="Whether semantic search was enabled")
+    avg_semantic_score: Optional[float] = Field(None, description="Average semantic similarity score (0-1)")
 
 
 class SearchHistoryItem(BaseModel):
@@ -127,6 +134,7 @@ async def search_candidates(
     - Multi-field filtering: skills, experience, education, location, languages
     - Range filters: experience years, match score, date ranges
     - Flexible sorting by relevance, date, or experience
+    - Semantic search using vector embeddings for enhanced relevance
 
     Examples of boolean search queries:
     - "Python AND Django" - Candidates with both Python and Django
@@ -173,12 +181,23 @@ async def search_candidates(
         ...     "http://localhost:8000/api/search/candidates",
         ...     json=data
         ... )
+        >>> # Search with semantic search enabled
+        >>> data = {
+        ...     "query": "Python developer",
+        ...     "use_semantic_search": True,
+        ...     "limit": 5
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/search/candidates",
+        ...     json=data
+        ... )
     """
     try:
         logger.info(
             f"Searching candidates - query: {search_data.query}, "
             f"filters: {search_data.filters}, skip: {search_data.skip}, "
-            f"limit: {search_data.limit}, sort_by: {search_data.sort_by}"
+            f"limit: {search_data.limit}, sort_by: {search_data.sort_by}, "
+            f"use_semantic_search: {search_data.use_semantic_search}"
         )
 
         # Get search service
@@ -200,7 +219,11 @@ async def search_candidates(
                 date_to=search_data.filters.get("date_to"),
                 vacancy_id=search_data.filters.get("vacancy_id"),
                 stage_id=search_data.filters.get("stage_id"),
+                use_semantic_search=search_data.use_semantic_search,
             )
+        elif search_data.use_semantic_search is not None:
+            # Create filters with just use_semantic_search if no other filters
+            filters = SearchFilters(use_semantic_search=search_data.use_semantic_search)
 
         # Execute search
         result = await search_service.search_candidates(
@@ -215,6 +238,8 @@ async def search_candidates(
             f"Search completed: {result.total} total candidates, "
             f"returned {len(result.candidates)} results in "
             f"{result.execution_time_seconds:.3f}s"
+            + (f", semantic search: {result.avg_semantic_score:.3f} avg score"
+               if result.semantic_search_enabled else "")
         )
 
         return JSONResponse(
@@ -227,6 +252,8 @@ async def search_candidates(
                 "execution_time_seconds": result.execution_time_seconds,
                 "skip": search_data.skip,
                 "limit": search_data.limit,
+                "semantic_search_enabled": result.semantic_search_enabled,
+                "avg_semantic_score": result.avg_semantic_score,
             },
         )
 
@@ -267,6 +294,7 @@ async def search_candidates_get(
     skip: int = Query(0, ge=0, description="Number of results to skip"),
     limit: int = Query(100, ge=1, le=200, description="Maximum number of results"),
     sort_by: str = Query("relevance", description="Sort field: relevance, date, or experience"),
+    use_semantic_search: Optional[bool] = Query(None, description="Enable semantic similarity search"),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
@@ -293,6 +321,7 @@ async def search_candidates_get(
         skip: Number of results to skip (pagination)
         limit: Maximum number of results to return
         sort_by: Sort field (relevance, date, experience)
+        use_semantic_search: Enable semantic similarity search
         db: Database session
 
     Returns:
@@ -325,6 +354,11 @@ async def search_candidates_get(
         ...         "skills": "Python, FastAPI, PostgreSQL",
         ...         "min_experience_years": 3
         ...     }
+        ... )
+        >>> # Search with semantic search enabled
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/search/candidates",
+        ...     params={"query": "Python developer", "use_semantic_search": True}
         ... )
     """
     try:
@@ -363,6 +397,8 @@ async def search_candidates_get(
             filters_dict["vacancy_id"] = vacancy_id
         if stage_id:
             filters_dict["stage_id"] = stage_id
+        if use_semantic_search is not None:
+            filters_dict["use_semantic_search"] = use_semantic_search
 
         filters = SearchFilters(**filters_dict) if filters_dict else None
 
@@ -378,6 +414,8 @@ async def search_candidates_get(
         logger.info(
             f"GET search completed: {result.total} total, "
             f"returned {len(result.candidates)} results"
+            + (f", semantic search: {result.avg_semantic_score:.3f} avg score"
+               if result.semantic_search_enabled else "")
         )
 
         return JSONResponse(
@@ -390,6 +428,8 @@ async def search_candidates_get(
                 "execution_time_seconds": result.execution_time_seconds,
                 "skip": skip,
                 "limit": limit,
+                "semantic_search_enabled": result.semantic_search_enabled,
+                "avg_semantic_score": result.avg_semantic_score,
             },
         )
 
@@ -404,6 +444,184 @@ async def search_candidates_get(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/export",
+    tags=["Search"],
+)
+async def export_candidates(
+    request: Request,
+    search_data: SearchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export candidate search results to CSV format.
+
+    This endpoint performs the same search as the /candidates endpoint but
+    returns the results as a downloadable CSV file instead of JSON. Useful for
+    generating reports, sharing candidate lists, or further data analysis.
+
+    The CSV file includes all candidate information: ID, filename, status,
+    timestamps, workflow stage, skills, experience, education, language, and quality score.
+
+    Args:
+        request: FastAPI request object
+        search_data: Search request with query, filters, pagination, and sorting
+        db: Database session
+
+    Returns:
+        StreamingResponse with CSV file download
+
+    Raises:
+        HTTPException(400): If filter parameters are invalid
+        HTTPException(404): If no results found for the search criteria
+        HTTPException(500): If export fails
+
+    Examples:
+        >>> import requests
+        >>> # Export search results with query
+        >>> data = {
+        ...     "query": "Python AND Django",
+        ...     "limit": 100
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/search/export",
+        ...     json=data
+        ... )
+        >>> with open("candidates.csv", "wb") as f:
+        ...     f.write(response.content)
+        >>> # Export filtered results
+        >>> data = {
+        ...     "filters": {
+        ...         "skills": ["Python", "FastAPI"],
+        ...         "min_experience_years": 5,
+        ...         "location": "Remote"
+        ...     },
+        ...     "limit": 50
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/search/export",
+        ...     json=data
+        ... )
+    """
+    try:
+        logger.info(
+            f"Exporting candidates - query: {search_data.query}, "
+            f"filters: {search_data.filters}, limit: {search_data.limit}, "
+            f"sort_by: {search_data.sort_by}"
+        )
+
+        # Get search service
+        search_service = get_search_service(db)
+
+        # Build SearchFilters from request data
+        filters = None
+        if search_data.filters:
+            filters = SearchFilters(
+                skills=search_data.filters.get("skills"),
+                min_experience_years=search_data.filters.get("min_experience_years"),
+                max_experience_years=search_data.filters.get("max_experience_years"),
+                location=search_data.filters.get("location"),
+                education_level=search_data.filters.get("education_level"),
+                languages=search_data.filters.get("languages"),
+                min_match_score=search_data.filters.get("min_match_score"),
+                max_match_score=search_data.filters.get("max_match_score"),
+                date_from=search_data.filters.get("date_from"),
+                date_to=search_data.filters.get("date_to"),
+                vacancy_id=search_data.filters.get("vacancy_id"),
+                stage_id=search_data.filters.get("stage_id"),
+                use_semantic_search=search_data.use_semantic_search,
+            )
+        elif search_data.use_semantic_search is not None:
+            # Create filters with just use_semantic_search if no other filters
+            filters = SearchFilters(use_semantic_search=search_data.use_semantic_search)
+
+        # Execute search
+        result = await search_service.search_candidates(
+            query=search_data.query,
+            filters=filters,
+            skip=0,  # Always start from 0 for exports
+            limit=search_data.limit,
+            sort_by=search_data.sort_by,
+        )
+
+        if not result.candidates:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No candidates found matching the search criteria",
+            )
+
+        logger.info(f"Exporting {len(result.candidates)} candidates to CSV")
+
+        # Generate CSV
+        output = io.StringIO()
+
+        # Define CSV fieldnames - use all candidate fields
+        fieldnames = [
+            "id",
+            "filename",
+            "status",
+            "created_at",
+            "updated_at",
+            "current_stage",
+            "vacancy_id",
+            "skills",
+            "total_experience_months",
+            "experience_years",
+            "education",
+            "language",
+            "quality_score",
+        ]
+
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Write candidate data
+        for candidate in result.candidates:
+            # Convert complex fields to JSON strings for CSV
+            row = {
+                "id": candidate.get("id", ""),
+                "filename": candidate.get("filename", ""),
+                "status": candidate.get("status", ""),
+                "created_at": candidate.get("created_at", ""),
+                "updated_at": candidate.get("updated_at", ""),
+                "current_stage": candidate.get("current_stage", ""),
+                "vacancy_id": candidate.get("vacancy_id", ""),
+                "skills": json.dumps(candidate.get("skills", []), ensure_ascii=False),
+                "total_experience_months": candidate.get("total_experience_months", ""),
+                "experience_years": candidate.get("experience_years", ""),
+                "education": json.dumps(candidate.get("education", []), ensure_ascii=False),
+                "language": candidate.get("language", ""),
+                "quality_score": candidate.get("quality_score", ""),
+            }
+            writer.writerow(row)
+
+        csv_data = output.getvalue()
+
+        # Generate filename based on query
+        query_str = search_data.query or "all"
+        # Sanitize query string for filename
+        query_str = "".join(c if c.isalnum() or c in (" ", "-", "_") else "_" for c in query_str)
+        query_str = query_str[:50]  # Limit length
+        filename = f"candidates_{query_str}.csv"
+
+        return StreamingResponse(
+            io.BytesIO(csv_data.encode("utf-8")),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting candidates: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export candidates: {str(e)}",
         ) from e
 
 

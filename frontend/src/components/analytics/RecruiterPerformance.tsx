@@ -16,17 +16,8 @@ import {
   Stack,
   Button,
   Avatar,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  Person as PersonIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
-  CheckCircle as CheckIcon,
-  Star as StarIcon,
-  Description as DescriptionIcon,
-  FileDownload as FileDownloadIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Individual recruiter performance metrics

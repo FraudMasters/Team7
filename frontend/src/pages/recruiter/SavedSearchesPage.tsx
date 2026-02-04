@@ -12,7 +12,7 @@ import {
   Typography,
   Button,
   Stack,
-  Grid2,
+  Grid,
   Paper,
   IconButton,
   Dialog,
@@ -25,17 +25,11 @@ import {
   CircularProgress,
   Menu,
   MenuItem,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  PlayArrow as RunIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  MoreVert as MoreVertIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { savedSearchesClient } from '../../api/savedSearches';
-import { useBreakpoints } from '../../hooks/useBreakpoints';
+import { useResponsive } from '../../hooks/useResponsive';
 
 interface SavedSearch {
   id: string;
@@ -49,7 +43,7 @@ interface SavedSearch {
 export function SavedSearchesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isMobile } = useBreakpoints();
+  const { isMobile } = useResponsive();
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -211,9 +205,9 @@ export function SavedSearchesPage() {
 
       {/* Saved Searches Grid */}
       {!isLoading && savedSearches.length > 0 && (
-        <Grid2 container spacing={3}>
+        <Grid container spacing={3}>
           {savedSearches.map((search) => (
-            <Grid2 key={search.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+            <Grid key={search.id} xs={12} sm={6} md={4} lg={3}>
               <Paper
                 sx={{
                   p: 3,

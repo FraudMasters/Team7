@@ -24,13 +24,18 @@ import {
   DialogActions,
   Alert,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Save as SaveIcon,
   Close as CloseIcon,
   TrendingUp as TrendingUpIcon,
+  FilterList as FilterIcon,
 } from '@mui/icons-material';
+import MobileSearchBar from '../../components/MobileSearchBar';
+import MobileFilterPanel from '../../components/MobileFilterPanel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { candidateSearchClient } from '../../api/search';
 import { savedSearchesClient } from '../../api/savedSearches';
@@ -53,6 +58,8 @@ export function SearchPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isMobile, isTablet } = useBreakpoints();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
 
   const [searchQuery, setSearchQuery] = useState('');
   const [skillsFilter, setSkillsFilter] = useState('');
@@ -60,6 +67,7 @@ export function SearchPage() {
   const [aiRankingEnabled, setAiRankingEnabled] = useState(true);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // Keyboard shortcuts
   useKeyboardNavigation([
@@ -129,6 +137,18 @@ export function SearchPage() {
     navigate(`/recruiter/candidates/${candidateId}`);
   };
 
+  const handleMobileFilters = (filters: any) => {
+    // Map mobile filter panel results to existing state
+    if (filters.skills && filters.skills.length > 0) {
+      setSkillsFilter(filters.skills.join(','));
+    } else {
+      setSkillsFilter('');
+    }
+    setMinMatchScore([filters.minMatchScore]);
+    setAiRankingEnabled(true);
+    refetch();
+  };
+
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Header */}
@@ -152,99 +172,160 @@ export function SearchPage() {
       </Stack>
 
       {/* Search and Filters */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Grid2 container spacing={3}>
-          {/* Search Input */}
-          <Grid2 size={{ xs: 12, md: 6 }}>
-            <TextField
-              id="search-input"
-              fullWidth
-              placeholder="Search by name, skills, or keywords..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              InputProps={{
-                endAdornment: searchQuery && (
-                  <IconButton onClick={() => setSearchQuery('')} size="small">
-                    <CloseIcon />
-                  </IconButton>
-                ),
-              }}
-              slotProps={{
-                input: {
-                  'aria-label': 'Search candidates',
-                },
-              }}
-            />
-          </Grid2>
+      {isSmallScreen ? (
+        // Mobile Layout
+        <Box sx={{ mb: 3 }}>
+          {/* Mobile Search Bar */}
+          <MobileSearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onSearch={handleSearch}
+            placeholder="Search by name, skills, or keywords..."
+            loading={isLoading}
+            sx={{ mb: 2 }}
+          />
 
-          {/* Skills Filter */}
-          <Grid2 size={{ xs: 12, md: 4 }}>
-            <TextField
-              fullWidth
-              placeholder="Skills (comma-separated)"
-              value={skillsFilter}
-              onChange={(e) => setSkillsFilter(e.target.value)}
-              helperText="e.g., Python, Django, PostgreSQL"
-              slotProps={{
-                input: {
-                  'aria-label': 'Filter by skills',
-                },
-              }}
-            />
-          </Grid2>
+          {/* Mobile Filter Button */}
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<FilterIcon />}
+            onClick={() => setMobileFilterOpen(true)}
+            sx={{
+              mb: 2,
+              minHeight: 48,
+              justifyContent: 'flex-start',
+            }}
+          >
+            Filters {skillsFilter || minMatchScore[0] > 0 ? `(Active)` : ''}
+          </Button>
 
-          {/* Search Button */}
-          <Grid2 size={{ xs: 12, md: 2 }}>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<SearchIcon />}
-              onClick={handleSearch}
-              sx={{ height: '56px' }}
-            >
-              Search
-            </Button>
-          </Grid2>
+          {/* Quick Filters Summary */}
+          {(skillsFilter || minMatchScore[0] > 0) && (
+            <Paper sx={{ p: 2 }}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {skillsFilter && (
+                  <Chip
+                    label={`Skills: ${skillsFilter}`}
+                    onDelete={() => setSkillsFilter('')}
+                    size="small"
+                  />
+                )}
+                {minMatchScore[0] > 0 && (
+                  <Chip
+                    label={`Min Score: ${minMatchScore[0]}%`}
+                    onDelete={() => setMinMatchScore([0])}
+                    size="small"
+                  />
+                )}
+                {aiRankingEnabled && (
+                  <Chip
+                    label="AI Ranking"
+                    icon={<TrendingUpIcon fontSize="small" />}
+                    onDelete={() => setAiRankingEnabled(false)}
+                    size="small"
+                  />
+                )}
+              </Stack>
+            </Paper>
+          )}
+        </Box>
+      ) : (
+        // Desktop Layout
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Grid2 container spacing={3}>
+            {/* Search Input */}
+            <Grid2 size={{ xs: 12, md: 6 }}>
+              <TextField
+                id="search-input"
+                fullWidth
+                placeholder="Search by name, skills, or keywords..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                InputProps={{
+                  endAdornment: searchQuery && (
+                    <IconButton onClick={() => setSearchQuery('')} size="small">
+                      <CloseIcon />
+                    </IconButton>
+                  ),
+                }}
+                slotProps={{
+                  input: {
+                    'aria-label': 'Search candidates',
+                  },
+                }}
+              />
+            </Grid2>
 
-          {/* Match Score Slider */}
-          <Grid2 size={{ xs: 12, md: 6 }}>
-            <Typography variant="body2" gutterBottom>
-              Minimum Match Score: {minMatchScore[0]}%
-            </Typography>
-            <Slider
-              value={minMatchScore}
-              onChange={(_, value) => setMinMatchScore(value as number[])}
-              min={0}
-              max={100}
-              marks={[
-                { value: 0, label: '0%' },
-                { value: 50, label: '50%' },
-                { value: 80, label: '80%' },
-                { value: 100, label: '100%' },
-              ]}
-              valueLabelDisplay="auto"
-              aria-label="Minimum match score"
-            />
-          </Grid2>
+            {/* Skills Filter */}
+            <Grid2 size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                placeholder="Skills (comma-separated)"
+                value={skillsFilter}
+                onChange={(e) => setSkillsFilter(e.target.value)}
+                helperText="e.g., Python, Django, PostgreSQL"
+                slotProps={{
+                  input: {
+                    'aria-label': 'Filter by skills',
+                  },
+                }}
+              />
+            </Grid2>
 
-          {/* AI Ranking Toggle */}
-          <Grid2 size={{ xs: 12, md: 6 }}>
-            <Stack direction="row" alignItems="center" justifyContent="flex-end">
-              <Typography variant="body2" sx={{ mr: 2 }}>
-                AI Ranking
-              </Typography>
+            {/* Search Button */}
+            <Grid2 size={{ xs: 12, md: 2 }}>
               <Button
-                variant={aiRankingEnabled ? 'contained' : 'outlined'}
-                startIcon={<TrendingUpIcon />}
-                onClick={() => setAiRankingEnabled(!aiRankingEnabled)}
+                fullWidth
+                variant="contained"
+                startIcon={<SearchIcon />}
+                onClick={handleSearch}
+                sx={{ height: '56px' }}
               >
-                {aiRankingEnabled ? 'Enabled' : 'Disabled'}
+                Search
               </Button>
-            </Stack>
+            </Grid2>
+
+            {/* Match Score Slider */}
+            <Grid2 size={{ xs: 12, md: 6 }}>
+              <Typography variant="body2" gutterBottom>
+                Minimum Match Score: {minMatchScore[0]}%
+              </Typography>
+              <Slider
+                value={minMatchScore}
+                onChange={(_, value) => setMinMatchScore(value as number[])}
+                min={0}
+                max={100}
+                marks={[
+                  { value: 0, label: '0%' },
+                  { value: 50, label: '50%' },
+                  { value: 80, label: '80%' },
+                  { value: 100, label: '100%' },
+                ]}
+                valueLabelDisplay="auto"
+                aria-label="Minimum match score"
+              />
+            </Grid2>
+
+            {/* AI Ranking Toggle */}
+            <Grid2 size={{ xs: 12, md: 6 }}>
+              <Stack direction="row" alignItems="center" justifyContent="flex-end">
+                <Typography variant="body2" sx={{ mr: 2 }}>
+                  AI Ranking
+                </Typography>
+                <Button
+                  variant={aiRankingEnabled ? 'contained' : 'outlined'}
+                  startIcon={<TrendingUpIcon />}
+                  onClick={() => setAiRankingEnabled(!aiRankingEnabled)}
+                >
+                  {aiRankingEnabled ? 'Enabled' : 'Disabled'}
+                </Button>
+              </Stack>
+            </Grid2>
           </Grid2>
-        </Grid2>
-      </Paper>
+        </Paper>
+      )}
 
       {/* Error Alert */}
       {error && (
@@ -283,17 +364,21 @@ export function SearchPage() {
           <CircularProgress />
         </Box>
       ) : candidates.length > 0 ? (
-        <Grid2 container spacing={3}>
+        <Grid2 container spacing={{ xs: 2, sm: 3 }}>
           {candidates.map((candidate) => (
             <Grid2 key={candidate.id} size={{ xs: 12, sm: 6, lg: 4 }}>
               <Paper
                 sx={{
-                  p: 3,
+                  p: { xs: 2, sm: 3 },
                   cursor: 'pointer',
                   transition: 'transform 0.2s, box-shadow 0.2s',
+                  minHeight: { xs: 180, sm: 200 },
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
+                  },
+                  '&:active': {
+                    transform: isMobile ? 'scale(0.98)' : 'translateY(-4px)',
                   },
                 }}
                 onClick={() => handleCandidateClick(candidate.id)}
@@ -308,6 +393,7 @@ export function SearchPage() {
                     label={`${candidate.match_percentage}%`}
                     color={candidate.match_percentage >= 80 ? 'success' : candidate.match_percentage >= 60 ? 'warning' : 'default'}
                     size="small"
+                    sx={{ minHeight: 32, fontSize: '0.875rem' }}
                   />
                   {aiRankingEnabled && candidate.ai_ranking_score && (
                     <Chip
@@ -316,12 +402,13 @@ export function SearchPage() {
                       size="small"
                       color="primary"
                       variant="outlined"
+                      sx={{ minHeight: 32, fontSize: '0.875rem' }}
                     />
                   )}
                 </Stack>
 
                 {/* Candidate Info */}
-                <Typography variant="h6" noWrap sx={{ mb: 1 }}>
+                <Typography variant={isMobile ? 'subtitle1' : 'h6'} noWrap sx={{ mb: 1 }}>
                   {candidate.name || candidate.filename}
                 </Typography>
                 {candidate.email && (
@@ -333,10 +420,20 @@ export function SearchPage() {
                 {/* Skills */}
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 2 }}>
                   {candidate.skills.slice(0, 5).map((skill) => (
-                    <Chip key={skill} label={skill} size="small" variant="outlined" />
+                    <Chip
+                      key={skill}
+                      label={skill}
+                      size="small"
+                      variant="outlined"
+                      sx={{ minHeight: isMobile ? 32 : 24 }}
+                    />
                   ))}
                   {candidate.skills.length > 5 && (
-                    <Chip label={`+${candidate.skills.length - 5}`} size="small" />
+                    <Chip
+                      label={`+${candidate.skills.length - 5}`}
+                      size="small"
+                      sx={{ minHeight: isMobile ? 32 : 24 }}
+                    />
                   )}
                 </Box>
 
@@ -346,7 +443,7 @@ export function SearchPage() {
                     label="TOP"
                     color="primary"
                     size="small"
-                    sx={{ mt: 2 }}
+                    sx={{ mt: 2, minHeight: 32 }}
                   />
                 )}
               </Paper>
@@ -354,8 +451,8 @@ export function SearchPage() {
           ))}
         </Grid2>
       ) : searchQuery || skillsFilter || minMatchScore[0] > 0 ? (
-        <Paper sx={{ p: 8, textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
+        <Paper sx={{ p: { xs: 4, sm: 8 }, textAlign: 'center' }}>
+          <Typography variant={isMobile ? 'body1' : 'h6'} color="text.secondary">
             No candidates found
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -363,9 +460,9 @@ export function SearchPage() {
           </Typography>
         </Paper>
       ) : (
-        <Paper sx={{ p: 8, textAlign: 'center' }}>
-          <SearchIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">
+        <Paper sx={{ p: { xs: 4, sm: 8 }, textAlign: 'center' }}>
+          <SearchIcon sx={{ fontSize: { xs: 48, sm: 64 }, color: 'text.disabled', mb: 2 }} />
+          <Typography variant={isMobile ? 'body1' : 'h6'} color="text.secondary">
             Start your search
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -403,6 +500,20 @@ export function SearchPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Mobile Filter Panel */}
+      {isSmallScreen && (
+        <MobileFilterPanel
+          open={mobileFilterOpen}
+          onClose={() => setMobileFilterOpen(false)}
+          onApplyFilters={handleMobileFilters}
+          defaultFilters={{
+            skills: skillsFilter ? skillsFilter.split(',').map(s => s.trim()) : [],
+            minMatchScore: minMatchScore[0],
+            maxMatchScore: 100,
+          }}
+        />
+      )}
     </Container>
   );
 }

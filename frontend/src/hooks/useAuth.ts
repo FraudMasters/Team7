@@ -1,32 +1,114 @@
-import { useAuthContext } from '../contexts/AuthContext';
-
 /**
- * Re-export auth types for convenience
- */
-export type { User, UserRole, AuthTokens } from '../contexts/AuthContext';
-
-/**
- * Authentication State
+ * useAuth Hook
  *
- * Provides access to authentication state and login/logout functions.
- * This is a convenient hook wrapper around the AuthContext.
+ * A custom hook for accessing authentication state and methods.
+ * Provides a convenient interface for user authentication, login, logout,
+ * registration, and token management.
+ *
+ * @module hooks/useAuth
+ */
+
+import { useAuthContext } from '@/contexts/AuthContext';
+import type { AuthContextValue } from '@/contexts/AuthContext';
+
+/**
+ * useAuth Hook
+ *
+ * Provides access to authentication state and methods.
+ * This is a convenience wrapper around useAuthContext for a cleaner API.
+ * Must be used within an AuthProvider.
+ *
+ * @returns AuthContextValue object with authentication state and methods
+ *
+ * @throws Error if used outside of AuthProvider
  *
  * @example
  * ```tsx
- * const { isAuthenticated, user, login, logout } = useAuth();
+ * function MyComponent() {
+ *   const { user, login, logout, isAuthenticated, isLoading } = useAuth();
  *
- * // Check authentication
- * if (isAuthenticated) {
- *   console.log(`Welcome, ${user?.name}`);
+ *   if (isLoading) {
+ *     return <CircularProgress />;
+ *   }
+ *
+ *   if (isAuthenticated) {
+ *     return (
+ *       <Box>
+ *         <Typography>Welcome, {user?.email}</Typography>
+ *         <Button onClick={logout}>Logout</Button>
+ *       </Box>
+ *     );
+ *   }
+ *
+ *   return <LoginPage />;
  * }
+ * ```
  *
- * // Login
- * await login('user@example.com', 'password');
+ * @example
+ * ```tsx
+ * function LoginForm() {
+ *   const { login, error } = useAuth();
+ *   const [email, setEmail] = useState('');
+ *   const [password, setPassword] = useState('');
  *
- * // Logout
- * logout();
+ *   const handleSubmit = async (e: FormEvent) => {
+ *     e.preventDefault();
+ *     try {
+ *       await login(email, password);
+ *       // Redirect to dashboard
+ *     } catch (err) {
+ *       // Error is already set in auth state
+ *       console.error('Login failed:', error);
+ *     }
+ *   };
+ *
+ *   return (
+ *     <form onSubmit={handleSubmit}>
+ *       {error && <Alert severity="error">{error}</Alert>}
+ *       <TextField
+ *         label="Email"
+ *         value={email}
+ *         onChange={(e) => setEmail(e.target.value)}
+ *       />
+ *       <TextField
+ *         label="Password"
+ *         type="password"
+ *         value={password}
+ *         onChange={(e) => setPassword(e.target.value)}
+ *       />
+ *       <Button type="submit">Login</Button>
+ *     </form>
+ *   );
+ * }
+ * ```
+ *
+ * @example
+ * ```tsx
+ * function ProtectedRoute({ children }: { children: ReactNode }) {
+ *   const { isAuthenticated, isLoading } = useAuth();
+ *
+ *   if (isLoading) {
+ *     return <CircularProgress />;
+ *   }
+ *
+ *   if (!isAuthenticated) {
+ *     return <Navigate to="/login" replace />;
+ *   }
+ *
+ *   return <>{children}</>;
+ * }
  * ```
  */
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   return useAuthContext();
 }
+
+/**
+ * Type export for authentication context value
+ *
+ * @example
+ * ```tsx
+ * type AuthContext = AuthContextValue;
+ * ```
+ */
+export type { AuthContextValue };

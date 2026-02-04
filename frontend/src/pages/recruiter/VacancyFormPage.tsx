@@ -10,17 +10,11 @@ import {
   Stack,
   Grid,
   Chip,
-  IconButton,
   Alert,
   CircularProgress,
   MenuItem,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ArrowBack as ArrowBackIcon,
-  Save as SaveIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 
@@ -153,7 +147,7 @@ export function VacancyFormPage() {
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Button
-        startIcon={<ArrowBackIcon />}
+        startIcon={<Icon name="arrow-left" size={20} />}
         onClick={() => navigate('/recruiter/vacancies')}
         sx={{ mb: 3 }}
       >
@@ -164,7 +158,7 @@ export function VacancyFormPage() {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {isEditing ? 'Edit Vacancy' : 'Create New Vacancy'}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+        <Typography variant="body2" color="secondary" sx={{ mb: 4 }}>
           {isEditing ? 'Update vacancy details' : 'Fill in the details to post a new job opening'}
         </Typography>
 
@@ -256,7 +250,7 @@ export function VacancyFormPage() {
                 label="Minimum Salary (USD/year)"
                 value={formData.salary_min || ''}
                 onChange={(e) => handleInputChange('salary_min', parseFloat(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
+                inputProps={{ min: 0 }}
               />
             </Grid>
 
@@ -267,7 +261,7 @@ export function VacancyFormPage() {
                 label="Maximum Salary (USD/year)"
                 value={formData.salary_max || ''}
                 onChange={(e) => handleInputChange('salary_max', parseFloat(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
+                inputProps={{ min: 0 }}
               />
             </Grid>
 
@@ -279,7 +273,7 @@ export function VacancyFormPage() {
                 label="Minimum Experience (months)"
                 value={formData.min_experience_months || ''}
                 onChange={(e) => handleInputChange('min_experience_months', parseFloat(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
+                inputProps={{ min: 0 }}
                 helperText="e.g. 12 for 1 year, 24 for 2 years"
               />
             </Grid>
@@ -295,7 +289,6 @@ export function VacancyFormPage() {
                     key={skill}
                     label={skill}
                     onDelete={() => handleRemoveSkill(skill)}
-                    deleteIcon={<DeleteIcon />}
                     color="primary"
                     variant="outlined"
                   />
@@ -318,7 +311,7 @@ export function VacancyFormPage() {
                 <Button
                   type="button"
                   variant="outlined"
-                  startIcon={<AddIcon />}
+                  startIcon={<Icon name="plus" size={20} />}
                   onClick={handleAddSkill}
                   disabled={!skillInput.trim()}
                 >
@@ -333,7 +326,7 @@ export function VacancyFormPage() {
                 <Button
                   type="submit"
                   variant="contained"
-                  startIcon={<SaveIcon />}
+                  startIcon={<Icon name="save" size={20} />}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {createMutation.isPending || updateMutation.isPending ? (

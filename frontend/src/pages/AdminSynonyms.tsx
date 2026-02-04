@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Typography, Box } from '@mui/material';
+import { Container, Typography, Box } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import CustomSynonymsManager from '@components/CustomSynonymsManager';
 
@@ -21,7 +21,7 @@ const AdminSynonymsPage: React.FC = () => {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {t('adminSynonyms.title')}
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           {t('adminSynonyms.subtitle')}
         </Typography>
       </Box>

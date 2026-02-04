@@ -10,7 +10,6 @@ AI-powered resume analysis system with intelligent job matching, ML-based candid
 - **Recruiter Feedback**: Feedback loop for continuous model improvement
 - **Explainable AI**: Feature importance and ranking factors breakdown
 - **Multi-language**: English and Russian support
-- **Authentication**: Keycloak-based JWT auth with RBAC (Admin, Recruiter, Viewer)
 - **Modern Monitoring**: Grafana + Loki + Promtail + Prometheus stack
 - **Async Processing**: Celery + Redis for background tasks
 - **Modern UI**: React 18 + Material-UI with responsive design
@@ -43,7 +42,6 @@ docker-compose ps
 | Frontend | http://localhost:3000 | - |
 | Backend API | http://localhost:8000 | - |
 | API Docs | http://localhost:8000/docs | - |
-| Keycloak Admin | http://localhost:8080/admin | admin/admin123 |
 | Grafana | http://localhost:3001 | admin/admin |
 | Prometheus | http://localhost:9090 | - |
 | Loki | http://localhost:3100 | - |
@@ -55,6 +53,58 @@ docker-compose ps
 docker-compose exec backend python scripts/reset_and_reload.py
 ```
 
+## Configuration
+
+### Database Connection Pool
+
+The database connection pool can be tuned via environment variables to optimize performance for your workload:
+
+| Environment Variable | Default | Range | Description |
+|---------------------|---------|-------|-------------|
+| `DB_POOL_SIZE` | 10 | 1-100 | Maximum number of persistent connections to maintain |
+| `DB_MAX_OVERFLOW` | 20 | 0-100 | Additional connections allowed beyond pool size during spikes |
+| `DB_POOL_TIMEOUT` | 30 | 1-300 | Seconds to wait before timing out when acquiring a connection |
+| `DB_POOL_RECYCLE` | 3600 | 0-86400 | Seconds before a connection is recycled (default: 1 hour) |
+
+#### Pool Sizing Recommendations
+
+**Small deployments** (single instance, < 100 concurrent users):
+```bash
+DB_POOL_SIZE=5
+DB_MAX_OVERFLOW=10
+```
+
+**Medium deployments** (2-4 instances, 100-500 concurrent users):
+```bash
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+```
+
+**Large deployments** (5+ instances, 500+ concurrent users):
+```bash
+DB_POOL_SIZE=20
+DB_MAX_OVERFLOW=30
+```
+
+#### Tuning Guidelines
+
+1. **Monitor pool metrics** in Grafana: `db_pool_size`, `db_pool_overflow`, `db_pool_checked_out`, `db_pool_available`
+2. **Increase pool size** if you frequently see pool exhaustion errors or high checkout times
+3. **Calculate total capacity**: `pool_size × max_overflow × number_of_app_instances` should not exceed PostgreSQL's `max_connections`
+4. **Set DB_POOL_RECYCLE** to prevent stale connections (default: 3600 seconds is safe for most use cases)
+5. **Connection overhead**: Each connection uses PostgreSQL memory (~1-5MB depending on workload)
+
+#### Example Configuration
+
+Add to your `.env` file:
+```bash
+# Database Pool Configuration
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_TIMEOUT=30
+DB_POOL_RECYCLE=3600
+```
+
 ## Architecture
 
 ```
@@ -62,11 +112,6 @@ docker-compose exec backend python scripts/reset_and_reload.py
 │  Frontend   │─────▶│   Backend    │─────▶│   Database  │
 │ (React+MUI) │      │   (FastAPI)  │      │ (PostgreSQL)│
 └─────────────┘      └──────────────┘      └─────────────┘
-       │                      │                      │
-       │                 ┌────┴────┐                 │
-       └─────────────────▶│Keycloak │◀────────────────┘
-                  (OIDC) │   Auth  │ (JWT Validation)
-                          └─────────┘
                             │
                     ┌───────┴────────────────────────┐
                     ▼                ▼               ▼
@@ -81,102 +126,6 @@ docker-compose exec backend python scripts/reset_and_reload.py
                                     │Grafana │  │ Loki │  │Prometheus│
                                     └────────┘  └──────┘  └─────────┘
 ```
-
-## Authentication
-
-This application uses **Keycloak** for authentication and authorization. Keycloak provides secure identity management with JWT-based stateless authentication and role-based access control (RBAC).
-
-### Default Credentials
-
-- **Admin Console**: http://localhost:8080/admin
-- **Username**: `admin`
-- **Password**: `admin123`
-- **⚠️ Important**: Change the admin password after first login!
-
-### User Roles
-
-The system supports three role levels with different permissions:
-
-| Role | Permissions | Access Level |
-|------|-------------|--------------|
-| **Admin** | Full system access, user management, role assignments | All endpoints and UI routes |
-| **Recruiter** | Access to hiring workflow, candidate ranking, vacancy management | Recruiter endpoints and UI routes |
-| **Viewer** | Read-only access to resumes, vacancies, and analytics | Read-only endpoints and UI routes |
-
-### Authentication Flow
-
-1. **User Login**: Users are redirected to Keycloak for authentication (OIDC Authorization Code flow with PKCE)
-2. **JWT Tokens**: Upon successful authentication, Keycloak issues JWT access tokens and refresh tokens
-3. **Token Validation**: Backend validates JWT tokens on every API request
-4. **Role-Based Access**: User roles are extracted from JWT tokens and enforced on protected endpoints
-5. **Automatic Refresh**: Access tokens are automatically refreshed before expiration
-
-### Email Configuration
-
-For email verification and password reset functionality, configure SMTP settings in `.env`:
-
-```bash
-# Keycloak SMTP Configuration
-KEYCLOAK_SMTP_HOST=smtp.gmail.com
-KEYCLOAK_SMTP_PORT=587
-KEYCLOAK_SMTP_USER=your_email@gmail.com
-KEYCLOAK_SMTP_PASSWORD=your_app_password
-KEYCLOAK_SMTP_FROM=noreply@yourdomain.com
-KEYCLOAK_SMTP_AUTH=true
-KEYCLOAK_SMTP_SSL=false
-KEYCLOAK_SMTP_STARTTLS=true
-```
-
-**For Gmail Users**: Create an App Password in Google Account settings (Security → 2-Step Verification → App passwords).
-
-### First Time Setup
-
-After starting services with `docker-compose up -d`, run the Keycloak setup script:
-
-```bash
-# 1. Wait for Keycloak to be healthy (30-60 seconds)
-curl http://localhost:8080/health/ready
-
-# 2. Run the automated setup script
-bash scripts/setup-keycloak-realm.sh
-
-# 3. Copy the backend client secret and add to .env
-# The script will display something like:
-# Backend Client Secret: <copy-this-secret>
-```
-
-The setup script automatically:
-- Creates the `agenthr` realm
-- Configures frontend (public) and backend (confidential) clients
-- Creates Admin, Recruiter, and Viewer roles
-- Creates a default admin user (admin/admin123)
-
-### API Authentication
-
-To access protected API endpoints, include the JWT token in the Authorization header:
-
-```bash
-# Login to get access token
-TOKEN=$(curl -X POST http://localhost:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin123"}' \
-  | jq -r '.access_token')
-
-# Access protected endpoint
-curl -X GET http://localhost:8000/api/vacancies/ \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Protected Routes
-
-Frontend routes are protected based on user roles:
-
-- **Public Routes**: `/login`, `/register`, `/callback`
-- **Authenticated Routes**: `/dashboard`, `/profile`
-- **Recruiter Routes** (`['Admin', 'Recruiter']`): `/recruiter/*`
-- **Admin Routes** (`['Admin']`): `/admin/*`
-
-Unauthenticated users are redirected to `/login`. Users without required roles see an "Access Denied" page.
 
 ## API Endpoints
 
@@ -372,9 +321,12 @@ docker-compose exec backend python scripts/reset_and_reload.py
 
 ## Documentation
 
+- **[API Usage Guide](docs/API_USAGE_GUIDE.md)** - Comprehensive API documentation with workflow examples
 - [SETUP.md](SETUP.md) - Detailed installation instructions
+- [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Complete environment variables reference
 - [README_RU.md](README_RU.md) - Версия на русском языке
 - [ML_PIPELINE.md](ML_PIPELINE.md) - ML/NLP pipeline details
+- [Dataset Usage Guide](docs/dataset-usage-guide.md) - External dataset integration guide
 
 ## License
 

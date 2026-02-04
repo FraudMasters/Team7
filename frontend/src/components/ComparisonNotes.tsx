@@ -15,17 +15,8 @@ import {
   Collapse,
   Chip,
   Divider,
-} from '@mui/material';
-import {
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  Delete as DeleteIcon,
-  Note as NoteIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  CheckCircle as CheckIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 
 interface ComparisonNotesProps {
@@ -200,12 +191,12 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
           p: 2,
           bgcolor: 'success.50',
           borderLeft: 4,
-          borderColor: 'success.main',
+          borderColor: 'success',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CheckIcon color="success" fontSize="small" />
-          <Typography variant="body2" color="success.main" fontWeight={600}>
+          <Icon name="check-circle" size={16} color="success" />
+          <Typography variant="body2" color="success" fontWeight={600}>
             {t('notes.saved') || 'Note saved'}
           </Typography>
         </Box>
@@ -230,7 +221,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
               '&:hover': { bgcolor: hasNote() ? 'primary.100' : 'action.selected' },
             }}
           >
-            <NoteIcon fontSize="small" />
+            <Icon name="file-text" size={16} />
           </IconButton>
         </Tooltip>
 
@@ -268,7 +259,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <NoteIcon color={hasNote() ? 'primary' : 'action'} />
+            <Icon name="file-text" size={20} color={hasNote() ? 'primary' : 'muted'} />
             <Typography variant="subtitle2" fontWeight={600}>
               {t('notes.title') || 'Recruiter Notes'}
             </Typography>
@@ -292,7 +283,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
                       onClick={() => setExpanded(!expanded)}
                       disabled={disabled}
                     >
-                      {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={20} />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -307,7 +298,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
                       '&:hover': { bgcolor: hasNote() ? 'primary.100' : 'action.selected' },
                     }}
                   >
-                    <EditIcon fontSize="small" />
+                    <Icon name="edit-2" size={16} />
                   </IconButton>
                 </Tooltip>
               </>
@@ -320,14 +311,14 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
           <Collapse in={expanded} timeout="auto" unmountOnExit>
             <Divider sx={{ mb: 2 }} />
             <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
+              <Typography variant="body2" color="secondary" sx={{ whiteSpace: 'pre-wrap' }}>
                 {getNoteForCandidate()}
               </Typography>
               <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                   size="small"
                   color="error"
-                  startIcon={<DeleteIcon />}
+                  startIcon={<Icon name="trash-2" size={16} />}
                   onClick={handleDeleteNote}
                   disabled={disabled || isDeleting}
                 >
@@ -352,7 +343,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
             }}
             onClick={handleStartEdit}
           >
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="secondary">
               {t('notes.empty') || 'Click to add a note about this candidate...'}
             </Typography>
           </Box>
@@ -376,7 +367,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
           <Box>
             <Typography variant="subtitle2" gutterBottom fontWeight={600}>
               {t('notes.yourNote') || 'Your Note'}
-              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              <Typography component="span" variant="caption" color="secondary" sx={{ ml: 1 }}>
                 ({t('notes.aboutCandidate', { name: candidateName || candidateId }) || `About ${candidateName || candidateId}`})
               </Typography>
             </Typography>
@@ -413,7 +404,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
               disabled={isSaving || isDeleting}
               size="small"
               color="inherit"
-              startIcon={<CancelIcon />}
+              startIcon={<Icon name="x" size={16} />}
             >
               {t('notes.cancel') || 'Cancel'}
             </Button>
@@ -423,7 +414,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
                 disabled={isSaving || isDeleting}
                 size="small"
                 color="error"
-                startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+                startIcon={isDeleting ? <CircularProgress size={16} /> : <Icon name="trash-2" size={16} />}
               >
                 {t('notes.delete') || 'Delete'}
               </Button>
@@ -432,7 +423,7 @@ const ComparisonNotes: React.FC<ComparisonNotesProps> = ({
               onClick={handleSaveNote}
               disabled={isSaving || isDeleting}
               variant="contained"
-              startIcon={isSaving ? <CircularProgress size={16} /> : <SaveIcon />}
+              startIcon={isSaving ? <CircularProgress size={16} /> : <Icon name="save" size={16} />}
               size="small"
               color="primary"
             >

@@ -17,16 +17,8 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-} from '@mui/material';
-import {
-  Lightbulb as TipsIcon,
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckIcon,
-  Help as QuestionIcon,
-  RecordVoiceOver as VoiceIcon,
-  Psychology as MindIcon,
-  Stars as StarsIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { PageTransition } from '../../components/ui/PageTransition';
 
 interface Tip {
@@ -49,7 +41,7 @@ const tips: Tip[] = [
     id: '1',
     category: 'Preparation',
     title: 'Research the Company',
-    icon: <MindIcon />,
+    icon: <Icon name="brain" />,
     content: [
       'Review the company website, mission, and values',
       'Research recent news and press releases',
@@ -62,7 +54,7 @@ const tips: Tip[] = [
     id: '2',
     category: 'Preparation',
     title: 'Practice Common Questions',
-    icon: <QuestionIcon />,
+    icon: <Icon name="help-circle" />,
     content: [
       'Tell me about yourself',
       'What are your greatest strengths and weaknesses?',
@@ -75,7 +67,7 @@ const tips: Tip[] = [
     id: '3',
     category: 'During Interview',
     title: 'Make a Great First Impression',
-    icon: <StarsIcon />,
+    icon: <Icon name="star" />,
     content: [
       'Arrive 10-15 minutes early',
       'Dress appropriately for the company culture',
@@ -88,7 +80,7 @@ const tips: Tip[] = [
     id: '4',
     category: 'During Interview',
     title: 'Answer Effectively',
-    icon: <VoiceIcon />,
+    icon: <Icon name="mic" />,
     content: [
       'Use the STAR method (Situation, Task, Action, Result)',
       'Be specific and quantify your achievements',
@@ -146,12 +138,12 @@ export function InterviewTipsPage() {
         {/* Header */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <TipsIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+            <Icon name="lightbulb" size={40} color="primary" />
             <Box>
               <Typography variant="h4" fontWeight={700}>
                 Interview Preparation
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography variant="body1" color="secondary">
                 Expert tips and common questions to help you succeed
               </Typography>
             </Box>
@@ -206,7 +198,7 @@ export function InterviewTipsPage() {
                       {tip.content.map((item, idx) => (
                         <ListItem key={idx} sx={{ px: 0 }}>
                           <ListItemIcon sx={{ minWidth: 32 }}>
-                            <CheckIcon color="success" fontSize="small" />
+                            <Icon name="check-circle" size="small" color="success" />
                           </ListItemIcon>
                           <ListItemText primary={item} />
                         </ListItem>
@@ -226,9 +218,9 @@ export function InterviewTipsPage() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {commonQuestions.map((q) => (
                 <Accordion key={q.id}>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <AccordionSummary expandIcon={<Icon name="chevron-down" />}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
-                      <QuestionIcon color="primary" fontSize="small" />
+                      <Icon name="help-circle" size="small" color="primary" />
                       <Typography variant="subtitle2" fontWeight={600}>
                         {q.question}
                       </Typography>
@@ -236,7 +228,7 @@ export function InterviewTipsPage() {
                     <Chip label={q.category} size="small" variant="outlined" />
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
                       <strong>Sample Answer:</strong>
                     </Typography>
                     <Typography variant="body2" sx={{ mt: 1 }}>

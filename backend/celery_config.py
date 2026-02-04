@@ -7,17 +7,11 @@ config module. It configures the broker, result backend, and task behavior.
 import logging
 from typing import Dict, Any
 
-from celery import Celery
-
 from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-
-# Create Celery application instance
-# This is the main app instance used by workers and beat scheduler
-app = Celery("backend.tasks")
 
 # Celery configuration dictionary
 # This configuration is used by the Celery application in tasks.py
@@ -66,8 +60,6 @@ celery_config: Dict[str, Any] = {
         "tasks.model_retraining.*": {"queue": "learning"},
         "tasks.audit_tasks.cleanup_old_audit_logs": {"queue": "audit"},
         "tasks.audit_tasks.*": {"queue": "audit"},
-        "tasks.linkedin_tasks.sync_linkedin_profiles": {"queue": "linkedin"},
-        "tasks.linkedin_tasks.*": {"queue": "linkedin"},
     },
 
     # Task priority (if needed in future)
@@ -115,16 +107,13 @@ celery_config: Dict[str, Any] = {
             "schedule": 86400.0,  # Run daily (every 24 hours)
             "options": {"expires": 3600},  # Task expires if not run within 1 hour
         },
-        "linkedin-profile-sync": {
-            "task": "tasks.linkedin_tasks.sync_linkedin_profiles",
+        "salary-benchmark-update": {
+            "task": "tasks.salary_data_fetch.fetch_market_salary_data",
             "schedule": 86400.0,  # Run daily (every 24 hours)
-            "options": {"expires": 3600},  # Task expires if not run within 1 hour
+            "options": {"expires": 7200},  # Task expires if not run within 2 hours
         },
     },
 }
-
-# Configure the Celery app with the configuration dictionary
-app.conf.update(celery_config)
 
 
 def get_celery_config() -> Dict[str, Any]:

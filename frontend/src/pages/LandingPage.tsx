@@ -9,6 +9,9 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  AppBar,
+  Toolbar,
+  Button,
 } from '@mui/material';
 import { Work as WorkIcon, BusinessCenter as BusinessIcon } from '@mui/icons-material';
 
@@ -77,6 +80,47 @@ const LandingPage: React.FC = () => {
       >
         Skip to main content
       </Box>
+
+      {/* Navigation Bar */}
+      <AppBar
+        position="static"
+        elevation={0}
+        sx={{
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Toolbar sx={{ justifyContent: 'flex-end' }}>
+          <Stack direction="row" spacing={2}>
+            <Button
+              color="primary"
+              onClick={() => navigate('/login')}
+              sx={{
+                fontWeight: 600,
+                textTransform: 'none',
+                px: 3,
+              }}
+              aria-label="Navigate to login page"
+            >
+              Login
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => navigate('/register')}
+              sx={{
+                fontWeight: 600,
+                textTransform: 'none',
+                px: 3,
+              }}
+              aria-label="Navigate to registration page"
+            >
+              Register
+            </Button>
+          </Stack>
+        </Toolbar>
+      </AppBar>
 
       <Container maxWidth="lg">
         <Box

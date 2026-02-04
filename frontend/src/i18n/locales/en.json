@@ -728,43 +728,6 @@
     "quality": "Quality",
     "viewResource": "View"
   },
-  "linkedin": {
-    "title": "LinkedIn Integration",
-    "auth": {
-      "connect": "Connect with LinkedIn",
-      "connecting": "Connecting...",
-      "success": "Successfully connected to LinkedIn!",
-      "helpText": "You will be redirected to LinkedIn to authorize access to your profile.",
-      "learnMore": "Learn more"
-    },
-    "disconnect": "Disconnect",
-    "import": {
-      "title": "Import LinkedIn Profile",
-      "helpText": "Enter a LinkedIn profile URL to import candidate information into AgentHR.",
-      "urlLabel": "LinkedIn Profile URL",
-      "urlHelper": "Paste the full LinkedIn profile URL (e.g., https://www.linkedin.com/in/username)",
-      "importButton": "Import Profile",
-      "importing": "Importing profile...",
-      "importAnother": "Import Another",
-      "success": "Profile {{profileId}} imported successfully!",
-      "profileUrl": "Profile URL",
-      "progress": "{{percent}}% complete",
-      "footerText": "Make sure the profile is public or you have authorized access to view it.",
-      "errors": {
-        "urlRequired": "LinkedIn URL is required",
-        "invalidFormat": "Invalid LinkedIn URL format. Use: https://www.linkedin.com/in/username",
-        "importFailed": "Failed to import LinkedIn profile. Please try again."
-      }
-    }
-  },
-  "errors": {
-    "linkedin": {
-      "authFailed": "LinkedIn authentication failed. Please try again.",
-      "accessDenied": "Access denied. Please authorize the application to use LinkedIn features.",
-      "networkError": "Network error. Please check your connection and try again.",
-      "urlGenerationFailed": "Failed to generate LinkedIn authorization URL. Please try again."
-    }
-  },
   "matchingWeights": {
     "title": "Matching Algorithm Weights",
     "subtitle": "Customize how the matching algorithm scores candidates by adjusting the relative importance of each matching method.",
@@ -842,5 +805,38 @@
     "success": {
       "saved": "Weights saved successfully!"
     }
+  },
+  "advancedSearch": {
+    "title": "Advanced Search",
+    "filters": "filters",
+    "searchQuery": "Search Query",
+    "searchPlaceholder": "Enter keywords or phrases to search for...",
+    "semanticSearch": "Semantic Search",
+    "semanticSearchDescription": "Use AI-powered semantic search to find matches based on meaning and context, not just keywords",
+    "addFilter": "Add Filter",
+    "skills": "Skills",
+    "selectSkills": "Select skills...",
+    "location": "Location",
+    "languages": "Languages",
+    "selectLanguages": "Select languages...",
+    "educationLevel": "Education Level",
+    "any": "Any",
+    "highSchool": "High School",
+    "bachelor": "Bachelor's Degree",
+    "master": "Master's Degree",
+    "phd": "PhD",
+    "experienceYears": "Experience: {{min}} - {{max}} years",
+    "matchScore": "Match Score: {{min}}% - {{max}}%",
+    "dateFrom": "Date From",
+    "dateTo": "Date To",
+    "minSalary": "Min Salary",
+    "maxSalary": "Max Salary",
+    "vacancy": "Vacancy",
+    "allVacancies": "All Vacancies",
+    "stage": "Stage",
+    "allStages": "All Stages",
+    "clear": "Clear",
+    "searching": "Searching...",
+    "search": "Search"
   }
 }

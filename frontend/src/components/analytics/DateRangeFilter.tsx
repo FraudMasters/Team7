@@ -13,12 +13,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-} from '@mui/material';
-import {
-  DateRange as DateRangeIcon,
-  RestartAlt as ResetIcon,
-  Check as ApplyIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Date range filter options
@@ -334,23 +330,23 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   };
 
   return (
-    <Paper elevation={1} sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <DateRangeIcon sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
+    <Paper elevation={1} css={{ padding: '24px' }}>
+      <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+        <Icon name="calendar" size={24} color="$primary" css={{ marginRight: '8px' }} />
         <Typography variant="h6" fontWeight={600}>
           {label}
         </Typography>
       </Box>
-      <Divider sx={{ mb: 2 }} />
+      <Divider css={{ marginBottom: '16px' }} />
 
       <Stack spacing={3}>
         {/* Preset Quick Select */}
         {showPresets && (
           <Box>
-            <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
+            <Typography variant="subtitle2" gutterBottom css={{ marginBottom: '12px' }}>
               Quick Select:
             </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack css={{ flexDirection: { xs: 'column', sm: 'row' } }} gap={1} flexWrap="wrap">
               <Button
                 size="small"
                 variant={preset === 'last_7_days' ? 'contained' : 'outlined'}
@@ -405,12 +401,12 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
 
         {/* Custom Date Range */}
         <Box>
-          <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
+          <Typography variant="subtitle2" gutterBottom css={{ marginBottom: '12px' }}>
             Custom Date Range:
           </Typography>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+          <Stack css={{ flexDirection: { xs: 'column', md: 'row' } }} gap={2}>
             {/* Preset Dropdown */}
-            <FormControl size="small" sx={{ minWidth: 150 }} disabled={disabled}>
+            <FormControl size="small" css={{ minWidth: '150px' }} disabled={disabled}>
               <InputLabel>Preset</InputLabel>
               <Select value={preset} onChange={handlePresetChange} label="Preset">
                 <MenuItem value="last_7_days">Last 7 Days</MenuItem>
@@ -431,7 +427,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               onChange={handleStartDateChange}
               size="small"
               disabled={disabled}
-              InputLabelProps={{
+              inputProps={{
                 shrink: true,
               }}
               error={hasError}
@@ -445,7 +441,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               onChange={handleEndDateChange}
               size="small"
               disabled={disabled}
-              InputLabelProps={{
+              inputProps={{
                 shrink: true,
               }}
               error={hasError}
@@ -467,7 +463,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               Active Filter:
             </Typography>
             <Chip
-              icon={<DateRangeIcon fontSize="small" />}
+              icon={<Icon name="calendar" />}
               label={`${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`}
               color="primary"
               variant="outlined"
@@ -477,11 +473,11 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
         )}
 
         {/* Action Buttons */}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+        <Stack css={{ flexDirection: { xs: 'column', sm: 'row' } }} gap={2}>
           <Button
             fullWidth
             variant="contained"
-            startIcon={<ApplyIcon />}
+            startIcon={<Icon name="check" />}
             onClick={handleApply}
             disabled={disabled || !isValidDateRange}
             color="primary"
@@ -491,7 +487,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           <Button
             fullWidth
             variant="outlined"
-            startIcon={<ResetIcon />}
+            startIcon={<Icon name="refresh" />}
             onClick={handleReset}
             disabled={disabled}
             color="secondary"

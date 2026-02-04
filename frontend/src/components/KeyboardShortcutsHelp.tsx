@@ -15,15 +15,10 @@ import {
   TableRow,
   Paper,
   Chip,
-  useTheme,
-  useMediaQuery,
   IconButton,
-} from '@mui/material';
-import {
-  Close as CloseIcon,
-  Keyboard as KeyboardIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import { useResponsive } from '@/hooks/useResponsive';
 
 /**
  * Keyboard shortcut definition
@@ -78,7 +73,7 @@ const SHORTCUT_CATEGORIES: Record<ShortcutCategory, ShortcutCategoryMeta> = {
   global: {
     label: 'Global Shortcuts',
     description: 'Available everywhere in the application',
-    icon: <KeyboardIcon />,
+    icon: 'keyboard',
     color: '#1976d2',
   },
   upload: {
@@ -311,8 +306,8 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
   onClose,
   title = 'Keyboard Shortcuts',
 }) => {
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+  const responsive = useResponsive();
+  const fullScreen = !responsive.isMdUp;
 
   const handleClose = useCallback(() => {
     onClose?.();
@@ -366,8 +361,8 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <KeyboardIcon color="primary" />
-            <Typography variant="h6" component="span">
+            <Icon name="keyboard" color="primary" />
+            <Typography variant="h6" as="span">
               {title}
             </Typography>
           </Box>
@@ -377,7 +372,7 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             aria-label="Close keyboard shortcuts"
             size="small"
           >
-            <CloseIcon />
+            <Icon name="x" />
           </IconButton>
         </Box>
       </DialogTitle>
@@ -396,7 +391,7 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
               borderRadius: 1,
             }}
           >
-            <InfoIcon fontSize="small" />
+            <Icon name="info" fontSize="small" />
             <Typography variant="body2">
               Press <strong>Ctrl+/</strong> anywhere in the application to open this
               help dialog. Keyboard shortcuts help you navigate and work more
@@ -436,7 +431,11 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
                       color: meta.color,
                     }}
                   >
-                    {meta.icon}
+                    {typeof meta.icon === 'string' ? (
+                      meta.icon
+                    ) : (
+                      <Icon name={meta.icon as string} />
+                    )}
                   </Box>
                   <Box>
                     <Typography variant="subtitle1" fontWeight={600}>

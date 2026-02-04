@@ -28,7 +28,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-} from '@mui/material';
+} from '@/components/ui';
 import {
   Person as PersonIcon,
   Search as SearchIcon,
@@ -41,8 +41,6 @@ import {
   Label as LabelIcon,
   DeleteSweep as DeleteSweepIcon,
   DragIndicator as DragIndicatorIcon,
-  Business as BusinessIcon,
-} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -51,8 +49,6 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import VirtualKanbanBoard from '../components/VirtualKanbanBoard';
 import ErrorMessage, { CandidateLoadFailedError, CandidateMoveFailedError, BatchActionFailedError } from '../components/ErrorMessage';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import { useOrganizationContext } from '@/contexts/OrganizationContext';
-import { orgScopedFetch } from '@/api/organizationScopedFetch';
 
 interface Candidate {
   id: string;
@@ -90,7 +86,6 @@ const CandidatesKanbanPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const theme = useTheme();
-  const { currentOrganization } = useOrganizationContext();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'lg'));
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
@@ -326,15 +321,14 @@ const CandidatesKanbanPage: React.FC = () => {
 
   useEffect(() => {
     fetchCandidates();
-  }, [currentOrganization]);
+  }, []);
 
   const fetchCandidates = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Use organization-scoped fetch to include X-Organization-ID header
-      const response = await orgScopedFetch('/api/candidates/', undefined, !currentOrganization);
+      const response = await fetch('/api/resumes/?limit=100');
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -772,51 +766,6 @@ const CandidatesKanbanPage: React.FC = () => {
 
   const selectedCount = selectedCandidateIds.size;
 
-  // Show message if no organization is selected
-  if (!currentOrganization) {
-    return (
-      <ErrorBoundary
-        onError={(error, errorInfo) => {
-          console.error('CandidatesKanban error:', error, errorInfo);
-        }}
-      >
-        <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
-          <Paper
-            sx={{
-              p: 6,
-              textAlign: 'center',
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            <BusinessIcon
-              sx={{
-                fontSize: 64,
-                color: 'text.disabled',
-                mb: 2,
-              }}
-            />
-            <Typography variant="h5" gutterBottom fontWeight={600}>
-              No Organization Selected
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 500, mx: 'auto' }}>
-              Please select an organization from the switcher in the header to view and manage candidates.
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<BusinessIcon />}
-              onClick={() => navigate('/organizations')}
-              sx={{ mt: 2 }}
-            >
-              Manage Organizations
-            </Button>
-          </Paper>
-        </Box>
-      </ErrorBoundary>
-    );
-  }
-
   if (loading) {
     return (
       <ErrorBoundary
@@ -870,14 +819,14 @@ const CandidatesKanbanPage: React.FC = () => {
         <Box sx={{ mb: { xs: 2, sm: 3 } }}>
           <Typography
             variant="h4"
-            component="h1"
+            as="h1"
             gutterBottom
             fontWeight={600}
             sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem', md: '2.5rem' } }}
           >
             {t('candidatesKanban.title')}
           </Typography>
-          <Typography variant="body1" color="text.secondary" paragraph sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+          <Typography variant="body1" color="secondary" paragraph sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
             {t('candidatesKanban.description')}
           </Typography>
 
@@ -908,7 +857,7 @@ const CandidatesKanbanPage: React.FC = () => {
           {/* Keyboard Shortcuts Hint - hide on very small screens */}
           <Typography
             variant="caption"
-            color="text.secondary"
+            color="secondary"
             sx={{
               display: { xs: 'none', sm: 'block' },
               mt: 1,
@@ -1148,7 +1097,7 @@ const CandidatesKanbanPage: React.FC = () => {
         >
           <DialogTitle>Move {selectedCount} Candidate(s)</DialogTitle>
           <DialogContent>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
               Select the stage to move {selectedCount} candidate(s) to:
             </Typography>
 
@@ -1201,7 +1150,7 @@ const CandidatesKanbanPage: React.FC = () => {
         >
           <DialogTitle>Add Tags to {selectedCount} Candidate(s)</DialogTitle>
           <DialogContent>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
               Enter a tag to add to {selectedCount} candidate(s):
             </Typography>
 
@@ -1222,7 +1171,7 @@ const CandidatesKanbanPage: React.FC = () => {
 
             {selectedCount > 0 && (
               <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   This tag will be added to all selected candidates.
                 </Typography>
               </Box>
@@ -1264,7 +1213,7 @@ const CandidatesKanbanPage: React.FC = () => {
             <Alert severity="warning" sx={{ mb: 2 }}>
               This action cannot be undone.
             </Alert>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="secondary">
               Are you sure you want to delete {selectedCount} candidate(s)? This will permanently remove them from the system.
             </Typography>
           </DialogContent>

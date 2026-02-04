@@ -8,14 +8,8 @@ import {
   Stack,
   Chip,
   IconButton,
-} from '@mui/material';
-import {
-  LocationOn,
-  WorkOutline,
-  BookmarkBorder,
-  Bookmark,
-  Schedule,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
 
 export interface JobApplication {
   id: string;
@@ -63,7 +57,7 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
 
   return (
     <Card
-      component={Link}
+      as={Link}
       to={`/jobs/${application.vacancy_id}`}
       sx={{
         textDecoration: 'none',
@@ -77,23 +71,23 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
         },
       }}
     >
-      <CardContent sx={{ flexGrow: 1, p: 3 }}>
+      <CardContent sx={{ flexGrow: 1, padding: 3 }}>
         {/* Header with title, status and bookmark */}
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" fontWeight={600} color="text.primary" gutterBottom>
+            <Typography variant="h6" fontWeight={600} color="primary" gutterBottom>
               {application.title}
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
               {application.location && (
-                <Stack direction="row" spacing={0.5} alignItems="center" color="text.secondary">
-                  <LocationOn sx={{ fontSize: 16 }} />
+                <Stack direction="row" spacing={0.5} alignItems="center" color="secondary">
+                  <Icon name="map-pin" size={16} />
                   <Typography variant="body2">{application.location}</Typography>
                 </Stack>
               )}
             </Stack>
-            <Stack direction="row" spacing={1} alignItems="center" color="text.secondary">
-              <Schedule sx={{ fontSize: 16 }} />
+            <Stack direction="row" spacing={1} alignItems="center" color="secondary">
+              <Icon name="clock" size={16} />
               <Typography variant="body2">Applied {formatDate(application.applied_at)}</Typography>
             </Stack>
           </Box>
@@ -103,7 +97,7 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
             sx={{ ml: 1 }}
             aria-label={saved ? 'Remove from saved' : 'Save job'}
           >
-            {saved ? <Bookmark color="primary" /> : <BookmarkBorder />}
+            <Icon name={saved ? 'bookmark' : 'bookmark'} size={20} color={saved ? 'primary' : 'inherit'} filled={saved} />
           </IconButton>
         </Stack>
 
@@ -139,7 +133,7 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
         {application.description && (
           <Typography
             variant="body2"
-            color="text.secondary"
+            color="secondary"
             sx={{
               mb: 2,
               display: '-webkit-box',
@@ -154,8 +148,8 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
 
         {/* Work format and experience */}
         {(application.work_format || application.min_experience_months) && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="text.secondary">
-            <WorkOutline sx={{ fontSize: 16 }} />
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="secondary">
+            <Icon name="briefcase" size={16} />
             <Typography variant="body2">
               {application.min_experience_months && application.min_experience_months > 0 && `${Math.floor(application.min_experience_months / 12)}+ years`}
               {application.work_format && ` • ${application.work_format}`}

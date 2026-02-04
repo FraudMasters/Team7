@@ -1,15 +1,15 @@
-import { Alert, Button, Box, SxProps, Theme } from '@mui/material';
+import { Alert, Button, Box } from '@/components/ui';
 
 export interface ErrorStateProps {
   title?: string;
   message: string;
   onRetry?: () => void;
-  sx?: SxProps<Theme>;
+  css?: any;
 }
 
-export function ErrorState({ title = 'Error', message, onRetry, sx }: ErrorStateProps) {
+export function ErrorState({ title = 'Error', message, onRetry, css }: ErrorStateProps) {
   return (
-    <Box sx={sx}>
+    <Box css={css}>
       <Alert severity="error" action={onRetry && <Button color="inherit" size="small" onClick={onRetry}>Try Again</Button>}>
         <strong>{title}</strong> - {message}
       </Alert>

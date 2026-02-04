@@ -13,8 +13,8 @@ import {
   InputLabel,
   CircularProgress,
   Box,
-} from '@mui/material';
-import { Search as SearchIcon, FilterList as FilterIcon } from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
 import { useJobs } from '../../hooks/useJobs';
 import { JobCard } from '../../components/jobs/JobCard';
 
@@ -43,7 +43,7 @@ export function JobsBrowsePage() {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           Find Your Next Job
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           Discover opportunities matched to your skills
         </Typography>
       </Box>
@@ -63,8 +63,8 @@ export function JobsBrowsePage() {
           placeholder="Search jobs..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+          inputProps={{
+            startAdornment: <Icon name="search" size={20} color="secondary" sx={{ mr: 1 }} />,
           }}
           sx={{ flexGrow: 1, minWidth: 200 }}
         />
@@ -94,7 +94,7 @@ export function JobsBrowsePage() {
         </Box>
       ) : filteredJobs.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography color="text.secondary">No jobs found</Typography>
+          <Typography color="secondary">No jobs found</Typography>
         </Box>
       ) : (
         <Grid container spacing={2}>

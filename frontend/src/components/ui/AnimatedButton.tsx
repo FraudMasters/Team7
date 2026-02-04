@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, ButtonProps } from '@mui/material';
+import { Button } from '@/components/ui';
+import type { ButtonProps } from '@/components/ui/Button';
 
 /**
  * Gradient variants matching the design system
@@ -18,25 +19,27 @@ const gradientMap = {
 export type GradientVariant = keyof typeof gradientMap;
 
 /**
- * Props interface extending MUI ButtonProps
+ * Props interface extending ButtonProps
  */
-export interface AnimatedButtonProps extends Omit<ButtonProps, 'variant'> {
+export interface AnimatedButtonProps extends Omit<ButtonProps, 'variant' | 'css'> {
   /**
    * Apply gradient background instead of solid color
    * Automatically overrides variant to 'contained' when gradient is specified
    */
   gradient?: GradientVariant;
+  /** CSS styles */
+  css?: any;
 }
 
 /**
  * AnimatedButton Component
  *
- * Wraps MUI Button with subtle micro-interactions using CSS:
+ * Wraps Button with subtle micro-interactions using CSS:
  * - Hover: Lifts up slightly and adds shadow
  * - Press/Click: Scales down slightly
  * - Fast transitions (0.1-0.2s duration) for responsive feel
  *
- * All standard MUI Button props are supported via ...rest spread.
+ * All standard Button props are supported via ...rest spread.
  *
  * @example
  * ```tsx
@@ -53,12 +56,12 @@ export interface AnimatedButtonProps extends Omit<ButtonProps, 'variant'> {
  */
 export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   gradient,
-  sx,
+  css,
   children,
   ...rest
 }) => {
   // Apply gradient styles if gradient prop is provided
-  const gradientSx = gradient
+  const gradientCss = gradient
     ? {
         background: gradientMap[gradient],
         color: 'white',
@@ -72,7 +75,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
         },
         transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out',
         // Override variant to contained for gradient buttons
-        ...(sx || {}),
+        ...(css || {}),
       }
     : {
         '&:hover': {
@@ -83,14 +86,14 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
           transform: 'scale(0.98)',
         },
         transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out',
-        ...sx,
+        ...css,
       };
 
   return (
     <Button
       // Force variant to contained if gradient is specified
       variant={gradient ? 'contained' : (rest.variant || 'text')}
-      sx={gradientSx}
+      css={gradientCss}
       {...rest}
     >
       {children}

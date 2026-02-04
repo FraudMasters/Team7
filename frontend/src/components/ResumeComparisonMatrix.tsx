@@ -19,15 +19,8 @@ import {
   CardContent,
   Grid,
   Divider,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Cancel as CrossIcon,
-  Refresh as RefreshIcon,
-  Grid4x4 as MatrixIcon,
-  EmojiEvents as TrophyIcon,
-  TrendingUp as TrendingIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import ComparisonNotes from './ComparisonNotes';
 
 /**
@@ -252,7 +245,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchComparison} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchComparison} startIcon={<Icon name="refresh-cw" />}>
             Retry
           </Button>
         }
@@ -292,7 +285,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <MatrixIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+            <Icon name="grid-3x3" sx={{ fontSize: 32, color: 'primary.main' }} />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 Resume Comparison Matrix
@@ -303,7 +296,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
+          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchComparison} size="small">
             Refresh
           </Button>
         </Box>
@@ -373,7 +366,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
       {/* Performance Summary Cards */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <TrendingIcon sx={{ mr: 1, fontSize: 28, color: 'primary.main' }} />
+          <Icon name="trending-up" sx={{ mr: 1, fontSize: 28, color: 'primary.main' }} />
           <Typography variant="h6" fontWeight={600}>
             Performance Summary
           </Typography>
@@ -399,7 +392,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
                 >
                   {topPerformer && (
                     <Tooltip title="Top Performer" arrow>
-                      <TrophyIcon
+                      <Icon name="trophy"
                         sx={{
                           position: 'absolute',
                           top: 8,
@@ -473,7 +466,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
       {/* Skills Matrix Table */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <MatrixIcon sx={{ mr: 1, fontSize: 28, color: 'primary.main' }} />
+          <Icon name="grid-3x3" sx={{ mr: 1, fontSize: 28, color: 'primary.main' }} />
           <Typography variant="h6" fontWeight={600}>
             Skills Matrix
           </Typography>
@@ -559,7 +552,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
                       >
                         {skillMatch ? (
                           <Tooltip title="Has this skill" arrow>
-                            <CheckIcon
+                            <Icon name="check-circle"
                               color="success"
                               sx={{
                                 fontSize: 24,
@@ -572,7 +565,7 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
                           </Tooltip>
                         ) : (
                           <Tooltip title="Missing this skill" arrow>
-                            <CrossIcon
+                            <Icon name="x-circle"
                               color="error"
                               sx={{
                                 fontSize: 24,
@@ -596,13 +589,13 @@ const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
         {/* Legend */}
         <Box sx={{ display: 'flex', gap: 3, mt: 2, justifyContent: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckIcon color="success" sx={{ fontSize: 20 }} />
+            <Icon name="check-circle" color="success" sx={{ fontSize: 20 }} />
             <Typography variant="caption" color="text.secondary">
               Has Skill
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CrossIcon color="error" sx={{ fontSize: 20 }} />
+            <Icon name="x-circle" color="error" sx={{ fontSize: 20 }} />
             <Typography variant="caption" color="text.secondary">
               Missing Skill
             </Typography>

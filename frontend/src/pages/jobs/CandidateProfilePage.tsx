@@ -10,17 +10,8 @@ import {
   TextField,
   Chip,
   Grid,
-} from '@mui/material';
-import {
-  Person as PersonIcon,
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  LocationOn as LocationIcon,
-  WorkOutline as WorkIcon,
-  School as SchoolIcon,
-  Edit as EditIcon,
-  Save as SaveIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';

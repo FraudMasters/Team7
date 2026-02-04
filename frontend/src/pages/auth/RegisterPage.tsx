@@ -1,165 +1,375 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Container,
+  Card,
+  CardContent,
   Box,
-  Paper,
   Typography,
   TextField,
   Button,
-  Stack,
   Alert,
   CircularProgress,
+  Stack,
+  useTheme,
 } from '@mui/material';
-import { useAuth } from '@/hooks/useAuth';
+import { PersonAdd as PersonAddIcon } from '@mui/icons-material';
+import { register } from '@/api/auth';
 
-export function RegisterPage() {
+interface FormErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  general?: string;
+}
+
+const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { register, isLoading } = useAuth();
-  const [name, setName] = useState('');
+  const theme = useTheme();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    // Password must be at least 8 characters with uppercase, lowercase, and number
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    return passwordRegex.test(password);
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    } else if (firstName.trim().length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
+    }
+
+    if (!lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    } else if (lastName.trim().length < 2) {
+      newErrors.lastName = 'Last name must be at least 2 characters';
+    }
+
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!validateEmail(email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (!validatePassword(password)) {
+      newErrors.password =
+        'Password must be at least 8 characters with uppercase, lowercase, and number';
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
 
-    // Basic validation
-    if (!name || !email || !password || !confirmPassword) {
-      setError('Please fill in all fields');
+    setGeneralError('');
+    if (!validateForm()) {
       return;
     }
 
-    if (name.trim().length < 2) {
-      setError('Name must be at least 2 characters long');
-      return;
-    }
-
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      await register(email, password, name);
-      setSuccess(true);
-      // Navigate to login after 2 seconds to show success message
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
-      setError(message);
+      // Call registration API
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      await register({
+        email: email.trim(),
+        password,
+        full_name: fullName || undefined,
+      });
+
+      // Successful registration - redirect to login with success message
+      navigate('/login', {
+        state: { message: 'Registration successful! Please sign in.' },
+      });
+    } catch (error) {
+      // Handle API errors
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during registration. Please try again.';
+      setGeneralError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
-        <Paper sx={{ p: 4, width: '100%', maxWidth: 450 }}>
-          <Box sx={{ mb: 4, textAlign: 'center' }}>
-            <Typography variant="h4" fontWeight={700} gutterBottom>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.default',
+        p: 2,
+      }}
+    >
+      {/* Skip Link for Keyboard Users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          zIndex: 9999,
+          '&:focus': {
+            left: '10px',
+            top: '10px',
+            bgcolor: 'primary.main',
+            color: 'white',
+            p: 2,
+            borderRadius: 1,
+          },
+        }}
+      >
+        Skip to main content
+      </Box>
+
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            animation: 'fadeInUp 0.6s ease-out both',
+            '@keyframes fadeInUp': {
+              '0%': {
+                opacity: 0,
+                transform: 'translateY(20px)',
+              },
+              '100%': {
+                opacity: 1,
+                transform: 'translateY(0)',
+              },
+            },
+          }}
+        >
+          {/* Header */}
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                mx: 'auto',
+                color: 'white',
+              }}
+            >
+              <PersonAddIcon sx={{ fontSize: 32 }} />
+            </Box>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 700,
+                mb: 1,
+              }}
+            >
               Create Account
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Sign up to get started with AgentHR
+              Join AgentHR to streamline your hiring process
             </Typography>
           </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
+          {/* Register Form Card */}
+          <Card
+            sx={{
+              boxShadow: 3,
+              animation: 'fadeInUp 0.5s ease-out 0.2s both',
+            }}
+          >
+            <CardContent sx={{ p: 4 }}>
+              {generalError && (
+                <Alert severity="error" sx={{ mb: 3 }} role="alert">
+                  {generalError}
+                </Alert>
+              )}
 
-          {success && (
-            <Alert severity="success" sx={{ mb: 3 }}>
-              Registration successful! Please check your email to verify your account. Redirecting to login...
-            </Alert>
-          )}
-
-          {!success && (
-            <form onSubmit={handleSubmit}>
-            <Stack spacing={3}>
-              <TextField
-                label="Full Name"
-                type="text"
-                fullWidth
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-                autoFocus
-                disabled={isLoading}
-              />
-
-              <TextField
-                label="Email"
-                type="email"
-                fullWidth
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                disabled={isLoading}
-              />
-
-              <TextField
-                label="Password"
-                type="password"
-                fullWidth
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                disabled={isLoading}
-                helperText="Must be at least 8 characters"
-              />
-
-              <TextField
-                label="Confirm Password"
-                type="password"
-                fullWidth
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-                disabled={isLoading}
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                disabled={isLoading}
-                sx={{ mt: 2 }}
+              <Box
+                component="form"
+                onSubmit={handleSubmit}
+                noValidate
+                id="main-content"
+                aria-label="Registration form"
               >
-                {isLoading ? <CircularProgress size={24} /> : 'Create Account'}
-              </Button>
-            </Stack>
-          </form>
-          )}
+                <Stack spacing={3}>
+                  {/* Name Fields */}
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <TextField
+                      label="First Name"
+                      type="text"
+                      autoComplete="given-name"
+                      required
+                      fullWidth
+                      value={firstName}
+                      onChange={(e) => {
+                        setFirstName(e.target.value);
+                        if (errors.firstName) {
+                          setErrors({ ...errors, firstName: undefined });
+                        }
+                      }}
+                      error={!!errors.firstName}
+                      helperText={errors.firstName}
+                      disabled={isLoading}
+                      autoFocus
+                      aria-describedby={errors.firstName ? 'firstName-error' : undefined}
+                    />
+                    <TextField
+                      label="Last Name"
+                      type="text"
+                      autoComplete="family-name"
+                      required
+                      fullWidth
+                      value={lastName}
+                      onChange={(e) => {
+                        setLastName(e.target.value);
+                        if (errors.lastName) {
+                          setErrors({ ...errors, lastName: undefined });
+                        }
+                      }}
+                      error={!!errors.lastName}
+                      helperText={errors.lastName}
+                      disabled={isLoading}
+                      aria-describedby={errors.lastName ? 'lastName-error' : undefined}
+                    />
+                  </Stack>
 
+                  {/* Email Field */}
+                  <TextField
+                    label="Email Address"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    fullWidth
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email) {
+                        setErrors({ ...errors, email: undefined });
+                      }
+                    }}
+                    error={!!errors.email}
+                    helperText={errors.email}
+                    disabled={isLoading}
+                    aria-describedby={errors.email ? 'email-error' : undefined}
+                  />
+
+                  {/* Password Field */}
+                  <TextField
+                    label="Password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    fullWidth
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) {
+                        setErrors({ ...errors, password: undefined });
+                      }
+                    }}
+                    error={!!errors.password}
+                    helperText={errors.password}
+                    disabled={isLoading}
+                    aria-describedby={errors.password ? 'password-error' : undefined}
+                  />
+
+                  {/* Confirm Password Field */}
+                  <TextField
+                    label="Confirm Password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    fullWidth
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (errors.confirmPassword) {
+                        setErrors({ ...errors, confirmPassword: undefined });
+                      }
+                    }}
+                    error={!!errors.confirmPassword}
+                    helperText={errors.confirmPassword}
+                    disabled={isLoading}
+                    aria-describedby={
+                      errors.confirmPassword ? 'confirmPassword-error' : undefined
+                    }
+                  />
+
+                  {/* Submit Button */}
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    disabled={isLoading}
+                    sx={{
+                      py: 1.5,
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                      },
+                    }}
+                  >
+                    {isLoading ? (
+                      <CircularProgress size={24} color="inherit" />
+                    ) : (
+                      'Create Account'
+                    )}
+                  </Button>
+                </Stack>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Footer Links */}
           <Box sx={{ mt: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
               Already have an account?{' '}
-              <Typography component="a" href="/login" color="primary" sx={{ fontWeight: 600 }}>
+              <Link
+                to="/login"
+                style={{
+                  color: theme.palette.primary.main,
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
+              >
                 Sign in
-              </Typography>
+              </Link>
             </Typography>
           </Box>
-        </Paper>
-      </Box>
-    </Container>
+        </Box>
+      </Container>
+    </Box>
   );
-}
+};
+
+export default RegisterPage;

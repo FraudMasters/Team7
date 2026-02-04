@@ -10,15 +10,9 @@ import {
   Alert,
   Divider,
   Tooltip,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Psychology as AIIcon,
-  Search as SearchIcon,
-  AutoFixHigh as MagicIcon,
-  Translate as SynonymIcon,
-} from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import { styled } from '@emotion/styled';
 
 export interface SkillMatchDetail {
   skill: string;
@@ -41,45 +35,46 @@ interface SkillDetailsWithConfidenceProps {
   maxDisplay?: number;
 }
 
-const StyledCard = styled(Card)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-}));
+const StyledCard = styled(Card)`
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
 
-const ConfidenceBar = styled('div')<{ confidence: number }>(({ theme, confidence }) => ({
-  height: 4,
-  borderRadius: 2,
-  backgroundColor: theme.palette.grey[200],
-  position: 'relative',
-  overflow: 'hidden',
-  marginTop: theme.spacing(0.5),
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: `${confidence * 100}%`,
-    backgroundColor:
+const ConfidenceBar = styled('div')<{ confidence: number; theme: any }>`
+  height: 4px;
+  border-radius: 2px;
+  background-color: ${({ theme }) => theme.colors.grey[200]};
+  position: relative;
+  overflow: hidden;
+  margin-top: ${({ theme }) => theme.spacing.xs};
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: ${({ confidence }) => confidence * 100}%;
+    background-color: ${({ confidence, theme }) =>
       confidence >= 0.9
-        ? theme.palette.success.main
+        ? theme.colors.success.main
         : confidence >= 0.7
-        ? theme.palette.primary.main
+        ? theme.colors.primary.main
         : confidence >= 0.5
-        ? theme.palette.warning.main
-        : theme.palette.error.main,
-    transition: 'width 0.3s ease',
-  },
-}));
+        ? theme.colors.warning.main
+        : theme.colors.error.main};
+    transition: width 0.3s ease;
+  }
+`;
 
 const getMatchTypeConfig = (matchType: string) => {
   switch (matchType) {
     case 'direct':
       return {
         label: 'Direct',
-        icon: <CheckIcon fontSize="small" />,
+        iconName: 'check-circle',
         color: 'success' as const,
         bgColor: 'success.light' as const,
         description: 'Exact match found in resume',
@@ -87,7 +82,7 @@ const getMatchTypeConfig = (matchType: string) => {
     case 'synonym':
       return {
         label: 'Synonym',
-        icon: <SynonymIcon fontSize="small" />,
+        iconName: 'languages',
         color: 'info' as const,
         bgColor: 'info.light' as const,
         description: 'Matched through known synonyms',
@@ -95,7 +90,7 @@ const getMatchTypeConfig = (matchType: string) => {
     case 'fuzzy':
       return {
         label: 'Fuzzy',
-        icon: <SearchIcon fontSize="small" />,
+        iconName: 'search',
         color: 'warning' as const,
         bgColor: 'warning.light' as const,
         description: 'Partial match (typo or variation)',
@@ -103,7 +98,7 @@ const getMatchTypeConfig = (matchType: string) => {
     case 'context':
       return {
         label: 'Context',
-        icon: <AIIcon fontSize="small" />,
+        iconName: 'brain',
         color: 'secondary' as const,
         bgColor: 'secondary.light' as const,
         description: 'Matched based on domain context',
@@ -111,7 +106,7 @@ const getMatchTypeConfig = (matchType: string) => {
     case 'compound':
       return {
         label: 'Compound',
-        icon: <MagicIcon fontSize="small" />,
+        iconName: 'wand-sparkles',
         color: 'primary' as const,
         bgColor: 'primary.light' as const,
         description: 'Compound skill match',
@@ -119,7 +114,7 @@ const getMatchTypeConfig = (matchType: string) => {
     case 'language_hierarchy':
       return {
         label: 'Hierarchy',
-        icon: <AIIcon fontSize="small" />,
+        iconName: 'brain',
         color: 'info' as const,
         bgColor: 'info.light' as const,
         description: 'Matched through language hierarchy',
@@ -127,7 +122,7 @@ const getMatchTypeConfig = (matchType: string) => {
     default:
       return {
         label: 'Unknown',
-        icon: <CheckIcon fontSize="small" />,
+        iconName: 'check-circle',
         color: 'default' as const,
         bgColor: 'grey.100' as const,
         description: 'Unknown match type',
@@ -144,9 +139,9 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
 }) => {
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+      <Box css={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />
-        <Typography variant="body1" sx={{ ml: 2 }}>
+        <Typography css={{ ml: 2 }}>
           Loading skill details...
         </Typography>
       </Box>
@@ -155,7 +150,7 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mb: 2 }}>
+      <Alert severity="error" css={{ mb: 2 }}>
         {error}
       </Alert>
     );
@@ -163,12 +158,12 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
 
   if (!skills || skills.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <CheckIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-        <Typography variant="h6" color="text.secondary">
+      <Box css={{ textAlign: 'center', py: 4 }}>
+        <Icon name="check-circle" css={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+        <Typography color="text.secondary">
           No matched skills
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography color="text.secondary">
           No skills were matched for this position
         </Typography>
       </Box>
@@ -182,14 +177,14 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
     <StyledCard>
       <CardContent>
         <Box
-          sx={{
+          css={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             mb: 2,
           }}
         >
-          <Typography variant="h6" fontWeight={600}>
+          <Typography fontWeight={600}>
             {title}
           </Typography>
           <Chip
@@ -200,7 +195,7 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
           />
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider css={{ mb: 2 }} />
 
         <Stack spacing={2}>
           {displaySkills.map((skillDetail, index) => {
@@ -210,7 +205,7 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
             return (
               <Box
                 key={`${skillDetail.skill}-${index}`}
-                sx={{
+                css={{
                   p: 1.5,
                   borderRadius: 1,
                   backgroundColor: 'grey.50',
@@ -221,49 +216,46 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
                 }}
               >
                 <Box
-                  sx={{
+                  css={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
                     mb: 1,
                   }}
                 >
-                  <Box sx={{ flex: 1 }}>
+                  <Box css={{ flex: 1 }}>
                     <Typography
-                      variant="subtitle2"
-                      fontWeight={600}
-                      sx={{ mb: 0.5 }}
+                      css={{ mb: 0.5, fontWeight: 600 }}
                     >
                       {skillDetail.skill}
                       {skillDetail.matched_as &&
                         skillDetail.matched_as !== skillDetail.skill && (
                           <Typography
-                            component="span"
-                            variant="caption"
+                            as="span"
                             color="text.secondary"
-                            sx={{ ml: 1, fontWeight: 400 }}
+                            css={{ ml: 1, fontWeight: 400 }}
                           >
                             (matched as "{skillDetail.matched_as}")
                           </Typography>
                         )}
                     </Typography>
 
-                    <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Stack css={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                       <Tooltip title={matchConfig.description} arrow>
                         <Chip
-                          icon={matchConfig.icon}
+                          iconName={matchConfig.iconName}
                           label={matchConfig.label}
                           size="small"
                           color={matchConfig.color}
                           variant="outlined"
-                          sx={{ fontSize: '0.7rem', height: 20 }}
+                          css={{ fontSize: '0.7rem', height: 20 }}
                         />
                       </Tooltip>
 
                       <Chip
                         label={`${confidencePercent}%`}
                         size="small"
-                        sx={{
+                        css={{
                           fontSize: '0.7rem',
                           height: 20,
                           fontWeight: 600,
@@ -284,18 +276,17 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
                 <ConfidenceBar confidence={skillDetail.confidence} />
 
                 {skillDetail.locations && skillDetail.locations.length > 0 && (
-                  <Box sx={{ mt: 1 }}>
+                  <Box css={{ mt: 1 }}>
                     <Typography
-                      variant="caption"
                       color="text.secondary"
-                      sx={{ display: 'block', mb: 0.5, fontWeight: 500 }}
+                      css={{ display: 'block', mb: 0.5, fontWeight: 500 }}
                     >
                       Found in resume:
                     </Typography>
                     {skillDetail.locations.slice(0, 2).map((location, idx) => (
                       <Box
                         key={idx}
-                        sx={{
+                        css={{
                           p: 0.75,
                           mt: idx > 0 ? 0.5 : 0,
                           backgroundColor: 'background.paper',
@@ -305,8 +296,7 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
                         }}
                       >
                         <Typography
-                          variant="caption"
-                          sx={{
+                          css={{
                             fontFamily: 'monospace',
                             fontSize: '0.65rem',
                             color: 'text.primary',
@@ -320,9 +310,8 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
                     ))}
                     {skillDetail.locations.length > 2 && (
                       <Typography
-                        variant="caption"
                         color="text.secondary"
-                        sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}
+                        css={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}
                       >
                         +{skillDetail.locations.length - 2} more locations
                       </Typography>
@@ -335,8 +324,8 @@ const SkillDetailsWithConfidence: React.FC<SkillDetailsWithConfidenceProps> = ({
         </Stack>
 
         {hasMore && (
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">
+          <Box css={{ mt: 2, textAlign: 'center' }}>
+            <Typography color="text.secondary">
               Showing {maxDisplay} of {skills.length} matched skills
             </Typography>
           </Box>

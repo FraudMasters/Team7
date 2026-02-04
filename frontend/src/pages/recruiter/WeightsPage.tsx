@@ -30,15 +30,10 @@ import {
   LinearProgress,
   Card,
   CardContent,
-} from '@mui/material';
-import {
-  Save as SaveIcon,
-  Tune as TuneIcon,
-  CheckCircle as SuccessIcon,
-  Warning as WarningIcon,
-  History as HistoryIcon,
-  AutoAwesome as PresetIcon,
-} from '@mui/icons-material';
+  IconButton,
+  Tooltip,
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives/Icon';
 import { apiClient } from '@/api/client';
 import type {
   PresetProfile,
@@ -251,10 +246,10 @@ function WeightsPage() {
         {/* Header */}
         <Box>
           <Typography variant="h4" gutterBottom>
-            <TuneIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <Icon name="sliders" size={24} sx={{ mr: 1, verticalAlign: 'middle', display: 'inline-block' }} />
             {t('matchingWeights.title', { defaultValue: 'Matching Algorithm Weights' })}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             {t('matchingWeights.subtitle', {
               defaultValue: 'Customize how the matching algorithm scores candidates. Adjust the relative importance of each matching method.',
             })}
@@ -272,7 +267,6 @@ function WeightsPage() {
         {success && (
           <Alert
             severity="success"
-            icon={<SuccessIcon />}
             onClose={() => setSuccess(false)}
           >
             {t('matchingWeights.success.saved', { defaultValue: 'Weights saved successfully!' })}
@@ -297,7 +291,6 @@ function WeightsPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <Box sx={{ flex: 1, mr: 2 }}>
                     <LinearProgress
-                      variant="determinate"
                       value={(weights.keyword / totalWeight) * 100}
                       sx={{
                         backgroundColor: '#E3F2FD',
@@ -305,14 +298,13 @@ function WeightsPage() {
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" color="secondary" sx={{ minWidth: 80 }}>
                     {t('matchingWeights.keyword.label', { defaultValue: 'Keyword' })}: {weights.keyword}%
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <Box sx={{ flex: 1, mr: 2 }}>
                     <LinearProgress
-                      variant="determinate"
                       value={(weights.tfidf / totalWeight) * 100}
                       sx={{
                         backgroundColor: '#FFF3E0',
@@ -320,14 +312,13 @@ function WeightsPage() {
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" color="secondary" sx={{ minWidth: 80 }}>
                     {t('matchingWeights.tfidf.label', { defaultValue: 'TF-IDF' })}: {weights.tfidf}%
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Box sx={{ flex: 1, mr: 2 }}>
                     <LinearProgress
-                      variant="determinate"
                       value={(weights.vector / totalWeight) * 100}
                       sx={{
                         backgroundColor: '#F3E5F5',
@@ -335,7 +326,7 @@ function WeightsPage() {
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" color="secondary" sx={{ minWidth: 80 }}>
                     {t('matchingWeights.vector.label', { defaultValue: 'Vector' })}: {weights.vector}%
                   </Typography>
                 </Box>
@@ -345,7 +336,6 @@ function WeightsPage() {
               {!isValid && (
                 <Alert
                   severity="warning"
-                  icon={<WarningIcon />}
                   action={
                     <Button
                       color="inherit"
@@ -383,15 +373,15 @@ function WeightsPage() {
                 variant="fullWidth"
               >
                 <Tab
-                  icon={<PresetIcon />}
+                  icon={<Icon name="sparkles" size={20} />}
                   label={t('matchingWeights.tabs.presets', { defaultValue: 'Presets' })}
                 />
                 <Tab
-                  icon={<TuneIcon />}
+                  icon={<Icon name="sliders" size={20} />}
                   label={t('matchingWeights.tabs.custom', { defaultValue: 'Custom' })}
                 />
                 <Tab
-                  icon={<HistoryIcon />}
+                  icon={<Icon name="history" size={20} />}
                   label={t('matchingWeights.tabs.saved', { defaultValue: 'Saved Profiles' })}
                   disabled={existingProfiles.length === 0}
                 />
@@ -420,7 +410,7 @@ function WeightsPage() {
                               defaultValue: key.charAt(0).toUpperCase() + key.slice(1),
                             })}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                             <Chip
                               label={`${t('matchingWeights.keyword.label', { defaultValue: 'Keyword' })}: ${preset.keyword}%`}
                               size="small"
@@ -437,7 +427,7 @@ function WeightsPage() {
                               sx={{ backgroundColor: '#F3E5F5' }}
                             />
                           </Box>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="secondary">
                             {t(`matchingWeights.presets.${key}.description`, {
                               defaultValue: 'Preset description',
                             })}
@@ -469,7 +459,7 @@ function WeightsPage() {
                     </Button>
                     <Button
                       variant="contained"
-                      startIcon={<SaveIcon />}
+                      startIcon={<Icon name="save" size={20} />}
                       onClick={() => setShowSaveDialog(true)}
                       disabled={!isValid}
                     >
@@ -504,13 +494,13 @@ function WeightsPage() {
                               <Chip label={t('matchingWeights.preset', { defaultValue: 'Preset' })} size="small" />
                             )}
                           </Box>
-                          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                             <Chip label={`K: ${profile.weights_percentage.keyword}%`} size="small" />
                             <Chip label={`T: ${profile.weights_percentage.tfidf}%`} size="small" />
                             <Chip label={`V: ${profile.weights_percentage.vector}%`} size="small" />
                           </Box>
                           {profile.description && (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="secondary">
                               {profile.description}
                             </Typography>
                           )}
@@ -614,7 +604,7 @@ function WeightsPage() {
             <Button
               onClick={handleSaveProfile}
               variant="contained"
-              startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+              startIcon={saving ? <CircularProgress size={20} /> : <Icon name="save" size={20} />}
               disabled={!profileName.trim() || saving}
             >
               {saving

@@ -14,20 +14,8 @@ import {
   LinearProgress,
   Chip,
   Divider,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  TrendingDown as TrendingDownIcon,
-  CheckCircle as CheckIcon,
-  Description as DescriptionIcon,
-  Upload as UploadIcon,
-  Person as PersonIcon,
-  Work as WorkIcon,
-  School as InterviewIcon,
-  Celebration as HiredIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Funnel stage interface from backend
@@ -78,24 +66,24 @@ const formatStageName = (stageName: string): string => {
  * Get icon for stage
  */
 const getStageIcon = (stageName: string) => {
-  const iconMap: Record<string, React.ReactElement> = {
-    resumes_uploaded: <UploadIcon />,
-    resumes_processed: <DescriptionIcon />,
-    candidates_matched: <PersonIcon />,
-    candidates_shortlisted: <WorkIcon />,
-    candidates_interviewed: <InterviewIcon />,
-    candidates_hired: <HiredIcon />,
+  const iconMap: Record<string, string> = {
+    resumes_uploaded: 'upload',
+    resumes_processed: 'description',
+    candidates_matched: 'person',
+    candidates_shortlisted: 'work',
+    candidates_interviewed: 'school',
+    candidates_hired: 'celebration',
   };
-  return iconMap[stageName] || <CheckIcon />;
+  return iconMap[stageName] || 'check-circle';
 };
 
 /**
  * Get color for conversion rate
  */
 const getConversionColor = (rate: number): string => {
-  if (rate >= 0.7) return 'success.main';
-  if (rate >= 0.5) return 'warning.main';
-  return 'error.main';
+  if (rate >= 0.7) return '$success';
+  if (rate >= 0.5) return '$warning';
+  return '$error';
 };
 
 /**
@@ -189,19 +177,19 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
   if (loading) {
     return (
       <Box
-        sx={{
+        css={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          py: 8,
+          padding: '64px 0',
         }}
       >
-        <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <CircularProgress size={60} css={{ marginBottom: '24px' }} />
+        <Typography variant="h6" color="secondary">
           Loading funnel data...
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="secondary" css={{ marginTop: '8px' }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -216,7 +204,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchFunnelData} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchFunnelData} startIcon={<Icon name="refresh" />}>
             Retry
           </Button>
         }
@@ -234,27 +222,27 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
   return (
     <Stack spacing={3}>
       {/* Header Section */}
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Paper elevation={2} css={{ padding: '24px' }}>
+        <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <Box>
             <Typography variant="h5" fontWeight={600}>
               Recruitment Funnel
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2" color="secondary" css={{ marginTop: '4px' }}>
               Track candidate progression through the hiring pipeline
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box css={{ display: 'flex', gap: '8px' }}>
             <Button
               variant={autoRefreshEnabled ? 'contained' : 'outlined'}
-              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
+              startIcon={<Icon name={autoRefreshEnabled ? 'pause' : 'play-arrow'} />}
               onClick={toggleAutoRefresh}
               size="small"
               color={autoRefreshEnabled ? 'primary' : 'default'}
             >
               {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
             </Button>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchFunnelData} size="small">
+            <Button variant="outlined" startIcon={<Icon name="refresh" />} onClick={fetchFunnelData} size="small">
               Refresh
             </Button>
           </Box>
@@ -262,43 +250,43 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
 
         {/* Overall Metrics */}
         <Box
-          sx={{
+          css={{
             display: 'flex',
-            gap: 3,
-            mb: 4,
+            gap: '24px',
+            marginBottom: '32px',
             flexWrap: 'wrap',
           }}
         >
-          <Box sx={{ flex: '1 1 200px' }}>
-            <Typography variant="caption" color="text.secondary">
+          <Box css={{ flex: '1 1 200px' }}>
+            <Typography variant="caption" color="secondary">
               Total Resumes Uploaded
             </Typography>
-            <Typography variant="h4" fontWeight={700} color="primary.main">
+            <Typography variant="h4" fontWeight={700} color="$primary">
               {funnelData.total_resumes.toLocaleString()}
             </Typography>
           </Box>
-          <Box sx={{ flex: '1 1 200px' }}>
-            <Typography variant="caption" color="text.secondary">
+          <Box css={{ flex: '1 1 200px' }}>
+            <Typography variant="caption" color="secondary">
               Overall Hire Rate
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box css={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Typography
                 variant="h4"
                 fontWeight={700}
-                color={funnelData.overall_hire_rate >= 0.05 ? 'success.main' : 'warning.main'}
+                color={funnelData.overall_hire_rate >= 0.05 ? '$success' : '$warning'}
               >
                 {(funnelData.overall_hire_rate * 100).toFixed(2)}%
               </Typography>
               {funnelData.overall_hire_rate >= 0.05 ? (
-                <CheckIcon color="success" fontSize="small" />
+                <Icon name="check-circle" size={20} color="$success" />
               ) : (
-                <TrendingDownIcon color="warning" fontSize="small" />
+                <Icon name="trending-down" size={20} color="$warning" />
               )}
             </Box>
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider css={{ marginBottom: '24px' }} />
 
         {/* Funnel Stages */}
         <Stack spacing={2}>
@@ -315,66 +303,66 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
               <Card
                 key={stage.stage_name}
                 variant="outlined"
-                sx={{
+                css={{
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   '&:hover': {
                     transform: 'translateX(4px)',
-                    boxShadow: 2,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                   },
                 }}
               >
-                <CardContent sx={{ py: 2 }}>
+                <CardContent css={{ padding: '16px' }}>
                   <Box
-                    sx={{
+                    css={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      mb: 1.5,
+                      marginBottom: '12px',
                     }}
                   >
                     {/* Stage Name and Icon */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+                    <Box css={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
                       <Box
-                        sx={{
+                        css={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          width: 36,
-                          height: 36,
-                          borderRadius: 1,
-                          bgcolor: isLastStage ? 'success.light' : 'primary.light',
-                          color: isLastStage ? 'success.dark' : 'primary.dark',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '4px',
+                          backgroundColor: isLastStage ? '$successLight' : '$primaryLight',
+                          color: isLastStage ? '$successDark' : '$primaryDark',
                         }}
                       >
-                        {getStageIcon(stage.stage_name)}
+                        <Icon name={getStageIcon(stage.stage_name)} size={20} />
                       </Box>
                       <Box>
                         <Typography variant="subtitle1" fontWeight={600}>
                           {formatStageName(stage.stage_name)}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           Stage {index + 1} of {funnelData.stages.length}
                         </Typography>
                       </Box>
                     </Box>
 
                     {/* Count and Conversion Rate */}
-                    <Box sx={{ textAlign: 'right', minWidth: 150 }}>
-                      <Typography variant="h5" fontWeight={700} color="primary.main">
+                    <Box css={{ textAlign: 'right', minWidth: '150px' }}>
+                      <Typography variant="h5" fontWeight={700} color="$primary">
                         {stage.count.toLocaleString()}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                      <Box css={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
                         {index === 0 ? (
                           <Chip
                             label="Starting Point"
                             size="small"
                             color="info"
                             variant="outlined"
-                            sx={{ height: 20, fontSize: '0.7rem' }}
+                            css={{ height: '20px', fontSize: '0.7rem' }}
                           />
                         ) : (
                           <>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="secondary">
                               {(stage.conversion_rate * 100).toFixed(1)}% conversion
                             </Typography>
                             <Chip
@@ -382,7 +370,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
                               size="small"
                               color={stage.conversion_rate >= 0.5 ? 'success' : 'warning'}
                               variant="outlined"
-                              sx={{ height: 20, fontSize: '0.7rem' }}
+                              css={{ height: '20px', fontSize: '0.7rem' }}
                             />
                           </>
                         )}
@@ -392,20 +380,20 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
 
                   {/* Visual Funnel Bar */}
                   <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary">
+                    <Box css={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <Typography variant="caption" color="secondary">
                         Stage Width: {(stageWidth * 100).toFixed(1)}% of total
                       </Typography>
                     </Box>
                     <LinearProgress
                       variant="determinate"
                       value={stageWidth * 100}
-                      sx={{
-                        height: 12,
-                        borderRadius: 1,
-                        bgcolor: 'action.hover',
+                      css={{
+                        height: '12px',
+                        borderRadius: '4px',
+                        backgroundColor: '$hover',
                         '& .MuiLinearProgress-bar': {
-                          bgcolor: isLastStage ? 'success.main' : getConversionColor(stage.conversion_rate),
+                          backgroundColor: isLastStage ? '$success' : getConversionColor(stage.conversion_rate),
                         },
                       }}
                     />
@@ -413,8 +401,8 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
 
                   {/* Drop-off Information (if not first stage) */}
                   {index > 0 && previousStage && (
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
+                    <Box css={{ marginTop: '8px' }}>
+                      <Typography variant="caption" color="secondary">
                         {(previousStage.count - stage.count).toLocaleString()} candidates dropped from previous stage
                       </Typography>
                     </Box>
@@ -427,7 +415,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
 
         {/* Insights */}
         {funnelData.stages.length > 0 && (
-          <Box sx={{ mt: 3 }}>
+          <Box css={{ marginTop: '24px' }}>
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>
               Pipeline Insights
             </Typography>
@@ -440,7 +428,7 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
 
                 return (
                   dropOffRate > 0.3 && previousStage && (
-                    <Typography key={stage.stage_name} variant="body2" color="text.secondary">
+                    <Typography key={stage.stage_name} variant="body2" color="secondary">
                       <strong>{formatStageName(stage.stage_name)}:</strong> {(dropOffRate * 100).toFixed(1)}% drop-off
                       from {formatStageName(previousStage.stage_name)}
                     </Typography>
@@ -448,8 +436,8 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
                 );
               })}
               {funnelData.stages.every((stage, index) => index === 0 || 1 - stage.conversion_rate <= 0.3) && (
-                <Typography variant="body2" color="success.main">
-                  <CheckIcon fontSize="inherit" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                <Typography variant="body2" color="$success">
+                  <Icon name="check-circle" size={16} css={{ verticalAlign: 'middle', marginRight: '4px' }} />
                   Pipeline shows healthy conversion rates across all stages
                 </Typography>
               )}

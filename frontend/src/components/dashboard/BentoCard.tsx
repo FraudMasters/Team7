@@ -1,4 +1,4 @@
-import { Card, CardContent, Box, Typography, SxProps, Theme } from '@mui/material';
+import { Card, CardContent, Box, Typography } from '@/components/ui';
 
 const colorMap = {
   primary: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -14,7 +14,7 @@ interface BentoCardProps {
   icon?: React.ReactNode;
   color?: 'primary' | 'secondary' | 'success' | 'warning';
   delay?: number;
-  sx?: SxProps<Theme>;
+  sx?: React.CSSProperties;
 }
 
 export function BentoCard({ title, value, subtitle, icon, color = 'primary', delay = 0, sx }: BentoCardProps) {
@@ -38,7 +38,7 @@ export function BentoCard({ title, value, subtitle, icon, color = 'primary', del
         ...sx,
       }}
     >
-      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardContent disableGutters sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
         <Box
           sx={{
             width: 48,
@@ -53,14 +53,14 @@ export function BentoCard({ title, value, subtitle, icon, color = 'primary', del
         >
           {icon}
         </Box>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
+        <Typography variant="body2" color="secondary" gutterBottom>
           {title}
         </Typography>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {value}
         </Typography>
         {subtitle && (
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="secondary">
             {subtitle}
           </Typography>
         )}

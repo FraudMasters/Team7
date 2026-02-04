@@ -23,11 +23,8 @@ import {
   Select,
   SelectChangeEvent,
   MenuItem,
-} from '@mui/material';
-import {
-  Download as DownloadIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Public taxonomy response from backend
@@ -236,7 +233,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchTaxonomies} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchTaxonomies} startIcon={<Icon name="refresh-cw" />}>
             Try Again
           </Button>
         }
@@ -255,7 +252,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
           <Typography variant="h5" fontWeight={600}>
             Browse Public Taxonomies
           </Typography>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchTaxonomies} size="small">
+          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchTaxonomies} size="small">
             Refresh
           </Button>
         </Box>
@@ -315,7 +312,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
                       variant="outlined"
                       size="small"
                       startIcon={
-                        forking === taxonomy.id ? <CircularProgress size={14} /> : <DownloadIcon />
+                        forking === taxonomy.id ? <CircularProgress size={14} /> : <Icon name="download" />
                       }
                       onClick={() => handleForkClick(taxonomy)}
                       disabled={forking !== null}
@@ -406,7 +403,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
             onClick={handleForkConfirm}
             variant="contained"
             disabled={forking !== null}
-            startIcon={forking ? <CircularProgress size={16} /> : <DownloadIcon />}
+            startIcon={forking ? <CircularProgress size={16} /> : <Icon name="download" />}
           >
             {forking ? 'Forking...' : 'Fork'}
           </Button>

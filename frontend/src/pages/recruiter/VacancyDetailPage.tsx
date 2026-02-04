@@ -21,6 +21,7 @@ import { useJob } from '../../hooks/useJobs';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import BestFitCandidates from '../../components/BestFitCandidates';
 
 export function VacancyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -158,6 +159,11 @@ export function VacancyDetailPage() {
           </Stack>
         </Stack>
       </Paper>
+
+      {/* Best Fit Candidates Section */}
+      <Box sx={{ mt: 4 }}>
+        <BestFitCandidates vacancyId={vacancy.id} vacancyTitle={vacancy.title} />
+      </Box>
       </Container>
     </PageTransition>
   );

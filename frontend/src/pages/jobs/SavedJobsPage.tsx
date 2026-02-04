@@ -7,8 +7,8 @@ import {
   Paper,
   Box,
   Button,
-} from '@mui/material';
-import { Search as SearchIcon, Bookmark as BookmarkIcon } from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
 import { useSavedJobs, useRemoveSavedJob } from '../../hooks/useSavedJobs';
 import { JobCard } from '../../components/jobs/JobCard';
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,7 +45,7 @@ export function SavedJobsPage() {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           Saved Jobs
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           Your bookmarked job opportunities
         </Typography>
       </Box>
@@ -64,14 +64,14 @@ export function SavedJobsPage() {
           placeholder="Search saved jobs..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+          inputProps={{
+            startAdornment: <Icon name="search" size={20} color="secondary" sx={{ mr: 1 }} />,
           }}
           sx={{ flexGrow: 1, minWidth: 200 }}
         />
         <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <BookmarkIcon color="primary" />
-          <Typography variant="body2" color="text.secondary">
+          <Icon name="bookmark" size={20} color="primary" filled />
+          <Typography variant="body2" color="secondary">
             {data?.total || 0} saved
           </Typography>
         </Box>
@@ -88,17 +88,17 @@ export function SavedJobsPage() {
         />
       ) : filteredJobs.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <BookmarkIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Icon name="bookmark" size={64} color="secondary" sx={{ mb: 2 }} filled />
+          <Typography variant="h6" color="secondary" gutterBottom>
             {searchTerm ? 'No saved jobs match your search' : 'No saved jobs yet'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             {searchTerm
               ? 'Try adjusting your search terms'
               : 'Start bookmarking jobs to see them here'}
           </Typography>
           {!searchTerm && (
-            <Button variant="contained" component="a" href="/jobs">
+            <Button variant="contained" as="a" href="/jobs">
               Browse Jobs
             </Button>
           )}

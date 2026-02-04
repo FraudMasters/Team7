@@ -25,16 +25,8 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
-} from '@mui/material';
-import {
-  Upload as UploadIcon,
-  Delete as DeleteIcon,
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  FolderOpen as FolderIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import Icon from '@/components/ui/primitives/Icon';
 import ErrorBoundary from '@components/ErrorBoundary';
 
 const API_URL = (window as any).env?.REACT_APP_API_URL || 'http://localhost:8000';
@@ -579,7 +571,7 @@ const BatchUploadPage: React.FC = () => {
               size="small"
               onClick={clearDraft}
               color="secondary"
-              startIcon={<DeleteIcon />}
+              startIcon={<Icon name="Trash2" size="small" />}
             >
               Clear Draft
             </Button>
@@ -631,7 +623,7 @@ const BatchUploadPage: React.FC = () => {
                   disabled={uploading}
                   sx={{ minWidth: 44, minHeight: 44 }}
                 >
-                  <DeleteIcon fontSize="small" />
+                  <Icon name="X" size="small" />
                 </IconButton>
               </Box>
             }
@@ -694,7 +686,10 @@ const BatchUploadPage: React.FC = () => {
                     style={{ display: 'none' }}
                     onChange={handleFileSelect}
                   />
-                  <UploadIcon
+                  <Icon
+                    name="Upload"
+                    size={48}
+                    color="primary"
                     sx={{
                       fontSize: { xs: 36, md: 48 },
                       color: 'primary.main',
@@ -823,10 +818,10 @@ const BatchUploadPage: React.FC = () => {
                                 {(fileItem.file.size / 1024).toFixed(1)} KB
                               </TableCell>
                               <TableCell>
-                                {fileItem.status === 'success' && <CheckIcon color="success" fontSize="small" />}
+                                {fileItem.status === 'success' && <Icon name="Check" size="small" color="success" />}
                                 {fileItem.status === 'error' && (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <ErrorIcon color="error" fontSize="small" />
+                                    <Icon name="AlertCircle" size="small" color="error" />
                                     <Typography
                                       variant="caption"
                                       color="error"
@@ -843,7 +838,7 @@ const BatchUploadPage: React.FC = () => {
                                 )}
                                 {fileItem.status === 'cancelled' && (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <CloseIcon color="disabled" fontSize="small" />
+                                    <Icon name="X" size="small" color="disabled" />
                                     <Typography variant="caption" color="text.secondary">
                                       Cancelled
                                     </Typography>
@@ -868,7 +863,7 @@ const BatchUploadPage: React.FC = () => {
                                       color="error"
                                       sx={{ minWidth: 44, minHeight: 44 }}
                                     >
-                                      <CloseIcon fontSize="small" />
+                                      <Icon name="X" size="small" color="error" />
                                     </IconButton>
                                   </Tooltip>
                                 )}
@@ -890,7 +885,7 @@ const BatchUploadPage: React.FC = () => {
                                     title="Retry this file"
                                     sx={{ minWidth: 44, minHeight: 44 }}
                                   >
-                                    <RefreshIcon fontSize="small" />
+                                    <Icon name="RefreshCw" size="small" color="primary" />
                                   </IconButton>
                                 )}
                                 {fileItem.status === 'cancelled' && (
@@ -910,7 +905,7 @@ const BatchUploadPage: React.FC = () => {
                                     title="Retry this file"
                                     sx={{ minWidth: 44, minHeight: 44 }}
                                   >
-                                    <RefreshIcon fontSize="small" />
+                                    <Icon name="RefreshCw" size="small" color="primary" />
                                   </IconButton>
                                 )}
                                 <IconButton
@@ -920,7 +915,7 @@ const BatchUploadPage: React.FC = () => {
                                   title="Remove file"
                                   sx={{ minWidth: 44, minHeight: 44 }}
                                 >
-                                  <DeleteIcon fontSize="small" />
+                                  <Icon name="Trash2" size="small" />
                                 </IconButton>
                               </TableCell>
                             </TableRow>
@@ -946,7 +941,7 @@ const BatchUploadPage: React.FC = () => {
                     size="large"
                     onClick={handleUpload}
                     disabled={uploading || files.length === 0}
-                    startIcon={uploading ? undefined : <UploadIcon />}
+                    startIcon={uploading ? undefined : <Icon name="Upload" />}>
                     fullWidth
                     sx={{ minHeight: 48 }}
                   >
@@ -981,7 +976,7 @@ const BatchUploadPage: React.FC = () => {
               >
                 <Button
                   variant="outlined"
-                  startIcon={<RefreshIcon />}
+                  startIcon={<Icon name="RefreshCw" size="small" />}
                   onClick={() => fetchBatchResults()}
                   disabled={currentBatch.status !== 'completed'}
                   fullWidth={{ xs: true, sm: false }}
@@ -1117,7 +1112,7 @@ const BatchUploadPage: React.FC = () => {
               onClick={() => window.location.reload()}
               sx={{ minWidth: 44, minHeight: 44 }}
             >
-              <RefreshIcon />
+              <Icon name="RefreshCw" />
             </IconButton>
           </Box>
           <BatchList />

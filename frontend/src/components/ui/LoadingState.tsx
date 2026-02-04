@@ -1,26 +1,26 @@
-import { CircularProgress, Box, Typography, SxProps, Theme } from '@mui/material';
+import { CircularProgress, Box, Typography } from '@/components/ui';
 
 export interface LoadingStateProps {
   message?: string;
   size?: number | string;
   color?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info';
-  sx?: SxProps<Theme>;
+  css?: any;
 }
 
-export function LoadingState({ message, size = 48, color = 'primary', sx }: LoadingStateProps) {
+export function LoadingState({ message, size = 48, color = 'primary', css }: LoadingStateProps) {
   return (
     <Box
-      sx={{
+      css={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        ...sx,
+        ...css,
       }}
     >
       <CircularProgress size={size} color={color} />
       {message && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        <Typography variant="body2" color="secondary" css={{ mt: '$md' }}>
           {message}
         </Typography>
       )}

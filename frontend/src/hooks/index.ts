@@ -27,7 +27,6 @@ export {
 } from './useGlobalKeyboardShortcuts';
 
 export {
-  useWebSocket,
-  type UseWebSocketOptions,
-  type UseWebSocketReturn,
-} from './useWebSocket';
+  useAuth,
+  type AuthContextValue,
+} from './useAuth';

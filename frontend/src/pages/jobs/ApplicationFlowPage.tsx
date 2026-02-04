@@ -13,7 +13,7 @@ import {
   Stack,
   CircularProgress,
   Alert,
-} from '@mui/material';
+} from '@/components/ui';
 import { useJob } from '../../hooks/useJobs';
 import ResumeUploader from '../../components/ResumeUploader';
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Box, Tabs, Tab } from '@mui/material';
+import { Typography, Box, Tabs, Tab } from '@/components/ui';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AnalysisResults from '@components/AnalysisResults';

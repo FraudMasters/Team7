@@ -8,13 +8,8 @@ import {
   Stack,
   Chip,
   IconButton,
-} from '@mui/material';
-import {
-  LocationOn,
-  WorkOutline,
-  BookmarkBorder,
-  Bookmark,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
 import type { JobVacancy } from '../../hooks/useJobs';
 
 interface JobCardProps {
@@ -35,7 +30,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
 
   return (
     <Card
-      component={Link}
+      as={Link}
       to={`/jobs/${job.id}`}
       sx={{
         textDecoration: 'none',
@@ -49,16 +44,16 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
         },
       }}
     >
-      <CardContent sx={{ flexGrow: 1, p: 3 }}>
+      <CardContent sx={{ flexGrow: 1, padding: 3 }}>
         {/* Header with title and bookmark */}
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" fontWeight={600} color="text.primary" gutterBottom>
+            <Typography variant="h6" fontWeight={600} color="primary" gutterBottom>
               {job.title}
             </Typography>
             {job.location && (
-              <Stack direction="row" spacing={1} alignItems="center" color="text.secondary">
-                <LocationOn sx={{ fontSize: 16 }} />
+              <Stack direction="row" spacing={1} alignItems="center" color="secondary">
+                <Icon name="map-pin" size={16} />
                 <Typography variant="body2">{job.location}</Typography>
               </Stack>
             )}
@@ -69,14 +64,14 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
             sx={{ ml: 1 }}
             aria-label={saved ? 'Remove from saved' : 'Save job'}
           >
-            {saved ? <Bookmark color="primary" /> : <BookmarkBorder />}
+            <Icon name={saved ? 'bookmark' : 'bookmark'} size={20} color={saved ? 'primary' : 'inherit'} filled={saved} />
           </IconButton>
         </Stack>
 
         {/* Description truncated to 2 lines */}
         <Typography
           variant="body2"
-          color="text.secondary"
+          color="secondary"
           sx={{
             mb: 2,
             display: '-webkit-box',
@@ -89,8 +84,8 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
         </Typography>
 
         {/* Work format and experience */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="text.secondary">
-          <WorkOutline sx={{ fontSize: 16 }} />
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="secondary">
+          <Icon name="briefcase" size={16} />
           <Typography variant="body2">
             {job.min_experience_months > 0 && `${Math.floor(job.min_experience_months / 12)}+ years`}
             {job.work_format && ` • ${job.work_format}`}

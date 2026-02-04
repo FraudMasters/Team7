@@ -12,15 +12,8 @@ import {
   Button,
   TextField,
   InputAdornment,
-} from '@mui/material';
-import {
-  School as LearningIcon,
-  Search as SearchIcon,
-  PlayArrow as PlayIcon,
-  CheckCircle as CompletedIcon,
-  Schedule as DurationIcon,
-  TrendingUp as LevelIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { PageTransition } from '../../components/ui/PageTransition';
 
 interface Course {

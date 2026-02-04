@@ -17,15 +17,8 @@ import {
   Divider,
   Card,
   CardContent,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Remove as TrendingFlatIcon,
-  Compare as CompareIcon,
-  Speed as SpeedIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Weight profile interface
@@ -164,7 +157,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
   const getRankChangeConfig = (rankChange: number) => {
     if (rankChange > 0) {
       return {
-        icon: <TrendingUpIcon />,
+        icon: <Icon name="trending-up" />,
         label: `+${rankChange}`,
         color: 'success' as const,
         bgColor: 'success.50',
@@ -173,7 +166,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
     }
     if (rankChange < 0) {
       return {
-        icon: <TrendingDownIcon />,
+        icon: <Icon name="trending-down" />,
         label: `${rankChange}`,
         color: 'error' as const,
         bgColor: 'error.50',
@@ -181,7 +174,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
       };
     }
     return {
-      icon: <TrendingFlatIcon />,
+      icon: <Icon name="minus" />,
       label: '0',
       color: 'default' as const,
       bgColor: 'grey.50',
@@ -307,7 +300,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <CompareIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+            <Icon name="git-compare" sx={{ fontSize: 32, color: 'primary.main' }} />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 Weight Profile Comparison
@@ -317,7 +310,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
+          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchComparison} size="small">
             Refresh
           </Button>
         </Box>
@@ -384,7 +377,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
       {/* Statistical Summary */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <SpeedIcon sx={{ mr: 1, fontSize: 24, color: 'info.main' }} />
+          <Icon name="gauge" sx={{ mr: 1, fontSize: 24, color: 'info.main' }} />
           <Typography variant="h6" fontWeight={600}>
             Statistical Summary
           </Typography>

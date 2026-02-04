@@ -11,14 +11,8 @@ import {
   Card,
   CardContent,
   Chip,
-} from '@mui/material';
-import {
-  AttachMoney as SalaryIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  LocationOn as LocationIcon,
-  Work as WorkIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { PageTransition } from '../../components/ui/PageTransition';
 
 interface SalaryData {

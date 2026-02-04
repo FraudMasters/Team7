@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Typography, Box } from '@mui/material';
+import { Container, Typography, Box } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import MatchingWeightsEditor from '@components/MatchingWeightsEditor';
 
@@ -22,7 +22,7 @@ const MatchingWeightsSettingsPage: React.FC = () => {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {t('matchingWeights.title', { defaultValue: 'Matching Algorithm Weights' })}
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           {t('matchingWeights.subtitle', { defaultValue: 'Customize how candidate-vacancy matching algorithms are weighted for your organization' })}
         </Typography>
       </Box>

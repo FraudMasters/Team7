@@ -62,7 +62,7 @@ test.describe('Responsive Design - Mobile (375px)', () => {
 
     // On mobile (< sm breakpoint which is 600px), should show hamburger menu button
     // Look for the button in the AppBar (not the drawer)
-    const hamburgerMenu = page.locator('.MuiAppBar-root button').filter({ hasText: '' }).and(
+    const hamburgerMenu = page.locator('header button, [role="banner"] button').filter({ hasText: '' }).and(
       page.locator('button').filter(async (el, _) => {
         const ariaLabel = await el.getAttribute('aria-label');
         return ariaLabel && (ariaLabel.includes('menu') || ariaLabel.includes('Menu'));
@@ -75,7 +75,7 @@ test.describe('Responsive Design - Mobile (375px)', () => {
       await expect(hamburgerMenu.first()).toBeVisible({ timeout: 10000 });
     } else {
       // Alternative: check that the AppBar has at least one button (language switcher, etc.)
-      const appBarButtons = page.locator('.MuiAppBar-root button');
+      const appBarButtons = page.locator('header button, [role="banner"] button');
       await expect(appBarButtons.first()).toBeVisible();
     }
   });
@@ -85,11 +85,11 @@ test.describe('Responsive Design - Mobile (375px)', () => {
     await page.waitForLoadState('networkidle');
 
     // App bar/brand should be visible
-    const appBar = page.locator('.MuiAppBar-root');
+    const appBar = page.locator('header, [role="banner"]');
     await expect(appBar).toBeVisible();
 
     // Feature cards should be visible on mobile
-    const allCards = page.locator('.MuiCard-root');
+    const allCards = page.locator('.card');
     await expect(allCards.first()).toBeVisible({ timeout: 10000 });
 
     // On mobile, cards should be visible and responsive
@@ -140,7 +140,7 @@ test.describe('Responsive Design - Mobile (375px)', () => {
     await page.waitForLoadState('networkidle');
 
     // Check button sizes (should be at least 44x44px for touch)
-    const buttons = page.locator('button, .MuiIconButton-root, a[role="button"]');
+    const buttons = page.locator('button, a[role="button"]');
 
     const count = await buttons.count();
     if (count > 0) {
@@ -184,11 +184,11 @@ test.describe('Responsive Design - Tablet (768px)', () => {
     await page.waitForLoadState('networkidle');
 
     // App bar should be visible
-    const appBar = page.locator('.MuiAppBar-root');
+    const appBar = page.locator('header, [role="banner"]');
     await expect(appBar).toBeVisible();
 
     // Feature cards should use 2-column grid on tablet
-    const cards = page.locator('.MuiCard-root');
+    const cards = page.locator('.card');
     await expect(cards.first()).toBeVisible({ timeout: 10000 });
 
     const count = await cards.count();
@@ -229,7 +229,7 @@ test.describe('Responsive Design - Tablet (768px)', () => {
     }
 
     // Desktop navigation should be visible on tablet
-    const navButtons = page.locator('.MuiAppBar-root button');
+    const navButtons = page.locator('header button, [role="banner"] button');
     expect(await navButtons.count()).toBeGreaterThan(0);
   });
 });
@@ -267,7 +267,7 @@ test.describe('Responsive Design - Desktop (1920px)', () => {
     }
 
     // Should have navigation buttons (desktop menu items)
-    const navButtons = page.locator('.MuiAppBar-root button');
+    const navButtons = page.locator('header button, [role="banner"] button');
     const navCount = await navButtons.count();
     expect(navCount).toBeGreaterThan(0);
   });
@@ -277,11 +277,11 @@ test.describe('Responsive Design - Desktop (1920px)', () => {
     await page.waitForLoadState('networkidle');
 
     // App bar should be visible with full width
-    const appBar = page.locator('.MuiAppBar-root');
+    const appBar = page.locator('header, [role="banner"]');
     await expect(appBar).toBeVisible();
 
     // Feature cards should be in 3-4 column grid on desktop
-    const cards = page.locator('.MuiCard-root');
+    const cards = page.locator('.card');
     await expect(cards.first()).toBeVisible({ timeout: 10000 });
 
     const count = await cards.count();
@@ -309,7 +309,7 @@ test.describe('Responsive Design - Desktop (1920px)', () => {
     await page.waitForLoadState('networkidle');
 
     // Vacancy cards should be in 3-column grid on desktop
-    const cards = page.locator('.MuiCard-root');
+    const cards = page.locator('.card');
     const count = await cards.count();
 
     if (count > 0) {
@@ -329,7 +329,7 @@ test.describe('Responsive Design - Desktop (1920px)', () => {
     await page.waitForLoadState('networkidle');
 
     // Resume cards should be in grid layout
-    const cards = page.locator('.MuiCard-root');
+    const cards = page.locator('.card');
     const count = await cards.count();
 
     if (count > 0) {
@@ -357,7 +357,7 @@ test.describe('Responsive Design - Cross-Viewport Consistency', () => {
       await page.waitForLoadState('networkidle');
 
       // Main content should be visible
-      const mainContent = page.locator('main, #root, .MuiContainer-root').first();
+      const mainContent = page.locator('main, #root, .container').first();
       await expect(mainContent).toBeVisible();
 
       // Check for critical console errors

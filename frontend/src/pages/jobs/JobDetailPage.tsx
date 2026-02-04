@@ -9,14 +9,8 @@ import {
   Button,
   Divider,
   CircularProgress,
-  Grid,
-} from '@mui/material';
-import {
-  LocationOn,
-  WorkOutline,
-  AttachMoney,
-  Business,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
 import { useJob } from '../../hooks/useJobs';
 
 export function JobDetailPage() {
@@ -63,21 +57,21 @@ export function JobDetailPage() {
             <Typography variant="h3" fontWeight={700} gutterBottom>
               {job.title}
             </Typography>
-            <Stack direction="row" spacing={2} flexWrap="wrap" color="text.secondary">
+            <Stack direction="row" spacing={2} flexWrap="wrap" color="secondary">
               {job.industry && (
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Business sx={{ fontSize: 18 }} />
+                  <Icon name="building" size={18} />
                   <Typography>{job.industry}</Typography>
                 </Stack>
               )}
               {job.location && (
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOn sx={{ fontSize: 18 }} />
+                  <Icon name="map-pin" size={18} />
                   <Typography>{job.location}</Typography>
                 </Stack>
               )}
               <Stack direction="row" spacing={1} alignItems="center">
-                <WorkOutline sx={{ fontSize: 18 }} />
+                <Icon name="briefcase" size={18} />
                 <Typography>
                   {job.work_format && `${job.work_format}`}
                   {job.min_experience_months > 0 && ` • ${Math.floor(job.min_experience_months / 12)}+ years`}
@@ -90,9 +84,9 @@ export function JobDetailPage() {
 
           {/* Salary */}
           {job.salary_min && (
-            <Stack direction="row" spacing={1} alignItems="center" color="success.main">
-              <AttachMoney sx={{ fontSize: 20 }} />
-              <Typography variant="h6" fontWeight={600} color="success.main">
+            <Stack direction="row" spacing={1} alignItems="center" color="success">
+              <Icon name="dollar-sign" size={20} />
+              <Typography variant="h6" fontWeight={600} color="success">
                 {job.salary_min.toLocaleString()}
                 {job.salary_max && ` - ${job.salary_max.toLocaleString()}`}
               </Typography>
@@ -128,7 +122,7 @@ export function JobDetailPage() {
             </Typography>
             <Typography
               variant="body1"
-              color="text.secondary"
+              color="secondary"
               sx={{
                 whiteSpace: 'pre-wrap',
                 lineHeight: 1.8,

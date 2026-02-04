@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Typography,
@@ -10,21 +10,11 @@ import {
   IconButton,
   CircularProgress,
   Alert,
-  Chip,
-  Fade,
-} from '@mui/material';
-import {
-  Close as CloseIcon,
-  PictureAsPdf as PdfIcon,
-  Refresh as RefreshIcon,
-  Schedule as TimeIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
 import KeyMetrics from '@components/analytics/KeyMetrics';
-import PredictiveAnalytics from '@components/analytics/PredictiveAnalytics';
 import SkillDemandChart from '@components/analytics/SkillDemandChart';
 import ReportBuilder from '@components/analytics/ReportBuilder';
 
@@ -49,14 +39,6 @@ const AnalyticsDashboardPage: React.FC = () => {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
-
-  // Real-time refresh state
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
-  const [refreshKey, setRefreshKey] = useState(0);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const REFRESH_INTERVAL = 60000; // 60 seconds
 
   /**
    * Handle date range change from DateRangeFilter component
@@ -111,125 +93,27 @@ const AnalyticsDashboardPage: React.FC = () => {
     }
   };
 
-  /**
-   * Trigger refresh of all dashboard components
-   */
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      // Increment refresh key to trigger child component updates
-      setRefreshKey((prev) => prev + 1);
-      setLastRefreshTime(new Date());
-
-      // Simulate refresh delay for visual feedback
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  /**
-   * Toggle auto-refresh
-   */
-  const toggleAutoRefresh = useCallback(() => {
-    setAutoRefreshEnabled((prev) => !prev);
-  }, []);
-
-  /**
-   * Setup auto-refresh polling
-   */
-  useEffect(() => {
-    if (!autoRefreshEnabled) {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
-      return;
-    }
-
-    refreshIntervalRef.current = setInterval(() => {
-      handleRefresh();
-    }, REFRESH_INTERVAL);
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-    };
-  }, [autoRefreshEnabled, handleRefresh]);
-
-  /**
-   * Initial data fetch on mount
-   */
-  useEffect(() => {
-    handleRefresh();
-  }, []);
-
   return (
     <>
       <Container maxWidth="xl" sx={{ py: 4 }} className="analytics-dashboard">
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+            <Typography variant="h4" as="h1" fontWeight={700} gutterBottom>
               {t('analyticsDashboard.title')}
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+            <Typography variant="body1" color="secondary">
               {t('analyticsDashboard.subtitle')}
             </Typography>
-
-            {/* Refresh Status Indicator */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-              <Chip
-                icon={autoRefreshEnabled ? <PlayIcon fontSize="small" /> : <PauseIcon fontSize="small" />}
-                label={autoRefreshEnabled ? 'Auto-refresh enabled' : 'Auto-refresh paused'}
-                size="small"
-                color={autoRefreshEnabled ? 'success' : 'default'}
-                variant="outlined"
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <TimeIcon fontSize="small" color="action" />
-                <Typography variant="caption" color="text.secondary">
-                  Last updated: {lastRefreshTime.toLocaleTimeString()}
-                </Typography>
-              </Box>
-              {isRefreshing && (
-                <Fade in={isRefreshing}>
-                  <CircularProgress size={16} sx={{ ml: 1 }} />
-                </Fade>
-              )}
-            </Box>
           </Box>
-
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button
-              variant={autoRefreshEnabled ? 'contained' : 'outlined'}
-              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
-              onClick={toggleAutoRefresh}
-              color={autoRefreshEnabled ? 'primary' : 'default'}
-              size="small"
-              sx={{ minWidth: 120 }}
-            >
-              {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={isRefreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              size="small"
-            >
-              Refresh All
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<PdfIcon />}
-              onClick={handleOpenReportBuilder}
-              color="primary"
-            >
-              Generate Report
-            </Button>
-          </Box>
+          <Button
+            variant="contained"
+            startIcon={<Icon name="file" size={20} />}
+            onClick={handleOpenReportBuilder}
+            color="primary"
+          >
+            Generate Report
+          </Button>
         </Box>
 
         {/* Date Range Filter */}
@@ -244,25 +128,12 @@ const AnalyticsDashboardPage: React.FC = () => {
 
         {/* Key Metrics */}
         <Box sx={{ mb: 4 }}>
-          <KeyMetrics
-            startDate={dateRange.startDate}
-            endDate={dateRange.endDate}
-            refreshKey={refreshKey}
-          />
+          <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
         </Box>
 
         {/* Skill Demand */}
         <Box sx={{ mb: 4 }}>
-          <SkillDemandChart
-            startDate={dateRange.startDate}
-            endDate={dateRange.endDate}
-            refreshKey={refreshKey}
-          />
-        </Box>
-
-        {/* Predictive Analytics */}
-        <Box sx={{ mb: 4 }}>
-          <PredictiveAnalytics refreshKey={refreshKey} />
+          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
         </Box>
 
         {/* Placeholder for disabled features */}
@@ -292,7 +163,7 @@ const AnalyticsDashboardPage: React.FC = () => {
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Button
                 variant="contained"
-                startIcon={generatingReport ? <CircularProgress size={16} /> : <PdfIcon />}
+                startIcon={generatingReport ? <CircularProgress size={16} /> : <Icon name="file" size={20} />}
                 onClick={handleGeneratePDF}
                 disabled={generatingReport}
                 color="primary"
@@ -304,7 +175,7 @@ const AnalyticsDashboardPage: React.FC = () => {
                 disabled={generatingReport}
                 size="small"
               >
-                <CloseIcon />
+                <Icon name="x" size={20} />
               </IconButton>
             </Box>
           </Box>
@@ -328,7 +199,7 @@ const AnalyticsDashboardPage: React.FC = () => {
       {/* Print-specific styles - only applied when printing */}
       <style>{`
         @media print {
-          .analytics-dashboard .MuiButton-root:not([data-print-include]) {
+          .analytics-dashboard button:not([data-print-include]) {
             display: none !important;
           }
           body {

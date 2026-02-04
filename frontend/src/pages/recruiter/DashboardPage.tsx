@@ -1,5 +1,4 @@
-import { Container, Box, Typography, Grid, Paper } from '@mui/material';
-import { Speed as SpeedIcon, People as PeopleIcon, Work as WorkIcon, TrendingUp as TrendingIcon } from '@mui/icons-material';
+import { Container, Box, Typography, Grid, Paper, Icon } from '@/components/ui';
 import { BentoCard } from '../../components/dashboard/BentoCard';
 import { useRecruiterAnalytics, useCandidates, useRecruiterVacancies } from '../../hooks/useRecruiterData';
 
@@ -17,7 +16,7 @@ export function DashboardPage() {
         <Typography variant="h4" fontWeight={700}>
           Recruiter Dashboard
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           Welcome back! Here's what's happening today.
         </Typography>
       </Box>
@@ -29,7 +28,7 @@ export function DashboardPage() {
             title="Active Jobs"
             value={vacancyCount}
             subtitle="Open positions"
-            icon={<WorkIcon sx={{ color: 'white' }} />}
+            icon={<Icon name="briefcase" size={24} sx={{ color: '#fff' }} />}
             color="primary"
           />
         </Grid>
@@ -38,7 +37,7 @@ export function DashboardPage() {
             title="Total Candidates"
             value={candidateCount}
             subtitle="In pipeline"
-            icon={<PeopleIcon sx={{ color: 'white' }} />}
+            icon={<Icon name="users" size={24} sx={{ color: '#fff' }} />}
             color="secondary"
           />
         </Grid>
@@ -47,7 +46,7 @@ export function DashboardPage() {
             title="Time to Hire"
             value={analytics?.time_to_hire ? `${analytics.time_to_hire}d` : '--'}
             subtitle="Average days"
-            icon={<SpeedIcon sx={{ color: 'white' }} />}
+            icon={<Icon name="zap" size={24} sx={{ color: '#fff' }} />}
             color="success"
           />
         </Grid>
@@ -56,7 +55,7 @@ export function DashboardPage() {
             title="Applications/Job"
             value={analytics?.applications_per_job?.toFixed(1) || '--'}
             subtitle="This month"
-            icon={<TrendingIcon sx={{ color: 'white' }} />}
+            icon={<Icon name="trending-up" size={24} sx={{ color: '#fff' }} />}
             color="warning"
           />
         </Grid>
@@ -69,7 +68,7 @@ export function DashboardPage() {
             Pipeline Funnel
           </Typography>
           <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="secondary">
               Pipeline metrics will be displayed here...
             </Typography>
           </Box>

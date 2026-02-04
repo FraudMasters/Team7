@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Box, BoxProps } from '@mui/material';
+import { Box } from '@/components/ui/primitives';
 
 /**
  * PageTransition Props
@@ -7,7 +7,7 @@ import { Box, BoxProps } from '@mui/material';
  * Wrapper component for smooth page transitions using CSS animations.
  * Provides fade + slide animations without external dependencies.
  */
-export interface PageTransitionProps extends BoxProps {
+export interface PageTransitionProps {
   /** Content to animate */
   children: ReactNode;
   /** Animation duration in milliseconds (default: 350ms) */
@@ -16,6 +16,10 @@ export interface PageTransitionProps extends BoxProps {
   delay?: number;
   /** Enable exit animation (default: true) - note: exit animation requires React transition group */
   exit?: boolean;
+  /** Additional class name */
+  className?: string;
+  /** CSS styles */
+  css?: any;
 }
 
 /**
@@ -36,13 +40,13 @@ const PageTransition: React.FC<PageTransitionProps> = ({
   duration = 350,
   delay = 0,
   className,
-  sx,
+  css,
   ...boxProps
 }) => {
   return (
     <Box
       className={className}
-      sx={{
+      css={{
         animation: `pageFadeIn ${duration}ms ease-out ${delay}ms both`,
         '@keyframes pageFadeIn': {
           '0%': {
@@ -54,7 +58,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
             transform: 'translateY(0)',
           },
         },
-        ...sx,
+        ...css,
       }}
       {...boxProps}
     >

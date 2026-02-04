@@ -14,13 +14,8 @@ import {
   Alert,
   Stack,
   Button,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Cancel as CrossIcon,
-  Refresh as RefreshIcon,
-  Person as PersonIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Individual skill match interface
@@ -170,7 +165,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
       return {
         color: 'success' as const,
         label: 'Excellent',
-        bgColor: 'success.main',
+        bgColor: 'success',
         textColor: 'success.contrastText',
       };
     }
@@ -178,14 +173,14 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
       return {
         color: 'warning' as const,
         label: 'Moderate',
-        bgColor: 'warning.main',
+        bgColor: 'warning',
         textColor: 'warning.contrastText',
       };
     }
     return {
       color: 'error' as const,
       label: 'Poor',
-      bgColor: 'error.main',
+      bgColor: 'error',
       textColor: 'error.contrastText',
     };
   };
@@ -205,10 +200,10 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <Typography variant="h6" color="secondary">
           Comparing resumes...
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
           Analyzing {resumeIds.length} resumes against vacancy requirements
         </Typography>
       </Box>
@@ -223,7 +218,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchComparison} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchComparison} startIcon={<Icon name="refresh-cw" size={16} />}>
             Retry
           </Button>
         }
@@ -266,11 +261,11 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
             <Typography variant="h5" fontWeight={600}>
               Resume Comparison Matrix
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2" color="secondary" sx={{ mt: 0.5 }}>
               Vacancy: <strong>{vacancyId}</strong> • Comparing <strong>{resumeIds.length}</strong> resumes
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
+          <Button variant="outlined" startIcon={<Icon name="refresh-cw" size={16} />} onClick={fetchComparison} size="small">
             Refresh
           </Button>
         </Box>
@@ -290,17 +285,17 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
                   px: 2,
                   py: 1,
                   borderRadius: 2,
-                  border: `1px solid ${matchConfig.color}.main`,
+                  border: `1px solid ${matchConfig.color}`,
                 }}
               >
-                <Typography variant="h6" fontWeight={700} color={`${matchConfig.color}.main`}>
+                <Typography variant="h6" fontWeight={700} color={matchConfig.bgColor}>
                   #{index + 1}
                 </Typography>
                 <Box>
                   <Typography variant="body2" fontWeight={600}>
                     {comparison.resume_id}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="secondary">
                     {comparison.match_percentage.toFixed(0)}% • {matchConfig.label}
                   </Typography>
                 </Box>
@@ -315,7 +310,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
         <Typography variant="h6" fontWeight={600} gutterBottom>
           Skills Matrix
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
           Showing which candidates have the required skills for this vacancy
         </Typography>
 
@@ -382,9 +377,9 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
                     return (
                       <TableCell key={`${comparison.resume_id}-${skill}`} align="center">
                         {skillMatch ? (
-                          <CheckIcon color="success" sx={{ fontSize: 28 }} />
+                          <Icon name="check-circle" size={28} color="success" />
                         ) : (
-                          <CrossIcon color="error" sx={{ fontSize: 28 }} />
+                          <Icon name="x-circle" size={28} color="error" />
                         )}
                       </TableCell>
                     );
@@ -399,7 +394,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
       {/* Experience Summary */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <PersonIcon sx={{ mr: 1, fontSize: 28, color: 'primary.main' }} />
+          <Icon name="user" size={28} color="primary" style={{ marginRight: '8px' }} />
           <Typography variant="h6" fontWeight={600}>
             Experience Summary
           </Typography>
@@ -414,7 +409,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
                 sx={{
                   p: 2,
                   borderRadius: 2,
-                  border: `1px solid ${matchConfig.color}.main`,
+                  border: `1px solid ${matchConfig.bgColor}`,
                   bgcolor: `${matchConfig.color}.50`,
                 }}
               >
@@ -429,13 +424,13 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
                     sx={{ fontWeight: 600 }}
                   />
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Matched Skills: <strong>{comparison.matched_skills.length}</strong> • Missing
                   Skills: <strong>{comparison.missing_skills.length}</strong>
                 </Typography>
                 {comparison.experience_verification && comparison.experience_verification.length > 0 && (
                   <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="secondary">
                       Experience verified for {comparison.experience_verification.length} skill
                       {comparison.experience_verification.length !== 1 ? 's' : ''}
                     </Typography>
@@ -449,7 +444,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({
 
       {/* Processing Time */}
       {data.processing_time && (
-        <Typography variant="caption" color="text.secondary" align="center" display="block">
+        <Typography variant="caption" color="secondary" align="center" display="block">
           Comparison completed in {data.processing_time.toFixed(2)} seconds
         </Typography>
       )}

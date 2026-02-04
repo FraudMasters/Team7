@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Container, Typography, Button, Stack, Grid, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Paper, Chip } from '@mui/material';
-import { Add as AddIcon, MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Box, Container, Typography, Button, Stack, Grid, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Paper, Chip } from '@/components/ui';
+import { Icon } from '@/components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 
@@ -89,13 +89,13 @@ export function VacanciesPage() {
           <Typography variant="h4" fontWeight={700}>
             Job Postings
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Manage your open positions
           </Typography>
         </Box>
         <Button
           variant="contained"
-          startIcon={<AddIcon />}
+          startIcon={<Icon name="plus" size={20} />}
           onClick={() => navigate('/recruiter/vacancies/create')}
         >
           Create Vacancy
@@ -107,12 +107,12 @@ export function VacanciesPage() {
           <Typography variant="h6" gutterBottom>
             No job postings yet
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             Create your first vacancy to start receiving applications
           </Typography>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={<Icon name="plus" size={20} />}
             onClick={() => navigate('/recruiter/vacancies/create')}
           >
             Create Vacancy
@@ -150,12 +150,12 @@ export function VacanciesPage() {
                       <Typography variant="h6" fontWeight={600} gutterBottom>
                         {vacancy.title}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="secondary">
                         {vacancy.location}
                       </Typography>
                     </Box>
                     <IconButton size="small" onClick={(e) => handleMenuOpen(e, vacancy)}>
-                      <MoreVertIcon />
+                      <Icon name="more-vertical" size={20} />
                     </IconButton>
                   </Stack>
 
@@ -190,11 +190,11 @@ export function VacanciesPage() {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={handleEdit}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          <Icon name="edit" size={16} sx={{ mr: 1 }} />
           Edit
         </MenuItem>
-        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error' }}>
+          <Icon name="trash-2" size={16} sx={{ mr: 1 }} />
           Delete
         </MenuItem>
       </Menu>

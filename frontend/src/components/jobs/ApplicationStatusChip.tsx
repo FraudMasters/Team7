@@ -1,5 +1,5 @@
 import React from 'react';
-import { Chip, ChipProps } from '@mui/material';
+import { Chip, ChipProps } from '@/components/ui';
 
 type ApplicationStatus =
   | 'applied'
@@ -17,9 +17,10 @@ type ApplicationStatus =
   | 'on_hold'
   | string;
 
-interface ApplicationStatusChipProps extends Omit<ChipProps, 'color'> {
+interface ApplicationStatusChipProps extends Omit<ChipProps, 'color' | 'sx'> {
   status: ApplicationStatus;
   stageName?: string;
+  sx?: React.CSSProperties;
 }
 
 const getStatusColor = (status: ApplicationStatus): ChipProps['color'] => {

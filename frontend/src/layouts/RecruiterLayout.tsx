@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, createContext, useContext, useRef, useCallback, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -18,6 +18,7 @@ import {
   Divider,
   Tooltip,
 } from '@mui/material';
+import { PullToRefresh } from '../components/ui';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -41,11 +42,32 @@ import {
   Compare as CompareIcon,
   ViewColumn as KanbanIcon,
   Upload as UploadIcon,
-  Payments as PaymentsIcon,
-  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 280;
+
+// Context for allowing child pages to register refresh handlers
+interface RefreshContextType {
+  registerRefreshHandler: (handler: (() => Promise<void>) | null) => void;
+}
+
+const RefreshContext = createContext<RefreshContextType | undefined>(undefined);
+
+export const useRefreshHandler = () => {
+  const context = useContext(RefreshContext);
+  if (!context) {
+    throw new Error('useRefreshHandler must be used within RecruiterLayout');
+  }
+  return context;
+};
+
+// Helper to check if current route supports pull-to-refresh
+const isRefreshableRoute = (pathname: string): boolean => {
+  return (
+    pathname.startsWith('/recruiter/resumes') ||
+    pathname.startsWith('/recruiter/candidates')
+  );
+};
 
 interface NavItem {
   label: string;
@@ -98,13 +120,6 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Salary & Compensation',
-    items: [
-      { label: 'Salary Benchmarking', path: '/recruiter/salary-benchmarking', icon: <PaymentsIcon /> },
-      { label: 'Compensation Analysis', path: '/recruiter/compensation-analysis', icon: <TrendingUpIcon /> },
-    ],
-  },
-  {
     title: 'Settings',
     items: [
       { label: 'Weights', path: '/recruiter/weights', icon: <TuneIcon /> },
@@ -118,17 +133,48 @@ const RecruiterLayout: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     Hiring: true,
     Resumes: false,
     Search: false,
     Analytics: false,
-    'Salary & Compensation': false,
     Settings: false,
   });
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Store refresh callback from child page
+  const refreshHandlerRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Register refresh handler from child page
+  const registerRefreshHandler = useCallback((handler: (() => Promise<void>) | null) => {
+    refreshHandlerRef.current = handler;
+  }, []);
+
+  // Handle pull-to-refresh action
+  const handleRefresh = useCallback(async () => {
+    if (refreshHandlerRef.current) {
+      try {
+        setRefreshing(true);
+        await refreshHandlerRef.current();
+      } catch (error) {
+        console.error('Refresh failed:', error);
+      } finally {
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  // Check if current route should have pull-to-refresh enabled
+  const enableRefresh = isMobile && isRefreshableRoute(location.pathname);
+
+  // Context value for child pages
+  const refreshContext = useMemo(
+    () => ({ registerRefreshHandler }),
+    [registerRefreshHandler]
+  );
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -393,7 +439,18 @@ const RecruiterLayout: React.FC = () => {
         tabIndex={-1}
       >
         <Toolbar />
-        <Outlet />
+        <RefreshContext.Provider value={refreshContext}>
+          <PullToRefresh
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            enabled={enableRefresh}
+            loadingMessage="Refreshing..."
+            pullMessage="Pull down to refresh"
+            releaseMessage="Release to refresh"
+          >
+            <Outlet />
+          </PullToRefresh>
+        </RefreshContext.Provider>
       </Box>
     </Box>
   );

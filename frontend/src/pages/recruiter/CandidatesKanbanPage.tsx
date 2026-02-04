@@ -1,19 +1,35 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Container, Box, TextField, Typography, Paper, Stack, Grid } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { KanbanBoard } from '../../components/kanban/KanbanBoard';
 import { useCandidates, useCandidateStages, useUpdateCandidateStage } from '../../hooks/useRecruiterData';
+import { useRefreshHandler } from '../../layouts/RecruiterLayout';
 import type { DropResult } from '@hello-pangea/dnd';
 
 const DEFAULT_STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired'];
 
 export function CandidatesKanbanPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: candidatesData } = useCandidates();
-  const { data: stagesData } = useCandidateStages();
+  const { data: candidatesData, refetch: refetchCandidates } = useCandidates();
+  const { data: stagesData, refetch: refetchStages } = useCandidateStages();
   const updateStage = useUpdateCandidateStage();
+  const { registerRefreshHandler } = useRefreshHandler();
 
   const stages = stagesData || DEFAULT_STAGES;
+
+  // Register refresh handler with layout
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetchCandidates(), refetchStages()]);
+  }, [refetchCandidates, refetchStages]);
+
+  useEffect(() => {
+    registerRefreshHandler(handleRefresh);
+
+    // Cleanup on unmount
+    return () => {
+      registerRefreshHandler(null);
+    };
+  }, [registerRefreshHandler, handleRefresh]);
 
   const columns = useMemo(() => {
     const candidates = candidatesData?.candidates || [];

@@ -7,7 +7,7 @@ import {
   MenuItem,
   Typography,
   SelectChangeEvent,
-} from '@mui/material';
+} from '@/components/ui';
 import { useLanguageContext, SUPPORTED_LANGUAGES } from '@/contexts/LanguageContext';
 
 /**
@@ -76,18 +76,18 @@ const LanguageSwitcher: React.FC = () => {
             color: 'inherit',
             bgcolor: 'rgba(255, 255, 255, 0.1)',
             borderRadius: 1,
-            '& .MuiSelect-select': {
+            '& select': {
               color: 'inherit',
               py: 0.75,
               px: 1.5,
             },
-            '& .MuiOutlinedInput-notchedOutline': {
+            '& .select-wrapper': {
               borderColor: 'rgba(255, 255, 255, 0.3)',
             },
-            '&:hover .MuiOutlinedInput-notchedOutline': {
+            '&:hover .select-wrapper': {
               borderColor: 'rgba(255, 255, 255, 0.5)',
             },
-            '& .MuiSvgIcon-root': {
+            '& svg': {
               color: 'inherit',
             },
           }}
@@ -103,7 +103,7 @@ const LanguageSwitcher: React.FC = () => {
               }}
             >
               <Box
-                component="span"
+                as="span"
                 sx={{
                   fontSize: '1.2rem',
                   display: 'inline-flex',

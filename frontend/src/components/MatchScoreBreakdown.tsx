@@ -9,12 +9,8 @@ import {
   Grid,
   Card,
   CardContent,
-} from '@mui/material';
-import {
-  Key as KeywordIcon,
-  Tune as TfidfIcon,
-  Psychology as VectorIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 interface MatchScoreBreakdownProps {
   keywordScore: number;
@@ -27,7 +23,7 @@ interface ScoreBreakdown {
   title: string;
   score: number;
   weight: number;
-  icon: React.ReactNode;
+  iconName: string;
   color: 'primary' | 'secondary' | 'info';
 }
 
@@ -60,21 +56,21 @@ const MatchScoreBreakdown: React.FC<MatchScoreBreakdownProps> = ({
       title: 'Keyword Matching',
       score: keywordScore,
       weight: keywordWeight,
-      icon: <KeywordIcon />,
+      iconName: 'key',
       color: 'primary',
     },
     {
       title: 'TF-IDF Weighting',
       score: tfidfScore,
       weight: tfidfWeight,
-      icon: <TfidfIcon />,
+      iconName: 'tune',
       color: 'secondary',
     },
     {
       title: 'Vector Similarity',
       score: vectorScore,
       weight: vectorWeight,
-      icon: <VectorIcon />,
+      iconName: 'brain',
       color: 'info',
     },
   ];
@@ -97,7 +93,7 @@ const MatchScoreBreakdown: React.FC<MatchScoreBreakdownProps> = ({
                   color: `${breakdown.color}.contrastText`,
                 }}
               >
-                {breakdown.icon}
+                <Icon name={breakdown.iconName} />
               </Box>
               <Box>
                 <Typography variant="subtitle2" fontWeight={600}>

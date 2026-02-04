@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -12,20 +12,8 @@ import {
   Alert,
   AlertTitle,
   Stack,
-  Chip,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  Schedule as TimeIcon,
-  Description as ResumeIcon,
-  TrendingUp as MatchIcon,
-  AccessTime as ClockIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
-  ErrorOutline as WarningIcon,
-  OpenInNew as DrillDownIcon,
-} from '@mui/icons-material';
-import DrillDownModal, { AnomalyType } from './DrillDownModal';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Time-to-hire metrics from backend
@@ -78,8 +66,6 @@ interface KeyMetricsProps {
   startDate?: string;
   /** Optional date range filter */
   endDate?: string;
-  /** Optional refresh key to trigger manual refresh */
-  refreshKey?: number;
 }
 
 /**
@@ -104,17 +90,11 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   apiUrl = '/api/analytics/key-metrics',
   startDate,
   endDate,
-  refreshKey,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<KeyMetricsResponse | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-
-  // Drill-down modal state
-  const [drillDownOpen, setDrillDownOpen] = useState(false);
-  const [anomalyType, setAnomalyType] = useState<AnomalyType | null>(null);
-  const [anomalyDescription, setAnomalyDescription] = useState<string | null>(null);
 
   /**
    * Fetch key metrics from backend
@@ -148,7 +128,7 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
    */
   useEffect(() => {
     fetchMetrics();
-  }, [apiUrl, startDate, endDate, refreshKey]);
+  }, [apiUrl, startDate, endDate]);
 
   /**
    * Auto-refresh every 60 seconds when enabled
@@ -173,63 +153,24 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   };
 
   /**
-   * Handle opening drill-down modal for time-to-hire anomaly
-   */
-  const handleTimeToHireDrillDown = useCallback(() => {
-    if (!metrics || metrics.time_to_hire.average_days <= 30) {
-      return;
-    }
-    setAnomalyType('high_duration');
-    setAnomalyDescription(
-      `Time-to-hire is ${metrics.time_to_hire.average_days.toFixed(1)} days on average, ` +
-      `which exceeds the 30-day target. Investigate which positions or stages are causing delays.`
-    );
-    setDrillDownOpen(true);
-  }, [metrics]);
-
-  /**
-   * Handle opening drill-down modal for match rate anomaly
-   */
-  const handleMatchRateDrillDown = useCallback(() => {
-    if (!metrics || metrics.match_rates.overall_match_rate >= 0.8) {
-      return;
-    }
-    setAnomalyType('low_match_rate');
-    setAnomalyDescription(
-      `Overall match rate is ${(metrics.match_rates.overall_match_rate * 100).toFixed(1)}%, ` +
-      `which is below the 80% target. Investigate quality of matches and low-confidence predictions.`
-    );
-    setDrillDownOpen(true);
-  }, [metrics]);
-
-  /**
-   * Handle closing drill-down modal
-   */
-  const handleDrillDownClose = useCallback(() => {
-    setDrillDownOpen(false);
-    setAnomalyType(null);
-    setAnomalyDescription(null);
-  }, []);
-
-  /**
    * Render loading state
    */
   if (loading) {
     return (
       <Box
-        sx={{
+        css={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          py: 8,
+          padding: '64px 0',
         }}
       >
-        <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <CircularProgress size={60} css={{ marginBottom: '24px' }} />
+        <Typography variant="h6" color="secondary">
           Loading key metrics...
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="secondary" css={{ marginTop: '8px' }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -244,7 +185,7 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchMetrics} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchMetrics} startIcon={<Icon name="refresh" />}>
             Retry
           </Button>
         }
@@ -262,22 +203,22 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   return (
     <Stack spacing={3}>
       {/* Header Section */}
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Paper elevation={2} css={{ padding: '24px' }}>
+        <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <Typography variant="h5" fontWeight={600}>
             Key Hiring Metrics
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box css={{ display: 'flex', gap: '8px' }}>
             <Button
               variant={autoRefreshEnabled ? 'contained' : 'outlined'}
-              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
+              startIcon={<Icon name={autoRefreshEnabled ? 'pause' : 'play-arrow'} />}
               onClick={toggleAutoRefresh}
               size="small"
               color={autoRefreshEnabled ? 'primary' : 'default'}
             >
               {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
             </Button>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchMetrics} size="small">
+            <Button variant="outlined" startIcon={<Icon name="refresh" />} onClick={fetchMetrics} size="small">
               Refresh
             </Button>
           </Box>
@@ -288,78 +229,60 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Grid item xs={12} sm={6} md={4}>
             <Card
               variant="outlined"
-              onClick={handleTimeToHireDrillDown}
-              sx={{
+              css={{
                 height: '100%',
-                borderColor: metrics.time_to_hire.average_days <= 30 ? 'success.main' : 'warning.main',
+                borderColor: metrics.time_to_hire.average_days <= 30 ? '$success' : '$warning',
                 transition: 'transform 0.2s, box-shadow 0.2s',
-                cursor: metrics.time_to_hire.average_days > 30 ? 'pointer' : 'default',
-                '&:hover': metrics.time_to_hire.average_days > 30 ? {
+                '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: 4,
-                } : {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 4,
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 },
               }}
             >
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <ClockIcon
-                      fontSize="large"
-                      sx={{
-                        mr: 1,
-                        color: metrics.time_to_hire.average_days <= 30 ? 'success.main' : 'warning.main',
-                      }}
-                    />
-                    <Typography variant="h6" fontWeight={600}>
-                      Time-to-Hire
-                    </Typography>
-                  </Box>
-                  {metrics.time_to_hire.average_days > 30 && (
-                    <Chip
-                      icon={<WarningIcon fontSize="small" />}
-                      label="Anomaly"
-                      size="small"
-                      color="warning"
-                      sx={{ fontWeight: 600 }}
-                    />
-                  )}
+                <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                  <Icon
+                    name="clock"
+                    size={24}
+                    color={metrics.time_to_hire.average_days <= 30 ? '$success' : '$warning'}
+                  />
+                  <Typography variant="h6" fontWeight={600} css={{ marginLeft: '8px' }}>
+                    Time-to-Hire
+                  </Typography>
                 </Box>
 
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                <Box css={{ marginBottom: '16px' }}>
+                  <Typography variant="caption" color="secondary">
                     Average
                   </Typography>
                   <Typography
                     variant="h4"
                     fontWeight={700}
-                    color={metrics.time_to_hire.average_days <= 30 ? 'success.main' : 'warning.main'}
+                    color={metrics.time_to_hire.average_days <= 30 ? '$success' : '$warning'}
                   >
                     {metrics.time_to_hire.average_days.toFixed(1)}d
                   </Typography>
                 </Box>
 
                 <Stack spacing={1}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       Median
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.time_to_hire.median_days.toFixed(1)}d
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       Range
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.time_to_hire.min_days}d - {metrics.time_to_hire.max_days}d
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       25th-75th %
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
@@ -367,14 +290,6 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
                     </Typography>
                   </Box>
                 </Stack>
-                {metrics.time_to_hire.average_days > 30 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 2, pt: 1, borderTop: 1, borderColor: 'divider' }}>
-                    <DrillDownIcon fontSize="small" color="warning" />
-                    <Typography variant="caption" color="warning.main" fontWeight={600}>
-                      Click to investigate
-                    </Typography>
-                  </Box>
-                )}
               </CardContent>
             </Card>
           </Grid>
@@ -383,52 +298,52 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Grid item xs={12} sm={6} md={4}>
             <Card
               variant="outlined"
-              sx={{
+              css={{
                 height: '100%',
-                borderColor: 'primary.main',
+                borderColor: '$primary',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: 4,
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 },
               }}
             >
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <ResumeIcon fontSize="large" sx={{ mr: 1, color: 'primary.main' }} />
-                  <Typography variant="h6" fontWeight={600}>
+                <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                  <Icon name="description" size={24} color="$primary" />
+                  <Typography variant="h6" fontWeight={600} css={{ marginLeft: '8px' }}>
                     Resumes Processed
                   </Typography>
                 </Box>
 
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                <Box css={{ marginBottom: '16px' }}>
+                  <Typography variant="caption" color="secondary">
                     Total
                   </Typography>
-                  <Typography variant="h4" fontWeight={700} color="primary.main">
+                  <Typography variant="h4" fontWeight={700} color="$primary">
                     {metrics.resumes.total_processed.toLocaleString()}
                   </Typography>
                 </Box>
 
                 <Stack spacing={1}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       This Month
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.resumes.processed_this_month.toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       This Week
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.resumes.processed_this_week.toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       Avg/Day
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
@@ -444,111 +359,72 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Grid item xs={12} sm={6} md={4}>
             <Card
               variant="outlined"
-              onClick={handleMatchRateDrillDown}
-              sx={{
+              css={{
                 height: '100%',
-                borderColor: metrics.match_rates.overall_match_rate >= 0.8 ? 'success.main' : 'warning.main',
+                borderColor: metrics.match_rates.overall_match_rate >= 0.8 ? '$success' : '$warning',
                 transition: 'transform 0.2s, box-shadow 0.2s',
-                cursor: metrics.match_rates.overall_match_rate < 0.8 ? 'pointer' : 'default',
-                '&:hover': metrics.match_rates.overall_match_rate < 0.8 ? {
+                '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: 4,
-                } : {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 4,
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 },
               }}
             >
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <MatchIcon
-                      fontSize="large"
-                      sx={{
-                        mr: 1,
-                        color: metrics.match_rates.overall_match_rate >= 0.8 ? 'success.main' : 'warning.main',
-                      }}
-                    />
-                    <Typography variant="h6" fontWeight={600}>
-                      Match Rates
-                    </Typography>
-                  </Box>
-                  {metrics.match_rates.overall_match_rate < 0.8 && (
-                    <Chip
-                      icon={<WarningIcon fontSize="small" />}
-                      label="Anomaly"
-                      size="small"
-                      color="warning"
-                      sx={{ fontWeight: 600 }}
-                    />
-                  )}
+                <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                  <Icon
+                    name="trending-up"
+                    size={24}
+                    color={metrics.match_rates.overall_match_rate >= 0.8 ? '$success' : '$warning'}
+                  />
+                  <Typography variant="h6" fontWeight={600} css={{ marginLeft: '8px' }}>
+                    Match Rates
+                  </Typography>
                 </Box>
 
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                <Box css={{ marginBottom: '16px' }}>
+                  <Typography variant="caption" color="secondary">
                     Overall
                   </Typography>
                   <Typography
                     variant="h4"
                     fontWeight={700}
-                    color={metrics.match_rates.overall_match_rate >= 0.8 ? 'success.main' : 'warning.main'}
+                    color={metrics.match_rates.overall_match_rate >= 0.8 ? '$success' : '$warning'}
                   >
                     {(metrics.match_rates.overall_match_rate * 100).toFixed(1)}%
                   </Typography>
                 </Box>
 
                 <Stack spacing={1}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       Avg Confidence
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {(metrics.match_rates.average_confidence * 100).toFixed(1)}%
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       High Confidence
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="success.main">
+                    <Typography variant="body2" fontWeight={600} color="$success">
                       {metrics.match_rates.high_confidence_matches.toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
+                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="secondary">
                       Low Confidence
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="warning.main">
+                    <Typography variant="body2" fontWeight={600} color="$warning">
                       {metrics.match_rates.low_confidence_matches.toLocaleString()}
                     </Typography>
                   </Box>
                 </Stack>
-                {metrics.match_rates.overall_match_rate < 0.8 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 2, pt: 1, borderTop: 1, borderColor: 'divider' }}>
-                    <DrillDownIcon fontSize="small" color="warning" />
-                    <Typography variant="caption" color="warning.main" fontWeight={600}>
-                      Click to investigate
-                    </Typography>
-                  </Box>
-                )}
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </Paper>
-
-      {/* Drill-Down Modal */}
-      {anomalyType && (
-        <DrillDownModal
-          open={drillDownOpen}
-          onClose={handleDrillDownClose}
-          anomalyType={anomalyType}
-          anomalyDescription={anomalyDescription || undefined}
-          startDate={startDate}
-          endDate={endDate}
-          metricName={anomalyType === 'high_duration' ? 'time_to_hire' : 'overall_match_rate'}
-        />
-      )}
     </Stack>
   );
 };

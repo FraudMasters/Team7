@@ -19,20 +19,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-} from '@mui/material';
-import {
-  ThumbUp as ThumbUpIcon,
-  ThumbUpOutlined as ThumbUpOutlinedIcon,
-  ThumbDown as ThumbDownIcon,
-  ThumbDownOutlined as ThumbDownOutlinedIcon,
-  Send as SendIcon,
-  Edit as EditIcon,
-  CheckCircle as CheckIcon,
-  Cancel as CancelIcon,
-  Feedback as FeedbackIcon,
-  Psychology as AIIcon,
-  Star as StarIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import {
@@ -223,7 +211,7 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
           onClick={handleSubmitFeedback}
           disabled={submitting || !feedback}
           variant="contained"
-          startIcon={submitting ? <CircularProgress size={16} /> : <SendIcon />}
+          startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="send" />}
           size="small"
           color={feedback === 'approved' ? 'success' : 'warning'}
         >
@@ -245,7 +233,7 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CheckIcon color="success" />
+          <Icon name="check-circle" color="success" />
           <Typography variant="body2" color="success.main" fontWeight={600}>
             {t('feedback.thankYou')}
           </Typography>
@@ -267,9 +255,9 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
               color={feedback === 'approved' ? 'success' : 'default'}
             >
               {feedback === 'approved' ? (
-                <ThumbUpIcon fontSize="small" />
+                <Icon name="thumbs-up" fontSize="small" />
               ) : (
-                <ThumbUpOutlinedIcon fontSize="small" />
+                <Icon name="thumbs-up" fontSize="small" />
               )}
             </IconButton>
           </Tooltip>
@@ -281,9 +269,9 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
               color={feedback === 'rejected' ? 'error' : 'default'}
             >
               {feedback === 'rejected' ? (
-                <ThumbDownIcon fontSize="small" />
+                <Icon name="thumbs-down" fontSize="small" />
               ) : (
-                <ThumbDownOutlinedIcon fontSize="small" />
+                <Icon name="thumbs-down" fontSize="small" />
               )}
             </IconButton>
           </Tooltip>
@@ -300,7 +288,7 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
         >
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FeedbackIcon />
+              <Icon name="message-circle" />
               <Typography variant="h6">
                 {feedback === 'approved'
                   ? t('feedback.approveTitle')
@@ -344,13 +332,13 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FeedbackIcon color={feedback ? (feedback === 'approved' ? 'success' : 'warning') : 'action'} />
+            <Icon name="message-circle" color={feedback ? (feedback === 'approved' ? 'success' : 'warning') : 'action'} />
             <Typography variant="subtitle2" fontWeight={600}>
               {t('feedback.rankReview')}
             </Typography>
             {feedback && (
               <Chip
-                icon={feedback === 'approved' ? <CheckIcon /> : <EditIcon />}
+                icon={feedback === 'approved' ? <Icon name="check-circle" /> : <Icon name="edit" />}
                 label={feedback === 'approved' ? t('feedback.approved') : t('feedback.needsCorrection')}
                 size="small"
                 color={feedback === 'approved' ? 'success' : 'warning'}
@@ -371,7 +359,7 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
                 }}
               >
                 {feedback === 'approved' ? (
-                  <ThumbUpIcon fontSize="small" />
+                  <Icon name="thumbs-up" fontSize="small" />
                 ) : (
                   <ThumbUpOutlinedIcon fontSize="small" />
                 )}
@@ -389,9 +377,9 @@ const RankingFeedback: React.FC<RankingFeedbackProps> = ({
                 }}
               >
                 {feedback === 'rejected' ? (
-                  <ThumbDownIcon fontSize="small" />
+                  <Icon name="thumbs-down" fontSize="small" />
                 ) : (
-                  <ThumbDownOutlinedIcon fontSize="small" />
+                  <Icon name="thumbs-down" fontSize="small" />
                 )}
               </IconButton>
             </Tooltip>

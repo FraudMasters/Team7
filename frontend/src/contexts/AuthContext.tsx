@@ -1,122 +1,55 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import { AuthProvider, useAuth as useOidcAuth } from 'react-oidc-context';
-import type { User } from 'oidc-client-ts';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, refreshToken as apiRefreshToken } from '@/api/auth';
+import type { UserInfo, LoginResponse, RegisterResponse } from '@/types/api';
 
 /**
- * User roles in the system
+ * Local storage keys for authentication persistence
  */
-export type UserRole = 'Admin' | 'Recruiter' | 'Viewer';
+const ACCESS_TOKEN_KEY = 'access_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+const USER_KEY = 'auth_user';
 
 /**
- * Authentication state interface
+ * Authentication Context State Interface
  */
-export interface AuthState {
+interface AuthState {
   /** Current authenticated user */
-  user: User | null;
-  /** Whether user is currently authenticated */
+  user: UserInfo | null;
+  /** Access token for API requests */
+  accessToken: string | null;
+  /** Refresh token for obtaining new access tokens */
+  refreshToken: string | null;
+  /** Whether user is authenticated */
   isAuthenticated: boolean;
-  /** Whether authentication is still loading */
+  /** Whether authentication state is loading */
   isLoading: boolean;
-  /** Error from authentication */
-  error: Error | undefined;
-  /** User's roles */
-  roles: UserRole[];
-  /** Trigger user login */
-  login: () => void;
-  /** Trigger user logout */
-  logout: () => void;
-  /** Check if user has a specific role */
-  hasRole: (role: UserRole) => boolean;
-  /** Check if user has any of the specified roles */
-  hasAnyRole: (roles: UserRole[]) => boolean;
-  /** Check if user has all of the specified roles */
-  hasAllRoles: (roles: UserRole[]) => boolean;
+  /** Authentication error message */
+  error: string | null;
 }
 
 /**
- * OIDC Configuration for Keycloak
- *
- * Configuration object for react-oidc-context to connect with Keycloak.
- * Uses environment variables for flexible deployment across environments.
- *
- * Environment variables:
- * - VITE_KEYCLOAK_URL: Keycloak server URL (default: http://localhost:8080)
- * - VITE_KEYCLOAK_REALM: Keycloak realm name (default: agenthr)
- * - VITE_KEYCLOAK_CLIENT_ID: OIDC client ID (default: agenthr-frontend)
+ * Authentication Context Actions Interface
  */
-export const oidcConfig = {
-  /** Keycloak realm URL */
-  authority: import.meta.env.VITE_KEYCLOAK_URL
-    ? `${import.meta.env.VITE_KEYCLOAK_URL}/realms/${import.meta.env.VITE_KEYCLOAK_REALM || 'agenthr'}`
-    : 'http://localhost:8080/realms/agenthr',
-  /** OIDC client ID from Keycloak */
-  client_id: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'agenthr-frontend',
-  /** Where to redirect after authentication */
-  redirect_uri: window.location.origin + '/callback',
-  /** Where to redirect after logout */
-  post_logout_redirect_uri: window.location.origin,
-  /** OIDC flow: authorization code flow (recommended for public clients) */
-  response_type: 'code' as const,
-  /** OAuth 2.0 scopes to request */
-  scope: 'openid profile email',
-  /** Enable automatic silent token renew before expiration */
-  automaticSilentRenew: true,
-  /** Include ID token in silent renew requests */
-  includeIdTokenInSilentRenew: true,
-  /** Monitor user session for changes (logout in another tab) */
-  monitorSession: true,
-  /** Check session interval in seconds */
-  checkSessionIntervalInSeconds: 10,
-  /** Load user profile from userinfo endpoint */
-  loadUserInfo: true,
-};
-
-/**
- * Extract roles from Keycloak JWT token
- *
- * Keycloak stores realm roles in the resource_access claim of the JWT token.
- * This function extracts and validates roles for the frontend client.
- *
- * @param user - Authenticated user object from oidc-client-ts
- * @returns Array of validated user roles
- */
-function extractUserRoles(user: User | null): UserRole[] {
-  if (!user) {
-    return [];
-  }
-
-  try {
-    // Access the resource_access claim from JWT token
-    const resourceAccess = user.profile.resource_access as Record<string, { roles: string[] }>;
-
-    // Get roles for our client
-    const clientId = oidcConfig.client_id;
-    const clientRoles = resourceAccess?.[clientId]?.roles || [];
-
-    // Validate roles against allowed values
-    const validRoles: UserRole[] = ['Admin', 'Recruiter', 'Viewer'];
-    const roles = clientRoles.filter((role): role is UserRole =>
-      validRoles.includes(role as UserRole)
-    );
-
-    return roles;
-  } catch (error) {
-    // Log warning but don't fail authentication
-    console.warn('Failed to extract user roles from token:', error);
-    return [];
-  }
+interface AuthActions {
+  /** Register a new user */
+  register: (email: string, password: string, fullName?: string) => Promise<RegisterResponse>;
+  /** Login with email and password */
+  login: (email: string, password: string) => Promise<LoginResponse>;
+  /** Logout and clear auth state */
+  logout: () => Promise<void>;
+  /** Refresh access token */
+  refreshAccessToken: () => Promise<void>;
+  /** Clear authentication error */
+  clearError: () => void;
 }
 
 /**
- * Authentication Context
- *
- * React context for authentication state and role-based access control.
- * Wraps react-oidc-context to provide Keycloak authentication.
+ * Combined Authentication Context Interface
  */
-const AuthContext = createContext<AuthState | undefined>(undefined);
+interface AuthContextValue extends AuthState, AuthActions {}
 
 /**
- * Authentication Provider Props
+ * Authentication Context Props
  */
 interface AuthProviderProps {
   /** Children components */
@@ -124,96 +57,296 @@ interface AuthProviderProps {
 }
 
 /**
- * Authentication Provider Component
+ * Get initial authentication state from localStorage
+ */
+const getInitialAuthState = (): Partial<AuthState> => {
+  try {
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    const userStr = localStorage.getItem(USER_KEY);
+
+    const user = userStr ? JSON.parse(userStr) : null;
+
+    return {
+      accessToken,
+      refreshToken,
+      user,
+      isAuthenticated: !!accessToken && !!user,
+      isLoading: false,
+      error: null,
+    };
+  } catch (error) {
+    // If localStorage is corrupted, clear it and return default state
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+
+    return {
+      accessToken: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    };
+  }
+};
+
+/**
+ * Authentication Context
  *
- * Wraps react-oidc-context AuthProvider and adds role-based access control.
- * Manages authentication state with Keycloak using OIDC protocol.
+ * Provides authentication state and management for the application.
+ * Handles user registration, login, logout, token refresh, and auth state persistence.
  *
  * @example
  * ```tsx
- * // Wrap your app with AuthContextProvider
- * <AuthContextProvider>
+ * // Wrap your app with AuthProvider
+ * <AuthProvider>
  *   <App />
- * </AuthContextProvider>
+ * </AuthProvider>
  *
  * // Use in components
- * const { user, isAuthenticated, login, logout, hasRole } = useAuthContext();
+ * const { user, login, logout, isAuthenticated } = useAuthContext();
  *
- * // Trigger login
- * <button onClick={login}>Login</button>
+ * // Login
+ * await login('user@example.com', 'password123');
+ *
+ * // Logout
+ * await logout();
  *
  * // Check authentication
- * {isAuthenticated ? <Welcome /> : <Login />}
- *
- * // Role-based rendering
- * {hasRole('Admin') && <AdminPanel />}
+ * if (isAuthenticated) {
+ *   console.log('Logged in as:', user?.email);
+ * }
  * ```
  */
-export const AuthenticationProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  // Get auth state from react-oidc-context
-  const auth = useOidcAuth();
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-  // Extract user roles from JWT token
-  const roles = extractUserRoles(auth.user);
+/**
+ * Authentication Provider Component
+ *
+ * Manages application authentication state and provides auth functionality.
+ * Handles authentication changes and persists auth state to localStorage.
+ * Automatically refreshes access tokens when they expire.
+ *
+ * @param props - Provider props
+ * @returns Authentication context provider
+ */
+export const AuthProvider: React.FC<AuthProviderProps> = ({
+  children,
+}) => {
+  const initialState = getInitialAuthState();
+
+  const [user, setUser] = useState<UserInfo | null>(initialState.user || null);
+  const [accessToken, setAccessToken] = useState<string | null>(initialState.accessToken || null);
+  const [refreshTokenValue, setRefreshTokenValue] = useState<string | null>(initialState.refreshToken || null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   /**
-   * Trigger login redirect to Keycloak
-   * Redirects user to Keycloak login page and back to callback URL
+   * Update localStorage with auth state
    */
-  const login = () => {
-    auth.signinRedirect();
-  };
+  const updateStorage = useCallback((
+    newAccessToken: string | null,
+    newRefreshToken: string | null,
+    newUser: UserInfo | null
+  ) => {
+    try {
+      if (newAccessToken) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
+      } else {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+      }
+
+      if (newRefreshToken) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+      } else {
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+      }
+
+      if (newUser) {
+        localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+      } else {
+        localStorage.removeItem(USER_KEY);
+      }
+    } catch (storageError) {
+      // Log error but don't throw - UI already updated
+      console.warn('Failed to persist auth state to localStorage:', storageError);
+    }
+  }, []);
 
   /**
-   * Trigger logout and redirect to Keycloak
-   * Logs out from Keycloak and redirects to post_logout_redirect_uri
-   */
-  const logout = () => {
-    auth.signoutRedirect();
-  };
-
-  /**
-   * Check if user has a specific role
+   * Register a new user
    *
-   * @param role - Role to check
-   * @returns True if user has the role
+   * Creates a new user account with the provided credentials.
+   * After successful registration, the user is logged in automatically.
+   *
+   * @param email - User's email address
+   * @param password - User's password
+   * @param fullName - User's full name (optional)
+   * @returns Promise resolving to registration response
    */
-  const hasRole = (role: UserRole): boolean => {
-    return roles.includes(role);
-  };
+  const register = useCallback(async (
+    email: string,
+    password: string,
+    fullName?: string
+  ): Promise<RegisterResponse> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiRegister({
+        email,
+        password,
+        full_name: fullName,
+      });
+
+      // Note: Registration doesn't return tokens by default
+      // User needs to login after registration
+      setIsLoading(false);
+
+      return response;
+    } catch (err) {
+      setIsLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
 
   /**
-   * Check if user has any of the specified roles
+   * Login with email and password
    *
-   * @param roleList - List of roles to check
-   * @returns True if user has at least one of the roles
+   * Authenticates a user and stores the received tokens.
+   *
+   * @param email - User's email address
+   * @param password - User's password
+   * @returns Promise resolving to login response with tokens
    */
-  const hasAnyRole = (roleList: UserRole[]): boolean => {
-    return roleList.some((role) => roles.includes(role));
-  };
+  const login = useCallback(async (
+    email: string,
+    password: string
+  ): Promise<LoginResponse> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiLogin(email, password);
+
+      // Update state
+      setUser(response.user);
+      setAccessToken(response.access_token);
+      setRefreshTokenValue(response.refresh_token);
+
+      // Persist to localStorage
+      updateStorage(
+        response.access_token,
+        response.refresh_token,
+        response.user
+      );
+
+      setIsLoading(false);
+
+      return response;
+    } catch (err) {
+      setIsLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [updateStorage]);
 
   /**
-   * Check if user has all of the specified roles
+   * Logout and clear auth state
    *
-   * @param roleList - List of roles to check
-   * @returns True if user has all the roles
+   * Invalidates the refresh token on the server and clears all auth state.
    */
-  const hasAllRoles = (roleList: UserRole[]): boolean => {
-    return roleList.every((role) => roles.includes(role));
-  };
+  const logout = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
 
-  // Context value with authentication state and functions
-  const contextValue: AuthState = {
-    user: auth.user,
-    isAuthenticated: !!auth.user,
-    isLoading: auth.isLoading,
-    error: auth.error,
-    roles,
+    try {
+      // Call logout API if we have a refresh token
+      if (refreshTokenValue) {
+        await apiLogout(refreshTokenValue);
+      }
+    } catch (err) {
+      // Log error but continue with cleanup
+      console.warn('Logout API call failed:', err);
+    } finally {
+      // Clear state regardless of API call success
+      setUser(null);
+      setAccessToken(null);
+      setRefreshTokenValue(null);
+
+      // Clear localStorage
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+
+      setIsLoading(false);
+    }
+  }, [refreshTokenValue]);
+
+  /**
+   * Refresh access token
+   *
+   * Obtains a new access token using the refresh token.
+   * Called automatically when the access token expires.
+   */
+  const refreshAccessToken = useCallback(async () => {
+    if (!refreshTokenValue) {
+      throw new Error('No refresh token available');
+    }
+
+    setError(null);
+
+    try {
+      const response = await apiRefreshToken(refreshTokenValue);
+
+      // Update access token (keep the same refresh token)
+      setAccessToken(response.access_token);
+
+      // Update localStorage
+      localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
+
+      return response;
+    } catch (err) {
+      // If refresh fails, clear auth state (token likely expired or revoked)
+      const errorMessage = err instanceof Error ? err.message : 'Token refresh failed';
+      setError(errorMessage);
+
+      // Clear auth state on refresh failure
+      setUser(null);
+      setAccessToken(null);
+      setRefreshTokenValue(null);
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+
+      throw err;
+    }
+  }, [refreshTokenValue]);
+
+  /**
+   * Clear authentication error
+   */
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const contextValue: AuthContextValue = {
+    user,
+    accessToken,
+    refreshToken: refreshTokenValue,
+    isAuthenticated: !!accessToken && !!user,
+    isLoading,
+    error,
+    register,
     login,
     logout,
-    hasRole,
-    hasAnyRole,
-    hasAllRoles,
+    refreshAccessToken,
+    clearError,
   };
 
   return (
@@ -224,147 +357,46 @@ export const AuthenticationProvider: React.FC<AuthProviderProps> = ({ children }
 };
 
 /**
- * Higher-Order Auth Provider
- *
- * Combines react-oidc-context AuthProvider with our custom AuthenticationProvider.
- * Use this to wrap your application.
- *
- * @example
- * ```tsx
- * <AuthContextProvider>
- *   <App />
- * </AuthContextProvider>
- * ```
- */
-export const AuthContextProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  return (
-    <AuthProvider {...oidcConfig}>
-      <AuthenticationProvider>
-        {children}
-      </AuthenticationProvider>
-    </AuthProvider>
-  );
-};
-
-/**
  * useAuthContext Hook
  *
  * Access authentication context state and functions.
- * Must be used within an AuthContextProvider.
+ * Must be used within an AuthProvider.
  *
- * @throws Error if used outside of AuthContextProvider
+ * @throws Error if used outside of AuthProvider
  * @returns Authentication context state
  *
  * @example
  * ```tsx
- * const { user, isAuthenticated, login, logout, hasRole } = useAuthContext();
+ * const { user, login, logout, isAuthenticated, isLoading } = useAuthContext();
  *
  * // Display user info
- * <p>Welcome, {user?.profile.preferred_username}</p>
+ * {user && <p>Welcome, {user.email}</p>}
  *
- * // Login button
- * <button onClick={login}>Login</button>
+ * // Login form
+ * <button onClick={() => login(email, password)}>
+ *   Login
+ * </button>
  *
  * // Logout button
- * <button onClick={logout}>Logout</button>
+ * <button onClick={logout}>
+ *   Logout
+ * </button>
  *
- * // Role-based rendering
- * {hasRole('Admin') && <AdminPanel />}
- *
- * // Check multiple roles
- * {hasAnyRole(['Admin', 'Recruiter']) && <HiringWorkflow />}
+ * // Show loading state
+ * {isLoading && <p>Loading...</p>}
  * ```
  */
-export const useAuthContext = (): AuthState => {
+export const useAuthContext = (): AuthContextValue => {
   const context = useContext(AuthContext);
 
   if (context === undefined) {
     throw new Error(
-      'useAuthContext must be used within an AuthContextProvider. ' +
-        'Wrap your component tree with <AuthContextProvider>.'
+      'useAuthContext must be used within an AuthProvider. ' +
+        'Wrap your component tree with <AuthProvider>.'
     );
   }
 
   return context;
 };
-
-/**
- * Higher-Order Component for Authentication
- *
- * Wraps a component to require authentication.
- * Redirects to login if user is not authenticated.
- *
- * @example
- * ```tsx
- * const ProtectedComponent = withAuth(({ user }) => {
- *   return <div>Welcome {user?.profile.email}</div>;
- * });
- * ```
- */
-export function withAuth<P extends object>(
-  Component: React.ComponentType<P & { user: User | null }>
-): React.ComponentType<P> {
-  return function AuthenticatedComponent(props: P) {
-    const { user, isAuthenticated, isLoading } = useAuthContext();
-
-    if (isLoading) {
-      return <div>Loading...</div>;
-    }
-
-    if (!isAuthenticated) {
-      return <div>Please log in to access this feature.</div>;
-    }
-
-    return <Component {...props} user={user} />;
-  };
-}
-
-/**
- * Higher-Order Component for Role-Based Access
- *
- * Wraps a component to require specific roles.
- * Shows error message if user lacks required roles.
- *
- * @param requiredRoles - Single role or array of roles required
- * @returns HOC function
- *
- * @example
- * ```tsx
- * const AdminOnlyComponent = withRole('Admin')(({ user }) => {
- *   return <div>Admin Panel</div>;
- * });
- *
- * const MultiRoleComponent = withRole(['Admin', 'Recruiter'])(({ user }) => {
- *   return <div>Hiring Workflow</div>;
- * });
- * ```
- */
-export function withRole<P extends object>(
-  requiredRoles: UserRole | UserRole[]
-): (Component: React.ComponentType<P>) => React.ComponentType<P> {
-  return function RoleProtectedComponent(Component: React.ComponentType<P>) {
-    return function ProtectedComponent(props: P) {
-      const { user, isAuthenticated, isLoading, hasAnyRole, hasRole } = useAuthContext();
-
-      if (isLoading) {
-        return <div>Loading...</div>;
-      }
-
-      if (!isAuthenticated) {
-        return <div>Please log in to access this feature.</div>;
-      }
-
-      const hasRequiredRole = Array.isArray(requiredRoles)
-        ? hasAnyRole(requiredRoles)
-        : hasRole(requiredRoles);
-
-      if (!hasRequiredRole) {
-        return <div>You do not have permission to access this feature.</div>;
-      }
-
-      return <Component {...props} />;
-    };
-  };
-}
 
 export default AuthContext;

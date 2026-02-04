@@ -9,16 +9,8 @@ import {
   CircularProgress,
   LinearProgress,
   Chip,
-} from '@mui/material';
-import {
-  Speed as SpeedIcon,
-  CheckCircle as SuccessIcon,
-  Warning as WarningIcon,
-  TrendingUp as TrendingIcon,
-  Description as DocIcon,
-  Code as CodeIcon,
-  AccessTime as TimeIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 
@@ -106,7 +98,7 @@ const ModelQualityMetrics: React.FC = () => {
   if (!metrics) {
     return (
       <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <WarningIcon sx={{ fontSize: 32, color: 'warning.main', mb: 1 }} />
+        <Icon name="alert-triangle" sx={{ fontSize: 32, color: 'warning.main', mb: 1 }} />
         <Typography variant="body1" color="text.secondary">
           {t('metrics.noData')}
         </Typography>
@@ -131,7 +123,7 @@ const ModelQualityMetrics: React.FC = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <SpeedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+          <Icon name="gauge" sx={{ fontSize: 20, color: 'primary.main' }} />
           <Typography variant="h6" fontWeight={500}>
             {t('metrics.title')}
           </Typography>
@@ -147,7 +139,7 @@ const ModelQualityMetrics: React.FC = () => {
       {/* Processing Metrics */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
-          <CodeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          <Icon name="code" sx={{ fontSize: 16, color: 'text.secondary' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={500}>
             ОБРАБОТКА
           </Typography>
@@ -199,7 +191,7 @@ const ModelQualityMetrics: React.FC = () => {
       {/* Model Quality */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
-          <TrendingIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          <Icon name="trending-up" sx={{ fontSize: 16, color: 'text.secondary' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={500}>
             КАЧЕСТВО ML
           </Typography>

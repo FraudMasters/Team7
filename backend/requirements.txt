@@ -35,7 +35,11 @@ redis==5.2.0
 httpx==0.27.2
 aiofiles==24.1.0
 python-dotenv==1.0.1
-cryptography==43.0.1  # Fernet encryption for secure token storage
+
+# Security & Authentication
+python-jose[cryptography]==3.3.0  # JWT token creation and validation
+passlib[bcrypt]==1.7.4  # Password hashing context
+bcrypt==4.2.1  # Password hashing algorithm
 
 # Monitoring and Logging
 prometheus-client==0.21.0  # Prometheus metrics export

@@ -1,348 +1,451 @@
 """
-Authentication middleware for JWT token validation.
+Authentication middleware for FastAPI endpoints.
 
-This module provides middleware and dependencies for validating JWT tokens
-issued by Keycloak, extracting user information, and enforcing role-based
-access control (RBAC) for protected endpoints.
+This module provides dependency injection functions for extracting and validating
+authenticated users from JWT tokens. It supports both basic user authentication
+and active user verification, as well as role-based access control (RBAC).
+
+Key features:
+- Extracts user from JWT access token in Authorization header
+- Validates token type and expiration
+- Queries user from database
+- Verifies user account status (active, verified)
+- Provides role-based access control (RBAC) with require_role() and require_admin()
+
+Example usage:
+    @router.get("/protected")
+    async def protected_endpoint(current_user: User = Depends(get_current_user)):
+        return {"message": f"Hello {current_user.email}"}
+
+    @router.get("/admin-only")
+    async def admin_endpoint(
+        current_user: User = Depends(get_current_active_user)
+    ):
+        return {"message": f"Welcome admin {current_user.email}"}
+
+    @router.get("/recruiter-only")
+    async def recruiter_endpoint(
+        current_user: User = Depends(require_role(UserRole.RECRUITER))
+    ):
+        return {"message": f"Welcome recruiter {current_user.email}"}
+
+    @router.delete("/users/{user_id}")
+    async def delete_user(
+        user_id: str,
+        current_user: User = Depends(require_admin)
+    ):
+        return {"message": "User deletion authorized"}
 """
 import logging
-from typing import List, Optional
+from typing import Optional
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
-from pydantic import BaseModel, Field
+from jose import JWTError
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import get_settings
+from database import get_db
+from models.role import Role, UserRole
+from models.user import User
+from utils.jwt_handler import decode_token, verify_token_type
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
-# HTTP Bearer token extractor
-security = HTTPBearer(auto_error=False)
+# HTTP Bearer token scheme for extracting Authorization header
+security = HTTPBearer()
 
 
-class TokenData(BaseModel):
+class AuthError(BaseModel):
     """
-    Extracted and validated token data.
+    Authentication error details.
 
     Attributes:
-        sub: User ID (subject)
-        username: Username from Keycloak
-        email: User email
-        roles: List of realm roles assigned to the user
-        exp: Token expiration timestamp
+        detail: Error message describing what went wrong
     """
 
-    sub: str = Field(..., description="User ID (subject)")
-    username: str = Field(..., description="Username from Keycloak")
-    email: Optional[str] = Field(None, description="User email")
-    roles: List[str] = Field(default_factory=list, description="User's realm roles")
-    exp: int = Field(..., description="Token expiration timestamp")
+    detail: str
 
 
-class AuthMiddleware:
-    """
-    Authentication middleware for JWT validation.
-
-    This middleware validates JWT tokens issued by Keycloak and extracts
-    user information for use in protected endpoints. It uses the
-    fastapi-keycloak library pattern for token validation and role checking.
-
-    Example:
-        Using the middleware in an endpoint:
-
-        @router.get("/protected")
-        async def protected_endpoint(
-            token_data: TokenData = Depends(get_current_token)
-        ):
-            return {"message": f"Hello, {token_data.username}"}
-
-        Role-based access control:
-
-        @router.get("/admin-only")
-        async def admin_endpoint(
-            token_data: TokenData = Depends(require_role("Admin"))
-        ):
-            return {"message": "Admin access granted"}
-    """
-
-    def __init__(self):
-        """Initialize the authentication middleware."""
-        self.keycloak_server_url = settings.keycloak_server_url
-        self.keycloak_realm = settings.keycloak_realm
-        self.keycloak_client_id = settings.keycloak_client_id
-        # For JWT validation, we need the realm's public key or use the client secret
-        # This will be initialized with Keycloak integration in main.py
-
-    async def decode_token(
-        self, token: str, credentials_exception: HTTPException
-    ) -> TokenData:
-        """
-        Decode and validate JWT token from Keycloak.
-
-        Args:
-            token: JWT token string
-            credentials_exception: Exception to raise if validation fails
-
-        Returns:
-            TokenData with extracted user information
-
-        Raises:
-            HTTPException: If token is invalid or expired
-        """
-        try:
-            # Decode JWT without verification first (Keycloak signature verification
-            # will be handled by fastapi-keycloak in main.py integration)
-            payload = jwt.decode(
-                token,
-                options={
-                    "verify_signature": False  # Will be verified by Keycloak integration
-                },
-            )
-
-            # Extract user information
-            sub: str = payload.get("sub")
-            username: str = payload.get("preferred_username") or payload.get("sub")
-            email: Optional[str] = payload.get("email")
-
-            # Extract realm roles from token
-            realm_access = payload.get("realm_access", {})
-            roles: List[str] = realm_access.get("roles", [])
-
-            # Get expiration time
-            exp: int = payload.get("exp")
-
-            if sub is None:
-                logger.warning("Token missing subject claim")
-                raise credentials_exception
-
-            token_data = TokenData(
-                sub=sub, username=username, email=email, roles=roles, exp=exp
-            )
-            logger.debug(f"Decoded token for user: {username}, roles: {roles}")
-            return token_data
-
-        except JWTError as e:
-            logger.warning(f"JWT decode error: {e}")
-            raise credentials_exception
-
-
-# Initialize auth middleware instance
-auth_middleware = AuthMiddleware()
-
-
-async def get_current_token(
-    request: Request,
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> TokenData:
+    db: AsyncSession = Depends(get_db),
+) -> User:
     """
-    Dependency to get and validate the current JWT token.
+    Extract and validate the current user from JWT access token.
 
-    This function extracts the Bearer token from the Authorization header,
-    validates it, and returns the extracted user information.
+    This dependency function:
+    1. Extracts the Bearer token from the Authorization header
+    2. Decodes and validates the JWT token
+    3. Verifies the token type is "access" (not refresh)
+    4. Queries the user from the database
+    5. Returns the user object if valid
 
     Args:
-        request: FastAPI request object
-        credentials: HTTP Bearer credentials
+        credentials: HTTP Bearer credentials from Authorization header
+        db: Database session for querying user
 
     Returns:
-        TokenData with extracted user information
+        User: The authenticated user object
 
     Raises:
-        HTTPException: 401 if no token or token is invalid
+        HTTPException: 401 Unauthorized if:
+            - Token is missing or invalid
+            - Token is expired
+            - Token is wrong type (not access token)
+            - User not found in database
 
     Example:
-        @router.get("/protected")
-        async def protected_endpoint(
-            token_data: TokenData = Depends(get_current_token)
-        ):
-            return {"username": token_data.username}
+        @router.get("/profile")
+        async def get_profile(current_user: User = Depends(get_current_user)):
+            return {"email": current_user.email, "name": current_user.full_name}
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    # Extract token from Authorization header
+    token: str = credentials.credentials
 
-    if credentials is None:
-        logger.warning("Request missing Authorization header")
-        raise credentials_exception
-
-    token = credentials.credentials
-    token_data = await auth_middleware.decode_token(token, credentials_exception)
-
-    # Store token data in request state for access in endpoints
-    request.state.token_data = token_data
-
-    return token_data
-
-
-async def get_optional_token(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> Optional[TokenData]:
-    """
-    Optional dependency to get token without requiring authentication.
-
-    This function attempts to extract and validate the JWT token but returns
-    None if no token is provided or if the token is invalid. Useful for
-    endpoints that have both authenticated and anonymous access.
-
-    Args:
-        request: FastAPI request object
-        credentials: HTTP Bearer credentials
-
-    Returns:
-        TokenData if token is valid, None otherwise
-
-    Example:
-        @router.get("/public")
-        async def public_endpoint(
-            token_data: Optional[TokenData] = Depends(get_optional_token)
-        ):
-            if token_data:
-                return {"message": f"Hello, {token_data.username}"}
-            return {"message": "Hello, anonymous user"}
-    """
-    if credentials is None:
-        return None
-
+    # Validate token type and decode
     try:
-        token = credentials.credentials
-        token_data = await auth_middleware.decode_token(token, None)
-        request.state.token_data = token_data
-        return token_data
-    except (HTTPException, JWTError):
-        return None
+        # Verify this is an access token (not a refresh token)
+        token_data = verify_token_type(token, "access")
+        logger.debug(f"Validated access token for user {token_data.email}")
+    except JWTError as e:
+        logger.warning(f"Invalid token provided: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except ValueError as e:
+        logger.warning(f"Token validation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Query user from database
+    try:
+        result = await db.execute(select(User).where(User.id == token_data.user_id))
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            logger.warning(f"User not found in database: {token_data.user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        logger.debug(f"Successfully retrieved user: {user.email}")
+        return user
+
+    except HTTPException:
+        # Re-raise HTTPException (user not found)
+        raise
+    except Exception as e:
+        logger.error(f"Database error while fetching user: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
 
 
-def require_role(required_role: str):
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
     """
-    Dependency factory to require a specific role.
+    Verify the current user is active and return the user object.
 
-    This function creates a dependency that checks if the authenticated user
-    has the required role. Raises 403 Forbidden if the user doesn't have
-    the required role.
+    This dependency extends get_current_user by adding an additional check
+    to ensure the user account is active. Inactive users (is_active=False)
+    cannot access protected endpoints even with valid credentials.
+
+    Common use cases for inactive accounts:
+    - User has been banned/disabled by admin
+    - Account has been deactivated
+    - Email verification is pending (if using is_verified)
 
     Args:
-        required_role: The role name required to access the endpoint
+        current_user: The authenticated user from get_current_user dependency
 
     Returns:
-        Dependency function that validates the user's role
+        User: The active user object
+
+    Raises:
+        HTTPException: 403 Forbidden if user account is not active
+
+    Example:
+        @router.post("/sensitive-operation")
+        async def sensitive_op(
+            current_user: User = Depends(get_current_active_user)
+        ):
+            # User is guaranteed to be active here
+            return {"message": "Operation authorized"}
+    """
+    if not current_user.is_active:
+        logger.warning(f"Inactive user attempted access: {current_user.email}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive. Please contact support.",
+        )
+
+    logger.debug(f"Active user verified: {current_user.email}")
+    return current_user
+
+
+async def get_current_verified_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Verify the current user is both active and email-verified.
+
+    This dependency extends get_current_user by checking both:
+    - User account is active (is_active=True)
+    - User email has been verified (is_verified=True)
+
+    Use this for endpoints that require email verification, such as:
+    - Password change
+    - Email update
+    - Sensitive operations
+
+    Args:
+        current_user: The authenticated user from get_current_user dependency
+
+    Returns:
+        User: The active and verified user object
+
+    Raises:
+        HTTPException: 403 Forbidden if user is not active or not verified
+
+    Example:
+        @router.post("/change-email")
+        async def change_email(
+            new_email: str,
+            current_user: User = Depends(get_current_verified_user)
+        ):
+            # User is guaranteed to be active AND verified here
+            return {"message": "Email update authorized"}
+    """
+    if not current_user.is_active:
+        logger.warning(f"Inactive user attempted access: {current_user.email}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive. Please contact support.",
+        )
+
+    if not current_user.is_verified:
+        logger.warning(f"Unverified user attempted access: {current_user.email}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email verification required. Please verify your email address.",
+        )
+
+    logger.debug(f"Active and verified user: {current_user.email}")
+    return current_user
+
+
+async def get_current_superuser(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """
+    Verify the current user is a superuser (admin).
+
+    This dependency enforces superuser-only access to sensitive endpoints.
+    Only users with is_superuser=True can access endpoints using this dependency.
+
+    Use this for administrative operations:
+    - User management
+    - System configuration
+    - Admin-only reports
+
+    Args:
+        current_user: The active user from get_current_active_user dependency
+
+    Returns:
+        User: The superuser object
+
+    Raises:
+        HTTPException: 403 Forbidden if user is not a superuser
+
+    Example:
+        @router.delete("/users/{user_id}")
+        async def delete_user(
+            user_id: str,
+            current_user: User = Depends(get_current_superuser)
+        ):
+            # Only superusers can reach this endpoint
+            return {"message": "User deletion authorized"}
+    """
+    if not current_user.is_superuser:
+        logger.warning(
+            f"Non-superuser attempted admin access: {current_user.email}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required. Access denied.",
+        )
+
+    logger.debug(f"Superuser access granted: {current_user.email}")
+    return current_user
+
+
+def require_role(required_role: UserRole):
+    """
+    Dependency factory that creates a dependency requiring a specific role.
+
+    This function returns a FastAPI dependency that checks if the current user
+    has the specified role. Use it to protect endpoints based on user roles.
+
+    Args:
+        required_role: The UserRole enum value required (e.g., UserRole.ADMIN)
+
+    Returns:
+        A dependency function that returns the User if authorized
+
+    Raises:
+        HTTPException: 403 Forbidden if user lacks the required role
 
     Example:
         @router.get("/admin-only")
         async def admin_endpoint(
-            token_data: TokenData = Depends(require_role("Admin"))
+            current_user: User = Depends(require_role(UserRole.ADMIN)):
         ):
-            return {"message": "Admin access granted"}
+            return {"message": f"Welcome admin {current_user.email}"}
+
+        @router.post("/recruiter-action")
+        async def recruiter_action(
+            current_user: User = Depends(require_role(UserRole.RECRUITER)):
+        ):
+            return {"message": "Recruiter action authorized"}
     """
-    async def role_dependency(
-        token_data: TokenData = Depends(get_current_token),
-    ) -> TokenData:
-        if required_role not in token_data.roles:
-            logger.warning(
-                f"User {token_data.username} lacks required role: {required_role}. "
-                f"User roles: {token_data.roles}"
+
+    async def check_role(
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        """
+        Verify the current user has the required role.
+
+        This dependency:
+        1. Ensures the user is active (via get_current_active_user)
+        2. Queries the roles table for the user's roles
+        3. Checks if the user has the required role
+        4. Returns the user if authorized, raises 403 otherwise
+
+        Args:
+            current_user: The active user from get_current_active_user
+            db: Database session for querying roles
+
+        Returns:
+            User: The authorized user object
+
+        Raises:
+            HTTPException: 403 Forbidden if user lacks the required role
+        """
+        # Query user's roles from the database
+        try:
+            result = await db.execute(
+                select(Role).where(
+                    Role.user_id == current_user.id,
+                    Role.role == required_role,
+                )
             )
+            user_role = result.scalar_one_or_none()
+
+            if user_role is None:
+                logger.warning(
+                    f"User {current_user.email} attempted access without required role: {required_role.value}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Role '{required_role.value}' required. Access denied.",
+                )
+
+            logger.debug(
+                f"User {current_user.email} granted access via role: {required_role.value}"
+            )
+            return current_user
+
+        except HTTPException:
+            # Re-raise HTTPException (authorization failed)
+            raise
+        except Exception as e:
+            logger.error(f"Database error while checking user role: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required role: {required_role}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal server error",
             )
-        logger.debug(
-            f"User {token_data.username} has required role: {required_role}"
-        )
-        return token_data
 
-    return role_dependency
+    return check_role
 
 
-def require_any_role(*required_roles: str):
+async def require_admin(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
     """
-    Dependency factory to require any of the specified roles.
+    Verify the current user has admin role and return the user object.
 
-    This function creates a dependency that checks if the authenticated user
-    has at least one of the required roles. Raises 403 Forbidden if the user
-    doesn't have any of the required roles.
+    This is a convenience dependency that checks for the ADMIN role.
+    It is equivalent to using Depends(require_role(UserRole.ADMIN)).
+
+    Use this for admin-only endpoints:
+    - User management
+    - System configuration
+    - Admin reports
 
     Args:
-        *required_roles: Variable number of role names, any of which grants access
+        current_user: The active user from get_current_active_user
+        db: Database session for querying roles
 
     Returns:
-        Dependency function that validates the user's roles
+        User: The admin user object
+
+    Raises:
+        HTTPException: 403 Forbidden if user is not an admin
 
     Example:
-        @router.get("/management")
-        async def management_endpoint(
-            token_data: TokenData = Depends(
-                require_any_role("Admin", "Recruiter")
-            )
+        @router.delete("/users/{user_id}")
+        async def delete_user(
+            user_id: str,
+            current_user: User = Depends(require_admin)
         ):
-            return {"message": "Management access granted"}
+            # Only admins can reach this endpoint
+            return {"message": "User deletion authorized"}
+
+    Note:
+        This checks the roles table for the ADMIN role assignment.
+        For superuser checks, use get_current_superuser instead.
     """
-    async def role_dependency(
-        token_data: TokenData = Depends(get_current_token),
-    ) -> TokenData:
-        if not any(role in token_data.roles for role in required_roles):
+    # Query user's admin role from the database
+    try:
+        result = await db.execute(
+            select(Role).where(
+                Role.user_id == current_user.id,
+                Role.role == UserRole.ADMIN,
+            )
+        )
+        admin_role = result.scalar_one_or_none()
+
+        if admin_role is None:
             logger.warning(
-                f"User {token_data.username} lacks required roles. "
-                f"Required any of: {required_roles}, "
-                f"User roles: {token_data.roles}"
+                f"Non-admin user attempted admin access: {current_user.email}"
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required one of: {', '.join(required_roles)}",
+                detail="Admin role required. Access denied.",
             )
-        logger.debug(
-            f"User {token_data.username} has at least one required role"
+
+        logger.debug(f"Admin access granted: {current_user.email}")
+        return current_user
+
+    except HTTPException:
+        # Re-raise HTTPException (authorization failed)
+        raise
+    except Exception as e:
+        logger.error(f"Database error while checking admin role: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
         )
-        return token_data
-
-    return role_dependency
-
-
-def require_all_roles(*required_roles: str):
-    """
-    Dependency factory to require all of the specified roles.
-
-    This function creates a dependency that checks if the authenticated user
-    has all of the required roles. Raises 403 Forbidden if the user is missing
-    any of the required roles.
-
-    Args:
-        *required_roles: Variable number of role names, all of which are required
-
-    Returns:
-        Dependency function that validates the user's roles
-
-    Example:
-        @router.get("/super-admin")
-        async def super_admin_endpoint(
-            token_data: TokenData = Depends(
-                require_all_roles("Admin", "SuperUser")
-            )
-        ):
-            return {"message": "Super admin access granted"}
-    """
-    async def role_dependency(
-        token_data: TokenData = Depends(get_current_token),
-    ) -> TokenData:
-        if not all(role in token_data.roles for role in required_roles):
-            missing_roles = [
-                role for role in required_roles if role not in token_data.roles
-            ]
-            logger.warning(
-                f"User {token_data.username} missing required roles: {missing_roles}. "
-                f"User roles: {token_data.roles}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Missing roles: {', '.join(missing_roles)}",
-            )
-        logger.debug(
-            f"User {token_data.username} has all required roles: {required_roles}"
-        )
-        return token_data
-
-    return role_dependency
