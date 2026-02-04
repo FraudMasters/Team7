@@ -271,6 +271,7 @@ from api import (
     batch,
     work_experience,
     skill_gap_analysis,
+    context,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -294,6 +295,7 @@ app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", ta
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
+app.include_router(context.router, prefix="/api/v1/context", tags=["Context"])
 
 
 if __name__ == "__main__":
