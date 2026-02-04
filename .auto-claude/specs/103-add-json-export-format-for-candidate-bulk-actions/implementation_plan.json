@@ -97,8 +97,9 @@
             "type": "manual",
             "instructions": "Check if user documentation or API documentation mentions JSON export format for bulk actions. If not, create a brief documentation snippet explaining how to use the feature (frontend: select candidates, click export, choose JSON; backend: POST to /api/candidates/bulk-action with action='export' and export_format='json')"
           },
-          "status": "pending",
-          "notes": "Optional: Add documentation if it doesn't exist"
+          "status": "completed",
+          "notes": "DOCUMENTATION ADDED: (1) backend/docs/API_REFERENCE.md - Added 'Bulk Action on Candidates' endpoint with JSON/CSV export format documentation, request/response examples, and cURL usage; (2) docs/API_USAGE_GUIDE.md - Added 'Bulk Export Candidates' section with frontend workflow explanation and API examples; (3) JSON_EXPORT_DOCUMENTATION.md - Created comprehensive standalone guide with step-by-step frontend usage, backend API examples in cURL/Python/JavaScript, use cases, and best practices. All documentation covers both JSON and CSV export formats.",
+          "updated_at": "2026-02-04T16:30:00.000000+00:00"
         }
       ]
     }
@@ -218,6 +219,6 @@
   },
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-02-04T15:58:31.953Z",
+  "updated_at": "2026-02-04T16:02:14.645Z",
   "last_updated": "2026-02-04T15:57:56.267536+00:00"
 }
