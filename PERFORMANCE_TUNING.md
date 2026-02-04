@@ -5116,6 +5116,1275 @@ Dashboard: Docker Container Metrics
 
 ---
 
+## Troubleshooting Performance Issues
+
+Comprehensive guide to diagnosing and resolving common performance bottlenecks in the AgentHR platform.
+
+### Overview
+
+Performance issues can manifest in various ways across different components. This section provides a systematic approach to identifying and resolving the most common bottlenecks.
+
+### Quick Diagnostic Flowchart
+
+```
+                    ┌─────────────────────┐
+                    │  Performance Issue? │
+                    └──────────┬──────────┘
+                               │
+                ┌──────────────┴──────────────┐
+                │                             │
+         ┌──────▼──────┐              ┌──────▼──────┐
+         │ Slow API?   │              │ High Memory?│
+         └──────┬──────┘              └──────┬──────┘
+                │                             │
+         ┌──────▼──────┐              ┌──────▼──────┐
+         │ Queue Backup?│             │ ML Model?   │
+         └──────┬──────┘              └──────┬──────┘
+                │                             │
+                └──────────────┬──────────────┘
+                               │
+                        ┌──────▼──────┐
+                        │  Follow the  │
+                        │ sections below│
+                        └─────────────┘
+```
+
+---
+
+## 1. Slow API Performance
+
+### Symptoms
+
+- API responses take > 500ms (p95)
+- Frontend pages load slowly
+- Users experience lag or timeouts
+- Grafana shows high API latency
+
+### Diagnosis
+
+#### Step 1: Identify the Bottleneck
+
+```bash
+# Check API response times
+curl -w "@-" -o /dev/null -s 'http://localhost:8000/api/v1/candidates' <<'EOF'
+    time_namelookup:  %{time_namelookup}\n
+       time_connect:  %{time_connect}\n
+    time_appconnect:  %{time_appconnect}\n
+   time_pretransfer:  %{time_pretransfer}\n
+      time_redirect:  %{time_redirect}\n
+ time_starttransfer:  %{time_starttransfer}\n
+                    ----------\n
+         time_total:  %{time_total}\n
+EOF
+
+# Check Prometheus metrics
+curl -s 'http://localhost:9090/api/v1/query?query=http_request_duration_seconds_bucket{le="0.5"}' | jq '.data.result[0].value[1]'
+
+# View slow queries in PostgreSQL
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT query, calls, mean_exec_time, max_exec_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;"
+```
+
+#### Step 2: Check Database Performance
+
+```bash
+# Check active connections
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT count(*), state
+FROM pg_stat_activity
+GROUP BY state;"
+
+# Check for blocking queries
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT pid, now() - pg_stat_activity.query_start AS duration, query
+FROM pg_stat_activity
+WHERE state = 'active'
+ORDER BY duration DESC;"
+
+# Check table sizes (large tables slow down queries)
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT relname AS table_name,
+       pg_size_pretty(pg_total_relation_size(relid)) AS total_size
+FROM pg_catalog.pg_statio_user_tables
+ORDER BY pg_total_relation_size(relid) DESC
+LIMIT 10;"
+```
+
+#### Step 3: Check Connection Pool
+
+```bash
+# Check pool statistics
+docker-compose logs backend | grep -i "connection pool"
+
+# Verify pool size in .env
+grep POOL .env
+```
+
+### Solutions
+
+#### Solution 1: Optimize Database Queries
+
+**Problem:** N+1 queries or missing indexes
+
+**Fix:**
+
+```bash
+# Add missing indexes
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+CREATE INDEX CONCURRENTLY idx_candidates_email ON candidates(email);
+CREATE INDEX CONCURRENTLY idx_vacancies_status ON vacancies(status);
+CREATE INDEX CONCURRENTLY idx_analysis_tasks_created ON analysis_tasks(created_at);"
+
+# Update query statistics
+docker-compose exec -T db psql -U agenthr -d agenthr -c "SELECT pg_stat_statements_reset();"
+```
+
+**Backend Code Changes:**
+
+```python
+# BAD: N+1 query problem
+candidates = db.query(Candidate).all()
+for candidate in candidates:
+    print(candidate.skills)  # N+1 query!
+
+# GOOD: Use eager loading
+candidates = db.query(Candidate).options(
+    joinedload(Candidate.skills),
+    joinedload(Candidate.experience)
+).all()
+```
+
+#### Solution 2: Increase Connection Pool Size
+
+**Problem:** Connection pool exhausted
+
+**Fix:**
+
+```bash
+# Update .env
+echo "DB_POOL_SIZE=20" >> .env
+echo "DB_MAX_OVERFLOW=10" >> .env
+
+# Restart backend
+docker-compose restart backend
+```
+
+#### Solution 3: Enable Response Caching
+
+**Problem:** Repeated expensive queries
+
+**Fix:**
+
+```python
+# Add caching to API endpoints
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+
+@app.get("/api/v1/vacancies")
+@cache(expire=60)  # Cache for 60 seconds
+async def get_vacancies():
+    return await vacancy_service.list_vacancies()
+```
+
+#### Solution 4: Optimize Serialization
+
+**Problem:** Slow JSON serialization
+
+**Fix:**
+
+```python
+# Use Pydantic for efficient serialization
+from pydantic import BaseModel
+
+class CandidateResponse(BaseModel):
+    id: int
+    email: str
+    # Only include necessary fields
+
+class Config:
+    orm_mode = True
+
+# Use list comprehension instead of .dict()
+@app.get("/api/v1/candidates")
+async def get_candidates(db: Session = Depends(get_db)):
+    candidates = db.query(Candidate).limit(100).all()
+    return [CandidateResponse.from_orm(c) for c in candidates]
+```
+
+### Verification
+
+```bash
+# Re-measure API performance
+curl -w "Total: %{time_total}s\n" -o /dev/null -s 'http://localhost:8000/api/v1/candidates'
+
+# Check Prometheus for improvement
+curl -s 'http://localhost:9090/api/v1/query?query=rate(http_request_duration_seconds_sum[5m])' | jq '.data.result[0]'
+
+# Verify database query time
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT mean_exec_time < 0.1 AS queries_fast
+FROM pg_stat_statements
+WHERE query LIKE '%SELECT%';"
+```
+
+---
+
+## 2. High Memory Usage
+
+### Symptoms
+
+- Containers restart with exit code 137 (OOM killed)
+- Docker stats show memory usage > 85%
+- System becomes sluggish under load
+- `docker events` shows OOM kills
+
+### Diagnosis
+
+```bash
+# Check current memory usage
+docker stats --no-stream $(docker-compose ps -q)
+
+# Check for OOM kills
+docker events --filter 'type=oom' --since 24h
+
+# Check per-container memory
+docker-compose ps
+docker inspect $(docker-compose ps -q backend) | jq '.[0].HostConfig.Memory'
+
+# Check Redis memory usage
+docker-compose exec -T redis redis-cli INFO memory | grep used_memory
+
+# Check PostgreSQL memory
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT name, setting, unit
+FROM pg_settings
+WHERE name LIKE '%memory%';"
+```
+
+### Solutions
+
+#### Solution 1: ML Model Memory Optimization
+
+**Problem:** ML models consume too much memory
+
+**Fix:**
+
+```python
+# Reduce batch size
+# In .env:
+ML_BATCH_SIZE=4  # Reduce from 8
+
+# Use model quantization (if supported)
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+model.quantize=True  # Reduce memory by ~40%
+
+# Clear unused models
+import gc
+gc.collect()
+```
+
+#### Solution 2: Optimize Model Caching
+
+**Problem:** Too many models loaded simultaneously
+
+**Fix:**
+
+```python
+# Limit cache size in .env
+MODEL_CACHE_SIZE=3  # Keep only 3 models in memory
+
+# Implement model unloading
+class ModelManager:
+    def __init__(self, max_models=3):
+        self.max_models = max_models
+        self.loaded_models = {}
+
+    def load_model(self, model_name):
+        if len(self.loaded_models) >= self.max_models:
+            # Unload least recently used
+            lru_model = min(self.loaded_models.items(), key=lambda x: x[1]['last_used'])
+            del self.loaded_models[lru_model[0]]
+            gc.collect()
+
+        self.loaded_models[model_name] = {
+            'model': load_model(model_name),
+            'last_used': time.time()
+        }
+        return self.loaded_models[model_name]['model']
+```
+
+#### Solution 3: Configure Celery Worker Memory Limits
+
+**Problem:** Workers consume too much memory
+
+**Fix:**
+
+```yaml
+# In docker-compose.yml
+services:
+  celery_worker:
+    deploy:
+      resources:
+        limits:
+          memory: 12G  # Increase from 8G
+        reservations:
+          memory: 6G
+    environment:
+      - CELERYD_CONCURRENCY=2  # Reduce from 4
+      - CELERYD_PREFETCH_MULTIPLIER=1  # Reduce from 4
+```
+
+#### Solution 4: Optimize Redis Memory
+
+**Problem:** Redis memory usage too high
+
+**Fix:**
+
+```bash
+# Set maxmemory policy
+docker-compose exec -T redis redis-cli CONFIG SET maxmemory 1gb
+docker-compose exec -T redis redis-cli CONFIG SET maxmemory-policy allkeys-lru
+
+# Check memory usage by key
+docker-compose exec -T redis redis-cli --scan --pattern 'analysis:*' | head -10 |
+  xargs -I {} docker-compose exec -T redis redis-cli MEMORY USAGE {}
+
+# Clear old cached results
+docker-compose exec -T redis redis-cli --scan --pattern 'result:*' |
+  head -1000 | xargs -I {} docker-compose exec -T redis redis-cli DEL {}
+```
+
+#### Solution 5: Database Memory Tuning
+
+**Problem:** PostgreSQL consuming too much memory
+
+**Fix:**
+
+```bash
+# Add to docker-compose.yml
+services:
+  db:
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=512MB"  # 25% of available RAM
+      - "-c"
+      - "effective_cache_size=2GB"  # 50-75% of RAM
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "max_connections=100"
+```
+
+### Verification
+
+```bash
+# Monitor memory after changes
+watch -n 5 'docker stats --no-stream $(docker-compose ps -q)'
+
+# Check for OOM kills (should be none)
+docker events --filter 'type=oom' --since 1h | wc -l
+
+# Verify Redis memory under limit
+docker-compose exec -T redis redis-cli INFO memory | grep used_memory_human
+
+# Check container restarts
+docker inspect $(docker-compose ps -q) | jq '.[] | {name: .Name, restart_count: .RestartCount}'
+```
+
+---
+
+## 3. Celery Queue Backup
+
+### Symptoms
+
+- Tasks take too long to process
+- Flower dashboard shows queue depth > 100
+- Tasks pile up during peak load
+- Users wait long for analysis results
+
+### Diagnosis
+
+```bash
+# Check queue depth
+curl -s http://localhost:5555/api/tasks | jq '.length'
+
+# Check worker status
+curl -s http://localhost:5555/api/workers | jq '.'
+
+# Check task processing rate
+docker-compose logs celery_worker | grep "Task.*succeeded" | tail -100 |
+  awk '{print $1, $2}' | uniq -c
+
+# Check for failed tasks
+curl -s http://localhost:5555/api/tasks?state=FAILURE | jq 'length'
+
+# Monitor task duration
+docker-compose logs celery_worker --tail 100 | grep "runtime" |
+  awk -F'retval=' '{print $2}' | awk '{print $1}' | sort -n | tail -10
+```
+
+### Solutions
+
+#### Solution 1: Increase Worker Concurrency
+
+**Problem:** Not enough workers to handle load
+
+**Fix:**
+
+```yaml
+# In docker-compose.yml, scale workers
+docker-compose up -d --scale celery_worker=4
+
+# Or increase concurrency per worker
+services:
+  celery_worker:
+    command: celery -A celery_app.celery_app worker --concurrency=8  # Increase from 4
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 16G  # Increase memory for more concurrency
+```
+
+#### Solution 2: Optimize Task Batching
+
+**Problem:** Tasks processed inefficiently
+
+**Fix:**
+
+```python
+# Batch similar tasks together
+@app.task(bind=True, max_retries=3)
+def process_resumes_batch(self, resume_ids: List[int]):
+    batch_size = 10
+    results = []
+
+    for i in range(0, len(resume_ids), batch_size):
+        batch = resume_ids[i:i + batch_size]
+        # Process batch in parallel
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            batch_results = list(executor.map(analyze_resume, batch))
+        results.extend(batch_results)
+
+    return results
+```
+
+#### Solution 3: Implement Task Priorities
+
+**Problem:** Urgent tasks stuck behind slow tasks
+
+**Fix:**
+
+```python
+# Define priority queues
+from kombu import Queue
+
+app.conf.task_queues = [
+    Queue('high_priority', routing_key='high'),
+    Queue('default', routing_key='default'),
+    Queue('low_priority', routing_key='low'),
+]
+
+# Assign priorities
+@app.task(queue='high_priority')
+def urgent_analysis_task(resume_id: int):
+    # Time-sensitive analysis
+    pass
+
+@app.task(queue='low_priority')
+def background_cleanup_task():
+    # Non-urgent cleanup
+    pass
+
+# Configure workers for priority queues
+# celery_worker_high: celery worker -Q high_priority,default -c 4
+# celery_worker_low: celery worker -Q low_priority,default -c 2
+```
+
+#### Solution 4: Add Auto-Scaling
+
+**Problem:** Static worker count can't handle variable load
+
+**Fix:**
+
+```bash
+# Install celery autoscaling tools
+pip install celery[redis,sqs]
+
+# Configure autoscaling in docker-compose.yml
+services:
+  celery_worker:
+    command: >
+      celery -A celery_app.celery_app worker
+      --autoscale=10,2  # Max 10, min 2
+      --concurrency=4
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+```
+
+#### Solution 5: Optimize Task Timeouts and Retries
+
+**Problem:** Failed tasks clog the queue
+
+**Fix:**
+
+```python
+# Configure task timeouts
+@app.task(
+    bind=True,
+    max_retries=3,
+    time_limit=300,      # Hard limit: 5 minutes
+    soft_time_limit=240, # Soft limit: 4 minutes
+    acks_late=True,      # Only acknowledge after completion
+)
+def analyze_resume(self, resume_id: int):
+    try:
+        # Analysis logic
+        pass
+    except SoftTimeLimitExceeded:
+        # Gracefully handle timeout
+        logger.warning(f"Task {resume_id} timed out, will retry")
+        self.retry(countdown=60)
+    except Exception as exc:
+        logger.error(f"Task failed: {exc}")
+        self.retry(exc=exc, countdown=60)
+```
+
+#### Solution 6: Implement Result Expiration
+
+**Problem:** Old results clog the backend
+
+**Fix:**
+
+```python
+# Set result expiration
+app.conf.task_result_expires = 3600  # 1 hour
+app.conf.task_acks_late = True
+app.conf.task_reject_on_worker_lost = True
+
+# Clean up old results periodically
+@app.task
+def cleanup_old_results():
+    from celery.result import AsyncResult
+    # Remove results older than 24 hours
+    pass
+
+# Schedule cleanup
+app.conf.beat_schedule = {
+    'cleanup-old-results': {
+        'task': 'cleanup_old_results',
+        'schedule': crontab(hour=2, minute=0),  # 2 AM daily
+    },
+}
+```
+
+### Verification
+
+```bash
+# Monitor queue depth (should be < 10)
+watch -n 5 'curl -s http://localhost:5555/api/tasks | jq ".length"'
+
+# Check worker processing rate
+docker-compose logs celery_worker --since 5m | grep "succeeded" | wc -l
+
+# Verify tasks complete within SLA
+curl -s http://localhost:5555/api/tasks | jq '.[] | select(.state=="SUCCESS") | .runtime' |
+  awk '{sum+=$1; count++} END {print "Average:", sum/count, "s"}'
+
+# Test with load test
+# This should complete without queue backup
+for i in {1..50}; do
+  curl -X POST http://localhost:8000/api/v1/analyze -F "file=@test_resume.pdf" &
+done
+wait
+```
+
+---
+
+## 4. Slow ML Model Inference
+
+### Symptoms
+
+- Resume analysis takes > 30 seconds
+- ML inference latency spikes in Grafana
+- Model loading time is excessive
+- High GPU/CPU usage during inference
+
+### Diagnosis
+
+```bash
+# Check model loading time
+docker-compose logs celery_worker | grep "Loading model" | tail -10
+
+# Check inference time per model
+docker-compose logs celery_worker | grep "inference" | tail -20
+
+# Check which models are loaded
+docker-compose exec celery_worker python -c "
+from backend.services.model_manager import get_model_manager
+mm = get_model_manager()
+print('Loaded models:', list(mm.loaded_models.keys()))
+"
+
+# Profile model inference
+docker-compose exec celery_worker python -m cProfile -s cumulative \
+  -o profile.stats backend/analyzers/skill_matcher.py
+```
+
+### Solutions
+
+#### Solution 1: Use Smaller/Faster Models
+
+**Problem:** Models too large for use case
+
+**Fix:**
+
+```python
+# Use smaller models
+# Instead of:
+model = SentenceTransformer('all-mpnet-base-v2')  # 420MB, 1.2s inference
+
+# Use:
+model = SentenceTransformer('all-MiniLM-L6-v2')  # 80MB, 0.3s inference
+
+# Or use quantized models
+from transformers import AutoModelForSequenceClassification
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    'model-name',
+    load_in_8bit=True  # Reduce memory by ~50%
+)
+```
+
+#### Solution 2: Implement Model Caching
+
+**Problem:** Models reloaded on every task
+
+**Fix:**
+
+```python
+# Cache models in memory
+from functools import lru_cache
+
+@lru_cache(maxsize=5)
+def get_model(model_name: str):
+    """Load and cache models"""
+    return SentenceTransformer(model_name)
+
+# Use in tasks
+@app.task
+def analyze_skills(text: str):
+    model = get_model('all-MiniLM-L6-v2')  # Cached after first load
+    embeddings = model.encode(text)
+    return embeddings
+```
+
+#### Solution 3: Batch Processing
+
+**Problem:** Processing one resume at a time
+
+**Fix:**
+
+```python
+# Batch multiple resumes
+@app.task
+def analyze_resume_batch(resume_ids: List[int]):
+    model = get_model('all-MiniLM-L6-v2')
+
+    # Load all resumes
+    resumes = [load_resume(id) for id in resume_ids]
+    texts = [r['text'] for r in resumes]
+
+    # Encode in batch (much faster)
+    embeddings = model.encode(texts, batch_size=16, show_progress_bar=False)
+
+    # Process results
+    results = process_embeddings(embeddings, resumes)
+    return results
+```
+
+#### Solution 4: Model Preloading
+
+**Problem:** First request slow due to model loading
+
+**Fix:**
+
+```python
+# Preload models on worker startup
+# In celery_app.py:
+from celery.signals import worker_ready
+
+@worker_ready.connect
+def preload_models(**kwargs):
+    """Preload models when worker starts"""
+    logger.info("Preloading ML models...")
+    get_model('all-MiniLM-L6-v2')
+    get_model('en_core_web_sm')
+    logger.info("Models preloaded successfully")
+```
+
+#### Solution 5: Use GPU Acceleration
+
+**Problem:** CPU inference too slow
+
+**Fix:**
+
+```yaml
+# Enable GPU in docker-compose.yml
+services:
+  celery_worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+
+# In Python, use GPU
+import torch
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+model = model.to(device)
+```
+
+### Verification
+
+```bash
+# Test inference time
+time docker-compose exec celery_worker python -c "
+from sentence_transformers import SentenceTransformer
+model = SentenceTransformer('all-MiniLM-L6-v2')
+model.encode(['test text'] * 10)
+"
+
+# Check model caching works
+docker-compose logs celery_worker | grep "Preloading ML models"
+
+# Monitor batch processing performance
+docker-compose logs celery_worker | grep "Batch processing" | tail -10
+```
+
+---
+
+## 5. Frontend Performance Issues
+
+### Symptoms
+
+- Page load time > 3 seconds
+- Janky scrolling or interactions
+- High bundle size
+- Slow initial render
+
+### Diagnosis
+
+```bash
+# Analyze bundle size
+npm run build
+ls -lh dist/assets/*.js | sort -k5 -h
+
+# Check with Lighthouse
+npx lighthouse http://localhost:5173 --view
+
+# Monitor with browser DevTools
+# Open Chrome DevTools > Performance > Record
+# Interact with the application
+# Stop recording and analyze
+
+# Check for large dependencies
+npm run build -- --report
+# Open dist/report.html to see bundle analysis
+```
+
+### Solutions
+
+#### Solution 1: Code Splitting
+
+**Problem:** Large bundle blocks initial render
+
+**Fix:**
+
+```typescript
+// Route-based splitting
+import { lazy, Suspense } from 'react'
+
+const UploadPage = lazy(() => import('./pages/UploadPage'))
+const AnalysisPage = lazy(() => import('./pages/AnalysisPage'))
+
+function App() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <Routes>
+        <Route path="/upload" element={<UploadPage />} />
+        <Route path="/analysis" element={<AnalysisPage />} />
+      </Routes>
+    </Suspense>
+  )
+}
+```
+
+#### Solution 2: Virtualization for Large Lists
+
+**Problem:** Rendering large lists causes lag
+
+**Fix:**
+
+```typescript
+import { useVirtualizer } from '@tanstack/react-virtual'
+
+function CandidateList({ candidates }: { candidates: Candidate[] }) {
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const virtualizer = useVirtualizer({
+    count: candidates.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80, // Estimated row height
+    overscan: 5, // Render 5 extra items above/below
+  })
+
+  return (
+    <div ref={parentRef} style={{ height: '600px', overflow: 'auto' }}>
+      <div style={{ height: `${virtualizer.getTotalSize()}px` }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            <CandidateCard candidate={candidates[virtualItem.index]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+#### Solution 3: Optimize API Calls
+
+**Problem:** Too many API calls or redundant requests
+
+**Fix:**
+
+```typescript
+// Implement request debouncing
+import { useDebouncedCallback } from 'use-debounce'
+
+function SearchBar() {
+  const debouncedSearch = useDebouncedCallback((query: string) => {
+    searchCandidates(query)
+  }, 500) // Wait 500ms after typing stops
+
+  return <input onChange={(e) => debouncedSearch(e.target.value)} />
+}
+
+// Implement request caching
+import { useQuery } from '@tanstack/react-query'
+
+function useVacancies() {
+  return useQuery({
+    queryKey: ['vacancies'],
+    queryFn: fetchVacancies,
+    staleTime: 60000, // Cache for 1 minute
+    cacheTime: 300000, // Keep in cache for 5 minutes
+  })
+}
+```
+
+#### Solution 4: Image Optimization
+
+**Problem:** Large images slow down loading
+
+**Fix:**
+
+```typescript
+// Lazy load images
+import { LazyLoadImage } from 'react-lazy-load-image-component'
+
+function CandidateProfile({ avatar }: { avatar: string }) {
+  return (
+    <LazyLoadImage
+      src={avatar}
+      alt="Candidate avatar"
+      effect="blur" // Blur effect while loading
+      threshold={200} // Load 200px before entering viewport
+    />
+  )
+}
+
+// Use modern formats
+// Convert images to WebP/AVIF for 30-50% size reduction
+```
+
+### Verification
+
+```bash
+# Check bundle size after optimizations
+npm run build
+du -sh dist/assets/
+
+# Run Lighthouse audit
+npx lighthouse http://localhost:5173 --json --output json > lighthouse-report.json
+cat lighthouse-report.json | jq '.categories.performance.score'
+
+# Test on slow 3G connection
+# Chrome DevTools > Network > Throttling > Slow 3G
+# Reload page and measure load time
+```
+
+---
+
+## 6. Database Performance Issues
+
+### Symptoms
+
+- Slow queries (> 100ms average)
+- High database CPU usage
+- Connection pool exhaustion
+- Database locks blocking queries
+
+### Diagnosis
+
+```bash
+# Identify slow queries
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT query, calls, mean_exec_time, max_exec_time, total_exec_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 20;"
+
+# Check for missing indexes
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT schemaname, tablename, attname, n_distinct, correlation
+FROM pg_stats
+WHERE schemaname = 'public'
+ORDER BY n_distinct DESC;"
+
+# Check table bloat
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT schemaname, tablename,
+       pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
+       pg_total_relation_size(schemaname||'.'||tablename) * 100.0 /
+         (SELECT sum(pg_total_relation_size(schemaname||'.'||tablename))
+          FROM pg_tables WHERE schemaname = 'public') AS percentage
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
+
+# Check for locks
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT pid, usename, pg_blocking_pids(pid) AS blocked_by,
+       query as blocked_query
+FROM pg_stat_activity
+WHERE cardinality(pg_blocking_pids(pid)) > 0;"
+```
+
+### Solutions
+
+#### Solution 1: Add Missing Indexes
+
+**Problem:** Queries perform full table scans
+
+**Fix:**
+
+```sql
+-- Create indexes on frequently filtered columns
+CREATE INDEX CONCURRENTLY idx_candidates_status ON candidates(status);
+CREATE INDEX CONCURRENTLY idx_candidates_created_at ON candidates(created_at DESC);
+
+-- Create composite indexes for common query patterns
+CREATE INDEX CONCURRENTLY idx_vacancies_status_created ON vacancies(status, created_at DESC);
+
+-- Create indexes for foreign keys
+CREATE INDEX CONCURRENTLY idx_analysis_tasks_candidate_id ON analysis_tasks(candidate_id);
+
+-- Create partial indexes for specific conditions
+CREATE INDEX CONCURRENTLY idx_active_candidates ON candidates(id) WHERE status = 'active';
+
+-- Analyze index usage
+SELECT schemaname, tablename, indexname, idx_scan, idx_tup_read
+FROM pg_stat_user_indexes
+ORDER BY idx_scan ASC;
+```
+
+#### Solution 2: Optimize Query Performance
+
+**Problem:** Inefficient query structure
+
+**Fix:**
+
+```python
+# BAD: Multiple queries
+def get_candidate_with_skills(candidate_id: int):
+    candidate = db.query(Candidate).filter_by(id=candidate_id).first()
+    skills = db.query(Skill).filter_by(candidate_id=candidate_id).all()
+    return {"candidate": candidate, "skills": skills}
+
+# GOOD: Single query with join
+def get_candidate_with_skills(candidate_id: int):
+    return db.query(Candidate).options(
+        joinedload(Candidate.skills)
+    ).filter_by(id=candidate_id).first()
+
+# Use pagination for large result sets
+def get_candidates(page: int = 1, per_page: int = 50):
+    return db.query(Candidate).limit(per_page).offset((page - 1) * per_page).all()
+```
+
+#### Solution 3: Connection Pool Optimization
+
+**Problem:** Pool exhausted or too small
+
+**Fix:**
+
+```bash
+# Update .env
+DB_POOL_SIZE=20  # Increase from default 5
+DB_MAX_OVERFLOW=10  # Allow 10 extra connections
+DB_POOL_TIMEOUT=30  # Wait 30s for connection
+DB_POOL_RECYCLE=3600  # Recycle connections after 1 hour
+
+# Monitor pool usage
+docker-compose logs backend | grep "connection pool"
+```
+
+#### Solution 4: Database Vacuum and Analyze
+
+**Problem:** Table bloat and outdated statistics
+
+**Fix:**
+
+```bash
+# Run vacuum and analyze
+docker-compose exec -T db psql -U agenthr -d agenthr -c "VACUUM ANALYZE;"
+
+# Schedule automatic vacuum
+# In docker-compose.yml:
+services:
+  db:
+    command:
+      - "postgres"
+      - "-c"
+      - "autovacuum=on"
+      - "-c"
+      - "autovacuum_vacuum_scale_factor=0.1"  # Vacuum when 10% of rows change
+      - "-c"
+      - "autovacuum_analyze_scale_factor=0.05"  # Analyze when 5% change
+
+# Monitor bloat
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT schemaname, tablename,
+       pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
+```
+
+### Verification
+
+```bash
+# Re-check slow queries
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT mean_exec_time < 0.1 AS queries_optimized
+FROM pg_stat_statements
+WHERE query LIKE '%SELECT%'
+LIMIT 1;"
+
+# Verify indexes are being used
+docker-compose exec -T db psql -U agenthr -d agentagenthr -c "
+EXPLAIN ANALYZE SELECT * FROM candidates WHERE status = 'active';"
+# Should show "Index Scan" not "Seq Scan"
+
+# Monitor connection pool
+docker-compose logs backend --tail 100 | grep "pool" | tail -10
+```
+
+---
+
+## Performance Tuning Checklist
+
+Use this checklist to systematically identify and resolve performance issues.
+
+### Quick Health Check (Run First)
+
+```bash
+#!/bin/bash
+echo "=== AgentHR Performance Health Check ==="
+echo ""
+
+# 1. Container Status
+echo "1. Container Status:"
+docker-compose ps
+echo ""
+
+# 2. Resource Usage
+echo "2. Resource Usage:"
+docker stats --no-stream $(docker-compose ps -q)
+echo ""
+
+# 3. API Response Time
+echo "3. API Response Time:"
+curl -w "Total: %{time_total}s\n" -o /dev/null -s http://localhost:8000/health
+echo ""
+
+# 4. Queue Depth
+echo "4. Celery Queue Depth:"
+curl -s http://localhost:5555/api/tasks | jq '.length'
+echo ""
+
+# 5. Database Connections
+echo "5. Database Connections:"
+docker-compose exec -T db psql -U agenthr -d agenthr -c "SELECT count(*) FROM pg_stat_activity;"
+echo ""
+
+# 6. Slow Queries
+echo "6. Slow Queries (avg > 100ms):"
+docker-compose exec -T db psql -U agenthr -d agenthr -c "
+SELECT count(*) FROM pg_stat_statements WHERE mean_exec_time > 0.1;"
+echo ""
+
+# 7. Redis Memory
+echo "7. Redis Memory:"
+docker-compose exec -T redis redis-cli INFO memory | grep used_memory_human
+echo ""
+
+# 8. OOM Kills (last 24h)
+echo "8. OOM Kills (last 24h):"
+docker events --filter 'type=oom' --since 24h | wc -l
+echo ""
+
+echo "=== Health Check Complete ==="
+```
+
+### Component-Specific Checks
+
+#### ML Models
+- [ ] Models cached in memory
+- [ ] Batch size optimized (4-8)
+- [ ] Model loading time < 5 seconds
+- [ ] Inference time < 10 seconds per resume
+- [ ] Memory usage < 80% of limit
+
+#### Celery Workers
+- [ ] Queue depth < 10 tasks
+- [ ] Worker concurrency appropriate (2-8 per worker)
+- [ ] Task failure rate < 5%
+- [ ] Average task duration < 30 seconds
+- [ ] No task retries exceeding limit
+
+#### Redis Cache
+- [ ] Memory usage < 80% of max
+- [ ] Cache hit rate > 70%
+- [ ] Eviction policy configured (allkeys-lru)
+- [ ] Old results expire automatically
+- [ ] Model cache size limited
+
+#### PostgreSQL
+- [ ] All foreign keys indexed
+- [ ] No sequential scans on large tables
+- [ ] Connection pool size appropriate (10-20)
+- [ ] Average query time < 100ms
+- [ ] No long-running locks
+
+#### Frontend
+- [ ] Initial load time < 3 seconds
+- [ ] Bundle size < 500KB (gzipped)
+- [ ] Large lists use virtualization
+- [ ] Images lazy-loaded
+- [ ] API calls debounced/cached
+
+### Diagnostic Commands Reference
+
+```bash
+# API Performance
+curl -w "@-" -o /dev/null -s 'http://localhost:8000/api/v1/candidates' <<'EOF'
+time_total: %{time_total}\n
+EOF
+
+# Database
+docker-compose exec -T db psql -U agenthr -d agenthr -c "SELECT query, mean_exec_time FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;"
+
+# Celery
+curl -s http://localhost:5555/api/workers | jq '.'
+docker-compose logs celery_worker --tail 100 | grep "succeeded\|failed"
+
+# Redis
+docker-compose exec -T redis redis-cli INFO stats
+docker-compose exec -T redis redis-cli --scan --pattern 'analysis:*' | head -10 | xargs -I {} redis-cli MEMORY USAGE {}
+
+# Memory/Docker
+docker stats --no-stream $(docker-compose ps -q)
+docker events --filter 'type=oom' --since 1h
+
+# Monitoring
+curl -s 'http://localhost:9090/api/v1/query?query=rate(http_request_duration_seconds_sum[5m])' | jq '.data.result'
+```
+
+### Common Bottleneck Patterns
+
+| Symptom | Likely Cause | First Check |
+|---------|-------------|-------------|
+| **Slow API** | Database queries | Check `pg_stat_statements` |
+| **High memory** | ML models | Check loaded models |
+| **Queue backup** | Insufficient workers | Check worker concurrency |
+| **Frontend slow** | Large bundle | Check bundle size |
+| **DB CPU high** | Missing indexes | Check query plan |
+| **Redis full** | No expiration | Check `maxmemory-policy` |
+
+### Performance Tuning Priority Matrix
+
+```
+High Impact, Low Effort (Do First):
+├── Add database indexes
+├── Enable Redis cache expiration
+├── Implement frontend code splitting
+└── Configure connection pooling
+
+High Impact, High Effort (Plan Carefully):
+├── Implement model quantization
+├── Add GPU acceleration
+├── Redesign database schema
+└── Implement microservices architecture
+
+Low Impact, Low Effort (Quick Wins):
+├── Tune worker concurrency
+├── Optimize batch sizes
+├── Enable compression
+└── Clean up old data
+
+Low Impact, High Effort (Avoid):
+├── Premature optimization
+├── Rewriting working code
+└── Over-engineering solutions
+```
+
+### When to Escalate
+
+Escalate to senior engineers or infrastructure team if:
+
+- Performance degrades after optimization
+- Unable to identify bottleneck with available tools
+- Changes require database downtime
+- Optimization affects multiple services
+- Resource limits reached on current infrastructure
+
+---
+
 ## Related Documentation
 
 - [ML_PIPELINE.md](ML_PIPELINE.md) - Detailed ML/NLP pipeline documentation
