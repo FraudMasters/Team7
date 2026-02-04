@@ -5187,3 +5187,870 @@ RESULT (60 days later):
 ### What's Next?
 
 Now that you know how to use the Analytics Dashboard to measure and improve your hiring process, you're ready to become a power user. In the next section, we'll cover [Advanced Search and Filtering](#9-advanced-search-and-filtering)—how to find exactly the right candidates with precision search queries and smart filters.
+
+---
+
+---
+
+## 9. Advanced Search and Filtering
+
+As your candidate database grows, finding the right person quickly becomes crucial. AgentHR's **advanced search and filtering** capabilities let you slice and dice your candidate pool with precision—whether you're looking for a specific skill combination, experience level, or any other criteria.
+
+This section covers how to use basic search, apply filters effectively, save your searches for reuse, and provides practical examples to help you find exactly who you need.
+
+### Basic Search
+
+**Simple explanation**: Type what you're looking for into the search bar, and AgentHR finds candidates matching your words.
+
+**In more detail**:
+
+The basic search bar is your fastest way to find candidates. It uses **full-text search** powered by PostgreSQL, which means it's smart about understanding what you mean—even if you don't use exact terminology.
+
+#### How Basic Search Works
+
+When you type in the search bar, AgentHR searches through:
+
+- **Skills** – All extracted skills from resumes
+- **Job titles** – Current and previous positions
+- **Experience descriptions** – Details about work history
+- **Education** – Degrees, certifications, institutions
+- **Resume text** – The full content of uploaded resumes
+
+#### Entering Search Queries
+
+You can enter anything that might appear on a resume:
+
+```
+Simple searches:
+- "Python developer"
+- "project manager"
+- "nurse"
+- "sales manager"
+
+Skills:
+- "React and Node.js"
+- "machine learning"
+- "accounting"
+
+Experience details:
+- "team lead"
+- "managed budget"
+- "customer service"
+```
+
+#### Boolean Operators: AND, OR, NOT
+
+For more precise searches, you can use **boolean operators**—special words that tell the search how to combine terms:
+
+| Operator | Symbol | What It Does | Example |
+|----------|--------|--------------|---------|
+| **AND** | (space) | Finds candidates with **both** terms | `Python AND Django` |
+| **OR** | \| | Finds candidates with **either** term | `React \| Angular \| Vue` |
+| **NOT** | - | Excludes candidates with a term | `developer -senior` |
+| **Phrase** | "quotes" | Finds exact phrase | `"full stack developer"` |
+| **Grouping** | ( ) | Groups terms together | `(React OR Vue) AND TypeScript` |
+
+**Examples:**
+
+```
+Find developers who know both Python and Django:
+Python Django
+
+Find front-end developers who know React, Angular, OR Vue:
+React | Angular | Vue
+
+Find developers but exclude senior ones:
+developer -senior
+
+Find exact phrase "full stack developer":
+"full stack developer"
+
+Find React or Vue developers who also know TypeScript:
+(React | Vue) TypeScript
+```
+
+#### Search Results
+
+When you search, you'll see:
+
+| Element | Description |
+|---------|-------------|
+| **Results count** | Total number of matching candidates |
+| **Candidates list** | Ordered by relevance (best matches first) |
+| **Highlighting** | Search terms highlighted in results |
+| **Quick filters** | Common filters on the left side |
+| **Execution time** | How fast the search ran (usually < 1 second) |
+
+**Result cards show**:
+- Name and filename
+- Match relevance score
+- Key skills found
+- Experience summary
+- Current hiring stage
+- Quick actions (view, add to pipeline, etc.)
+
+#### Sorting Results
+
+Change how results are ordered using the **Sort by** dropdown:
+
+| Sort Option | Best For |
+|-------------|----------|
+| **Relevance** (default) | Finding best overall matches |
+| **Date** | Finding recently added candidates |
+| **Experience** | Finding most/least experienced candidates |
+
+---
+
+### Using Filters Effectively
+
+**Simple explanation**: Filters let you narrow down your search by specific criteria like years of experience, location, education level, and more.
+
+**In more detail**:
+
+While search finds candidates matching your keywords, **filters** let you specify exact requirements. Filters are applied **in addition** to your search query—so you can search for "developer" and then filter to "5+ years experience" and "location: New York."
+
+#### Available Filters
+
+AgentHR provides the following filters:
+
+| Filter | Description | Example Use Cases |
+|--------|-------------|-------------------|
+| **Skills** | Filter by specific skills (OR logic within filter) | Find candidates with React OR Angular |
+| **Experience Years** | Minimum/maximum years of experience | "3-7 years" for mid-level roles |
+| **Location** | Geographic location filter | Find local candidates or remote workers |
+| **Education Level** | Minimum education required | "Bachelor's degree" or higher |
+| **Languages** | Language skills beyond resume language | Bilingual candidates: "English AND Spanish" |
+| **Match Score** | Filter by AI match score range | Only show candidates with 70%+ match |
+| **Date Range** | When resume was added or updated | "Added in the last 30 days" |
+| **Vacancy** | Candidates associated with specific job opening | View all candidates for "Senior Dev" role |
+| **Stage** | Candidates in specific hiring stage | Who's in "Interview" stage |
+
+#### How Filters Work Together
+
+Filters use **AND logic**—candidates must meet **all** filter criteria to appear in results.
+
+**Example**:
+```
+Search: "developer"
+Filters:
+- Skills: "Python OR Django"
+- Experience: "3+ years"
+- Location: "Remote"
+- Match Score: "60%+"
+
+Result: Developers who know Python or Django,
+        have 3+ years experience, work remotely,
+        AND have 60%+ match score.
+```
+
+#### Skills Filter
+
+The skills filter finds candidates with specific technical or professional skills.
+
+**Features**:
+- **OR logic** within the filter: `React, Angular, Vue` finds candidates with ANY of these
+- **Multiple skill groups**: Create separate skill groups if needed
+- **Skill matching**: Finds related terms (e.g., "JS" matches "JavaScript")
+
+**Examples**:
+```
+Find front-end developers:
+Skills: React, Angular, Vue
+
+Find data scientists:
+Skills: Python, R, "machine learning", SQL
+
+Find developers with cloud experience:
+Skills: AWS, Azure, GCP
+```
+
+#### Experience Years Filter
+
+Filter candidates by total years of experience.
+
+**Options**:
+- **Minimum experience**: "At least X years"
+- **Maximum experience**: "No more than X years"
+- **Range**: "Between X and Y years"
+
+**Use cases**:
+```
+Junior role (0-2 years):
+- Min: 0
+- Max: 2
+
+Mid-level role (3-5 years):
+- Min: 3
+- Max: 5
+
+Senior role (6+ years):
+- Min: 6
+- Max: (leave blank)
+
+Exclude very senior candidates (not C-suite):
+- Min: (leave blank)
+- Max: 15
+```
+
+**Pro tip**: Experience is calculated from **all work history**, not just relevant experience. Review resume details to confirm relevant experience.
+
+#### Location Filter
+
+Find candidates in specific geographic locations.
+
+**How it works**:
+- Searches city, state, country, and remote indicators
+- Supports partial matches (e.g., "New" matches "New York", "Newark")
+- Recognizes common location formats
+
+**Examples**:
+```
+Specific city:
+- "San Francisco"
+
+State/region:
+- "California" or "CA"
+
+Country:
+- "United States" or "USA"
+
+Remote workers:
+- "Remote" or "Anywhere"
+
+Multiple locations (use OR in search):
+- "New York | San Francisco | Austin"
+```
+
+#### Education Level Filter
+
+Filter candidates by minimum educational attainment.
+
+**Levels** (from lowest to highest):
+- High School Diploma
+- Associate's Degree
+- Bachelor's Degree
+- Master's Degree
+- PhD / Doctorate
+- Professional Certification (e.g., MD, JD)
+
+**Examples**:
+```
+Entry-level requiring degree:
+- Education: Bachelor's Degree
+
+Senior roles requiring advanced degree:
+- Education: Master's Degree
+
+Specialized roles (e.g., lawyer, doctor):
+- Education: PhD / Doctorate
+```
+
+**Note**: Education is extracted from resume text. Some candidates may have equivalent experience without formal degrees.
+
+#### Languages Filter
+
+Find candidates who speak specific languages beyond their resume's primary language.
+
+**Examples**:
+```
+Bilingual customer support:
+- Languages: Spanish, Portuguese
+
+International sales:
+- Languages: German, French, Mandarin
+```
+
+**Pro tip**: This filter detects **explicitly stated** language skills. Candidates may know other languages not listed on their resume.
+
+#### Match Score Filter
+
+Filter by AI-calculated match score for a specific vacancy.
+
+**Options**:
+- **Minimum score**: "Show only candidates with X%+ match"
+- **Maximum score**: "Show only candidates with up to X% match"
+
+**Use cases**:
+```
+Top candidates only:
+- Min match: 80%
+
+Review decent matches:
+- Min match: 60%
+
+Find hidden gems (lower keyword, higher potential):
+- Min match: 40%
+- Max match: 60%
+```
+
+**Important**: Match score requires candidates to be **matched to a vacancy**. Unmatched candidates won't appear with this filter.
+
+#### Date Range Filter
+
+Find candidates added or updated within a specific time period.
+
+**Use cases**:
+```
+Recently added candidates:
+- Date from: 30 days ago
+- Date to: today
+
+Candidates from last hiring push:
+- Date from: 2024-01-01
+- Date to: 2024-03-31
+
+Updated resumes (candidates who refreshed their profile):
+- Filter: Updated date range
+```
+
+**Formats**:
+- ISO 8601 format: `2024-01-15`
+- Relative dates: `30 days ago`, `3 months ago`
+- Presets: "Last 7 days", "Last 30 days", "Last 90 days"
+
+#### Vacancy Filter
+
+View candidates associated with a specific job opening.
+
+**Use cases**:
+```
+See all candidates for "Senior Python Developer" role:
+- Vacancy: Senior Python Developer
+
+Compare candidates across different roles:
+- Vacancy 1: Junior Developer
+- Vacancy 2: Senior Developer
+```
+
+**Pro tip**: Use this filter to review how candidates stack up against each other for the same position.
+
+#### Stage Filter
+
+Find candidates in a specific stage of your hiring pipeline.
+
+**Stages** (typical pipeline):
+- Applied
+- Screening
+- Interview
+- Offer
+- Hired
+- Rejected
+
+**Use cases**:
+```
+Who's waiting for screening?
+- Stage: Screening
+
+Who interviewed but no decision yet?
+- Stage: Interview
+
+All active candidates (not rejected):
+- Stage: Applied, Screening, Interview, Offer
+```
+
+**Pro tip**: Combine with search to find specific candidates in a stage:
+```
+Search: "developer"
+Stage: Interview
+→ All developers currently in interview stage
+```
+
+---
+
+### Saving and Reusing Searches
+
+**Simple explanation**: If you search for the same thing regularly, save it! Saved searches remember your query and filters so you can run them again with one click.
+
+**In more detail**:
+
+**Saved searches** are a huge time-saver. Instead of re-entering the same search query and filters every time, you can save them with a descriptive name and reuse them anytime. This is especially useful for:
+
+- **Recurring hiring needs** (e.g., "Always looking for sales reps")
+- **Complex searches** (e.g., "React or Vue + TypeScript + 3-5 years + remote")
+- **Monitoring candidate pools** (e.g., "Check weekly for new data scientists")
+
+#### Creating a Saved Search
+
+After running a search (with or without filters):
+
+1. **Click the "Save Search" button** near the search bar
+2. **Enter a descriptive name** for your search
+   - ✅ Good: "React Developers 3-5 years Remote"
+   - ❌ Bad: "Search 1" or "My search"
+3. **Click "Save"**
+
+**What gets saved**:
+- ✅ Search query (including boolean operators)
+- ✅ All filter settings
+- ✅ Sort order
+- ❌ Specific candidates (search runs fresh each time)
+
+**Result**: Your saved search appears in the **"Saved Searches"** panel or dropdown.
+
+#### Running a Saved Search
+
+To run a saved search:
+
+1. **Open the "Saved Searches" panel** (or dropdown)
+2. **Click on the search name**
+3. **Results load instantly** with current data
+
+**Important**: Saved searches run with **up-to-date data**. If new candidates match your criteria since you last ran the search, they'll appear in results.
+
+#### Managing Saved Searches
+
+From the **Saved Searches** panel, you can:
+
+| Action | How | Why |
+|--------|-----|-----|
+| **Run** | Click search name | Get fresh results |
+| **Rename** | Click edit icon → Update name | Make name more descriptive |
+| **Update** | Edit search query or filters | Refine your search criteria |
+| **Delete** | Click delete icon | Remove outdated searches |
+| **Duplicate** | Copy search | Create similar searches quickly |
+
+#### Best Practices for Saved Searches
+
+**✅ Do**:
+- Use **descriptive names** with key criteria
+  - `"React Developers 3-5y Remote"`
+  - `"Sales Reps NYC Bilingual"`
+
+- **Update searches** as requirements change
+  - Hiring needs evolve—update saved searches to match
+
+- **Delete old searches** to keep the list manageable
+  - If a role is closed, delete its saved search
+
+- **Use consistent naming** for similar searches
+  - `"Junior Developers"`, `"Mid Developers"`, `"Senior Developers"`
+
+**❌ Don't**:
+- Use vague names like `"Search 1"` or `"Candidates"`
+- Save searches you'll only use once
+- Keep searches for closed positions
+- Duplicate searches unless you need variations
+
+#### Examples of Useful Saved Searches
+
+**By Role**:
+```
+"Frontend Developers - React Stack"
+"Backend Developers - Python/Django"
+"Full Stack - Node.js + React"
+"Data Scientists - Python + ML"
+"DevOps Engineers - AWS + Kubernetes"
+```
+
+**By Experience Level**:
+```
+"Junior Developers - 0-2 years"
+"Mid-Level Developers - 3-5 years"
+"Senior Developers - 6+ years"
+"Tech Leads - 8+ years"
+```
+
+**By Special Criteria**:
+```
+"Remote Workers Only"
+"Bilingual Candidates - English/Spanish"
+"Local Candidates - San Francisco Bay Area"
+"Recent Graduates - 0-1 years experience"
+"Candidates with Security Clearance"
+```
+
+#### Quick Access: Your Most-Used Searches
+
+AgentHR tracks your search history. Your **recently used searches** appear at the top of the Saved Searches panel for quick access—even if you haven't formally saved them.
+
+**To save a recent search**:
+1. Find it in recent searches
+2. Click the bookmark icon
+3. Enter a name
+4. Save
+
+---
+
+### Search Examples and Tips
+
+Now that you understand the building blocks of search and filters, let's put them together with practical examples and power-user tips.
+
+#### Real-World Search Scenarios
+
+**Scenario 1: Finding Mid-Level React Developers (Remote)**
+
+```
+Search Query:
+"React developer" OR "React engineer"
+
+Filters:
+- Skills: React, TypeScript, Redux
+- Min Experience: 3 years
+- Max Experience: 5 years
+- Location: Remote
+- Min Match Score: 60%
+
+Sort by: Relevance
+
+Save as: "React Devs 3-5y Remote TS"
+```
+
+**Scenario 2: Finding Recent Graduates for Junior Roles**
+
+```
+Search Query:
+("software engineer" OR "developer" OR "programmer")
+AND ("junior" OR "entry level" OR "recent graduate")
+
+Filters:
+- Max Experience: 2 years
+- Education: Bachelor's Degree
+- Date from: 90 days ago (recently added)
+
+Sort by: Date (newest first)
+
+Save as: "Junior Developers Recent Grads"
+```
+
+**Scenario 3: Finding Senior Data Scientists**
+
+```
+Search Query:
+"data scientist" AND ("senior" OR "lead" OR "principal")
+
+Filters:
+- Skills: Python, R, "machine learning", SQL, TensorFlow
+- Min Experience: 6 years
+- Education: Master's Degree
+- Min Match Score: 70%
+
+Sort by: Experience (most experience first)
+
+Save as: "Senior Data Scientists 6y+"
+```
+
+**Scenario 4: Finding Local Candidates (On-Site Required)**
+
+```
+Search Query:
+"project manager" OR "program manager"
+
+Filters:
+- Skills: Agile, Scrum, JIRA
+- Min Experience: 4 years
+- Location: "New York" OR "NYC" OR "Manhattan"
+- Education: Bachelor's Degree
+
+Save as: "Project Managers NYC"
+```
+
+**Scenario 5: Finding Bilingual Customer Support**
+
+```
+Search Query:
+("customer support" OR "customer service" OR "support agent")
+
+Filters:
+- Languages: Spanish, Portuguese
+- Min Experience: 1 year
+- Location: Remote
+
+Save as: "Support Bilingual ES/PT"
+```
+
+#### Pro Tips: Becoming a Search Power User
+
+**Tip 1: Start Broad, Then Narrow**
+
+1. Start with a **simple search**: `"developer"`
+2. Review results count (e.g., 500+ candidates)
+3. **Add filters one at a time**:
+   - Add experience: `3+ years` → 200 candidates
+   - Add skills: `Python, Django` → 75 candidates
+   - Add location: `Remote` → 30 candidates
+4. Stop when you have a manageable list (20-50 candidates)
+
+**Why**: Narrowing gradually shows you the impact of each filter and helps you understand your candidate pool.
+
+---
+
+**Tip 2: Use Boolean Operators for Precision**
+
+| Too Broad | Better | Best |
+|-----------|--------|------|
+| `developer` (results: 500+) | `Python developer` (results: 200) | `Python AND Django AND (developer OR engineer)` (results: 45) |
+| `manager` (results: 150) | `project manager` (results: 80) | `"project manager" AND Agile AND Scrum` (results: 30) |
+
+**Why**: Boolean operators let you specify exact requirements without over-narrowing.
+
+---
+
+**Tip 3: Understand OR vs. AND**
+
+```
+OR = Any of these skills
+React | Angular | Vue
+→ Finds candidates with React OR Angular OR Vue (or all three)
+
+AND = Must have all these skills
+React AND TypeScript AND Redux
+→ Finds candidates with ALL THREE skills
+
+Combine them:
+(React | Angular | Vue) AND TypeScript
+→ Finds candidates with React OR Angular OR Vue, BUT MUST ALSO have TypeScript
+```
+
+**Why**: OR broadens your search; AND narrows it. Use them together for precision.
+
+---
+
+**Tip 4: Use Quotes for Exact Phrases**
+
+```
+Without quotes:
+full stack developer
+→ Matches "full developer", "stack developer", "full and stack", etc.
+
+With quotes:
+"full stack developer"
+→ Matches ONLY the exact phrase "full stack developer"
+```
+
+**Why**: Quotes prevent partial matches and find exact role titles or descriptions.
+
+---
+
+**Tip 5: Exclude with NOT (Minus Sign)**
+
+```
+Find developers but exclude seniors:
+developer -senior
+
+Find managers but exclude interns:
+manager -intern
+
+Find designers but exclude graphic designers (focus on UX/UI):
+designer -graphic
+```
+
+**Why**: Exclusion removes irrelevant results without over-constraining your search.
+
+---
+
+**Tip 6: Check "Total Results" Before Applying Filters**
+
+Before spending time on detailed filters, check the initial results count:
+
+| Results Count | Action |
+|---------------|--------|
+| **0-10** | Filters probably unnecessary—browse these results |
+| **10-50** | Add 1-2 key filters to prioritize |
+| **50-200** | Apply relevant filters to narrow down |
+| **200+** | Definitely apply multiple filters |
+
+**Why**: Don't over-filter a small dataset—you'll miss candidates.
+
+---
+
+**Tip 7: Sort by Experience for Senior Roles**
+
+When hiring senior roles, **sort by experience** instead of relevance:
+
+```
+Role: Senior Software Engineer
+Search: "senior" AND ("developer" OR "engineer")
+Sort by: Experience (descending)
+→ Most experienced candidates appear first
+```
+
+**Why**: Relevance weighs all factors equally. For senior roles, experience matters most.
+
+---
+
+**Tip 8: Sort by Date for Recent Grads**
+
+When hiring entry-level roles, **sort by date** to find newly added candidates:
+
+```
+Role: Junior Developer
+Search: "junior" OR "entry level"
+Sort by: Date (newest first)
+→ Most recently added resumes appear first
+```
+
+**Why**: Recent graduates often upload resumes during hiring season. Sorting by date surfaces fresh candidates.
+
+---
+
+**Tip 9: Use Match Score Filter to Prioritize**
+
+After matching candidates to a vacancy, **filter by match score** to focus on top matches:
+
+```
+Vacancy: Senior Python Developer
+Search: (leave blank or use broad terms)
+Filters:
+- Vacancy: Senior Python Developer
+- Min Match Score: 70%
+Sort by: Relevance
+
+→ Only candidates with 70%+ match appear
+```
+
+**Why**: AI match scores surface candidates who best fit the job—even if they use different terminology.
+
+---
+
+**Tip 10: Save Searches for Roles You Hire Regularly**
+
+If you're always hiring for similar roles, **save searches** for each:
+
+```
+Saved Searches for a Tech Recruiter:
+- "Frontend Devs - React Stack"
+- "Frontend Devs - Vue Stack"
+- "Backend Devs - Python/Django"
+- "Backend Devs - Node.js/Express"
+- "Full Stack - MERN Stack"
+- "DevOps - AWS/Kubernetes"
+- "QA Engineers - Automation"
+- "Data Engineers - Python/SQL"
+```
+
+**Why**: One click gives you a fresh list of candidates for common roles. Update searches quarterly as requirements evolve.
+
+---
+
+**Tip 11: Reuse Search History**
+
+Check your **search history** before creating new searches:
+
+```
+Recent Searches (Last 30 Days):
+- "Python developer" (ran 3 times)
+- "React engineer" (ran 5 times)
+- "data scientist" (ran 2 times)
+
+→ Save these as formal searches if running repeatedly
+```
+
+**Why**: If you search for the same thing 3+ times, save it. Saves time and ensures consistency.
+
+---
+
+**Tip 12: Avoid Over-Specific Searches**
+
+Don't make searches so specific that no candidates match:
+
+```
+❌ Too Specific:
+"senior React Redux TypeScript Node.js PostgreSQL AWS Docker Kubernetes CI/CD agile scrum master phd computer science 10 years san francisco onsite only"
+
+→ Likely 0 results
+
+✅ Better:
+senior developer
+Filters:
+- Skills: React, TypeScript
+- Experience: 6+ years
+- Location: San Francisco
+
+→ Start broad, refine gradually
+```
+
+**Why**: Over-specific searches miss great candidates who don't match every single criterion.
+
+---
+
+**Tip 13: Search Synonyms and Alternate Terms**
+
+Candidates use different terminology for the same skills:
+
+```
+Don't just search for:
+"UX designer"
+
+Also try:
+"UI/UX designer"
+"user experience designer"
+"product designer"
+"interaction designer"
+
+Or use OR:
+"UX designer" | "UI/UX designer" | "user experience" | "product designer"
+```
+
+**Why**: One term won't capture all relevant candidates. Broaden with synonyms.
+
+---
+
+**Tip 14: Check Filter Execution Time**
+
+After running a search with many filters, check the **execution time**:
+
+| Execution Time | Meaning |
+|----------------|---------|
+| **< 0.5 seconds** | Fast! Filters are well-optimized |
+| **0.5-2 seconds** | Normal for complex filters |
+| **2+ seconds** | Consider simplifying filters |
+
+**Why**: Overly complex filters slow down searches. If it takes 5+ seconds, you may have too many conditions.
+
+---
+
+**Tip 15: Use "Any Skills" for Diverse Candidates**
+
+When skills can vary widely, **use OR logic within the skills filter**:
+
+```
+Instead of requiring ALL these:
+Skills: React, Angular, Vue, Svelte, Solid.js
+→ Finds ONLY candidates who know ALL FIVE frameworks (rare!)
+
+Use separate searches with OR:
+Skills: React, Angular
+→ Finds candidates who know React OR Angular (common)
+```
+
+**Why**: Requiring every skill in a long list eliminates good candidates. Use OR for flexibility.
+
+---
+
+### Advanced Search Quick Reference
+
+| Task | Search Query | Filters (if any) |
+|------|--------------|------------------|
+| **Find React developers** | `React developer` OR `React engineer` | Skills: React, TypeScript; Experience: 3+ years |
+| **Find recent grads** | `junior` OR `entry level` | Max Experience: 2 years; Education: Bachelor's |
+| **Find senior candidates** | `senior` AND `developer` | Min Experience: 6 years; Sort: Experience |
+| **Find remote workers** | (leave blank) | Location: Remote |
+| **Find local candidates** | `role name` | Location: your city |
+| **Find bilingual candidates** | (leave blank) | Languages: second language |
+| **Exclude seniors** | `developer` -senior | Max Experience: 4 years |
+| **Find exact role** | `"full stack developer"` | (optional filters) |
+| **Multiple skills (any)** | (leave blank) | Skills: React, Angular, Vue (OR logic) |
+| **Multiple skills (all)** | (leave blank) | Skills: React, TypeScript (AND via search) |
+
+---
+
+### Common Search Mistakes to Avoid
+
+| Mistake | Problem | Solution |
+|---------|---------|----------|
+| **Too many filters** | 0 results | Start with 1-2 filters, add gradually |
+| **Over-specific terms** | Misses good candidates | Use synonyms and OR operators |
+| **Not using quotes** | Partial matches clutter results | Use quotes for exact phrases |
+| **Forgetting NOT** | Irrelevant results appear | Exclude unwanted terms with minus sign |
+| **Sorting wrong** | Best candidates buried | Sort by Relevance (default), Experience, or Date as needed |
+| **Not saving searches** | Re-typing same queries | Save searches you run 3+ times |
+| **Ignoring match scores** | Overlooking AI insights | Use match score filter after matching to vacancy |
+| **Only searching once** | Misses new candidates | Re-run saved searches weekly for fresh results |
+
+---
+
+### What's Next?
+
+Now that you know how to find exactly the right candidates with advanced search and filtering, you're ready to compare them side-by-side to make the final decision. In the next section, we'll cover [Comparing Candidates Side-by-Side](#10-comparing-candidates-side-by-side)—how to view multiple candidates together, understand their relative strengths, and export comparison results for your hiring team.
+
+---
