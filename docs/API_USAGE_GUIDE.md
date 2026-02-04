@@ -1251,6 +1251,69 @@ curl -X POST http://localhost:8000/api/skill-gap/analyze \
 
 ### Export & Reporting
 
+#### Bulk Export Candidates (JSON or CSV)
+
+Export multiple candidates with format selection (JSON or CSV):
+
+```bash
+# Export to JSON (machine-readable, ideal for integrations)
+curl -X POST http://localhost:8000/api/candidates/bulk-action \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resume_ids": ["uuid1", "uuid2", "uuid3"],
+    "action": "export",
+    "export_format": "json"
+  }'
+
+# Export to CSV (spreadsheet-friendly)
+curl -X POST http://localhost:8000/api/candidates/bulk-action \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resume_ids": ["uuid1", "uuid2", "uuid3"],
+    "action": "export",
+    "export_format": "csv"
+  }'
+```
+
+**JSON Response:**
+```json
+{
+  "action": "export",
+  "total_requested": 3,
+  "successful": 3,
+  "failed": 0,
+  "export_data": {
+    "format": "json",
+    "count": 3,
+    "data": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "filename": "resume.pdf",
+        "current_stage": "screening",
+        "stage_name": "Screening",
+        "vacancy_id": "650e8400-e29b-41d4-a716-446655440000",
+        "created_at": "2026-01-15T10:30:00Z",
+        "updated_at": "2026-01-15T14:20:00Z",
+        "tags": ["Senior Level", "Python Expert"]
+      }
+    ]
+  }
+}
+```
+
+**Frontend Usage:**
+1. Navigate to the candidate search results page
+2. Select multiple candidates using the checkboxes
+3. Click the "Export" button in the bulk actions toolbar
+4. Choose export format: **JSON** (machine-readable) or **CSV** (spreadsheet)
+5. Click "Export" to download the file
+
+**When to use JSON vs CSV:**
+- **JSON**: Use for API integrations, automated processing, or when you need preserved data types
+- **CSV**: Use for spreadsheet analysis, reporting, or sharing with non-technical stakeholders
+
+#### Export Vacancy Candidates to CSV
+
 Export candidate data to CSV:
 
 ```bash

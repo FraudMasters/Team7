@@ -417,6 +417,105 @@ Manage candidates and workflow stages (kanban-style board).
 
 ---
 
+### Bulk Action on Candidates
+
+**Endpoint:** `POST /api/candidates/bulk-action`
+
+Perform bulk operations on multiple candidates including export, tag management, and workflow changes.
+
+**Request:**
+```json
+{
+  "resume_ids": [
+    "550e8400-e29b-41d4-a716-446655440000",
+    "550e8400-e29b-41d4-a716-446655440001"
+  ],
+  "action": "export",
+  "export_format": "json"
+}
+```
+
+**Request Parameters:**
+- `resume_ids` (required): Array of candidate resume UUIDs
+- `action` (required): Action to perform. Values: `export`, `tag`, `untag`, `move`
+- `export_format` (optional): Export format. Values: `json`, `csv`. Default: `json`
+- `tag_id` (optional): Tag ID (required for tag/untag actions)
+- `stage_id` (optional): Target stage ID (required for move action)
+- `vacancy_id` (optional): Vacancy ID (required for move action)
+
+**Response:** `200 OK`
+```json
+{
+  "action": "export",
+  "total_requested": 2,
+  "successful": 2,
+  "failed": 0,
+  "results": [
+    {
+      "resume_id": "550e8400-e29b-41d4-a716-446655440000",
+      "success": true,
+      "message": "Candidate data exported",
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "filename": "resume.pdf",
+        "current_stage": "screening",
+        "stage_name": "Screening",
+        "vacancy_id": "650e8400-e29b-41d4-a716-446655440000",
+        "created_at": "2026-01-15T10:30:00Z",
+        "updated_at": "2026-01-15T14:20:00Z",
+        "tags": ["Senior Level", "Python Expert"]
+      }
+    }
+  ],
+  "export_data": {
+    "format": "json",
+    "data": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "filename": "resume.pdf",
+        "current_stage": "screening",
+        "stage_name": "Screening",
+        "vacancy_id": "650e8400-e29b-41d4-a716-446655440000",
+        "created_at": "2026-01-15T10:30:00Z",
+        "updated_at": "2026-01-15T14:20:00Z",
+        "tags": ["Senior Level", "Python Expert"]
+      }
+    ],
+    "count": 2
+  }
+}
+```
+
+**Export Format Options:**
+
+- **JSON Format** (`export_format: "json"`): Returns structured JSON data with all candidate fields including id, filename, current_stage, stage_name, vacancy_id, timestamps, and tags. Ideal for machine processing and API integrations.
+
+- **CSV Format** (`export_format: "csv"`): Returns CSV-formatted data with the same fields. Ideal for spreadsheet applications and human-readable reports.
+
+**Example: Export to JSON**
+```bash
+curl -X POST http://localhost:8000/api/candidates/bulk-action \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resume_ids": ["uuid1", "uuid2"],
+    "action": "export",
+    "export_format": "json"
+  }'
+```
+
+**Example: Export to CSV**
+```bash
+curl -X POST http://localhost:8000/api/candidates/bulk-action \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resume_ids": ["uuid1", "uuid2"],
+    "action": "export",
+    "export_format": "csv"
+  }'
+```
+
+---
+
 ### Get Ranked Candidates for Vacancy
 
 **Endpoint:** `GET /api/candidates/vacancy/{vacancy_id}/ranked`
