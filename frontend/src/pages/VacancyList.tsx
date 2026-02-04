@@ -348,9 +348,59 @@ const VacancyList: React.FC = () => {
     }
   }, [isNearBottom, hasActiveFilters, hasMore, loading, loadingMore, loadMore]);
 
+  // Track individual filter value changes with a combined key
+  const filterKey = `${workFormatFilter}-${locationFilter}-${dateFromFilter}-${dateToFilter}`;
+  const previousFilterKeyRef = useRef(filterKey);
+  const isInitialMountRef = useRef(true);
+
+  // Initial data fetch on mount
   useEffect(() => {
-    fetchVacancies(0, limit);
-  }, [limit]);
+    fetchVacancies(0, limit, false);
+    // Mark as initialized
+    isInitialMountRef.current = false;
+    // Sync the filter key
+    previousFilterKeyRef.current = filterKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset pagination and refetch when any filter value changes
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMountRef.current) {
+      return;
+    }
+
+    // Skip if filter key hasn't changed
+    if (previousFilterKeyRef.current === filterKey) {
+      return;
+    }
+
+    // Reset pagination state
+    resetPaginationState();
+    setVacancies([]);
+
+    // Fetch data based on filter state
+    if (hasActiveFilters) {
+      // When filters are applied, load all data for client-side filtering
+      fetchVacancies(0, 10000, false);
+    } else {
+      // When filters are cleared, reset to paginated loading
+      fetchVacancies(0, limit, false);
+    }
+
+    // Update previous filter key
+    previousFilterKeyRef.current = filterKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, hasActiveFilters]);
+
+  /**
+   * Reset pagination state to initial values
+   */
+  const resetPaginationState = useCallback(() => {
+    setSkip(0);
+    setHasMore(true);
+    setLoadingMore(false);
+  }, []);
 
   /**
    * Fetch vacancies with pagination support
