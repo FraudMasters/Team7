@@ -1,0 +1,372 @@
+{
+  "feature": "Fix CI/CD Workflow Failures on Pull Requests",
+  "workflow_type": "investigation",
+  "workflow_rationale": "Investigation workflow chosen because the task involves debugging CI/CD failures. Root cause has been identified during spec_writing phase (restrictive path filters and GitHub-specific syntax), so we can proceed to fix implementation.",
+  "phases": [
+    {
+      "id": "phase-1-reproduce",
+      "name": "Reproduce Issue",
+      "type": "investigation",
+      "description": "Document and confirm the 'no jobs were run' issue with current workflow configuration",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Document current workflow behavior and path filter issue",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".auto-claude/specs/109-pr/INVESTIGATION.md"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review INVESTIGATION.md to confirm path filter blocking behavior is documented"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Document GitHub to Gitea syntax incompatibilities",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".auto-claude/specs/109-pr/INVESTIGATION.md"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review INVESTIGATION.md to confirm all github.* context usage is documented"
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-investigate",
+      "name": "Confirm Root Cause",
+      "type": "investigation",
+      "description": "Verify the identified root causes and determine fix approach",
+      "depends_on": [
+        "phase-1-reproduce"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Verify path filters cause 'no jobs were run' error",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".auto-claude/specs/109-pr/INVESTIGATION.md"
+          ],
+          "patterns_from": [],
+          "expected_output": "Root cause documentation with (1) Path filter blocking mechanism, (2) Evidence from workflow files, (3) Proposed fix approach",
+          "verification": {
+            "type": "manual",
+            "instructions": "Review INVESTIGATION.md root cause section confirms path filters prevent job execution on PRs with non-matching files"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Determine Gitea Actions syntax compatibility requirements",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".auto-claude/specs/109-pr/INVESTIGATION.md"
+          ],
+          "patterns_from": [],
+          "expected_output": "Documentation of all required syntax changes from GitHub to Gitea Actions",
+          "verification": {
+            "type": "manual",
+            "instructions": "Review INVESTIGATION.md Gitea migration section confirms all required syntax changes"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-fix",
+      "name": "Fix Workflow Configuration",
+      "type": "implementation",
+      "description": "Implement fixes to remove path filters and update syntax for Gitea compatibility",
+      "depends_on": [
+        "phase-2-investigate"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Remove path filters from lighthouse.yml pull_request trigger",
+          "service": "cicd",
+          "files_to_modify": [
+            ".github/workflows/lighthouse.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/lighthouse.yml"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "/bin/grep -A 5 'pull_request:' .github/workflows/lighthouse.yml | /bin/grep -v 'paths:' || true",
+            "expected": "No paths: filter found under pull_request trigger"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Remove path filters from performance-tests.yml pull_request trigger",
+          "service": "cicd",
+          "files_to_modify": [
+            ".github/workflows/performance-tests.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/performance-tests.yml"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "/bin/grep -A 5 'pull_request:' .github/workflows/performance-tests.yml | /bin/grep -v 'paths:' || true",
+            "expected": "No paths: filter found under pull_request trigger"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Replace github.* context with gitea.* in lighthouse.yml",
+          "service": "cicd",
+          "files_to_modify": [
+            ".github/workflows/lighthouse.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "/bin/grep -c 'github\\.' .github/workflows/lighthouse.yml || echo '0'",
+            "expected": "0 (no github. references found)"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-4",
+          "description": "Replace github.* context with gitea.* in performance-tests.yml",
+          "service": "cicd",
+          "files_to_modify": [
+            ".github/workflows/performance-tests.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "/bin/grep -c 'github\\.' .github/workflows/performance-tests.yml || echo '0'",
+            "expected": "0 (no github. references found)"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-5",
+          "description": "Replace github.* context with gitea.* in deploy.yml",
+          "service": "cicd",
+          "files_to_modify": [
+            ".github/workflows/deploy.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "/bin/grep -c 'github\\.' .github/workflows/deploy.yml || echo '0'",
+            "expected": "0 (no github. references found)"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-6",
+          "description": "Update secrets references from GITHUB_TOKEN to GITEA_TOKEN",
+          "service": "cicd",
+          "files_to_modify": [
+            ".github/workflows/deploy.yml",
+            ".github/workflows/lighthouse.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "/bin/grep -n 'GITHUB_TOKEN' .github/workflows/*.yml || echo 'No GITHUB_TOKEN references found'",
+            "expected": "No GITHUB_TOKEN references found"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-harden",
+      "name": "Validate and Document",
+      "type": "integration",
+      "description": "Validate workflow syntax and document required secrets and configuration",
+      "depends_on": [
+        "phase-3-fix"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Validate workflow YAML syntax",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "find .github/workflows -name '*.yml' -exec echo \"Checking {}\" \\; -exec python3 -c \"import yaml; yaml.safe_load(open('{}'))\" \\;",
+            "expected": "All workflow files are valid YAML"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Document required secrets for Gitea Actions",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".auto-claude/specs/109-pr/GITEA_SETUP.md"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review GITEA_SETUP.md confirms all required secrets are documented"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Create summary of changes made to workflows",
+          "service": "cicd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".auto-claude/specs/109-pr/CHANGES.md"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review CHANGES.md summarizes all modifications made to workflow files"
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 4,
+    "total_subtasks": 11,
+    "services_involved": [
+      "cicd"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-3-fix"
+          ],
+          "reason": "Subtasks within Fix phase can run in parallel as they modify different workflow files"
+        }
+      ],
+      "recommended_workers": 2,
+      "speedup_estimate": "1.5x faster than sequential"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 109 --parallel 2"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "Path filters removed from pull_request triggers",
+      "All github.* context replaced with gitea.*",
+      "GITHUB_TOKEN references replaced with GITEA_TOKEN",
+      "Workflows have valid YAML syntax",
+      "Required secrets documented"
+    ],
+    "verification_steps": [
+      {
+        "name": "YAML Syntax Validation",
+        "command": "python3 -c \"import yaml; [yaml.safe_load(open(f)) for f in ['.github/workflows/lighthouse.yml', '.github/workflows/performance-tests.yml', '.github/workflows/deploy.yml']]\"",
+        "expected_outcome": "All workflow files parse without errors",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Path Filter Removal Check",
+        "command": "/bin/grep -A 5 'pull_request:' .github/workflows/lighthouse.yml .github/workflows/performance-tests.yml | /bin/grep -c 'paths:' || echo '0'",
+        "expected_outcome": "0 (no paths: filters under pull_request triggers)",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "GitHub Context Removal Check",
+        "command": "/bin/grep -rh 'github\\.' .github/workflows/ | wc -l",
+        "expected_outcome": "0 (no github. context references)",
+        "type": "test",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "Documentation Completeness",
+        "command": "ls .auto-claude/specs/109-pr/*.md",
+        "expected_outcome": "INVESTIGATION.md, GITEA_SETUP.md, and CHANGES.md exist",
+        "type": "test",
+        "required": true,
+        "blocking": false
+      }
+    ],
+    "reasoning": "Medium risk CI/CD configuration change requires validation that workflows are syntactically correct and path filters are removed. Unit tests verify YAML syntax. No security scan or staging deployment needed as only workflow configuration is modified."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/lighthouse.yml'))\"",
+        "python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/performance-tests.yml'))\"",
+        "python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/deploy.yml'))\""
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "/bin/grep -A 5 'pull_request:' .github/workflows/*.yml | /bin/grep -c 'paths:' || echo '0'"
+      ],
+      "services_to_test": [
+        "cicd"
+      ]
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": []
+    },
+    "manual_verification": {
+      "required": true,
+      "checks": [
+        "Review INVESTIGATION.md confirms root cause analysis",
+        "Review GITEA_SETUP.md lists all required secrets",
+        "Review CHANGES.md summarizes modifications",
+        "Verify workflows use gitea.* instead of github.*",
+        "Verify path filters removed from pull_request triggers"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "updated_at": "2026-02-04T17:59:37.805Z"
+}
