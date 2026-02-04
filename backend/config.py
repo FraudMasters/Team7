@@ -32,6 +32,10 @@ class Settings(BaseSettings):
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         celery_broker_url: Celery broker URL
         celery_result_backend: Celery result backend URL
+        neo4j_uri: Neo4j database connection URI
+        neo4j_user: Neo4j database username
+        neo4j_password: Neo4j database password
+        graphiti_telemetry_enabled: Enable/disable Graphiti telemetry
     """
 
     model_config = SettingsConfigDict(
@@ -117,6 +121,27 @@ class Settings(BaseSettings):
     celery_result_backend: str = Field(
         default="redis://localhost:6379/0",
         description="Celery result backend URL",
+    )
+
+    # Neo4j Configuration
+    neo4j_uri: str = Field(
+        default="bolt://localhost:7687",
+        description="Neo4j database connection URI",
+    )
+
+    neo4j_user: str = Field(
+        default="neo4j",
+        description="Neo4j database username",
+    )
+
+    neo4j_password: str = Field(
+        default="password",
+        description="Neo4j database password",
+    )
+
+    graphiti_telemetry_enabled: bool = Field(
+        default=False,
+        description="Enable/disable Graphiti telemetry",
     )
 
     @field_validator("database_url")
