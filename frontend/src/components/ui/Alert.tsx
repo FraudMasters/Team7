@@ -360,4 +360,5 @@ const Alert: React.FC<AlertProps> = ({
   );
 };
 
+export { AlertTitle };
 export default Alert;

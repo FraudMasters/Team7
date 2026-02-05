@@ -1,6 +1,12 @@
+// React для создания компонента
 import React from 'react';
-import { Chip, ChipProps } from '@/components/ui';
+// Компоненты Material UI для создания интерфейса
+import { Chip, ChipProps } from '@mui/material';
 
+/**
+ * Тип статуса заявки на работу
+ * Поддерживает все возможные статусы из ATS
+ */
 type ApplicationStatus =
   | 'applied'
   | 'pending'
@@ -17,12 +23,21 @@ type ApplicationStatus =
   | 'on_hold'
   | string;
 
-interface ApplicationStatusChipProps extends Omit<ChipProps, 'color' | 'sx'> {
+/**
+ * Свойства компонента ApplicationStatusChip
+ */
+interface ApplicationStatusChipProps extends Omit<ChipProps, 'color'> {
+  /** Статус заявки */
   status: ApplicationStatus;
+  /** Название этапа (опционально, переопределяет status) */
   stageName?: string;
-  sx?: React.CSSProperties;
 }
 
+/**
+ * Возвращает цвет чипа на основе статуса
+ * @param status - Статус заявки
+ * @returns Цвет из палитры MUI
+ */
 const getStatusColor = (status: ApplicationStatus): ChipProps['color'] => {
   const normalizedStatus = status.toLowerCase().replace(/ /g, '_');
 
@@ -50,6 +65,12 @@ const getStatusColor = (status: ApplicationStatus): ChipProps['color'] => {
   }
 };
 
+/**
+ * Возвращает текстовую метку для статуса
+ * @param status - Статус заявки
+ * @param stageName - Название этапа (опционально)
+ * @returns Отформатированная строка метки
+ */
 const getStatusLabel = (status: ApplicationStatus, stageName?: string): string => {
   if (stageName) {
     return stageName;
@@ -62,6 +83,38 @@ const getStatusLabel = (status: ApplicationStatus, stageName?: string): string =
     .join(' ');
 };
 
+/**
+ * Чип статуса заявки на работу
+ *
+ * Отображает статус заявки в виде цветного чипа.
+ * Автоматически определяет цвет на основе статуса:
+ * - default: applied, pending
+ * - info: under_review, shortlisted, interview, technical_assessment
+ * - success: offer, offered, accepted
+ * - error: rejected
+ * - warning: withdrawn, on_hold
+ *
+ * Поддерживает все стандартные свойства Chip MUI.
+ *
+ * @example
+ * ```tsx
+ * <ApplicationStatusChip status="applied" />
+ * ```
+ *
+ * @example
+ * ```tsx
+ * <ApplicationStatusChip status="interview" stageName="Technical Interview" />
+ * ```
+ *
+ * @example
+ * ```tsx
+ * <ApplicationStatusChip
+ *   status="offer"
+ *   size="medium"
+ *   sx={{ fontWeight: 'bold' }}
+ * />
+ * ```
+ */
 export function ApplicationStatusChip({
   status,
   stageName,

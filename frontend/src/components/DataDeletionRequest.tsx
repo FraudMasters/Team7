@@ -189,7 +189,7 @@ const DataDeletionRequest: React.FC<DataDeletionRequestProps> = ({
 
       {/* Warning Alert */}
       {!successMessage && (
-        <Alert severity="error" icon={<WarningIcon fontSize="inherit"()}>
+        <Alert severity="error" icon={<WarningIcon fontSize="inherit" />}>
           <AlertTitle>{t('dataDeletion.warningTitle')}</AlertTitle>
           {t('dataDeletion.warningMessage')}
         </Alert>

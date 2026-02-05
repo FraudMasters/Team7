@@ -22,7 +22,7 @@ import {
   useMediaQuery,
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
-import { useEmotionTheme } from '@/components/ui/theme';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
 import {
   DragDropContext,
   Droppable,

@@ -1,10 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Container, Typography, Button, Stack, Grid, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Paper, Chip } from '@/components/ui';
-import { Icon } from '@/components/ui';
+import { Box, Container, Typography, Button, Stack, Grid, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Paper, Chip } from '@mui/material';
+import { Add as AddIcon, MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 
+/**
+ * Страница вакансий рекрутера
+ *
+ * Отображает список всех вакансий рекрутера с возможностью просмотра,
+ * редактирования и удаления. Использует MUI компоненты для отображения
+ * карточек вакансий в сетке.
+ */
+
+// Интерфейс вакансии
 interface Vacancy {
   id: string;
   title: string;
@@ -19,12 +28,16 @@ interface Vacancy {
 }
 
 export function VacanciesPage() {
+  // Хуки для навигации и управления кэшем
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Состояние для меню действий
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Загружаем список вакансий
   const { data: vacanciesData, isLoading, error } = useQuery({
     queryKey: ['vacancies'],
     queryFn: async () => {
@@ -33,6 +46,7 @@ export function VacanciesPage() {
     },
   });
 
+  // Мутация для удаления вакансии
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiClient.delete(`/vacancies/${id}`);
@@ -46,6 +60,7 @@ export function VacanciesPage() {
 
   const vacancies = vacanciesData?.vacancies || [];
 
+  // Обработчики действий
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, vacancy: Vacancy) => {
     setAnchorEl(event.currentTarget);
     setSelectedVacancy(vacancy);
@@ -74,6 +89,7 @@ export function VacanciesPage() {
     }
   };
 
+  // Состояние загрузки
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
@@ -84,41 +100,44 @@ export function VacanciesPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
+      {/* Заголовок страницы с кнопкой создания */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>
             Job Postings
           </Typography>
-          <Typography variant="body1" color="secondary">
+          <Typography variant="body1" color="text.secondary">
             Manage your open positions
           </Typography>
         </Box>
         <Button
           variant="contained"
-          startIcon={<Icon name="plus" size={20} />}
+          startIcon={<AddIcon />}
           onClick={() => navigate('/recruiter/vacancies/create')}
         >
           Create Vacancy
         </Button>
       </Stack>
 
+      {/* Пустое состояние - нет вакансий */}
       {vacancies.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Typography variant="h6" gutterBottom>
             No job postings yet
           </Typography>
-          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Create your first vacancy to start receiving applications
           </Typography>
           <Button
             variant="contained"
-            startIcon={<Icon name="plus" size={20} />}
+            startIcon={<AddIcon />}
             onClick={() => navigate('/recruiter/vacancies/create')}
           >
             Create Vacancy
           </Button>
         </Paper>
       ) : (
+        /* Сетка карточек вакансий */
         <Grid container spacing={2}>
           {vacancies.map((vacancy, index) => {
             const visibleSkills = vacancy.required_skills?.slice(0, 3) || [];
@@ -145,20 +164,22 @@ export function VacanciesPage() {
                   }}
                 >
                 <Box sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                  {/* Заголовок карточки с кнопкой меню */}
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" fontWeight={600} gutterBottom>
                         {vacancy.title}
                       </Typography>
-                      <Typography variant="body2" color="secondary">
+                      <Typography variant="body2" color="text.secondary">
                         {vacancy.location}
                       </Typography>
                     </Box>
                     <IconButton size="small" onClick={(e) => handleMenuOpen(e, vacancy)}>
-                      <Icon name="more-vertical" size={20} />
+                      <MoreVertIcon />
                     </IconButton>
                   </Stack>
 
+                  {/* Метки с форматом работы и зарплатой */}
                   <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
                     {vacancy.work_format && (
                       <Chip label={vacancy.work_format} size="small" variant="outlined" />
@@ -168,6 +189,7 @@ export function VacanciesPage() {
                     )}
                   </Stack>
 
+                  {/* Навыки */}
                   <Stack direction="row" spacing={1} flexWrap="wrap" gap={0.5} sx={{ mt: 'auto' }}>
                     {visibleSkills.map((skill) => (
                       <Chip key={skill} label={skill} size="small" variant="outlined" />
@@ -184,21 +206,23 @@ export function VacanciesPage() {
         </Grid>
       )}
 
+      {/* Контекстное меню действий */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
         <MenuItem onClick={handleEdit}>
-          <Icon name="edit" size={16} sx={{ mr: 1 }} />
+          <EditIcon fontSize="small" sx={{ mr: 1 }} />
           Edit
         </MenuItem>
-        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error' }}>
-          <Icon name="trash-2" size={16} sx={{ mr: 1 }} />
+        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
           Delete
         </MenuItem>
       </Menu>
 
+      {/* Диалог подтверждения удаления */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Delete this vacancy?</DialogTitle>
         <DialogContent>

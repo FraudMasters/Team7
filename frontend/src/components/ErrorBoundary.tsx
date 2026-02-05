@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Box, Typography, Button, Paper, Container } from '@/components/ui';
+import { Box, Typography, Button, Paper, Container } from '@mui/material';
 import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 

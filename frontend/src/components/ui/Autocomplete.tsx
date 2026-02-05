@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import styled from '@emotion/styled';
-import { useEmotionTheme, EmotionTheme } from '../contexts/EmotionThemeContext';
+import { useEmotionTheme, EmotionTheme } from '../../contexts/EmotionThemeContext';
 import { TextField } from './TextField';
 import { Chip } from './Chip';
 import { Icon } from './primitives/Icon';

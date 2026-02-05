@@ -1,18 +1,25 @@
 /**
- * Saved Searches Page
+ * Страница сохраненных поисковых запросов
  *
- * Manage saved candidate searches with options to run, edit, and delete.
+ * Управление сохраненными поисками кандидатов с опциями запуска,
+ * редактирования и удаления. Использует MUI компоненты для отображения
+ * карточек поисков и меню действий.
  */
 
+// Импорт хуков React
 import { useState } from 'react';
+
+// Импорт хука React Router для навигации
 import { useNavigate } from 'react-router-dom';
+
+// Импорт компонентов MUI
 import {
   Box,
   Container,
   Typography,
   Button,
   Stack,
-  Grid,
+  Grid2,
   Paper,
   IconButton,
   Dialog,
@@ -25,12 +32,27 @@ import {
   CircularProgress,
   Menu,
   MenuItem,
-  Icon,
-} from '@/components/ui';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { savedSearchesClient } from '../../api/savedSearches';
-import { useResponsive } from '../../hooks/useResponsive';
+} from '@mui/material';
 
+// Импорт иконок MUI
+import {
+  Add as AddIcon,
+  PlayArrow as RunIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  MoreVert as MoreVertIcon,
+} from '@mui/icons-material';
+
+// Импорт хуков React Query для управления данными
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// Импорт API клиента для сохраненных поисков
+import { savedSearchesClient } from '../../api/savedSearches';
+
+// Импорт хука для определения размеров экрана
+import { useBreakpoints } from '../../hooks';
+
+// Интерфейс сохраненного поиска
 interface SavedSearch {
   id: string;
   name: string;
@@ -41,16 +63,23 @@ interface SavedSearch {
 }
 
 export function SavedSearchesPage() {
+  // Хук для навигации между страницами
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { isMobile } = useResponsive();
 
+  // Хук для управления кэшем React Query
+  const queryClient = useQueryClient();
+
+  // Определяем, мобильное ли устройство
+  const { isMobile } = useBreakpoints();
+
+  // Состояния диалогов и меню
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSearch, setSelectedSearch] = useState<SavedSearch | null>(null);
   const [editName, setEditName] = useState('');
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
+  // Загружаем сохраненные поиски
   const {
     data: savedSearchesData,
     isLoading,
@@ -62,6 +91,7 @@ export function SavedSearchesPage() {
     },
   });
 
+  // Мутация для обновления названия поиска
   const updateMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       return await savedSearchesClient.updateSavedSearch(id, { name });
@@ -73,6 +103,7 @@ export function SavedSearchesPage() {
     },
   });
 
+  // Мутация для удаления поиска
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await savedSearchesClient.deleteSavedSearch(id);
@@ -84,19 +115,23 @@ export function SavedSearchesPage() {
     },
   });
 
+  // Получаем список поисков
   const savedSearches = savedSearchesData?.saved_searches || [];
   const total = savedSearchesData?.total || 0;
 
+  // Обработчик открытия меню
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, search: SavedSearch) => {
     setMenuAnchor(event.currentTarget);
     setSelectedSearch(search);
   };
 
+  // Обработчик закрытия меню
   const handleMenuClose = () => {
     setMenuAnchor(null);
     setSelectedSearch(null);
   };
 
+  // Обработчик редактирования
   const handleEdit = () => {
     if (selectedSearch) {
       setEditName(selectedSearch.name);
@@ -105,11 +140,13 @@ export function SavedSearchesPage() {
     handleMenuClose();
   };
 
+  // Обработчик удаления
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
     handleMenuClose();
   };
 
+  // Обработчик запуска поиска
   const handleRunSearch = () => {
     handleMenuClose();
     if (selectedSearch) {
@@ -122,18 +159,21 @@ export function SavedSearchesPage() {
     }
   };
 
+  // Сохранить изменения названия
   const handleEditSave = () => {
     if (selectedSearch && editName.trim()) {
       updateMutation.mutate({ id: selectedSearch.id, name: editName });
     }
   };
 
+  // Подтверждение удаления
   const handleDeleteConfirm = () => {
     if (selectedSearch) {
       deleteMutation.mutate(selectedSearch.id);
     }
   };
 
+  // Форматирование фильтров для отображения
   const formatFilters = (filters: Record<string, unknown>): string => {
     const parts: string[] = [];
     if (filters.skills && Array.isArray(filters.skills)) {
@@ -150,7 +190,7 @@ export function SavedSearchesPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
-      {/* Header */}
+      {/* Заголовок страницы */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
           <Typography variant={isMobile ? 'h5' : 'h4'} fontWeight={700}>
@@ -169,14 +209,14 @@ export function SavedSearchesPage() {
         </Button>
       </Stack>
 
-      {/* Error Alert */}
+      {/* Сообщение об ошибке */}
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {(error as { detail?: string }).detail || 'Failed to load saved searches.'}
         </Alert>
       )}
 
-      {/* Empty State */}
+      {/* Пустое состояние */}
       {!isLoading && savedSearches.length === 0 && (
         <Paper sx={{ p: 8, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
@@ -196,18 +236,18 @@ export function SavedSearchesPage() {
         </Paper>
       )}
 
-      {/* Loading State */}
+      {/* Состояние загрузки */}
       {isLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>
       )}
 
-      {/* Saved Searches Grid */}
+      {/* Сетка сохраненных поисков */}
       {!isLoading && savedSearches.length > 0 && (
-        <Grid container spacing={3}>
+        <Grid2 container spacing={3}>
           {savedSearches.map((search) => (
-            <Grid key={search.id} xs={12} sm={6} md={4} lg={3}>
+            <Grid2 key={search.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <Paper
                 sx={{
                   p: 3,
@@ -221,7 +261,7 @@ export function SavedSearchesPage() {
                   },
                 }}
               >
-                {/* Header with Menu */}
+                {/* Заголовок с меню */}
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                   <Typography variant="h6" noWrap sx={{ flex: 1 }}>
                     {search.name}
@@ -235,7 +275,7 @@ export function SavedSearchesPage() {
                   </IconButton>
                 </Stack>
 
-                {/* Query */}
+                {/* Поисковый запрос */}
                 {search.query && (
                   <Typography
                     variant="body2"
@@ -253,7 +293,7 @@ export function SavedSearchesPage() {
                   </Typography>
                 )}
 
-                {/* Filters */}
+                {/* Фильтры */}
                 {search.filters && Object.keys(search.filters).length > 0 && (
                   <Box sx={{ mb: 2, flex: 1 }}>
                     <Typography variant="caption" color="text.secondary">
@@ -262,7 +302,7 @@ export function SavedSearchesPage() {
                   </Box>
                 )}
 
-                {/* Quick Actions */}
+                {/* Быстрые действия */}
                 <Stack direction="row" spacing={1} sx={{ mt: 'auto' }}>
                   <Button
                     size="small"
@@ -278,7 +318,7 @@ export function SavedSearchesPage() {
                   </Button>
                 </Stack>
 
-                {/* Last Updated */}
+                {/* Дата последнего обновления */}
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
                   Updated {new Date(search.updated_at).toLocaleDateString()}
                 </Typography>
@@ -288,7 +328,7 @@ export function SavedSearchesPage() {
         </Grid2>
       )}
 
-      {/* Options Menu */}
+      {/* Меню опций */}
       <Menu
         anchorEl={menuAnchor}
         open={Boolean(menuAnchor)}
@@ -308,7 +348,7 @@ export function SavedSearchesPage() {
         </MenuItem>
       </Menu>
 
-      {/* Edit Dialog */}
+      {/* Диалог редактирования */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Rename Search</DialogTitle>
         <DialogContent>
@@ -338,7 +378,7 @@ export function SavedSearchesPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Диалог подтверждения удаления */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Delete Saved Search</DialogTitle>
         <DialogContent>

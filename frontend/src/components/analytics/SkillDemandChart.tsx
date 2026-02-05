@@ -1,5 +1,8 @@
+// React хуки для управления состоянием, эффектами и колбэками
 import React, { useState, useEffect, useCallback } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -14,11 +17,18 @@ import {
   Grid,
   Chip,
   LinearProgress,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  Refresh as RefreshIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Work as SkillIcon,
+  FileDownload as FileDownloadIcon,
+} from '@mui/icons-material';
 
 /**
- * Skill demand item interface from backend
+ * Интерфейс элемента спроса на навыки с бэкенда
  */
 interface SkillDemandItem {
   skill_name: string;
@@ -28,7 +38,7 @@ interface SkillDemandItem {
 }
 
 /**
- * Skill demand response from backend
+ * Ответ о спросе на навыки с бэкенда
  */
 interface SkillDemandResponse {
   skills: SkillDemandItem[];
@@ -36,27 +46,27 @@ interface SkillDemandResponse {
 }
 
 /**
- * SkillDemandChart Component Props
+ * Свойства компонента SkillDemandChart
  */
 interface SkillDemandChartProps {
-  /** API endpoint URL for skill demand analytics */
+  /** URL API endpoint для аналитики спроса на навыки */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
-  /** Maximum number of skills to display */
+  /** Максимальное количество навыков для отображения */
   limit?: number;
 }
 
 /**
- * SkillDemandChart Component
+ * Компонент SkillDemandChart
  *
- * Displays trending skills with demand metrics including:
- * - Skill name with demand count
- * - Demand percentage as a horizontal bar chart
- * - Trend percentage with up/down indicators
- * - Total job postings analyzed
+ * Отображает trending навыки с метриками спроса включая:
+ * - Имя навыка с количеством спроса
+ * - Процент спроса в виде горизонтальной гистограммы
+ * - Процент тренда с индикаторами вверх/вниз
+ * - Общее количество проанализированных вакансий
  *
  * @example
  * ```tsx
@@ -74,12 +84,13 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
   endDate,
   limit = 20,
 }) => {
+  // Состояния для загрузки, ошибки и данных навыков
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [skillData, setSkillData] = useState<SkillDemandResponse | null>(null);
 
   /**
-   * Fetch skill demand data from backend
+   * Загрузка данных о спросе на навыки с бэкенда
    */
   const fetchSkillDemand = async () => {
     try {
@@ -148,19 +159,19 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
   if (loading) {
     return (
       <Box
-        css={{
+        sx={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '64px 0',
+          py: 8,
         }}
       >
-        <CircularProgress size={60} css={{ marginBottom: '24px' }} />
-        <Typography variant="h6" color="secondary">
+        <CircularProgress size={60} sx={{ mb: 3 }} />
+        <Typography variant="h6" color="text.secondary">
           Loading skill demand analytics...
         </Typography>
-        <Typography variant="body2" color="secondary" css={{ marginTop: '8px' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -175,7 +186,7 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchSkillDemand} startIcon={<Icon name="refresh" />}>
+          <Button color="inherit" onClick={fetchSkillDemand} startIcon={<RefreshIcon />}>
             Retry
           </Button>
         }
@@ -198,30 +209,30 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
   return (
     <Stack spacing={3}>
       {/* Header Section */}
-      <Paper elevation={2} css={{ padding: '24px' }}>
-        <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <Box css={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Icon name="work" size={32} color="$primary" />
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SkillIcon fontSize="large" color="primary" />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 Skill Demand Analytics
               </Typography>
-              <Typography variant="body2" color="secondary">
+              <Typography variant="body2" color="text.secondary">
                 Most requested skills from job postings
               </Typography>
             </Box>
           </Box>
-          <Box css={{ display: 'flex', gap: '8px' }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="outlined"
-              startIcon={<Icon name="download" />}
+              startIcon={<FileDownloadIcon />}
               onClick={exportAsCSV}
               size="small"
               disabled={!skillData || skillData.skills.length === 0}
             >
               Export CSV
             </Button>
-            <Button variant="outlined" startIcon={<Icon name="refresh" />} onClick={fetchSkillDemand} size="small">
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSkillDemand} size="small">
               Refresh
             </Button>
           </Box>
@@ -231,11 +242,11 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
         <Grid container spacing={2}>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
-                <Typography variant="h4" color="$primary" fontWeight={700}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="primary.main" fontWeight={700}>
                   {skillData.skills.length}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Trending Skills
                 </Typography>
               </CardContent>
@@ -243,11 +254,11 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
           </Grid>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
-                <Typography variant="h4" color="$success" fontWeight={700}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="success.main" fontWeight={700}>
                   {skillData.skills[0]?.demand_count || 0}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Top Skill Count
                 </Typography>
               </CardContent>
@@ -255,11 +266,11 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
           </Grid>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" fontWeight={700}>
                   {((skillData.skills[0]?.demand_percentage || 0) * 100).toFixed(1)}%
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Highest Demand
                 </Typography>
               </CardContent>
@@ -267,11 +278,11 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
           </Grid>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
-                <Typography variant="h4" color="$info" fontWeight={700}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="info.main" fontWeight={700}>
                   {skillData.total_postings_analyzed.toLocaleString()}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Postings Analyzed
                 </Typography>
               </CardContent>
@@ -281,111 +292,111 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
       </Paper>
 
       {/* Skills Chart */}
-      <Paper elevation={1} css={{ padding: '24px' }}>
+      <Paper elevation={1} sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom fontWeight={600}>
           Trending Skills by Demand
         </Typography>
 
-        <Stack spacing={2} css={{ marginTop: '24px' }}>
+        <Stack spacing={2} sx={{ mt: 3 }}>
           {skillData.skills.map((skill, index) => (
             <Card
               key={skill.skill_name}
               variant="outlined"
-              css={{
+              sx={{
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateX(4px)',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  boxShadow: 2,
                 },
               }}
             >
-              <CardContent css={{ padding: '16px' }}>
+              <CardContent sx={{ py: 2 }}>
                 <Grid container spacing={2} alignItems="center">
                   {/* Rank and Skill Name */}
                   <Grid item xs={12} sm={4}>
-                    <Box css={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Chip
-                        label={`#${index + 1}`}
-                        size="small"
-                        color={index < 3 ? 'primary' : 'default'}
-                        css={{
-                          fontWeight: 700,
-                          minWidth: '45px',
-                          backgroundColor: index < 3 ? '$primary' : '$disabledBackground',
-                        }}
-                      />
-                      <Typography variant="subtitle1" fontWeight={600}>
-                        {skill.skill_name}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Chip
+                    label={`#${index + 1}`}
+                    size="small"
+                    color={index < 3 ? 'primary' : 'default'}
+                    sx={{
+                      fontWeight: 700,
+                      minWidth: 45,
+                      bgcolor: index < 3 ? 'primary.main' : 'action.disabledBackground',
+                    }}
+                  />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {skill.skill_name}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Demand Bar Chart */}
+              <Grid item xs={12} sm={5}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Demand
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {skill.demand_count.toLocaleString()} ({(skill.demand_percentage * 100).toFixed(1)}%)
                       </Typography>
                     </Box>
-                  </Grid>
-
-                  {/* Demand Bar Chart */}
-                  <Grid item xs={12} sm={5}>
-                    <Box css={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Box css={{ flexGrow: 1 }}>
-                        <Box css={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <Typography variant="caption" color="secondary">
-                            Demand
-                          </Typography>
-                          <Typography variant="body2" fontWeight={600}>
-                            {skill.demand_count.toLocaleString()} ({(skill.demand_percentage * 100).toFixed(1)}%)
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={skill.demand_percentage * 100}
-                          css={{
-                            height: '8px',
-                            borderRadius: '4px',
-                            backgroundColor: '$hover',
-                            '& .MuiLinearProgress-bar': {
-                              backgroundColor: index < 3 ? '$primary' : '$primaryLight',
-                            },
-                          }}
-                        />
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  {/* Trend Indicator */}
-                  <Grid item xs={12} sm={3}>
-                    <Box
-                      css={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        gap: '4px',
+                    <LinearProgress
+                      variant="determinate"
+                      value={skill.demand_percentage * 100}
+                      sx={{
+                        height: 8,
+                        borderRadius: 1,
+                        bgcolor: 'action.hover',
+                        '& .MuiLinearProgress-bar': {
+                          bgcolor: index < 3 ? 'primary.main' : 'primary.light',
+                        },
                       }}
-                    >
-                      {skill.trend_percentage > 0 ? (
-                        <Icon name="trending-up" size={16} color="$success" />
-                      ) : skill.trend_percentage < 0 ? (
-                        <Icon name="trending-down" size={16} color="$error" />
-                      ) : null}
-                      <Typography
-                        variant="body2"
-                        fontWeight={600}
-                        color={
-                          skill.trend_percentage > 0 ? '$success' : skill.trend_percentage < 0 ? '$error' : '$secondary'
-                        }
-                      >
-                        {skill.trend_percentage > 0 ? '+' : ''}{(skill.trend_percentage * 100).toFixed(1)}%
-                      </Typography>
-                      <Typography variant="caption" color="secondary">
-                        trend
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          ))}
+                    />
+                  </Box>
+                </Box>
+              </Grid>
+
+              {/* Trend Indicator */}
+              <Grid item xs={12} sm={3}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 0.5,
+                  }}
+                >
+                  {skill.trend_percentage > 0 ? (
+                    <TrendingUpIcon fontSize="small" color="success" />
+                  ) : skill.trend_percentage < 0 ? (
+                    <TrendingDownIcon fontSize="small" color="error" />
+                  ) : null}
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    color={
+                      skill.trend_percentage > 0 ? 'success.main' : skill.trend_percentage < 0 ? 'error.main' : 'text.secondary'
+                    }
+                  >
+                    {skill.trend_percentage > 0 ? '+' : ''}{(skill.trend_percentage * 100).toFixed(1)}%
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    trend
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      ))}
         </Stack>
 
         {skillData.skills.length >= limit && (
-          <Box css={{ marginTop: '16px', textAlign: 'center' }}>
-            <Typography variant="caption" color="secondary">
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary">
               Showing top {skillData.skills.length} skills of {skillData.total_postings_analyzed.toLocaleString()} job postings analyzed
             </Typography>
           </Box>

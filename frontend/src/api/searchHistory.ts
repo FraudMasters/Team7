@@ -1,20 +1,20 @@
 /**
  * Search History API Client
  *
- * This module provides a client for managing search history,
- * including retrieving and clearing search history records.
+ * Этот модуль предоставляет клиент для управления историей поиска,
+ * включая получение и очистку записей истории поиска.
  *
  * @example
  * ```ts
  * import { searchHistoryClient } from '@/api/searchHistory';
  *
- * // List search history
+ * // Получение списка истории поиска
  * const history = await searchHistoryClient.listSearchHistory();
  *
- * // Get search history with pagination
+ * // Получение истории поиска с пагинацией
  * const history = await searchHistoryClient.listSearchHistory(0, 20);
  *
- * // Clear all search history
+ * // Очистка всей истории поиска
  * await searchHistoryClient.clearSearchHistory();
  * ```
  */
@@ -26,36 +26,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Default API configuration for search history client
+ * Конфигурация по умолчанию для клиента истории поиска
  */
 const DEFAULT_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  timeout: 10000, // 10 секунд
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Search History API Client class
+ * Класс клиента API для работы с историей поиска
  *
- * Provides methods for managing search history with proper
- * error handling and type safety.
+ * Предоставляет методы для управления историей поиска с proper
+ * обработкой ошибок и типобезопасностью.
  */
 export class SearchHistoryClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new SearchHistory client instance
+   * Создание нового экземпляра клиента истории поиска
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -63,74 +63,74 @@ export class SearchHistoryClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid request. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      422: 'Validation error. Please check your input.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Ресурс не найден.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * List search history with optional pagination
+   * Получение списка истории поиска с опциональной пагинацией
    *
-   * @param skip - Number of records to skip (pagination)
-   * @param limit - Maximum number of records to return
-   * @param recruiterId - Optional filter by recruiter ID
-   * @returns List of search history items
-   * @throws ApiError if listing fails
+   * @param skip - Количество записей для пропуска (пагинация)
+   * @param limit - Максимальное количество записей для возврата
+   * @param recruiterId - Опциональный фильтр по ID рекрутера
+   * @returns Список элементов истории поиска
+   * @throws ApiError если получение списка не удалось
    *
    * @example
    * ```ts
-   * // Get all search history
+   * // Получение всей истории поиска
    * const history = await searchHistoryClient.listSearchHistory();
    *
-   * // Get first 20 items
+   * // Получение первых 20 элементов
    * const history = await searchHistoryClient.listSearchHistory(0, 20);
    *
-   * // Get next 20 items
+   * // Получение следующих 20 элементов
    * const history = await searchHistoryClient.listSearchHistory(20, 20);
    * ```
    */
@@ -154,12 +154,12 @@ export class SearchHistoryClient {
   }
 
   /**
-   * Clear all search history
+   * Очистка всей истории поиска
    *
-   * Note: This endpoint may not be implemented in the backend yet.
-   * If you get a 404 error, the backend needs to implement this endpoint.
+   * Примечание: Этот эндпоинт может быть еще не реализован в backend.
+   * Если вы получаете ошибку 404, backend должен реализовать этот эндпоинт.
    *
-   * @throws ApiError if clearing fails
+   * @throws ApiError если очистка не удалась
    *
    * @example
    * ```ts
@@ -175,11 +175,11 @@ export class SearchHistoryClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение базового экземпляра Axios
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
    *
-   * @returns Axios instance
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -187,13 +187,13 @@ export class SearchHistoryClient {
 }
 
 /**
- * Default search history client instance
+ * Экземпляр клиента истории поиска по умолчанию
  *
- * Use this singleton instance for all search history calls.
+ * Используйте этот singleton-экземпляр для всех операций с историей поиска.
  */
 export const searchHistoryClient = new SearchHistoryClient();
 
 /**
- * Export search history client class for custom instances
+ * Экспорт класса истории поиска для создания кастомных экземпляров
  */
 export default SearchHistoryClient;

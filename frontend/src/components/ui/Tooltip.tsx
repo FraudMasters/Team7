@@ -282,7 +282,7 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
   ) => {
     const { theme } = useEmotionTheme();
     const anchorRef = useRef<HTMLElement>(null);
-    const tooltipRef = useRef<HTMLDivElement>(null);
+    const internalTooltipRef = useRef<HTMLDivElement>(null);
     const tooltipRootRef = useRef<HTMLDivElement | null>(null);
     const [internalOpen, setInternalOpen] = useState(false);
     const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -291,8 +291,8 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
     const leaveTimerRef = useRef<NodeJS.Timeout>();
 
     // Combine refs
-    React.useImperativeHandle(ref, () => tooltipRef.current!);
-    React.useImperativeHandle(tooltipRef, () => tooltipRef.current!);
+    React.useImperativeHandle(ref, () => internalTooltipRef.current!);
+    React.useImperativeHandle(tooltipRef, () => internalTooltipRef.current!);
 
     // Create tooltip root element on mount
     useEffect(() => {
@@ -316,9 +316,9 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
 
     // Calculate position when tooltip opens
     useEffect(() => {
-      if ((controlledOpen !== undefined ? controlledOpen : internalOpen) && anchorRef.current && tooltipRef.current) {
+      if ((controlledOpen !== undefined ? controlledOpen : internalOpen) && anchorRef.current && internalTooltipRef.current) {
         const anchorRect = anchorRef.current.getBoundingClientRect();
-        const tooltipRect = tooltipRef.current.getBoundingClientRect();
+        const tooltipRect = internalTooltipRef.current.getBoundingClientRect();
 
         let pos: { top: number; left: number };
 
@@ -435,7 +435,7 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
 
     const tooltipContent = (
       <StyledTooltipContainer
-        ref={tooltipRef}
+        ref={internalTooltipRef}
         theme={theme}
         variant={variant}
         className={`${className || ''} tooltip-visible ${arrow ? 'with-arrow' : ''} placement-${placement.split('-')[0]}`}

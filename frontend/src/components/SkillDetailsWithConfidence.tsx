@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
-import { styled } from '@emotion/styled';
+import styled from '@emotion/styled';
 
 export interface SkillMatchDetail {
   skill: string;

@@ -1,39 +1,51 @@
+// Импорт хуков для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для UI
 import {
-  Container,
-  Typography,
-  Box,
-  Grid,
-  Paper,
-  Button,
-  Switch,
-  Chip,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  Divider,
-  Icon,
-} from '@/components/ui';
-import { PageTransition } from '../../components/ui/PageTransition';
+  Container,          // Контейнер для ограничения ширины содержимого
+  Typography,         // Компонент для текста с различными стилями
+  Box,                // Универсальный контейнер для верстки
+  Grid,               // Сетка для адаптивной верстки
+  Paper,              // Контейнер с эффектом elevated (карточка)
+  Button,             // Кнопки
+  Switch,             // Переключатель
+  Chip,               // Метки/теги
+  TextField,          // Поле ввода текста
+  Dialog,             // Модальное окно
+  DialogTitle,        // Заголовок модального окна
+  DialogContent,      // Содержимое модального окна
+  DialogActions,      // Действия модального окна
+  FormControl,        // Контейнер для элементов форм
+  InputLabel,         // Метка поля ввода
+  Select,             // Выпадающий список
+  MenuItem,           // Пункт выпадающего списка
+  List,               // Список
+  ListItem,           // Элемент списка
+  ListItemText,       // Текст элемента списка
+  ListItemSecondaryAction, // Вторичное действие элемента списка
+  IconButton,         // Иконка-кнопка
+  Divider,            // Разделитель
+} from '@mui/material';
+// Импорт иконок из MUI
+import {
+  Notifications as NotificationsIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Email as EmailIcon,
+  NotificationsActive as PushIcon,
+} from '@mui/icons-material';
+// Импорт MUI компонентов
+import { PageTransition } from '@components/mui/PageTransition';
 
+// Интерфейс описывающий оповещение о вакансии
 interface JobAlert {
   id: string;
   name: string;
   keywords: string[];
   location: string;
   workFormat: string;
-  frequency: 'instant' | 'daily' | 'weekly';
+  frequency: 'instant' | 'daily' | 'weekly'; // Частота уведомлений
   active: boolean;
   emailEnabled: boolean;
   pushEnabled: boolean;
@@ -41,6 +53,7 @@ interface JobAlert {
   matchesCount: number;
 }
 
+// Демо-данные оповещений
 const mockAlerts: JobAlert[] = [
   {
     id: '1',
@@ -83,9 +96,16 @@ const mockAlerts: JobAlert[] = [
   },
 ];
 
+/**
+ * Страница оповещений о вакансиях
+ * Отображает и управляет оповещениями о новых подходящих вакансиях
+ */
 export function JobAlertsPage() {
+  // Состояние списка оповещений
   const [alerts, setAlerts] = useState<JobAlert[]>(mockAlerts);
+  // Состояние открытости диалога создания
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  // Состояние формы нового оповещения
   const [newAlert, setNewAlert] = useState({
     name: '',
     keywords: '',
@@ -94,6 +114,9 @@ export function JobAlertsPage() {
     frequency: 'daily' as 'instant' | 'daily' | 'weekly',
   });
 
+  /**
+   * Переключение активности оповещения
+   */
   const handleToggleAlert = (id: string) => {
     setAlerts((prev) =>
       prev.map((alert) =>
@@ -102,6 +125,9 @@ export function JobAlertsPage() {
     );
   };
 
+  /**
+   * Переключение email-уведомлений
+   */
   const handleToggleEmail = (id: string) => {
     setAlerts((prev) =>
       prev.map((alert) =>
@@ -110,6 +136,9 @@ export function JobAlertsPage() {
     );
   };
 
+  /**
+   * Переключение push-уведомлений
+   */
   const handleTogglePush = (id: string) => {
     setAlerts((prev) =>
       prev.map((alert) =>
@@ -118,10 +147,16 @@ export function JobAlertsPage() {
     );
   };
 
+  /**
+   * Удаление оповещения
+   */
   const handleDeleteAlert = (id: string) => {
     setAlerts((prev) => prev.filter((alert) => alert.id !== id));
   };
 
+  /**
+   * Создание нового оповещения
+   */
   const handleCreateAlert = () => {
     const alert: JobAlert = {
       id: Date.now().toString(),
@@ -149,7 +184,7 @@ export function JobAlertsPage() {
   return (
     <PageTransition>
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -173,7 +208,7 @@ export function JobAlertsPage() {
           </Button>
         </Box>
 
-        {/* Stats */}
+        {/* Статистика */}
         <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid item xs={4}>
             <Paper sx={{ p: 2, textAlign: 'center' }}>
@@ -207,7 +242,7 @@ export function JobAlertsPage() {
           </Grid>
         </Grid>
 
-        {/* Alerts List */}
+        {/* Список оповещений */}
         <Paper>
           <List>
             {alerts.map((alert, index) => (
@@ -231,98 +266,103 @@ export function JobAlertsPage() {
                       />
                     </Box>
 
+                    {/* Ключевые слова оповещения */}
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
                       {alert.keywords.map((keyword) => (
                         <Chip key={keyword} label={keyword} size="small" variant="outlined" />
                       ))}
                     </Box>
 
-                <Box sx={{ display: 'flex', gap: 3, mt: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Location:
-                    </Typography>
-                    <Typography variant="body2">{alert.location}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Format:
-                    </Typography>
-                    <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
-                      {alert.workFormat}
-                    </Typography>
-                  </Box>
-                  {alert.lastTriggered && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Last triggered:
-                      </Typography>
-                      <Typography variant="body2">{alert.lastTriggered}</Typography>
+                    {/* Детали оповещения */}
+                    <Box sx={{ display: 'flex', gap: 3, mt: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Location:
+                        </Typography>
+                        <Typography variant="body2">{alert.location}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Format:
+                        </Typography>
+                        <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                          {alert.workFormat}
+                        </Typography>
+                      </Box>
+                      {alert.lastTriggered && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Last triggered:
+                          </Typography>
+                          <Typography variant="body2">{alert.lastTriggered}</Typography>
+                        </Box>
+                      )}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Matches:
+                        </Typography>
+                        <Typography variant="body2" color="primary" fontWeight={600}>
+                          {alert.matchesCount}
+                        </Typography>
+                      </Box>
                     </Box>
-                  )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Matches:
-                    </Typography>
-                    <Typography variant="body2" color="primary" fontWeight={600}>
-                      {alert.matchesCount}
-                    </Typography>
                   </Box>
-                </Box>
-              </Box>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                  }}
-                >
-                  <EmailIcon fontSize="small" color="action" />
-                  <Switch
-                    size="small"
-                    checked={alert.emailEnabled}
-                    onChange={() => handleToggleEmail(alert.id)}
-                  />
-                </Box>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                  }}
-                >
-                  <PushIcon fontSize="small" color="action" />
-                  <Switch
-                    size="small"
-                    checked={alert.pushEnabled}
-                    onChange={() => handleTogglePush(alert.id)}
-                  />
-                </Box>
-              </Box>
+                  {/* Переключатели уведомлений */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                      }}
+                    >
+                      <EmailIcon fontSize="small" color="action" />
+                      <Switch
+                        size="small"
+                        checked={alert.emailEnabled}
+                        onChange={() => handleToggleEmail(alert.id)}
+                      />
+                    </Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                      }}
+                    >
+                      <PushIcon fontSize="small" color="action" />
+                      <Switch
+                        size="small"
+                        checked={alert.pushEnabled}
+                        onChange={() => handleTogglePush(alert.id)}
+                      />
+                    </Box>
+                  </Box>
 
-              <ListItemSecondaryAction>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Switch
-                    checked={alert.active}
-                    onChange={() => handleToggleAlert(alert.id)}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => handleDeleteAlert(alert.id)}
-                    color="error"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              </ListItemSecondaryAction>
-            </ListItem>
+                  {/* Действия с оповещением */}
+                  <ListItemSecondaryAction>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Switch
+                        checked={alert.active}
+                        onChange={() => handleToggleAlert(alert.id)}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteAlert(alert.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </ListItemSecondaryAction>
+                </ListItem>
                 {index < alerts.length - 1 && <Divider />}
               </Box>
             ))}
           </List>
 
+          {/* Состояние: нет оповещений */}
           {alerts.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 8 }}>
               <NotificationsIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
@@ -343,7 +383,7 @@ export function JobAlertsPage() {
           )}
         </Paper>
 
-        {/* Create Alert Dialog */}
+        {/* Диалог создания оповещения */}
         <Dialog
           open={createDialogOpen}
           onClose={() => setCreateDialogOpen(false)}

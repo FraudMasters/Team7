@@ -1,43 +1,37 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Container, Box, TextField, Typography, Paper, Stack, Grid } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { KanbanBoard } from '../../components/kanban/KanbanBoard';
 import { useCandidates, useCandidateStages, useUpdateCandidateStage } from '../../hooks/useRecruiterData';
-import { useRefreshHandler } from '../../layouts/RecruiterLayout';
 import type { DropResult } from '@hello-pangea/dnd';
 
+// Этапы воронки кандидатов по умолчанию
 const DEFAULT_STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired'];
 
+// Страница канбан-доски для управления кандидатами
 export function CandidatesKanbanPage() {
+  // Состояние для поиска кандидатов
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: candidatesData, refetch: refetchCandidates } = useCandidates();
-  const { data: stagesData, refetch: refetchStages } = useCandidateStages();
-  const updateStage = useUpdateCandidateStage();
-  const { registerRefreshHandler } = useRefreshHandler();
 
+  // Получение данных о кандидатах и этапах
+  const { data: candidatesData } = useCandidates();
+  const { data: stagesData } = useCandidateStages();
+  const updateStage = useUpdateCandidateStage();
+
+  // Используем полученные этапы или значения по умолчанию
   const stages = stagesData || DEFAULT_STAGES;
 
-  // Register refresh handler with layout
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([refetchCandidates(), refetchStages()]);
-  }, [refetchCandidates, refetchStages]);
-
-  useEffect(() => {
-    registerRefreshHandler(handleRefresh);
-
-    // Cleanup on unmount
-    return () => {
-      registerRefreshHandler(null);
-    };
-  }, [registerRefreshHandler, handleRefresh]);
-
+  // Формирование колонок для канбан-доски с фильтрацией по поиску
   const columns = useMemo(() => {
     const candidates = candidatesData?.candidates || [];
+
+    // Фильтрация кандидатов по поисковому запросу
     const filtered = candidates.filter((c) =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Создание колонок для каждого этапа
     return stages.map((stage) => ({
       id: stage.toLowerCase().replace(/\s+/g, '-'),
       title: stage,
@@ -45,17 +39,20 @@ export function CandidatesKanbanPage() {
     }));
   }, [candidatesData, stages, searchTerm]);
 
+  // Обработчик завершения перетаскивания
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
 
     const candidateId = result.draggableId as string;
     const newStage = columns[result.destination.droppableId].title;
 
+    // Обновление этапа кандидата в БД
     await updateStage.mutateAsync({ candidateId, stage: newStage });
   };
 
   return (
     <Container maxWidth="xl" sx={{ py: 2, height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
+      {/* Заголовок страницы */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           Candidate Pipeline
@@ -65,6 +62,7 @@ export function CandidatesKanbanPage() {
         </Typography>
       </Box>
 
+      {/* Поле поиска кандидатов */}
       <TextField
         placeholder="Search candidates..."
         value={searchTerm}
@@ -75,6 +73,7 @@ export function CandidatesKanbanPage() {
         sx={{ mb: 3, maxWidth: 400 }}
       />
 
+      {/* Канбан-доска с перетаскиванием */}
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         <KanbanBoard columns={columns} onDragEnd={handleDragEnd} />
       </Box>

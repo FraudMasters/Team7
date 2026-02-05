@@ -296,4 +296,5 @@ const IconInternal: React.FC<IconProps> = ({
 IconInternal.displayName = 'Icon';
 
 const Icon = React.memo(IconInternal);
+export { Icon };
 export default Icon;

@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useRef, useCallback, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -18,7 +18,6 @@ import {
   Divider,
   Tooltip,
 } from '@mui/material';
-import { PullToRefresh } from '../components/ui';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -44,31 +43,10 @@ import {
   Upload as UploadIcon,
 } from '@mui/icons-material';
 
+// Ширина боковой панели навигации
 const DRAWER_WIDTH = 280;
 
-// Context for allowing child pages to register refresh handlers
-interface RefreshContextType {
-  registerRefreshHandler: (handler: (() => Promise<void>) | null) => void;
-}
-
-const RefreshContext = createContext<RefreshContextType | undefined>(undefined);
-
-export const useRefreshHandler = () => {
-  const context = useContext(RefreshContext);
-  if (!context) {
-    throw new Error('useRefreshHandler must be used within RecruiterLayout');
-  }
-  return context;
-};
-
-// Helper to check if current route supports pull-to-refresh
-const isRefreshableRoute = (pathname: string): boolean => {
-  return (
-    pathname.startsWith('/recruiter/resumes') ||
-    pathname.startsWith('/recruiter/candidates')
-  );
-};
-
+// Интерфейс элемента навигации
 interface NavItem {
   label: string;
   path: string;
@@ -76,11 +54,13 @@ interface NavItem {
   children?: NavItem[];
 }
 
+// Интерфейс секции навигации
 interface NavSection {
   title?: string;
   items: NavItem[];
 }
 
+// Конфигурация секций навигации для рекрутера
 const navSections: NavSection[] = [
   {
     items: [
@@ -129,11 +109,14 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Основной компонент макета рекрутера
 const RecruiterLayout: React.FC = () => {
   const theme = useTheme();
+  // Проверка, является ли устройство мобильным
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  // Состояние открытости мобильного меню
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  // Состояние раскрытых секций навигации
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     Hiring: true,
     Resumes: false,
@@ -145,48 +128,20 @@ const RecruiterLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Store refresh callback from child page
-  const refreshHandlerRef = useRef<(() => Promise<void>) | null>(null);
-
-  // Register refresh handler from child page
-  const registerRefreshHandler = useCallback((handler: (() => Promise<void>) | null) => {
-    refreshHandlerRef.current = handler;
-  }, []);
-
-  // Handle pull-to-refresh action
-  const handleRefresh = useCallback(async () => {
-    if (refreshHandlerRef.current) {
-      try {
-        setRefreshing(true);
-        await refreshHandlerRef.current();
-      } catch (error) {
-        console.error('Refresh failed:', error);
-      } finally {
-        setRefreshing(false);
-      }
-    }
-  }, []);
-
-  // Check if current route should have pull-to-refresh enabled
-  const enableRefresh = isMobile && isRefreshableRoute(location.pathname);
-
-  // Context value for child pages
-  const refreshContext = useMemo(
-    () => ({ registerRefreshHandler }),
-    [registerRefreshHandler]
-  );
-
+  // Обработчик переключения мобильного меню
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  // Обработчик переключения секции навигации
   const handleSectionToggle = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
+  // Контент боковой панели ( drawer)
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Logo */}
+      {/* Логотип */}
       <Box
         sx={{
           height: 64,
@@ -212,7 +167,7 @@ const RecruiterLayout: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Navigation Sections */}
+      {/* Секции навигации */}
       <nav aria-label="Main navigation" sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <List
           sx={{ px: 2, py: 2 }}
@@ -221,6 +176,7 @@ const RecruiterLayout: React.FC = () => {
         >
           {navSections.map((section, sectionIdx) => (
             <Box key={sectionIdx || 'root'}>
+              {/* Заголовок секции с возможностью раскрытия/скрытия */}
               {section.title && (
                 <>
                   <ListItem
@@ -255,8 +211,10 @@ const RecruiterLayout: React.FC = () => {
                 </>
               )}
 
+              {/* Элементы навигации секции */}
               <Collapse in={!section.title || expandedSections[section.title!]} timeout="auto" unmountOnExit>
                 {section.items.map((item) => {
+                  // Определение активного элемента на основе текущего пути
                   const isActive = location.pathname === item.path ||
                     (item.path !== '/recruiter/dashboard' && location.pathname.startsWith(item.path + '/'));
 
@@ -267,6 +225,7 @@ const RecruiterLayout: React.FC = () => {
                         aria-current={isActive ? 'page' : undefined}
                         onClick={() => {
                           navigate(item.path);
+                          // Закрытие мобильного меню после навигации
                           if (isMobile) setMobileOpen(false);
                         }}
                         sx={{
@@ -308,6 +267,7 @@ const RecruiterLayout: React.FC = () => {
                 })}
               </Collapse>
 
+              {/* Разделитель между секциями */}
               {sectionIdx < navSections.length - 1 && (
                 <Divider sx={{ my: 1, mx: 2 }} />
               )}
@@ -320,7 +280,7 @@ const RecruiterLayout: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* Skip Link for Keyboard Users */}
+      {/* Ссылка для быстрого перехода к основному контенту (для пользователей клавиатуры) */}
       <Box
         component="a"
         href="#main-content"
@@ -342,7 +302,7 @@ const RecruiterLayout: React.FC = () => {
         Skip to main content
       </Box>
 
-      {/* Top AppBar */}
+      {/* Верхняя панель приложения (AppBar) */}
       <AppBar
         position="fixed"
         elevation={0}
@@ -355,6 +315,7 @@ const RecruiterLayout: React.FC = () => {
         }}
       >
         <Toolbar>
+          {/* Кнопка меню для мобильных устройств */}
           <IconButton
             color="inherit"
             edge="start"
@@ -366,9 +327,11 @@ const RecruiterLayout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
+          {/* Заголовок панели */}
           <Typography variant="h6" fontWeight={600} color="text.primary" component="h2">
             Recruiter Portal
           </Typography>
+          {/* Кнопки быстрого доступа */}
           <Box sx={{ ml: 'auto', display: { xs: 'none', md: 'flex' }, gap: 1 }}>
             <Tooltip title="Quick Search (Ctrl+K)">
               <IconButton
@@ -383,14 +346,14 @@ const RecruiterLayout: React.FC = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar */}
+      {/* Боковая панель навигации */}
       <Box
         component="nav"
         sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
         aria-label="Recruiter sidebar navigation"
         id="drawer-menu"
       >
-        {/* Mobile Drawer */}
+        {/* Мобильная версия боковой панели */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -407,7 +370,7 @@ const RecruiterLayout: React.FC = () => {
           {drawerContent}
         </Drawer>
 
-        {/* Desktop Drawer */}
+        {/* Десктопная версия боковой панели */}
         <Drawer
           variant="permanent"
           sx={{
@@ -425,7 +388,7 @@ const RecruiterLayout: React.FC = () => {
         </Drawer>
       </Box>
 
-      {/* Main Content */}
+      {/* Основной контент */}
       <Box
         component="main"
         id="main-content"
@@ -439,18 +402,7 @@ const RecruiterLayout: React.FC = () => {
         tabIndex={-1}
       >
         <Toolbar />
-        <RefreshContext.Provider value={refreshContext}>
-          <PullToRefresh
-            onRefresh={handleRefresh}
-            refreshing={refreshing}
-            enabled={enableRefresh}
-            loadingMessage="Refreshing..."
-            pullMessage="Pull down to refresh"
-            releaseMessage="Release to refresh"
-          >
-            <Outlet />
-          </PullToRefresh>
-        </RefreshContext.Provider>
+        <Outlet />
       </Box>
     </Box>
   );

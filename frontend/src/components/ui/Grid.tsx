@@ -123,7 +123,7 @@ const generateResponsiveStyles = (
   props: Record<Breakpoint, GridSize | undefined>,
   theme: EmotionTheme,
   propertyName: string = 'grid-column'
-: string => {
+): string => {
   const styles: string[] = [];
 
   // xs (default, mobile first)

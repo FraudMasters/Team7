@@ -31,7 +31,6 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
-import { useRefreshHandler } from '../layouts/RecruiterLayout';
 import {
   Work as WorkIcon,
   Search as SearchIcon,
@@ -114,18 +113,6 @@ const ResumeDatabasePage: React.FC = () => {
   useEffect(() => {
     fetchResumes();
   }, []);
-
-  // Register refresh handler with layout
-  const { registerRefreshHandler } = useRefreshHandler();
-
-  useEffect(() => {
-    registerRefreshHandler(fetchResumes);
-
-    // Cleanup on unmount
-    return () => {
-      registerRefreshHandler(null);
-    };
-  }, [registerRefreshHandler]);
 
   // Filter and sort resumes based on search query, quick filter, and sort order
   useEffect(() => {

@@ -10,6 +10,11 @@ import RecruiterLayout from './layouts/RecruiterLayout';
 // Pages - Landing
 import LandingPage from './pages/LandingPage';
 
+// Auth Pages
+import LoginPage from './auth/LoginPage';
+import RegisterPage from './auth/RegisterPage';
+import CallbackPage from './auth/CallbackPage';
+
 // Job Seeker Pages
 import { JobsBrowsePage } from './pages/jobs/JobsBrowsePage';
 import { JobDetailPage } from './pages/jobs/JobDetailPage';
@@ -62,6 +67,11 @@ function App() {
       <Routes>
         {/* Root route - Landing Page */}
         <Route path="/" element={<LandingPage />} />
+
+        {/* Auth Routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/callback" element={<CallbackPage />} />
 
         {/* Job Seeker Flow */}
         <Route path="/jobs" element={<JobSeekerLayout />}>

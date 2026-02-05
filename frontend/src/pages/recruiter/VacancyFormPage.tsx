@@ -1,3 +1,5 @@
+// Страница создания и редактирования вакансии для рекрутера
+// Компонент предоставляет форму для заполнения деталей вакансии
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -10,14 +12,21 @@ import {
   Stack,
   Grid,
   Chip,
+  IconButton,
   Alert,
   CircularProgress,
   MenuItem,
-  Icon,
-} from '@/components/ui';
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon,
+  Save as SaveIcon,
+} from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 
+// Интерфейс данных вакансии
 interface Vacancy {
   id: string;
   title: string;
@@ -31,6 +40,7 @@ interface Vacancy {
   salary_max?: number;
 }
 
+// Списки доступных опций для полей формы
 const WORK_FORMATS = ['remote', 'office', 'hybrid'];
 const INDUSTRIES = [
   'IT',
@@ -43,11 +53,13 @@ const INDUSTRIES = [
 ];
 
 export function VacancyFormPage() {
+  // Хуки для навигации и работы с параметрами URL
   const navigate = useNavigate();
   const { id } = useParams();
   const queryClient = useQueryClient();
   const isEditing = Boolean(id);
 
+  // Локальное состояние для ввода навыков и данных формы
   const [skillInput, setSkillInput] = useState('');
   const [formData, setFormData] = useState({
     title: '',
@@ -61,6 +73,7 @@ export function VacancyFormPage() {
     salary_max: 0,
   });
 
+  // Запрос для получения данных вакансии при редактировании
   const { data: vacancyData, isLoading } = useQuery({
     queryKey: ['vacancy', id],
     queryFn: async () => {
@@ -70,6 +83,7 @@ export function VacancyFormPage() {
     },
     enabled: isEditing,
     onSuccess: (data) => {
+      // Заполняем форму полученными данными
       if (data?.vacancy) {
         setFormData({
           title: data.vacancy.title || '',
@@ -86,32 +100,38 @@ export function VacancyFormPage() {
     },
   });
 
+  // Мутация для создания новой вакансии
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const response = await apiClient.post('/vacancies', data);
       return response.data;
     },
     onSuccess: () => {
+      // Инвалидируем кеш вакансий и переходим к списку
       queryClient.invalidateQueries({ queryKey: ['vacancies'] });
       navigate('/recruiter/vacancies');
     },
   });
 
+  // Мутация для обновления существующей вакансии
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const response = await apiClient.put(`/vacancies/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
+      // Инвалидируем кеш вакансий и переходим к списку
       queryClient.invalidateQueries({ queryKey: ['vacancies'] });
       navigate('/recruiter/vacancies');
     },
   });
 
+  // Обработчик изменения любого поля формы
   const handleInputChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Обработчик добавления навыка в список
   const handleAddSkill = () => {
     if (skillInput.trim() && !formData.required_skills.includes(skillInput.trim())) {
       setFormData((prev) => ({
@@ -122,6 +142,7 @@ export function VacancyFormPage() {
     }
   };
 
+  // Обработчик удаления навыка из списка
   const handleRemoveSkill = (skillToRemove: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -129,6 +150,7 @@ export function VacancyFormPage() {
     }));
   };
 
+  // Обработчик отправки формы
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -136,6 +158,7 @@ export function VacancyFormPage() {
     mutation.mutate(formData);
   };
 
+  // Отображаем индикатор загрузки при получении данных
   if (isLoading) {
     return (
       <Container maxWidth="xl" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
@@ -146,8 +169,9 @@ export function VacancyFormPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Кнопка возврата к списку вакансий */}
       <Button
-        startIcon={<Icon name="arrow-left" size={20} />}
+        startIcon={<ArrowBackIcon />}
         onClick={() => navigate('/recruiter/vacancies')}
         sx={{ mb: 3 }}
       >
@@ -155,13 +179,15 @@ export function VacancyFormPage() {
       </Button>
 
       <Paper sx={{ p: 4 }}>
+        {/* Заголовок формы */}
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {isEditing ? 'Edit Vacancy' : 'Create New Vacancy'}
         </Typography>
-        <Typography variant="body2" color="secondary" sx={{ mb: 4 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
           {isEditing ? 'Update vacancy details' : 'Fill in the details to post a new job opening'}
         </Typography>
 
+        {/* Сообщение об ошибке */}
         {createMutation.error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             Failed to {isEditing ? 'update' : 'create'} vacancy. Please try again.
@@ -170,7 +196,7 @@ export function VacancyFormPage() {
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            {/* Title */}
+            {/* Заголовок вакансии */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -182,7 +208,7 @@ export function VacancyFormPage() {
               />
             </Grid>
 
-            {/* Description */}
+            {/* Описание вакансии */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -196,7 +222,7 @@ export function VacancyFormPage() {
               />
             </Grid>
 
-            {/* Industry & Work Format */}
+            {/* Отрасль и формат работы */}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -231,7 +257,7 @@ export function VacancyFormPage() {
               </TextField>
             </Grid>
 
-            {/* Location */}
+            {/* Местоположение */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -242,7 +268,7 @@ export function VacancyFormPage() {
               />
             </Grid>
 
-            {/* Salary Range */}
+            {/* Диапазон заработной платы */}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -250,7 +276,7 @@ export function VacancyFormPage() {
                 label="Minimum Salary (USD/year)"
                 value={formData.salary_min || ''}
                 onChange={(e) => handleInputChange('salary_min', parseFloat(e.target.value) || 0)}
-                inputProps={{ min: 0 }}
+                InputProps={{ inputProps: { min: 0 } }}
               />
             </Grid>
 
@@ -261,11 +287,11 @@ export function VacancyFormPage() {
                 label="Maximum Salary (USD/year)"
                 value={formData.salary_max || ''}
                 onChange={(e) => handleInputChange('salary_max', parseFloat(e.target.value) || 0)}
-                inputProps={{ min: 0 }}
+                InputProps={{ inputProps: { min: 0 } }}
               />
             </Grid>
 
-            {/* Experience */}
+            {/* Минимальный опыт работы */}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -273,27 +299,30 @@ export function VacancyFormPage() {
                 label="Minimum Experience (months)"
                 value={formData.min_experience_months || ''}
                 onChange={(e) => handleInputChange('min_experience_months', parseFloat(e.target.value) || 0)}
-                inputProps={{ min: 0 }}
+                InputProps={{ inputProps: { min: 0 } }}
                 helperText="e.g. 12 for 1 year, 24 for 2 years"
               />
             </Grid>
 
-            {/* Skills */}
+            {/* Требуемые навыки */}
             <Grid item xs={12}>
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                 Required Skills
               </Typography>
+              {/* Отображение добавленных навыков как чипов */}
               <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                 {formData.required_skills.map((skill) => (
                   <Chip
                     key={skill}
                     label={skill}
                     onDelete={() => handleRemoveSkill(skill)}
+                    deleteIcon={<DeleteIcon />}
                     color="primary"
                     variant="outlined"
                   />
                 ))}
               </Box>
+              {/* Поле для добавления нового навыка */}
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <TextField
                   size="small"
@@ -311,7 +340,7 @@ export function VacancyFormPage() {
                 <Button
                   type="button"
                   variant="outlined"
-                  startIcon={<Icon name="plus" size={20} />}
+                  startIcon={<AddIcon />}
                   onClick={handleAddSkill}
                   disabled={!skillInput.trim()}
                 >
@@ -320,13 +349,13 @@ export function VacancyFormPage() {
               </Box>
             </Grid>
 
-            {/* Actions */}
+            {/* Кнопки действий формы */}
             <Grid item xs={12}>
               <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
                 <Button
                   type="submit"
                   variant="contained"
-                  startIcon={<Icon name="save" size={20} />}
+                  startIcon={<SaveIcon />}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {createMutation.isPending || updateMutation.isPending ? (

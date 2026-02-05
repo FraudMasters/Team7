@@ -1,5 +1,8 @@
+// React хуки для управления состоянием, эффектами и колбэками
 import React, { useState, useEffect, useCallback } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -16,11 +19,21 @@ import {
   Stack,
   Button,
   Avatar,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  Refresh as RefreshIcon,
+  Person as PersonIcon,
+  TrendingUp as TrendingUpIcon,
+  Schedule as ScheduleIcon,
+  CheckCircle as CheckIcon,
+  Star as StarIcon,
+  Description as DescriptionIcon,
+  FileDownload as FileDownloadIcon,
+} from '@mui/icons-material';
 
 /**
- * Individual recruiter performance metrics
+ * Метрики производительности отдельного рекрутера
  */
 interface RecruiterPerformanceItem {
   recruiter_id: string;
@@ -34,7 +47,7 @@ interface RecruiterPerformanceItem {
 }
 
 /**
- * Recruiter performance response from backend
+ * Ответ о производительности рекрутеров с бэкенда
  */
 interface RecruiterPerformanceResponse {
   recruiters: RecruiterPerformanceItem[];
@@ -44,29 +57,29 @@ interface RecruiterPerformanceResponse {
 }
 
 /**
- * RecruiterPerformance Component Props
+ * Свойства компонента RecruiterPerformance
  */
 interface RecruiterPerformanceProps {
-  /** API endpoint URL for fetching recruiter performance data */
+  /** URL API endpoint для получения данных о производительности рекрутеров */
   apiUrl?: string;
-  /** Optional start date for filtering (ISO 8601 format) */
+  /** Опциональная начальная дата для фильтрации (формат ISO 8601) */
   startDate?: string;
-  /** Optional end date for filtering (ISO 8601 format) */
+  /** Опциональная конечная дата для фильтрации (формат ISO 8601) */
   endDate?: string;
-  /** Maximum number of recruiters to display */
+  /** Максимальное количество рекрутеров для отображения */
   limit?: number;
 }
 
 /**
- * RecruiterPerformance Component
+ * Компонент RecruiterPerformance
  *
- * Displays recruiter performance comparison in table format with:
- * - Hires, interviews conducted, resumes processed
- * - Average time-to-hire with color coding
- * - Offer acceptance rate with visual indicator
- * - Candidate satisfaction score with star rating
- * - Rank ordering by number of hires
- * - Performance insights and metrics
+ * Отображает сравнение производительности рекрутеров в табличном формате с:
+ * - Наем, проведенные интервью, обработанные резюме
+ * - Средний time-to-hire с цветовой кодировкой
+ * - Rate принятия офферов с визуальным индикатором
+ * - Оценка удовлетворенности кандидатов со звездочками
+ * - Ранжирование по количеству наймов
+ * - Инсайты и метрики производительности
  *
  * @example
  * ```tsx
@@ -88,12 +101,13 @@ const RecruiterPerformance: React.FC<RecruiterPerformanceProps> = ({
   endDate,
   limit = 20,
 }) => {
+  // Состояния для загрузки, ошибки и данных
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<RecruiterPerformanceResponse | null>(null);
 
   /**
-   * Fetch recruiter performance data from backend
+   * Загрузка данных о производительности рекрутеров с бэкенда
    */
   const fetchPerformance = async () => {
     setLoading(true);

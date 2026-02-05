@@ -16,7 +16,7 @@ import {
   Email as EmailIcon,
   Lock as LockIcon,
 } from '@mui/icons-material';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useAuth } from 'react-oidc-context';
 
 /**
  * LoginPage Component
@@ -42,7 +42,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, isLoading, error } = useAuthContext();
+  const auth = useAuth();
 
   /**
    * Get the redirect path from location state
@@ -55,7 +55,11 @@ const LoginPage: React.FC = () => {
    * Triggers OIDC redirect to Keycloak
    */
   const handleLogin = () => {
-    login();
+    // Store original path for redirect after login
+    if (location.state?.from?.pathname) {
+      sessionStorage.setItem('oidc-original-path', location.state.from.pathname);
+    }
+    auth.signinRedirect();
   };
 
   /**
@@ -70,10 +74,10 @@ const LoginPage: React.FC = () => {
    * Redirect authenticated users away from login page
    */
   React.useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (auth.user && !auth.isLoading) {
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate, from]);
+  }, [auth.user, auth.isLoading, navigate, from]);
 
   return (
     <Box
@@ -121,7 +125,7 @@ const LoginPage: React.FC = () => {
           </Box>
 
           {/* Error Alert */}
-          {error && (
+          {auth.error && (
             <Alert severity="error" sx={{ mb: 3 }}>
               Authentication failed. Please try again.
             </Alert>
@@ -199,9 +203,9 @@ const LoginPage: React.FC = () => {
               fullWidth
               variant="contained"
               size="large"
-              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
+              startIcon={auth.isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
               onClick={handleLogin}
-              disabled={isLoading}
+              disabled={auth.isLoading}
               sx={{
                 py: 1.5,
                 fontSize: '1rem',
@@ -209,7 +213,7 @@ const LoginPage: React.FC = () => {
                 textTransform: 'none',
               }}
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {auth.isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
 
             {/* Divider */}

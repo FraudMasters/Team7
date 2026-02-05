@@ -1,35 +1,47 @@
+// Импорт хуков для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для UI
 import {
-  Container,
-  Typography,
-  Box,
-  Grid,
-  Paper,
-  Card,
-  CardContent,
-  CardMedia,
-  Chip,
-  Button,
-  TextField,
-  InputAdornment,
-  Icon,
-} from '@/components/ui';
-import { PageTransition } from '../../components/ui/PageTransition';
+  Container,       // Контейнер для ограничения ширины содержимого
+  Typography,      // Компонент для текста с различными стилями
+  Box,             // Универсальный контейнер для верстки
+  Grid,            // Сетка для адаптивной верстки
+  Paper,           // Контейнер с эффектом elevated (карточка)
+  Card,            // Карточка
+  CardContent,     // Содержимое карточки
+  Chip,            // Метки/теги
+  Button,          // Кнопки
+  TextField,       // Поле ввода текста
+  InputAdornment,  // Декоративный элемент в поле ввода
+} from '@mui/material';
+// Импорт иконок из MUI
+import {
+  School as LearningIcon,
+  Search as SearchIcon,
+  PlayArrow as PlayIcon,
+  CheckCircle as CompletedIcon,
+  Schedule as DurationIcon,
+  TrendingUp as LevelIcon,
+} from '@mui/icons-material';
+// Импорт MUI компонентов
+import { PageTransition } from '@components/mui/PageTransition';
 
+// Интерфейс описывающий курс обучения
 interface Course {
   id: string;
   title: string;
   description: string;
   category: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  duration: string;
-  modules: number;
-  progress?: number;
-  completed?: boolean;
+  level: 'beginner' | 'intermediate' | 'advanced'; // Уровень сложности
+  duration: string;   // Продолжительность
+  modules: number;    // Количество модулей
+  progress?: number;  // Прогресс прохождения
+  completed?: boolean; // Завершен ли курс
   thumbnail?: string;
-  skills: string[];
+  skills: string[];   // Приобретаемые навыки
 }
 
+// Демо-данные курсов
 const mockCourses: Course[] = [
   {
     id: '1',
@@ -96,14 +108,24 @@ const mockCourses: Course[] = [
   },
 ];
 
+// Список категорий курсов
 const categories = ['All', 'Frontend', 'Backend', 'DevOps', 'Cloud', 'Data Science'];
+// Список уровней сложности
 const levels = ['All', 'beginner', 'intermediate', 'advanced'];
 
+/**
+ * Страница учебного центра
+ * Отображает доступные курсы для повышения квалификации
+ */
 export function LearningPage() {
+  // Состояние поискового запроса
   const [searchQuery, setSearchQuery] = useState('');
+  // Состояние выбранной категории
   const [selectedCategory, setSelectedCategory] = useState('All');
+  // Состояние выбранного уровня
   const [selectedLevel, setSelectedLevel] = useState('All');
 
+  // Фильтрация курсов по поиску, категории и уровню
   const filteredCourses = mockCourses.filter((course) => {
     const matchesSearch =
       searchQuery === '' ||
@@ -116,13 +138,15 @@ export function LearningPage() {
     return matchesSearch && matchesCategory && matchesLevel;
   });
 
+  // Курсы в процессе прохождения
   const inProgressCourses = mockCourses.filter((c) => c.progress && c.progress > 0 && !c.completed);
+  // Завершенные курсы
   const completedCourses = mockCourses.filter((c) => c.completed);
 
   return (
     <PageTransition>
       <Container maxWidth="xl" sx={{ py: 2 }}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <LearningIcon sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -137,7 +161,7 @@ export function LearningPage() {
           </Box>
         </Box>
 
-        {/* Stats */}
+        {/* Статистика обучения */}
         <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid item xs={4}>
             <Paper sx={{ p: 2, textAlign: 'center' }}>
@@ -171,7 +195,7 @@ export function LearningPage() {
           </Grid>
         </Grid>
 
-        {/* Search and Filters */}
+        {/* Поиск и фильтры */}
         <Paper sx={{ p: 2, mb: 4 }}>
           <TextField
             fullWidth
@@ -218,7 +242,7 @@ export function LearningPage() {
           </Box>
         </Paper>
 
-        {/* Continue Learning */}
+        {/* Курсы в процессе прохождения */}
         {inProgressCourses.length > 0 && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -235,6 +259,7 @@ export function LearningPage() {
                       position: 'relative',
                     }}
                   >
+                    {/* Индикатор прогресса */}
                     <Box
                       sx={{
                         position: 'absolute',
@@ -283,7 +308,7 @@ export function LearningPage() {
           </Box>
         )}
 
-        {/* All Courses */}
+        {/* Все курсы */}
         <Typography variant="h6" fontWeight={600} gutterBottom>
           All Courses ({filteredCourses.length})
         </Typography>
@@ -298,6 +323,7 @@ export function LearningPage() {
                   opacity: course.completed ? 0.7 : 1,
                 }}
               >
+                {/* Бейдж завершенного курса */}
                 {course.completed && (
                   <Chip
                     icon={<CompletedIcon />}
@@ -355,6 +381,7 @@ export function LearningPage() {
           ))}
         </Grid>
 
+        {/* Состояние: курсы не найдены */}
         {filteredCourses.length === 0 && (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <LearningIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />

@@ -50,8 +50,7 @@ import {
  */
 const PWAInstallPrompt: React.FC = () => {
   const { t } = useTranslation();
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const fullScreen = useMediaQuery('(max-width:600px)');
 
   // State for install prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);

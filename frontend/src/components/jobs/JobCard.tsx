@@ -1,5 +1,8 @@
+// React для создания компонента
 import React from 'react';
+// React Router для навигации
 import { Link } from 'react-router-dom';
+// Компоненты Material UI для создания интерфейса
 import {
   Card,
   CardContent,
@@ -8,21 +11,62 @@ import {
   Stack,
   Chip,
   IconButton,
-} from '@/components/ui';
-import { Icon } from '@/components/ui';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  LocationOn,
+  WorkOutline,
+  BookmarkBorder,
+  Bookmark,
+} from '@mui/icons-material';
+// Типы для работы с вакансиями
 import type { JobVacancy } from '../../hooks/useJobs';
 
+/**
+ * Свойства компонента JobCard
+ */
 interface JobCardProps {
+  /** Данные вакансии */
   job: JobVacancy;
+  /** Сохранена ли вакансия */
   saved?: boolean;
+  /** Обработчик сохранения */
   onSave?: () => void;
 }
 
+/**
+ * Карточка вакансии
+ *
+ * Отображает информацию о вакансии, включая:
+ * - Название должности и местоположение
+ * - Краткое описание (обрезанное до 2 строк)
+ * - Формат работы и требуемый опыт
+ * - Требуемые навыки
+ * - Кнопку сохранения в закладки
+ *
+ * Компонент кликабелен и переходит на страницу вакансии.
+ *
+ * @example
+ * ```tsx
+ * <JobCard
+ *   job={vacancyData}
+ *   saved={false}
+ *   onSave={() => console.log('Saved')}
+ * />
+ * ```
+ */
 export function JobCard({ job, saved = false, onSave }: JobCardProps) {
+  // Максимальное количество навыков для отображения
   const maxSkillsToShow = 4;
+  // Видимые навыки (первые N)
   const visibleSkills = job.required_skills.slice(0, maxSkillsToShow);
+  // Количество оставшихся навыков
   const remainingSkillsCount = Math.max(0, job.required_skills.length - maxSkillsToShow);
 
+  /**
+   * Обработчик клика по закладке
+   * Предотвращает переход по ссылке
+   */
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.preventDefault();
     onSave?.();
@@ -30,7 +74,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
 
   return (
     <Card
-      as={Link}
+      component={Link}
       to={`/jobs/${job.id}`}
       sx={{
         textDecoration: 'none',
@@ -44,16 +88,16 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
         },
       }}
     >
-      <CardContent sx={{ flexGrow: 1, padding: 3 }}>
-        {/* Header with title and bookmark */}
+      <CardContent sx={{ flexGrow: 1, p: 3 }}>
+        {/* Заголовок с названием и закладкой */}
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" fontWeight={600} color="primary" gutterBottom>
+            <Typography variant="h6" fontWeight={600} color="text.primary" gutterBottom>
               {job.title}
             </Typography>
             {job.location && (
-              <Stack direction="row" spacing={1} alignItems="center" color="secondary">
-                <Icon name="map-pin" size={16} />
+              <Stack direction="row" spacing={1} alignItems="center" color="text.secondary">
+                <LocationOn sx={{ fontSize: 16 }} />
                 <Typography variant="body2">{job.location}</Typography>
               </Stack>
             )}
@@ -64,14 +108,14 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
             sx={{ ml: 1 }}
             aria-label={saved ? 'Remove from saved' : 'Save job'}
           >
-            <Icon name={saved ? 'bookmark' : 'bookmark'} size={20} color={saved ? 'primary' : 'inherit'} filled={saved} />
+            {saved ? <Bookmark color="primary" /> : <BookmarkBorder />}
           </IconButton>
         </Stack>
 
-        {/* Description truncated to 2 lines */}
+        {/* Описание, обрезанное до 2 строк */}
         <Typography
           variant="body2"
-          color="secondary"
+          color="text.secondary"
           sx={{
             mb: 2,
             display: '-webkit-box',
@@ -83,16 +127,16 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
           {job.description}
         </Typography>
 
-        {/* Work format and experience */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="secondary">
-          <Icon name="briefcase" size={16} />
+        {/* Формат работы и опыт */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="text.secondary">
+          <WorkOutline sx={{ fontSize: 16 }} />
           <Typography variant="body2">
             {job.min_experience_months > 0 && `${Math.floor(job.min_experience_months / 12)}+ years`}
             {job.work_format && ` • ${job.work_format}`}
           </Typography>
         </Stack>
 
-        {/* Skills chips */}
+        {/* Чипы навыков */}
         <Stack direction="row" spacing={1} flexWrap="wrap" gap={0.5}>
           {visibleSkills.map((skill) => (
             <Chip

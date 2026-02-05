@@ -941,7 +941,7 @@ const BatchUploadPage: React.FC = () => {
                     size="large"
                     onClick={handleUpload}
                     disabled={uploading || files.length === 0}
-                    startIcon={uploading ? undefined : <Icon name="Upload" />}>
+                    startIcon={uploading ? undefined : <Icon name="Upload" />}
                     fullWidth
                     sx={{ minHeight: 48 }}
                   >

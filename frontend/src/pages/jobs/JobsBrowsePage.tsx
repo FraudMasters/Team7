@@ -1,73 +1,89 @@
+// Импорт хуков React для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для оформления интерфейса
 import {
-  Container,
-  Typography,
-  TextField,
-  Stack,
-  Grid,
-  Paper,
-  Chip,
-  FormControl,
-  Select,
-  MenuItem,
-  InputLabel,
-  CircularProgress,
-  Box,
-} from '@/components/ui';
-import { Icon } from '@/components/ui';
+  Container,      // Контейнер для ограничения ширины содержимого
+  Typography,     // Компонент для текста с различными стилями
+  TextField,      // Поле ввода текста
+  Stack,          // Контейнер для flexbox-расположения элементов
+  Grid,           // Сетка для адаптивной верстки
+  Paper,          // Контейнер с эффектом elevated (карточка)
+  Chip,           // Метки/теги
+  FormControl,    // Контейнер для элементов форм
+  Select,         // Выпадающий список
+  MenuItem,       // Пункт выпадающего списка
+  InputLabel,     // Метка поля ввода
+  CircularProgress, // Индикатор загрузки
+  Box,            // Универсальный контейнер для верстки
+} from '@mui/material';
+// Импорт иконок из MUI
+import { Search as SearchIcon, FilterList as FilterIcon } from '@mui/icons-material';
+// Импорт кастомного хука для получения данных о вакансиях
 import { useJobs } from '../../hooks/useJobs';
+// Импорт компонента карточки вакансии
 import { JobCard } from '../../components/jobs/JobCard';
 
+// Основной компонент страницы просмотра вакансий
 export function JobsBrowsePage() {
+  // Состояние для текста поиска
   const [searchTerm, setSearchTerm] = useState('');
+  // Состояние для фильтров вакансий
   const [filters, setFilters] = useState<{
-    workFormat?: string;
+    workFormat?: string; // Формат работы (удаленно/офис/гибрид)
   }>({});
 
+  // Получение данных о вакансиях с использованием кастомного хука
   const { data, isLoading, error } = useJobs();
 
+  // Фильтрация вакансий по поисковому запросу и выбранным фильтрам
   const filteredJobs = data?.vacancies.filter((job) => {
+    // Проверка совпадения поискового запроса с названием или описанием вакансии
     const matchesSearch =
       searchTerm === '' ||
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase());
 
+    // Проверка совпадения формата работы
     const matchesFormat = !filters.workFormat || job.work_format === filters.workFormat;
 
+    // Возвращаем вакансию, если она соответствует обоим критериям
     return matchesSearch && matchesFormat;
   }) ?? [];
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
+      {/* Заголовок страницы */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           Find Your Next Job
         </Typography>
-        <Typography variant="body1" color="secondary">
+        <Typography variant="body1" color="text.secondary">
           Discover opportunities matched to your skills
         </Typography>
       </Box>
 
-      {/* Search and Filters */}
+      {/* Панель поиска и фильтров */}
       <Paper
         sx={{
-          p: 2,
-          mb: 4,
+          p: 2,           // Внутренний отступ
+          mb: 4,          // Внешний отступ снизу
           display: 'flex',
-          gap: 2,
+          gap: 2,         // Расстояние между элементами
           alignItems: 'center',
-          flexWrap: 'wrap',
+          flexWrap: 'wrap', // Перенос элементов на новую строку
         }}
       >
+        {/* Поле поиска вакансий */}
         <TextField
           placeholder="Search jobs..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          inputProps={{
-            startAdornment: <Icon name="search" size={20} color="secondary" sx={{ mr: 1 }} />,
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
           }}
           sx={{ flexGrow: 1, minWidth: 200 }}
         />
+        {/* Выпадающий список для выбора формата работы */}
         <FormControl sx={{ minWidth: 150 }}>
           <InputLabel>Work Format</InputLabel>
           <Select
@@ -83,20 +99,24 @@ export function JobsBrowsePage() {
         </FormControl>
       </Paper>
 
-      {/* Loading State */}
+      {/* Отображение состояния загрузки, ошибки или списка вакансий */}
       {isLoading ? (
+        // Состояние загрузки данных
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>
       ) : error ? (
+        // Состояние ошибки при загрузке
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography color="error">Failed to load jobs</Typography>
         </Box>
       ) : filteredJobs.length === 0 ? (
+        // Состояние отсутствия вакансий
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography color="secondary">No jobs found</Typography>
+          <Typography color="text.secondary">No jobs found</Typography>
         </Box>
       ) : (
+        // Сетка с карточками вакансий
         <Grid container spacing={2}>
           {filteredJobs.map((job) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={job.id}>

@@ -156,6 +156,79 @@ export interface JobVacancy {
 }
 
 /**
+ * Vacancy create request data
+ */
+export interface VacancyCreate {
+  position: string;
+  industry?: string;
+  mandatory_requirements: string[];
+  additional_requirements?: string[];
+  experience_levels?: string[];
+  project_tasks?: string[];
+  project_description?: string[];
+}
+
+/**
+ * Vacancy update request data
+ */
+export interface VacancyUpdate {
+  position?: string;
+  industry?: string;
+  mandatory_requirements?: string[];
+  additional_requirements?: string[];
+  experience_levels?: string[];
+  project_tasks?: string[];
+  project_description?: string[];
+}
+
+/**
+ * Vacancy response data
+ */
+export interface VacancyResponse {
+  id: string;
+  uid?: string;
+  position: string;
+  industry?: string;
+  mandatory_requirements: string[];
+  additional_requirements?: string[];
+  experience_levels?: string[];
+  project_tasks?: string[];
+  project_description?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Vacancy list response with pagination
+ */
+export interface VacancyListResponse {
+  vacancies: VacancyResponse[];
+  total_count: number;
+  skip?: number;
+  limit?: number;
+}
+
+/**
+ * Vacancy bulk import request
+ */
+export interface VacancyBulkImportRequest {
+  vacancies: VacancyCreate[];
+}
+
+/**
+ * Vacancy bulk import response
+ */
+export interface VacancyBulkImportResponse {
+  imported: VacancyResponse[];
+  failed: Array<{
+    vacancy: VacancyCreate;
+    error: string;
+  }>;
+  total_imported: number;
+  total_failed: number;
+}
+
+/**
  * API error response
  */
 export interface ApiError {
@@ -1851,186 +1924,5 @@ export interface SearchHistoryResponse {
   history: SearchHistoryItem[];
   skip: number;
   limit: number;
-}
-
-// ==================== Salary Benchmarking Types ====================
-
-/**
- * Request for salary benchmark data
- */
-export interface SalaryBenchmarkRequest {
-  role: string;
-  location: string;
-  country?: string;
-  experience_level?: string;
-  industry?: string;
-  employment_type?: string;
-}
-
-/**
- * Response with salary benchmark data
- */
-export interface SalaryBenchmarkResponse {
-  role: string;
-  location: string;
-  salary_min: number;
-  salary_median: number;
-  salary_max: number;
-  salary_p90?: number;
-  currency: string;
-  sample_size?: number;
-  data_source?: string;
-  effective_date?: string;
-}
-
-/**
- * Request for salary suggestion for a candidate
- */
-export interface SalarySuggestionRequest {
-  resume_id: string;
-  vacancy_id: string;
-  include_cost_of_living?: boolean;
-  target_location?: string;
-}
-
-/**
- * Response with suggested salary range
- */
-export interface SalarySuggestionResponse {
-  resume_id: string;
-  vacancy_id: string;
-  suggested_min: number;
-  suggested_median: number;
-  suggested_max: number;
-  currency: string;
-  confidence: number;
-  factors: Record<string, unknown>;
-  market_benchmark?: SalaryBenchmarkResponse;
-}
-
-/**
- * Request to create salary history record
- */
-export interface SalaryHistoryCreate {
-  resume_id: string;
-  salary_amount: number;
-  salary_frequency?: string;
-  currency?: string;
-  effective_date: string;
-  salary_type?: string;
-  employment_type?: string;
-  job_title?: string;
-  company_name?: string;
-  location?: string;
-  country?: string;
-  bonus_amount?: number;
-  bonus_type?: string;
-  equity_value?: number;
-  equity_type?: string;
-  other_compensation?: Record<string, unknown>;
-  is_confirmed?: boolean;
-  data_source?: string;
-}
-
-/**
- * Response with salary history record
- */
-export interface SalaryHistoryResponse {
-  id: string;
-  resume_id: string;
-  salary_amount: number;
-  salary_frequency: string;
-  currency: string;
-  effective_date: string;
-  salary_type: string;
-  employment_type: string;
-  job_title?: string;
-  company_name?: string;
-  location?: string;
-  bonus_amount?: number;
-  equity_value?: number;
-  total_compensation?: number;
-  is_confirmed: boolean;
-  verification_status: string;
-  created_at: string;
-}
-
-/**
- * List of salary history records
- */
-export interface SalaryHistoryListResponse {
-  total: number;
-  history: SalaryHistoryResponse[];
-}
-
-/**
- * Single offer in comparison
- */
-export interface OfferComparisonItem {
-  salary: number;
-  location: string;
-  currency?: string;
-  bonus?: number;
-  equity?: number;
-  job_title?: string;
-  company?: string;
-}
-
-/**
- * Request to compare multiple job offers
- */
-export interface OfferComparisonRequest {
-  resume_id: string;
-  offers: OfferComparisonItem[];
-  apply_cost_of_living?: boolean;
-}
-
-/**
- * Response with offer comparison analysis
- */
-export interface OfferComparisonResponse {
-  resume_id: string;
-  offers: Array<Record<string, unknown>>;
-  recommendation: string;
-  analysis: Record<string, unknown>;
-  current_salary?: number;
-}
-
-/**
- * Request for internal equity analysis
- */
-export interface EquityAnalysisRequest {
-  vacancy_id: string;
-  include_demographics?: boolean;
-  pay_gap_threshold?: number;
-}
-
-/**
- * Pay disparity between groups
- */
-export interface EquityDisparity {
-  group: string;
-  mean_salary: number;
-  sample_size: number;
-  pay_gap: number;
-  is_fair: boolean;
-}
-
-/**
- * Response with equity analysis results
- */
-export interface EquityAnalysisResponse {
-  vacancy_id: string;
-  role: string;
-  total_candidates: number;
-  mean_salary: number;
-  median_salary: number;
-  salary_range: {
-    min: number;
-    max: number;
-  };
-  disparities: EquityDisparity[];
-  alerts: string[];
-  recommendations: string[];
 }
 

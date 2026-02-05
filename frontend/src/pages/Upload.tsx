@@ -298,7 +298,7 @@ const UploadPage: React.FC = () => {
                   <Skeleton variant="rectangular" width={160} height={40} animation="wave" />
                 </Box>
               </Box>
-            </Grid2>
+            </Grid>
 
             {/* Instructions Section Skeleton */}
             <Grid item xs={12} md={5} lg={4}>
@@ -345,8 +345,8 @@ const UploadPage: React.FC = () => {
                   animation="wave"
                 />
               </Box>
-            </Grid2>
-          </Grid2>
+            </Grid>
+          </Grid>
         </Box>
       )}
 
@@ -388,7 +388,7 @@ const UploadPage: React.FC = () => {
               onUploadingChange={handleUploadingChange}
             />
           </Paper>
-        </Grid2>
+        </Grid>
 
         {/* Instructions Section */}
         <Grid item xs={12} md={5} lg={4}>
@@ -409,8 +409,8 @@ const UploadPage: React.FC = () => {
               {t('upload.whatHappensNext.timeline')}
             </Typography>
           </Paper>
-        </Grid2>
-      </Grid2>
+        </Grid>
+      </Grid>
       </Box>
     </ErrorBoundary>
   );

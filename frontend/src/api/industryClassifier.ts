@@ -1,26 +1,26 @@
 /**
  * Industry Classifier API Client
  *
- * This module provides a typed client for communicating with the
- * industry classification backend service. Handles industry detection
- * from job titles and descriptions, as well as skill suggestions
- * based on industry context.
+ * Этот модуль предоставляет типизированный клиент для взаимодействия с
+ * backend сервисом классификации индустрии. Обрабатывает определение индустрии
+ * из должностей и описаний вакансий, а также предложения навыков
+ * на основе контекста индустрии.
  *
  * @example
  * ```ts
  * import { industryClassifier } from '@/api/industryClassifier';
  *
- * // Classify industry from job title
+ * // Классификация индустрии из должности
  * const classification = await industryClassifier.classifyIndustry({
  *   title: 'Senior Registered Nurse',
- *   description: 'Looking for an experienced RN with ICU experience...',
+ *   description: 'Ищем опытную медсестру с опытом работы в отделении интенсивной терапии...',
  * });
  *
- * // Get skill suggestions for a specific industry
+ * // Получение предложений навыков для конкретной индустрии
  * const suggestions = await industryClassifier.getSuggestions({
  *   industry: 'healthcare',
  *   title: 'Senior Registered Nurse',
- *   description: 'ICU, patient care, medical records...',
+ *   description: 'Отделение интенсивной терапии, уход за пациентами, медицинские записи...',
  *   limit: 20,
  * });
  * ```
@@ -36,29 +36,29 @@ import type {
 } from '@/types/api';
 
 /**
- * Default API configuration for industry classifier
+ * Конфигурация API по умолчанию для классификатора индустрии
  */
 const DEFAULT_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 30000, // 30 seconds for classification
+  timeout: 30000, // 30 секунд для классификации
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Industry Classifier API Client class
+ * Класс клиента API классификатора индустрии
  *
- * Provides methods for industry classification and skill suggestions
- * with proper error handling and type safety.
+ * Предоставляет методы для классификации индустрии и предложений навыков
+ * с proper обработкой ошибок и типобезопасностью.
  */
 export class IndustryClassifierClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new Industry Classifier client instance
+   * Создание нового экземпляра клиента классификатора индустрии
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = {
@@ -72,7 +72,7 @@ export class IndustryClassifierClient {
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -80,68 +80,68 @@ export class IndustryClassifierClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid request. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      422: 'Validation error. Please check your input.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Ресурс не найден.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * Classify industry from job title and optional description
+   * Классификация индустрии из должности и опционального описания
    *
-   * @param request - Classification request with title and optional description
-   * @returns Industry classification with confidence score
-   * @throws ApiError if classification fails
+   * @param request - Запрос на классификацию с должностью и опциональным описанием
+   * @returns Классификация индустрии с оценкой уверенности
+   * @throws ApiError если классификация не удалась
    *
    * @example
    * ```ts
    * const result = await industryClassifier.classifyIndustry({
    *   title: 'Senior Java Developer',
-   *   description: 'Looking for a backend developer with Spring experience...',
+   *   description: 'Ищем backend разработчика с опытом Spring...',
    * });
    * // Returns: { industry: 'tech', confidence: 0.95, ... }
    * ```
@@ -162,18 +162,18 @@ export class IndustryClassifierClient {
   }
 
   /**
-   * Get skill suggestions based on industry and job context
+   * Получение предложений навыков на основе индустрии и контекста работы
    *
-   * @param request - Suggestion request with industry, title, description, and limit
-   * @returns Skill suggestions with relevance scores
-   * @throws ApiError if suggestion fails
+   * @param request - Запрос предложений с индустрией, должностью, описанием и лимитом
+   * @returns Предложения навыков с оценками релевантности
+   * @throws ApiError если получение предложений не удалось
    *
    * @example
    * ```ts
    * const suggestions = await industryClassifier.getSuggestions({
    *   industry: 'healthcare',
    *   title: 'Senior Registered Nurse',
-   *   description: 'ICU, patient care, medical records...',
+   *   description: 'Отделение интенсивной терапии, уход за пациентами, медицинские записи...',
    *   limit: 20,
    * });
    * // Returns: { industry: 'healthcare', suggested_skills: [...], total_count: 15 }
@@ -195,11 +195,11 @@ export class IndustryClassifierClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение базового экземпляра Axios
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
    *
-   * @returns Axios instance
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -207,13 +207,13 @@ export class IndustryClassifierClient {
 }
 
 /**
- * Default industry classifier client instance
+ * Экземпляр клиента классификатора индустрии по умолчанию
  *
- * Use this singleton instance for all industry classification calls.
+ * Используйте этот singleton-экземпляр для всех вызовов классификации индустрии.
  */
 export const industryClassifier = new IndustryClassifierClient();
 
 /**
- * Export industry classifier client class for custom instances
+ * Экспорт класса клиента классификатора индустрии для создания кастомных экземпляров
  */
 export default IndustryClassifierClient;

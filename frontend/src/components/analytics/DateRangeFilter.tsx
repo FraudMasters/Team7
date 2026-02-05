@@ -1,4 +1,6 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useCallback, useEffect } from 'react';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -13,11 +15,16 @@ import {
   InputLabel,
   Select,
   MenuItem,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  DateRange as DateRangeIcon,
+  RestartAlt as ResetIcon,
+  Check as ApplyIcon,
+} from '@mui/icons-material';
 
 /**
- * Date range filter options
+ * Варианты предустановленных диапазонов дат для фильтрации аналитики
  */
 export type DateRangePreset =
   | 'last_7_days'
@@ -29,7 +36,8 @@ export type DateRangePreset =
   | 'custom';
 
 /**
- * Date range filter interface
+ * Интерфейс фильтра диапазона дат
+ * @description Содержит начальную дату, конечную дату и выбранный пресет
  */
 export interface DateRangeFilter {
   startDate: string;
@@ -38,32 +46,34 @@ export interface DateRangeFilter {
 }
 
 /**
- * DateRangeFilter Component Props
+ * Свойства компонента DateRangeFilter
+ * @description Определяет параметры для фильтрации диапазона дат
  */
 interface DateRangeFilterProps {
-  /** Callback when date range changes */
+  /** Колбэк при изменении диапазона дат */
   onDateRangeChange?: (dateRange: DateRangeFilter) => void;
-  /** Callback when apply is clicked */
+  /** Колбэк при нажатии кнопки применения */
   onApply?: (dateRange: DateRangeFilter) => void;
-  /** Initial date range values */
+  /** Начальные значения диапазона дат */
   initialDateRange?: Partial<DateRangeFilter>;
-  /** Show preset quick select buttons */
+  /** Показывать кнопки быстрого выбора пресетов */
   showPresets?: boolean;
-  /** Disabled state */
+  /** Отключенное состояние */
   disabled?: boolean;
-  /** Custom label for the filter section */
+  /** Пользовательская метка для секции фильтра */
   label?: string;
 }
 
 /**
- * Helper function to format date as ISO string (YYYY-MM-DD)
+ * Вспомогательная функция для форматирования даты в ISO строку (YYYY-MM-DD)
  */
 const formatDateAsISO = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
 /**
- * Helper function to get date range for preset
+ * Вспомогательная функция для получения диапазона дат по пресету
+ * @description Вычисляет начальную и конечную дату для указанного пресета
  */
 const getDateRangeForPreset = (preset: DateRangePreset): { startDate: string; endDate: string } => {
   const now = new Date();
@@ -108,15 +118,15 @@ const getDateRangeForPreset = (preset: DateRangePreset): { startDate: string; en
 };
 
 /**
- * DateRangeFilter Component
+ * Компонент DateRangeFilter
  *
- * Provides date range filtering for analytics with:
- * - Start and end date pickers
- * - Preset date ranges (Last 7/30/90 days, This/Last Month, This Year)
- * - Custom date range selection
- * - Apply button to trigger filter
- * - Reset to defaults
- * - Validation ensuring start date <= end date
+ * Предоставляет фильтрацию диапазона дат для аналитики с:
+ * - Выбором начальной и конечной даты
+ * - Предустановленными диапазонами дат (последние 7/30/90 дней, этот/прошлый месяц, этот год)
+ * - Выбором пользовательского диапазона дат
+ * - Кнопкой применения для запуска фильтрации
+ * - Сбросом к значениям по умолчанию
+ * - Валидацией, обеспечивающей начальная дата <= конечная дата
  *
  * @example
  * ```tsx
@@ -143,10 +153,11 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   disabled = false,
   label = 'Date Range Filter',
 }) => {
-  // Default date range is last 30 days
+  // Диапазон дат по умолчанию - последние 30 дней
   const defaultPreset: DateRangePreset = initialDateRange.preset || 'last_30_days';
   const defaultRange = getDateRangeForPreset(defaultPreset);
 
+  // Состояние для выбранного пресета, начальной даты, конечной даты и ошибки
   const [preset, setPreset] = useState<DateRangePreset>(defaultPreset);
   const [startDate, setStartDate] = useState<string>(
     initialDateRange.startDate || defaultRange.startDate
@@ -155,7 +166,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Handle preset change
+   * Обработчик изменения пресета
    */
   const handlePresetChange = useCallback(
     (event: React.ChangeEvent<{ value: unknown }>) => {
@@ -179,19 +190,19 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   );
 
   /**
-   * Handle start date change
+   * Обработчик изменения начальной даты
    */
   const handleStartDateChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newStartDate = event.target.value;
       setStartDate(newStartDate);
 
-      // Switch to custom preset when manually changing dates
+      // Переключение на пользовательский пресет при ручном изменении дат
       if (preset !== 'custom') {
         setPreset('custom');
       }
 
-      // Validate date range
+      // Валидация диапазона дат
       if (newStartDate && endDate && newStartDate > endDate) {
         setError('Start date must be before or equal to end date');
       } else {
@@ -210,7 +221,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   );
 
   /**
-   * Handle end date change
+   * Обработчик изменения конечной даты
    */
   const handleEndDateChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -241,7 +252,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   );
 
   /**
-   * Handle preset button click
+   * Обработчик нажатия кнопки пресета
    */
   const handlePresetClick = useCallback(
     (clickedPreset: DateRangePreset) => {
@@ -265,7 +276,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   );
 
   /**
-   * Handle apply button click
+   * Обработчик нажатия кнопки применения
    */
   const handleApply = useCallback(() => {
     if (error) {
@@ -282,7 +293,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   }, [preset, startDate, endDate, error, onApply]);
 
   /**
-   * Handle reset
+   * Обработчик сброса к значениям по умолчанию
    */
   const handleReset = useCallback(() => {
     const resetPreset: DateRangePreset = 'last_30_days';
@@ -303,7 +314,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
     onApply?.(resetDateRange);
   }, [onDateRangeChange, onApply]);
 
-  // Update state when initialDateRange prop changes
+  // Обновление состояния при изменении свойства initialDateRange
   useEffect(() => {
     if (initialDateRange.preset) {
       setPreset(initialDateRange.preset);
@@ -322,7 +333,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   const isValidDateRange = startDate && endDate && startDate <= endDate;
   const hasError = !!error;
 
-  // Format date for display
+  // Форматирование даты для отображения
   const formatDateDisplay = (dateString: string): string => {
     if (!dateString) return 'Not set';
     const date = new Date(dateString);
@@ -330,23 +341,24 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   };
 
   return (
-    <Paper elevation={1} css={{ padding: '24px' }}>
-      <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-        <Icon name="calendar" size={24} color="$primary" css={{ marginRight: '8px' }} />
+    <Paper elevation={1} sx={{ p: 3 }}>
+      {/* Заголовок фильтра с иконкой */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <DateRangeIcon sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
         <Typography variant="h6" fontWeight={600}>
           {label}
         </Typography>
       </Box>
-      <Divider css={{ marginBottom: '16px' }} />
+      <Divider sx={{ mb: 2 }} />
 
       <Stack spacing={3}>
-        {/* Preset Quick Select */}
+        {/* Быстрый выбор пресетов */}
         {showPresets && (
           <Box>
-            <Typography variant="subtitle2" gutterBottom css={{ marginBottom: '12px' }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
               Quick Select:
             </Typography>
-            <Stack css={{ flexDirection: { xs: 'column', sm: 'row' } }} gap={1} flexWrap="wrap">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
               <Button
                 size="small"
                 variant={preset === 'last_7_days' ? 'contained' : 'outlined'}
@@ -399,14 +411,14 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           </Box>
         )}
 
-        {/* Custom Date Range */}
+        {/* Пользовательский диапазон дат */}
         <Box>
-          <Typography variant="subtitle2" gutterBottom css={{ marginBottom: '12px' }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
             Custom Date Range:
           </Typography>
-          <Stack css={{ flexDirection: { xs: 'column', md: 'row' } }} gap={2}>
-            {/* Preset Dropdown */}
-            <FormControl size="small" css={{ minWidth: '150px' }} disabled={disabled}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            {/* Выпадающий список пресетов */}
+            <FormControl size="small" sx={{ minWidth: 150 }} disabled={disabled}>
               <InputLabel>Preset</InputLabel>
               <Select value={preset} onChange={handlePresetChange} label="Preset">
                 <MenuItem value="last_7_days">Last 7 Days</MenuItem>
@@ -419,7 +431,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               </Select>
             </FormControl>
 
-            {/* Start Date */}
+            {/* Поле начальной даты */}
             <TextField
               type="date"
               label="Start Date"
@@ -427,13 +439,13 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               onChange={handleStartDateChange}
               size="small"
               disabled={disabled}
-              inputProps={{
+              InputLabelProps={{
                 shrink: true,
               }}
               error={hasError}
             />
 
-            {/* End Date */}
+            {/* Поле конечной даты */}
             <TextField
               type="date"
               label="End Date"
@@ -441,7 +453,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               onChange={handleEndDateChange}
               size="small"
               disabled={disabled}
-              inputProps={{
+              InputLabelProps={{
                 shrink: true,
               }}
               error={hasError}
@@ -449,21 +461,21 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           </Stack>
         </Box>
 
-        {/* Error Message */}
+        {/* Сообщение об ошибке */}
         {hasError && (
           <Alert severity="error" variant="outlined">
             {error}
           </Alert>
         )}
 
-        {/* Current Filter Display */}
+        {/* Отображение активного фильтра */}
         {isValidDateRange && (
           <Box>
             <Typography variant="subtitle2" gutterBottom>
               Active Filter:
             </Typography>
             <Chip
-              icon={<Icon name="calendar" />}
+              icon={<DateRangeIcon fontSize="small" />}
               label={`${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`}
               color="primary"
               variant="outlined"
@@ -472,12 +484,12 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           </Box>
         )}
 
-        {/* Action Buttons */}
-        <Stack css={{ flexDirection: { xs: 'column', sm: 'row' } }} gap={2}>
+        {/* Кнопки действий */}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <Button
             fullWidth
             variant="contained"
-            startIcon={<Icon name="check" />}
+            startIcon={<ApplyIcon />}
             onClick={handleApply}
             disabled={disabled || !isValidDateRange}
             color="primary"
@@ -487,7 +499,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           <Button
             fullWidth
             variant="outlined"
-            startIcon={<Icon name="refresh" />}
+            startIcon={<ResetIcon />}
             onClick={handleReset}
             disabled={disabled}
             color="secondary"
@@ -496,7 +508,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           </Button>
         </Stack>
 
-        {/* Info Alert */}
+        {/* Информационное сообщение */}
         <Alert severity="info" variant="outlined">
           <Typography variant="body2">
             <strong>Tip:</strong> Use quick select buttons for common date ranges or choose custom

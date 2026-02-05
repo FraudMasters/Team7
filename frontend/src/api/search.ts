@@ -1,14 +1,14 @@
 /**
  * Candidate Search API Client
  *
- * This module provides a client for advanced candidate search with
- * full-text search, boolean operators, and multi-field filtering.
+ * Этот модуль предоставляет клиент для расширенного поиска кандидатов с
+ * полнотекстовым поиском, булевыми операторами и мульти-полевой фильтрацией.
  *
  * @example
  * ```ts
  * import { candidateSearchClient } from '@/api/search';
  *
- * // Search with query and filters
+ * // Поиск с запросом и фильтрами
  * const results = await candidateSearchClient.searchCandidates({
  *   query: 'Python AND Django',
  *   filters: {
@@ -19,7 +19,7 @@
  *   limit: 10
  * });
  *
- * // Search by skills only
+ * // Поиск только по навыкам
  * const results = await candidateSearchClient.searchCandidates({
  *   filters: {
  *     skills: ['Python', 'FastAPI'],
@@ -27,7 +27,7 @@
  *   }
  * });
  *
- * // Get search history
+ * // Получение истории поиска
  * const history = await candidateSearchClient.getSearchHistory(0, 20);
  * ```
  */
@@ -41,36 +41,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Default API configuration for candidate search client
+ * Конфигурация по умолчанию для клиента поиска кандидатов
  */
 const DEFAULT_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  timeout: 10000, // 10 секунд
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Candidate Search API Client class
+ * Класс клиента API для поиска кандидатов
  *
- * Provides methods for searching candidates with proper
- * error handling and type safety.
+ * Предоставляет методы для поиска кандидатов с proper
+ * обработкой ошибок и типобезопасностью.
  */
 export class CandidateSearchClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new CandidateSearch client instance
+   * Создание нового экземпляра клиента поиска кандидатов
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -78,69 +78,69 @@ export class CandidateSearchClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid search parameters. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      422: 'Validation error. Please check your search criteria.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверные параметры поиска. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Ресурс не найден.',
+      422: 'Ошибка валидации. Проверьте критерии поиска.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * Search for candidates with advanced filters
+   * Поиск кандидатов с расширенными фильтрами
    *
-   * Supports full-text search with boolean operators (AND, OR, NOT)
-   * and multi-field filtering by skills, experience, education, location, etc.
+   * Поддерживает полнотекстовый поиск с булевыми операторами (AND, OR, NOT)
+   * и мульти-полевую фильтрацию по навыкам, опыту, образованию, локации и т.д.
    *
-   * @param request - Search request with query, filters, pagination, and sorting
-   * @returns Search results with candidate list and metadata
-   * @throws ApiError if search fails
+   * @param request - Запрос на поиск с запросом, фильтрами, пагинацией и сортировкой
+   * @returns Результаты поиска со списком кандидатов и метаданными
+   * @throws ApiError если поиск не удался
    *
    * @example
    * ```ts
-   * // Search with boolean operators and filters
+   * // Поиск с булевыми операторами и фильтрами
    * const results = await candidateSearchClient.searchCandidates({
    *   query: 'Python AND Django',
    *   filters: {
@@ -152,7 +152,7 @@ export class CandidateSearchClient {
    *   sort_by: 'relevance'
    * });
    *
-   * // Filter by skills only
+   * // Фильтрация только по навыкам
    * const results = await candidateSearchClient.searchCandidates({
    *   filters: {
    *     skills: ['Python', 'FastAPI', 'PostgreSQL'],
@@ -160,7 +160,7 @@ export class CandidateSearchClient {
    *   }
    * });
    *
-   * // Search with match score range
+   * // Поиск с диапазоном оценки совпадения
    * const results = await candidateSearchClient.searchCandidates({
    *   filters: {
    *     min_match_score: 70,
@@ -189,26 +189,26 @@ export class CandidateSearchClient {
   }
 
   /**
-   * Get search history with pagination
+   * Получение истории поиска с пагинацией
    *
-   * Retrieves previously executed searches including query, filters,
-   * results count, and execution time. Useful for reviewing and repeating searches.
+   * Получает ранее выполненные поиски, включая запрос, фильтры,
+   * количество результатов и время выполнения. Полезно для просмотра и повторения поисков.
    *
-   * @param skip - Number of records to skip (pagination)
-   * @param limit - Maximum number of records to return
-   * @param recruiterId - Optional filter by recruiter ID
-   * @returns Search history records with pagination metadata
-   * @throws ApiError if retrieval fails
+   * @param skip - Количество записей для пропуска (пагинация)
+   * @param limit - Максимальное количество записей для возврата
+   * @param recruiterId - Опциональный фильтр по ID рекрутера
+   * @returns Записи истории поиска с метаданными пагинации
+   * @throws ApiError если получение не удалось
    *
    * @example
    * ```ts
-   * // Get recent search history
+   * // Получение недавней истории поиска
    * const history = await candidateSearchClient.getSearchHistory(0, 20);
    *
-   * // Get next page
+   * // Получение следующей страницы
    * const history = await candidateSearchClient.getSearchHistory(20, 20);
    *
-   * // Get history for specific recruiter
+   * // Получение истории для конкретного рекрутера
    * const history = await candidateSearchClient.getSearchHistory(0, 50, 'recruiter-uuid');
    * ```
    */
@@ -232,11 +232,11 @@ export class CandidateSearchClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение базового экземпляра Axios
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
    *
-   * @returns Axios instance
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -244,13 +244,13 @@ export class CandidateSearchClient {
 }
 
 /**
- * Default candidate search client instance
+ * Экземпляр клиента поиска кандидатов по умолчанию
  *
- * Use this singleton instance for all candidate search calls.
+ * Используйте этот singleton-экземпляр для всех операций поиска кандидатов.
  */
 export const candidateSearchClient = new CandidateSearchClient();
 
 /**
- * Export candidate search client class for custom instances
+ * Экспорт класса поиска кандидатов для создания кастомных экземпляров
  */
 export default CandidateSearchClient;

@@ -1,6 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import styled from '@emotion/styled';
-import Link from 'next/link';
 import { useEmotionTheme, EmotionTheme } from '../../contexts/EmotionThemeContext';
 
 /**
@@ -182,9 +182,9 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
       className,
       style,
       breadcrumbsRef,
+      ref,
       ...rest
-    ),
-    ref
+    }
   ) => {
     const { theme } = useEmotionTheme();
 

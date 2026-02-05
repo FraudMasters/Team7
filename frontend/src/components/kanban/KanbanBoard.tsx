@@ -1,31 +1,49 @@
+// React для создания компонента
 import React from 'react';
+// Библиотека drag-and-drop для kanban доски
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Box, Paper, Typography, Card, CardContent } from '@/components/ui';
+// Компоненты Material UI для создания интерфейса
+import { Box, Paper, Typography, Card, CardContent } from '@mui/material';
 
+/**
+ * Интерфейс колонки канбан доски
+ */
 export interface Column {
+  /** Уникальный идентификатор колонки */
   id: string;
+  /** Заголовок колонки */
   title: string;
+  /** Список кандидатов в колонке */
   candidates: any[];
 }
 
+/**
+ * Свойства компонента KanbanBoard
+ */
 export interface KanbanBoardProps {
+  /** Массив колонок для отображения */
   columns: Column[];
+  /** Обработчик завершения перетаскивания */
   onDragEnd: (result: DropResult) => void | Promise<void>;
 }
 
 /**
- * Simple Kanban Board Component
+ * Компонент канбан доски
  *
- * Basic drag-and-drop kanban board for candidate pipeline.
- * Uses hello-pangea/dnd for drag and drop functionality.
+ * Простая kanban доска с drag-and-drop для управления пайплайном кандидатов.
+ * Использует библиотеку hello-pangea/dnd для реализации перетаскивания.
+ *
+ * @param props - Свойства компонента KanbanBoardProps
+ * @returns React элемент
  */
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
+      {/* Контейнер для всех колонок с горизонтальной прокруткой */}
       <Box
-        css={{
+        sx={{
           display: 'flex',
-          gap: '16px',
+          gap: 2,
           overflowX: 'auto',
           height: '100%',
         }}
@@ -33,21 +51,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
         {columns.map((column) => (
           <Box
             key={column.id}
-            css={{
-              minWidth: '280px',
-              maxWidth: '320px',
+            sx={{
+              minWidth: 280,
+              maxWidth: 320,
               flex: '0 0 auto',
               display: 'flex',
               flexDirection: 'column',
             }}
           >
-            {/* Column Header */}
+            {/* Заголовок колонки с названием и количеством кандидатов */}
             <Paper
-              css={{
-                padding: '16px',
-                marginBottom: '8px',
-                backgroundColor: '$primary',
-                color: '$primaryContrastText',
+              sx={{
+                p: 2,
+                mb: 2,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
               }}
             >
               <Typography variant="h6" fontWeight={600}>
@@ -58,20 +76,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
               </Typography>
             </Paper>
 
-            {/* Column Content */}
+            {/* Область для перетаскивания карточек кандидатов */}
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => (
                 <Box
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  css={{
+                  sx={{
                     flex: 1,
-                    minHeight: '200px',
-                    backgroundColor: snapshot.isDraggingOver ? '$hover' : '$background',
-                    borderRadius: '4px',
-                    padding: '8px',
+                    minHeight: 200,
+                    bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'background.default',
+                    borderRadius: 1,
+                    p: 1,
                   }}
                 >
+                  {/* Карточки кандидатов в колонке */}
                   {column.candidates.map((candidate: any, index: number) => (
                     <Draggable
                       key={candidate.id}
@@ -83,18 +102,20 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          css={{
-                            marginBottom: '4px',
-                            boxShadow: snapshot.isDragging ? '0 4px 20px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.12)',
+                          sx={{
+                            mb: 1,
+                            boxShadow: snapshot.isDragging ? 8 : 1,
                             transform: snapshot.isDragging ? 'rotate(3deg)' : 'none',
                           }}
                         >
-                          <CardContent css={{ padding: '16px' }}>
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            {/* Имя кандидата или имя файла резюме */}
                             <Typography variant="subtitle2" fontWeight={600}>
                               {candidate.name || candidate.filename || 'Unknown'}
                             </Typography>
+                            {/* Email кандидата если доступен */}
                             {candidate.email && (
-                              <Typography variant="caption" color="secondary">
+                              <Typography variant="caption" color="text.secondary">
                                 {candidate.email}
                               </Typography>
                             )}
@@ -103,6 +124,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
                       )}
                     </Draggable>
                   ))}
+                  {/* Placeholder для корректной работы drag-and-drop */}
                   {provided.placeholder}
                 </Box>
               )}

@@ -19,7 +19,7 @@ import {
   Lock as LockIcon,
   CheckCircle as CheckIcon,
 } from '@mui/icons-material';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useAuth } from 'react-oidc-context';
 
 /**
  * Form state interface for registration
@@ -64,7 +64,7 @@ interface FormErrors {
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, isLoading } = useAuthContext();
+  const auth = useAuth();
 
   // Form state
   const [formData, setFormData] = React.useState<RegistrationForm>({
@@ -140,7 +140,7 @@ const RegisterPage: React.FC = () => {
     if (validateForm()) {
       // Trigger OIDC registration flow
       // Keycloak will handle the actual registration
-      login();
+      auth.signinRedirect();
     }
   };
 
@@ -156,10 +156,10 @@ const RegisterPage: React.FC = () => {
    * Redirect authenticated users away from registration page
    */
   React.useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (auth.user && !auth.auth.isLoading) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [auth.user, auth.auth.isLoading, navigate]);
 
   // Password strength indicator
   const getPasswordStrength = () => {
@@ -251,7 +251,7 @@ const RegisterPage: React.FC = () => {
                 onChange={handleInputChange('email')}
                 error={!!errors.email}
                 helperText={errors.email}
-                disabled={isLoading}
+                disabled={auth.isLoading}
                 InputProps={{
                   startAdornment: <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
@@ -271,7 +271,7 @@ const RegisterPage: React.FC = () => {
                 onChange={handleInputChange('password')}
                 error={!!errors.password}
                 helperText={errors.password}
-                disabled={isLoading}
+                disabled={auth.isLoading}
                 InputProps={{
                   startAdornment: <LockIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
@@ -319,7 +319,7 @@ const RegisterPage: React.FC = () => {
                 onChange={handleInputChange('confirmPassword')}
                 error={!!errors.confirmPassword}
                 helperText={errors.confirmPassword}
-                disabled={isLoading}
+                disabled={auth.isLoading}
                 InputProps={{
                   startAdornment: <LockIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
@@ -333,7 +333,7 @@ const RegisterPage: React.FC = () => {
                   checked={formData.agreeToTerms}
                   onChange={handleInputChange('agreeToTerms')}
                   color="primary"
-                  disabled={isLoading}
+                  disabled={auth.isLoading}
                 />
               }
               label={
@@ -360,9 +360,9 @@ const RegisterPage: React.FC = () => {
               fullWidth
               variant="contained"
               size="large"
-              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckIcon />}
+              startIcon={auth.isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckIcon />}
               onClick={handleRegister}
-              disabled={isLoading}
+              disabled={auth.isLoading}
               sx={{
                 py: 1.5,
                 mt: 2,
@@ -371,7 +371,7 @@ const RegisterPage: React.FC = () => {
                 textTransform: 'none',
               }}
             >
-              {isLoading ? 'Creating account...' : 'Create Account'}
+              {auth.isLoading ? 'Creating account...' : 'Create Account'}
             </Button>
 
             {/* Divider */}

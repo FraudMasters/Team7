@@ -1,5 +1,8 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -14,11 +17,16 @@ import {
   Grid,
   Chip,
   LinearProgress,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  Refresh as RefreshIcon,
+  AccessTime as ClockIcon,
+  Business as SourceIcon,
+} from '@mui/icons-material';
 
 /**
- * Source tracking item interface from backend
+ * Интерфейс элемента отслеживания источника с бэкенда
  */
 interface SourceTrackingItem {
   source_name: string;
@@ -28,7 +36,7 @@ interface SourceTrackingItem {
 }
 
 /**
- * Source tracking response from backend
+ * Ответ об отслеживании источников с бэкенда
  */
 interface SourceTrackingResponse {
   sources: SourceTrackingItem[];
@@ -36,19 +44,19 @@ interface SourceTrackingResponse {
 }
 
 /**
- * SourceTracking Component Props
+ * Свойства компонента SourceTracking
  */
 interface SourceTrackingProps {
-  /** API endpoint URL for source tracking analytics */
+  /** URL API endpoint для аналитики отслеживания источников */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
 }
 
 /**
- * Get color for source based on index
+ * Получить цвет для источника на основе индекса
  */
 const getSourceColor = (index: number): string => {
   const colors: string[] = [
@@ -65,13 +73,13 @@ const getSourceColor = (index: number): string => {
 };
 
 /**
- * SourceTracking Component
+ * Компонент SourceTracking
  *
- * Displays source tracking analytics including:
- * - Vacancies by source (job board, referral, etc.) with pie chart
- * - Percentage distribution of sources
- * - Average time-to-fill by source
- * - Total vacancies analyzed
+ * Отображает аналитику отслеживания источников включая:
+ * - Вакансии по источникам (job board, referral и т.д.) с круговой диаграммой
+ * - Процентное распределение источников
+ * - Среднее время заполнения по источникам
+ * - Общее количество проанализированных вакансий
  *
  * @example
  * ```tsx
@@ -88,12 +96,13 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
   startDate,
   endDate,
 }) => {
+  // Состояния для загрузки, ошибки и данных источников
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sourceData, setSourceData] = useState<SourceTrackingResponse | null>(null);
 
   /**
-   * Fetch source tracking data from backend
+   * Загрузка данных отслеживания источников с бэкенда
    */
   const fetchSourceTracking = async () => {
     try {
@@ -125,19 +134,19 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
   if (loading) {
     return (
       <Box
-        css={{
+        sx={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '64px 0',
+          py: 8,
         }}
       >
-        <CircularProgress size={60} css={{ marginBottom: '24px' }} />
-        <Typography variant="h6" color="secondary">
+        <CircularProgress size={60} sx={{ mb: 3 }} />
+        <Typography variant="h6" color="text.secondary">
           Loading source tracking analytics...
         </Typography>
-        <Typography variant="body2" color="secondary" css={{ marginTop: '8px' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -152,7 +161,7 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchSourceTracking} startIcon={<Icon name="refresh" />}>
+          <Button color="inherit" onClick={fetchSourceTracking} startIcon={<RefreshIcon />}>
             Retry
           </Button>
         }
@@ -190,20 +199,20 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
   return (
     <Stack spacing={3}>
       {/* Header Section */}
-      <Paper elevation={2} css={{ padding: '24px' }}>
-        <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <Box css={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Icon name="business" size={32} color="$primary" />
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SourceIcon fontSize="large" color="primary" />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 Source Tracking Analytics
               </Typography>
-              <Typography variant="body2" color="secondary">
+              <Typography variant="body2" color="text.secondary">
                 Vacancy distribution by source channel
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<Icon name="refresh" />} onClick={fetchSourceTracking} size="small">
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSourceTracking} size="small">
             Refresh
           </Button>
         </Box>
@@ -212,11 +221,11 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
         <Grid container spacing={2}>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
-                <Typography variant="h4" color="$primary" fontWeight={700}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="primary.main" fontWeight={700}>
                   {sourceData.sources.length}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Active Sources
                 </Typography>
               </CardContent>
@@ -224,11 +233,11 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
           </Grid>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
-                <Typography variant="h4" color="$success" fontWeight={700}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="success.main" fontWeight={700}>
                   {sourceData.sources[0]?.vacancy_count || 0}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Top Source Count
                 </Typography>
               </CardContent>
@@ -236,11 +245,11 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
           </Grid>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" fontWeight={700}>
                   {((sourceData.sources[0]?.percentage || 0) * 100).toFixed(1)}%
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Highest Share
                 </Typography>
               </CardContent>
@@ -248,11 +257,11 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
           </Grid>
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
-              <CardContent css={{ textAlign: 'center', padding: '8px' }}>
-                <Typography variant="h4" color="$info" fontWeight={700}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="info.main" fontWeight={700}>
                   {sourceData.total_vacancies.toLocaleString()}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Total Vacancies
                 </Typography>
               </CardContent>
@@ -262,54 +271,54 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
       </Paper>
 
       {/* Pie Chart and Details */}
-      <Paper elevation={1} css={{ padding: '24px' }}>
+      <Paper elevation={1} sx={{ p: 3 }}>
         <Grid container spacing={4}>
           {/* Pie Chart */}
-          <Grid item xs={12} md={5} css={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Grid item xs={12} md={5} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Vacancy Distribution
             </Typography>
             <Box
-              css={{
+              sx={{
                 position: 'relative',
-                width: '280px',
-                height: '280px',
-                marginTop: '16px',
+                width: 280,
+                height: 280,
+                mt: 2,
               }}
             >
               {/* Pie Chart */}
               <Box
-                css={{
+                sx={{
                   width: '100%',
                   height: '100%',
                   borderRadius: '50%',
                   background: `conic-gradient(${conicGradient})`,
                   position: 'relative',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  boxShadow: 3,
                 }}
               />
               {/* Donut Hole */}
               <Box
-                css={{
+                sx={{
                   position: 'absolute',
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  width: '140px',
-                  height: '140px',
+                  width: 140,
+                  height: 140,
                   borderRadius: '50%',
-                  backgroundColor: '$background',
+                  bgcolor: 'background.paper',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                  boxShadow: 2,
                 }}
               >
-                <Typography variant="h4" fontWeight={700} color="$primary">
+                <Typography variant="h4" fontWeight={700} color="primary.main">
                   {sourceData.total_vacancies.toLocaleString()}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Total Vacancies
                 </Typography>
               </Box>
@@ -321,31 +330,31 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Source Breakdown
             </Typography>
-            <Stack spacing={2} css={{ marginTop: '24px' }}>
+            <Stack spacing={2} sx={{ mt: 3 }}>
               {pieSegments.map((source, index) => (
                 <Card
                   key={source.source_name}
                   variant="outlined"
-                  css={{
+                  sx={{
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     '&:hover': {
                       transform: 'translateX(4px)',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      boxShadow: 2,
                     },
                   }}
                 >
-                  <CardContent css={{ padding: '16px' }}>
+                  <CardContent sx={{ py: 2 }}>
                     <Grid container spacing={2} alignItems="center">
                       {/* Source Name and Color Indicator */}
                       <Grid item xs={12} sm={4}>
-                        <Box css={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Box
-                            css={{
-                              width: '16px',
-                              height: '16px',
+                            sx={{
+                              width: 16,
+                              height: 16,
                               borderRadius: '50%',
-                              backgroundColor: source.color,
-                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                              bgcolor: source.color,
+                              boxShadow: 1,
                             }}
                           />
                           <Typography variant="subtitle1" fontWeight={600}>
@@ -356,10 +365,10 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
 
                       {/* Percentage Bar */}
                       <Grid item xs={12} sm={4}>
-                        <Box css={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Box css={{ flexGrow: 1 }}>
-                            <Box css={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <Typography variant="caption" color="secondary">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary">
                                 Share
                               </Typography>
                               <Typography variant="body2" fontWeight={600}>
@@ -369,13 +378,13 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
                             <LinearProgress
                               variant="determinate"
                               value={source.percentage * 100}
-                              css={{
-                                height: '8px',
-                                borderRadius: '4px',
-                                backgroundColor: '$hover',
+                              sx={{
+                                height: 8,
+                                borderRadius: 1,
+                                bgcolor: 'action.hover',
                                 '& .MuiLinearProgress-bar': {
-                                                  backgroundColor: source.color,
-                                                },
+                                  bgcolor: source.color,
+                                },
                               }}
                             />
                           </Box>
@@ -385,38 +394,38 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
                       {/* Time to Fill */}
                       <Grid item xs={12} sm={4}>
                         <Box
-                          css={{
+                          sx={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'flex-end',
-                            gap: '4px',
+                            gap: 0.5,
                           }}
                         >
-                          <Icon
-                            name="clock"
-                            size={16}
-                            color={
-                              source.average_time_to_fill <= 30
-                                ? '$success'
-                                : source.average_time_to_fill <= 45
-                                  ? '$warning'
-                                  : '$error'
-                            }
+                          <ClockIcon
+                            fontSize="small"
+                            sx={{
+                              color:
+                                source.average_time_to_fill <= 30
+                                  ? 'success.main'
+                                  : source.average_time_to_fill <= 45
+                                    ? 'warning.main'
+                                    : 'error.main',
+                            }}
                           />
                           <Typography
                             variant="body2"
                             fontWeight={600}
                             color={
                               source.average_time_to_fill <= 30
-                                ? '$success'
+                                ? 'success.main'
                                 : source.average_time_to_fill <= 45
-                                  ? '$warning'
-                                  : '$error'
+                                  ? 'warning.main'
+                                  : 'error.main'
                             }
                           >
                             {source.average_time_to_fill.toFixed(0)}d
                           </Typography>
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             avg fill time
                           </Typography>
                         </Box>

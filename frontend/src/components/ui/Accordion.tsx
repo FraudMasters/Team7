@@ -98,7 +98,7 @@ const StyledAccordionSummary = styled('div')<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: ${({ theme }) => theme.spacing.md} ${theme.spacing.lg};
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   user-select: none;
   transition: background-color ${({ theme }) => theme.transitions.duration.shortest}ms

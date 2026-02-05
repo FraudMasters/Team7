@@ -1,73 +1,99 @@
 /**
- * Vacancy Search API Client
+ * Vacancy API Client
  *
- * This module provides a client for advanced vacancy search with
- * full-text search, boolean operators, and multi-field filtering.
+ * Этот модуль предоставляет клиент для работы с вакансиями через микросервис Vacancy Service.
+ * Поддерживает полный цикл управления вакансиями: создание, просмотр, обновление, удаление и массовый импорт.
  *
  * @example
  * ```ts
- * import { vacancySearchClient } from '@/api/vacancies';
+ * import { vacanciesClient, VacanciesClient } from '@/api/vacancies';
  *
- * // Search with query and filters
- * const results = await vacancySearchClient.searchVacancies({
- *   query: 'software engineer',
- *   filters: {
- *     work_format: 'remote',
- *     employment_type: 'full-time',
- *     salary_min: 80000,
- *     salary_max: 120000
- *   },
- *   limit: 10
+ * // Получение списка всех вакансий
+ * const vacancies = await vacanciesClient.listVacancies();
+ *
+ * // Получение вакансии по ID
+ * const vacancy = await vacanciesClient.getVacancy('vacancy-123');
+ *
+ * // Создание новой вакансии
+ * const created = await vacanciesClient.createVacancy({
+ *   position: 'Senior React Developer',
+ *   industry: 'tech',
+ *   mandatory_requirements: ['React', 'TypeScript', 'Node.js'],
  * });
  *
- * // Search by location only
- * const results = await vacancySearchClient.searchVacancies({
- *   filters: {
- *     location: 'New York',
- *     work_format: 'hybrid'
- *   }
+ * // Обновление вакансии
+ * const updated = await vacanciesClient.updateVacancy('vacancy-123', {
+ *   position: 'Lead React Developer',
+ * });
+ *
+ * // Удаление вакансии
+ * await vacanciesClient.deleteVacancy('vacancy-123');
+ *
+ * // Массовый импорт вакансий
+ * const imported = await vacanciesClient.bulkImport({
+ *   vacancies: [
+ *     { position: 'Frontend Developer', mandatory_requirements: ['React'] },
+ *     { position: 'Backend Developer', mandatory_requirements: ['Python'] },
+ *   ],
  * });
  * ```
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import type {
-  VacancySearchRequest,
-  VacancySearchResponse,
+  JobVacancy,
   ApiError,
+  VacancyCreate,
+  VacancyUpdate,
+  VacancyResponse,
+  VacancyListResponse,
+  VacancyBulkImportRequest,
+  VacancyBulkImportResponse,
 } from '@/types/api';
 
 /**
- * Default API configuration for vacancy search client
+ * Переэкспорт типов для удобства использования
+ */
+export type {
+  VacancyCreate,
+  VacancyUpdate,
+  VacancyResponse,
+  VacancyListResponse,
+  VacancyBulkImportRequest,
+  VacancyBulkImportResponse,
+};
+
+/**
+ * Конфигурация по умолчанию для клиента вакансий
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  baseURL: import.meta.env.VITE_API_GATEWAY_URL ?? 'http://localhost:8888',
+  timeout: 10000, // 10 секунд
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Vacancy Search API Client class
+ * Класс клиента API для работы с вакансиями
  *
- * Provides methods for searching vacancies with proper
- * error handling and type safety.
+ * Предоставляет методы для CRUD-операций с вакансиями с proper
+ * обработкой ошибок и типобезопасностью.
  */
-export class VacancySearchClient {
+export class VacanciesClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new VacancySearch client instance
+   * Создание нового экземпляра клиента вакансий
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -75,110 +101,95 @@ export class VacancySearchClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid search parameters. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      422: 'Validation error. Please check your search criteria.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Вакансия не найдена.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * Search for vacancies with advanced filters
+   * Получение списка всех вакансий с пагинацией и опциональными фильтрами
    *
-   * Supports full-text search with boolean operators (AND, OR, NOT)
-   * and multi-field filtering by work format, location, salary range, employment type, etc.
-   *
-   * @param request - Search request with query, filters, pagination, and sorting
-   * @returns Search results with vacancy list and metadata
-   * @throws ApiError if search fails
+   * @param skip - Количество записей для пропуска (пагинация)
+   * @param limit - Максимальное количество записей для возврата
+   * @param industry - Опциональный фильтр по индустрии
+   * @param position - Опциональный фильтр по должности (частичное совпадение)
+   * @returns Список вакансий с метаданными пагинации
+   * @throws ApiError если получение списка не удалось
    *
    * @example
    * ```ts
-   * // Search with query and filters
-   * const results = await vacancySearchClient.searchVacancies({
-   *   query: 'software engineer',
-   *   filters: {
-   *     work_format: 'remote',
-   *     employment_type: 'full-time',
-   *     salary_min: 80000,
-   *     salary_max: 120000
-   *   },
-   *   limit: 10,
-   *   sort_by: 'date'
-   * });
+   * // Получение первых 50 вакансий
+   * const vacancies = await vacanciesClient.listVacancies(0, 50);
    *
-   * // Filter by location and work format
-   * const results = await vacancySearchClient.searchVacancies({
-   *   filters: {
-   *     location: 'New York',
-   *     work_format: 'hybrid'
-   *   }
-   * });
+   * // Фильтрация по индустрии
+   * const techVacancies = await vacanciesClient.listVacancies(0, 50, 'tech');
    *
-   * // Search with salary range only
-   * const results = await vacancySearchClient.searchVacancies({
-   *   filters: {
-   *     salary_min: 50000,
-   *     salary_max: 100000
-   *   },
-   *   sort_by: 'salary'
-   * });
+   * // Поиск по должности
+   * const reactJobs = await vacanciesClient.listVacancies(0, 50, undefined, 'React');
+   *
+   * // Пагинация
+   * const page2 = await vacanciesClient.listVacancies(50, 50);
    * ```
    */
-  async searchVacancies(request: VacancySearchRequest = {}): Promise<VacancySearchResponse> {
+  async listVacancies(
+    skip: number = 0,
+    limit: number = 100,
+    industry?: string,
+    position?: string
+  ): Promise<VacancyListResponse> {
     try {
-      const response: AxiosResponse<VacancySearchResponse> = await this.client.post(
-        '/api/vacancies/search',
-        {
-          query: request.query ?? null,
-          filters: request.filters ?? null,
-          skip: request.skip ?? 0,
-          limit: request.limit ?? 100,
-          sort_by: request.sort_by ?? 'date',
-        }
+      const params: Record<string, number | string> = { skip, limit };
+      if (industry) params.industry = industry;
+      if (position) params.position = position;
+
+      const response: AxiosResponse<VacancyListResponse> = await this.client.get(
+        '/api/vacancies',
+        { params }
       );
       return response.data;
     } catch (error) {
@@ -187,11 +198,163 @@ export class VacancySearchClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение вакансии по ID
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * @param id - ID вакансии
+   * @returns Данные вакансии
+   * @throws ApiError если вакансия не найдена
    *
-   * @returns Axios instance
+   * @example
+   * ```ts
+   * const vacancy = await vacanciesClient.getVacancy('vacancy-123');
+   * console.log(vacancy.position, vacancy.mandatory_requirements);
+   * ```
+   */
+  async getVacancy(id: string): Promise<VacancyResponse> {
+    try {
+      const response: AxiosResponse<VacancyResponse> = await this.client.get(
+        `/api/vacancies/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Создание новой вакансии
+   *
+   * @param data - Данные для создания вакансии
+   * @returns Созданная вакансия с присвоенным ID
+   * @throws ApiError если создание не удалось
+   *
+   * @example
+   * ```ts
+   * const created = await vacanciesClient.createVacancy({
+   *   position: 'Senior React Developer',
+   *   industry: 'tech',
+   *   mandatory_requirements: ['React', 'TypeScript', 'Node.js'],
+   *   additional_requirements: ['GraphQL', 'Docker'],
+   *   experience_levels: ['Senior', 'Lead'],
+   * });
+   * ```
+   */
+  async createVacancy(data: VacancyCreate): Promise<VacancyResponse> {
+    try {
+      const response: AxiosResponse<VacancyResponse> = await this.client.post(
+        '/api/vacancies',
+        data
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Обновление существующей вакансии
+   *
+   * @param id - ID вакансии
+   * @param data - Данные для обновления (все поля опциональны)
+   * @returns Обновленная вакансия
+   * @throws ApiError если обновление не удалось
+   *
+   * @example
+   * ```ts
+   * const updated = await vacanciesClient.updateVacancy('vacancy-123', {
+   *   position: 'Lead React Developer',
+   *   mandatory_requirements: ['React', 'TypeScript', 'Node.js', 'GraphQL'],
+   * });
+   * ```
+   */
+  async updateVacancy(id: string, data: VacancyUpdate): Promise<VacancyResponse> {
+    try {
+      const response: AxiosResponse<VacancyResponse> = await this.client.put(
+        `/api/vacancies/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Удаление вакансии
+   *
+   * @param id - ID вакансии
+   * @throws ApiError если удаление не удалось
+   *
+   * @example
+   * ```ts
+   * await vacanciesClient.deleteVacancy('vacancy-123');
+   * ```
+   */
+  async deleteVacancy(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/vacancies/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Массовый импорт вакансий
+   *
+   * Позволяет создать несколько вакансий за один запрос.
+   * Возвращает результаты импорта с разделением на успешные и неудачные.
+   *
+   * @param request - Запрос с массивом вакансий для импорта
+   * @returns Результаты импорта с подсчетом успешных и неудачных
+   * @throws ApiError если импорт не удалось выполнить
+   *
+   * @example
+   * ```ts
+   * const result = await vacanciesClient.bulkImport({
+   *   vacancies: [
+   *     {
+   *       position: 'Frontend Developer',
+   *       industry: 'tech',
+   *       mandatory_requirements: ['React', 'TypeScript'],
+   *     },
+   *     {
+   *       position: 'Backend Developer',
+   *       industry: 'tech',
+   *       mandatory_requirements: ['Python', 'Django', 'PostgreSQL'],
+   *     },
+   *     {
+   *       position: 'DevOps Engineer',
+   *       industry: 'tech',
+   *       mandatory_requirements: ['Docker', 'Kubernetes', 'AWS'],
+   *     },
+   *   ],
+   * });
+   *
+   * console.log(`Импортировано: ${result.total_imported}`);
+   * console.log(`Ошибок: ${result.total_failed}`);
+   * result.failed.forEach(({ vacancy, error }) => {
+   *   console.error(`Ошибка для ${vacancy.position}: ${error}`);
+   * });
+   * ```
+   */
+  async bulkImport(request: VacancyBulkImportRequest): Promise<VacancyBulkImportResponse> {
+    try {
+      const response: AxiosResponse<VacancyBulkImportResponse> = await this.client.post(
+        '/api/vacancies/bulk',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Получение базового экземпляра Axios
+   *
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
+   *
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -199,13 +362,13 @@ export class VacancySearchClient {
 }
 
 /**
- * Default vacancy search client instance
+ * Экземпляр клиента вакансий по умолчанию
  *
- * Use this singleton instance for all vacancy search calls.
+ * Используйте этот singleton-экземпляр для всех операций с вакансиями.
  */
-export const vacancySearchClient = new VacancySearchClient();
+export const vacanciesClient = new VacanciesClient();
 
 /**
- * Export vacancy search client class for custom instances
+ * Экспорт класса вакансий для создания кастомных экземпляров
  */
-export default VacancySearchClient;
+export default VacanciesClient;

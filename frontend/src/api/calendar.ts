@@ -7,7 +7,7 @@ import type {
   AvailabilityCheckRequest,
   AvailabilityCheckResponse,
   ApiError,
-} from '@/types/api'; posed
+} from '@/types/api';
 
 export interface CalendarConnectionFilters {
   recruiter_id?: string;

@@ -1,27 +1,27 @@
 /**
  * Candidate Notes API Client
  *
- * This module provides a client for managing candidate notes and comments,
- * including creating, reading, updating, and deleting collaborative notes.
+ * Этот модуль предоставляет клиент для управления заметками и комментариями кандидата,
+ * включая создание, чтение, обновление и удаление совместных заметок.
  *
  * @example
  * ```ts
  * import { candidateNotesClient } from '@/api/candidateNotes';
  *
- * // List all notes for a candidate
+ * // Получение всех заметок для кандидата
  * const notes = await candidateNotesClient.listNotes('resume-123');
  *
- * // Create a new note
+ * // Создание новой заметки
  * const newNote = await candidateNotesClient.createNote({
  *   resume_id: 'resume-123',
- *   content: 'Great candidate, strong technical skills',
+ *   content: 'Отличный кандидат, сильные технические навыки',
  *   recruiter_id: 'recruiter-123',
  *   is_private: false
  * });
  *
- * // Update a note
+ * // Обновление заметки
  * const updated = await candidateNotesClient.updateNote('note-id', {
- *   content: 'Updated note content',
+ *   content: 'Обновленное содержание заметки',
  *   is_private: true
  * });
  * ```
@@ -37,36 +37,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Default API configuration for candidate notes client
+ * Конфигурация по умолчанию для клиента заметок кандидата
  */
 const DEFAULT_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  timeout: 10000, // 10 секунд
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Candidate Notes API Client class
+ * Класс клиента API для работы с заметками кандидата
  *
- * Provides methods for managing candidate notes with proper
- * error handling and type safety.
+ * Предоставляет методы для управления заметками кандидата с proper
+ * обработкой ошибок и типобезопасностью.
  */
 export class CandidateNotesClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new CandidateNotes client instance
+   * Создание нового экземпляра клиента заметок кандидата
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -74,69 +74,69 @@ export class CandidateNotesClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid request. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      409: 'A conflict occurred with the existing note.',
-      422: 'Validation error. Please check your input.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Ресурс не найден.',
+      409: 'Конфликт с существующей заметкой.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * Create a candidate note
+   * Создание заметки кандидата
    *
-   * @param request - Create request with note details
-   * @returns Created candidate note
-   * @throws ApiError if creation fails
+   * @param request - Запрос на создание с деталями заметки
+   * @returns Созданная заметка кандидата
+   * @throws ApiError если создание не удалось
    *
    * @example
    * ```ts
    * const note = await candidateNotesClient.createNote({
    *   resume_id: 'resume-123',
-   *   content: 'Great candidate, strong technical skills',
+   *   content: 'Отличный кандидат, сильные технические навыки',
    *   recruiter_id: 'recruiter-123',
    *   is_private: false
    * });
@@ -155,23 +155,23 @@ export class CandidateNotesClient {
   }
 
   /**
-   * List candidate notes with optional filters
+   * Получение списка заметок кандидата с опциональными фильтрами
    *
-   * @param resumeId - Optional resume ID filter
-   * @param isPrivate - Optional private status filter
-   * @param recruiterId - Optional recruiter (author) ID filter
-   * @returns List of candidate notes
-   * @throws ApiError if listing fails
+   * @param resumeId - Опциональный фильтр по ID резюме
+   * @param isPrivate - Опциональный фильтр по приватному статусу
+   * @param recruiterId - Опциональный фильтр по ID рекрутера (автора)
+   * @returns Список заметок кандидата
+   * @throws ApiError если получение списка не удалось
    *
    * @example
    * ```ts
-   * // Get all notes for a candidate
+   * // Получение всех заметок для кандидата
    * const notes = await candidateNotesClient.listNotes('resume-123');
    *
-   * // Get only public notes
+   * // Получение только публичных заметок
    * const publicNotes = await candidateNotesClient.listNotes('resume-123', false);
    *
-   * // Get all notes by a specific recruiter
+   * // Получение всех заметок конкретного рекрутера
    * const myNotes = await candidateNotesClient.listNotes(undefined, undefined, 'recruiter-123');
    * ```
    */
@@ -197,11 +197,11 @@ export class CandidateNotesClient {
   }
 
   /**
-   * Get a specific candidate note by ID
+   * Получение конкретной заметки кандидата по ID
    *
-   * @param noteId - Candidate note ID
-   * @returns Candidate note details
-   * @throws ApiError if not found
+   * @param noteId - ID заметки кандидата
+   * @returns Детали заметки кандидата
+   * @throws ApiError если заметка не найдена
    *
    * @example
    * ```ts
@@ -220,17 +220,17 @@ export class CandidateNotesClient {
   }
 
   /**
-   * Update a candidate note
+   * Обновление заметки кандидата
    *
-   * @param noteId - Candidate note ID
-   * @param request - Update request with fields to modify
-   * @returns Updated candidate note
-   * @throws ApiError if update fails
+   * @param noteId - ID заметки кандидата
+   * @param request - Запрос на обновление с полями для изменения
+   * @returns Обновленная заметка кандидата
+   * @throws ApiError если обновление не удалось
    *
    * @example
    * ```ts
    * const updated = await candidateNotesClient.updateNote('note-uuid', {
-   *   content: 'Updated note content',
+   *   content: 'Обновленное содержание заметки',
    *   is_private: true
    * });
    * ```
@@ -251,10 +251,10 @@ export class CandidateNotesClient {
   }
 
   /**
-   * Delete a candidate note
+   * Удаление заметки кандидата
    *
-   * @param noteId - Candidate note ID
-   * @throws ApiError if deletion fails
+   * @param noteId - ID заметки кандидата
+   * @throws ApiError если удаление не удалось
    *
    * @example
    * ```ts
@@ -270,11 +270,11 @@ export class CandidateNotesClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение базового экземпляра Axios
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
    *
-   * @returns Axios instance
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -282,13 +282,13 @@ export class CandidateNotesClient {
 }
 
 /**
- * Default candidate notes client instance
+ * Экземпляр клиента заметок кандидата по умолчанию
  *
- * Use this singleton instance for all candidate notes calls.
+ * Используйте этот singleton-экземпляр для всех операций с заметками кандидата.
  */
 export const candidateNotesClient = new CandidateNotesClient();
 
 /**
- * Export candidate notes client class for custom instances
+ * Экспорт класса заметок кандидата для создания кастомных экземпляров
  */
 export default CandidateNotesClient;

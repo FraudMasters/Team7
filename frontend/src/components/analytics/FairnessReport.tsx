@@ -1,4 +1,6 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -22,9 +24,24 @@ import {
   TableRow,
   IconButton,
   Tooltip,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  Refresh as RefreshIcon,
+  Balance as FairnessIcon,
+  CheckCircle as CheckIcon,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  TrendingUp as TrendUpIcon,
+  TrendingDown as TrendDownIcon,
+  Info as InfoIcon,
+  Download as DownloadIcon,
+  DateRange as DateIcon,
+  Assessment as ReportIcon,
+} from '@mui/icons-material';
+// API клиент для получения данных о fairness
 import { fairness } from '@/api/fairness';
+// Типы API для типизации данных
 import type {
   BiasReport,
   FairnessMetric,
@@ -32,7 +49,7 @@ import type {
 } from '@/types/api';
 
 /**
- * Demographic breakdown data
+ * Данные демографического распределения
  */
 interface DemographicBreakdown {
   attribute: string;
@@ -46,7 +63,7 @@ interface DemographicBreakdown {
 }
 
 /**
- * Fairness chart data point
+ * Точка данных графика fairness
  */
 interface FairnessChartData {
   label: string;
@@ -56,23 +73,24 @@ interface FairnessChartData {
 }
 
 /**
- * FairnessReport Component Props
+ * Свойства компонента FairnessReport
+ * @description Определяет параметры для генерации отчета о fairness
  */
 interface FairnessReportProps {
-  /** Model name to generate report for */
+  /** Имя модели для генерации отчета */
   modelName?: string;
-  /** Model version */
+  /** Версия модели */
   modelVersion?: string;
-  /** Report type */
+  /** Тип отчета */
   reportType?: string;
-  /** API endpoint URL */
+  /** URL API endpoint */
   apiUrl?: string;
-  /** Callback when report data changes */
+  /** Колбэк при изменении данных отчета */
   onReportChange?: (report: BiasReport) => void;
 }
 
 /**
- * Get severity color for display
+ * Получить цвет серьезности для отображения
  */
 function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | 'info' {
   switch (severity.toLowerCase()) {
@@ -90,25 +108,25 @@ function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | '
 }
 
 /**
- * Get severity icon component
+ * Получить компонент иконки серьезности
  */
 function getSeverityIcon(severity: string) {
   switch (severity.toLowerCase()) {
     case 'none':
     case 'low':
-      return <Icon name="check-circle" size={20} />;
+      return <CheckIcon />;
     case 'medium':
-      return <Icon name="alert-triangle" size={20} />;
+      return <WarningIcon />;
     case 'high':
     case 'critical':
-      return <Icon name="alert-circle" size={20} />;
+      return <ErrorIcon />;
     default:
-      return <Icon name="info" size={20} />;
+      return <InfoIcon />;
   }
 }
 
 /**
- * Format metric type for display
+ * Форматирование типа метрики для отображения
  */
 function formatMetricType(metricType: string): string {
   return metricType
@@ -118,13 +136,13 @@ function formatMetricType(metricType: string): string {
 }
 
 /**
- * FairnessReport Component
+ * Компонент FairnessReport
  *
- * Displays detailed fairness analysis reports including:
- * - Demographic breakdown by protected attribute
- * - Fairness metric charts with thresholds
- * - Bias detection alerts and recommendations
- * - Historical trend data
+ * Отображает подробные отчеты об анализе fairness включая:
+ * - Демографическое распределение по защищаемым атрибутам
+ * - Графики метрик fairness с порогами
+ * - Оповещения об обнаружении bias и рекомендации
+ * - Данные исторических трендов
  *
  * @example
  * ```tsx
@@ -146,6 +164,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
   reportType = 'demographic_analysis',
   onReportChange,
 }) => {
+  // Состояния для загрузки, генерации, ошибки, отчета, метрик, оповещений и демографических данных
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +174,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
   const [demographicData, setDemographicData] = useState<DemographicBreakdown[]>([]);
 
   /**
-   * Fetch report data from backend
+   * Загрузка данных отчета с бэкенда
    */
   const fetchReportData = async () => {
     setLoading(true);
@@ -192,7 +211,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
       });
 
       if (reports.reports.length > 0) {
-        setReport(reports.reports[0]!]);
+        setReport(reports.reports[0]!);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load fairness report';
@@ -287,10 +306,10 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="secondary">
+        <Typography variant="h6" color="text.secondary">
           Loading Fairness Report...
         </Typography>
-        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           Analyzing demographic data and fairness metrics
         </Typography>
       </Box>
@@ -305,7 +324,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchReportData} startIcon={<Icon name="refresh-cw" size={16} />}>
+          <Button color="inherit" onClick={fetchReportData} startIcon={<RefreshIcon />}>
             Retry
           </Button>
         }
@@ -330,26 +349,29 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
             {data.label}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Typography variant="body2" fontWeight={600} color={color}>
+            <Typography variant="body2" fontWeight={600} color={`${color}.main`}>
               {(data.value * 100).toFixed(1)}%
             </Typography>
             {data.acceptable ? (
-              <Icon name="check-circle" size={16} color="success" />
+              <CheckIcon color="success" fontSize="small" />
             ) : (
-              <Icon name="alert-triangle" size={16} color="error" />
+              <WarningIcon color="error" fontSize="small" />
             )}
           </Box>
         </Box>
         <LinearProgress
           variant="determinate"
           value={percentage}
-          color={color}
           sx={{
             height: 10,
             borderRadius: 5,
+            backgroundColor: `${color}.main`,
+            '& .MuiLinearProgress-bar': {
+              backgroundColor: data.acceptable ? '#4caf50' : '#f44336',
+            },
           }}
         />
-        <Typography variant="caption" color="secondary" sx={{ mt: 0.5, display: 'block' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
           Threshold: {(data.threshold * 100).toFixed(1)}%
         </Typography>
       </Box>
@@ -362,12 +384,12 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Icon name="file-text" size={32} color="primary" />
+            <ReportIcon color="primary" sx={{ fontSize: 32 }} />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 Fairness Analysis Report
               </Typography>
-              <Typography variant="caption" color="secondary">
+              <Typography variant="caption" color="text.secondary">
                 Model: {modelName} {modelVersion ? `(${modelVersion})` : ''}
               </Typography>
             </Box>
@@ -375,7 +397,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="outlined"
-              startIcon={<Icon name="refresh-cw" size={16} />}
+              startIcon={<RefreshIcon />}
               onClick={fetchReportData}
               size="small"
             >
@@ -383,7 +405,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
             </Button>
             <Button
               variant="contained"
-              startIcon={generating ? <CircularProgress size={16} /> : <Icon name="file-text" size={16} />}
+              startIcon={generating ? <CircularProgress size={16} /> : <ReportIcon />}
               onClick={generateReport}
               disabled={generating}
               size="small"
@@ -426,11 +448,11 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={600} gutterBottom>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Icon name="balance" size={20} />
+              <FairnessIcon />
               Demographic Breakdown
             </Box>
           </Typography>
-          <Typography variant="body2" color="secondary" paragraph>
+          <Typography variant="body2" color="text.secondary" paragraph>
             Analysis of candidate distribution and outcomes across protected attributes
           </Typography>
           <Divider sx={{ my: 2 }} />
@@ -487,11 +509,11 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={600} gutterBottom>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Icon name="trending-up" size={20} />
+              <TrendUpIcon />
               Fairness Metrics
             </Box>
           </Typography>
-          <Typography variant="body2" color="secondary" paragraph>
+          <Typography variant="body2" color="text.secondary" paragraph>
             Key fairness indicators compared to acceptable thresholds
           </Typography>
           <Divider sx={{ my: 2 }} />
@@ -507,7 +529,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
                     key={metric.metric_id}
                     variant="outlined"
                     sx={{
-                      borderColor: metric.is_acceptable ? 'success' : 'error',
+                      borderColor: metric.is_acceptable ? 'success.main' : 'error.main',
                     }}
                   >
                     <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
@@ -516,7 +538,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
                           <Typography variant="body2" fontWeight={600}>
                             {formatMetricType(metric.metric_type)}
                           </Typography>
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             {metric.protected_attribute}
                           </Typography>
                         </Box>
@@ -524,11 +546,11 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
                           <Typography
                             variant="body2"
                             fontWeight={600}
-                            color={metric.is_acceptable ? 'success' : 'error'}
+                            color={metric.is_acceptable ? 'success.main' : 'error.main'}
                           >
                             {metric.metric_value.toFixed(3)}
                           </Typography>
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             thresh: {metric.threshold.toFixed(3)}
                           </Typography>
                         </Box>
@@ -564,11 +586,11 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={600} gutterBottom>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Icon name="alert-triangle" size={20} />
+              <WarningIcon />
               Alerts and Recommendations
             </Box>
           </Typography>
-          <Typography variant="body2" color="secondary" paragraph>
+          <Typography variant="body2" color="text.secondary" paragraph>
             {alerts.filter((a) => !a.acknowledged).length} unacknowledged alerts requiring attention
           </Typography>
           <Divider sx={{ my: 2 }} />
@@ -579,14 +601,14 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
                 key={alert.alert_id}
                 variant="outlined"
                 sx={{
-                  borderColor: getSeverityColor(alert.severity),
+                  borderColor: `${getSeverityColor(alert.severity)}.main`,
                   borderLeft: 4,
-                  borderLeftColor: getSeverityColor(alert.severity),
+                  borderLeftColor: `${getSeverityColor(alert.severity)}.main`,
                 }}
               >
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
-                    <Box sx={{ mr: 1, mt: 0.5, color: getSeverityColor(alert.severity) }}>
+                    <Box sx={{ mr: 1, mt: 0.5, color: `${getSeverityColor(alert.severity)}.main` }}>
                       {getSeverityIcon(alert.severity)}
                     </Box>
                     <Box sx={{ flex: 1 }}>
@@ -600,19 +622,19 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
                           color={getSeverityColor(alert.severity)}
                         />
                       </Box>
-                      <Typography variant="body2" color="secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
                         {alert.description}
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
-                        <Typography variant="caption" color="secondary">
+                        <Typography variant="caption" color="text.secondary">
                           Model: <strong>{alert.model_name}</strong>
                         </Typography>
-                        <Typography variant="caption" color="secondary">
+                        <Typography variant="caption" color="text.secondary">
                           Attribute: <strong>{alert.protected_attribute}</strong>
                         </Typography>
                       </Box>
                       <Box sx={{ mt: 1 }}>
-                        <Typography variant="caption" color="info">
+                        <Typography variant="caption" color="info.main">
                           💡 <strong>Recommendation:</strong> {alert.recommendation}
                         </Typography>
                       </Box>
@@ -630,7 +652,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={600} gutterBottom>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Icon name="info" size={20} />
+              <InfoIcon />
               Analysis Recommendations
             </Box>
           </Typography>
@@ -638,7 +660,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
 
           <Stack spacing={2}>
             {report.recommendations.map((recommendation, idx) => (
-              <Alert key={idx} severity="info" icon={<Icon name="info" size={20} />}>
+              <Alert key={idx} severity="info" icon={<InfoIcon />}>
                 <Typography variant="body2">{recommendation}</Typography>
               </Alert>
             ))}
@@ -649,16 +671,16 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
       {/* Empty State */}
       {demographicData.length === 0 && metrics.length === 0 && alerts.length === 0 && !report && (
         <Paper elevation={2} sx={{ p: 4, textAlign: 'center' }}>
-          <Icon name="balance" size={60} color="muted" style={{ marginBottom: '16px' }} />
-          <Typography variant="h6" color="secondary" gutterBottom>
+          <FairnessIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
             No Fairness Data Available
           </Typography>
-          <Typography variant="body2" color="secondary" gutterBottom>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
             Generate a fairness report to analyze demographic breakdown and bias metrics.
           </Typography>
           <Button
             variant="contained"
-            startIcon={generating ? <CircularProgress size={16} /> : <Icon name="file-text" size={16} />}
+            startIcon={generating ? <CircularProgress size={16} /> : <ReportIcon />}
             onClick={generateReport}
             disabled={generating}
             sx={{ mt: 2 }}

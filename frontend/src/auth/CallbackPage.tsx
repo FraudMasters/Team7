@@ -4,6 +4,43 @@ import { Box, Container, CircularProgress, Typography, Paper } from '@mui/materi
 import { useAuth } from 'react-oidc-context';
 
 /**
+ * Get user roles from the OIDC token
+ * Roles can be in different locations in Keycloak tokens:
+ * - realm_access.roles - realm-level roles
+ * - resource_access.{client}.roles - client-level roles
+ * - profile.roles - user profile roles
+ */
+const getUserRoles = (auth: any): string[] => {
+  // Try to get roles from various locations in the token/user info
+  const roles = new Set<string>();
+
+  // 1. Check realm_access.roles (most common in Keycloak)
+  const realmAccess = auth.user?.profile?.realm_access;
+  if (realmAccess?.roles && Array.isArray(realmAccess.roles)) {
+    realmAccess.roles.forEach((role: string) => roles.add(role));
+  }
+
+  // 2. Check resource_access for client-specific roles
+  const resourceAccess = auth.user?.profile?.resource_access;
+  if (resourceAccess) {
+    Object.keys(resourceAccess).forEach((client) => {
+      const clientRoles = resourceAccess[client]?.roles;
+      if (clientRoles && Array.isArray(clientRoles)) {
+        clientRoles.forEach((role: string) => roles.add(role));
+      }
+    });
+  }
+
+  // 3. Check direct profile.roles
+  const profileRoles = auth.user?.profile?.roles;
+  if (profileRoles && Array.isArray(profileRoles)) {
+    profileRoles.forEach((role: string) => roles.add(role));
+  }
+
+  return Array.from(roles);
+};
+
+/**
  * CallbackPage Component
  *
  * Handles the OIDC authentication callback from Keycloak.
@@ -13,7 +50,10 @@ import { useAuth } from 'react-oidc-context';
  * The page:
  * 1. Processes the authorization code from Keycloak
  * 2. Exchanges it for JWT tokens (handled by react-oidc-context)
- * 3. Redirects to the home page or originally requested page
+ * 3. Redirects to the appropriate page based on user role:
+ *    - recruiter → /recruiter/dashboard
+ *    - job_seeker → /jobs
+ *    - no role → /jobs (default)
  *
  * This component must be mounted at the /callback route to match
  * the redirect_uri configured in the OIDC settings.
@@ -34,9 +74,8 @@ const CallbackPage: React.FC = () => {
      * When the user is redirected back from Keycloak with an authorization code,
      * react-oidc-context automatically exchanges it for tokens.
      *
-     * We wait for the authentication to complete, then redirect to the home page.
-     * In a more sophisticated implementation, we could redirect to the page
-     * the user originally tried to access (stored in session storage).
+     * We wait for the authentication to complete, then redirect to the
+     * appropriate page based on user role.
      */
     const handleCallback = async () => {
       try {
@@ -54,10 +93,27 @@ const CallbackPage: React.FC = () => {
         }
 
         if (auth.user) {
-          // Authentication succeeded - redirect to home
-          // In production, you might redirect to the original destination
+          // Authentication succeeded - determine redirect based on role
+          const roles = getUserRoles(auth);
+
+          console.log('User roles:', roles);
+
+          // Get original path if stored (from protected route redirect)
           const originalPath = sessionStorage.getItem('oidc-original-path');
-          navigate(originalPath || '/', { replace: true });
+
+          // Determine redirect based on role
+          let redirectPath = '/jobs'; // Default for job seekers
+
+          if (roles.includes('admin')) {
+            // Admin users go to recruiter dashboard (they have full access)
+            redirectPath = originalPath || '/recruiter/dashboard';
+          } else if (roles.includes('recruiter')) {
+            redirectPath = originalPath || '/recruiter/dashboard';
+          } else if (roles.includes('job_seeker')) {
+            redirectPath = originalPath || '/jobs';
+          }
+
+          navigate(redirectPath, { replace: true });
           sessionStorage.removeItem('oidc-original-path');
         } else {
           // No user yet - might still be loading

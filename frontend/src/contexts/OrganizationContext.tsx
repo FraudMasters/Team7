@@ -120,21 +120,34 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({
       let targetOrgId = organizationId;
 
       if (!targetOrgId) {
-        // Get first active organization
-        const orgsResponse = await axios.get<{ organizations: OrganizationData[]; total_count: number }>(
-          '/api/organizations/',
-          { params: { is_active: true, limit: 1 } }
-        );
+        try {
+          // Get first active organization
+          const orgsResponse = await axios.get<{ organizations: OrganizationData[]; total_count: number }>(
+            '/api/organizations/',
+            { params: { is_active: true, limit: 1 } }
+          );
 
-        if (orgsResponse.data.organizations && orgsResponse.data.organizations.length > 0) {
-          targetOrgId = orgsResponse.data.organizations[0].id;
-          setOrganization(orgsResponse.data.organizations[0]);
-        } else {
-          // No organization found
-          setOrganization(null);
-          setBranding(null);
-          setLoading(false);
-          return;
+          if (orgsResponse.data.organizations && orgsResponse.data.organizations.length > 0) {
+            targetOrgId = orgsResponse.data.organizations[0].id;
+            setOrganization(orgsResponse.data.organizations[0]);
+          } else {
+            // No organization found - use defaults
+            setOrganization(null);
+            setBranding(null);
+            setLoading(false);
+            return;
+          }
+        } catch (orgErr: unknown) {
+          const axiosErr = orgErr as { response?: { status?: number } };
+          // If 404, organizations API doesn't exist - use defaults
+          if (axiosErr.response?.status === 404) {
+            console.info('Organizations API not available - using default theme');
+            setOrganization(null);
+            setBranding(null);
+            setLoading(false);
+            return;
+          }
+          throw orgErr;
         }
       } else if (!organization) {
         // Load specific organization

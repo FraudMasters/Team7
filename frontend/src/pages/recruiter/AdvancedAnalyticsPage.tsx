@@ -1,350 +1,352 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+/**
+ * Страница расширенной аналитики для рекрутера
+ *
+ * Отображает продвинутую аналитику и метрики рекрутинга:
+ * - Воронка найма с конверсией на каждом этапе
+ * - Time-to-fill по вакансиям
+ * - Эффективность источников кандидатов
+ * - Анализ качества наемных сотрудников
+ */
+
+// Импорт хука состояния React
+import { useState } from 'react';
+
+// Импорт компонентов MUI
 import {
+  Box,
   Container,
   Typography,
-  Box,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  IconButton,
-  CircularProgress,
-  Alert,
-  Chip,
-  Fade,
+  Paper,
+  Stack,
   Grid,
+  Card,
+  CardContent,
+  Tab,
+  Tabs,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress,
 } from '@mui/material';
+
+// Импорт иконок MUI
 import {
-  Close as CloseIcon,
-  PictureAsPdf as PdfIcon,
-  Refresh as RefreshIcon,
-  Schedule as TimeIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
+  TrendingUp as TrendingUpIcon,
+  Schedule as ScheduleIcon,
+  People as PeopleIcon,
+  Assessment as AssessmentIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
-import { useTranslation } from 'react-i18next';
-import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
-import FunnelVisualization from '@components/analytics/FunnelVisualization';
-import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
-import SourceTracking from '@components/analytics/SourceTracking';
-import ReportBuilder from '@components/analytics/ReportBuilder';
+
+// Интерфейс для метрик воронки
+interface FunnelMetrics {
+  stage: string;
+  count: number;
+  conversion_rate: number;
+}
+
+// Интерфейс для метрик времени найма
+interface TimeToFillMetrics {
+  vacancy_id: string;
+  vacancy_title: string;
+  days: number;
+}
+
+// Интерфейс для эффективности источников
+interface SourceMetrics {
+  source: string;
+  candidates: number;
+  hires: number;
+  conversion_rate: number;
+}
 
 /**
- * Advanced Analytics Dashboard Page (Recruiter Module)
- *
- * Shows advanced hiring metrics and analytics with:
- * - Hiring velocity insights (time-to-hire trends, bottlenecks)
- * - Funnel analysis (conversion rates at each stage)
- * - Recruiter performance metrics
- * - Source tracking and ROI analysis
- * - Configurable date range filtering
- * - Real-time data refresh
+ * Компонент панели вкладок
  */
-const AdvancedAnalyticsPage: React.FC = () => {
-  const { t } = useTranslation();
-  const [dateRange, setDateRange] = useState<DateRangeFilterType>({
-    startDate: '',
-    endDate: '',
-    preset: 'last_30_days',
-  });
-  const [reportDialogOpen, setReportDialogOpen] = useState(false);
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
 
-  // Real-time refresh state
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
-  const [refreshKey, setRefreshKey] = useState(0);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const REFRESH_INTERVAL = 60000; // 60 seconds
+function TabPanel({ children, value, index }: TabPanelProps) {
+  return (
+    <div role="tabpanel" hidden={value !== index}>
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
-  /**
-   * Handle date range change from DateRangeFilter component
-   */
-  const handleDateRangeChange = (newDateRange: DateRangeFilterType) => {
-    setDateRange(newDateRange);
+/**
+ * Страница расширенной аналитики для рекрутера
+ */
+export function AdvancedAnalyticsPage() {
+  // Состояние активной вкладки
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Состояние периода времени для фильтрации
+  const [timePeriod, setTimePeriod] = useState('30d');
+
+  // Состояние загрузки данных
+  const [loading, setLoading] = useState(false);
+
+  // Тестовые данные для воронки найма
+  const funnelData: FunnelMetrics[] = [
+    { stage: 'Applied', count: 450, conversion_rate: 100 },
+    { stage: 'Screened', count: 180, conversion_rate: 40 },
+    { stage: 'Interview', count: 90, conversion_rate: 50 },
+    { stage: 'Offer', count: 45, conversion_rate: 50 },
+    { stage: 'Hired', count: 35, conversion_rate: 78 },
+  ];
+
+  // Тестовые данные для времени найма
+  const timeToFillData: TimeToFillMetrics[] = [
+    { vacancy_id: '1', vacancy_title: 'Senior React Developer', days: 28 },
+    { vacancy_id: '2', vacancy_title: 'Product Manager', days: 35 },
+    { vacancy_id: '3', vacancy_title: 'DevOps Engineer', days: 21 },
+  ];
+
+  // Тестовые данные для эффективности источников
+  const sourceData: SourceMetrics[] = [
+    { source: 'LinkedIn', candidates: 150, hires: 20, conversion_rate: 13.3 },
+    { source: 'Indeed', candidates: 200, hires: 10, conversion_rate: 5.0 },
+    { source: 'Referral', candidates: 50, hires: 15, conversion_rate: 30.0 },
+    { source: 'Direct', candidates: 50, hires: 5, conversion_rate: 10.0 },
+  ];
+
+  // Обработчик смены вкладки
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
   };
 
-  /**
-   * Handle apply button click
-   */
-  const handleApplyFilter = (appliedDateRange: DateRangeFilterType) => {
-    setDateRange(appliedDateRange);
+  // Обработчик изменения периода
+  const handlePeriodChange = (event: { target: { value: unknown } }) => {
+    setTimePeriod(event.target.value as string);
   };
 
-  /**
-   * Open report builder dialog
-   */
-  const handleOpenReportBuilder = () => {
-    setReportDialogOpen(true);
-    setReportError(null);
+  // Обработчик экспорта отчета
+  const handleExport = () => {
+    // TODO: Implement export functionality
+    console.log('Exporting analytics report...');
   };
-
-  /**
-   * Close report builder dialog
-   */
-  const handleCloseReportBuilder = () => {
-    setReportDialogOpen(false);
-  };
-
-  /**
-   * Generate PDF report using browser print functionality
-   */
-  const handleGeneratePDF = async () => {
-    setGeneratingReport(true);
-    setReportError(null);
-
-    try {
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          window.print();
-          resolve();
-        }, 100);
-      });
-
-      setReportDialogOpen(false);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate report';
-      setReportError(errorMessage);
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
-  /**
-   * Trigger refresh of all dashboard components
-   */
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      // Increment refresh key to trigger child component updates
-      setRefreshKey((prev) => prev + 1);
-      setLastRefreshTime(new Date());
-
-      // Simulate refresh delay for visual feedback
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  /**
-   * Toggle auto-refresh
-   */
-  const toggleAutoRefresh = useCallback(() => {
-    setAutoRefreshEnabled((prev) => !prev);
-  }, []);
-
-  /**
-   * Setup auto-refresh polling
-   */
-  useEffect(() => {
-    if (!autoRefreshEnabled) {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
-      return;
-    }
-
-    refreshIntervalRef.current = setInterval(() => {
-      handleRefresh();
-    }, REFRESH_INTERVAL);
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-    };
-  }, [autoRefreshEnabled, handleRefresh]);
-
-  /**
-   * Initial data fetch on mount
-   */
-  useEffect(() => {
-    handleRefresh();
-  }, []);
 
   return (
-    <>
-      <Container maxWidth="xl" sx={{ py: 4 }} className="advanced-analytics-dashboard">
-        {/* Header */}
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
+      <Stack spacing={4}>
+        {/* Заголовок страницы */}
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Typography variant="h4" fontWeight={700}>
               Advanced Analytics
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-              Deep dive into hiring performance, velocity, and source effectiveness
+            <Typography variant="body2" color="text.secondary">
+              Deep insights into your recruiting performance
             </Typography>
-
-            {/* Refresh Status Indicator */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-              <Chip
-                icon={autoRefreshEnabled ? <PlayIcon fontSize="small" /> : <PauseIcon fontSize="small" />}
-                label={autoRefreshEnabled ? 'Auto-refresh enabled' : 'Auto-refresh paused'}
-                size="small"
-                color={autoRefreshEnabled ? 'success' : 'default'}
-                variant="outlined"
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <TimeIcon fontSize="small" color="action" />
-                <Typography variant="caption" color="text.secondary">
-                  Last updated: {lastRefreshTime.toLocaleTimeString()}
-                </Typography>
-              </Box>
-              {isRefreshing && (
-                <Fade in={isRefreshing}>
-                  <CircularProgress size={16} sx={{ ml: 1 }} />
-                </Fade>
-              )}
-            </Box>
           </Box>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExport}
+          >
+            Export Report
+          </Button>
+        </Stack>
 
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button
-              variant={autoRefreshEnabled ? 'contained' : 'outlined'}
-              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
-              onClick={toggleAutoRefresh}
-              color={autoRefreshEnabled ? 'primary' : 'default'}
-              size="small"
-              sx={{ minWidth: 120 }}
-            >
-              {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={isRefreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              size="small"
-            >
-              Refresh All
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<PdfIcon />}
-              onClick={handleOpenReportBuilder}
-              color="primary"
-            >
-              Generate Report
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Date Range Filter */}
-        <Box sx={{ mb: 4 }}>
-          <DateRangeFilter
-            onDateRangeChange={handleDateRangeChange}
-            onApply={handleApplyFilter}
-            initialDateRange={{ preset: 'last_30_days' }}
-            showPresets={true}
-          />
-        </Box>
-
-        {/* Advanced Analytics Grid */}
-        <Grid container spacing={3}>
-          {/* Funnel Visualization */}
-          <Grid item xs={12}>
-            <Box sx={{ mb: 3 }}>
-              <FunnelVisualization
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-                refreshKey={refreshKey}
-              />
-            </Box>
-          </Grid>
-
-          {/* Recruiter Performance */}
-          <Grid item xs={12} lg={6}>
-            <Box sx={{ height: '100%' }}>
-              <RecruiterPerformance
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-                refreshKey={refreshKey}
-              />
-            </Box>
-          </Grid>
-
-          {/* Source Tracking */}
-          <Grid item xs={12} lg={6}>
-            <Box sx={{ height: '100%' }}>
-              <SourceTracking
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-                refreshKey={refreshKey}
-              />
-            </Box>
-          </Grid>
-        </Grid>
-      </Container>
-
-      {/* Report Builder Dialog */}
-      <Dialog
-        open={reportDialogOpen}
-        onClose={handleCloseReportBuilder}
-        maxWidth="xl"
-        fullWidth
-        PaperProps={{
-          sx: { height: '80vh', maxHeight: '80vh' }
-        }}
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6" fontWeight={600}>
-              Generate Advanced Analytics Report
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <Button
-                variant="contained"
-                startIcon={generatingReport ? <CircularProgress size={16} /> : <PdfIcon />}
-                onClick={handleGeneratePDF}
-                disabled={generatingReport}
-                color="primary"
+        {/* Фильтры */}
+        <Paper sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Time Period</InputLabel>
+              <Select
+                value={timePeriod}
+                label="Time Period"
+                onChange={handlePeriodChange}
               >
-                {generatingReport ? 'Generating...' : 'Export as PDF'}
-              </Button>
-              <IconButton
-                onClick={handleCloseReportBuilder}
-                disabled={generatingReport}
-                size="small"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Box>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          {reportError && (
-            <Alert severity="error" sx={{ m: 2 }} onClose={() => setReportError(null)}>
-              {reportError}
-            </Alert>
-          )}
-          <Box sx={{ height: '100%', overflow: 'auto' }}>
-            <ReportBuilder
-              onReportChange={(report) => {
-                // Report configuration saved
-              }}
-            />
-          </Box>
-        </DialogContent>
-      </Dialog>
+                <MenuItem value="7d">Last 7 days</MenuItem>
+                <MenuItem value="30d">Last 30 days</MenuItem>
+                <MenuItem value="90d">Last 90 days</MenuItem>
+                <MenuItem value="1y">Last year</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </Paper>
 
-      {/* Print-specific styles - only applied when printing */}
-      <style>{`
-        @media print {
-          .advanced-analytics-dashboard .MuiButton-root:not([data-print-include]) {
-            display: none !important;
-          }
-          body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-        }
-      `}</style>
-    </>
+        {/* Состояние загрузки */}
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {/* Вкладки аналитики */}
+            <Paper sx={{ width: '100%' }}>
+              <Tabs value={activeTab} onChange={handleTabChange}>
+                <Tab label="Hiring Funnel" />
+                <Tab label="Time to Fill" />
+                <Tab label="Source Effectiveness" />
+                <Tab label="Quality Metrics" />
+              </Tabs>
+
+              {/* Вкладка "Воронка найма" */}
+              <TabPanel value={activeTab} index={0}>
+                <Grid container spacing={3}>
+                  {funnelData.map((item) => (
+                    <Grid item xs={12} sm={6} md={2.4} key={item.stage}>
+                      <Card>
+                        <CardContent>
+                          <Stack spacing={2}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PeopleIcon color="primary" />
+                              <Typography variant="caption" color="text.secondary">
+                                {item.stage}
+                              </Typography>
+                            </Box>
+                            <Typography variant="h4" fontWeight={700}>
+                              {item.count}
+                            </Typography>
+                            <Typography variant="body2" color="success.main">
+                              {item.conversion_rate}% conversion
+                            </Typography>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </TabPanel>
+
+              {/* Вкладка "Время найма" */}
+              <TabPanel value={activeTab} index={1}>
+                <Grid container spacing={2}>
+                  {timeToFillData.map((item) => (
+                    <Grid item xs={12} md={4} key={item.vacancy_id}>
+                      <Card>
+                        <CardContent>
+                          <Stack spacing={2}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <ScheduleIcon color="action" />
+                              <Typography variant="h6">
+                                {item.days} days
+                              </Typography>
+                            </Box>
+                            <Typography variant="body1" fontWeight={600}>
+                              {item.vacancy_title}
+                            </Typography>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </TabPanel>
+
+              {/* Вкладка "Эффективность источников" */}
+              <TabPanel value={activeTab} index={2}>
+                <Grid container spacing={2}>
+                  {sourceData.map((item, index) => (
+                    <Grid item xs={12} sm={6} md={3} key={index}>
+                      <Card>
+                        <CardContent>
+                          <Stack spacing={2}>
+                            <Typography variant="h6" noWrap>
+                              {item.source}
+                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Candidates
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {item.candidates}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Hires
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {item.hires}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Conversion
+                              </Typography>
+                              <Typography variant="body2" color="success.main" fontWeight={600}>
+                                {item.conversion_rate}%
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </TabPanel>
+
+              {/* Вкладка "Метрики качества" */}
+              <TabPanel value={activeTab} index={3}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AssessmentIcon color="primary" />
+                            <Typography variant="h6">
+                              4.2
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Avg. Interview Score
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TrendingUpIcon color="success" />
+                            <Typography variant="h6">
+                              92%
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Retention Rate (90d)
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <PeopleIcon color="action" />
+                            <Typography variant="h6">
+                              8.5
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Avg. Time to Productivity
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </TabPanel>
+            </Paper>
+          </>
+        )}
+      </Stack>
+    </Container>
   );
-};
+}
 
 export default AdvancedAnalyticsPage;

@@ -1,20 +1,34 @@
+// Импорт хуков для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для UI
 import {
-  Container,
-  Typography,
-  Box,
-  Grid,
-  Paper,
-  Chip,
-  Button,
-  CircularProgress,
-  Icon,
-} from '@/components/ui';
+  Container,       // Контейнер для ограничения ширины содержимого
+  Typography,      // Компонент для текста с различными стилями
+  Box,             // Универсальный контейнер для верстки
+  Grid,            // Сетка для адаптивной верстки
+  Paper,           // Контейнер с эффектом elevated (карточка)
+  Chip,            // Метки/теги
+  Button,          // Кнопки
+  CircularProgress, // Индикатор загрузки
+} from '@mui/material';
+// Импорт иконок из MUI
+import {
+  Recommend as RecommendIcon,
+  AutoAwesome as AIIcon,
+  TrendingUp as TrendingUpIcon,
+} from '@mui/icons-material';
+// Импорт хуков для работы с данными
 import { useQuery } from '@tanstack/react-query';
+// Импорт API клиента
 import { apiClient } from '../../api/client';
+// Импорт компонента карточки вакансии
 import { JobCard } from '../../components/jobs/JobCard';
-import { PageTransition } from '../../components/ui/PageTransition';
+// Импорт MUI компонентов
+import { PageTransition } from '@components/mui/PageTransition';
+import { LoadingState } from '@components/mui/LoadingState';
+import { ErrorState } from '@components/mui/ErrorState';
 
+// Интерфейс описывающий структуру вакансии
 interface Job {
   id: string;
   title: string;
@@ -25,21 +39,28 @@ interface Job {
   salary_min?: number;
   salary_max?: number;
   skills: string[];
-  match_score?: number;
+  match_score?: number; // Оценка соответствия профилю
 }
 
+// Интерфейс ответа API с рекомендациями
 interface RecommendationsResponse {
   jobs: Job[];
   total: number;
   insights: {
-    top_skills: string[];
-    recommended_industries: string[];
+    top_skills: string[];          // Топ навыков пользователя
+    recommended_industries: string[]; // Рекомендуемые индустрии
   };
 }
 
+/**
+ * Страница рекомендуемых вакансий
+ * Отображает AI-рекомендации вакансий на основе профиля пользователя
+ */
 export function RecommendedJobsPage() {
+  // Состояние фильтрации вакансий
   const [filter, setFilter] = useState<'all' | 'high-match'>('all');
 
+  // Получение рекомендаций с сервера
   const { data, isLoading, error } = useQuery({
     queryKey: ['recommended-jobs', filter],
     queryFn: async () => {
@@ -50,6 +71,7 @@ export function RecommendedJobsPage() {
     },
   });
 
+  // Фильтрация вакансий по выбранному критерию
   const filteredJobs = data?.jobs.filter(job =>
     filter === 'all' || (job.match_score && job.match_score >= 70)
   ) ?? [];
@@ -57,7 +79,7 @@ export function RecommendedJobsPage() {
   return (
     <PageTransition>
       <Container maxWidth="xl" sx={{ py: 2 }}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <RecommendIcon sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -72,7 +94,7 @@ export function RecommendedJobsPage() {
           </Box>
         </Box>
 
-        {/* Insights Section */}
+        {/* Секция AI-инсайтов */}
         {data?.insights && (
           <Paper sx={{ p: 3, mb: 4, bgcolor: 'primary.50', border: '1px solid', borderColor: 'primary.200' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -106,7 +128,7 @@ export function RecommendedJobsPage() {
           </Paper>
         )}
 
-        {/* Filters */}
+        {/* Панель фильтров */}
         <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
           <Button
             variant={filter === 'all' ? 'contained' : 'outlined'}
@@ -124,19 +146,17 @@ export function RecommendedJobsPage() {
           </Button>
         </Box>
 
-        {/* Loading State */}
+        {/* Состояния загрузки, ошибки и список вакансий */}
         {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <CircularProgress />
-          </Box>
+          <LoadingState message="Loading recommendations..." />
         ) : error ? (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography color="error">Failed to load recommendations</Typography>
-            <Button variant="outlined" sx={{ mt: 2 }} onClick={() => window.location.reload()}>
-              Retry
-            </Button>
-          </Box>
+          <ErrorState
+            title="Error"
+            message="Failed to load recommendations. Please try again later."
+            onRetry={() => window.location.reload()}
+          />
         ) : filteredJobs.length === 0 ? (
+          // Состояние: нет рекомендаций
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <RecommendIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -150,10 +170,12 @@ export function RecommendedJobsPage() {
             </Button>
           </Box>
         ) : (
+          // Сетка с карточками вакансий
           <Grid container spacing={2}>
             {filteredJobs.map((job) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={job.id}>
                 <Box sx={{ position: 'relative' }}>
+                  {/* Бейдж соответствия вакансии */}
                   {job.match_score && (
                     <Chip
                       label={`${job.match_score}% match`}

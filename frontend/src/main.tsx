@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
-import { ThemeProvider as MuiThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider as MuiThemeProvider, CssBaseline, createTheme } from '@mui/material';
+import { AuthProvider } from 'react-oidc-context';
 import { LanguageProvider } from './contexts/LanguageContext';
-import { ThemeProvider, useThemeContext } from './contexts/ThemeContext';
+import { EmotionThemeProvider, useEmotionTheme } from './contexts/EmotionThemeContext';
 import QueryProvider from './providers/QueryProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
+import oidcConfig from './auth/oidcConfig';
 import './index.css';
 import './i18n'; // Initialize i18n
 
@@ -15,7 +17,15 @@ import '@fontsource/space-grotesk';
 
 // Import service worker registration for PWA
 // This is a virtual module provided by vite-plugin-pwa
-import { registerSW } from 'virtual:pwa-register';
+// Note: PWA is optional - if not configured, service worker won't register
+let registerSW: any = null;
+try {
+  // Dynamic import to avoid build errors when PWA plugin is not configured
+  registerSW = require('virtual:pwa-register').registerSW;
+} catch {
+  // PWA plugin not available, service worker registration will be skipped
+  console.info('PWA plugin not configured - service worker disabled in development');
+}
 
 /**
  * ServiceWorkerRegistration Component
@@ -58,6 +68,11 @@ const ServiceWorkerRegistration: React.FC = () => {
    * - Callbacks for registration events
    */
   useEffect(() => {
+    // Skip if PWA plugin is not configured
+    if (!registerSW || typeof registerSW !== 'function') {
+      return;
+    }
+
     const updateSW = registerSW({
       /**
        * Handle service worker registration success
@@ -223,14 +238,51 @@ const ServiceWorkerRegistration: React.FC = () => {
 };
 
 /**
+ * Create MUI theme using createTheme and extend with EmotionTheme values
+ */
+const createMuiTheme = (emotionTheme: any) => {
+  // Extract borderRadius value (use 'md' as default)
+  const borderRadius = parseFloat(emotionTheme.borderRadius.md) || 8;
+
+  // Use MUI's createTheme with custom options
+  return createTheme({
+    cssVariables: true, // Enable CSS variables for MUI v6
+    palette: {
+      mode: emotionTheme.mode,
+      primary: emotionTheme.primary,
+      secondary: emotionTheme.secondary,
+      error: emotionTheme.error,
+      warning: emotionTheme.warning,
+      info: emotionTheme.info,
+      success: emotionTheme.success,
+      text: emotionTheme.text,
+      divider: emotionTheme.divider,
+      background: {
+        default: emotionTheme.background.default,
+        paper: emotionTheme.background.paper,
+      },
+    },
+    typography: {
+      fontFamily: emotionTheme.typography.fontFamily,
+    },
+    shape: {
+      borderRadius: borderRadius,
+    },
+    // Extend with EmotionTheme values for custom components
+    custom: emotionTheme,
+  });
+};
+
+/**
  * Inner App Component that uses the theme context
  * This allows us to use useThemeContext inside the provider tree
  */
 const AppWithTheme: React.FC = () => {
-  const { theme } = useThemeContext();
+  const { theme } = useEmotionTheme();
+  const muiTheme = createMuiTheme(theme);
 
   return (
-    <MuiThemeProvider theme={theme}>
+    <MuiThemeProvider theme={muiTheme}>
       <CssBaseline />
       <App />
     </MuiThemeProvider>
@@ -251,14 +303,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     }}
   >
     <React.StrictMode>
-      <ServiceWorkerRegistration />
-      <LanguageProvider>
-        <ThemeProvider>
-          <QueryProvider>
-            <AppWithTheme />
-          </QueryProvider>
-        </ThemeProvider>
-      </LanguageProvider>
+      <AuthProvider {...oidcConfig}>
+        <ServiceWorkerRegistration />
+        <LanguageProvider>
+          <EmotionThemeProvider>
+            <QueryProvider>
+              <AppWithTheme />
+            </QueryProvider>
+          </EmotionThemeProvider>
+        </LanguageProvider>
+      </AuthProvider>
     </React.StrictMode>
   </ErrorBoundary>
 );

@@ -1,5 +1,8 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -12,11 +15,20 @@ import {
   Alert,
   AlertTitle,
   Stack,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+// Иконки Material UI
+import {
+  Refresh as RefreshIcon,
+  Schedule as TimeIcon,
+  Description as ResumeIcon,
+  TrendingUp as MatchIcon,
+  AccessTime as ClockIcon,
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
+} from '@mui/icons-material';
 
 /**
- * Time-to-hire metrics from backend
+ * Метрики time-to-hire с бэкенда
  */
 interface TimeToHireMetrics {
   average_days: number;
@@ -28,7 +40,7 @@ interface TimeToHireMetrics {
 }
 
 /**
- * Resume processing metrics from backend
+ * Метрики обработки резюме с бэкенда
  */
 interface ResumeMetrics {
   total_processed: number;
@@ -38,7 +50,7 @@ interface ResumeMetrics {
 }
 
 /**
- * Match rate metrics from backend
+ * Метрики match rate с бэкенда
  */
 interface MatchRateMetrics {
   overall_match_rate: number;
@@ -48,7 +60,7 @@ interface MatchRateMetrics {
 }
 
 /**
- * Key metrics response from backend
+ * Ответ с ключевыми метриками с бэкенда
  */
 interface KeyMetricsResponse {
   time_to_hire: TimeToHireMetrics;
@@ -57,24 +69,24 @@ interface KeyMetricsResponse {
 }
 
 /**
- * KeyMetrics Component Props
+ * Свойства компонента KeyMetrics
  */
 interface KeyMetricsProps {
-  /** API endpoint URL for key metrics */
+  /** URL API endpoint для ключевых метрик */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
 }
 
 /**
- * KeyMetrics Component
+ * Компонент KeyMetrics
  *
- * Displays key hiring metrics including:
- * - Time-to-hire statistics (average, median, min, max, percentiles)
- * - Resume processing metrics (total, monthly, weekly, processing rate)
- * - Match rates (overall, high/low confidence, average confidence)
+ * Отображает ключевые метрики найма включая:
+ * - Статистику time-to-hire (среднее, медиана, мин, макс, процентили)
+ * - Метрики обработки резюме (всего, за месяц, за неделю, скорость обработки)
+ * - Match rates (общий, высокой/низкой уверенности, средняя уверенность)
  *
  * @example
  * ```tsx
@@ -91,13 +103,14 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   startDate,
   endDate,
 }) => {
+  // Состояния для загрузки, ошибки, метрик и автообновления
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<KeyMetricsResponse | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   /**
-   * Fetch key metrics from backend
+   * Загрузка ключевых метрик с бэкенда
    */
   const fetchMetrics = async () => {
     try {
@@ -158,19 +171,19 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   if (loading) {
     return (
       <Box
-        css={{
+        sx={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '64px 0',
+          py: 8,
         }}
       >
-        <CircularProgress size={60} css={{ marginBottom: '24px' }} />
-        <Typography variant="h6" color="secondary">
+        <CircularProgress size={60} sx={{ mb: 3 }} />
+        <Typography variant="h6" color="text.secondary">
           Loading key metrics...
         </Typography>
-        <Typography variant="body2" color="secondary" css={{ marginTop: '8px' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -185,7 +198,7 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchMetrics} startIcon={<Icon name="refresh" />}>
+          <Button color="inherit" onClick={fetchMetrics} startIcon={<RefreshIcon />}>
             Retry
           </Button>
         }
@@ -203,22 +216,22 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   return (
     <Stack spacing={3}>
       {/* Header Section */}
-      <Paper elevation={2} css={{ padding: '24px' }}>
-        <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5" fontWeight={600}>
             Key Hiring Metrics
           </Typography>
-          <Box css={{ display: 'flex', gap: '8px' }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant={autoRefreshEnabled ? 'contained' : 'outlined'}
-              startIcon={<Icon name={autoRefreshEnabled ? 'pause' : 'play-arrow'} />}
+              startIcon={autoRefreshEnabled ? <PauseIcon /> : <PlayIcon />}
               onClick={toggleAutoRefresh}
               size="small"
               color={autoRefreshEnabled ? 'primary' : 'default'}
             >
               {autoRefreshEnabled ? 'Auto-refresh' : 'Paused'}
             </Button>
-            <Button variant="outlined" startIcon={<Icon name="refresh" />} onClick={fetchMetrics} size="small">
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchMetrics} size="small">
               Refresh
             </Button>
           </Box>
@@ -229,60 +242,62 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Grid item xs={12} sm={6} md={4}>
             <Card
               variant="outlined"
-              css={{
+              sx={{
                 height: '100%',
-                borderColor: metrics.time_to_hire.average_days <= 30 ? '$success' : '$warning',
+                borderColor: metrics.time_to_hire.average_days <= 30 ? 'success.main' : 'warning.main',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  boxShadow: 4,
                 },
               }}
             >
               <CardContent>
-                <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-                  <Icon
-                    name="clock"
-                    size={24}
-                    color={metrics.time_to_hire.average_days <= 30 ? '$success' : '$warning'}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ClockIcon
+                    fontSize="large"
+                    sx={{
+                      mr: 1,
+                      color: metrics.time_to_hire.average_days <= 30 ? 'success.main' : 'warning.main',
+                    }}
                   />
-                  <Typography variant="h6" fontWeight={600} css={{ marginLeft: '8px' }}>
+                  <Typography variant="h6" fontWeight={600}>
                     Time-to-Hire
                   </Typography>
                 </Box>
 
-                <Box css={{ marginBottom: '16px' }}>
-                  <Typography variant="caption" color="secondary">
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
                     Average
                   </Typography>
                   <Typography
                     variant="h4"
                     fontWeight={700}
-                    color={metrics.time_to_hire.average_days <= 30 ? '$success' : '$warning'}
+                    color={metrics.time_to_hire.average_days <= 30 ? 'success.main' : 'warning.main'}
                   >
                     {metrics.time_to_hire.average_days.toFixed(1)}d
                   </Typography>
                 </Box>
 
                 <Stack spacing={1}>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       Median
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.time_to_hire.median_days.toFixed(1)}d
                     </Typography>
                   </Box>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       Range
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.time_to_hire.min_days}d - {metrics.time_to_hire.max_days}d
                     </Typography>
                   </Box>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       25th-75th %
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
@@ -298,52 +313,52 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Grid item xs={12} sm={6} md={4}>
             <Card
               variant="outlined"
-              css={{
+              sx={{
                 height: '100%',
-                borderColor: '$primary',
+                borderColor: 'primary.main',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  boxShadow: 4,
                 },
               }}
             >
               <CardContent>
-                <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-                  <Icon name="description" size={24} color="$primary" />
-                  <Typography variant="h6" fontWeight={600} css={{ marginLeft: '8px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ResumeIcon fontSize="large" sx={{ mr: 1, color: 'primary.main' }} />
+                  <Typography variant="h6" fontWeight={600}>
                     Resumes Processed
                   </Typography>
                 </Box>
 
-                <Box css={{ marginBottom: '16px' }}>
-                  <Typography variant="caption" color="secondary">
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
                     Total
                   </Typography>
-                  <Typography variant="h4" fontWeight={700} color="$primary">
+                  <Typography variant="h4" fontWeight={700} color="primary.main">
                     {metrics.resumes.total_processed.toLocaleString()}
                   </Typography>
                 </Box>
 
                 <Stack spacing={1}>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       This Month
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.resumes.processed_this_month.toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       This Week
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {metrics.resumes.processed_this_week.toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       Avg/Day
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
@@ -359,63 +374,65 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
           <Grid item xs={12} sm={6} md={4}>
             <Card
               variant="outlined"
-              css={{
+              sx={{
                 height: '100%',
-                borderColor: metrics.match_rates.overall_match_rate >= 0.8 ? '$success' : '$warning',
+                borderColor: metrics.match_rates.overall_match_rate >= 0.8 ? 'success.main' : 'warning.main',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  boxShadow: 4,
                 },
               }}
             >
               <CardContent>
-                <Box css={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-                  <Icon
-                    name="trending-up"
-                    size={24}
-                    color={metrics.match_rates.overall_match_rate >= 0.8 ? '$success' : '$warning'}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <MatchIcon
+                    fontSize="large"
+                    sx={{
+                      mr: 1,
+                      color: metrics.match_rates.overall_match_rate >= 0.8 ? 'success.main' : 'warning.main',
+                    }}
                   />
-                  <Typography variant="h6" fontWeight={600} css={{ marginLeft: '8px' }}>
+                  <Typography variant="h6" fontWeight={600}>
                     Match Rates
                   </Typography>
                 </Box>
 
-                <Box css={{ marginBottom: '16px' }}>
-                  <Typography variant="caption" color="secondary">
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
                     Overall
                   </Typography>
                   <Typography
                     variant="h4"
                     fontWeight={700}
-                    color={metrics.match_rates.overall_match_rate >= 0.8 ? '$success' : '$warning'}
+                    color={metrics.match_rates.overall_match_rate >= 0.8 ? 'success.main' : 'warning.main'}
                   >
                     {(metrics.match_rates.overall_match_rate * 100).toFixed(1)}%
                   </Typography>
                 </Box>
 
                 <Stack spacing={1}>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       Avg Confidence
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {(metrics.match_rates.average_confidence * 100).toFixed(1)}%
                     </Typography>
                   </Box>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       High Confidence
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="$success">
+                    <Typography variant="body2" fontWeight={600} color="success.main">
                       {metrics.match_rates.high_confidence_matches.toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box css={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="secondary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
                       Low Confidence
                     </Typography>
-                    <Typography variant="body2" fontWeight={600} color="$warning">
+                    <Typography variant="body2" fontWeight={600} color="warning.main">
                       {metrics.match_rates.low_confidence_matches.toLocaleString()}
                     </Typography>
                   </Box>
