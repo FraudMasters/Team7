@@ -46,6 +46,16 @@ repos:
         name: Detect Private Key
         description: Detects the presence of private keys.
 
+  # Secret scanning with detect-secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: Detect Secrets
+        description: Detects secrets in code.
+        args: [--baseline, .secrets.baseline]
+        exclude: ^(vendor/|third_party/|\.eggs/|\.git/|build/|dist/|package-lock.json|poetry\.lock|\.secrets\.baseline$)
+
   # Python linting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.4

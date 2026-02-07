@@ -573,5 +573,196 @@ Verification Note:
 
 Commit: c8508de
 
+=== SUBTASK 6-2 COMPLETED ===
+2026-02-07 - Subtask 6-2: Create test coverage reporting workflow
+Status: COMPLETED
 
+Files Created:
+- .github/workflows/test-coverage.yml (330 lines)
+  * Comprehensive test coverage reporting and PR comment workflow
+
+Workflow Configuration:
+
+Triggers:
+- pull_request to [main, develop]
+- push to [main, develop]
+- workflow_dispatch for manual runs
+
+Environment Variables:
+- NODE_VERSION: '18'
+- PYTHON_VERSION: '3.11'
+
+Jobs:
+
+1. frontend-coverage:
+   - Runs tests with coverage using vitest/c8
+   - Generates coverage reports (text, json, html, lcov, cobertura)
+   - Uploads coverage artifacts (7-day retention)
+
+2. backend-coverage:
+   - Uses PostgreSQL and Redis services
+   - Runs pytest with coverage plugin
+   - Generates coverage reports (term, html, xml, json)
+   - continue-on-error for test failures
+   - Uploads coverage artifacts (7-day retention)
+
+3. coverage-report (aggregator):
+   - Downloads frontend and backend coverage artifacts
+   - Parses coverage-summary.json and coverage.json files
+   - Extracts metrics: lines, functions, branches, statements
+   - Generates markdown summary table
+   - Posts summary as PR comment using actions/github-script
+   - Updates existing bot comments instead of creating duplicates
+   - Adds coverage to GitHub step summary
+   - Checks coverage thresholds:
+     * Frontend: 85% minimum
+     * Backend: 80% minimum
+   - Fails if thresholds not met
+
+PR Comment Features:
+- Bot comment detection and update (prevents duplicate comments)
+- Coverage table with frontend and backend metrics
+- Automatic posting on pull requests
+- Comment includes emoji (📊) for visibility
+- Shows lines, functions, branches, statements coverage
+
+Coverage Report Format:
+```markdown
+## 📊 Test Coverage Report
+
+### Frontend Coverage
+| Metric | Coverage |
+|--------|----------|
+| Lines | XX% |
+| Functions | XX% |
+| Branches | XX% |
+| Statements | XX% |
+
+### Backend Coverage
+| Metric | Value |
+|--------|-------|
+| Overall | XX% |
+| Lines Covered | XX |
+| Total Statements | XX |
+```
+
+Notes:
+- Follows patterns from ci.yml for consistency
+- Uses actions/upload-artifact@v4 and actions/download-artifact@v4
+- Uses actions/github-script@v7 for PR comment operations
+- Runs on both PRs and pushes to main/develop
+- Threshold enforcement prevents merge if coverage drops
+- Artifacts retained for 7 days for debugging
+- Comment update logic prevents spam on re-runs
+
+Verification:
+- Manual: Verify coverage report is generated and posted as PR comment
+- Trigger on pull_request to see comment functionality
+- Check GitHub step summary for coverage table
+- Verify artifact upload in workflow run
+
+Commit: 5bda0ce
+
+=== SUBTASK 7-2 COMPLETED ===
+2026-02-07 - Subtask 7-2: Add Bandit configuration and baseline
+Status: COMPLETED
+
+Files Created:
+- .github/bandit.yml (228 lines)
+  * Comprehensive Bandit security scanner configuration
+
+Configuration Details:
+
+Directory Exclusions:
+- /tests - Test directories
+- /test_* - Test files
+- /.*test.* - Test pattern files
+- /alembic - Database migrations
+- /__pycache__ - Python bytecode cache
+- /.venv, /venv, /env - Virtual environments
+- /.eggs - Setuptools eggs
+- /build, /dist - Build artifacts
+- /.tox - Tox directories
+- /migrations - Migration files
+
+Test Skip Configuration:
+- B101: Assert used - actively skipped (acceptable in tests)
+- B105-B703: All other Bandit tests documented and commented out
+  * Each test includes reason for when it might be acceptable to skip
+  * Default behavior: all tests enabled except B101
+
+Severity & Confidence Filtering:
+- level_set: Commented out (default: all levels)
+- confidence_set: Commented out (default: all levels)
+- Can be uncommented to filter reports
+
+Output Configuration:
+- max_lines: 2000 - Prevents timeouts on large files
+- show_line_on_output: true - Shows code lines in reports
+
+Notes:
+- Only B101 (assert) is actively skipped as it's acceptable in test code
+- All other security tests remain enabled by default
+- Comprehensive documentation for each Bandit plugin (B101-B703)
+- Configuration ready for integration with security-scan.yml workflow
+- YAML syntax valid and follows Bandit documentation
+- Excludes standard Python development directories and artifacts
+
+Verification Note:
+- bandit command not available in current environment
+- YAML syntax verified by manual inspection
+- File structure follows Bandit configuration documentation
+- Ready for use in CI/CD pipeline
+
+Commit: ccaaf21
+
+=== SUBTASK 7-3 COMPLETED ===
+2026-02-07 - Subtask 7-3: Add dependency scanning workflow
+Status: COMPLETED
+
+Files Modified:
+- Implementation plan updated to mark subtask as completed
+
+Dependency Scanning Implementation:
+The dependency scanning workflow is already fully implemented in .github/workflows/security-scan.yml:
+
+1. Frontend Dependency Scan (frontend-dependency-scan job):
+   - Uses npm audit to check for npm package vulnerabilities
+   - Runs on Node.js 18 with npm ci for clean installs
+   - Generates JSON report (npm-audit-report.json)
+   - Parses and displays vulnerability summary in GitHub Step Summary
+   - Uploads audit report as artifact (30-day retention)
+   - Uses continue-on-error for non-blocking alerts
+
+2. Backend Dependency Scan (backend-dependency-scan job):
+   - Uses pip-audit to check Python package vulnerabilities
+   - Uses safety check for additional vulnerability database checks
+   - Runs on Python 3.11 with cached pip dependencies
+   - Generates JSON reports (pip-audit-report.json, safety-report.json)
+   - Displays results in GitHub Step Summary with emoji (🔍)
+   - Uploads audit reports as artifacts (30-day retention)
+   - Uses continue-on-error for non-blocking alerts
+   - Supports optional SAFETY_API_KEY for enhanced safety DB
+
+Workflow Triggers:
+- push to [main, develop]
+- pull_request to [main, develop]
+- workflow_dispatch for manual runs
+- Daily scheduled runs at 2 AM UTC (cron: '0 2 * * *')
+
+Notes:
+- Dependency scanning was already implemented in subtask 7-1 (security-scan.yml creation)
+- No additional code changes required for this subtask
+- The implementation includes both npm audit (frontend) and pip-audit + safety (backend)
+- Reports are uploaded as artifacts and displayed in GitHub Step Summary
+- Scheduled daily scans ensure vulnerabilities are caught early
+- Manual verification can be done by checking workflow runs in GitHub Actions
+
+Verification:
+- Manual: Push a test branch and verify dependency scans run successfully
+- Check GitHub Actions tab for security-scan workflow runs
+- Review uploaded artifacts for JSON audit reports
+- Verify GitHub Step Summary shows vulnerability counts
+
+Commit: Pending (implementation already complete from subtask 7-1)
 
