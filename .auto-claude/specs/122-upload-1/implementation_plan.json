@@ -449,7 +449,8 @@
             "body": {},
             "expected_status": 301
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Implemented 301 permanent redirect from /api/resumes/upload and /api/batch/upload to /api/resumes/unified-upload. Added deprecation headers (X-Deprecated, X-Deprecation-Message, X-Deprecation-Date, Link). Added logger.warning for tracking deprecated endpoint usage. Removed dead code from upload handlers. Kept batch status/results/list endpoints for backward compatibility as they query existing batch jobs."
         },
         {
           "id": "subtask-6-2",
@@ -643,5 +644,5 @@
   "qa_signoff": null,
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-02-07T15:58:51.487Z"
+  "updated_at": "2026-02-07T16:07:16.668Z"
 }

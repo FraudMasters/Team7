@@ -393,3 +393,28 @@ Backend Security Issues Found:
 - Next: phase-6-cleanup (Cleanup and Deprecation)
 
 === END SESSION 12 ===
+
+=== SESSION 13 - Subtask Implementation ===
+
+[2026-02-07] subtask-6-1: COMPLETED
+- Action: Mark old upload endpoints as deprecated
+- Changes:
+  * Modified POST /api/resumes/upload to return 301 redirect to /api/resumes/unified-upload
+  * Modified POST /api/batch/upload to return 301 redirect to /api/resumes/unified-upload
+  * Added deprecation headers (X-Deprecated, X-Deprecation-Message, X-Deprecation-Date, Link)
+  * Added deprecation warnings in module and function docstrings
+  * Added logger.warning for tracking deprecated endpoint usage
+  * Removed dead code from upload handlers (old implementation)
+  * Kept batch status/results/list endpoints for backward compatibility (query endpoints, not upload)
+  * Updated FastAPI router decorator with deprecated=True and status_code=301
+- Commit: ff82828 - "auto-claude: subtask-6-1 - Mark old upload endpoints as deprecated"
+- Files modified: backend/api/resumes/upload.py, backend/api/batch.py
+- Lines changed: 88 insertions(+), 172 deletions(-)
+- Verification: grep confirms deprecation markers (301, RedirectResponse, X-Deprecated headers) in place
+- Migration Guide:
+  * Old: POST /api/resumes/upload with file in form data
+  * Old: POST /api/batch/upload with files array
+  * New: POST /api/resumes/unified-upload with files array (handles both single and batch)
+- Next: subtask-6-2 (Remove old frontend upload pages)
+
+=== END SESSION 13 ===

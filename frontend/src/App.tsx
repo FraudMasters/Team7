@@ -40,8 +40,6 @@ import ComparePage from './pages/Compare';
 import SkillGapAnalysisPage from './pages/SkillGapAnalysis';
 import BackupsPage from './pages/Backups';
 import WorkflowBoardPage from './pages/WorkflowBoard';
-import UploadPage from './pages/Upload';
-import BatchUploadPage from './pages/BatchUpload';
 import UnifiedUploadPage from './pages/UnifiedUpload';
 import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
@@ -94,8 +92,6 @@ function App() {
           <Route path="saved-searches" element={<SavedSearchesPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
           <Route path="resumes" element={<ResumeDatabasePage />} />
-          <Route path="upload" element={<UploadPage />} />
-          <Route path="batch-upload" element={<BatchUploadPage />} />
           <Route path="unified-upload" element={<UnifiedUploadPage />} />
           <Route path="compare" element={<ComparePage />} />
           <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
