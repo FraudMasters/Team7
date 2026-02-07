@@ -669,6 +669,116 @@ async def delete_matching_weights_profile(
         ) from e
 
 
+@router.post("/{profile_id}/set-active", tags=["Matching Weights"])
+async def set_active_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Set a matching weights profile as the active/default profile for its organization.
+
+    This endpoint sets the specified profile as the default profile for its organization,
+    automatically unsetting any existing default profile for the same organization.
+
+    Args:
+        profile_id: UUID of the profile to set as active
+        db: Database session
+
+    Returns:
+        JSON response with updated profile details
+
+    Raises:
+        HTTPException(404): If profile not found
+        HTTPException(422): If profile_id is invalid
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post("/api/matching-weights/abc-123-def/set-active")
+        >>> response.json()
+        {
+            "id": "abc-123-def",
+            "organization_id": "org123",
+            "name": "Technical Role Focus",
+            "is_default": true,
+            ...
+        }
+    """
+    try:
+        logger.info(f"Setting profile as active: {profile_id}")
+
+        # Validate profile_id
+        if not profile_id or len(profile_id.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Profile ID cannot be empty",
+            )
+
+        # Get the profile to set as active
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
+            )
+
+        # Update all other profiles in the organization to is_default=False
+        from models.matching_weights_profile import MatchingWeightsProfile as MWP
+        other_profiles_result = await db.execute(
+            select(MWP).where(
+                MWP.organization_id == profile.organization_id,
+                MWP.id != profile_id,
+                MWP.is_default == True,
+            )
+        )
+        other_profiles = other_profiles_result.scalars().all()
+        for other_profile in other_profiles:
+            other_profile.is_default = False
+
+        # Set the selected profile as active
+        profile.is_default = True
+
+        await db.commit()
+        await db.refresh(profile)
+
+        response_data = {
+            "id": profile.id,
+            "organization_id": profile.organization_id,
+            "name": profile.name,
+            "description": profile.description,
+            "keyword_weight": profile.keyword_weight,
+            "tfidf_weight": profile.tfidf_weight,
+            "vector_weight": profile.vector_weight,
+            "is_default": profile.is_default,
+            "is_preset": profile.is_preset,
+            "preset_type": profile.preset_type,
+            "created_by": profile.created_by,
+            "created_at": profile.created_at.isoformat(),
+            "updated_at": profile.updated_at.isoformat(),
+        }
+
+        logger.info(f"Set profile as active: {profile_id} for organization: {profile.organization_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting profile as active: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set profile as active: {str(e)}",
+        ) from e
+
+
 @router.post("/{profile_id}/rematch", tags=["Matching Weights"])
 async def rematch_candidates_with_profile(
     profile_id: str,
