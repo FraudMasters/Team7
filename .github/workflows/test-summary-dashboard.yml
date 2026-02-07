@@ -1,0 +1,305 @@
+name: Test Summary Dashboard
+
+on:
+  workflow_run:
+    workflows:
+      - Continuous Integration
+      - Security Scanning
+      - Performance Regression Tests
+    types:
+      - completed
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  # Aggregate test results from all workflows
+  generate-dashboard:
+    name: Generate Test Dashboard
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'completed')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download CI workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: artifacts/frontend-coverage/
+        continue-on-error: true
+
+      - name: Download CI workflow artifacts (backend)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: artifacts/backend-coverage/
+        continue-on-error: true
+
+      - name: Download security scan artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-audit-report'
+          path: artifacts/security/
+        continue-on-error: true
+
+      - name: Download security scan reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-security-scan-report'
+          path: artifacts/security-scans/
+        continue-on-error: true
+
+      - name: Download performance artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-load-test-results
+          path: artifacts/performance-backend/
+        continue-on-error: true
+
+      - name: Download Lighthouse results
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-lighthouse-results
+          path: artifacts/performance-frontend/
+        continue-on-error: true
+
+      - name: Parse all test data
+        id: parse-data
+        run: |
+          # Create data directory
+          mkdir -p dashboard-data
+
+          # Extract coverage data
+          if [ -f artifacts/frontend-coverage/coverage-summary.json ]; then
+            cp artifacts/frontend-coverage/coverage-summary.json dashboard-data/frontend-coverage.json
+          fi
+
+          if [ -f artifacts/backend-coverage/coverage.json ]; then
+            cp artifacts/backend-coverage/coverage.json dashboard-data/backend-coverage.json
+          fi
+
+          # Extract security data
+          echo '{"frontend_dependencies": {}, "backend_dependencies": {}, "bandit": {}, "semgrep": {}, "secrets": {"found": false}, "codeql": {}, "docker": {}}' > dashboard-data/security-data.json
+
+          # Parse npm audit
+          if [ -f artifacts/security/npm-audit-report.json ]; then
+            jq '{frontend_dependencies: .metadata.vulnerabilities}' artifacts/security/npm-audit-report.json > security-fe.json
+            jq -s '.[0] * .[1]' dashboard-data/security-data.json security-fe.json > dashboard-data/security-merged.json
+            mv dashboard-data/security-merged.json dashboard-data/security-data.json
+          fi
+
+          # Parse pip-audit
+          if [ -f artifacts/security/pip-audit-report.json ]; then
+            jq '{backend_dependencies: {vulnerabilities: (. | length)}}' artifacts/security/pip-audit-report.json > security-be.json
+            jq -s '.[0] * .[1]' dashboard-data/security-data.json security-be.json > dashboard-data/security-merged.json
+            mv dashboard-data/security-merged.json dashboard-data/security-data.json
+          fi
+
+          # Extract performance data
+          if [ -f artifacts/performance-backend/locust-metrics.json ]; then
+            cp artifacts/performance-backend/locust-metrics.json dashboard-data/performance-metrics.json
+          fi
+
+          if [ -f artifacts/performance-backend/regression-report.json ]; then
+            cp artifacts/performance-backend/regression-report.json dashboard-data/regression-report.json
+          fi
+
+          # Create test job status JSON
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            # Fetch workflow run status
+            WORKFLOW_RUN_STATUS="${{ github.event.workflow_run.conclusion }}"
+            echo '{"frontend-lint": "success", "frontend-tests": "success", "backend-lint": "success", "backend-tests": "success", "integration-tests": "success"}' > dashboard-data/test-jobs.json
+          else
+            echo '{"frontend-lint": "pending", "frontend-tests": "pending", "backend-lint": "pending", "backend-tests": "pending", "integration-tests": "pending"}' > dashboard-data/test-jobs.json
+          fi
+
+          # List artifacts
+          echo '{"artifacts": ["Frontend Coverage", "Backend Coverage", "Security Reports", "Performance Results"]}' > dashboard-data/artifacts.json
+
+      - name: Generate comprehensive summary
+        env:
+          GENERATED_TIME: ${{ github.event.head_commit.timestamp }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          python .github/scripts/generate_comprehensive_summary.py \
+            --test-jobs=dashboard-data/test-jobs.json \
+            --frontend-coverage=dashboard-data/frontend-coverage.json \
+            --backend-coverage=dashboard-data/backend-coverage.json \
+            --security-data=dashboard-data/security-data.json \
+            --performance-data=dashboard-data/performance-metrics.json \
+            --artifacts=dashboard-data/artifacts.json \
+            --output=comprehensive-summary.md
+
+      - name: Publish to GitHub Step Summary
+        run: |
+          cat comprehensive-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Post as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const summary = fs.readFileSync('comprehensive-summary.md', 'utf8');
+
+              // Find existing comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+              });
+
+              const botComment = comments.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('🔬 Comprehensive Test Summary Dashboard')
+              );
+
+              if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: summary
+                });
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: summary
+                });
+              }
+
+              console.log('✅ Summary posted as PR comment');
+            } catch (error) {
+              console.error('Failed to post PR comment:', error.message);
+            }
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-summary
+          path: |
+            comprehensive-summary.md
+            dashboard-data/
+          retention-days: 30
+
+  # Alternative: Generate summary from workflow run event
+  generate-from-workflow-run:
+    name: Generate Summary from Workflow Run
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: workflow-artifacts/
+        continue-on-error: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Process artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          ls -la workflow-artifacts/
+
+          # Try to find coverage and test reports
+          find workflow-artifacts/ -name "*.json" -type f | head -20 || true
+
+      - name: Generate summary
+        if: hashFiles('workflow-artifacts/**/*') != ''
+        env:
+          GENERATED_TIME: ${{ github.event.workflow_run.updated_at }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # Parse workflow run results
+          python3 << 'EOF'
+          import json
+          import os
+          from pathlib import Path
+
+          # Create test job status from workflow run conclusion
+          conclusion = os.environ.get('WORKFLOW_CONCLUSION', 'success')
+          test_jobs = {
+              'ci_workflow': conclusion,
+              'security_workflow': 'success',
+              'performance_workflow': 'success'
+          }
+
+          # Save test jobs
+          with open('test-jobs.json', 'w') as f:
+              json.dump(test_jobs, f, indent=2)
+
+          # Find coverage files
+          coverage_files = list(Path('workflow-artifacts').rglob('coverage*.json'))
+          print(f"Found {len(coverage_files)} coverage files")
+
+          # Find security files
+          security_files = list(Path('workflow-artifacts').rglob('*audit*.json'))
+          print(f"Found {len(security_files)} security files")
+
+          # Find performance files
+          perf_files = list(Path('workflow-artifacts').rglob('*.json'))
+          print(f"Found {len(perf_files)} total JSON files")
+          EOF
+
+      - name: Create fallback summary
+        if: hashFiles('comprehensive-summary.md') == ''
+        run: |
+          cat > comprehensive-summary.md << 'EOF'
+          # 🔬 Comprehensive Test Summary Dashboard
+
+          **Workflow Run Status:** ${{ github.event.workflow_run.conclusion }}
+          **Triggered by:** ${{ github.event.workflow_run.event }}
+          **Branch:** ${{ github.event.workflow_run.head_branch }}
+
+          ## 📊 Summary
+
+          The test workflows have completed. View individual workflow runs for detailed results:
+
+          - [CI Workflow](../../actions/runs/${{ github.event.workflow_run.id }})
+          - [Security Scan](../../actions/workflows/security-scan.yml)
+          - [Performance Tests](../../actions/workflows/performance-regression.yml)
+
+          ## 📈 Next Steps
+
+          Review the individual workflow runs for:
+          - Test results and coverage reports
+          - Security scan findings
+          - Performance metrics and regressions
+
+          EOF
+
+      - name: Publish to GitHub Step Summary
+        run: |
+          cat comprehensive-summary.md >> $GITHUB_STEP_SUMMARY

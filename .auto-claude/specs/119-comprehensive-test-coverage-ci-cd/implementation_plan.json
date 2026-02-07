@@ -907,8 +907,8 @@
             "type": "manual",
             "instructions": "Verify smoke tests run after deployment"
           },
-          "status": "pending",
-          "notes": "Test critical endpoints: health, login, basic API calls"
+          "status": "completed",
+          "notes": "Created comprehensive smoke test script (scripts/smoke-tests.sh) that tests: frontend accessibility, API health check, key endpoints (candidates), authentication verification, CORS headers, and response time monitoring. Added dedicated smoke-tests job in deploy.yml that runs after both frontend and backend deployments complete. Enhanced deployment notifications to include smoke test results."
         },
         {
           "id": "subtask-11-4",
