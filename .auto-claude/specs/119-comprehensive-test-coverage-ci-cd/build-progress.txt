@@ -341,61 +341,178 @@ Verification Note:
 
 Commit: 8556235
 
-=== END SESSION 2 ===
-2026-02-07 12:46:19 - Subtask 4-2 COMPLETED: Created contract tests for API Gateway to services
-- Created backend/tests/contract/test_api_gateway_contracts.py (918 lines)
-- Created backend/tests/contract/__init__.py
-- Contract tests cover: Candidate API, Vacancy API, Matching API, Ranking API, Search API, Resume Upload, Error Responses, Service Integration
-- All tests use @pytest.mark.contract marker
-- Follow conftest.py patterns for fixtures and async handling
-- Committed with git commit 6cd472e
-
-=== SUBTASK 4-3 COMPLETED ===
-2026-02-07 - Subtask 4-3: Create contract tests for Matching to Candidate service
+=== SUBTASK 5-2 COMPLETED ===
+2026-02-07 - Subtask 5-2: Create ruff.toml configuration
 Status: COMPLETED
 
 Files Created:
-- backend/tests/contract/test_matching_candidate_contracts.py
-  * 6 test classes covering Matching to Candidate service boundaries
-  * TestRankedCandidatesContract: Ranked candidates API schema validation
-    - test_ranked_candidates_request_schema: Validates request accepts vacancy_id and limit
-    - test_ranked_candidates_limit_validation: Tests limit parameter (1-200)
-    - test_ranked_candidate_item_schema: Validates individual candidate items
-    - test_ranked_candidates_invalid_vacancy_id: Tests error handling for invalid IDs
-  * TestMatchingStageIntegrationContract: Match result to stage transition integration
-    - test_match_result_to_stage_transition_schema: Validates match results for stage transitions
-    - test_stage_transition_with_match_context: Tests stage movement with match context
-  * TestBulkMatchingOperationsContract: Bulk operations with matching context
-    - test_bulk_move_with_vacancy_context_schema: Tests bulk move with vacancy association
-    - test_bulk_add_to_pipeline_from_matching_schema: Tests bulk add to pipeline
-  * TestMatchResultPersistenceContract: Match result persistence and retrieval
-    - test_get_match_result_schema: Validates match result retrieval schema
-    - test_match_result_id_format: Tests UUID format validation
-  * TestMatchFeedbackContract: Match feedback submission
-    - test_submit_feedback_request_schema: Validates feedback submission
-    - test_feedback_confidence_range_validation: Tests confidence score 0-1 range
-  * TestStageMetricsMatchingContract: Stage metrics with matching context
-    - test_stage_metrics_response_schema: Validates metrics API response
-    - test_stage_metrics_time_fields_schema: Validates time metrics (average, median, min, max)
-    - test_stage_metrics_dropoff_fields_schema: Validates dropoff metrics
+- ruff.toml (182 lines)
+  * Comprehensive ruff configuration for backend code quality
 
-Test Helper Functions:
-- validate_response_schema: Validates required and optional fields with types
-- validate_error_response: Validates error response follows standard contract
-- validate_ranking_score: Validates scores are in valid range [0,1]
+Configuration Details:
+Global Settings:
+- target-version = "py311"
+- line-length = 100 (matches black configuration)
+- exclude = [".git", ".tox", ".eggs", "venv", "virtualenv", "__pycache__", ".pytest_cache", "build", "dist", "vendor", "third_party", "*.pyc"]
+
+Lint Rule Categories Enabled (30+):
+- E, W: pycodestyle errors and warnings
+- F: pyflakes
+- I: isort
+- N: pep8-naming
+- UP: pyupgrade
+- B: flake8-bugbear
+- C4: flake8-comprehensions
+- DTZ: flake8-datetimez
+- T10: flake8-debugger
+- EM: flake8-errmsg
+- ISC: flake8-implicit-str-concat
+- ICN: flake8-import-conventions
+- G: flake8-logging-format
+- PIE: flake8-pie
+- T20: flake8-print
+- PT: flake8-pytest-style
+- Q: flake8-quotes
+- RSE: flake8-raise
+- RET: flake8-return
+- SIM: flake8-simplify
+- TID: flake8-tidy-imports
+- TCH: flake8-type-checking
+- ARG: flake8-unused-arguments
+- PTH: flake8-use-pathlib
+- ERA: eradicate
+- PL: pylint
+- TRY: tryceratops
+- FLY: flynt
+- PERF: perflint
+- RUF: ruff-specific rules
+
+Ignored Rules (Sensible Defaults for ML/NLP and FastAPI):
+- TD003, TD002: Allow TODO comments without issue links
+- E501: Line length handled by formatter
+- S101: Allow assert in tests
+- E402: Allow module level imports for ML libraries
+- N806, N803, N812: Ignore naming conventions for ML/NLP code
+- DTZ005, DTZ006: Allow datetime.now() without tz for legacy code
+- ISC001: Allow implicit str concat for readability
+- TRY003, TRY300: Allow certain try/except patterns
+- PLR0913, PLR2004, PLR0915: Allow pylint rules for ML patterns
+- C901, PLR0912: Ignore complexity rules for ML algorithms
+- ARG001, ARG002: Allow unused args for FastAPI patterns
+- PT011, PT012: Allow certain pytest patterns
+- RET504-RET508: Allow certain return patterns
+
+Per-File Ignores:
+- tests/**/*.py: ["T201", "S101"] - Allow print and asserts in tests
+- **/alembic/versions/*.py: ["N806", "E501", "DTZ"] - Allow different patterns in migrations
+- backend/analyzers/**/*.py: ["N806", "PLR0913", "C901"] - Allow different patterns in ML/NLP modules
+
+isort Configuration:
+- known-first-party: ["backend", "analyzers", "api"]
+- known-third-party: ["fastapi", "pydantic", "sqlalchemy", "alembic", "pytest", "spacy", "torch", "transformers", "sklearn"]
+- section-order: ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+Additional Settings:
+- max-doc-length: 100 (pycodestyle)
+- convention: "google" (pydocstyle)
+- max-complexity: 15 (mccabe)
+- quote-style: "double" (format)
+- indent-style: "space" (format)
+- docstring-code-format: true (format)
 
 Notes:
-- Follows patterns from test_api_gateway_contracts.py
-- All tests use @pytest.mark.contract marker
-- Tests verify interface compatibility (schema, types, required fields)
-- Uses fixtures from conftest.py (sample_resume, sample_vacancy)
-- Properly handles async/await patterns with AsyncClient
-- Validates score ranges for ranking (0-1) and match percentage (0-100)
+- Follows patterns from pytest.ini and .coveragerc for clear structure and comments
+- Compatible with pre-commit ruff hook configuration
+- Supports ML/NLP code patterns with appropriate rule exclusions
+- FastAPI-friendly with unused argument allowances
+- Test-friendly with assert and print allowances in test files
+- Google-style docstring convention for better documentation
 
 Verification Note:
-- pytest command blocked in current environment
-- File follows exact structure of test_api_gateway_contracts.py
-- All test classes have proper docstrings and type hints
-- Comprehensive coverage of Matching to Candidate integration points
+- ruff command not available in current environment
+- TOML syntax verified by manual inspection
+- Configuration follows ruff documentation patterns
+- Comprehensive coverage of common Python linting rules
 
-Commit: 455bea3
+Commit: 71f3769
+
+=== SUBTASK 5-3 COMPLETED ===
+2026-02-07 - Subtask 5-3: Create pyproject.toml for backend tooling
+Status: COMPLETED
+
+Files Created:
+- backend/pyproject.toml (270 lines)
+  * Comprehensive Python tooling configuration for backend
+
+Configuration Details:
+
+[project] Section:
+- name = "agenthr-backend"
+- version = "0.1.0"
+- requires-python = ">=3.11"
+- classifiers for Python 3.11 and 3.12
+
+[tool.black] - Code Formatter:
+- line-length = 100
+- target-version = ["py311", "py312"]
+- include = '\.pyi?$'
+- extend-exclude for vendor, third_party, build artifacts
+
+[tool.isort] - Import Sorting:
+- profile = "black" (compatible with black formatter)
+- line_length = 100
+- known_first_party = ["backend", "analyzers", "api"]
+- known_third_party = [fastapi, pydantic, sqlalchemy, alembic, pytest, spacy, torch, transformers, sklearn, numpy, pandas]
+- skip_glob = "**/alembic/versions/*.py"
+
+[tool.mypy] - Static Type Checking:
+- python_version = "3.11"
+- warn_return_any = true
+- warn_unused_configs = true
+- check_untyped_defs = true
+- disallow_untyped_defs = false (gradually enable this)
+- strict_optional = true
+- strict_equality = true
+- Per-module overrides:
+  - spacy.*, torch.*, transformers.*, sklearn.*: ignore_missing_imports = true
+  - analyzers.*: disallow_untyped_defs = false (ML/NLP code has complex typing)
+  - tests.*: disallow_untyped_defs = false
+
+[tool.coverage.run] - Coverage Configuration:
+- source = ["analyzers", "api"]
+- branch = true
+- omit = ["*/tests/*", "*/test_*.py", "*/__pycache__/*", "*/venv/*", "*/.venv/*", "*/dist/*", "*/build/*", "*/alembic/versions/*"]
+
+[tool.coverage.report]:
+- precision = 2
+- show_missing = true
+- exclude_lines for pragma: no cover, __repr__, assert, raise NotImplementedError, etc.
+
+[tool.pytest.ini_options] - Pytest Configuration:
+- testpaths = ["tests"]
+- addopts with coverage: --cov=analyzers, --cov=api, --cov-report=term-missing, --cov-report=html:htmlcov, --cov-report=xml:coverage.xml, --cov-fail-under=80
+- markers: slow, integration, unit
+- log_cli = true, log_cli_level = "INFO"
+
+[tool.ruff] - Minimal Config (main config in ruff.toml):
+- line-length = 100
+- target-version = "py311"
+- Basic rule selection and isort configuration
+
+Notes:
+- Consolidates all Python tooling configuration in one file
+- Black config matches pre-commit hook settings (line-length=100, py311)
+- Isort configured to be compatible with black formatter
+- Mypy configured with gradual typing approach for ML/NLP code
+- Coverage settings match .coveragerc and pytest.ini
+- Enables mypy in pre-commit hooks (can be uncommented in .pre-commit-config.yaml)
+- Provides centralized configuration for modern Python tooling
+
+Verification Note:
+- black command not available in current environment
+- File created successfully and verified to exist
+- TOML syntax validated by manual inspection
+- All tool configurations follow documented patterns
+
+Commit: 6be3515
+
