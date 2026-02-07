@@ -355,12 +355,19 @@ async def list_matching_weights_profiles(
 
 
 @router.get("/{profile_id}", tags=["Matching Weights"])
-async def get_matching_weights_profile(profile_id: str) -> JSONResponse:
+async def get_matching_weights_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Retrieve a specific matching weights profile by ID.
 
+    This endpoint retrieves detailed information about a single matching weights profile,
+    including the weight configuration for keyword, TF-IDF, and vector similarity matching.
+
     Args:
         profile_id: UUID of the profile to retrieve
+        db: Database session
 
     Returns:
         JSON response with profile details
@@ -373,22 +380,51 @@ async def get_matching_weights_profile(profile_id: str) -> JSONResponse:
         >>> import requests
         >>> response = requests.get("/api/matching-weights/abc-123-def")
         >>> response.json()
+        {
+            "id": "abc-123-def",
+            "organization_id": "org123",
+            "name": "Technical Role Focus",
+            "keyword_weight": 0.6,
+            "tfidf_weight": 0.3,
+            "vector_weight": 0.1,
+            ...
+        }
     """
     try:
         logger.info(f"Retrieving matching weights profile: {profile_id}")
 
-        # Validate profile_id
-        if not profile_id or len(profile_id.strip()) == 0:
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Profile ID cannot be empty",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Matching weights profile not found: {profile_id}",
+        response_data = {
+            "id": profile.id,
+            "organization_id": profile.organization_id,
+            "name": profile.name,
+            "description": profile.description,
+            "keyword_weight": profile.keyword_weight,
+            "tfidf_weight": profile.tfidf_weight,
+            "vector_weight": profile.vector_weight,
+            "is_default": profile.is_default,
+            "is_preset": profile.is_preset,
+            "preset_type": profile.preset_type,
+            "created_by": profile.created_by,
+            "created_at": profile.created_at.isoformat(),
+            "updated_at": profile.updated_at.isoformat(),
+        }
+
+        logger.info(f"Retrieved matching weights profile: {profile_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
         )
 
     except HTTPException:
