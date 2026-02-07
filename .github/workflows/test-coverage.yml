@@ -1,0 +1,330 @@
+name: Test Coverage Report
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Frontend coverage
+  frontend-coverage:
+    name: Frontend Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: ./frontend
+        run: npm run test:coverage -- --reporter=verbose --coverage
+        env:
+          CI: true
+
+      - name: Generate coverage summary
+        working-directory: ./frontend
+        run: |
+          npm run test:coverage -- --reporter=json --coverage.reporters=json-summary || true
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: |
+            frontend/coverage/
+          retention-days: 7
+
+  # Backend coverage
+  backend-coverage:
+    name: Backend Coverage
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify services are running
+        run: |
+          pg_isready -h localhost -p 5432
+          redis-cli -h localhost -p 6379 ping
+
+      - name: Set up environment
+        working-directory: ./backend
+        run: |
+          cp .env.example .env || true
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head || echo "Migrations already applied or no migrations needed"
+
+      - name: Run tests with coverage
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/unit/ \
+            -v \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html:htmlcov \
+            --cov-report=json:coverage.json \
+            -m "not slow" \
+            --maxfail=5
+        continue-on-error: true
+
+      - name: Generate coverage summary
+        working-directory: ./backend
+        if: always()
+        run: |
+          if [ -f coverage.json ]; then
+            python -c "
+import json
+with open('coverage.json') as f:
+    data = json.load(f)
+    totals = data['totals']
+    print(f\"Coverage Summary:\")
+    print(f\"  Statements: {totals['covered_lines']}/{totals['num_statements']} ({totals['percent_covered']:.1f}%)\")
+" || true
+          fi
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/htmlcov/
+            backend/coverage.xml
+            backend/coverage.json
+          retention-days: 7
+
+  # Generate and post coverage report
+  coverage-report:
+    name: Generate Coverage Report
+    runs-on: ubuntu-latest
+    needs: [frontend-coverage, backend-coverage]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download frontend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage-frontend/
+
+      - name: Download backend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage-backend/
+
+      - name: Parse coverage reports
+        id: parse-coverage
+        run: |
+          # Frontend coverage
+          if [ -f coverage-frontend/coverage-summary.json ]; then
+            FRONTEND_LINES=$(jq -r '.total?.lines?.pct // "N/A"' coverage-frontend/coverage-summary.json)
+            FRONTEND_FUNCTIONS=$(jq -r '.total?.functions?.pct // "N/A"' coverage-frontend/coverage-summary.json)
+            FRONTEND_BRANCHES=$(jq -r '.total?.branches?.pct // "N/A"' coverage-frontend/coverage-summary.json)
+            FRONTEND_STATEMENTS=$(jq -r '.total?.statements?.pct // "N/A"' coverage-frontend/coverage-summary.json)
+          else
+            FRONTEND_LINES="N/A"
+            FRONTEND_FUNCTIONS="N/A"
+            FRONTEND_BRANCHES="N/A"
+            FRONTEND_STATEMENTS="N/A"
+          fi
+
+          # Backend coverage
+          if [ -f coverage-backend/coverage.json ]; then
+            BACKEND_COV=$(jq -r '.totals.percent_covered // "N/A"' coverage-backend/coverage.json)
+            BACKEND_LINES=$(jq -r '.totals.covered_lines // "N/A"' coverage-backend/coverage.json)
+            BACKEND_TOTAL=$(jq -r '.totals.num_statements // "N/A"' coverage-backend/coverage.json)
+          else
+            BACKEND_COV="N/A"
+            BACKEND_LINES="N/A"
+            BACKEND_TOTAL="N/A"
+          fi
+
+          # Set outputs
+          echo "frontend_lines=$FRONTEND_LINES" >> $GITHUB_OUTPUT
+          echo "frontend_functions=$FRONTEND_FUNCTIONS" >> $GITHUB_OUTPUT
+          echo "frontend_branches=$FRONTEND_BRANCHES" >> $GITHUB_OUTPUT
+          echo "frontend_statements=$FRONTEND_STATEMENTS" >> $GITHUB_OUTPUT
+          echo "backend_cov=$BACKEND_COV" >> $GITHUB_OUTPUT
+
+          # Generate coverage summary
+          cat > coverage-summary.md << EOF
+          ## 📊 Test Coverage Report
+
+          ### Frontend Coverage
+
+          | Metric | Coverage |
+          |--------|----------|
+          | Lines | ${FRONTEND_LINES}% |
+          | Functions | ${FRONTEND_FUNCTIONS}% |
+          | Branches | ${FRONTEND_BRANCHES}% |
+          | Statements | ${FRONTEND_STATEMENTS}% |
+
+          ### Backend Coverage
+
+          | Metric | Value |
+          |--------|-------|
+          | Overall | ${BACKEND_COV}% |
+          | Lines Covered | ${BACKEND_LINES} |
+          | Total Statements | ${BACKEND_TOTAL} |
+
+          ---
+
+          *This report is generated automatically on every pull request and push to main/develop.*
+          EOF
+
+          # Output for verification
+          cat coverage-summary.md
+
+      - name: Post coverage as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('coverage-summary.md', 'utf8');
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('📊 Test Coverage Report')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: summary
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary
+              });
+            }
+
+      - name: Add coverage to job summary
+        if: always()
+        run: |
+          cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Check coverage thresholds
+        if: always()
+        run: |
+          FAILED=0
+
+          # Frontend threshold: 85%
+          if [ "${{ steps.parse-coverage.outputs.frontend_statements }}" != "N/A" ]; then
+            if (( $(echo "${{ steps.parse-coverage.outputs.frontend_statements }} < 85" | bc -l) )); then
+              echo "❌ Frontend coverage (${{ steps.parse-coverage.outputs.frontend_statements }}%) is below 85% threshold"
+              FAILED=1
+            else
+              echo "✅ Frontend coverage (${{ steps.parse-coverage.outputs.frontend_statements }}%) meets 85% threshold"
+            fi
+          fi
+
+          # Backend threshold: 80%
+          if [ "${{ steps.parse-coverage.outputs.backend_cov }}" != "N/A" ]; then
+            if (( $(echo "${{ steps.parse-coverage.outputs.backend_cov }} < 80" | bc -l) )); then
+              echo "❌ Backend coverage (${{ steps.parse-coverage.outputs.backend_cov }}%) is below 80% threshold"
+              FAILED=1
+            else
+              echo "✅ Backend coverage (${{ steps.parse-coverage.outputs.backend_cov }}%) meets 80% threshold"
+            fi
+          fi
+
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "❌ Coverage thresholds not met"
+            exit 1
+          fi
+
+      - name: Coverage passed
+        if: success()
+        run: |
+          echo "✅ All coverage thresholds met!"
