@@ -4,7 +4,7 @@
   "workflow_type": "feature",
   "workflow_rationale": "This is a feature implementation that spans multiple services (frontend, backend, microservices). The workflow follows service dependency order: establish test infrastructure first (setup), then build testing capabilities for each service layer (implementation), and finally integrate everything with CI/CD automation (integration). This ensures each service can be tested independently before being wired together.",
   "created_at": "2026-02-07T12:00:00.000Z",
-  "updated_at": "2026-02-07T11:23:19.658Z",
+  "updated_at": "2026-02-07T11:39:48.265Z",
   "status": "in_progress",
   "phases": [
     {
@@ -871,8 +871,8 @@
             "type": "manual",
             "instructions": "Verify that failing tests block deployment"
           },
-          "status": "pending",
-          "notes": "Add 'needs: [ci, security-scan, performance-tests]' to deploy jobs"
+          "status": "completed",
+          "notes": "Created a dedicated 'test' job that runs all tests (frontend + backend) before any deployment begins. Updated deploy-frontend to depend on 'test' job, deploy-backend to depend on both 'test' and 'deploy-frontend' jobs, invalidate-cdn and notify jobs to explicitly depend on 'test'. Removed inline test steps from deployment jobs. This provides clear separation between testing and deployment phases and ensures tests are run once before any deployment begins."
         },
         {
           "id": "subtask-11-2",
@@ -889,8 +889,8 @@
             "type": "manual",
             "instructions": "Merge to main and verify staging deployment occurs"
           },
-          "status": "pending",
-          "notes": "Configure environment, deployment steps, health checks"
+          "status": "completed",
+          "notes": "Implemented proper staging and production deployment flow: Staging deployment triggered on push to main (without --prod flag), Production deployment triggered on version tags (with --prod flag), Preview deployment remains for pull requests. Updated workflow name from 'Deploy to Production' to 'Deploy'. Added separate staging/production deployment steps for frontend and backend. Updated environment detection for all jobs. Fixed step ID for Vercel preview deployment outputs. Added staging/production specific CDN cache invalidation. Updated notification messages with correct environment detection."
         },
         {
           "id": "subtask-11-3",
