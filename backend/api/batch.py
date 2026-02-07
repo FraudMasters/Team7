@@ -7,13 +7,16 @@ tracking batch processing status, and retrieving batch results.
 The core file upload logic is delegated to UnifiedUploadService for consistency,
 while this module maintains batch job tracking and Celery task integration.
 This is a compatibility layer that routes upload requests to the new unified service.
+
+**DEPRECATED**: The batch upload endpoint is deprecated and will be removed in a future version.
+Please use the unified upload endpoint at `/api/resumes/unified-upload` instead.
 """
 import logging
 from typing import Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,8 +89,9 @@ class BatchResultsResponse(BaseModel):
 @router.post(
     "/upload",
     response_model=BatchUploadResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_301_MOVED_PERMANENTLY,
     tags=["Batch"],
+    deprecated=True,
 )
 async def upload_batch(
     request: Request,
@@ -99,124 +103,59 @@ async def upload_batch(
     """
     Upload multiple resume files for batch processing.
 
-    This endpoint accepts multiple resume files (PDF or DOCX), validates each file,
-    stores them, creates database records, and initiates batch processing.
+    **DEPRECATED**: This endpoint is deprecated as of 2026-02-07.
+    Please migrate to the unified upload endpoint at `/api/resumes/unified-upload`.
 
-    The core file upload logic is delegated to UnifiedUploadService for consistency,
-    while this endpoint maintains batch job tracking and Celery integration.
+    This endpoint now permanently redirects to the new unified upload endpoint.
+    The new endpoint provides enhanced security features including:
+    - Magic number file validation for all files
+    - XXE protection for DOCX files
+    - Filename sanitization to prevent path traversal
+    - Consolidated single and batch upload functionality
+
+    Migration guide:
+    - Old: POST /api/batch/upload with files array and optional notification_email, analyze
+    - New: POST /api/resumes/unified-upload with files array and optional notification_email, analyze
 
     Args:
         request: FastAPI request object
-        files: List of uploaded resume files
-        notification_email: Optional email for completion notification
-        analyze: Whether to analyze resumes after upload
+        files: List of uploaded resume files (redirected to unified endpoint)
+        notification_email: Optional email for completion notification (passed to unified endpoint)
+        analyze: Whether to analyze resumes after upload (passed to unified endpoint)
         db: Database session
 
     Returns:
-        JSON response with batch ID and initial status
+        Permanent redirect (301) to the new unified upload endpoint
 
     Raises:
-        HTTPException(415): If file type is not supported
-        HTTPException(413): If file size exceeds maximum
-        HTTPException(500): If file storage or database operation fails
+        N/A - This endpoint redirects all requests
+
+    Examples:
+        >>> import requests
+        >>> # Old endpoint (deprecated - will redirect)
+        >>> files = [("files", open("resume1.pdf", "rb")), ("files", open("resume2.docx", "rb"))]
+        >>> response = requests.post("http://localhost:8000/api/batch/upload", files=files)
+        >>> # New endpoint (use this instead)
+        >>> files = [("files", open("resume1.pdf", "rb")), ("files", open("resume2.docx", "rb"))]
+        >>> response = requests.post("http://localhost:8000/api/resumes/unified-upload", files=files, data={"analyze": "true"})
     """
-    # Get the unified upload service
-    upload_service = get_upload_service()
+    # Log deprecation warning
+    logger.warning(
+        f"Deprecated endpoint /api/batch/upload called from {request.client.host}. "
+        f"Please migrate to /api/resumes/unified-upload"
+    )
 
-    # Extract locale from Accept-Language header
-    locale = upload_service.extract_locale(request)
-
-    if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No files provided",
-        )
-
-    logger.info(f"Received batch upload request with {len(files)} files, analyze={analyze}, notification_email={notification_email}")
-
-    try:
-        # Create batch job record first
-        batch_id = uuid4()
-        batch_job = BatchJob(
-            id=batch_id,
-            total_files=len(files),
-            processed_files=0,
-            failed_files=0,
-            status=BatchJobStatus.pending,
-            notification_email=notification_email,
-        )
-        db.add(batch_job)
-        await db.flush()
-
-        # Use unified upload service for core upload logic
-        upload_result = await upload_service.upload_batch(files, db, locale, request)
-
-        # Extract successful and failed file information
-        resume_ids = [item["id"] for item in upload_result["successful"]]
-        failed_count = upload_result["failure_count"]
-
-        # Update batch job with actual counts
-        batch_job.total_files = upload_result["success_count"]
-        batch_job.failed_files = failed_count
-
-        if failed_count > 0:
-            batch_job.status = BatchJobStatus.failed
-            failed_filenames = [item["filename"] for item in upload_result["failed"]]
-            batch_job.error_message = f"Failed to upload {failed_count} files: {', '.join(failed_filenames[:5])}"
-            await db.commit()
-
-            return JSONResponse(
-                status_code=status.HTTP_201_CREATED,
-                content={
-                    "batch_id": str(batch_id),
-                    "total_files": upload_result["success_count"],
-                    "status": BatchJobStatus.failed.value,
-                    "message": f"Batch created with errors. {failed_count} files failed to upload.",
-                }
-            )
-
-        # Initiate batch analysis if requested
-        if analyze and resume_ids:
-            logger.info(f"Initiating batch analysis for {len(resume_ids)} resumes")
-            batch_job.status = BatchJobStatus.processing
-            await db.commit()
-
-            # Trigger Celery task
-            try:
-                celery_task = batch_analyze_resumes.delay(resume_ids)
-                logger.info(f"Celery task dispatched: {celery_task.id}")
-
-                # Store Celery task ID
-                batch_job.celery_task_id = celery_task.id
-                await db.commit()
-
-                logger.info(f"Started Celery task {celery_task.id} for batch {batch_id}")
-            except Exception as task_error:
-                logger.error(f"Error dispatching Celery task: {task_error}", exc_info=True)
-                raise
-        else:
-            logger.info(f"Batch analysis not requested. analyze={analyze}, resume_ids count={len(resume_ids)}")
-            await db.commit()
-
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content={
-                "batch_id": str(batch_id),
-                "total_files": len(resume_ids),
-                "status": batch_job.status.value,
-                "message": f"Batch upload started with {len(resume_ids)} files",
-            }
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in batch upload: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch upload failed: {str(e)}",
-        ) from e
+    # Return permanent redirect to new unified endpoint
+    return RedirectResponse(
+        url="/api/resumes/unified-upload",
+        status_code=status.HTTP_301_MOVED_PERMANENTLY,
+        headers={
+            "X-Deprecated": "true",
+            "X-Deprecation-Message": "This endpoint is deprecated. Please use /api/resumes/unified-upload instead.",
+            "X-Deprecation-Date": "2026-02-07",
+            "Link": '</api/resumes/unified-upload>; rel="alternate"; type="application/json"',
+        }
+    )
 
 
 @router.get(

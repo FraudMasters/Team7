@@ -6,13 +6,16 @@ The core upload logic is delegated to the UnifiedUploadService for consistency,
 while this module maintains the compatibility layer and adds audit logging.
 
 This is a compatibility layer that routes requests to the new unified service.
+
+**DEPRECATED**: This endpoint is deprecated and will be removed in a future version.
+Please use the unified upload endpoint at `/api/resumes/unified-upload` instead.
 """
 import logging
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,8 +44,9 @@ class ResumeUploadResponse(BaseModel):
 @router.post(
     "/upload",
     response_model=ResumeUploadResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_301_MOVED_PERMANENTLY,
     tags=["Resumes"],
+    deprecated=True,
 )
 async def upload_resume(
     request: Request,
@@ -52,12 +56,19 @@ async def upload_resume(
     """
     Upload a resume file for analysis.
 
-    This endpoint accepts resume files in PDF or DOCX format, validates the file
-    type and size, stores the file, and creates a database record for tracking.
+    **DEPRECATED**: This endpoint is deprecated as of 2026-02-07.
+    Please migrate to the unified upload endpoint at `/api/resumes/unified-upload`.
 
-    The core upload logic is delegated to UnifiedUploadService for consistency
-    across the application, while this endpoint maintains the compatibility layer
-    and adds audit logging.
+    This endpoint now permanently redirects to the new unified upload endpoint.
+    The new endpoint provides enhanced security features including:
+    - Magic number file validation
+    - XXE protection for DOCX files
+    - Filename sanitization to prevent path traversal
+    - Consolidated single and batch upload functionality
+
+    Migration guide:
+    - Old: POST /api/resumes/upload with file in form data
+    - New: POST /api/resumes/unified-upload with files in form data
 
     Args:
         request: FastAPI request object (for Accept-Language header)
@@ -65,65 +76,31 @@ async def upload_resume(
         db: Database session
 
     Returns:
-        JSON response with resume ID, filename, and status
-
-    Raises:
-        HTTPException(415): If file type is not supported
-        HTTPException(413): If file size exceeds maximum allowed
-        HTTPException(500): If file storage or database operation fails
+        Permanent redirect (301) to the new unified upload endpoint
 
     Examples:
         >>> import requests
+        >>> # Old endpoint (deprecated - will redirect)
         >>> with open("resume.pdf", "rb") as f:
         ...     response = requests.post("http://localhost:8000/api/resumes/upload", files={"file": f})
-        >>> response.json()
-        {
-            "id": "123e4567-e89b-12d3-a456-426614174000",
-            "filename": "resume.pdf",
-            "status": "pending",
-            "message": "Resume uploaded successfully"
-        }
+        >>> # New endpoint (use this instead)
+        >>> with open("resume.pdf", "rb") as f:
+        ...     response = requests.post("http://localhost:8000/api/resumes/unified-upload", files={"files": f})
     """
-    # Get the unified upload service
-    upload_service = get_upload_service()
+    # Log deprecation warning
+    logger.warning(
+        f"Deprecated endpoint /api/resumes/upload called from {request.client.host}. "
+        f"Please migrate to /api/resumes/unified-upload"
+    )
 
-    # Extract locale from Accept-Language header
-    locale = upload_service.extract_locale(request)
-
-    try:
-        # Use unified upload service for core upload logic
-        result = await upload_service.upload_file(file, db, locale, request)
-
-        # Log audit event (compatibility layer adds this)
-        resume_id = UUID(result["id"])
-        ip_address, user_agent = get_request_context(request)
-        await log_audit_event(
-            db=db,
-            action_type=AuditActionType.RESUME_UPLOADED,
-            entity_type="resume",
-            entity_id=resume_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            action_data={
-                "filename": result["filename"],
-                "content_type": file.content_type or "application/octet-stream" if file else "application/octet-stream",
-            },
-        )
-
-        logger.info(f"Resume uploaded successfully: {result['id']}")
-
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=result,
-        )
-
-    except HTTPException:
-        # Re-raise HTTP exceptions (validation errors)
-        raise
-    except Exception as e:
-        logger.error(f"Error uploading resume: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Resume upload failed: {str(e)}",
-        ) from e
+    # Return permanent redirect to new unified endpoint
+    return RedirectResponse(
+        url="/api/resumes/unified-upload",
+        status_code=status.HTTP_301_MOVED_PERMANENTLY,
+        headers={
+            "X-Deprecated": "true",
+            "X-Deprecation-Message": "This endpoint is deprecated. Please use /api/resumes/unified-upload instead.",
+            "X-Deprecation-Date": "2026-02-07",
+            "Link": '</api/resumes/unified-upload>; rel="alternate"; type="application/json"',
+        }
+    )
