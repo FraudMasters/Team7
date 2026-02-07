@@ -42,6 +42,7 @@ import BackupsPage from './pages/Backups';
 import WorkflowBoardPage from './pages/WorkflowBoard';
 import UploadPage from './pages/Upload';
 import BatchUploadPage from './pages/BatchUpload';
+import UnifiedUploadPage from './pages/UnifiedUpload';
 import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
@@ -95,6 +96,7 @@ function App() {
           <Route path="resumes" element={<ResumeDatabasePage />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="batch-upload" element={<BatchUploadPage />} />
+          <Route path="unified-upload" element={<UnifiedUploadPage />} />
           <Route path="compare" element={<ComparePage />} />
           <Route path="skill-gap" element={<SkillGapAnalysisPage />} />
           <Route path="backups" element={<BackupsPage />} />
