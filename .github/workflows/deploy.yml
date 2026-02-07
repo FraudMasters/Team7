@@ -22,11 +22,90 @@ env:
   PYTHON_VERSION: '3.11'
 
 jobs:
+  # Run all tests before deployment
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: |
+          npm run lint
+          npm run test:coverage
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/ -v --cov=. --cov-report=xml
+
+      - name: Test Summary
+        run: |
+          echo "✅ All tests passed successfully!"
+          echo "Frontend: Linting and coverage tests passed"
+          echo "Backend: Pytest with coverage passed"
+
   # Frontend deployment to Vercel (CDN)
   deploy-frontend:
     name: Deploy Frontend to CDN
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: test
 
     steps:
       - name: Checkout code
@@ -44,12 +123,6 @@ jobs:
       - name: Install dependencies
         working-directory: ./frontend
         run: npm ci
-
-      - name: Run tests
-        working-directory: ./frontend
-        run: |
-          npm run lint
-          npm run test:coverage
 
       - name: Build frontend
         working-directory: ./frontend
@@ -116,32 +189,7 @@ jobs:
     name: Deploy Backend API
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'staging' }}
-    needs: deploy-frontend
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: agenthr_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    needs: [test, deploy-frontend]
 
     steps:
       - name: Checkout code
@@ -159,14 +207,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Run tests
-        working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
-          REDIS_URL: redis://localhost:6379/0
-        run: |
-          pytest tests/ -v --cov=. --cov-report=xml
 
       - name: Build Docker image
         run: |
@@ -198,7 +238,7 @@ jobs:
     name: Invalidate CDN Cache
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    needs: [deploy-frontend, deploy-backend]
+    needs: [test, deploy-frontend, deploy-backend]
 
     steps:
       - name: Purge Cloudflare cache
@@ -221,7 +261,7 @@ jobs:
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: [deploy-frontend, deploy-backend, invalidate-cdn]
+    needs: [test, deploy-frontend, deploy-backend, invalidate-cdn]
     if: always()
 
     steps:
