@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
+from services.graphiti_service import get_graphiti_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -43,10 +44,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     settings.models_cache_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Models cache directory: {settings.models_cache_path}")
 
+    # Initialize Graphiti service
+    try:
+        graphiti_service = get_graphiti_service()
+        await graphiti_service.initialize()
+        logger.info("Graphiti service initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Graphiti service: {e}")
+        logger.warning("Graph features will be unavailable")
+
     yield
 
     # Shutdown
     logger.info("Shutting down Resume Analysis API")
+
+    # Close Graphiti service
+    try:
+        graphiti_service = get_graphiti_service()
+        await graphiti_service.close()
+        logger.info("Graphiti service closed successfully")
+    except Exception as e:
+        logger.error(f"Error closing Graphiti service: {e}")
 
 
 # Create FastAPI application
@@ -253,6 +271,7 @@ from api import (
     batch,
     work_experience,
     skill_gap_analysis,
+    context,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -276,6 +295,7 @@ app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", ta
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
+app.include_router(context.router, prefix="/api/v1/context", tags=["Context"])
 
 
 if __name__ == "__main__":
