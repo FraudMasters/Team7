@@ -8,10 +8,14 @@ are combined for resume-job matching.
 import logging
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.matching_weights_profile import MatchingWeightsProfile
 
 logger = logging.getLogger(__name__)
 
