@@ -20,6 +20,7 @@ from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
 from utils.audit_logger import log_audit_event, get_request_context
+from utils.file_validation import validate_magic_number
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -175,6 +176,15 @@ async def upload_resume(
 
         # Validate file size
         validate_file_size(file_size, locale)
+
+        # Validate magic number (file signature) to prevent malicious file uploads
+        file_extension = Path(file.filename or "resume").suffix
+        is_valid, error_msg = validate_magic_number(file_content, file_extension, locale)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=error_msg,
+            )
 
         # Generate UUID for the resume
         resume_id = uuid4()

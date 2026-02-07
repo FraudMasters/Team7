@@ -21,6 +21,7 @@ from models.batch_job import BatchJob, BatchJobStatus
 from models.resume import Resume, ResumeStatus
 from tasks.analysis_task import batch_analyze_resumes
 from celery_app import celery_app
+from utils.file_validation import validate_magic_number
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -191,6 +192,15 @@ async def upload_batch(
                 # Validate
                 validate_file_type(file.filename or "unknown", file.content_type or "application/octet-stream", locale)
                 validate_file_size(file_size, locale)
+
+                # Validate magic number (file signature) to prevent malicious file uploads
+                file_extension = Path(file.filename or "resume").suffix
+                is_valid, error_msg = validate_magic_number(file_content, file_extension, locale)
+                if not is_valid:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail=error_msg,
+                    )
 
                 # Generate resume ID and save file
                 resume_id = uuid4()
