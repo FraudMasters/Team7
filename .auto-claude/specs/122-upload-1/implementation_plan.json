@@ -470,7 +470,8 @@
               "Route redirects to /unified-upload or shows 404"
             ]
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Removed old upload page imports and routes from App.tsx: (1) Removed UploadPage import and /recruiter/upload route, (2) Removed BatchUploadPage import and /recruiter/batch-upload route, (3) Kept UnifiedUploadPage as the consolidated upload interface. Old routes now fall through to catch-all route which redirects to landing page (404-like behavior)."
         },
         {
           "id": "subtask-6-3",
@@ -644,5 +645,5 @@
   "qa_signoff": null,
   "status": "in_progress",
   "planStatus": "in_progress",
-  "updated_at": "2026-02-07T16:07:16.668Z"
+  "updated_at": "2026-02-07T16:10:13.623Z"
 }

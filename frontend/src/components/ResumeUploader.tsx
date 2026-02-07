@@ -78,7 +78,6 @@ interface ResumeUploaderProps {
  * const uploaderRef = useRef<ResumeUploaderHandle>(null);
  * <ResumeUploader
  *   ref={uploaderRef}
- *   uploadUrl={`${config.api.url}/api/resumes/upload`}
  *   onUploadComplete={(id) => navigate(`/results/${id}`)}
  * />
  *
@@ -88,7 +87,7 @@ interface ResumeUploaderProps {
  * ```
  */
 const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
-  uploadUrl = `${config.api.url}/api/resumes/upload`,
+  uploadUrl = `${config.api.url}/api/resumes/unified-upload`,
   maxFileSize = 10 * 1024 * 1024, // 10MB
   acceptedFileTypes = ['.pdf', '.docx'],
   onUploadComplete,
