@@ -399,6 +399,98 @@ describe('ApiClient', () => {
     });
   });
 
+  describe('getPerformanceStats', () => {
+    it('should return performance statistics', () => {
+      const stats = apiClient.getPerformanceStats();
+      expect(stats).toHaveProperty('totalCalls');
+      expect(stats).toHaveProperty('successfulCalls');
+      expect(stats).toHaveProperty('failedCalls');
+      expect(stats).toHaveProperty('averageDuration');
+      expect(stats).toHaveProperty('callsByEndpoint');
+      expect(stats).toHaveProperty('callsByMethod');
+    });
+
+    it('should return zero stats for new client', () => {
+      const client = new ApiClient({ baseURL: 'http://test.com' });
+      const stats = client.getPerformanceStats();
+      expect(stats.totalCalls).toBe(0);
+      expect(stats.successfulCalls).toBe(0);
+      expect(stats.failedCalls).toBe(0);
+    });
+  });
+
+  describe('logPerformanceSummary', () => {
+    it('should log performance summary without errors', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      expect(() => {
+        apiClient.logPerformanceSummary();
+      }).not.toThrow();
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('post (generic method)', () => {
+    it('should make generic POST request successfully', async () => {
+      const mockData = { foo: 'bar' };
+      const mockResponse = { result: 'success' };
+
+      mockAxiosInstance.post.mockResolvedValue({ data: mockResponse });
+
+      const result = await apiClient.post('/test-endpoint', mockData);
+
+      expect(result.data).toEqual(mockResponse);
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+        '/test-endpoint',
+        mockData
+      );
+    });
+
+    it('should make POST request without data', async () => {
+      const mockResponse = { result: 'success' };
+
+      mockAxiosInstance.post.mockResolvedValue({ data: mockResponse });
+
+      const result = await apiClient.post('/test-endpoint');
+
+      expect(result.data).toEqual(mockResponse);
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+        '/test-endpoint',
+        undefined
+      );
+    });
+
+    it('should handle POST request error', async () => {
+      const error = {
+        response: {
+          status: 400,
+          data: { detail: 'Bad request' },
+        },
+      };
+
+      mockAxiosInstance.post.mockRejectedValue(error);
+
+      await expect(apiClient.post('/test-endpoint')).rejects.toEqual({
+        detail: 'Bad request',
+        status: 400,
+      });
+    });
+
+    it('should handle POST request network error', async () => {
+      const error = {
+        code: 'ENOTCONN',
+      };
+
+      mockAxiosInstance.post.mockRejectedValue(error);
+
+      await expect(apiClient.post('/test-endpoint')).rejects.toEqual({
+        detail: 'Network error. Please check your connection and try again.',
+        status: 0,
+      });
+    });
+  });
+
   describe('Error transformation', () => {
     it('should transform 400 error with default message', async () => {
       const error = {

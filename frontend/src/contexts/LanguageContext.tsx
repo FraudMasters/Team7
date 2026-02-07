@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import i18n from '@i18n';
-import { apiClient } from '@/api/client';
+import { preferencesClient } from '@/api';
 
 /**
  * Supported languages for the application
@@ -170,7 +170,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
     // Synchronize language preference with backend
     // Don't let backend failures block the UI update
     try {
-      await apiClient.updateLanguagePreference(newLanguage);
+      await preferencesClient.updateLanguagePreference(newLanguage);
     } catch (error) {
       // Log error but don't throw - UI already updated locally
       console.warn('Failed to sync language preference to backend:', error);

@@ -48,7 +48,7 @@ import {
 } from '@mui/icons-material';
 
 // Импорт API клиента и типов
-import { apiClient } from '@/api/client';
+import { matchingWeightsClient } from '@/api';
 import type {
   PresetProfile,
   MatchingWeightsProfile,
@@ -193,8 +193,8 @@ function WeightsPage() {
     try {
       // Загружаем кастомные профили и пресеты
       const [profilesResult, presetsResult] = await Promise.all([
-        apiClient.listWeightProfiles(),
-        apiClient.getPresetProfiles(),
+        matchingWeightsClient.listWeightProfiles(),
+        matchingWeightsClient.getPresetProfiles(),
       ]);
 
       setExistingProfiles(profilesResult.profiles);
@@ -229,7 +229,7 @@ function WeightsPage() {
         change_reason: 'Created from weight customization UI',
       };
 
-      await apiClient.createWeightProfile(createData);
+      await matchingWeightsClient.createWeightProfile(createData);
 
       setSuccess(true);
       setShowSaveDialog(false);

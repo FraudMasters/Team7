@@ -42,7 +42,8 @@ import {
   Warning as WarningIcon,
   History as HistoryIcon,
   AutoAwesome as PresetIcon,
-import { apiClient } from '@/api/client';
+} from '@mui/icons-material';
+import { matchingWeightsClient } from '@/api';
 import type {
   PresetProfile,
   MatchingWeightsProfile,
@@ -175,8 +176,8 @@ export default function WeightCustomizationPage() {
     try {
       // Load both custom profiles and presets
       const [profilesResult, presetsResult] = await Promise.all([
-        apiClient.listWeightProfiles(),
-        apiClient.getPresetProfiles(),
+        matchingWeightsClient.listWeightProfiles(),
+        matchingWeightsClient.getPresetProfiles(),
       ]);
 
       setExistingProfiles(profilesResult.profiles);
@@ -211,7 +212,7 @@ export default function WeightCustomizationPage() {
         change_reason: 'Created from weight customization UI',
       };
 
-      await apiClient.createWeightProfile(createData);
+      await matchingWeightsClient.createWeightProfile(createData);
 
       setSuccess(true);
       setShowSaveDialog(false);
