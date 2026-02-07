@@ -32,8 +32,10 @@ class Settings(BaseSettings):
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         celery_broker_url: Celery broker URL
         celery_result_backend: Celery result backend URL
-        backup_retention_days: Default backup retention period in days
-        audit_log_retention_days: Default audit log retention period in days
+        neo4j_uri: Neo4j database connection URI
+        neo4j_user: Neo4j database username
+        neo4j_password: Neo4j database password
+        graphiti_telemetry_enabled: Enable/disable Graphiti telemetry
     """
 
     model_config = SettingsConfigDict(
@@ -121,201 +123,25 @@ class Settings(BaseSettings):
         description="Celery result backend URL",
     )
 
-    # Backup Configuration
-    backup_enabled: bool = Field(
-        default=True,
-        description="Enable automated backups",
+    # Neo4j Configuration
+    neo4j_uri: str = Field(
+        default="bolt://localhost:7687",
+        description="Neo4j database connection URI",
     )
 
-    backup_retention_days: int = Field(
-        default=30,
-        ge=1,
-        le=365,
-        description="Default backup retention period in days",
+    neo4j_user: str = Field(
+        default="neo4j",
+        description="Neo4j database username",
     )
 
-    backup_schedule: str = Field(
-        default="0 2 * * *",
-        description="Cron expression for scheduled backups (default: daily at 2 AM)",
+    neo4j_password: str = Field(
+        default="password",
+        description="Neo4j database password",
     )
 
-    backup_dir: Path = Field(
-        default=Path("./data/backups"),
-        description="Directory for storing backup files",
-    )
-
-    # S3 Backup Configuration
-    backup_s3_enabled: bool = Field(
+    graphiti_telemetry_enabled: bool = Field(
         default=False,
-        description="Enable S3 off-site backup",
-    )
-
-    backup_s3_bucket: Optional[str] = Field(
-        default=None,
-        description="S3 bucket name for backups",
-    )
-
-    backup_s3_endpoint: Optional[str] = Field(
-        default=None,
-        description="S3-compatible endpoint URL",
-    )
-
-    backup_s3_access_key: Optional[str] = Field(
-        default=None,
-        description="S3 access key ID",
-    )
-
-    backup_s3_secret_key: Optional[str] = Field(
-        default=None,
-        description="S3 secret access key",
-    )
-
-    backup_s3_region: str = Field(
-        default="us-east-1",
-        description="S3 region",
-    )
-
-    backup_notification_email: Optional[str] = Field(
-        default=None,
-        description="Email for backup failure notifications",
-    )
-
-    backup_incremental_enabled: bool = Field(
-        default=True,
-        description="Enable incremental backups",
-    )
-
-    backup_compression_enabled: bool = Field(
-        default=True,
-        description="Enable backup compression",
-    )
-
-    # Audit Log Configuration
-    audit_log_retention_days: int = Field(
-        default=90,
-        ge=1,
-        le=365,
-        description="Default audit log retention period in days",
-    )
-
-    # ==============================================
-    # JWT Configuration for Authentication
-    # ==============================================
-    secret_key: str = Field(
-        default="change-this-secret-key-in-production",
-        description="Secret key for JWT token signing (CHANGE IN PRODUCTION)",
-    )
-
-    jwt_algorithm: str = Field(
-        default="HS256",
-        description="JWT algorithm for token signing",
-    )
-
-    access_token_expire_minutes: int = Field(
-        default=30,
-        ge=5,
-        le=1440,
-        description="Access token expiration time in minutes",
-    )
-
-    refresh_token_expire_days: int = Field(
-        default=7,
-        ge=1,
-        le=30,
-        description="Refresh token expiration time in days",
-    )
-
-    # ==============================================
-    # LLM API Configuration for ATS Simulation
-    # ==============================================
-    llm_provider: str = Field(
-        default="zai",
-        description="LLM provider to use (openai, anthropic, google, zai)",
-    )
-
-    zai_api_key: Optional[str] = Field(
-        default=None,
-        description="Z.ai API key for ATS simulation",
-    )
-
-    zai_base_url: str = Field(
-        default="https://api.z.ai/api/paas/v4",
-        description="Z.ai API base URL",
-    )
-
-    openai_api_key: Optional[str] = Field(
-        default=None,
-        description="OpenAI API key for ATS simulation",
-    )
-
-    anthropic_api_key: Optional[str] = Field(
-        default=None,
-        description="Anthropic API key for ATS simulation",
-    )
-
-    google_api_key: Optional[str] = Field(
-        default=None,
-        description="Google API key for Gemini models",
-    )
-
-    llm_model: str = Field(
-        default="glm-4.7",
-        description="Default LLM model for ATS simulation",
-    )
-
-    llm_temperature: float = Field(
-        default=0.1,
-        ge=0.0,
-        le=1.0,
-        description="Temperature for LLM calls (lower = more deterministic)",
-    )
-
-    llm_max_tokens: int = Field(
-        default=4096,
-        ge=256,
-        le=32768,
-        description="Maximum tokens for LLM responses",
-    )
-
-    # ATS Simulation Configuration
-    ats_threshold: float = Field(
-        default=0.6,
-        ge=0.0,
-        le=1.0,
-        description="Minimum ATS score to pass (0.0-1.0)",
-    )
-
-    ats_visual_check_enabled: bool = Field(
-        default=True,
-        description="Enable visual format checking in ATS",
-    )
-
-    ats_keyword_weight: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Weight for keyword matching in ATS score",
-    )
-
-    ats_experience_weight: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Weight for experience matching in ATS score",
-    )
-
-    ats_education_weight: float = Field(
-        default=0.2,
-        ge=0.0,
-        le=1.0,
-        description="Weight for education matching in ATS score",
-    )
-
-    ats_fit_weight: float = Field(
-        default=0.2,
-        ge=0.0,
-        le=1.0,
-        description="Weight for overall fit assessment in ATS score",
+        description="Enable/disable Graphiti telemetry",
     )
 
     @field_validator("database_url")

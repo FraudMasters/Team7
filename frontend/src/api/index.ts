@@ -1,7 +1,7 @@
 /**
- * Экспорты модуля API
+ * API module exports
  *
- * Централизованные экспорты для API клиента и связанных типов.
+ * Central exports for the API client and related types.
  */
 
 export { ApiClient, apiClient } from './client';
@@ -13,7 +13,7 @@ export { candidateActivitiesClient, CandidateActivitiesClient } from './candidat
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
 export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
 export { candidateSearchClient, CandidateSearchClient } from './search';
-export { vacanciesClient, VacanciesClient } from './vacancies';
+export { semanticSearchClient, SemanticSearchClient } from './semanticSearch';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -76,10 +76,13 @@ export type {
   CandidateSearchRequest,
   CandidateSearchResult,
   CandidateSearchResponse,
-  VacancyCreate,
-  VacancyUpdate,
-  VacancyResponse,
-  VacancyListResponse,
-  VacancyBulkImportRequest,
-  VacancyBulkImportResponse,
+  SemanticSearchFilters,
+  SemanticSearchRequest,
+  SemanticSearchResponse,
+  SemanticMatchExplanation,
+  SemanticCandidateResult,
+  HybridSearchRequest,
+  HybridSearchResponse,
+  MatchExplanationRequest,
+  MatchExplanationResponse,
 } from '@/types/api';

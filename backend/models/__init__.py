@@ -32,10 +32,7 @@ from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
-from .salary_benchmark import SalaryBenchmark
-from .salary_history import SalaryHistory
-from .salary_offer import SalaryOffer
-from .cost_of_living import CostOfLivingIndex
+from .retraining_config import RetrainingConfig
 
 __all__ = [
     "Base",
@@ -78,8 +75,5 @@ __all__ = [
     "SavedSearch",
     "SearchAlert",
     "SearchHistory",
-    "SalaryBenchmark",
-    "SalaryHistory",
-    "SalaryOffer",
-    "CostOfLivingIndex",
+    "RetrainingConfig",
 ]

@@ -806,522 +806,111 @@
       "saved": "Weights saved successfully!"
     }
   },
-  "resumeResults": {
-    "title": "Resume Analysis Results",
-    "subtitle": "AI-powered analysis of your resume with insights and recommendations",
-    "backToUpload": "Upload Another Resume",
-    "analysisSummary": "Analysis Summary",
-    "overallScore": "Overall Score",
-    "skills": {
-      "title": "Skills Analysis",
-      "extracted": "Extracted Skills",
-      "missing": "Suggested Skills",
-      "proficiency": "Skill Proficiency"
+  "semanticSearch": {
+    "title": "Semantic Search",
+    "tooltip": "Use natural language to describe your ideal candidate",
+    "placeholder": "Describe your ideal candidate in natural language...\n\nExample: 'Find me a senior Python developer with experience in fintech who has led teams of 5+ people'",
+    "helperText": "Type your search query and press Enter or click Search",
+    "search": "Search",
+    "searching": "Searching...",
+    "showSuggestions": "Show Suggestions",
+    "hideSuggestions": "Hide Suggestions",
+    "suggestionsTitle": "Quick Search Suggestions",
+    "examplesTitle": "Try these examples:",
+    "modes": {
+      "semantic": "Semantic",
+      "hybrid": "Hybrid",
+      "keyword": "Keyword"
     },
-    "experience": {
-      "title": "Experience Analysis",
-      "total": "Total Experience",
-      "roles": "Roles Detected",
-      "companies": "Companies"
+    "modeDescriptions": {
+      "semantic": "AI-powered search that understands meaning and context. Finds candidates based on intent, not just keywords.",
+      "hybrid": "Combines semantic understanding with keyword matching for comprehensive results.",
+      "keyword": "Traditional keyword-based search. Matches exact terms in resumes."
     },
-    "grammar": {
-      "title": "Grammar & Style",
-      "issues": "Issues Found",
-      "suggestions": "Suggestions"
-    },
-    "recommendations": {
-      "title": "Recommendations",
-      "improvements": "Suggested Improvements",
-      "keywords": "Keywords to Add"
-    },
-    "actions": {
-      "download": "Download Report",
-      "share": "Share Results",
-      "applyJobs": "Apply to Matching Jobs"
-    }
-  },
-  "recommendedJobs": {
-    "title": "Recommended Jobs",
-    "subtitle": "Personalized job recommendations based on your resume profile",
-    "matchScore": "Match Score",
-    "filterBy": "Filter by",
-    "sortBy": "Sort by",
-    "relevance": "Relevance",
-    "salary": "Salary",
-    "location": "Location",
-    "recentlyPosted": "Recently Posted",
-    "noJobs": "No recommended jobs available",
-    "adjustFilters": "Try adjusting your filters",
-    "viewDetails": "View Details",
-    "applyNow": "Apply Now",
-    "saveJob": "Save Job"
-  },
-  "skillAssessment": {
-    "title": "Skill Assessment",
-    "subtitle": "Evaluate your skills and identify areas for growth",
-    "selectSkill": "Select a skill to assess",
-    "currentLevel": "Your Current Level",
-    "desiredLevel": "Desired Level",
-    "assessment": {
-      "title": "Assessment Questions",
-      "question": "Question",
-      "of": "of",
-      "submit": "Submit Answer",
-      "next": "Next Question",
-      "previous": "Previous Question"
+    "examples": {
+      "seniorDeveloper": "Senior Python developer with fintech experience",
+      "teamLead": "Full stack developer who has led teams",
+      "fullStack": "React and TypeScript developer with cloud experience"
     },
     "results": {
-      "title": "Assessment Results",
-      "score": "Your Score",
-      "feedback": "Feedback",
-      "improve": "Ways to Improve",
-      "retake": "Retake Assessment"
-    },
-    "levels": {
-      "beginner": "Beginner",
-      "intermediate": "Intermediate",
-      "advanced": "Advanced",
-      "expert": "Expert"
-    }
-  },
-  "learning": {
-    "title": "Learning Resources",
-    "subtitle": "Curated courses and materials to upgrade your skills",
-    "categories": "Categories",
-    "all": "All",
-    "courses": "Courses",
-    "tutorials": "Tutorials",
-    "certifications": "Certifications",
-    "books": "Books",
-    "filterBySkill": "Filter by Skill",
-    "difficulty": {
-      "title": "Difficulty",
-      "beginner": "Beginner",
-      "intermediate": "Intermediate",
-      "advanced": "Advanced"
-    },
-    "duration": "Duration",
-    "rating": "Rating",
-    "free": "Free",
-    "paid": "Paid",
-    "enroll": "Enroll Now",
-    "viewDetails": "View Details",
-    "provider": "Provider",
-    "noResources": "No resources found",
-    "tryDifferentFilters": "Try different filters"
-  },
-  "salaryCalculator": {
-    "title": "Salary Calculator",
-    "subtitle": "Estimate your market value based on skills and experience",
-    "yourProfile": "Your Profile",
-    "skills": "Skills",
-    "experience": "Years of Experience",
-    "location": "Location",
-    "industry": "Industry",
-    "calculate": "Calculate Salary",
-    "calculating": "Calculating...",
-    "results": {
-      "title": "Salary Estimate",
-      "min": "Minimum",
-      "max": "Maximum",
-      "average": "Average",
-      "range": "Estimated Range",
-      "factors": "Factors Affecting Salary",
-      "topSkills": "Top Skills Contributing"
-    },
-    "disclaimer": "This is an estimate based on market data. Actual offers may vary."
-  },
-  "interviewTips": {
-    "title": "Interview Preparation",
-    "subtitle": "Tips and resources to help you succeed in interviews",
-    "categories": {
-      "behavioral": "Behavioral Questions",
-      "technical": "Technical Questions",
-      "general": "General Tips",
-      "common": "Common Questions"
-    },
-    "prepare": {
-      "title": "How to Prepare",
-      "research": "Research the Company",
-      "practice": "Practice Common Questions",
-      "questions": "Prepare Questions to Ask",
-      "followUp": "Plan Follow-up"
-    },
-    "questions": {
-      "title": "Practice Questions",
-      "behavioral": "Behavioral",
-      "technical": "Technical",
-      "showAnswer": "Show Answer",
-      "hideAnswer": "Hide Answer"
-    },
-    "tips": {
-      "title": "Quick Tips",
-      "tip1": "Arrive 10-15 minutes early",
-      "tip2": "Bring extra copies of your resume",
-      "tip3": "Maintain eye contact",
-      "tip4": "Be honest about your skills",
-      "tip5": "Follow up with a thank you note"
-    }
-  },
-  "jobAlerts": {
-    "title": "Job Alerts",
-    "subtitle": "Stay updated with new matching opportunities",
-    "createAlert": "Create Alert",
-    "myAlerts": "My Alerts",
-    "noAlerts": "No job alerts configured",
-    "createFirst": "Create your first job alert",
-    "alertForm": {
-      "title": "Alert Details",
-      "name": "Alert Name",
-      "namePlaceholder": "e.g., React Developer in NYC",
-      "keywords": "Keywords",
-      "keywordsPlaceholder": "e.g., React, TypeScript, Node.js",
-      "location": "Location",
-      "locationPlaceholder": "e.g., New York, Remote",
-      "salary": "Minimum Salary",
-      "frequency": "Email Frequency",
-      "frequencies": {
-        "immediate": "Immediate",
-        "daily": "Daily",
-        "weekly": "Weekly"
+      "title": "Semantic Search Results",
+      "searching": "Searching...",
+      "understandingQuery": "Understanding your query using AI...",
+      "searchQuery": "Search Query",
+      "candidate": "Candidate",
+      "yearsExperience": "years experience",
+      "skills": "{{count}} skills",
+      "seeExplanation": "See why this candidate matched",
+      "quickMatch": "Quick Match Explanation",
+      "semanticScoreTooltip": "Semantic similarity score based on AI understanding of meaning",
+      "keywordScoreTooltip": "Keyword match score based on explicit term matching",
+      "finalScoreTooltip": "Final combined score",
+      "semanticUsed": "Semantic AI Used",
+      "fallbackUsed": "Fallback to Keyword Search",
+      "keywordOnly": "Keyword Search Only",
+      "candidates": "{{count}} Candidates Found",
+      "error": {
+        "title": "Search Failed",
+        "failedToLoad": "Failed to load search results"
       },
-      "save": "Save Alert",
-      "cancel": "Cancel"
-    },
-    "activeAlerts": {
-      "title": "Active Alerts",
-      "matches": "New Matches",
-      "lastSent": "Last Sent",
-      "edit": "Edit",
-      "delete": "Delete",
-      "pause": "Pause",
-      "resume": "Resume"
-    }
-  },
-  "settings": {
-    "title": "Settings",
-    "subtitle": "Manage your account preferences and profile",
-    "profile": {
-      "title": "Profile Settings",
-      "fullName": "Full Name",
-      "email": "Email Address",
-      "phone": "Phone Number",
-      "location": "Location",
-      "headline": "Professional Headline",
-      "bio": "Bio",
-      "save": "Save Changes",
-      "cancel": "Cancel",
-      "updating": "Updating..."
-    },
-    "notifications": {
-      "title": "Notification Preferences",
-      "email": "Email Notifications",
-      "push": "Push Notifications",
-      "jobAlerts": "Job Alerts",
-      "applicationUpdates": "Application Updates",
-      "messages": "Messages",
-      "marketing": "Marketing Emails"
-    },
-    "privacy": {
-      "title": "Privacy Settings",
-      "profileVisibility": "Profile Visibility",
-      "resumeVisibility": "Resume Visibility",
-      "showContact": "Show Contact Information",
-      "dataSharing": "Data Sharing Preferences"
-    },
-    "account": {
-      "title": "Account Settings",
-      "changePassword": "Change Password",
-      "twoFactor": "Two-Factor Authentication",
-      "sessions": "Active Sessions",
-      "deleteAccount": "Delete Account",
-      "danger": "Danger Zone"
-    },
-    "language": {
-      "title": "Language & Region",
-      "language": "Language",
-      "timezone": "Timezone",
-      "dateFormat": "Date Format"
-    }
-  },
-  "candidateProfile": {
-    "title": "Candidate Profile",
-    "subtitle": "Manage your professional profile and resume",
-    "personalInfo": {
-      "title": "Personal Information",
-      "fullName": "Full Name",
-      "email": "Email",
-      "phone": "Phone",
-      "location": "Location",
-      "website": "Website",
-      "linkedin": "LinkedIn"
-    },
-    "professionalSummary": {
-      "title": "Professional Summary",
-      "headline": "Professional Headline",
-      "bio": "About Me",
-      "save": "Save"
-    },
-    "skills": {
-      "title": "Skills",
-      "add": "Add Skill",
-      "edit": "Edit Skills",
-      "proficiency": "Proficiency Level",
-      "years": "Years of Experience",
-      "levels": {
-        "beginner": "Beginner",
-        "intermediate": "Intermediate",
-        "advanced": "Advanced",
-        "expert": "Expert"
+      "noResults": {
+        "title": "No Results Found",
+        "message": "Try rephrasing your query or use broader terms."
+      },
+      "noCandidates": {
+        "title": "No Candidates",
+        "message": "No candidates match your search criteria. Try adjusting your query or filters."
+      },
+      "stats": {
+        "candidatesFound": "Candidates Found",
+        "highMatch": "High Match (70%+)",
+        "semanticMatches": "Semantic Matches",
+        "executionTime": "Execution Time"
+      },
+      "explanation": {
+        "semanticScore": "Semantic Score",
+        "skillMatch": "Skill Match",
+        "experienceRelevance": "Experience Relevance",
+        "contextFit": "Context Fit",
+        "matchedSkills": "Matched Skills ({{count}})",
+        "inferredSkills": "Inferred Skills ({{count}})",
+        "inferredTooltip": "Skills inferred from context based on related experience",
+        "transferableSkills": "Transferable Skills ({{count}})",
+        "transferableTooltip": "Skills from other contexts that apply to this role",
+        "missingSkills": "Missing Skills ({{count}})",
+        "whyMatched": "Why This Candidate Matched"
       }
-    },
-    "experience": {
-      "title": "Work Experience",
-      "add": "Add Experience",
-      "edit": "Edit Experience",
-      "current": "Current Position",
-      "previous": "Previous Positions"
-    },
-    "education": {
-      "title": "Education",
-      "add": "Add Education",
-      "degree": "Degree",
-      "school": "School",
-      "graduation": "Graduation Year"
-    },
-    "resumes": {
-      "title": "My Resumes",
-      "upload": "Upload New Resume",
-      "primary": "Primary Resume",
-      "makePrimary": "Set as Primary",
-      "delete": "Delete",
-      "download": "Download"
     }
   },
-  "advancedAnalytics": {
-    "title": "Advanced Analytics",
-    "subtitle": "Comprehensive hiring metrics and insights",
-    "tabs": {
-      "overview": "Overview",
-      "funnel": "Hiring Funnel",
-      "timeToFill": "Time to Fill",
-      "sources": "Source Effectiveness",
-      "quality": "Quality Metrics"
-    },
-    "overview": {
-      "title": "Analytics Overview",
-      "totalApplications": "Total Applications",
-      "activeJobs": "Active Jobs",
-      "interviewsScheduled": "Interviews Scheduled",
-      "offersExtended": "Offers Extended",
-      "acceptanceRate": "Acceptance Rate",
-      "timeToHire": "Avg Time to Hire"
-    },
-    "funnel": {
-      "title": "Hiring Funnel",
-      "sourced": "Sourced",
-      "applied": "Applied",
-      "screened": "Screened",
-      "interviewed": "Interviewed",
-      "offered": "Offered",
-      "hired": "Hired",
-      "conversionRate": "Conversion Rate"
-    },
-    "timeToFill": {
-      "title": "Time to Fill Analysis",
-      "average": "Average Days",
-      "byDepartment": "By Department",
-      "byRole": "By Role",
-      "benchmark": "Industry Benchmark"
-    },
-    "sources": {
-      "title": "Source Effectiveness",
-      "source": "Source",
-      "applications": "Applications",
-      "hires": "Hires",
-      "costPerHire": "Cost per Hire",
-      "qualityOfHire": "Quality of Hire"
-    },
-    "quality": {
-      "title": "Quality Metrics",
-      "retention": "Retention Rate",
-      "performance": "Performance Scores",
-      "satisfaction": "Candidate Satisfaction",
-      "matchQuality": "Match Quality"
-    }
-  },
-  "compensationAnalysis": {
-    "title": "Compensation Analysis",
-    "subtitle": "Salary distribution and compensation insights",
-    "tabs": {
-      "overview": "Overview",
-      "distribution": "Salary Distribution",
-      "byRole": "By Role",
-      "byLevel": "By Level",
-      "recommendations": "Recommendations"
-    },
-    "overview": {
-      "title": "Compensation Overview",
-      "avgSalary": "Average Salary",
-      "medianSalary": "Median Salary",
-      "salaryRange": "Salary Range",
-      "totalBudget": "Total Budget"
-    },
-    "distribution": {
-      "title": "Salary Distribution",
-      "histogram": "Salary Histogram",
-      "percentiles": "Percentiles",
-      "p25": "25th Percentile",
-      "p50": "50th Percentile",
-      "p75": "75th Percentile",
-      "p90": "90th Percentile"
-    },
-    "byRole": {
-      "title": "Salaries by Role",
-      "role": "Role",
-      "min": "Minimum",
-      "max": "Maximum",
-      "average": "Average"
-    },
-    "byLevel": {
-      "title": "Compensation by Level",
-      "entry": "Entry Level",
-      "mid": "Mid Level",
-      "senior": "Senior Level",
-      "lead": "Lead/Principal"
-    },
-    "recommendations": {
-      "title": "Compensation Recommendations",
-      "adjustment": "Recommended Adjustments",
-      "budget": "Budget Optimization",
-      "market": "Market Alignment"
-    }
-  },
-  "salaryBenchmarking": {
-    "title": "Salary Benchmarking",
-    "subtitle": "Compare your salary offers against market data",
-    "search": {
-      "title": "Market Benchmark Search",
-      "role": "Role/Title",
-      "location": "Location",
-      "experience": "Years of Experience",
-      "search": "Search Benchmarks"
-    },
-    "results": {
-      "title": "Benchmark Results",
-      "p10": "10th Percentile",
-      "p25": "25th Percentile",
-      "p50": "Median (50th)",
-      "p75": "75th Percentile",
-      "p90": "90th Percentile",
-      "yourOffer": "Your Offer",
-      "position": "Position"
-    },
-    "comparison": {
-      "title": "Offer Comparison",
-      "below": "Below Market",
-      "at": "At Market",
-      "above": "Above Market",
-      "competitiveness": "Competitiveness Score"
-    },
-    "actions": {
-      "export": "Export Data",
-      "save": "Save Comparison",
-      "share": "Share Results"
-    }
-  },
-  "jobIntegrations": {
-    "title": "Job Board Integrations",
-    "subtitle": "Connect and manage job posting platforms",
-    "platforms": {
-      "title": "Connected Platforms",
-      "linkedin": "LinkedIn",
-      "indeed": "Indeed",
-      "glassdoor": "Glassdoor",
-      "monster": "Monster",
-      "careerBuilder": "CareerBuilder"
-    },
-    "connection": {
-      "title": "Platform Connection",
-      "status": "Connection Status",
-      "connected": "Connected",
-      "disconnected": "Disconnected",
-      "connect": "Connect",
-      "disconnect": "Disconnect",
-      "configure": "Configure"
-    },
-    "autoPublish": {
-      "title": "Auto-Publish Settings",
-      "enable": "Enable Auto-Publish",
-      "defaultPlatforms": "Default Platforms",
-      "postImmediately": "Post Immediately",
-      "schedule": "Schedule Posting"
-    },
-    "sync": {
-      "title": "Synchronization",
-      "lastSync": "Last Sync",
-      "syncNow": "Sync Now",
-      "syncStatus": "Sync Status",
-      "applications": "Import Applications"
-    },
-    "credentials": {
-      "title": "API Credentials",
-      "apiKey": "API Key",
-      "apiSecret": "API Secret",
-      "validate": "Validate",
-      "update": "Update"
-    }
-  },
-  "systemHealth": {
-    "title": "System Health Monitoring",
-    "subtitle": "Real-time microservices health and performance metrics",
-    "tabs": {
-      "overview": "Overview",
-      "services": "Services",
-      "performance": "Performance",
-      "logs": "Logs"
-    },
-    "overview": {
-      "title": "System Status",
-      "overallHealth": "Overall Health",
-      "uptime": "System Uptime",
-      "activeServices": "Active Services",
-      "issues": "Active Issues",
-      "healthy": "All Systems Operational",
-      "degraded": "Some Systems Degraded",
-      "down": "System Outage"
-    },
-    "services": {
-      "title": "Microservices Status",
-      "service": "Service",
-      "status": "Status",
-      "responseTime": "Response Time",
-      "lastCheck": "Last Check",
-      "uptime": "Uptime",
-      "operational": "Operational",
-      "degraded": "Degraded Performance",
-      "down": "Service Down",
-      "unknown": "Unknown Status"
-    },
-    "performance": {
-      "title": "Performance Metrics",
-      "cpu": "CPU Usage",
-      "memory": "Memory Usage",
-      "disk": "Disk Usage",
-      "network": "Network I/O",
-      "requests": "Requests/sec",
-      "errors": "Error Rate",
-      "latency": "Avg Latency"
-    },
-    "logs": {
-      "title": "Health Logs",
-      "recent": "Recent Logs",
-      "errors": "Error Logs",
-      "warnings": "Warnings",
-      "filterByLevel": "Filter by Level",
-      "filterByService": "Filter by Service",
-      "export": "Export Logs",
-      "clear": "Clear Logs"
-    }
+  "advancedSearch": {
+    "title": "Advanced Filters",
+    "filters": "filters",
+    "searchQuery": "Search Query",
+    "searchPlaceholder": "Enter your search query...",
+    "addFilter": "Add Filter",
+    "skills": "Skills",
+    "selectSkills": "Select skills...",
+    "location": "Location",
+    "languages": "Languages",
+    "selectLanguages": "Select languages...",
+    "educationLevel": "Education Level",
+    "any": "Any",
+    "highSchool": "High School",
+    "bachelor": "Bachelor's",
+    "master": "Master's",
+    "phd": "PhD",
+    "experienceYears": "Experience: {{min}} - {{max}} years",
+    "matchScore": "Match Score: {{min}}% - {{max}}%",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "minSalary": "Min Salary",
+    "maxSalary": "Max Salary",
+    "vacancy": "Vacancy",
+    "allVacancies": "All Vacancies",
+    "stage": "Stage",
+    "allStages": "All Stages",
+    "clear": "Clear All",
+    "search": "Search",
+    "searching": "Searching..."
   }
 }

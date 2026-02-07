@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-resume_analysis}
     ports:
-      - "55432:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     deploy:
@@ -32,7 +32,7 @@ services:
     image: redis:7-alpine
     container_name: resume_analysis_redis
     ports:
-      - "56379:6379"
+      - "6379:6379"
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -52,28 +52,84 @@ services:
     networks:
       - resume_network
 
-  # PostgreSQL Exporter (Prometheus metrics for PostgreSQL)
-  postgres_exporter:
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
-    container_name: resume_analysis_postgres_exporter
+  # Neo4j Graph Database (for Graphiti-Core knowledge graph)
+  neo4j:
+    image: neo4j:5.26
+    container_name: resume_analysis_neo4j
     environment:
-      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_analysis}?sslmode=disable
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-graphiti_password}
+      NEO4J_dbms_memory_heap_max__size: 2G
+      NEO4J_dbms_memory_heap_initial__size: 512M
     ports:
-      - "9187:9187"
+      - "7474:7474"  # HTTP Browser UI
+      - "7687:7687"  # Bolt Protocol
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '2.0'
+          memory: 2G
         reservations:
-          cpus: '0.25'
-          memory: 128M
-    depends_on:
-      postgres:
-        condition: service_healthy
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-graphiti_password} 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - resume_network
 
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: resume_analysis_backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-graphiti_password}
+      MODELS_CACHE_PATH: /app/models_cache
+      PYTHONPATH: /app:/app/services
+      # Hugging Face optimizations
+      TRANSFORMERS_CACHE: /app/models_cache/hub
+      HF_HOME: /app/models_cache
+      PYTORCH_ENABLE_MPS_FALLBACK: 1
+      # Logging to Loki
+      LOKI_URL: http://loki:3100
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - ./services:/app/services
+      - ./testdata:/app/testdata:ro
+      - backend_models:/app/models_cache
+      - backend_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks:
+      - resume_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # Celery Worker (for async processing)
   celery_worker:
@@ -86,6 +142,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-graphiti_password}
       MODELS_CACHE_PATH: /app/models_cache
       PYTHONPATH: /app:/app/services
       # Hugging Face optimizations
@@ -94,30 +153,11 @@ services:
       PYTORCH_ENABLE_MPS_FALLBACK: 1
       # Logging to Loki
       LOKI_URL: http://loki:3100
-      # Backup Configuration
-      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
-      BACKUP_DIR: /app/data/backups
-      BACKUP_S3_ENABLED: ${BACKUP_S3_ENABLED:-false}
-      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
-      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
-      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
-      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
-      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
-      BACKUP_NOTIFICATION_EMAIL: ${BACKUP_NOTIFICATION_EMAIL:-}
-      # PostgreSQL connection for pg_dump
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: ${POSTGRES_USER:-postgres}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      PGDATABASE: ${POSTGRES_DB:-resume_analysis}
     volumes:
       - ./backend:/app
       - ./services:/app/services
       - backend_models:/app/models_cache
       - backend_logs:/app/logs
-      - backend_backups:/app/data/backups
-      - backend_uploads:/app/data/uploads
     deploy:
       resources:
         limits:
@@ -131,124 +171,25 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
     networks:
       - resume_network
     command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=4 --prefetch-multiplier=2 --queues=celery,analysis,learning,reporting
 
-  # Celery Beat (for scheduled tasks like daily backups)
-  celery_beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: resume_analysis_celery_beat
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_analysis}
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-      MODELS_CACHE_PATH: /app/models_cache
-      PYTHONPATH: /app:/app/services
-      # Logging to Loki
-      LOKI_URL: http://loki:3100
-      # Backup Configuration
-      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
-      BACKUP_DIR: /app/data/backups
-      BACKUP_S3_ENABLED: ${BACKUP_S3_ENABLED:-false}
-      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
-      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
-      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
-      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
-      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
-      BACKUP_NOTIFICATION_EMAIL: ${BACKUP_NOTIFICATION_EMAIL:-}
-      # PostgreSQL connection for pg_dump
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: ${POSTGRES_USER:-postgres}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      PGDATABASE: ${POSTGRES_DB:-resume_analysis}
-    volumes:
-      - ./backend:/app
-      - ./services:/app/services
-      - backend_backups:/app/data/backups
-      - celerybeat_data:/app/celerybeat
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - resume_network
-    command: celery -A celery_app.celery_app beat --loglevel=info
-
-  # Celery Exporter (Prometheus metrics for Celery)
-  celery_exporter:
-    image: zerok/celery-prometheus-exporter:latest
-    container_name: resume_analysis_celery_exporter
-    environment:
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_EXPORTER_BROKER_URL: redis://redis:6379/0
-      CELERY_EXPORTER_ENABLE_BROKER_OPTIONAL: "true"
-    ports:
-      - "9540:9540"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - resume_network
-
-  # cAdvisor (Container metrics for Docker)
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: resume_analysis_cadvisor
-    ports:
-      - "5800:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    privileged: true
-    devices:
-      - /dev/kmsg
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    networks:
-      - resume_network
-
-  # Frontend (React + Vite) - Development mode with Vite dev server
+  # Frontend (React + Vite) - Production build with nginx
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: development
+      target: production
+      args:
+        VITE_API_URL: ""
     container_name: resume_analysis_frontend
     ports:
-      - "${FRONTEND_PORT:-3000}:5173"
-    depends_on: []
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
     networks:
       - resume_network
 
@@ -264,22 +205,8 @@ services:
       GF_SERVER_ROOT_URL: "http://localhost:3001"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_TELEMETRY_ENABLED: "false"
-      # SMTP Configuration (Email Alerts)
-      GF_SMTP_ENABLED: "true"
-      GF_SMTP_HOST: ${GRAFANA_SMTP_HOST:-smtp.gmail.com:587}
-      GF_SMTP_USER: ${GRAFANA_SMTP_USER:-}
-      GF_SMTP_PASSWORD: ${GRAFANA_SMTP_PASSWORD:-}
-      GF_SMTP_FROM_ADDRESS: ${GRAFANA_SMTP_FROM_ADDRESS:-grafana@example.com}
-      GF_SMTP_FROM_NAME: "Grafana Alerts"
-      GF_SMTP_STARTTLS_POLICY: ${GRAFANA_SMTP_STARTTLS_POLICY:-OpportunisticStartTLS}
-      # Alert Configuration
-      ALERT_EMAIL_ADDRESS: ${ALERT_EMAIL_ADDRESS:-alerts@example.com}
-      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
-      ALERT_WEBHOOK_USERNAME: ${ALERT_WEBHOOK_USERNAME:-}
-      ALERT_WEBHOOK_PASSWORD: ${ALERT_WEBHOOK_PASSWORD:-}
-      ALERT_WEBHOOK_BEARER_TOKEN: ${ALERT_WEBHOOK_BEARER_TOKEN:-}
     ports:
-      - "5301:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -355,7 +282,6 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/grafana/provisioning/alerts/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     deploy:
       resources:
@@ -371,11 +297,10 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  neo4j_data:
+  neo4j_logs:
   backend_models:
   backend_logs:
-  backend_backups:
-  backend_uploads:
-  celerybeat_data:
   grafana_data:
   loki_data:
   prometheus_data:

@@ -12,7 +12,7 @@ from . import (
     candidates,
     saved_searches,
     search,
-    salary_benchmarking,
+    training_pipeline,
 )
 
 __all__ = [
@@ -23,5 +23,5 @@ __all__ = [
     "candidates",
     "saved_searches",
     "search",
-    "salary_benchmarking",
+    "training_pipeline",
 ]

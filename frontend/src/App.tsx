@@ -1,19 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-// Components
-import PWAInstallPrompt from './components/PWAInstallPrompt';
-
 // Layouts
 import JobSeekerLayout from './layouts/JobSeekerLayout';
 import RecruiterLayout from './layouts/RecruiterLayout';
 
 // Pages - Landing
 import LandingPage from './pages/LandingPage';
-
-// Auth Pages
-import LoginPage from './auth/LoginPage';
-import RegisterPage from './auth/RegisterPage';
-import CallbackPage from './auth/CallbackPage';
 
 // Job Seeker Pages
 import { JobsBrowsePage } from './pages/jobs/JobsBrowsePage';
@@ -55,6 +47,10 @@ import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
 
+// Admin Pages
+import ModelTrainingPage from './pages/admin/ModelTrainingPage';
+import ModelVersionsPage from './pages/admin/ModelVersionsPage';
+
 /**
  * Main App Component
  *
@@ -67,11 +63,6 @@ function App() {
       <Routes>
         {/* Root route - Landing Page */}
         <Route path="/" element={<LandingPage />} />
-
-        {/* Auth Routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/callback" element={<CallbackPage />} />
 
         {/* Job Seeker Flow */}
         <Route path="/jobs" element={<JobSeekerLayout />}>
@@ -122,10 +113,17 @@ function App() {
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
         </Route>
 
+        {/* Admin Flow */}
+        <Route path="/admin/model-training" element={<RecruiterLayout />}>
+          <Route index element={<ModelTrainingPage />} />
+        </Route>
+        <Route path="/admin/model-versions" element={<RecruiterLayout />}>
+          <Route index element={<ModelVersionsPage />} />
+        </Route>
+
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <PWAInstallPrompt />
     </BrowserRouter>
   );
 }
