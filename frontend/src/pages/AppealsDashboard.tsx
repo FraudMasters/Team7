@@ -4,7 +4,7 @@ import {
   Box,
   Paper,
   Container,
-} from '@mui/material';
+} from '@/components/ui';
 
 /**
  * Appeals Dashboard Page Component
@@ -17,7 +17,7 @@ const AppealsDashboardPage: React.FC = () => {
     <Container maxWidth="lg">
       <Box sx={{ mt: 4, mb: 4 }}>
         <Paper sx={{ p: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
+          <Typography variant="h4" as="h1" gutterBottom>
             Appeals Dashboard
           </Typography>
           <Typography variant="body1">

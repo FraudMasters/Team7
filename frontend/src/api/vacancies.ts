@@ -1,89 +1,84 @@
 /**
- * Vacancy Search API Client
+ * Vacancy API Client
  *
- * This module provides a client for advanced vacancy search with
- * full-text search, boolean operators, and multi-field filtering.
+ * This module provides clients for working with vacancies:
+ * - VacanciesClient: CRUD operations for vacancy management
+ * - VacancySearchClient: Advanced search with filtering
  *
  * @example
  * ```ts
- * import { vacancySearchClient } from '@/api/vacancies';
+ * import { vacanciesClient, vacancySearchClient } from '@/api/vacancies';
  *
- * // Search with query and filters
+ * // CRUD operations
+ * const vacancies = await vacanciesClient.listVacancies();
+ * const vacancy = await vacanciesClient.getVacancy('vacancy-123');
+ *
+ * // Search operations
  * const results = await vacancySearchClient.searchVacancies({
  *   query: 'software engineer',
- *   filters: {
- *     work_format: 'remote',
- *     employment_type: 'full-time',
- *     salary_min: 80000,
- *     salary_max: 120000
- *   },
- *   limit: 10
- * });
- *
- * // Search by location only
- * const results = await vacancySearchClient.searchVacancies({
- *   filters: {
- *     location: 'New York',
- *     work_format: 'hybrid'
- *   }
+ *   filters: { work_format: 'remote' }
  * });
  * ```
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import type {
+  JobVacancy,
+  ApiError,
+  VacancyCreate,
+  VacancyUpdate,
+  VacancyResponse,
+  VacancyListResponse,
+  VacancyBulkImportRequest,
+  VacancyBulkImportResponse,
   VacancySearchRequest,
   VacancySearchResponse,
-  ApiError,
 } from '@/types/api';
 
 /**
- * Default API configuration for vacancy search client
+ * Re-export types for convenience
+ */
+export type {
+  VacancyCreate,
+  VacancyUpdate,
+  VacancyResponse,
+  VacancyListResponse,
+  VacancyBulkImportRequest,
+  VacancyBulkImportResponse,
+  VacancySearchRequest,
+  VacancySearchResponse,
+};
+
+/**
+ * Default API configuration
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  baseURL: import.meta.env.VITE_API_GATEWAY_URL ?? 'http://localhost:8888',
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Vacancy Search API Client class
- *
- * Provides methods for searching vacancies with proper
- * error handling and type safety.
+ * Base class with common functionality
  */
-export class VacancySearchClient {
-  private client: AxiosInstance;
+abstract class BaseVacancyClient {
+  protected client: AxiosInstance;
 
-  /**
-   * Create a new VacancySearch client instance
-   *
-   * @param config - Optional configuration overrides
-   */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
-
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
     );
   }
 
-  /**
-   * Transform Axios error to standardized API error
-   *
-   * @param error - Axios error
-   * @returns Transformed API error
-   */
-  private transformError(error: unknown): ApiError {
+  protected transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
@@ -97,22 +92,19 @@ export class VacancySearchClient {
       };
     }
 
-    // Server returned error response
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid search parameters. Please check your input.',
+      400: 'Invalid request. Please check your input.',
       401: 'Unauthorized. Please log in.',
       403: 'Forbidden. You do not have permission.',
       404: 'Resource not found.',
-      422: 'Validation error. Please check your search criteria.',
+      422: 'Validation error. Please check your input.',
       429: 'Too many requests. Please try again later.',
       500: 'Server error. Please try again later.',
       502: 'Bad gateway. Please try again later.',
@@ -125,19 +117,123 @@ export class VacancySearchClient {
     };
   }
 
+  getAxiosInstance(): AxiosInstance {
+    return this.client;
+  }
+}
+
+/**
+ * CRUD API Client for Vacancies
+ *
+ * Provides methods for creating, reading, updating, and deleting vacancies.
+ */
+export class VacanciesClient extends BaseVacancyClient {
+  /**
+   * Get all vacancies with pagination and optional filters
+   */
+  async listVacancies(
+    skip: number = 0,
+    limit: number = 100,
+    industry?: string,
+    position?: string
+  ): Promise<VacancyListResponse> {
+    try {
+      const params: Record<string, number | string> = { skip, limit };
+      if (industry) params.industry = industry;
+      if (position) params.position = position;
+
+      const response: AxiosResponse<VacancyListResponse> = await this.client.get(
+        '/api/vacancies',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get a vacancy by ID
+   */
+  async getVacancy(id: string): Promise<VacancyResponse> {
+    try {
+      const response: AxiosResponse<VacancyResponse> = await this.client.get(
+        `/api/vacancies/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Create a new vacancy
+   */
+  async createVacancy(data: VacancyCreate): Promise<VacancyResponse> {
+    try {
+      const response: AxiosResponse<VacancyResponse> = await this.client.post(
+        '/api/vacancies',
+        data
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Update an existing vacancy
+   */
+  async updateVacancy(id: string, data: VacancyUpdate): Promise<VacancyResponse> {
+    try {
+      const response: AxiosResponse<VacancyResponse> = await this.client.put(
+        `/api/vacancies/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Delete a vacancy
+   */
+  async deleteVacancy(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/api/vacancies/${id}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Bulk import vacancies
+   */
+  async bulkImport(request: VacancyBulkImportRequest): Promise<VacancyBulkImportResponse> {
+    try {
+      const response: AxiosResponse<VacancyBulkImportResponse> = await this.client.post(
+        '/api/vacancies/bulk',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+}
+
+/**
+ * Search API Client for Vacancies
+ *
+ * Provides advanced search functionality with filters and boolean operators.
+ */
+export class VacancySearchClient extends BaseVacancyClient {
   /**
    * Search for vacancies with advanced filters
    *
-   * Supports full-text search with boolean operators (AND, OR, NOT)
-   * and multi-field filtering by work format, location, salary range, employment type, etc.
-   *
-   * @param request - Search request with query, filters, pagination, and sorting
-   * @returns Search results with vacancy list and metadata
-   * @throws ApiError if search fails
-   *
    * @example
    * ```ts
-   * // Search with query and filters
    * const results = await vacancySearchClient.searchVacancies({
    *   query: 'software engineer',
    *   filters: {
@@ -148,23 +244,6 @@ export class VacancySearchClient {
    *   },
    *   limit: 10,
    *   sort_by: 'date'
-   * });
-   *
-   * // Filter by location and work format
-   * const results = await vacancySearchClient.searchVacancies({
-   *   filters: {
-   *     location: 'New York',
-   *     work_format: 'hybrid'
-   *   }
-   * });
-   *
-   * // Search with salary range only
-   * const results = await vacancySearchClient.searchVacancies({
-   *   filters: {
-   *     salary_min: 50000,
-   *     salary_max: 100000
-   *   },
-   *   sort_by: 'salary'
    * });
    * ```
    */
@@ -185,27 +264,15 @@ export class VacancySearchClient {
       throw this.transformError(error);
     }
   }
-
-  /**
-   * Get the underlying Axios instance
-   *
-   * This is useful for making custom requests not covered by the convenience methods.
-   *
-   * @returns Axios instance
-   */
-  getAxiosInstance(): AxiosInstance {
-    return this.client;
-  }
 }
 
 /**
- * Default vacancy search client instance
- *
- * Use this singleton instance for all vacancy search calls.
+ * Default client instances
  */
+export const vacanciesClient = new VacanciesClient();
 export const vacancySearchClient = new VacancySearchClient();
 
 /**
- * Export vacancy search client class for custom instances
+ * Export clients for creating custom instances
  */
-export default VacancySearchClient;
+export { VacanciesClient as default, VacancySearchClient };

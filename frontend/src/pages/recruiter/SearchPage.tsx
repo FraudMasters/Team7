@@ -1,7 +1,8 @@
 /**
- * Candidate Search Page
+ * Страница поиска кандидатов
  *
- * Advanced candidate search with filtering, AI ranking, and save functionality.
+ * Расширенный поиск кандидатов с фильтрацией, AI-ранжированием и возможностью сохранения.
+ * Использует MUI компоненты для отображения формы поиска, фильтров и результатов.
  */
 
 import { useState } from 'react';
@@ -34,9 +35,10 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { candidateSearchClient } from '../../api/search';
 import { savedSearchesClient } from '../../api/savedSearches';
-import { useBreakpoints } from '../../hooks/useBreakpoints';
+import { useBreakpoints } from '../../hooks';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 
+// Интерфейс кандидата
 interface Candidate {
   id: string;
   filename: string;
@@ -50,10 +52,12 @@ interface Candidate {
 }
 
 export function SearchPage() {
+  // Хуки для навигации и управления кэшем
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isMobile, isTablet } = useBreakpoints();
 
+  // Состояния для поиска и фильтров
   const [searchQuery, setSearchQuery] = useState('');
   const [skillsFilter, setSkillsFilter] = useState('');
   const [minMatchScore, setMinMatchScore] = useState([0]);
@@ -61,13 +65,14 @@ export function SearchPage() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
 
-  // Keyboard shortcuts
+  // Горячие клавиши для быстрого доступа к функциям поиска
   useKeyboardNavigation([
     { key: 'Ctrl+K', action: () => document.getElementById('search-input')?.focus(), priority: 10 },
     { key: 'Ctrl+S', action: () => setSaveDialogOpen(true), priority: 10 },
     { key: 'Escape', action: () => setSaveDialogOpen(false), priority: 5 },
   ]);
 
+  // Загружаем результаты поиска
   const {
     data: searchResults,
     isLoading,
@@ -90,6 +95,7 @@ export function SearchPage() {
     enabled: searchQuery.length > 0 || skillsFilter.length > 0 || minMatchScore[0] > 0,
   });
 
+  // Мутация для сохраненного поиска
   const saveSearchMutation = useMutation({
     mutationFn: async () => {
       await savedSearchesClient.createSavedSearch({
@@ -108,6 +114,7 @@ export function SearchPage() {
     },
   });
 
+  // Вычисляем статистику по результатам
   const candidates = searchResults?.candidates || [];
   const highMatchCount = candidates.filter(c => c.match_percentage >= 80).length;
   const mediumMatchCount = candidates.filter(c => c.match_percentage >= 60 && c.match_percentage < 80).length;
@@ -115,23 +122,26 @@ export function SearchPage() {
     ? Math.round(candidates.reduce((sum, c) => sum + c.match_percentage, 0) / candidates.length)
     : 0;
 
+  // Обработчик поиска
   const handleSearch = () => {
     refetch();
   };
 
+  // Обработчик сохранения поиска
   const handleSaveSearch = () => {
     if (saveSearchName.trim()) {
       saveSearchMutation.mutate();
     }
   };
 
+  // Переход к детали кандидата
   const handleCandidateClick = (candidateId: string) => {
     navigate(`/recruiter/candidates/${candidateId}`);
   };
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
-      {/* Header */}
+      {/* Заголовок страницы */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
           <Typography variant={isMobile ? 'h5' : 'h4'} fontWeight={700}>
@@ -151,10 +161,10 @@ export function SearchPage() {
         </Button>
       </Stack>
 
-      {/* Search and Filters */}
+      {/* Форма поиска и фильтры */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid2 container spacing={3}>
-          {/* Search Input */}
+          {/* Поле поиска */}
           <Grid2 size={{ xs: 12, md: 6 }}>
             <TextField
               id="search-input"
@@ -178,7 +188,7 @@ export function SearchPage() {
             />
           </Grid2>
 
-          {/* Skills Filter */}
+          {/* Фильтр по навыкам */}
           <Grid2 size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
@@ -194,7 +204,7 @@ export function SearchPage() {
             />
           </Grid2>
 
-          {/* Search Button */}
+          {/* Кнопка поиска */}
           <Grid2 size={{ xs: 12, md: 2 }}>
             <Button
               fullWidth
@@ -207,7 +217,7 @@ export function SearchPage() {
             </Button>
           </Grid2>
 
-          {/* Match Score Slider */}
+          {/* Слайдер минимального соответствия */}
           <Grid2 size={{ xs: 12, md: 6 }}>
             <Typography variant="body2" gutterBottom>
               Minimum Match Score: {minMatchScore[0]}%
@@ -228,7 +238,7 @@ export function SearchPage() {
             />
           </Grid2>
 
-          {/* AI Ranking Toggle */}
+          {/* Переключатель AI-ранжирования */}
           <Grid2 size={{ xs: 12, md: 6 }}>
             <Stack direction="row" alignItems="center" justifyContent="flex-end">
               <Typography variant="body2" sx={{ mr: 2 }}>
@@ -246,14 +256,14 @@ export function SearchPage() {
         </Grid2>
       </Paper>
 
-      {/* Error Alert */}
+      {/* Сообщение об ошибке */}
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {(error as { detail?: string }).detail || 'Search failed. Please try again.'}
         </Alert>
       )}
 
-      {/* Results Summary */}
+      {/* Сводка результатов */}
       {candidates.length > 0 && (
         <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}>
           <Grid2 container spacing={2}>
@@ -277,7 +287,7 @@ export function SearchPage() {
         </Paper>
       )}
 
-      {/* Candidates Grid */}
+      {/* Сетка кандидатов */}
       {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
@@ -302,7 +312,7 @@ export function SearchPage() {
                 aria-label={`View ${candidate.name || candidate.filename}`}
                 onKeyPress={(e) => e.key === 'Enter' && handleCandidateClick(candidate.id)}
               >
-                {/* Match Score Badge */}
+                {/* Бейдж соответствия */}
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                   <Chip
                     label={`${candidate.match_percentage}%`}
@@ -320,7 +330,7 @@ export function SearchPage() {
                   )}
                 </Stack>
 
-                {/* Candidate Info */}
+                {/* Информация о кандидате */}
                 <Typography variant="h6" noWrap sx={{ mb: 1 }}>
                   {candidate.name || candidate.filename}
                 </Typography>
@@ -330,7 +340,7 @@ export function SearchPage() {
                   </Typography>
                 )}
 
-                {/* Skills */}
+                {/* Навыки */}
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 2 }}>
                   {candidate.skills.slice(0, 5).map((skill) => (
                     <Chip key={skill} label={skill} size="small" variant="outlined" />
@@ -340,7 +350,7 @@ export function SearchPage() {
                   )}
                 </Box>
 
-                {/* TOP Recommendation Badge */}
+                {/* Бейдж TOP рекомендации */}
                 {candidate.match_percentage >= 90 && (
                   <Chip
                     label="TOP"
@@ -374,7 +384,7 @@ export function SearchPage() {
         </Paper>
       )}
 
-      {/* Save Search Dialog */}
+      {/* Диалог сохранения поиска */}
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Save Search</DialogTitle>
         <DialogContent>

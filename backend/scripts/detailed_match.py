@@ -13,6 +13,9 @@ from services.data_extractor.extract import extract_text_from_docx
 from sqlalchemy import select
 from database import async_session_maker
 from models.job_vacancy import JobVacancy
+from config import get_settings
+
+settings = get_settings()
 
 
 # Vacancy ID map
@@ -32,7 +35,7 @@ async def detailed_analysis(cv_num: int):
     print(f"{'='*80}\n")
     
     # Extract text and skills
-    cv_path = Path(f"data/uploads/{cv_num}.docx")
+    cv_path = settings.upload_dir / f"{cv_num}.docx"
     result = extract_text_from_docx(str(cv_path))
     text = result.get("text", "")
     entities = extract_resume_entities(text)
@@ -85,9 +88,13 @@ async def detailed_analysis(cv_num: int):
         print()
     
     # Get API result
+    api_base_url = os.getenv("API_BASE_URL", "")
+    if not api_base_url:
+        raise ValueError("API_BASE_URL environment variable must be set")
+
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"http://localhost:8000/api/vacancies/match-all?resume_id={cv_num}",
+            f"{api_base_url}/api/vacancies/match-all?resume_id={cv_num}",
             timeout=60.0
         )
         api_result = response.json()

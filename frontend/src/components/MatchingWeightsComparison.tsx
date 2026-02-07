@@ -18,6 +18,7 @@ import {
   Card,
   CardContent,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
@@ -103,7 +104,7 @@ const MatchingWeightsComparison: React.FC<MatchingWeightsComparisonProps> = ({
   profileAId,
   profileBId,
   vacancyId,
-  apiUrl = 'http://localhost:8000/api/matching-weights',
+  apiUrl = `${config.api.url}/api/matching-weights`,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

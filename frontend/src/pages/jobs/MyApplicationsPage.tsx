@@ -1,4 +1,5 @@
 import { useState } from 'react';
+// MUI компоненты для UI
 import {
   Container,
   Typography,
@@ -12,32 +13,42 @@ import {
   MenuItem,
   InputLabel,
 } from '@mui/material';
+// Иконки MUI
 import { Search as SearchIcon, WorkOutline as WorkIcon } from '@mui/icons-material';
+// Хуки для получения данных
 import { useApplications } from '../../hooks/useApplications';
+// Компоненты
 import { ApplicationCard } from '../../components/jobs/ApplicationCard';
-import { PageTransition } from '../../components/ui/PageTransition';
-import { LoadingState } from '../../components/ui/LoadingState';
-import { ErrorState } from '../../components/ui/ErrorState';
+import { PageTransition } from '@components/mui/PageTransition';
+import { LoadingState } from '@components/mui/LoadingState';
+import { ErrorState } from '@components/mui/ErrorState';
 
 export function MyApplicationsPage() {
+  // Состояние для поискового запроса
   const [searchTerm, setSearchTerm] = useState('');
+  // Состояние для фильтрации по статусу
   const [filters, setFilters] = useState<{
     status?: string;
   }>({});
 
+  // Получаем данные о заявках
   const { data, isLoading, error } = useApplications();
 
+  // Фильтрация заявок по поиску и статусу
   const filteredApplications = data?.applications.filter((application) => {
+    // Проверка соответствия поисковому запросу
     const matchesSearch =
       searchTerm === '' ||
       application.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       application.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
+    // Проверка соответствия статусу
     const matchesStatus = !filters.status || application.status === filters.status;
 
     return matchesSearch && matchesStatus;
   }) ?? [];
 
+  // Функция для подсчета заявок по статусу
   const getStatusCount = (status: string) => {
     return data?.applications.filter((app) => app.status === status).length ?? 0;
   };
@@ -45,6 +56,7 @@ export function MyApplicationsPage() {
   return (
     <PageTransition>
       <Container maxWidth="xl" sx={{ py: 2 }}>
+        {/* Заголовок страницы */}
         <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           My Applications
@@ -54,7 +66,7 @@ export function MyApplicationsPage() {
         </Typography>
       </Box>
 
-      {/* Search and Filters */}
+      {/* Поиск и фильтры */}
       <Paper
         sx={{
           p: 2,
@@ -89,6 +101,7 @@ export function MyApplicationsPage() {
             <MenuItem value="rejected">Rejected</MenuItem>
           </Select>
         </FormControl>
+        {/* Отображение общего количества заявок */}
         <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
           <WorkIcon color="primary" />
           <Typography variant="body2" color="text.secondary">
@@ -97,7 +110,7 @@ export function MyApplicationsPage() {
         </Box>
       </Paper>
 
-      {/* Status Summary */}
+      {/* Сводка по статусам */}
       {data && data.applications.length > 0 && (
         <Paper sx={{ p: 2, mb: 4 }}>
           <Stack direction="row" spacing={2} flexWrap="wrap">
@@ -123,7 +136,7 @@ export function MyApplicationsPage() {
         </Paper>
       )}
 
-      {/* Loading State */}
+      {/* Состояния загрузки, ошибки, пустого списка и сетка заявок */}
       {isLoading ? (
         <LoadingState message="Loading applications..." />
       ) : error ? (
@@ -133,6 +146,7 @@ export function MyApplicationsPage() {
           onRetry={() => window.location.reload()}
         />
       ) : filteredApplications.length === 0 ? (
+        // Состояние пустого списка
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <WorkIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -156,6 +170,7 @@ export function MyApplicationsPage() {
           )}
         </Box>
       ) : (
+        // Сетка карточек заявок
         <Grid container spacing={2}>
           {filteredApplications.map((application) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={application.id}>

@@ -1,4 +1,5 @@
 """
+import os
 End-to-End Integration Tests for AI Bias Detection and Fairness Monitoring
 
 Tests the complete fairness monitoring workflow:
@@ -20,7 +21,7 @@ from datetime import datetime, timedelta
 class TestFairnessE2E:
     """End-to-end tests for the fairness monitoring workflow."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = os.getenv("API_BASE_URL", "")
 
     @pytest.fixture(scope="class")
     def test_vacancy(self):
@@ -600,7 +601,7 @@ class TestFairnessE2E:
 class TestFairnessDataIntegrity:
     """Test data integrity and privacy protections for fairness monitoring."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = os.getenv("API_BASE_URL", "")
 
     def test_demographic_data_privacy(self):
         """Test that demographic data respects privacy protections."""

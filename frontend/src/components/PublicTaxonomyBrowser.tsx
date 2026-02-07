@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -82,7 +83,7 @@ interface PublicTaxonomyBrowserProps {
  */
 const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
   organizationId = 'default',
-  apiUrl = 'http://localhost:8000/api/taxonomy-sharing',
+  apiUrl = `${config.api.url}/api/taxonomy-sharing`,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);

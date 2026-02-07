@@ -2,6 +2,26 @@
 :root {
   --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   --gradient-secondary: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+
+  /* Theme Colors - Light Mode (default) */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-tertiary: rgba(0, 0, 0, 0.08);
+  --color-text: rgba(0, 0, 0, 0.87);
+  --color-text-secondary: rgba(0, 0, 0, 0.6);
+  --color-border: rgba(0, 0, 0, 0.15);
+  --color-divider: rgba(0, 0, 0, 0.12);
+}
+
+/* Dark Mode Theme Colors */
+[data-theme="dark"] {
+  --color-bg-primary: #121212;
+  --color-bg-secondary: #1e1e1e;
+  --color-bg-tertiary: rgba(255, 255, 255, 0.08);
+  --color-text: rgba(255, 255, 255, 0.87);
+  --color-text-secondary: rgba(255, 255, 255, 0.6);
+  --color-border: rgba(255, 255, 255, 0.15);
+  --color-divider: rgba(255, 255, 255, 0.12);
 }
 
 /* Smooth scrolling */
@@ -37,9 +57,9 @@ kbd {
   font-size: 0.85em;
   font-family: monospace;
   line-height: 1;
-  color: var(--mui-palette-text-primary, inherit);
-  background-color: var(--mui-palette-action-hover, rgba(0, 0, 0, 0.08));
-  border: 1px solid var(--mui-palette-divider, rgba(0, 0, 0, 0.15));
+  color: var(--color-text, inherit);
+  background-color: var(--color-bg-tertiary, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.15));
   border-radius: 0.25em;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
   white-space: nowrap;
@@ -51,21 +71,21 @@ kbd {
 
 /* Dark Mode Support
  *
- * This application supports both light and dark themes through Material-UI's
- * theming system. The global CSS is designed to work seamlessly with both themes
- * by avoiding hardcoded colors and letting MUI's theme provider handle colors.
+ * This application supports both light and dark themes through CSS custom properties.
+ * The global CSS is designed to work seamlessly with both themes by using CSS variables
+ * that automatically adapt based on the [data-theme] attribute.
  *
  * Theme-aware elements:
- * - Backgrounds and text colors are managed by MUI CssBaseline
+ * - Backgrounds and text colors use CSS custom properties (--color-*)
  * - Components automatically adapt to theme changes
- * - Custom styles use CSS custom properties that respond to theme
+ * - Theme is controlled by the [data-theme="dark"] attribute on the root element
  *
  * When adding custom CSS:
- * - Use MUI theme colors via CSS custom properties (var(--mui-palette-...))
+ * - Use theme colors via CSS custom properties (var(--color-text), var(--color-bg-primary), etc.)
  * - Avoid hardcoded colors (use 'inherit', 'currentColor', or theme vars)
  * - Test styles in both light and dark modes
  *
- * Dark mode is controlled by ThemeContext (frontend/src/contexts/ThemeContext.tsx)
+ * Dark mode is controlled by EmotionThemeContext (frontend/src/contexts/EmotionThemeContext.tsx)
  * and persists across sessions via localStorage.
  */
 
@@ -181,9 +201,9 @@ kbd {
   button,
   input[type='text'],
   input[type='search'],
-  .MuiButtonBase-root,
-  .MuiDialog-root,
-  .MuiSnackbar-root {
+  [role="button"],
+  [role="dialog"],
+  [role="alert"] {
     display: none !important;
   }
 
@@ -195,14 +215,18 @@ kbd {
   }
 
   /* Adjust container for print */
-  .MuiContainer-root {
+  .container,
+  [class*="container"] {
     max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
   }
 
   /* Ensure papers/sections are clearly separated */
-  .MuiPaper-root {
+  .paper,
+  [class*="paper"],
+  .card,
+  [class*="card"] {
     box-shadow: none !important;
     border: 1px solid #ddd !important;
     margin-bottom: 1rem !important;
@@ -216,7 +240,7 @@ kbd {
   }
 
   /* Print-friendly typography */
-  .MuiTypography-root {
+  h1, h2, h3, h4, h5, h6, p, span, div {
     color: black !important;
   }
 
@@ -236,12 +260,14 @@ kbd {
   }
 
   /* Ensure chip colors print correctly */
-  .MuiChip-root {
+  .chip,
+  [class*="chip"] {
     border: 1px solid #ccc !important;
   }
 
   /* Stack for print layout */
-  .MuiStack-root {
+  .stack,
+  [class*="stack"] {
     display: block !important;
   }
 }

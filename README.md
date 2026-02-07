@@ -267,8 +267,55 @@ docker-compose exec backend alembic upgrade head
 docker-compose exec backend python scripts/reset_and_reload.py
 ```
 
+## Configuration
+
+AgentHR uses a centralized configuration management system with:
+
+- **Environment-specific profiles** - Separate configurations for dev, staging, and production
+- **YAML config files** - Store settings in version control
+- **Environment variable overrides** - Override any setting via environment variables
+- **Hot reload support** - Update non-critical settings without restarting
+- **Configuration validation** - Startup validation prevents invalid configurations
+- **Audit logging** - Track all configuration changes
+
+### Quick Configuration
+
+```bash
+# 1. Set environment
+export ENVIRONMENT=dev  # or 'staging' or 'production'
+
+# 2. Copy environment templates
+cp .env.example .env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# 3. Update with your values
+# Edit .env files with your database URLs, API keys, etc.
+
+# 4. Start services
+docker-compose up -d
+```
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `backend/config/config.dev.yml` | Development environment settings |
+| `backend/config/config.staging.yml` | Staging environment settings |
+| `backend/config/config.production.yml` | Production environment settings |
+| `.env` | Root environment variables (overrides) |
+| `backend/.env` | Backend-specific variables |
+| `frontend/.env` | Frontend-specific variables |
+
+For complete configuration documentation, see:
+- **[Configuration Management](docs/configuration.md)** - Complete configuration guide
+- **[Configuration Reference](docs/configuration/reference.md)** - All configuration options
+- **[Backend Config README](backend/config/README.md)** - Backend config module documentation
+
 ## Documentation
 
+- **[Configuration Management](docs/configuration.md)** - Complete configuration guide with examples
+- **[Configuration Reference](docs/configuration/reference.md)** - All configuration options reference
 - **[API Usage Guide](docs/API_USAGE_GUIDE.md)** - Comprehensive API documentation with workflow examples
 - [SETUP.md](SETUP.md) - Detailed installation instructions
 - [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Complete environment variables reference

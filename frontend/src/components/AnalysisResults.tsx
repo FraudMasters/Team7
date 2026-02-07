@@ -8,7 +8,6 @@ import {
   Typography,
   Chip,
   Alert,
-  AlertTitle,
   Stack,
   Divider,
   Grid,
@@ -23,16 +22,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-} from '@mui/material';
-import {
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  CheckCircle as CheckIcon,
-  Cancel as CrossIcon,
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import CandidateMatchVisualization from '@components/CandidateMatchVisualization';
 
 /**
@@ -175,20 +166,20 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       case 'error':
         return {
           color: 'error' as const,
-          icon: <ErrorIcon />,
+          icon: <Icon name="alert-circle" />,
           label: t('results.errors.severity.critical'),
         };
       case 'warning':
         return {
           color: 'warning' as const,
-          icon: <WarningIcon />,
+          icon: <Icon name="alert-triangle" />,
           label: t('results.errors.severity.warning'),
         };
       case 'info':
       default:
         return {
           color: 'info' as const,
-          icon: <InfoIcon />,
+          icon: <Icon name="info" />,
           label: t('results.errors.severity.info'),
         };
     }
@@ -221,19 +212,19 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   if (loading) {
     return (
       <Box
-        sx={{
+        css={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          py: 8,
+          py: '$8',
         }}
       >
-        <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <CircularProgress size={60} css={{ mb: '$3' }} />
+        <Typography variant="h6" color="secondary">
           {t('results.loading.title')}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="secondary" css={{ mt: '$1' }}>
           {t('results.loading.subtitle')}
         </Typography>
       </Box>
@@ -248,12 +239,14 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchAnalysis} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchAnalysis} startIcon={<Icon name="refresh-cw" />}>
             {t('results.error.retry')}
           </Button>
         }
       >
-        <AlertTitle>{t('results.error.title')}</AlertTitle>
+        <Typography variant="subtitle1" fontWeight={600}>
+          {t('results.error.title')}
+        </Typography>
         {error}
       </Alert>
     );
@@ -265,7 +258,9 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   if (!data) {
     return (
       <Alert severity="info">
-        <AlertTitle>{t('results.noData.title')}</AlertTitle>
+        <Typography variant="subtitle1" fontWeight={600}>
+          {t('results.noData.title')}
+        </Typography>
         <span dangerouslySetInnerHTML={{ __html: t('results.noData.message', { id: resumeId }) }} />
       </Alert>
     );
@@ -282,12 +277,12 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   return (
     <Stack spacing={3}>
       {/* Header Section */}
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Paper elevation={2} css={{ p: '$3' }}>
+        <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '$2' }}>
           <Typography variant="h5" fontWeight={600}>
             {t('results.title')}
           </Typography>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchAnalysis} size="small">
+          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchAnalysis} size="small">
             {t('results.refresh')}
           </Button>
         </Box>
@@ -295,48 +290,48 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         {/* Summary Statistics */}
         <Grid container spacing={2}>
           <Grid item xs={6} sm={3}>
-            <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
-              <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="error.main" fontWeight={700}>
+            <Card variant="outlined" css={{ borderColor: '$error' }}>
+              <CardContent css={{ textAlign: 'center', py: '$1' }}>
+                <Typography variant="h4" color="error" fontWeight={700}>
                   {criticalCount}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('results.stats.critical')}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={6} sm={3}>
-            <Card variant="outlined" sx={{ borderColor: 'warning.main' }}>
-              <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="warning.main" fontWeight={700}>
+            <Card variant="outlined" css={{ borderColor: '$warning' }}>
+              <CardContent css={{ textAlign: 'center', py: '$1' }}>
+                <Typography variant="h4" color="warning" fontWeight={700}>
                   {warningCount}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('results.stats.warnings')}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={6} sm={3}>
-            <Card variant="outlined" sx={{ borderColor: 'info.main' }}>
-              <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="info.main" fontWeight={700}>
+            <Card variant="outlined" css={{ borderColor: '$info' }}>
+              <CardContent css={{ textAlign: 'center', py: '$1' }}>
+                <Typography variant="h4" color="info" fontWeight={700}>
                   {infoCount}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('results.stats.info')}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={6} sm={3}>
-            <Card variant="outlined" sx={{ borderColor: grammarErrorCount > 0 ? 'error.main' : 'success.main' }}>
-              <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color={grammarErrorCount > 0 ? 'error.main' : 'success.main'} fontWeight={700}>
+            <Card variant="outlined" css={{ borderColor: grammarErrorCount > 0 ? '$error' : '$success' }}>
+              <CardContent css={{ textAlign: 'center', py: '$1' }}>
+                <Typography variant="h4" color={grammarErrorCount > 0 ? 'error' : 'success'} fontWeight={700}>
                   {grammarErrorCount}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('results.stats.grammarIssues')}
                 </Typography>
               </CardContent>
@@ -349,44 +344,44 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       {best_match && (
         <Paper
           elevation={3}
-          sx={{
-            p: 3,
+          css={{
+            p: '$3',
             background: (theme) =>
-              `linear-gradient(135deg, ${theme.palette.primary.main}15 0%, ${theme.palette.primary.main}05 100%)`,
-            borderLeft: 6,
-            borderColor: 'primary.main',
+              `linear-gradient(135deg, ${theme.colors.primary}15 0%, ${theme.colors.primary}05 100%)`,
+            borderLeft: '6px solid',
+            borderLeftColor: '$primary',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ flex: 1, minWidth: 250 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          <Box css={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '$2' }}>
+            <Box css={{ flex: 1, minWidth: 250 }}>
+              <Typography variant="subtitle2" color="secondary" gutterBottom>
                 Best Match
               </Typography>
-              <Typography variant="h5" fontWeight={600} color="primary.main">
+              <Typography variant="h5" fontWeight={600} color="primary">
                 {best_match.match_percentage}% Match
               </Typography>
-              <Typography variant="h6" sx={{ mt: 1 }}>
+              <Typography variant="h6" css={{ mt: '$1' }}>
                 {best_match.vacancy_title}
               </Typography>
               {best_match.location && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   📍 {best_match.location}
                 </Typography>
               )}
             </Box>
 
-            <Box sx={{ flex: 1, minWidth: 200 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            <Box css={{ flex: 1, minWidth: 200 }}>
+              <Typography variant="subtitle2" color="secondary" gutterBottom>
                 Matched Skills
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$0.5' }}>
                 {best_match.matched_skills.slice(0, 8).map((skill) => (
                   <Chip
                     key={skill}
                     label={skill}
                     size="small"
                     color="success"
-                    sx={{ fontSize: '0.75rem' }}
+                    css={{ fontSize: '0.75rem' }}
                   />
                 ))}
                 {best_match.matched_skills.length > 8 && (
@@ -399,12 +394,12 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               </Box>
             </Box>
 
-            <Box sx={{ textAlign: 'center' }}>
+            <Box css={{ textAlign: 'center' }}>
               <Button
                 variant="contained"
                 size="large"
                 href={`/compare/${resumeId}/${best_match.vacancy_id}`}
-                sx={{ minWidth: 180 }}
+                css={{ minWidth: 180 }}
               >
                 View Details
               </Button>
@@ -415,21 +410,21 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       {/* Resume Text Section */}
       {raw_text && (
-        <Paper elevation={1} sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Paper elevation={1} css={{ p: '$3' }}>
+          <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '$2' }}>
             <Typography variant="h6" fontWeight={600}>
               Resume Content: {filename}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               {raw_text.length} characters
             </Typography>
           </Box>
-          <Divider sx={{ mb: 2 }} />
+          <Divider css={{ mb: '$2' }} />
           <Box
-            sx={{
-              bgcolor: 'grey.50',
-              p: 2,
-              borderRadius: 1,
+            css={{
+              bgcolor: '$grey50',
+              p: '$2',
+              borderRadius: '$1',
               maxHeight: 500,
               overflow: 'auto',
               fontFamily: 'monospace',
@@ -450,27 +445,27 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       {/* Errors and Issues Section */}
       {errors.length > 0 && (
-        <Paper elevation={1} sx={{ p: 3 }}>
+        <Paper elevation={1} css={{ p: '$3' }}>
           <Typography variant="h6" gutterBottom fontWeight={600}>
             {t('results.detectedIssues')}
           </Typography>
-          <Divider sx={{ mb: 2 }} />
+          <Divider css={{ mb: '$2' }} />
           <Stack spacing={2}>
             {(errors || []).map((errorItem, index) => {
               const config = getSeverityConfig(errorItem.severity);
               return (
                 <Alert key={index} severity={config.color} icon={config.icon}>
-                  <AlertTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box css={{ display: 'flex', alignItems: 'center', gap: '$1' }}>
                     <Chip label={config.label} size="small" color={config.color} variant="filled" />
-                    <Typography variant="subtitle2" component="span" fontWeight={600}>
+                    <Typography variant="subtitle2" fontWeight={600}>
                       {errorItem.type}
                     </Typography>
-                  </AlertTitle>
+                  </Box>
                   <Typography variant="body2" paragraph>
                     {errorItem.message}
                   </Typography>
                   {errorItem.recommendation && (
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="secondary">
                       <strong>{t('results.issues.recommendation')}</strong> {errorItem.recommendation}
                     </Typography>
                   )}
@@ -483,13 +478,13 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       {/* Grammar and Spelling Section */}
       {grammar_errors && grammar_errors.length > 0 && (
-        <Paper elevation={1} sx={{ p: 3 }}>
+        <Paper elevation={1} css={{ p: '$3' }}>
           <Typography variant="h6" gutterBottom fontWeight={600}>
             {t('results.grammar.title')}
           </Typography>
-          <Divider sx={{ mb: 2 }} />
+          <Divider css={{ mb: '$2' }} />
           <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <AccordionSummary expandIcon={<Icon name="chevron-down" />}>
               <Typography variant="body1" fontWeight={500}>
                 {t('results.grammar.viewIssues', { count: (grammar_errors || []).length })}
               </Typography>
@@ -499,12 +494,12 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 {(grammar_errors || []).map((error, index) => {
                   const config = getSeverityConfig(error.severity);
                   return (
-                    <ListItem key={index} alignItems="flex-start" sx={{ px: 0 }}>
+                    <ListItem key={index} alignItems="flex-start" css={{ px: 0 }}>
                       <ListItemIcon>{config.icon}</ListItemIcon>
                       <ListItemText
                         primary={
                           <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="subtitle2" component="span">
+                            <Typography variant="subtitle2">
                               {error.type}
                             </Typography>
                             <Chip label={config.label} size="small" color={config.color} variant="outlined" />
@@ -512,24 +507,24 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                         }
                         secondary={
                           <Stack spacing={1} mt={0.5}>
-                            <Typography variant="body2" component="div">
+                            <Typography variant="body2">
                               {error.message}
                             </Typography>
                             <Typography
                               variant="caption"
-                              sx={{
+                              css={{
                                 fontFamily: 'monospace',
-                                bgcolor: 'action.hover',
-                                px: 1,
-                                py: 0.5,
-                                borderRadius: 0.5,
+                                bgcolor: '$grey100',
+                                px: '$1',
+                                py: '$0.5',
+                                borderRadius: '$0.5',
                                 display: 'inline-block',
                               }}
                             >
                               "{error.context}"
                             </Typography>
                             {error.suggestions && error.suggestions.length > 0 && (
-                              <Typography variant="body2" color="primary.main">
+                              <Typography variant="body2" color="primary">
                                 <strong>{t('results.grammar.suggestion')}</strong> {error.suggestions.join(` ${t('common.or')} `)}
                               </Typography>
                             )}
@@ -547,19 +542,19 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       {/* Extracted Information Section */}
       {(keywords && keywords.length > 0) || (technical_skills && technical_skills.length > 0) ? (
-        <Paper elevation={1} sx={{ p: 3 }}>
+        <Paper elevation={1} css={{ p: '$3' }}>
           <Typography variant="h6" gutterBottom fontWeight={600}>
             {t('results.extractedInfo')}
           </Typography>
-          <Divider sx={{ mb: 2 }} />
+          <Divider css={{ mb: '$2' }} />
 
           {/* Total Experience */}
           {total_experience_months !== undefined && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            <Box css={{ mb: '$3' }}>
+              <Typography variant="subtitle2" color="secondary" gutterBottom>
                 {t('results.experience.title')}
               </Typography>
-              <Typography variant="h5" color="primary.main" fontWeight={600}>
+              <Typography variant="h5" color="primary" fontWeight={600}>
                 {formatExperience(total_experience_months)}
               </Typography>
             </Box>
@@ -567,11 +562,11 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
           {/* Keywords */}
           {keywords && keywords.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            <Box css={{ mb: '$3' }}>
+              <Typography variant="subtitle2" color="secondary" gutterBottom>
                 {t('results.keywords.title')}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
                 {keywords.slice(0, 20).map((keyword, index) => (
                   <Chip key={index} label={keyword} size="small" variant="outlined" />
                 ))}
@@ -582,10 +577,10 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           {/* Technical Skills */}
           {technical_skills && technical_skills.length > 0 && (
             <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              <Typography variant="subtitle2" color="secondary" gutterBottom>
                 {t('results.skills.title')}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
                 {(technical_skills || []).map((skill, index) => (
                   <Chip key={index} label={skill} size="small" color="primary" variant="filled" />
                 ))}
@@ -597,8 +592,8 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       {/* Skill Matching Section (if available) */}
       {(matched_skills && matched_skills.length > 0) || (missing_skills && missing_skills.length > 0) ? (
-        <Paper elevation={1} sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Paper elevation={1} css={{ p: '$3' }}>
+          <Box css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '$2' }}>
             <Typography variant="h6" fontWeight={600}>
               {t('results.skillMatching')}
             </Typography>
@@ -606,30 +601,30 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               <Chip
                 label={t('results.skills.matchPercentage', { percentage: formatNumber(match_percentage, language) })}
                 color={match_percentage >= 70 ? 'success' : match_percentage >= 40 ? 'warning' : 'error'}
-                sx={{ fontWeight: 600 }}
+                css={{ fontWeight: 600 }}
               />
             )}
           </Box>
-          <Divider sx={{ mb: 2 }} />
+          <Divider css={{ mb: '$2' }} />
 
           {/* Matched Skills - Green */}
           {matched_skills && matched_skills.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" color="success.main" gutterBottom fontWeight={600}>
-                <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+            <Box css={{ mb: '$3' }}>
+              <Typography variant="subtitle2" color="success" gutterBottom fontWeight={600}>
+                <Icon name="check-circle" css={{ verticalAlign: 'middle', mr: '$0.5' }} />
                 {t('results.skills.matched', { count: matched_skills.length })}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
                 {matched_skills.map((item, index) => (
                   <Chip
                     key={index}
                     label={item.skill}
                     size="small"
-                    sx={{
-                      bgcolor: 'success.main',
-                      color: 'success.contrastText',
+                    css={{
+                      bgcolor: '$success',
+                      color: '$successContrastText',
                       '&:hover': {
-                        bgcolor: 'success.dark',
+                        bgcolor: '$successDark',
                       },
                     }}
                   />
@@ -641,21 +636,21 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           {/* Missing Skills - Red */}
           {missing_skills && missing_skills.length > 0 && (
             <Box>
-              <Typography variant="subtitle2" color="error.main" gutterBottom fontWeight={600}>
-                <CrossIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+              <Typography variant="subtitle2" color="error" gutterBottom fontWeight={600}>
+                <Icon name="x-circle" css={{ verticalAlign: 'middle', mr: '$0.5' }} />
                 {t('results.skills.missing', { count: missing_skills.length })}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
                 {missing_skills.map((item, index) => (
                   <Chip
                     key={index}
                     label={item.skill}
                     size="small"
-                    sx={{
-                      bgcolor: 'error.main',
-                      color: 'error.contrastText',
+                    css={{
+                      bgcolor: '$error',
+                      color: '$errorContrastText',
                       '&:hover': {
-                        bgcolor: 'error.dark',
+                        bgcolor: '$errorDark',
                       },
                     }}
                   />
@@ -668,12 +663,12 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       {/* All Clear Message */}
       {errors.length === 0 && (!grammar_errors || grammar_errors.length === 0) && (
-        <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
-          <CheckIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-          <Typography variant="h6" color="success.main" gutterBottom fontWeight={600}>
+        <Paper elevation={1} css={{ p: '$4', textAlign: 'center' }}>
+          <Icon name="check-circle" size={64} color="$success" css={{ mb: '$2' }} />
+          <Typography variant="h6" color="success" gutterBottom fontWeight={600}>
             {t('results.allClear.title')}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             {t('results.allClear.message')}
           </Typography>
         </Paper>

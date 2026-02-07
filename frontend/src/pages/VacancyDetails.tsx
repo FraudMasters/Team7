@@ -12,18 +12,9 @@ import {
   Grid,
   Card,
   CardContent,
-  CircularProgress,
   Alert,
-} from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Work as WorkIcon,
-  Business as BusinessIcon,
-  LocationOn as LocationIcon,
-  Money as MoneyIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -99,7 +90,7 @@ const VacancyDetails: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Button
-          startIcon={<ArrowBackIcon />}
+          startIcon={<Icon name="arrow-left" size={20} />}
           onClick={() => navigate('/recruiter/vacancies')}
           sx={{ mb: 2 }}
         >
@@ -116,7 +107,7 @@ const VacancyDetails: React.FC = () => {
             </Typography>
             <Stack direction="row" spacing={1} mt={1}>
               <Chip
-                icon={<LocationIcon />}
+                icon={<Icon name="map-pin" size={16} />}
                 label={vacancy.location || 'Remote'}
                 size="small"
                 variant="outlined"
@@ -131,14 +122,14 @@ const VacancyDetails: React.FC = () => {
           </Box>
           <Stack direction="row" spacing={1}>
             <Button
-              startIcon={<EditIcon />}
+              startIcon={<Icon name="edit" size={20} />}
               variant="outlined"
               onClick={() => navigate(`/recruiter/vacancies/${vacancy.id}/edit`)}
             >
               {t('common.edit')}
             </Button>
             <Button
-              startIcon={<DeleteIcon />}
+              startIcon={<Icon name="trash-2" size={20} />}
               variant="outlined"
               color="error"
               onClick={handleDelete}
@@ -157,7 +148,7 @@ const VacancyDetails: React.FC = () => {
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                 Description
               </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
+              <Typography variant="body1" color="secondary" sx={{ whiteSpace: 'pre-wrap' }}>
                 {vacancy.description || 'No description provided'}
               </Typography>
             </Box>
@@ -173,7 +164,7 @@ const VacancyDetails: React.FC = () => {
                 <Stack spacing={2}>
                   {vacancy.min_experience_months && (
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="secondary">
                         Experience Required
                       </Typography>
                       <Typography variant="body1">
@@ -183,7 +174,7 @@ const VacancyDetails: React.FC = () => {
                   )}
                   {(vacancy.salary_min || vacancy.salary_max) && (
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="secondary">
                         Salary
                       </Typography>
                       <Typography variant="body1">

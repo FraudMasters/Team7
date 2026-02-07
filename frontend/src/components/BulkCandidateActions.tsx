@@ -10,7 +10,6 @@ import {
   Divider,
   Alert,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   CircularProgress,
@@ -24,16 +23,9 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-} from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  RadioButtonUnchecked as RadioButtonUncheckedIcon,
-  ArrowForward as ArrowForwardIcon,
-  Warning as WarningIcon,
-  Download as DownloadIcon,
-  Label as LabelIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import type { SelectChangeEvent } from '@/components/ui/Select';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '@/api/client';
 import type { WorkflowStageResponse } from '@/types/api';

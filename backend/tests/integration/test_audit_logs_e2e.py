@@ -1,4 +1,5 @@
 """
+import os
 End-to-End Integration Tests for Audit Trail Functionality
 
 This test module performs comprehensive verification of the audit trail system,

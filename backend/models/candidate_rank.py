@@ -31,8 +31,11 @@ class CandidateRank(Base, UUIDMixin, TimestampMixin):
         feature_contributions: JSON object with SHAP values for each feature
         ranking_factors: JSON object with detailed factor scores
         prediction_confidence: Model's confidence in the prediction (0-1)
+        explanation_narrative: Natural language explanation (1-3 sentences) from LLM
+        confidence_interval: JSON object with lower/upper bounds for uncertainty
+        resume_highlights: JSON object mapping features to resume sections for highlighting
         recommendation: Hiring recommendation (excellent/good/maybe/poor)
-        metadata: Additional metadata about the ranking
+        extra_metadata: Additional metadata about the ranking
     """
 
     __tablename__ = "candidate_ranks"
@@ -72,6 +75,17 @@ class CandidateRank(Base, UUIDMixin, TimestampMixin):
     prediction_confidence: Mapped[Optional[float]] = mapped_column(
         Numeric(5, 4), nullable=True, default=None
     )
+
+    # Enhanced explainability (for dashboard)
+    explanation_narrative: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, default=None
+    )  # LLM-generated natural language explanation (1-3 sentences)
+    confidence_interval: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True, default=None
+    )  # {"lower": 0.65, "upper": 0.85} for uncertainty bounds
+    resume_highlights: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True, default=None
+    )  # Feature-to-section mapping for highlighting: {"skills_match": {"section": "skills", "offset": 100, "length": 50}}
 
     # Recommendation
     recommendation: Mapped[Optional[str]] = mapped_column(

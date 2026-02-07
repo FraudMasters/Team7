@@ -117,7 +117,7 @@ async def create_candidate_tag(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidate-tags/",
+        ...     "/api/candidate-tags/",
         ...     json={
         ...         "organization_id": "org-123",
         ...         "tag_name": "High Priority",
@@ -220,7 +220,7 @@ async def list_candidate_tags(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/candidate-tags/?organization_id=org-123")
+        >>> response = requests.get("/api/candidate-tags/?organization_id=org-123")
         >>> response.json()
         {
             "organization_id": "org-123",

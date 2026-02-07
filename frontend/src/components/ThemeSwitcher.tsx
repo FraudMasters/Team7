@@ -4,13 +4,9 @@ import {
   Box,
   IconButton,
   Tooltip,
-  useTheme,
-} from '@mui/material';
-import {
-  LightMode as LightModeIcon,
-  DarkMode as DarkModeIcon,
-} from '@mui/icons-material';
-import { useThemeContext } from '@/contexts/ThemeContext';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
 
 /**
  * ThemeSwitcher Component
@@ -21,7 +17,7 @@ import { useThemeContext } from '@/contexts/ThemeContext';
  * Features:
  * - Shows current theme mode with appropriate icon
  * - Toggles between light and dark themes on click
- * - Integrates with ThemeContext for state management
+ * - Integrates with EmotionThemeContext for state management
  * - Persists theme preference to localStorage
  * - Displays tooltip indicating the alternate theme option
  *
@@ -33,8 +29,7 @@ import { useThemeContext } from '@/contexts/ThemeContext';
  */
 const ThemeSwitcher: React.FC = () => {
   const { t } = useTranslation();
-  const { themeMode, toggleTheme } = useThemeContext();
-  const muiTheme = useTheme();
+  const { themeMode, toggleTheme } = useEmotionTheme();
 
   /**
    * Get icon for current theme mode
@@ -46,7 +41,7 @@ const ThemeSwitcher: React.FC = () => {
    * @returns Icon component for alternate theme
    */
   const getToggleIcon = () => {
-    return themeMode === 'light' ? <DarkModeIcon /> : <LightModeIcon />;
+    return themeMode === 'light' ? 'moon' : 'sun';
   };
 
   /**
@@ -95,7 +90,7 @@ const ThemeSwitcher: React.FC = () => {
             },
           }}
         >
-          {getToggleIcon()}
+          <Icon name={getToggleIcon()} size={20} />
         </IconButton>
       </Tooltip>
     </Box>

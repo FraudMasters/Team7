@@ -28,7 +28,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-} from '@mui/material';
+} from '@/components/ui';
 import {
   Person as PersonIcon,
   Search as SearchIcon,
@@ -41,7 +41,6 @@ import {
   Label as LabelIcon,
   DeleteSweep as DeleteSweepIcon,
   DragIndicator as DragIndicatorIcon,
-} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -820,14 +819,14 @@ const CandidatesKanbanPage: React.FC = () => {
         <Box sx={{ mb: { xs: 2, sm: 3 } }}>
           <Typography
             variant="h4"
-            component="h1"
+            as="h1"
             gutterBottom
             fontWeight={600}
             sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem', md: '2.5rem' } }}
           >
             {t('candidatesKanban.title')}
           </Typography>
-          <Typography variant="body1" color="text.secondary" paragraph sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+          <Typography variant="body1" color="secondary" paragraph sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
             {t('candidatesKanban.description')}
           </Typography>
 
@@ -858,7 +857,7 @@ const CandidatesKanbanPage: React.FC = () => {
           {/* Keyboard Shortcuts Hint - hide on very small screens */}
           <Typography
             variant="caption"
-            color="text.secondary"
+            color="secondary"
             sx={{
               display: { xs: 'none', sm: 'block' },
               mt: 1,
@@ -1098,7 +1097,7 @@ const CandidatesKanbanPage: React.FC = () => {
         >
           <DialogTitle>Move {selectedCount} Candidate(s)</DialogTitle>
           <DialogContent>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
               Select the stage to move {selectedCount} candidate(s) to:
             </Typography>
 
@@ -1151,7 +1150,7 @@ const CandidatesKanbanPage: React.FC = () => {
         >
           <DialogTitle>Add Tags to {selectedCount} Candidate(s)</DialogTitle>
           <DialogContent>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
               Enter a tag to add to {selectedCount} candidate(s):
             </Typography>
 
@@ -1172,7 +1171,7 @@ const CandidatesKanbanPage: React.FC = () => {
 
             {selectedCount > 0 && (
               <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   This tag will be added to all selected candidates.
                 </Typography>
               </Box>
@@ -1214,7 +1213,7 @@ const CandidatesKanbanPage: React.FC = () => {
             <Alert severity="warning" sx={{ mb: 2 }}>
               This action cannot be undone.
             </Alert>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="secondary">
               Are you sure you want to delete {selectedCount} candidate(s)? This will permanently remove them from the system.
             </Typography>
           </DialogContent>

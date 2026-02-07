@@ -9,6 +9,7 @@ Features:
 - Multi-field filtering: skills, experience, education, location, languages
 - Boolean operators: AND, OR, NOT for complex queries
 - Range filters: experience years, match score, date ranges, salary ranges
+- Semantic search using vector similarity matching
 - Performance optimized with proper indexing
 
 The service builds on the existing resume_analyses table which contains
@@ -35,6 +36,14 @@ from models import Resume, ResumeAnalysis, HiringStage, HiringStageName, JobVaca
 
 logger = logging.getLogger(__name__)
 
+# Import vector matcher for semantic search
+try:
+    from analyzers.vector_matcher import get_vector_matcher, VectorMatchResult
+    _HAS_VECTOR_MATCHER = True
+except ImportError:
+    _HAS_VECTOR_MATCHER = False
+    logger.warning("Vector matcher not available, semantic search disabled")
+
 
 @dataclass
 class SearchFilters:
@@ -54,6 +63,7 @@ class SearchFilters:
         date_to: End date filter (ISO date, optional)
         vacancy_id: Filter by vacancy ID (optional)
         stage_id: Filter by workflow stage (optional)
+        use_semantic_search: Enable semantic similarity search (optional)
     """
 
     skills: Optional[List[str]] = None
@@ -68,6 +78,7 @@ class SearchFilters:
     date_to: Optional[str] = None
     vacancy_id: Optional[str] = None
     stage_id: Optional[str] = None
+    use_semantic_search: Optional[bool] = None
 
 
 @dataclass
@@ -101,6 +112,8 @@ class SearchResult:
         query: The search query used
         filters_applied: Filters that were applied
         execution_time_seconds: Time taken to execute search
+        semantic_search_enabled: Whether semantic search was used (optional)
+        avg_semantic_score: Average semantic score of results (optional)
     """
 
     total: int
@@ -108,6 +121,8 @@ class SearchResult:
     query: str
     filters_applied: Dict[str, Any]
     execution_time_seconds: float
+    semantic_search_enabled: Optional[bool] = None
+    avg_semantic_score: Optional[float] = None
 
 
 class SearchService:
@@ -202,11 +217,35 @@ class SearchService:
             # Convert to candidate format
             candidates = await self._format_results(rows)
 
+            # Apply semantic search if enabled
+            semantic_search_enabled = False
+            avg_semantic_score = None
+
+            if filters and filters.use_semantic_search and _HAS_VECTOR_MATCHER:
+                semantic_search_enabled = True
+                candidates = await self._apply_semantic_search(
+                    candidates, query, filters
+                )
+
+                # Calculate average semantic score
+                if candidates:
+                    semantic_scores = [
+                        c.get("semantic_score", 0.0)
+                        for c in candidates
+                        if "semantic_score" in c
+                    ]
+                    if semantic_scores:
+                        avg_semantic_score = round(
+                            sum(semantic_scores) / len(semantic_scores), 3
+                        )
+
             execution_time = time.time() - start_time
 
             logger.info(
                 f"Search completed: found {total} candidates, "
                 f"returned {len(candidates)} in {execution_time:.3f}s"
+                + (f", semantic search: {avg_semantic_score:.3f} avg score"
+                   if semantic_search_enabled else "")
             )
 
             return SearchResult(
@@ -215,6 +254,8 @@ class SearchService:
                 query=query or "",
                 filters_applied=self._serialize_filters(filters),
                 execution_time_seconds=execution_time,
+                semantic_search_enabled=semantic_search_enabled,
+                avg_semantic_score=avg_semantic_score,
             )
 
         except Exception as e:
@@ -597,6 +638,121 @@ class SearchService:
 
         return candidates
 
+    async def _apply_semantic_search(
+        self,
+        candidates: List[Dict[str, Any]],
+        query: Optional[str],
+        filters: SearchFilters,
+    ) -> List[Dict[str, Any]]:
+        """
+        Apply semantic similarity search to candidates.
+
+        Calculates semantic similarity scores between resumes and job postings
+        using vector embeddings. Enhances candidate results with semantic scores.
+
+        Args:
+            candidates: List of candidate dictionaries from initial search
+            query: Search query string
+            filters: SearchFilters object
+
+        Returns:
+            List of candidates with semantic_score added
+        """
+        vector_matcher = get_vector_matcher()
+        if vector_matcher is None:
+            logger.warning("Vector matcher not available, skipping semantic search")
+            return candidates
+
+        # Determine job context for matching
+        job_title = ""
+        job_description = ""
+        job_skills = []
+
+        # Try to get vacancy details if vacancy_id is provided
+        if filters.vacancy_id:
+            try:
+                from models import Vacancy
+                vacancy_uuid = UUID(filters.vacancy_id)
+                vacancy_query = select(Vacancy).where(Vacancy.id == vacancy_uuid)
+                vacancy_result = await self.db.execute(vacancy_query)
+                vacancy = vacancy_result.scalar_one_or_none()
+
+                if vacancy:
+                    job_title = vacancy.title or ""
+                    job_description = vacancy.description or ""
+                    job_skills = vacancy.skills or []
+                    logger.info(
+                        f"Using vacancy '{job_title}' for semantic search"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to load vacancy for semantic search: {e}")
+
+        # If no vacancy, use query as job context
+        if not job_title and query:
+            job_title = query
+            job_description = ""
+            job_skills = filters.skills or []
+
+        # If still no job context, skip semantic search
+        if not job_title and not job_description and not job_skills:
+            logger.info("No job context available for semantic search")
+            return candidates
+
+        # Calculate semantic scores for each candidate
+        for candidate in candidates:
+            try:
+                # Get resume text from database
+                resume_uuid = UUID(candidate["id"])
+                resume_query = select(Resume).where(Resume.id == resume_uuid)
+                resume_result = await self.db.execute(resume_query)
+                resume = resume_result.scalar_one_or_none()
+
+                if not resume or not resume.raw_text:
+                    candidate["semantic_score"] = 0.0
+                    candidate["semantic_passed"] = False
+                    continue
+
+                # Get skills from analysis if available
+                resume_skills = candidate.get("skills", [])
+
+                # Calculate semantic similarity
+                match_result = vector_matcher.match_resume_to_vacancy(
+                    resume_text=resume.raw_text,
+                    resume_skills=resume_skills,
+                    vacancy_title=job_title,
+                    vacancy_description=job_description,
+                    vacancy_skills=job_skills,
+                )
+
+                candidate["semantic_score"] = round(match_result.score, 3)
+                candidate["semantic_passed"] = match_result.passed
+                candidate["semantic_similarity"] = round(match_result.similarity, 3)
+
+            except Exception as e:
+                logger.error(f"Error calculating semantic score for candidate {candidate.get('id')}: {e}")
+                candidate["semantic_score"] = 0.0
+                candidate["semantic_passed"] = False
+
+        # Filter by min_match_score if specified
+        if filters.min_match_score is not None:
+            min_score = filters.min_match_score / 100.0  # Convert to 0-1 range
+            candidates = [
+                c for c in candidates
+                if c.get("semantic_score", 0.0) >= min_score
+            ]
+            logger.info(
+                f"Filtered to {len(candidates)} candidates with semantic score >= {min_score}"
+            )
+
+        # Sort by semantic score (highest first)
+        candidates = sorted(
+            candidates,
+            key=lambda c: c.get("semantic_score", 0.0),
+            reverse=True
+        )
+
+        return candidates
+
     def _serialize_filters(self, filters: Optional[SearchFilters]) -> Dict[str, Any]:
         """
         Serialize filters for response.
@@ -623,6 +779,7 @@ class SearchService:
             "date_to": filters.date_to,
             "vacancy_id": filters.vacancy_id,
             "stage_id": filters.stage_id,
+            "use_semantic_search": filters.use_semantic_search,
         }
 
     def _build_vacancy_search_query(

@@ -61,7 +61,9 @@ class Colors:
 
 
 # Test configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "")
+if not API_BASE_URL:
+    raise ValueError("API_BASE_URL environment variable must be set")
 TEST_ORG_ID = uuid4()
 
 

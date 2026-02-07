@@ -17,16 +17,8 @@ import {
   Chip,
   Switch,
   FormControlLabel,
-} from '@mui/material';
-import {
-  Send as SendIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Person as PersonIcon,
-  Lock as LockIcon,
-  Public as PublicIcon,
-  CheckCircle as CheckCircleIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import { candidateNotesClient } from '@/api/candidateNotes';
 import type {
@@ -264,7 +256,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
         }}
       >
         <CircularProgress size={40} sx={{ mb: 2 }} />
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="secondary">
           {t('notes.loading')}
         </Typography>
       </Box>
@@ -284,7 +276,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
       {successMessage && (
         <Alert
           severity="success"
-          icon={<CheckCircleIcon fontSize="inherit" />}
+          icon={<Icon name="check-circle" size={20} />}
           onClose={() => setSuccessMessage(null)}
         >
           {successMessage}
@@ -307,7 +299,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
 
         {notes.length === 0 ? (
           <Box sx={{ py: 4, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="secondary">
               {t('notes.noNotes')}
             </Typography>
           </Box>
@@ -329,7 +321,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                       sx={{
                         width: 36,
                         height: 36,
-                        bgcolor: 'primary.main',
+                        bgcolor: 'primary',
                         fontSize: '0.875rem',
                       }}
                     >
@@ -353,7 +345,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                           </Typography>
                           {showPrivateIndicator && note.is_private && (
                             <Chip
-                              icon={<LockIcon fontSize="small" />}
+                              icon={<Icon name="lock" size={14} />}
                               label={t('notes.private')}
                               size="small"
                               color="secondary"
@@ -362,7 +354,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                           )}
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="secondary">
                             {formatTimestamp(note.created_at)}
                           </Typography>
                           {!readOnly && note.recruiter_id === recruiterId && (
@@ -375,7 +367,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                               {deleting === note.id ? (
                                 <CircularProgress size={16} />
                               ) : (
-                                <DeleteIcon fontSize="small" />
+                                <Icon name="trash-2" size={16} />
                               )}
                             </IconButton>
                           )}
@@ -383,7 +375,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                       </Box>
 
                       {/* Note Text */}
-                      <Typography variant="body2" color="text.primary" sx={{ wordBreak: 'break-word' }}>
+                      <Typography variant="body2" color="primary" sx={{ wordBreak: 'break-word' }}>
                         {note.content}
                       </Typography>
                     </Box>
@@ -395,7 +387,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
             {/* Show more indicator */}
             {maxNotes > 0 && notes.length > maxNotes && (
               <Box sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('notes.showingMore', {
                     shown: displayedNotes.length,
                     total: notes.length,
@@ -443,7 +435,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                 }
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <LockIcon fontSize="small" />
+                    <Icon name="lock" size={14} />
                     <Typography variant="caption">
                       {t('notes.privateNote')}
                     </Typography>
@@ -455,7 +447,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
                 variant="contained"
                 size="small"
                 startIcon={
-                  submitting ? <CircularProgress size={16} /> : <SendIcon />
+                  submitting ? <CircularProgress size={16} /> : <Icon name="send" size={16} />
                 }
                 onClick={handleAddNote}
                 disabled={!newNoteContent.trim() || submitting}
@@ -464,7 +456,7 @@ const CandidateNotes: React.FC<CandidateNotesProps> = ({
               </Button>
             </Box>
 
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               {newNoteIsPrivate ? t('notes.privateHint') : t('notes.publicHint')}
             </Typography>
           </Stack>

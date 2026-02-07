@@ -21,3 +21,6 @@ export { default as RecruiterDashboardPage } from './RecruiterDashboard';
 export { default as SkillGapAnalysisPage } from './SkillGapAnalysis';
 export { default as WeightCustomizationPage } from './WeightCustomization';
 export { default as AuditLogsPage } from './AuditLogs';
+export { default as LoginPage } from './auth/LoginPage';
+export { default as RegisterPage } from './auth/RegisterPage';
+export { default as PasswordResetPage } from './auth/PasswordResetPage';

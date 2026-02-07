@@ -153,7 +153,7 @@ async def rank_candidate(
         ...     "use_experiment": True
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/ranking/rank",
+        ...     "/api/ranking/rank",
         ...     json=data
         ... )
         >>> response.json()
@@ -267,7 +267,7 @@ async def rank_candidate_fair(
         ...     "use_experiment": True
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/ranking/rank-fair",
+        ...     "/api/ranking/rank-fair",
         ...     json=data
         ... )
         >>> response.json()

@@ -27,6 +27,8 @@
  * ```
  */
 
+import { config, isDevelopment } from '@/config';
+
 /**
  * API call metric entry
  */
@@ -141,7 +143,7 @@ const metrics: ApiMetric[] = [];
  * Flag to enable/disable logging
  * In production, this can be set to false via environment variable
  */
-const ENABLE_LOGGING = import.meta.env.VITE_ENABLE_PERFORMANCE_LOGGING !== 'false';
+const ENABLE_LOGGING = config.features.enablePerformanceLogging;
 
 /**
  * Track an API call metric
@@ -169,7 +171,7 @@ export function trackApiCall(metric: ApiMetric): void {
   }
 
   // Log in development mode
-  if (ENABLE_LOGGING && import.meta.env.DEV) {
+  if (ENABLE_LOGGING && isDevelopment()) {
     const statusIcon = metric.success ? '✓' : '✗';
     const durationColor = metric.duration > 1000 ? '\x1b[31m' : metric.duration > 500 ? '\x1b[33m' : '\x1b[32m';
     const reset = '\x1b[0m';

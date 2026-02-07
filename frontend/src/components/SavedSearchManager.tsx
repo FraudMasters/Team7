@@ -20,16 +20,8 @@ import {
   TextField,
   CircularProgress,
   IconButton,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  Search as SearchIcon,
-  Save as SaveIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { savedSearchesClient } from '@/api/savedSearches';
 import type {
   SavedSearchResponse,
@@ -282,7 +274,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <Typography variant="h6" color="secondary">
           Loading saved searches...
         </Typography>
       </Box>
@@ -297,7 +289,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchSavedSearches} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchSavedSearches} startIcon={<Icon name="refresh-cw" />}>
             Try Again
           </Button>
         }
@@ -318,7 +310,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
           </Typography>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            startIcon={<Icon name="refresh-cw" />}
             onClick={fetchSavedSearches}
             size="small"
           >
@@ -326,7 +318,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
           </Button>
         </Box>
 
-        <Typography variant="body2" color="text.secondary" paragraph>
+        <Typography variant="body2" color="secondary" paragraph>
           Save your frequently used search queries and filters for quick access. Get alerted when new candidates match your saved searches.
         </Typography>
 
@@ -337,9 +329,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
             placeholder="Search saved searches..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-            }}
+            startIcon={<Icon name="search" sx={{ mr: 1, color: 'secondary' }} />}
             size="small"
           />
         </Box>
@@ -347,24 +337,24 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
         {/* Summary Statistics */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6}>
-            <Card variant="outlined" sx={{ borderColor: 'primary.main' }}>
+            <Card variant="outlined" sx={{ borderColor: 'primary' }}>
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="primary.main" fontWeight={700}>
+                <Typography variant="h4" color="primary" fontWeight={700}>
                   {savedSearches.length}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   Total Saved Searches
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={12} sm={6}>
-            <Card variant="outlined" sx={{ borderColor: 'success.main' }}>
+            <Card variant="outlined" sx={{ borderColor: 'success' }}>
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="success.main" fontWeight={700}>
+                <Typography variant="h4" color="success" fontWeight={700}>
                   {savedSearches.filter((s) => s.query).length}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   With Queries
                 </Typography>
               </CardContent>
@@ -376,7 +366,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={<Icon name="plus" />}
             onClick={handleCreate}
             size="large"
           >
@@ -388,11 +378,11 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
       {/* Saved Searches List */}
       {savedSearches.length === 0 ? (
         <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
-          <SearchIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Icon name="search" sx={{ fontSize: 60, color: 'secondary', mb: 2 }} />
+          <Typography variant="h6" color="secondary" gutterBottom>
             No saved searches found
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="secondary">
             Save your search queries to quickly access them later. Click "Save Current Search" to create your first saved search.
           </Typography>
         </Paper>
@@ -418,7 +408,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
                         <Chip
-                          icon={<SearchIcon />}
+                          icon={<Icon name="search" />}
                           label={search.query || 'No query'}
                           size="small"
                           variant="outlined"
@@ -436,7 +426,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                         size="small"
                         onClick={() => handleExecuteSearch(search)}
                         variant="outlined"
-                        startIcon={<SearchIcon />}
+                        startIcon={<Icon name="search" />}
                       >
                         Run Search
                       </Button>
@@ -445,14 +435,14 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                         onClick={() => handleEdit(search)}
                         color="primary"
                       >
-                        <EditIcon fontSize="small" />
+                        <Icon name="edit" fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteClick(search)}
                         color="error"
                       >
-                        <DeleteIcon fontSize="small" />
+                        <Icon name="trash-2" fontSize="small" />
                       </IconButton>
                     </Stack>
                   </Box>
@@ -461,7 +451,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                     <>
                       <Divider sx={{ my: 1 }} />
                       <Box sx={{ mt: 1 }}>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        <Typography variant="subtitle2" color="secondary" gutterBottom>
                           Filters:
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -479,7 +469,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                     </>
                   )}
 
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                  <Typography variant="caption" color="secondary" sx={{ display: 'block', mt: 2 }}>
                     Last updated: {new Date(search.updated_at).toLocaleString()}
                   </Typography>
                 </CardContent>
@@ -506,7 +496,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
               disabled={submitting}
               size="small"
             >
-              <CloseIcon />
+              <Icon name="x" />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -565,7 +555,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
             onClick={handleSubmit}
             variant="contained"
             disabled={submitting || !formData.name || !formData.query}
-            startIcon={submitting ? <CircularProgress size={16} /> : <SaveIcon />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="save" />}
           >
             {submitting ? 'Saving...' : editingSearch ? 'Update' : 'Save'}
           </Button>
@@ -579,7 +569,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
           <Typography variant="body1">
             Are you sure you want to delete "{searchToDelete?.name}"?
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
             This will permanently remove the saved search. You can still use the search query manually, but it won't be saved for quick access.
           </Typography>
         </DialogContent>
@@ -592,7 +582,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
             variant="contained"
             color="error"
             disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="trash-2" />}
           >
             {submitting ? 'Deleting...' : 'Delete'}
           </Button>

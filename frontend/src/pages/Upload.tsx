@@ -7,6 +7,7 @@ import ResumeUploader, { ResumeUploaderHandle } from '@components/ResumeUploader
 import ErrorBoundary from '@components/ErrorBoundary';
 import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
 import ErrorMessage, { ErrorType, ErrorAction } from '@components/ErrorMessage';
+import { config } from '@/config';
 
 /**
  * Upload Page Component
@@ -382,7 +383,7 @@ const UploadPage: React.FC = () => {
 
             <ResumeUploader
               ref={uploaderRef}
-              uploadUrl="http://localhost:8000/api/resumes/upload"
+              uploadUrl={`${config.api.url}/api/resumes/upload`}
               onUploadComplete={handleUploadComplete}
               onUploadError={handleUploadError}
               onUploadingChange={handleUploadingChange}

@@ -158,7 +158,7 @@ async def list_backups(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/?backup_type=full&limit=10")
+        >>> response = requests.get("/api/backups/?backup_type=full&limit=10")
         >>> backups = response.json()
     """
     try:
@@ -237,7 +237,7 @@ async def create_backup(
         ...     "retention_days": 30,
         ...     "upload_to_s3": true
         ... }
-        >>> response = requests.post("http://localhost:8000/api/backups/", json=data)
+        >>> response = requests.post("/api/backups/", json=data)
         >>> backup = response.json()
     """
     try:
@@ -317,7 +317,7 @@ async def get_backup_status(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/status")
+        >>> response = requests.get("/api/backups/status")
         >>> status = response.json()
     """
     try:
@@ -393,7 +393,7 @@ async def get_backup_config_endpoint(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/config")
+        >>> response = requests.get("/api/backups/config")
         >>> config = response.json()
     """
     try:
@@ -454,7 +454,7 @@ async def update_backup_config(
         ...     "s3_enabled": true,
         ...     "s3_bucket": "my-backup-bucket"
         ... }
-        >>> response = requests.put("http://localhost:8000/api/backups/config", json=data)
+        >>> response = requests.put("/api/backups/config", json=data)
         >>> config = response.json()
     """
     try:
@@ -546,7 +546,7 @@ async def get_backup(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/backups/123e4567-e89b-12d3-a456-426614174000")
         >>> backup = response.json()
     """
     try:
@@ -607,7 +607,7 @@ async def restore_backup(
         ...     "restore_type": "full"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/backups/123/restore",
+        ...     "/api/backups/123/restore",
         ...     json=data
         ... )
         >>> result = response.json()
@@ -694,7 +694,7 @@ async def delete_backup(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/backups/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.delete("/api/backups/123e4567-e89b-12d3-a456-426614174000")
         >>> result = response.json()
     """
     try:
@@ -757,7 +757,7 @@ async def verify_backup(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/backups/123/verify")
+        >>> response = requests.post("/api/backups/123/verify")
         >>> result = response.json()
         >>> print(result['valid'])
         True
@@ -825,7 +825,7 @@ async def sync_s3(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/backups/sync-s3")
+        >>> response = requests.post("/api/backups/sync-s3")
         >>> result = response.json()
     """
     try:
@@ -886,7 +886,7 @@ async def cleanup_backups(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/backups/cleanup?retention_days=30")
+        >>> response = requests.post("/api/backups/cleanup?retention_days=30")
         >>> result = response.json()
     """
     try:

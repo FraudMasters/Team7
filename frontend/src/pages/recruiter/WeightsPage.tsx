@@ -1,13 +1,18 @@
 /**
- * Recruiter Matching Weight Customization Page
+ * Страница настройки весов соответствия для рекрутера
  *
- * Allows recruiters to customize the relative weights of Keyword, TF-IDF,
- * and Vector similarity matching algorithms, with preset profiles for
- * different role types (technical, creative, executive).
+ * Позволяет рекрутерам настраивать относительные веса алгоритмов сопоставления:
+ * ключевое слово, TF-IDF и векторная схожесть. Включает пресеты профиля
+ * для различных типов ролей (технические, творческие, управленческие).
  */
 
+// Импорт React и хуков
 import React, { useState, useCallback, useEffect } from 'react';
+
+// Импорт хука для интернационализации
 import { useTranslation } from 'react-i18next';
+
+// Импорт компонентов MUI
 import {
   Box,
   Container,
@@ -31,6 +36,8 @@ import {
   Card,
   CardContent,
 } from '@mui/material';
+
+// Импорт иконок MUI
 import {
   Save as SaveIcon,
   Tune as TuneIcon,
@@ -39,27 +46,36 @@ import {
   History as HistoryIcon,
   AutoAwesome as PresetIcon,
 } from '@mui/icons-material';
+
+// Импорт API клиента и типов
 import { apiClient } from '@/api/client';
 import type {
   PresetProfile,
   MatchingWeightsProfile,
   MatchingWeightsCreate,
 } from '@/types/api';
-import { WeightSliderCardStack } from '@/components/WeightSliderCard';
-import { PageTransition } from '../../components/ui/PageTransition';
 
+// Импорт компонентов для слайдеров весов
+import { WeightSliderCardStack } from '@/components/WeightSliderCard';
+
+// Импорт MUI компонента анимации переходов
+import { PageTransition } from '@components/mui/PageTransition';
+
+// Интерфейс состояния весов
 interface WeightState {
   keyword: number;
   tfidf: number;
   vector: number;
 }
 
+// Свойства панели вкладок
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
 
+// Компонент панели вкладок
 function TabPanel({ children, value, index }: TabPanelProps) {
   return (
     <div role="tabpanel" hidden={value !== index}>
@@ -69,59 +85,63 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 }
 
 /**
- * Preset configurations
+ * Предустановленные конфигурации весов для различных типов ролей
  */
 const PRESETS: Record<string, WeightState> = {
+  // Технические роли - упор на ключевые навыки
   technical: { keyword: 60, tfidf: 25, vector: 15 },
+  // Творческие роли - упор на семантическое понимание
   creative: { keyword: 20, tfidf: 25, vector: 55 },
+  // Управленческие роли - сбалансированный подход
   executive: { keyword: 33, tfidf: 34, vector: 33 },
+  // Сбалансированный профиль
   balanced: { keyword: 34, tfidf: 33, vector: 33 },
 };
 
 /**
- * Recruiter Matching Weight Customization Page
+ * Страница настройки весов соответствия для рекрутера
  */
 function WeightsPage() {
   const { t } = useTranslation();
 
-  // Weight state
+  // Состояние весов алгоритмов сопоставления
   const [weights, setWeights] = useState<WeightState>({
     keyword: 50,
     tfidf: 30,
     vector: 20,
   });
 
-  // UI state
+  // Состояния UI
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [tabValue, setTabValue] = useState(0);
 
-  // Custom profile
+  // Состояние кастомного профиля
   const [profileName, setProfileName] = useState('');
   const [profileDescription, setProfileDescription] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
-  // Existing profiles
+  // Существующие профили
   const [existingProfiles, setExistingProfiles] = useState<MatchingWeightsProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
 
-  // Presets from API
+  // Пресеты из API
   const [presets, setPresets] = useState<PresetProfile[]>([]);
 
   /**
-   * Calculate total weight percentage
+   * Вычисляем общий процент веса
    */
   const totalWeight = weights.keyword + weights.tfidf + weights.vector;
 
   /**
-   * Check if weights are valid (sum to 100)
+   * Проверяем, что веса валидны (сумма равна 100)
    */
   const isValid = Math.abs(totalWeight - 100) < 1;
 
   /**
-   * Handle weight change
+   * Обработчик изменения веса
    */
   const handleWeightChange = useCallback((type: 'keyword' | 'tfidf' | 'vector', value: number) => {
     setWeights((prev) => ({
@@ -132,7 +152,7 @@ function WeightsPage() {
   }, []);
 
   /**
-   * Apply preset weights
+   * Применить пресет весов
    */
   const applyPreset = useCallback((presetKey: string) => {
     const preset = PRESETS[presetKey];
@@ -143,7 +163,7 @@ function WeightsPage() {
   }, []);
 
   /**
-   * Normalize weights to sum to 100
+   * Нормализовать веса, чтобы сумма была равна 100
    */
   const normalizeWeights = useCallback(() => {
     if (totalWeight === 0) return;
@@ -154,7 +174,7 @@ function WeightsPage() {
       vector: Math.round((weights.vector / totalWeight) * 100),
     };
 
-    // Adjust for rounding errors
+    // Корректировка ошибок округления
     const normalizedTotal = normalized.keyword + normalized.tfidf + normalized.vector;
     if (normalizedTotal !== 100) {
       normalized.vector += (100 - normalizedTotal);
@@ -164,14 +184,14 @@ function WeightsPage() {
   }, [weights, totalWeight]);
 
   /**
-   * Load profiles from API
+   * Загрузить профили из API
    */
   const loadProfiles = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Load both custom profiles and presets
+      // Загружаем кастомные профили и пресеты
       const [profilesResult, presetsResult] = await Promise.all([
         apiClient.listWeightProfiles(),
         apiClient.getPresetProfiles(),
@@ -188,7 +208,7 @@ function WeightsPage() {
   }, []);
 
   /**
-   * Save profile
+   * Сохранить профиль
    */
   const handleSaveProfile = useCallback(async () => {
     if (!profileName.trim()) {
@@ -225,7 +245,7 @@ function WeightsPage() {
   }, [profileName, profileDescription, weights, t, loadProfiles]);
 
   /**
-   * Load existing profile
+   * Загрузить существующий профиль
    */
   const loadExistingProfile = useCallback((profileId: string) => {
     const profile = existingProfiles.find((p) => p.id === profileId);
@@ -239,7 +259,7 @@ function WeightsPage() {
     }
   }, [existingProfiles]);
 
-  // Load profiles on mount
+  // Загружаем профили при монтировании компонента
   useEffect(() => {
     loadProfiles();
   }, [loadProfiles]);
@@ -248,7 +268,7 @@ function WeightsPage() {
     <PageTransition>
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={4}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box>
           <Typography variant="h4" gutterBottom>
             <TuneIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -261,14 +281,14 @@ function WeightsPage() {
           </Typography>
         </Box>
 
-        {/* Error Alert */}
+        {/* Предупреждение об ошибке */}
         {error && (
           <Alert severity="error" onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
 
-        {/* Success Alert */}
+        {/* Сообщение об успехе */}
         {success && (
           <Alert
             severity="success"
@@ -279,20 +299,20 @@ function WeightsPage() {
           </Alert>
         )}
 
-        {/* Loading State */}
+        {/* Состояние загрузки */}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
           </Box>
         ) : (
           <>
-            {/* Weight Distribution Display */}
+            {/* Отображение распределения весов */}
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
                 {t('matchingWeights.currentDistribution', { defaultValue: 'Current Weight Distribution' })}
               </Typography>
 
-              {/* Progress Bar Visualization */}
+              {/* Визуализация прогресс-барами */}
               <Box sx={{ mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <Box sx={{ flex: 1, mr: 2 }}>
@@ -341,7 +361,7 @@ function WeightsPage() {
                 </Box>
               </Box>
 
-              {/* Validation Alert */}
+              {/* Предупреждение о валидации */}
               {!isValid && (
                 <Alert
                   severity="warning"
@@ -362,7 +382,7 @@ function WeightsPage() {
                 </Alert>
               )}
 
-              {/* Total Display */}
+              {/* Отображение суммы */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                 <Typography variant="subtitle2">
                   {t('matchingWeights.totalWeight', { defaultValue: 'Total Weight' })}:
@@ -375,7 +395,7 @@ function WeightsPage() {
               </Box>
             </Paper>
 
-            {/* Tabs for Presets and Custom */}
+            {/* Вкладки для пресетов и кастомных настроек */}
             <Paper sx={{ width: '100%' }}>
               <Tabs
                 value={tabValue}
@@ -397,7 +417,7 @@ function WeightsPage() {
                 />
               </Tabs>
 
-              {/* Presets Tab */}
+              {/* Вкладка пресетов */}
               <TabPanel value={tabValue} index={0}>
                 <Grid container spacing={2}>
                   {Object.entries(PRESETS).map(([key, preset]) => (
@@ -449,7 +469,7 @@ function WeightsPage() {
                 </Grid>
               </TabPanel>
 
-              {/* Custom Tab */}
+              {/* Вкладка кастомных настроек */}
               <TabPanel value={tabValue} index={1}>
                 <Stack spacing={4}>
                   <WeightSliderCardStack
@@ -458,7 +478,7 @@ function WeightsPage() {
                     disabled={false}
                   />
 
-                  {/* Action Buttons */}
+                  {/* Кнопки действий */}
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                     <Button
                       variant="outlined"
@@ -479,7 +499,7 @@ function WeightsPage() {
                 </Stack>
               </TabPanel>
 
-              {/* Saved Profiles Tab */}
+              {/* Вкладка сохраненных профилей */}
               <TabPanel value={tabValue} index={2}>
                 <Grid container spacing={2}>
                   {existingProfiles.map((profile) => (
@@ -522,7 +542,7 @@ function WeightsPage() {
               </TabPanel>
             </Paper>
 
-            {/* Explanation Section */}
+            {/* Раздел с объяснением */}
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
                 {t('matchingWeights.explanation.title', { defaultValue: 'Understanding the Weights' })}
@@ -569,7 +589,7 @@ function WeightsPage() {
           </>
         )}
 
-        {/* Save Profile Dialog */}
+        {/* Диалог сохранения профиля */}
         <Dialog open={showSaveDialog} onClose={() => setShowSaveDialog(false)} maxWidth="sm" fullWidth>
           <DialogTitle>
             {t('matchingWeights.saveDialog.title', { defaultValue: 'Save as Custom Profile' })}

@@ -1,0 +1,694 @@
+# Docker Compose configuration for microservices architecture
+# Конфигурация Docker Compose для микросервисной архитектуры
+# Этот файл определяет все 10 микросервисов и API Gateway для распределенной системы
+
+services:
+  # PostgreSQL Database - shared by all microservices
+  # База данных PostgreSQL - общая для всех микросервисов
+  postgres:
+    image: postgres:14-alpine
+    container_name: microservices_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-resume_analysis}
+    ports:
+      - "5432:5432"
+    volumes:
+      - microservices_postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices_network
+
+  # Redis - for Celery brokers and caching across services
+  # Redis - для брокеров Celery и кеширования между сервисами
+  redis:
+    image: redis:7-alpine
+    container_name: microservices_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - microservices_redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices_network
+
+  # API Gateway - Kong Gateway for routing and authentication
+  # API Gateway - Kong Gateway для маршрутизации и аутентификации
+  api_gateway:
+    image: kong:latest
+    container_name: api_gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_ADMIN_GUI_URL: "http://localhost:8002"
+      KONG_PORTAL: "off"
+      KONG_LOG_LEVEL: ${KONG_LOG_LEVEL:-info}
+    ports:
+      - "5888:8000"   # Proxy port / Прокси-порт
+      - "8443:8443"   # Proxy SSL port / Прокси-порт SSL
+      - "5801:8001"   # Admin API port / Порт Admin API
+      - "8002:8002"   # Admin GUI port / Порт Admin GUI
+    volumes:
+      - ./infrastructure/api-gateway/kong.yml:/usr/local/kong/declarative/kong.yml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices_network
+
+  # Service 1: Resume Processing Service (port 8001)
+  # Сервис 1: Сервис обработки резюме (порт 8001)
+  resume_processing:
+    build:
+      context: ./services/resume_processing
+      dockerfile: Dockerfile
+    container_name: resume_processing_service
+    environment:
+      SERVICE_NAME: "resume_processing"
+      SERVICE_PORT: 8001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      # Отслеживание / Tracing
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      # Консул для service discovery / Consul for service discovery
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      # Логирование / Logging
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8011:8001"
+    volumes:
+      - ./services/resume_processing:/app
+      - ./shared:/app/shared
+      - resume_processing_uploads:/app/uploads
+      - resume_processing_models:/app/models_cache
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8001
+
+  # Service 2: Matching Service (port 8002)
+  # Сервис 2: Сервис сопоставления (порт 8002)
+  matching:
+    build:
+      context: ./services/matching
+      dockerfile: Dockerfile
+    container_name: matching_service
+    environment:
+      SERVICE_NAME: "matching"
+      SERVICE_PORT: 8002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8012:8002"
+    volumes:
+      - ./services/matching:/app
+      - ./shared:/app/shared
+      - matching_models:/app/models_cache
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8002
+
+  # Service 3: Candidate Service (port 8003)
+  # Сервис 3: Сервис кандидатов (порт 8003)
+  candidate:
+    build:
+      context: ./services/candidate
+      dockerfile: Dockerfile
+    container_name: candidate_service
+    environment:
+      SERVICE_NAME: "candidate"
+      SERVICE_PORT: 8003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8013:8003"
+    volumes:
+      - ./services/candidate:/app
+      - ./shared:/app/shared
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8003
+
+  # Service 4: Vacancy Service (port 8004)
+  # Сервис 4: Сервис вакансий (порт 8004)
+  vacancy:
+    build:
+      context: ./services/vacancy
+      dockerfile: Dockerfile
+    container_name: vacancy_service
+    environment:
+      SERVICE_NAME: "vacancy"
+      SERVICE_PORT: 8004
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8014:8004"
+    volumes:
+      - ./services/vacancy:/app
+      - ./shared:/app/shared
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8004
+
+  # Service 5: Taxonomy Service (port 8005)
+  # Сервис 5: Сервис таксономии (порт 8005)
+  taxonomy:
+    build:
+      context: ./services/taxonomy
+      dockerfile: Dockerfile
+    container_name: taxonomy_service
+    environment:
+      SERVICE_NAME: "taxonomy"
+      SERVICE_PORT: 8005
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8015:8005"
+    volumes:
+      - ./services/taxonomy:/app
+      - ./shared:/app/shared
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8005
+
+  # Service 6: Analytics Service (port 8006)
+  # Сервис 6: Сервис аналитики (порт 8006)
+  analytics:
+    build:
+      context: ./services/analytics
+      dockerfile: Dockerfile
+    container_name: analytics_service
+    environment:
+      SERVICE_NAME: "analytics"
+      SERVICE_PORT: 8006
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8016:8006"
+    volumes:
+      - ./services/analytics:/app
+      - ./shared:/app/shared
+      - analytics_reports:/app/reports
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8006
+
+  # Service 7: ATS Simulation Service (port 8007)
+  # Сервис 7: Сервис симуляции ATS (порт 8007)
+  ats_simulation:
+    build:
+      context: ./services/ats_simulation
+      dockerfile: Dockerfile
+    container_name: ats_simulation_service
+    environment:
+      SERVICE_NAME: "ats_simulation"
+      SERVICE_PORT: 8007
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      # LLM API ключи для ATS симуляции / LLM API keys for ATS simulation
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8017:8007"
+    volumes:
+      - ./services/ats_simulation:/app
+      - ./shared:/app/shared
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8007
+
+  # Service 8: Notification Service (port 8008)
+  # Сервис 8: Сервис уведомлений (порт 8008)
+  notifications:
+    build:
+      context: ./services/notifications
+      dockerfile: Dockerfile
+    container_name: notifications_service
+    environment:
+      SERVICE_NAME: "notifications"
+      SERVICE_PORT: 8008
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      # SMTP настройки для email / SMTP settings for email
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+      # Twilio настройки для SMS / Twilio settings for SMS
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8018:8008"
+    volumes:
+      - ./services/notifications:/app
+      - ./shared:/app/shared
+      - notifications_templates:/app/templates
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8008
+
+  # Service 9: Integration Service (port 8009)
+  # Сервис 9: Сервис интеграций (порт 8009)
+  integration:
+    build:
+      context: ./services/integration
+      dockerfile: Dockerfile
+    container_name: integration_service
+    environment:
+      SERVICE_NAME: "integration"
+      SERVICE_PORT: 8009
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@microservices_postgres:5432/${POSTGRES_DB:-resume_analysis}
+      REDIS_URL: redis://microservices_redis:6379/0
+      PYTHONPATH: /app:/app/../shared
+      # LinkedIn API / LinkedIn API
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      LINKEDIN_REDIRECT_URI: ${LINKEDIN_REDIRECT_URI:-http://localhost:8009/api/integrations/linkedin/callback}
+      # Другие интеграции / Other integrations
+      GREENHOUSE_API_KEY: ${GREENHOUSE_API_KEY:-}
+      LEVER_API_KEY: ${LEVER_API_KEY:-}
+      JAEGER_HOST: ${JAEGER_HOST:-jaeger}
+      JAEGER_PORT: ${JAEGER_PORT:-6831}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.1}
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SERVICE_REGISTRY_ENABLED: ${SERVICE_REGISTRY_ENABLED:-true}
+      LOKI_URL: http://loki:3100
+    ports:
+      - "8019:8009"
+    volumes:
+      - ./services/integration:/app
+      - ./shared:/app/shared
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn main:app --host 0.0.0.0 --port 8009
+
+  # Consul - Service discovery and configuration
+  # Consul - Обнаружение сервисов и конфигурация
+  consul:
+    image: hashicorp/consul:1.15
+    container_name: consul_service
+    environment:
+      CONSUL_BIND_INTERFACE: eth0
+      CONSUL_AGENT_MODE: "server"
+      CONSUL_CLIENT_ADDR: "0.0.0.0"
+      CONSUL_DATA_DIR: "/consul/data"
+      CONSUL_UI: "true"
+    ports:
+      - "8500:8500"   # HTTP API / UI
+      - "8600:8600/udp" # DNS
+    volumes:
+      - consul_data:/consul/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - microservices_network
+    command: agent -server -ui -bootstrap-expect=1 -client=0.0.0.0
+
+  # Jaeger - Distributed tracing
+  # Jaeger - Распределенное отслеживание
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger_tracing
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "5775:5775/udp" # accept zipkin.thrift over compact thrift protocol
+      - "6831:6831/udp" # accept zipkin.thrift over compact thrift protocol
+      - "6832:6832/udp" # accept zipkin.thrift over compact thrift protocol
+      - "5778:5778"     # serve configs
+      - "16686:16686"   # serve frontend (Jaeger UI)
+      - "14268:14268"   # accept jaeger.thrift directly from clients
+      - "14250:14250"   # accept model.proto
+      - "9411:9411"     # Zipkin compatible endpoint
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - microservices_network
+
+  # Loki - Log aggregation
+  # Loki - Агрегация логов
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: microservices_loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "5310:3100"
+      - "5900:9080"  # Prometheus metrics
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - microservices_network
+
+  # Keycloak - Identity and Access Management
+  # Keycloak - Управление идентификацией и доступом (OIDC)
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.0
+    container_name: agenthr_keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-postgres}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8080
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_PROXY: edge
+      # Admin credentials
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Initial realm setup
+      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+    ports:
+      - "5881:8080"
+    volumes:
+      - ./infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - keycloak_data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices_network
+
+volumes:
+  microservices_postgres_data:
+  microservices_redis_data:
+  resume_processing_uploads:
+  resume_processing_models:
+  matching_models:
+  analytics_reports:
+  notifications_templates:
+  consul_data:
+  loki_data:
+  keycloak_data:
+
+networks:
+  microservices_network:
+    driver: bridge

@@ -1,0 +1,184 @@
+apiVersion: 1
+
+groups:
+  - name: backup_alerts
+    interval: 30s
+    rules:
+      - alert: BackupFailure
+        expr: |
+          increase(backup_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Backup failure detected"
+          description: "Backup type {{ $labels.backup_type }} has failed {{ $value }} times in the last 5 minutes"
+
+      - alert: BackupMissed
+        expr: |
+          (time() - backup_last_success_timestamp{backup_type="database"}) > 86400
+        for: 5m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Database backup missed"
+          description: "No successful database backup for over 24 hours (last backup: {{ $value | humanizeDuration }} ago)"
+
+      - alert: BackupMissedFiles
+        expr: |
+          (time() - backup_last_success_timestamp{backup_type="files"}) > 86400
+        for: 5m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "File backup missed"
+          description: "No successful file backup for over 24 hours (last backup: {{ $value | humanizeDuration }} ago)"
+
+      - alert: BackupMissedFull
+        expr: |
+          (time() - backup_last_success_timestamp{backup_type="full"}) > 86400
+        for: 5m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Full backup missed"
+          description: "No successful full backup for over 24 hours (last backup: {{ $value | humanizeDuration }} ago)"
+
+      - alert: HighBackupFailureRate
+        expr: |
+          (
+            sum(rate(backup_operations_total{status="failure"}[15m]))
+            /
+            sum(rate(backup_operations_total[15m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: backup
+        annotations:
+          summary: "High backup failure rate"
+          description: "Backup failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      - alert: CriticalBackupFailureRate
+        expr: |
+          (
+            sum(rate(backup_operations_total{status="failure"}[15m]))
+            /
+            sum(rate(backup_operations_total[15m]))
+          ) > 0.25
+        for: 2m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Critical backup failure rate"
+          description: "Backup failure rate is {{ $value | humanizePercentage }} (threshold: 25%)"
+
+      - alert: S3SyncFailure
+        expr: |
+          increase(s3_sync_operations_total{status="failure"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "S3 sync failure detected"
+          description: "S3 backup sync has failed {{ $value }} times in the last 5 minutes"
+
+      - alert: LowBackupDiskSpace
+        expr: |
+          (backup_disk_usage_bytes{type="free"} / backup_disk_usage_bytes{type="total"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: backup
+        annotations:
+          summary: "Low backup disk space"
+          description: "Only {{ $value | humanizePercentage }} free disk space remaining for backups (threshold: 10%)"
+
+      - alert: CriticalBackupDiskSpace
+        expr: |
+          (backup_disk_usage_bytes{type="free"} / backup_disk_usage_bytes{type="total"}) < 0.05
+        for: 2m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Critical backup disk space"
+          description: "Only {{ $value | humanizePercentage }} free disk space remaining for backups (threshold: 5%)"
+
+      - alert: BackupIntegrityCheckFailed
+        expr: |
+          increase(backup_integrity_checks_total{result="fail"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Backup integrity check failed"
+          description: "{{ $value }} backup integrity checks have failed in the last 10 minutes"
+
+      - alert: SlowBackupOperation
+        expr: |
+          histogram_quantile(0.95,
+            rate(backup_duration_seconds_bucket[10m])
+          ) > 1800
+        for: 10m
+        labels:
+          severity: warning
+          category: backup
+        annotations:
+          summary: "Slow backup operation"
+          description: "P95 backup duration is {{ $value }}s (threshold: 1800s / 30 minutes)"
+
+      - alert: CriticalSlowBackupOperation
+        expr: |
+          histogram_quantile(0.95,
+            rate(backup_duration_seconds_bucket[10m])
+          ) > 3600
+        for: 5m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Critically slow backup operation"
+          description: "P95 backup duration is {{ $value }}s (threshold: 3600s / 1 hour)"
+
+      - alert: InsufficientBackupRetention
+        expr: |
+          backup_retention_count < 2
+        for: 10m
+        labels:
+          severity: warning
+          category: backup
+        annotations:
+          summary: "Insufficient backup retention"
+          description: "Only {{ $value }} backups retained for {{ $labels.backup_type }} (expected: at least 2)"
+
+      - alert: RestoreFailure
+        expr: |
+          increase(restore_operations_total{status="failure"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: backup
+        annotations:
+          summary: "Restore operation failed"
+          description: "Restore operation for {{ $labels.backup_type }} has failed {{ $value }} times in the last 5 minutes"
+
+      - alert: SlowRestoreOperation
+        expr: |
+          histogram_quantile(0.95,
+            rate(restore_duration_seconds_bucket[10m])
+          ) > 3600
+        for: 10m
+        labels:
+          severity: warning
+          category: backup
+        annotations:
+          summary: "Slow restore operation"
+          description: "P95 restore duration is {{ $value }}s (threshold: 3600s / 1 hour)"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Box, Container, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Typography, Box, Container, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@/components/ui';
 
 /**
  * Job Applications Page
@@ -23,21 +23,21 @@ const ApplicationsPage: React.FC = () => {
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+        <Typography variant="h4" as="h1" gutterBottom fontWeight={600}>
           My Applications
         </Typography>
-        <Typography variant="body1" color="text.secondary" paragraph>
+        <Typography variant="body1" color="secondary" paragraph>
           Track your job applications and their status.
         </Typography>
 
         {applications.length === 0 ? (
           <Paper sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
+            <Typography variant="body1" color="secondary">
               You haven't applied to any vacancies yet.
             </Typography>
           </Paper>
         ) : (
-          <TableContainer component={Paper}>
+          <TableContainer as={Paper}>
             <Table>
               <TableHead>
                 <TableRow>

@@ -5,7 +5,7 @@ import {
   Typography,
   Stack,
   Box,
-} from '@mui/material';
+} from '@/components/ui';
 import SkillDetailsWithConfidence, {
   SkillMatchDetail,
 } from '@components/SkillDetailsWithConfidence';
@@ -253,7 +253,7 @@ const SkillDetailsWithConfidenceTest: React.FC = () => {
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Skill Details With Confidence - Component Test
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Testing the SkillDetailsWithConfidence component with various match
             types and scenarios
           </Typography>
@@ -264,7 +264,7 @@ const SkillDetailsWithConfidenceTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 1: Mixed Match Types and Confidence Levels
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Showing various match types: direct, synonym, fuzzy, context, and
             compound with different confidence scores
           </Typography>
@@ -278,7 +278,7 @@ const SkillDetailsWithConfidenceTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 2: High Confidence Matches
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             All matches with 90%+ confidence
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -294,7 +294,7 @@ const SkillDetailsWithConfidenceTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 3: Limited Display (Max 5)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Showing only first 5 of 10 skills
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -316,7 +316,7 @@ const SkillDetailsWithConfidenceTest: React.FC = () => {
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Verification Checklist:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             ✓ Component displays matched skills with confidence scores<br />
             ✓ Shows match type badges (direct, synonym, fuzzy, context)<br />
             ✓ Chips are color-coded by match type<br />

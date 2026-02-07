@@ -127,7 +127,7 @@ async def create_model_versions(request: ModelVersionCreate) -> JSONResponse:
         ...         }
         ...     ]
         ... }
-        >>> response = requests.post("http://localhost:8000/api/model-versions/", json=data)
+        >>> response = requests.post("/api/model-versions/", json=data)
         >>> response.json()
         {
             "models": [...],
@@ -222,7 +222,7 @@ async def list_model_versions(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/model-versions/?model_name=skill_matching")
+        >>> response = requests.get("/api/model-versions/?model_name=skill_matching")
         >>> response.json()
     """
     try:
@@ -270,7 +270,7 @@ async def get_active_model(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/model-versions/active?model_name=skill_matching")
+        >>> response = requests.get("/api/model-versions/active?model_name=skill_matching")
         >>> response.json()
     """
     try:
@@ -321,7 +321,7 @@ async def get_model_version(version_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/model-versions/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/model-versions/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
     """
     try:
@@ -378,7 +378,7 @@ async def update_model_version(
         >>> import requests
         >>> data = {"performance_score": 90.0, "is_active": True}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/model-versions/123",
+        ...     "/api/model-versions/123",
         ...     json=data
         ... )
         >>> response.json()
@@ -440,7 +440,7 @@ async def delete_model_version(version_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/model-versions/123")
+        >>> response = requests.delete("/api/model-versions/123")
         >>> response.json()
         {"message": "Model version deleted successfully"}
     """
@@ -481,7 +481,7 @@ async def activate_model_version(version_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/model-versions/123/activate")
+        >>> response = requests.post("/api/model-versions/123/activate")
         >>> response.json()
         {"message": "Model version activated successfully"}
     """
@@ -524,7 +524,7 @@ async def deactivate_model_version(version_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/model-versions/123/deactivate")
+        >>> response = requests.post("/api/model-versions/123/deactivate")
         >>> response.json()
         {"message": "Model version deactivated successfully"}
     """
@@ -574,7 +574,7 @@ async def trigger_model_retraining(request: ModelRetrainRequest) -> JSONResponse
         >>> import requests
         >>> data = {"model_name": "ranking"}
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/model-versions/retrain",
+        ...     "/api/model-versions/retrain",
         ...     json=data
         ... )
         >>> response.json()
@@ -647,7 +647,7 @@ async def rollback_model_version(request: ModelRollbackRequest) -> JSONResponse:
         ...     "target_version": "v1.0.0"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/model-versions/rollback",
+        ...     "/api/model-versions/rollback",
         ...     json=data
         ... )
         >>> response.json()

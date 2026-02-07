@@ -143,7 +143,7 @@ async def get_fairness_metrics(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/fairness/metrics?model_name=ranking")
+        >>> response = requests.get("/api/fairness/metrics?model_name=ranking")
         >>> response.json()
         {
             "metrics": [...],
@@ -227,7 +227,7 @@ async def get_bias_reports(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/fairness/reports?severity_level=high")
+        >>> response = requests.get("/api/fairness/reports?severity_level=high")
         >>> response.json()
         {
             "reports": [...],
@@ -313,7 +313,7 @@ async def get_fairness_alerts(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/fairness/alerts?severity=high&acknowledged=false")
+        >>> response = requests.get("/api/fairness/alerts?severity=high&acknowledged=false")
         >>> response.json()
         {
             "alerts": [...],
@@ -381,7 +381,7 @@ async def get_fairness_summary() -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/fairness/summary")
+        >>> response = requests.get("/api/fairness/summary")
         >>> response.json()
         {
             "total_models": 5,
@@ -455,7 +455,7 @@ async def generate_bias_report(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/fairness/reports/generate?model_name=ranking"
+        ...     "/api/fairness/reports/generate?model_name=ranking"
         ... )
         >>> response.json()
         {
@@ -545,7 +545,7 @@ async def acknowledge_alert(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/fairness/alerts/abc-123/acknowledge")
+        >>> response = requests.post("/api/fairness/alerts/abc-123/acknowledge")
         >>> response.json()
         {
             "alert_id": "abc-123",

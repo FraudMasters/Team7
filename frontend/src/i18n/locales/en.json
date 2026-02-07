@@ -805,5 +805,214 @@
     "success": {
       "saved": "Weights saved successfully!"
     }
+  },
+  "explainability": {
+    "title": "AI Ranking Explanation",
+    "rankScore": "Ranking Score",
+    "rankPosition": "Position",
+    "recommendation": {
+      "excellent": "Excellent Candidate",
+      "good": "Good Candidate",
+      "fair": "Fair Candidate",
+      "poor": "Poor Candidate"
+    },
+    "confidenceInterval": {
+      "title": "Confidence Interval",
+      "confidence": "confidence",
+      "range": "Predicted range"
+    },
+    "strengths": {
+      "title": "Key Strengths",
+      "none": "No significant strengths identified"
+    },
+    "weaknesses": {
+      "title": "Areas for Improvement",
+      "none": "No significant weaknesses"
+    },
+    "candidateStrengths": "Candidate Strengths",
+    "improvementAreas": "Improvement Areas",
+    "featureDetails": {
+      "title": "Detailed Feature Analysis",
+      "tooltip": "Shows how each feature contributed to the ranking",
+      "contributions": "Feature Contributions",
+      "metrics": "Ranking Metrics"
+    },
+    "metrics": {
+      "rankScore": "Ranking Score",
+      "rankPosition": "Position",
+      "recommendation": "Recommendation",
+      "positiveFactors": "Positive Factors",
+      "negativeFactors": "Negative Factors",
+      "notAvailable": "N/A"
+    },
+    "legend": {
+      "title": "Legend",
+      "positive": "Positive contribution to ranking",
+      "negative": "Negative contribution to ranking"
+    },
+    "highlightSections": {
+      "title": "Resume Sections Highlighting",
+      "description": "Showing {{count}} influential section(s) that affected the ranking",
+      "expandAll": "Expand All",
+      "collapseAll": "Collapse All",
+      "expand": "Show full content",
+      "collapse": "Hide content",
+      "mappingLegend": "These sections from the resume had the most influence on the AI ranking decision",
+      "associatedFeatures": "Associated Features",
+      "noData": {
+        "title": "No Section Highlights",
+        "message": "No resume section highlights available for this analysis."
+      },
+      "stats": {
+        "positive": "Positive",
+        "neutral": "Neutral",
+        "negative": "Negative"
+      }
+    },
+    "method": "Method",
+    "provider": "Provider",
+    "model": "Model",
+    "features": "Features",
+    "aiModel": "AI Model",
+    "loading": {
+      "title": "Loading Explanation...",
+      "subtitle": "Analyzing candidate ranking factors"
+    },
+    "error": {
+      "title": "Failed to Load Explanation",
+      "failedToLoad": "Failed to load explainability data. Please try again.",
+      "retry": "Retry"
+    },
+    "noData": {
+      "title": "No Explanation Available",
+      "message": "No explanation data found for the specified resume and vacancy."
+    }
+  },
+  "candidateComparison": {
+    "title": "Side-by-Side Candidate Comparison",
+    "subtitle": "Comparing {{count}} candidates for this vacancy",
+    "refresh": "Refresh",
+    "overallScore": "Overall Score",
+    "scoreBreakdown": "Score Breakdown",
+    "keywordScore": "Keyword",
+    "tfidfScore": "TF-IDF",
+    "vectorScore": "Vector",
+    "skills": "Skills",
+    "matched": "matched",
+    "missing": "missing",
+    "featureContributions": "Feature Contributions",
+    "recommendation": "Recommendation",
+    "best": "Best",
+    "average": "Average",
+    "passed": "Passed",
+    "keyDifferences": "Key Differences Between Candidates",
+    "keyDifferencesDescription": "Understanding why one candidate ranks higher than another",
+    "processingTime": "Comparison completed in {{seconds}} seconds",
+    "loading": {
+      "title": "Comparing Candidates...",
+      "subtitle": "Analyzing {{count}} candidate(s)"
+    },
+    "error": {
+      "title": "Comparison Failed",
+      "failedToLoad": "Failed to load comparison data",
+      "retry": "Retry",
+      "noCandidates": "At least one candidate is required for comparison"
+    },
+    "noData": {
+      "title": "No Comparison Data",
+      "message": "No candidates found for comparison. Check that the vacancy and resume IDs are valid."
+    },
+    "legend": {
+      "best": "Best score in category",
+      "better": "Better than reference",
+      "worse": "Worse than reference",
+      "equal": "Equal to reference"
+    }
+  },
+  "whatIfAnalysis": {
+    "title": "What-If Analysis",
+    "subtitle": "Explore how changes to candidate attributes would affect their ranking",
+    "reset": "Reset All",
+    "originalScore": "Original Score",
+    "adjustedScore": "Adjusted Score",
+    "scoreChange": "Score Change",
+    "changeFromOriginal": "from original",
+    "updating": "Updating analysis...",
+    "presets": {
+      "title": "Quick Scenarios",
+      "description": "Click a preset to see how different changes would affect the ranking",
+      "moreExperience": "More Experience (+12 months)",
+      "improveSkills": "Improve Skills (+15%)",
+      "higherEducation": "Higher Education (+1 level)",
+      "betterKeywords": "Better Keywords (+10%)",
+      "allImprovements": "All Improvements"
+    },
+    "categories": {
+      "experience": "Experience",
+      "skills": "Skills",
+      "scoring": "Scoring",
+      "education": "Education"
+    },
+    "features": {
+      "experience_months": "Experience",
+      "experience_monthsDescription": "Add or remove months of work experience",
+      "skills_match_ratio": "Skills Match",
+      "skills_match_ratioDescription": "Adjust the overall skills matching percentage",
+      "keyword_score": "Keyword Score",
+      "keyword_scoreDescription": "Adjust the exact keyword matching score",
+      "tfidf_score": "TF-IDF Score",
+      "tfidf_scoreDescription": "Adjust the TF-IDF based matching score",
+      "vector_score": "Vector Score",
+      "vector_scoreDescription": "Adjust the semantic vector similarity score",
+      "education_level": "Education Level",
+      "education_levelDescription": "Adjust the education level (e.g., Bachelor's → Master's)"
+    },
+    "adjustments": {
+      "title": "Feature Adjustments",
+      "description": "Adjust the sliders to see how different feature values would affect the candidate's ranking",
+      "hint": "Positive values improve the feature, negative values reduce it. The analysis updates automatically after you stop adjusting."
+    },
+    "loading": {
+      "title": "Analyzing Scenario..."
+    },
+    "error": {
+      "title": "Analysis Failed",
+      "failedToLoad": "Failed to load what-if analysis. Please try again."
+    },
+    "results": {
+      "title": "Analysis Results",
+      "scenarioAnalysis": "Scenario Analysis",
+      "featureChanges": "Feature Changes",
+      "featureImpacts": "Feature Impacts on Score"
+    }
+  },
+  "resumeHighlighter": {
+    "title": "Resume Sections Highlighting",
+    "description": "Showing {{count}} influential section(s) that affected the ranking",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All",
+    "expand": "Show full content",
+    "collapse": "Hide content",
+    "mappingLegend": "These sections from the resume had the most influence on the AI ranking decision",
+    "associatedFeatures": "Associated Features",
+    "noData": {
+      "title": "No Section Highlights",
+      "message": "No resume section highlights available for this analysis."
+    },
+    "stats": {
+      "positive": "Positive",
+      "neutral": "Neutral",
+      "negative": "Negative"
+    }
+  },
+  "explanationReportExport": {
+    "title": "Export Explanation Report",
+    "exportButton": "Export Explanation Report",
+    "generating": "Generating report...",
+    "success": "Report generated successfully",
+    "error": "Failed to generate report",
+    "reportContents": "Report Contents: AI narrative explanation, feature contributions, confidence intervals, candidate strengths and weaknesses, and resume section highlights",
+    "formatPdf": "Format: PDF (professional document)",
+    "formatHtml": "Format: HTML (viewable in any browser, can be printed to PDF)"
   }
 }

@@ -1,19 +1,20 @@
 """
-Redis caching service with connection pooling and serialization.
+Сервис кэширования Redis с пулом соединений и сериализацией.
 
-This module provides a high-performance caching layer using Redis with connection
-pooling and automatic serialization/deserialization of complex Python objects.
+# Русский комментарий:
+Этот модуль предоставляет высокопроизводительный уровень кэширования с использованием Redis,
+пулов соединений и автоматической сериализации/десериализации сложных объектов Python.
 
-The cache service supports:
-- Connection pooling for efficient Redis connections
-- JSON serialization for complex objects
-- TTL (Time To Live) management
-- Pattern-based cache invalidation
-- Health checks and connection monitoring
-- Graceful fallback when Redis is unavailable
+Сервис кэширования поддерживает:
+- Пулы соединений для эффективного подключения к Redis
+- JSON-сериализацию для сложных объектов
+- Управление TTL (временем жизни)
+- Инвалидацию кэша на основе шаблонов
+- Проверки работоспособности и мониторинг соединений
+- Graceful fallback при недоступности Redis
 
-Cache key format: {prefix}:{namespace}:{key}
-Example: agenthr:candidate:12345
+Формат ключа кэша: {prefix}:{namespace}:{key}
+Пример: agenthr:candidate:12345
 """
 import json
 import logging

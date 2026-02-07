@@ -86,14 +86,47 @@ docker-compose logs -f
 
 ## Configuration
 
-For detailed information about environment variables, including:
-- Database and Redis settings
-- ML model configurations
-- Feature flags (keyword extraction, NER, grammar check)
-- Security settings (JWT, secrets)
-- Performance tuning parameters
+AgentHR uses a centralized configuration management system with environment-specific profiles.
 
-See the [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) reference guide.
+### Quick Configuration
+
+```bash
+# 1. Set environment (optional, defaults to development)
+export ENVIRONMENT=dev  # or 'staging' or 'production'
+
+# 2. Copy environment templates
+cp .env.example .env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# 3. Edit .env files with your settings
+# The setup script will guide you through this
+```
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `backend/config/config.dev.yml` | Development settings |
+| `backend/config/config.staging.yml` | Staging settings |
+| `backend/config/config.production.yml` | Production settings |
+| `.env` | Root environment overrides |
+| `backend/.env` | Backend-specific overrides |
+| `frontend/.env` | Frontend-specific overrides |
+
+### Environment Profiles
+
+| Environment | Description | Config File |
+|-------------|-------------|-------------|
+| `dev` / `development` | Local development | `config.dev.yml` |
+| `staging` | Pre-production testing | `config.staging.yml` |
+| `production` | Production deployment | `config.production.yml` |
+
+For detailed configuration information, see:
+- **[Configuration Management](docs/configuration.md)** - Complete configuration guide
+- **[Configuration Reference](docs/configuration/reference.md)** - All configuration options
+- **[Backend Config Module](backend/config/README.md)** - Backend configuration documentation
+- [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Environment variables reference
 
 ## Common Commands
 

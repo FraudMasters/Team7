@@ -12,19 +12,9 @@ import {
   Tooltip,
   Collapse,
   IconButton,
-} from '@mui/material';
-import {
-  Cancel as MissingIcon,
-  Lightbulb as SuggestionIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Psychology as AIIcon,
-  Translate as SynonymIcon,
-  Category as CategoryIcon,
-  Search as FuzzyIcon,
-  Link as RelatedIcon,
-} from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import styled from '@emotion/styled';
 
 export interface SkillSuggestion {
   skill: string;
@@ -45,45 +35,46 @@ interface SkillGapAnalysisProps {
   maxDisplay?: number;
 }
 
-const StyledCard = styled(Card)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-}));
+const StyledCard = styled(Card)`
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
 
-const SuggestionBar = styled('div')<{ confidence: number }>(({ theme, confidence }) => ({
-  height: 4,
-  borderRadius: 2,
-  backgroundColor: theme.palette.grey[200],
-  position: 'relative',
-  overflow: 'hidden',
-  marginTop: theme.spacing(0.5),
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: `${confidence * 100}%`,
-    backgroundColor:
+const SuggestionBar = styled('div')<{ confidence: number; theme: any }>`
+  height: 4px;
+  border-radius: 2px;
+  background-color: ${({ theme }) => theme.colors.grey[200]};
+  position: relative;
+  overflow: hidden;
+  margin-top: ${({ theme }) => theme.spacing.xs};
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: ${({ confidence }) => confidence * 100}%;
+    background-color: ${({ confidence, theme }) =>
       confidence >= 0.8
-        ? theme.palette.success.main
+        ? theme.colors.success.main
         : confidence >= 0.65
-        ? theme.palette.info.main
+        ? theme.colors.info.main
         : confidence >= 0.5
-        ? theme.palette.warning.main
-        : theme.palette.error.main,
-    transition: 'width 0.3s ease',
-  },
-}));
+        ? theme.colors.warning.main
+        : theme.colors.error.main};
+    transition: width 0.3s ease;
+  }
+`;
 
 const getSuggestionReasonConfig = (reason: string) => {
   switch (reason) {
     case 'synonym':
       return {
         label: 'Synonym',
-        icon: <SynonymIcon fontSize="small" />,
+        iconName: 'languages',
         color: 'success' as const,
         bgColor: 'success.light' as const,
         description: 'Known synonym or equivalent term',
@@ -91,7 +82,7 @@ const getSuggestionReasonConfig = (reason: string) => {
     case 'same_category':
       return {
         label: 'Category',
-        icon: <CategoryIcon fontSize="small" />,
+        iconName: 'folder-tree',
         color: 'info' as const,
         bgColor: 'info.light' as const,
         description: 'From the same skill category',
@@ -99,7 +90,7 @@ const getSuggestionReasonConfig = (reason: string) => {
     case 'related':
       return {
         label: 'Related',
-        icon: <RelatedIcon fontSize="small" />,
+        iconName: 'link',
         color: 'secondary' as const,
         bgColor: 'secondary.light' as const,
         description: 'Commonly used together',
@@ -107,7 +98,7 @@ const getSuggestionReasonConfig = (reason: string) => {
     case 'fuzzy_match':
       return {
         label: 'Similar',
-        icon: <FuzzyIcon fontSize="small" />,
+        iconName: 'search',
         color: 'warning' as const,
         bgColor: 'warning.light' as const,
         description: 'Similar name or variation',
@@ -115,7 +106,7 @@ const getSuggestionReasonConfig = (reason: string) => {
     default:
       return {
         label: 'Suggestion',
-        icon: <AIIcon fontSize="small" />,
+        iconName: 'brain',
         color: 'default' as const,
         bgColor: 'grey.100' as const,
         description: 'Suggested alternative',
@@ -146,9 +137,9 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+      <Box css={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />
-        <Typography variant="body1" sx={{ ml: 2 }}>
+        <Typography css={{ ml: 2 }}>
           Analyzing skill gaps...
         </Typography>
       </Box>
@@ -157,7 +148,7 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mb: 2 }}>
+      <Alert severity="error" css={{ mb: 2 }}>
         {error}
       </Alert>
     );
@@ -165,12 +156,12 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
 
   if (!missingSkills || missingSkills.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <SuggestionIcon sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
-        <Typography variant="h6" color="text.secondary">
+      <Box css={{ textAlign: 'center', py: 4 }}>
+        <Icon name="lightbulb" css={{ fontSize: 48, color: 'success.main', mb: 2 }} />
+        <Typography color="text.secondary">
           No Missing Skills
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography color="text.secondary">
           All required skills are covered in the resume
         </Typography>
       </Box>
@@ -184,16 +175,16 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
     <StyledCard>
       <CardContent>
         <Box
-          sx={{
+          css={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             mb: 2,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <MissingIcon sx={{ color: 'warning.main' }} />
-            <Typography variant="h6" fontWeight={600}>
+          <Box css={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Icon name="x-circle" css={{ color: 'warning.main' }} />
+            <Typography fontWeight={600}>
               {title}
             </Typography>
           </Box>
@@ -205,7 +196,7 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
           />
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider css={{ mb: 2 }} />
 
         <Stack spacing={2}>
           {displaySkills.map((missingSkill, index) => {
@@ -215,7 +206,7 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
             return (
               <Box
                 key={`${missingSkill.skill}-${index}`}
-                sx={{
+                css={{
                   p: 1.5,
                   borderRadius: 1,
                   backgroundColor: 'warning.50',
@@ -229,22 +220,20 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
               >
                 {/* Missing Skill Header */}
                 <Box
-                  sx={{
+                  css={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                   }}
                 >
-                  <Box sx={{ flex: 1 }}>
+                  <Box css={{ flex: 1 }}>
                     <Typography
-                      variant="subtitle2"
-                      fontWeight={600}
-                      sx={{ mb: 0.5 }}
+                      css={{ mb: 0.5, fontWeight: 600 }}
                       color="warning.dark"
                     >
                       {missingSkill.skill}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography color="text.secondary">
                       {hasSuggestions
                         ? `${missingSkill.suggestions.length} suggestion${missingSkill.suggestions.length > 1 ? 's' : ''} available`
                         : 'No similar skills found in resume'}
@@ -255,9 +244,9 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
                     <IconButton
                       size="small"
                       onClick={() => toggleExpanded(missingSkill.skill)}
-                      sx={{ ml: 1 }}
+                      css={{ ml: 1 }}
                     >
-                      {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
                     </IconButton>
                   )}
                 </Box>
@@ -265,11 +254,10 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
                 {/* Suggestions */}
                 {hasSuggestions && (
                   <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                    <Box sx={{ mt: 1.5 }}>
+                    <Box css={{ mt: 1.5 }}>
                       <Typography
-                        variant="caption"
                         color="text.secondary"
-                        sx={{ display: 'block', mb: 1, fontWeight: 500 }}
+                        css={{ display: 'block', mb: 1, fontWeight: 500 }}
                       >
                         Suggested alternatives from resume:
                       </Typography>
@@ -281,7 +269,7 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
                           return (
                             <Box
                               key={idx}
-                              sx={{
+                              css={{
                                 p: 1,
                                 borderRadius: 0.75,
                                 backgroundColor: 'background.paper',
@@ -294,20 +282,19 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
                               }}
                             >
                               <Box
-                                sx={{
+                                css={{
                                   display: 'flex',
                                   justifyContent: 'space-between',
                                   alignItems: 'flex-start',
                                   mb: 0.5,
                                 }}
                               >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <SuggestionIcon
-                                    fontSize="small"
-                                    sx={{ color: 'info.main', fontSize: '1rem' }}
+                                <Box css={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Icon
+                                    name="lightbulb"
+                                    css={{ color: 'info.main', fontSize: '1rem' }}
                                   />
                                   <Typography
-                                    variant="body2"
                                     fontWeight={600}
                                     color="text.primary"
                                   >
@@ -315,22 +302,22 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
                                   </Typography>
                                 </Box>
 
-                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                <Stack css={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                                   <Tooltip title={reasonConfig.description} arrow>
                                     <Chip
-                                      icon={reasonConfig.icon}
+                                      iconName={reasonConfig.iconName}
                                       label={reasonConfig.label}
                                       size="small"
                                       color={reasonConfig.color}
                                       variant="outlined"
-                                      sx={{ fontSize: '0.65rem', height: 18 }}
+                                      css={{ fontSize: '0.65rem', height: 18 }}
                                     />
                                   </Tooltip>
 
                                   <Chip
                                     label={`${confidencePercent}%`}
                                     size="small"
-                                    sx={{
+                                    css={{
                                       fontSize: '0.65rem',
                                       height: 18,
                                       fontWeight: 600,
@@ -361,8 +348,8 @@ const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
         </Stack>
 
         {hasMore && (
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">
+          <Box css={{ mt: 2, textAlign: 'center' }}>
+            <Typography color="text.secondary">
               Showing {maxDisplay} of {missingSkills.length} missing skills
             </Typography>
           </Box>

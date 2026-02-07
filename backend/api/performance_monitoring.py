@@ -122,7 +122,7 @@ async def get_performance_metrics(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/performance/metrics?model_name=ranking")
+        >>> response = requests.get("/api/performance/metrics?model_name=ranking")
         >>> response.json()
         {
             "metrics": [...],
@@ -185,7 +185,7 @@ async def get_performance_degradation_alerts(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/performance/degradation?threshold=0.1")
+        >>> response = requests.get("/api/performance/degradation?threshold=0.1")
         >>> response.json()
         [
             {
@@ -246,7 +246,7 @@ async def get_performance_summary(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/performance/summary")
+        >>> response = requests.get("/api/performance/summary")
         >>> response.json()
         [
             {
@@ -309,7 +309,7 @@ async def get_performance_trends(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/performance/trends?model_name=ranking&days=30"
+        ...     "/api/performance/trends?model_name=ranking&days=30"
         ... )
         >>> response.json()
         {
@@ -395,7 +395,7 @@ async def get_performance_history(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/performance/history?model_name=ranking&days=30"
+        ...     "/api/performance/history?model_name=ranking&days=30"
         ... )
         >>> response.json()
         {

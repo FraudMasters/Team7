@@ -211,7 +211,7 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
     Examples:
         >>> import requests
         >>> with open("resume.pdf", "rb") as f:
-        ...     response = requests.post("http://localhost:8000/api/resume-parser/parse", files={"file": f})
+        ...     response = requests.post("/api/resume-parser/parse", files={"file": f})
         >>> response.json()
         {
             "success": true,

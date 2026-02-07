@@ -5,7 +5,7 @@ import {
   Typography,
   Stack,
   Box,
-} from '@mui/material';
+} from '@/components/ui';
 import MatchScoreBreakdown from '@components/MatchScoreBreakdown';
 
 const MatchScoreBreakdownTest: React.FC = () => {
@@ -38,7 +38,7 @@ const MatchScoreBreakdownTest: React.FC = () => {
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Match Score Breakdown - Component Test
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Testing the MatchScoreBreakdown component with various scenarios
           </Typography>
         </Box>
@@ -48,7 +48,7 @@ const MatchScoreBreakdownTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 1: Typical Candidate (Good match)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Keyword: 80%, TF-IDF: 70%, Vector: 60%
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -65,7 +65,7 @@ const MatchScoreBreakdownTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 2: Excellent Candidate
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Keyword: 95%, TF-IDF: 90%, Vector: 85%
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -82,7 +82,7 @@ const MatchScoreBreakdownTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 3: Poor Candidate (Weak match)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Keyword: 30%, TF-IDF: 20%, Vector: 40%
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -99,7 +99,7 @@ const MatchScoreBreakdownTest: React.FC = () => {
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Verification Checklist:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             ✓ Component renders without errors<br />
             ✓ Shows three score bars (Keyword, TF-IDF, Vector)<br />
             ✓ Displays weight percentages (50%, 30%, 20%)<br />

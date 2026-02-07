@@ -1,0 +1,221 @@
+// Resume service gRPC definitions
+// Defines messages and services for managing resumes and parsed resume data
+
+syntax = "proto3";
+
+package agenthr.resumes;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/any.proto";
+
+// Resume status enum
+enum ResumeStatus {
+  RESUME_STATUS_PENDING = 0;     // Pending processing
+  RESUME_STATUS_PROCESSING = 1;  // Currently processing
+  RESUME_STATUS_COMPLETED = 2;   // Processing completed
+  RESUME_STATUS_FAILED = 3;      // Processing failed
+  RESUME_STATUS_NEW = 4;         // New candidate (hiring stage)
+  RESUME_STATUS_REVIEWED = 5;    // Reviewed (screening stage)
+  RESUME_STATUS_INTERVIEW = 6;   // Interview stage
+  RESUME_STATUS_OFFERED = 7;     // Offer stage
+  RESUME_STATUS_HIRED = 8;       // Hired stage
+}
+
+// Resume information
+message Resume {
+  string id = 1;                              // Unique identifier
+  string filename = 2;                        // Original filename
+  string file_path = 3;                       // Path to stored file
+  string content_type = 4;                    // MIME type (e.g., application/pdf)
+  ResumeStatus status = 5;                    // Current status
+  google.protobuf.Timestamp created_at = 6;   // Upload timestamp
+  google.protobuf.Timestamp updated_at = 7;   // Last update timestamp
+  google.protobuf.StringValue raw_text = 8;   // Extracted text content
+  google.protobuf.StringValue language = 9;   // Detected language (en, ru, etc.)
+  google.protobuf.StringValue error_message = 10; // Error message if processing failed
+}
+
+// Skill extracted from resume
+message Skill {
+  string name = 1;                    // Normalized skill name
+  string original_name = 2;           // Original skill name as found
+  google.protobuf.StringValue category = 3; // Skill category (technical, soft, framework, language)
+  repeated string variations = 4;     // Alternative names/synonyms
+  repeated int32 sources = 5;         // Experience entry indices where used
+  double confidence = 6;              // Confidence score (0.0 to 1.0)
+}
+
+// Education entry from resume
+message Education {
+  google.protobuf.StringValue degree = 1;        // Degree level (Bachelor, Master, PhD)
+  google.protobuf.StringValue institution = 2;   // University/college name
+  google.protobuf.StringValue field_of_study = 3; // Major/field of study
+  google.protobuf.StringValue start_date = 4;    // Start date (ISO or partial format)
+  google.protobuf.StringValue end_date = 5;      // Graduation date
+  google.protobuf.StringValue gpa = 6;           // Grade point average
+  google.protobuf.StringValue description = 7;   // Additional details (honors, thesis)
+}
+
+// Work experience entry from resume
+message WorkExperience {
+  google.protobuf.StringValue company = 1;       // Company/organization name
+  google.protobuf.StringValue position = 2;      // Job title/position
+  google.protobuf.StringValue start_date = 3;    // Start date (ISO or partial format)
+  google.protobuf.StringValue end_date = 4;      // End date (null if current)
+  google.protobuf.Int32Value duration_months = 5; // Duration in months
+  google.protobuf.StringValue description = 6;   // Job description and achievements
+  repeated string skills = 7;                    // Skills used in this role
+  google.protobuf.StringValue location = 8;      // Job location (city, country)
+}
+
+// Language proficiency from resume
+message Language {
+  string name = 1;                               // Language name (English, Russian, etc.)
+  google.protobuf.StringValue proficiency = 2;   // Proficiency level (native, fluent, intermediate, basic)
+  google.protobuf.StringValue certification = 3; // Language certification (IELTS, TOEFL)
+}
+
+// Experience summary
+message ExperienceSummary {
+  int32 total_months = 1;                           // Total work experience in months
+  double total_years = 2;                           // Total work experience in years
+  string total_years_formatted = 3;                 // Human-readable experience string
+  map<string, string> framework_specific = 4;        // Framework-specific experience (e.g., "React": "3 years")
+}
+
+// Parsed resume data
+message ParsedResume {
+  google.protobuf.StringValue raw_text = 1;              // Full text extracted from resume
+  string language = 2;                                   // Detected resume language (en, ru)
+  google.protobuf.StringValue position = 3;              // Current/most recent job position
+  google.protobuf.Int32Value age = 4;                    // Age if explicitly mentioned
+  repeated Skill skills = 5;                             // Extracted skills
+  repeated Education education = 6;                      // Education entries
+  repeated WorkExperience work_experience = 7;           // Work experience entries
+  repeated Language languages = 8;                       // Languages with proficiency
+  ExperienceSummary experience_summary = 9;              // Experience summary
+  repeated string warnings = 10;                         // Parsing warnings
+  map<string, google.protobuf.Any> processing_metadata = 11; // Processing metadata
+}
+
+// Request to upload a resume
+message UploadResumeRequest {
+  bytes file_data = 1;          // Resume file data (PDF, DOCX, etc.)
+  string filename = 2;          // Original filename
+  string content_type = 3;      // MIME type
+}
+
+// Response after uploading resume
+message UploadResumeResponse {
+  Resume resume = 1;            // Created resume record
+  string message = 2;           // Success message
+}
+
+// Request to list resumes
+message ListResumesRequest {
+  google.protobuf.StringValue status = 1;     // Filter by status
+  google.protobuf.StringValue search = 2;     // Search term to filter by filename
+  google.protobuf.StringValue language = 3;   // Filter by detected language
+  int32 skip = 4;                            // Number of records to skip
+  int32 limit = 5;                           // Maximum number of records to return
+}
+
+// Response with list of resumes
+message ListResumesResponse {
+  repeated Resume resumes = 1;  // List of resumes
+  int32 total_count = 2;        // Total count (for pagination)
+}
+
+// Request to get a specific resume
+message GetResumeRequest {
+  string resume_id = 1;  // Resume UUID
+}
+
+// Response with resume details
+message GetResumeResponse {
+  Resume resume = 1;  // Resume details
+}
+
+// Request to get parsed resume data
+message GetParsedResumeRequest {
+  string resume_id = 1;  // Resume UUID
+}
+
+// Response with parsed resume data
+message GetParsedResumeResponse {
+  ParsedResume parsed_resume = 1;  // Parsed resume data
+}
+
+// Request to delete a resume
+message DeleteResumeRequest {
+  string resume_id = 1;  // Resume UUID
+}
+
+// Response after deleting resume
+message DeleteResumeResponse {
+  bool success = 1;   // Whether deletion was successful
+  string message = 2;  // Success message
+}
+
+// Request to search resumes by skills
+message SearchResumesBySkillsRequest {
+  repeated string skills = 1;  // Skills to search for
+  google.protobuf.StringValue operator = 2; // Search operator: "and" or "or" (default: "or")
+  int32 skip = 3;              // Number of records to skip
+  int32 limit = 4;             // Maximum number of records to return
+}
+
+// Response with resumes matching skills
+message SearchResumesBySkillsResponse {
+  repeated Resume resumes = 1;  // Matching resumes
+  int32 total_count = 2;        // Total matching count
+}
+
+// Request to get resume work experiences
+message GetResumeWorkExperiencesRequest {
+  string resume_id = 1;  // Resume UUID
+}
+
+// Individual work experience
+message ResumeWorkExperience {
+  string id = 1;                                   // Unique identifier
+  string resume_id = 2;                            // Resume UUID
+  string company = 3;                              // Company name
+  string title = 4;                                // Job title
+  google.protobuf.Timestamp start_date = 5;        // Start date
+  google.protobuf.Timestamp end_date = 6;          // End date
+  google.protobuf.StringValue description = 7;     // Job description
+  google.protobuf.DoubleValue confidence_score = 8; // Extraction confidence (0.0 to 1.0)
+  google.protobuf.Timestamp created_at = 9;        // Creation timestamp
+  google.protobuf.Timestamp updated_at = 10;       // Update timestamp
+}
+
+// Response with resume work experiences
+message GetResumeWorkExperiencesResponse {
+  repeated ResumeWorkExperience work_experiences = 1;  // Work experiences
+}
+
+// Resume service
+service ResumeService {
+  // Upload a new resume
+  rpc UploadResume(UploadResumeRequest) returns (UploadResumeResponse);
+
+  // List all resumes with optional filters
+  rpc ListResumes(ListResumesRequest) returns (ListResumesResponse);
+
+  // Get a specific resume
+  rpc GetResume(GetResumeRequest) returns (GetResumeResponse);
+
+  // Get parsed resume data
+  rpc GetParsedResume(GetParsedResumeRequest) returns (GetParsedResumeResponse);
+
+  // Delete a resume
+  rpc DeleteResume(DeleteResumeRequest) returns (DeleteResumeResponse);
+
+  // Search resumes by skills
+  rpc SearchResumesBySkills(SearchResumesBySkillsRequest) returns (SearchResumesBySkillsResponse);
+
+  // Get resume work experiences
+  rpc GetResumeWorkExperiences(GetResumeWorkExperiencesRequest) returns (GetResumeWorkExperiencesResponse);
+}

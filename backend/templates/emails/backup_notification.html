@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Backup Notification</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table {border-collapse: collapse;}
+        .mj-container {font-size: 0 !important;}
+    </style>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        body {{
+            margin: 0;
+            padding: 0;
+            word-spacing: normal;
+            background-color: #f4f4f7;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }}
+        .mj-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }}
+        .mj-header {{
+            padding: 24px;
+            text-align: center;
+        }}
+        .mj-header.failure {{
+            background-color: #dc2626;
+        }}
+        .mj-header.success {{
+            background-color: #10b981;
+        }}
+        .mj-header.warning {{
+            background-color: #f59e0b;
+        }}
+        .mj-header h1 {{
+            color: #ffffff;
+            font-size: 24px;
+            margin: 0;
+            font-weight: 600;
+        }}
+        .mj-content {{
+            padding: 32px 24px;
+        }}
+        .mj-section {{
+            margin-bottom: 24px;
+        }}
+        .mj-section h2 {{
+            color: #1e293b;
+            font-size: 18px;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }}
+        .mj-section p {{
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 12px 0;
+        }}
+        .mj-alert-box {{
+            background-color: #fee2e2;
+            border-left: 4px solid #dc2626;
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+        .mj-alert-box.success {{
+            background-color: #d1fae5;
+            border-left-color: #10b981;
+        }}
+        .mj-alert-box.warning {{
+            background-color: #fef3c7;
+            border-left-color: #f59e0b;
+        }}
+        .mj-alert-box-title {{
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }}
+        .mj-alert-box-text {{
+            color: #475569;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            word-break: break-word;
+        }}
+        .mj-meta {{
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+        .mj-meta-row {{
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .mj-meta-row:last-child {{
+            border-bottom: none;
+        }}
+        .mj-meta-label {{
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 500;
+        }}
+        .mj-meta-value {{
+            color: #1e293b;
+            font-size: 13px;
+            font-weight: 600;
+        }}
+        .mj-divider {{
+            border-bottom: 1px solid #e2e8f0;
+            margin: 24px 0;
+        }}
+        .mj-footer {{
+            background-color: #f8fafc;
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .mj-footer p {{
+            color: #94a3b8;
+            font-size: 13px;
+            margin: 0;
+        }}
+        .mj-button {{
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+        }}
+        .mj-button:hover {{
+            background-color: #1d4ed8;
+        }}
+    </style>
+</head>
+<body>
+    <div class="mj-container">
+        <!-- Header -->
+        <div class="mj-header {severity_class}">
+            <h1>{header_title}</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="mj-content">
+            <!-- Greeting -->
+            <div class="mj-section">
+                <p>Hello Administrator,</p>
+                <p>{message}</p>
+            </div>
+
+            <!-- Error Details (for failures) -->
+            {error_section_start}
+            <div class="mj-section">
+                <h2>Error Details</h2>
+                <div class="mj-alert-box {severity_class}">
+                    <div class="mj-alert-box-title">{severity_label} Occurred</div>
+                    <div class="mj-alert-box-text">{error_message}</div>
+                </div>
+            </div>
+            {error_section_end}
+
+            <!-- Operation Metadata -->
+            <div class="mj-section">
+                <h2>Operation Details</h2>
+                <div class="mj-meta">
+                    <div class="mj-meta-row">
+                        <span class="mj-meta-label">Operation:</span>
+                        <span class="mj-meta-value">{operation}</span>
+                    </div>
+                    <div class="mj-meta-row">
+                        <span class="mj-meta-label">Timestamp:</span>
+                        <span class="mj-meta-value">{timestamp}</span>
+                    </div>
+                    {backup_name_row_start}
+                    <div class="mj-meta-row">
+                        <span class="mj-meta-label">Backup Name:</span>
+                        <span class="mj-meta-value">{backup_name}</span>
+                    </div>
+                    {backup_name_row_end}
+                    {duration_row_start}
+                    <div class="mj-meta-row">
+                        <span class="mj-meta-label">Duration:</span>
+                        <span class="mj-meta-value">{duration}</span>
+                    </div>
+                    {duration_row_end}
+                    {size_row_start}
+                    <div class="mj-meta-row">
+                        <span class="mj-meta-label">Size:</span>
+                        <span class="mj-meta-value">{backup_size}</span>
+                    </div>
+                    {size_row_end}
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="mj-divider"></div>
+
+            <!-- Call to Action -->
+            {action_button_start}
+            <div class="mj-section" style="text-align: center;">
+                <a href="{dashboard_url}" class="mj-button">View Backup Status</a>
+            </div>
+            {action_button_end}
+        </div>
+
+        <!-- Footer -->
+        <div class="mj-footer">
+            <p>This is an automated backup notification from AgentHR.</p>
+            <p>Please review the backup logs for more details.</p>
+            <p>&copy; {current_year} AgentHR. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

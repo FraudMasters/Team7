@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -77,7 +78,7 @@ interface ResumeUploaderProps {
  * const uploaderRef = useRef<ResumeUploaderHandle>(null);
  * <ResumeUploader
  *   ref={uploaderRef}
- *   uploadUrl="http://localhost:8000/api/resumes/upload"
+ *   uploadUrl={`${config.api.url}/api/resumes/upload`}
  *   onUploadComplete={(id) => navigate(`/results/${id}`)}
  * />
  *
@@ -87,7 +88,7 @@ interface ResumeUploaderProps {
  * ```
  */
 const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
-  uploadUrl = 'http://localhost:8000/api/resumes/upload',
+  uploadUrl = `${config.api.url}/api/resumes/upload`,
   maxFileSize = 10 * 1024 * 1024, // 10MB
   acceptedFileTypes = ['.pdf', '.docx'],
   onUploadComplete,

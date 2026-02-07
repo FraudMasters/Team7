@@ -1,23 +1,26 @@
+// Импорт хуков для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для UI
 import {
-  Container,
-  Typography,
-  Box,
-  Grid,
-  Paper,
-  Card,
-  CardContent,
-  Chip,
-  Button,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Divider,
+  Container,       // Контейнер для ограничения ширины содержимого
+  Typography,      // Компонент для текста с различными стилями
+  Box,             // Универсальный контейнер для верстки
+  Grid,            // Сетка для адаптивной верстки
+  Paper,           // Контейнер с эффектом elevated (карточка)
+  Card,            // Карточка
+  CardContent,     // Содержимое карточки
+  Chip,            // Метки/теги
+  Button,          // Кнопки
+  Accordion,       // Раскрывающийся список
+  AccordionSummary, // Заголовок аккордеона
+  AccordionDetails, // Содержимое аккордеона
+  List,            // Список
+  ListItem,        // Элемент списка
+  ListItemIcon,    // Иконка элемента списка
+  ListItemText,    // Текст элемента списка
+  Divider,         // Разделитель
 } from '@mui/material';
+// Импорт иконок из MUI
 import {
   Lightbulb as TipsIcon,
   ExpandMore as ExpandMoreIcon,
@@ -27,8 +30,10 @@ import {
   Psychology as MindIcon,
   Stars as StarsIcon,
 } from '@mui/icons-material';
-import { PageTransition } from '../../components/ui/PageTransition';
+// Импорт MUI компонентов
+import { PageTransition } from '@components/mui/PageTransition';
 
+// Интерфейс описывающий совет
 interface Tip {
   id: string;
   category: string;
@@ -37,6 +42,7 @@ interface Tip {
   icon: React.ReactElement;
 }
 
+// Интерфейс описывающий вопрос для интервью
 interface Question {
   id: string;
   question: string;
@@ -44,6 +50,7 @@ interface Question {
   category: string;
 }
 
+// Демо-данные советов
 const tips: Tip[] = [
   {
     id: '1',
@@ -99,6 +106,7 @@ const tips: Tip[] = [
   },
 ];
 
+// Демо-данные распространенных вопросов
 const commonQuestions: Question[] = [
   {
     id: '1',
@@ -130,11 +138,18 @@ const commonQuestions: Question[] = [
   },
 ];
 
+/**
+ * Страница подготовки к интервью
+ * Отображает советы и распространенные вопросы для успешного прохождения интервью
+ */
 export function InterviewTipsPage() {
+  // Состояние выбранной категории советов
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
+  // Список категорий
   const categories = ['All', 'Preparation', 'During Interview', 'Follow-up'];
 
+  // Фильтрация советов по категории
   const filteredTips =
     selectedCategory === 'All'
       ? tips
@@ -143,7 +158,7 @@ export function InterviewTipsPage() {
   return (
     <PageTransition>
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <TipsIcon sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -158,7 +173,7 @@ export function InterviewTipsPage() {
           </Box>
         </Box>
 
-        {/* Category Filter */}
+        {/* Фильтр по категориям */}
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 4 }}>
           {categories.map((cat) => (
             <Chip
@@ -172,7 +187,7 @@ export function InterviewTipsPage() {
         </Box>
 
         <Grid container spacing={3}>
-          {/* Tips */}
+          {/* Секция советов */}
           <Grid item xs={12} md={6}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Essential Tips
@@ -218,7 +233,7 @@ export function InterviewTipsPage() {
             </Box>
           </Grid>
 
-          {/* Common Questions */}
+          {/* Секция вопросов */}
           <Grid item xs={12} md={6}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Common Interview Questions
@@ -247,7 +262,7 @@ export function InterviewTipsPage() {
               ))}
             </Box>
 
-            {/* Quick Tips Card */}
+            {/* Карточка быстрых советов */}
             <Paper sx={{ p: 3, mt: 3, bgcolor: 'primary.50' }}>
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                 Quick Reminders
@@ -283,7 +298,7 @@ export function InterviewTipsPage() {
           </Grid>
         </Grid>
 
-        {/* Mock Interview CTA */}
+        {/* Призыв к пробному интервью */}
         <Paper sx={{ p: 4, mt: 4, textAlign: 'center', bgcolor: 'gradient.primary' }}>
           <Typography variant="h5" fontWeight={600} gutterBottom>
             Practice Makes Perfect

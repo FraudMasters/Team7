@@ -1,0 +1,384 @@
+# Traefik Dynamic Configuration
+# Динамическая конфигурация Traefik API Gateway
+# Этот файл определяет все маршруты, сервисы и middleware для API Gateway
+# Использование: Поместите этот файл в /etc/traefik/dynamic/ или подключите как volume
+
+# HTTP Routers - Маршрутизаторы HTTP
+http:
+  routers:
+    # Health Check Router
+    # Маршрутизатор проверки работоспособности
+    health-check:
+      rule: "Path(`/health`)"
+      service: health-check
+      entryPoints:
+        - web
+
+    # Resume Processing Service Router
+    # Маршрутизатор сервиса обработки резюме
+    resume-processing:
+      rule: "PathPrefix(`/api/resumes`) || PathPrefix(`/api/analysis`)"
+      service: resume-processing
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Matching Service Router
+    # Маршрутизатор сервиса сопоставления
+    matching:
+      rule: "PathPrefix(`/api/matching`) || PathPrefix(`/api/comparisons`) || PathPrefix(`/api/ranking`)"
+      service: matching
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Candidate Service Router
+    # Маршрутизатор сервиса кандидатов
+    candidate:
+      rule: "PathPrefix(`/api/candidates`) || PathPrefix(`/api/candidate-notes`) || PathPrefix(`/api/candidate-tags`) || PathPrefix(`/api/candidate-activities`)"
+      service: candidate
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Vacancy Service Router
+    # Маршрутизатор сервиса вакансий
+    vacancy:
+      rule: "PathPrefix(`/api/vacancies`)"
+      service: vacancy
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Taxonomy Service Router
+    # Маршрутизатор сервиса таксономии
+    taxonomy:
+      rule: "PathPrefix(`/api/skill-taxonomies`) || PathPrefix(`/api/taxonomy-import-export`)"
+      service: taxonomy
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Analytics Service Router
+    # Маршрутизатор сервиса аналитики
+    analytics:
+      rule: "PathPrefix(`/api/analytics`) || PathPrefix(`/api/reports`)"
+      service: analytics
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # ATS Simulation Service Router
+    # Маршрутизатор сервиса симуляции ATS
+    ats-simulation:
+      rule: "PathPrefix(`/api/ats`)"
+      service: ats-simulation
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Notification Service Router
+    # Маршрутизатор сервиса уведомлений
+    notifications:
+      rule: "PathPrefix(`/api/notifications`)"
+      service: notifications
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Integration Service Router
+    # Маршрутизатор сервиса интеграций
+    integration:
+      rule: "PathPrefix(`/api/integrations`)"
+      service: integration
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - auth-headers
+      entryPoints:
+        - web
+
+    # Dashboard Router (Traefik UI)
+    # Маршрутизатор панели управления Traefik
+    dashboard:
+      rule: "PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
+      service: api@internal
+      middlewares:
+        - dashboard-auth
+      entryPoints:
+        - web
+      tls: {}
+
+  # Services - Backend microservices
+  # Сервисы - внутренние микросервисы
+  services:
+    # Health Check Service
+    # Сервис проверки работоспособности
+    health-check:
+      loadBalancer:
+        servers:
+          - url: "http://resume_processing:8001"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "3s"
+
+    # Resume Processing Service
+    # Сервис обработки резюме
+    resume-processing:
+      loadBalancer:
+        servers:
+          - url: "http://resume_processing:8001"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Matching Service
+    # Сервис сопоставления
+    matching:
+      loadBalancer:
+        servers:
+          - url: "http://matching:8002"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Candidate Service
+    # Сервис кандидатов
+    candidate:
+      loadBalancer:
+        servers:
+          - url: "http://candidate:8003"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Vacancy Service
+    # Сервис вакансий
+    vacancy:
+      loadBalancer:
+        servers:
+          - url: "http://vacancy:8004"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Taxonomy Service
+    # Сервис таксономии
+    taxonomy:
+      loadBalancer:
+        servers:
+          - url: "http://taxonomy:8005"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Analytics Service
+    # Сервис аналитики
+    analytics:
+      loadBalancer:
+        servers:
+          - url: "http://analytics:8006"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # ATS Simulation Service
+    # Сервис симуляции ATS
+    ats-simulation:
+      loadBalancer:
+        servers:
+          - url: "http://ats_simulation:8007"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Notification Service
+    # Сервис уведомлений
+    notifications:
+      loadBalancer:
+        servers:
+          - url: "http://notifications:8008"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+    # Integration Service
+    # Сервис интеграций
+    integration:
+      loadBalancer:
+        servers:
+          - url: "http://integration:8009"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "10s"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+
+  # Middlewares - Cross-cutting concerns
+    # Middleware для CORS заголовков
+    # CORS Headers Middleware
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        accessControlAllowHeaders:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - Authorization
+          - X-Request-ID
+          - X-API-Key
+        accessControlAllowOriginList:
+          - http://localhost:5173
+          - http://localhost:3000
+        accessControlExposeHeaders:
+          - X-Request-ID
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 3600
+        addVaryHeader: true
+
+    # Rate Limiting Middleware
+    # Middleware ограничения частоты запросов
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: "1s"
+        sourceCriterion:
+          requestHeaderName: "X-Request-ID"
+
+    # Authentication Headers Middleware
+    # Middleware заголовков аутентификации
+    auth-headers:
+      headers:
+        customRequestHeaders:
+          X-Gateway: "traefik"
+          X-Request-ID: "GeneratedRequestId"
+
+    # Dashboard Authentication Middleware
+    # Middleware аутентификации панели управления
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$hash"  # Замените на хэш пароля / Replace with password hash
+
+    # Request Size Limiting Middleware
+    # Middleware ограничения размера запроса
+    size-limit:
+      buffering:
+        maxRequestBodyBytes: 104857600  # 100 MB для загрузки резюме
+        memRequestBodyBytes: 104857600
+
+  # TLS Configuration
+  # Конфигурация TLS
+  tls:
+    certificates: []
+    options:
+      default:
+        minVersion: VersionTLS12
+        cipherSuites:
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+
+# JWT Authentication Middleware Configuration
+# Конфигурация middleware JWT аутентификации
+# Интеграция с Keycloak: проверка JWT токенов на уровне Gateway
+# Keycloak Integration: JWT token validation at Gateway level
+
+# Для интеграции с Keycloak используйте traefik-forward-auth или ForwardAuth middleware
+# For Keycloak integration use traefik-forward-auth or ForwardAuth middleware
+
+# JWT Authentication Middleware (опционально для Traefik)
+# JWT Authentication Middleware (optional for Traefik)
+# Примечание: Для production рекомендуется использовать external auth service (traefik-forward-auth)
+# Note: For production, use external auth service (traefik-forward-auth)
+
+# jwt-auth:
+#   forwardAuth:
+#     address: "http://traefik-forward-auth:4181/verify?uri=/oauth2/verify"
+#     authResponseHeaders:
+#       - "X-Forwarded-User"
+#       - "X-User-Id"
+#       - "X-User-Email"
+#       - "X-User-Roles"
+#     trustForwardHeader: true
+#     authRequestHeaders:
+#       - "Authorization"
+#       - "Cookie"
+
+# Маршруты, требующие аутентификации, должны добавить middleware 'jwt-auth'
+# Routes requiring authentication should add 'jwt-auth' middleware
+# Например:
+# middlewares:
+#   - cors-headers
+#   - rate-limit
+#   - jwt-auth  # Добавить эту middleware для защищенных маршрутов

@@ -18,18 +18,8 @@ import {
   TableContainer,
   TableRow,
   Divider,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Cancel as CrossIcon,
-  Speed as SpeedIcon,
-  Psychology as VectorIcon,
-  Tune as TfidfIcon,
-  Key as KeywordIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 interface UnifiedMatchMetricsProps {
   overallScore: number;
@@ -80,31 +70,31 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
         return {
           color: 'success' as const,
           label: 'Отличный кандидат',
-          icon: <CheckIcon />,
+          icon: <Icon name="check-circle" size={16} />,
         };
       case 'good':
         return {
           color: 'success' as const,
           label: 'Хороший кандидат',
-          icon: <CheckIcon />,
+          icon: <Icon name="check-circle" size={16} />,
         };
       case 'maybe':
         return {
           color: 'warning' as const,
           label: 'Возможно подходит',
-          icon: <SpeedIcon />,
+          icon: <Icon name="zap" size={16} />,
         };
       case 'poor':
         return {
           color: 'error' as const,
           label: 'Слабое совпадение',
-          icon: <CrossIcon />,
+          icon: <Icon name="x-circle" size={16} />,
         };
       default:
         return {
           color: 'info' as const,
           label: 'Неизвестно',
-          icon: <SpeedIcon />,
+          icon: <Icon name="zap" size={16} />,
         };
     }
   };
@@ -153,9 +143,9 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
                 {getScoreValue(score)}%
               </Typography>
               {passed ? (
-                <CheckIcon color="success" />
+                <Icon name="check-circle" size="small" color="success" />
               ) : (
-                <CrossIcon color="error" />
+                <Icon name="x-circle" size="small" color="error" />
               )}
             </Box>
             <LinearProgress
@@ -190,14 +180,14 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
         {typeof value === 'boolean' ? (
           value ? (
             <Chip
-              icon={<CheckIcon />}
+              icon={<Icon name="check-circle" size="small" />}
               label="Да"
               color="success"
               size="small"
             />
           ) : (
             <Chip
-              icon={<CrossIcon />}
+              icon={<Icon name="x-circle" size="small" />}
               label="Нет"
               color="error"
               size="small"
@@ -256,7 +246,7 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
           <ScoreCard
             title="Ключевые слова"
             score={keywordScore}
-            icon={<KeywordIcon />}
+            icon={<Icon name="key" size={16} />}
             passed={keywordPassed}
             description="Синонимы, нечёткое сравнение, составные навыки"
           />
@@ -265,7 +255,7 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
           <ScoreCard
             title="TF-IDF взвешивание"
             score={tfidfScore}
-            icon={<TfidfIcon />}
+            icon={<Icon name="sliders" size={16} />}
             passed={tfidfPassed}
             description="Учитывает важность каждого ключевого слова"
           />
@@ -274,7 +264,7 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
           <ScoreCard
             title="Семантическая похожесть"
             score={vectorScore}
-            icon={<VectorIcon />}
+            icon={<Icon name="brain" size={16} />}
             passed={vectorPassed}
             description="Понимает смысл, а не только ключевые слова"
           />
@@ -287,7 +277,7 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
           <Paper elevation={1} sx={{ p: 2, height: '100%', bgcolor: 'success.50' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <CheckIcon color="success" sx={{ mr: 1, fontSize: 20 }} />
+                <Icon name="check-circle" size={20} color="success" style={{ marginRight: '4px' }} />
                 <Typography variant="subtitle2" fontWeight={600} color="success.main">
                   Найденные навыки
                 </Typography>
@@ -306,7 +296,7 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
           <Paper elevation={1} sx={{ p: 2, height: '100%', bgcolor: 'error.50' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <CrossIcon color="error" sx={{ mr: 1, fontSize: 20 }} />
+                <Icon name="x-circle" size={20} color="error" style={{ marginRight: '4px' }} />
                 <Typography variant="subtitle2" fontWeight={600} color="error.main">
                   Недостающие навыки
                 </Typography>
@@ -334,13 +324,13 @@ const UnifiedMatchMetrics: React.FC<UnifiedMatchMetricsProps> = ({
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InfoIcon color="primary" />
+            <Icon name="info" size="small" color="primary" />
             <Typography variant="subtitle1" fontWeight={600}>
               Подробная информация по метрикам
             </Typography>
           </Box>
           <IconButton size="small">
-            {detailsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            {detailsOpen ? <Icon name="chevron-up" size={20} /> : <Icon name="chevron-down" size={20} />}
           </IconButton>
         </Box>
 

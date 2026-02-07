@@ -487,33 +487,148 @@ def get_s3_config() -> Dict[str, Any]:
     }
 
 
-def send_backup_failure_notification(operation: str, error_message: str) -> None:
+def send_backup_failure_notification(
+    operation: str,
+    error_message: str,
+    backup_id: Optional[str] = None,
+) -> None:
     """
     Send notification on backup failure.
 
+    This function sends an email notification when a backup operation fails.
+    It uses the Celery email task for asynchronous delivery with retries.
+
+    Task Workflow:
+    1. Retrieve notification email address from settings
+    2. Check if email notifications are enabled
+    3. Queue email task for asynchronous delivery
+    4. Log notification status
+
     Args:
-        operation: Name of the failed operation
-        error_message: Error message
+        operation: Name of the failed operation (e.g., "daily_backup", "create_database")
+        error_message: Error message describing the failure
+        backup_id: Optional UUID of the backup operation for tracking
+
+    Example:
+        >>> send_backup_failure_notification(
+        ...     operation="daily_backup",
+        ...     error_message="Disk space exceeded",
+        ...     backup_id="backup-123"
+        ... )
     """
-    # Get notification email from config
-    notification_email = os.getenv("BACKUP_NOTIFICATION_EMAIL")
+    # Get notification email from settings
+    notification_email = settings.backup_notification_email
 
     if not notification_email:
-        logger.warning("No notification email configured")
+        logger.warning("No backup notification email configured")
         return
 
-    # In a full implementation, this would send an email
-    # For now, just log the notification
-    logger.error(
-        f"BACKUP FAILURE NOTIFICATION for {operation}: {error_message} "
-        f"(would send to: {notification_email})"
+    logger.info(
+        f"Sending backup failure notification for operation '{operation}' to {notification_email}"
     )
 
-    # TODO: Implement email notification
-    # Could use Celery with tasks like:
-    # - send_email_task
-    # - send_slack_notification
-    # - send_webhook_notification
+    # Import email task to avoid circular dependency
+    try:
+        from tasks.email_tasks import send_email_task
+
+        # Prepare email content
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        subject = f"[AgentHR] Backup Failure: {operation}"
+
+        # HTML email body
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background-color: #d32f2f; color: white; padding: 15px; text-align: center; }}
+                .content {{ background-color: #f9f9f9; padding: 20px; border-radius: 5px; }}
+                .error-box {{ background-color: #ffebee; border-left: 4px solid #d32f2f; padding: 15px; margin: 15px 0; }}
+                .footer {{ margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }}
+                .label {{ font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h2>⚠️ Backup Operation Failed</h2>
+                </div>
+                <div class="content">
+                    <p>A backup operation has failed and requires your attention.</p>
+
+                    <p><span class="label">Operation:</span> {operation}</p>
+                    <p><span class="label">Timestamp:</span> {timestamp}</p>
+                    {f'<p><span class="label">Backup ID:</span> {backup_id}</p>' if backup_id else ''}
+
+                    <div class="error-box">
+                        <strong>Error Message:</strong><br>
+                        <code>{error_message}</code>
+                    </div>
+
+                    <p><strong>Recommended Actions:</strong></p>
+                    <ul>
+                        <li>Check the system logs for more details</li>
+                        <li>Verify available disk space</li>
+                        <li>Ensure database connectivity</li>
+                        <li>Review backup service configuration</li>
+                    </ul>
+                </div>
+                <div class="footer">
+                    <p>This is an automated notification from AgentHR Backup Service.</p>
+                    <p>Please do not reply to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        # Plain text fallback
+        text_body = f"""
+        BACKUP OPERATION FAILED
+
+        Operation: {operation}
+        Timestamp: {timestamp}
+        {f'Backup ID: {backup_id}' if backup_id else ''}
+
+        Error Message:
+        {error_message}
+
+        Recommended Actions:
+        - Check the system logs for more details
+        - Verify available disk space
+        - Ensure database connectivity
+        - Review backup service configuration
+
+        This is an automated notification from AgentHR Backup Service.
+        """
+
+        # Queue email task for asynchronous delivery
+        send_email_task.delay(
+            to=notification_email,
+            subject=subject,
+            body=html_body,
+            email_type="backup_failure",
+            html=True,
+        )
+
+        logger.info(
+            f"Backup failure notification queued for delivery to {notification_email}"
+        )
+
+    except ImportError as e:
+        logger.error(f"Failed to import email task: {e}")
+        logger.error(
+            f"BACKUP FAILURE NOTIFICATION for {operation}: {error_message} "
+            f"(would send to: {notification_email})"
+        )
+    except Exception as e:
+        logger.error(f"Failed to queue backup failure notification: {e}", exc_info=True)
+        logger.error(
+            f"BACKUP FAILURE NOTIFICATION for {operation}: {error_message} "
+            f"(would send to: {notification_email})"
+        )
 
 
 @shared_task(

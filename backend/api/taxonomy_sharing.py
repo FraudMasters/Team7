@@ -109,7 +109,7 @@ async def list_public_taxonomies(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/taxonomy-sharing/public?industry=healthcare")
+        >>> response = requests.get("/api/taxonomy-sharing/public?industry=healthcare")
         >>> response.json()
         {
             "industry": "healthcare",
@@ -184,7 +184,7 @@ async def fork_taxonomy(
         >>> import requests
         >>> data = {"organization_id": "org-123"}
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/taxonomy-sharing/abc-123/fork",
+        ...     "/api/taxonomy-sharing/abc-123/fork",
         ...     json=data
         ... )
         >>> response.json()

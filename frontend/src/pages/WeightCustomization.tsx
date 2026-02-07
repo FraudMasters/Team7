@@ -34,7 +34,7 @@ import {
   LinearProgress,
   Card,
   CardContent,
-} from '@mui/material';
+} from '@/components/ui';
 import {
   Save as SaveIcon,
   Tune as TuneIcon,
@@ -42,7 +42,6 @@ import {
   Warning as WarningIcon,
   History as HistoryIcon,
   AutoAwesome as PresetIcon,
-} from '@mui/icons-material';
 import { apiClient } from '@/api/client';
 import type {
   PresetProfile,
@@ -256,7 +255,7 @@ export default function WeightCustomizationPage() {
             <TuneIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
             {t('matchingWeights.title', { defaultValue: 'Matching Algorithm Weights' })}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             {t('matchingWeights.subtitle', {
               defaultValue: 'Customize how the matching algorithm scores candidates. Adjust the relative importance of each matching method.',
             })}
@@ -307,7 +306,7 @@ export default function WeightCustomizationPage() {
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" color="secondary" sx={{ minWidth: 80 }}>
                     {t('matchingWeights.keyword.label', { defaultValue: 'Keyword' })}: {weights.keyword}%
                   </Typography>
                 </Box>
@@ -322,7 +321,7 @@ export default function WeightCustomizationPage() {
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" color="secondary" sx={{ minWidth: 80 }}>
                     {t('matchingWeights.tfidf.label', { defaultValue: 'TF-IDF' })}: {weights.tfidf}%
                   </Typography>
                 </Box>
@@ -337,7 +336,7 @@ export default function WeightCustomizationPage() {
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" color="secondary" sx={{ minWidth: 80 }}>
                     {t('matchingWeights.vector.label', { defaultValue: 'Vector' })}: {weights.vector}%
                   </Typography>
                 </Box>
@@ -439,7 +438,7 @@ export default function WeightCustomizationPage() {
                               sx={{ backgroundColor: '#F3E5F5' }}
                             />
                           </Box>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="secondary">
                             {t(`matchingWeights.presets.${key}.description`, {
                               defaultValue: 'Preset description',
                             })}
@@ -512,7 +511,7 @@ export default function WeightCustomizationPage() {
                             <Chip label={`V: ${profile.weights_percentage.vector}%`} size="small" />
                           </Box>
                           {profile.description && (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="secondary">
                               {profile.description}
                             </Typography>
                           )}

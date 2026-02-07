@@ -144,7 +144,7 @@ async def create_report(request: ReportCreate) -> JSONResponse:
         ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
         ...     "is_public": True
         ... }
-        >>> response = requests.post("http://localhost:8000/api/reports/", json=data)
+        >>> response = requests.post("/api/reports/", json=data)
         >>> response.json()
         {
             "id": "report-123",
@@ -227,7 +227,7 @@ async def list_reports(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/reports/?organization_id=org123")
+        >>> response = requests.get("/api/reports/?organization_id=org123")
         >>> response.json()
     """
     try:
@@ -271,7 +271,7 @@ async def get_report(report_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/reports/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/reports/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
     """
     try:
@@ -326,7 +326,7 @@ async def update_report(
         >>> import requests
         >>> data = {"name": "Updated Report Name", "metrics": ["time_to_hire", "match_rates"]}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/reports/123",
+        ...     "/api/reports/123",
         ...     json=data
         ... )
         >>> response.json()
@@ -380,7 +380,7 @@ async def delete_report(report_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/reports/123")
+        >>> response = requests.delete("/api/reports/123")
         >>> response.json()
         {"message": "Report deleted successfully"}
     """
@@ -418,7 +418,7 @@ async def delete_reports_by_organization(organization_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/reports/organization/org123")
+        >>> response = requests.delete("/api/reports/organization/org123")
         >>> response.json()
         {"message": "Deleted 5 reports for organization: org123"}
     """
@@ -469,7 +469,7 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
         ...     }
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/reports/export/pdf",
+        ...     "/api/reports/export/pdf",
         ...     json=data
         ... )
         >>> response.json()
@@ -550,7 +550,7 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
         ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"}
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/reports/export/csv",
+        ...     "/api/reports/export/csv",
         ...     json=data
         ... )
         >>> with open("report.csv", "wb") as f:
@@ -665,7 +665,7 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
         ...     "is_active": True
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/reports/schedule",
+        ...     "/api/reports/schedule",
         ...     json=data
         ... )
         >>> response.json()

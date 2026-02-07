@@ -1,19 +1,19 @@
 /**
  * Skill Suggestions API Client
  *
- * This module provides a convenient interface for fetching skill suggestions
- * based on industry, job title, and job description. It wraps the industry
- * classifier's skill suggestion functionality.
+ * Этот модуль предоставляет удобный интерфейс для получения предложений навыков
+ * на основе индустрии, должности и описания вакансии. Обертывает функциональность
+ * предложений навыков классификатора индустрии.
  *
  * @example
  * ```ts
  * import { skillSuggestions } from '@/api/skillSuggestions';
  *
- * // Get skill suggestions for a job posting
+ * // Получение предложений навыков для вакансии
  * const suggestions = await skillSuggestions.getSuggestions({
  *   industry: 'tech',
  *   title: 'Senior React Developer',
- *   description: 'Looking for a React developer with TypeScript experience...',
+ *   description: 'Ищем разработчика React с опытом TypeScript...',
  *   limit: 20,
  * });
  *
@@ -29,27 +29,27 @@ import type {
 } from '@/types/api';
 
 /**
- * Default configuration for skill suggestions
+ * Конфигурация по умолчанию для предложений навыков
  */
 const DEFAULTS = {
   limit: 20,
-  minRelevanceScore: 0.3, // Only show skills with relevance >= 0.3
+  minRelevanceScore: 0.3, // Показывать только навыки с релевантностью >= 0.3
 };
 
 /**
- * Skill Suggestions Client class
+ * Класс клиента предложений навыков
  *
- * Provides a simplified interface for fetching skill suggestions
- * with built-in filtering and sorting.
+ * Предоставляет упрощенный интерфейс для получения предложений навыков
+ * со встроенной фильтрацией и сортировкой.
  */
 export class SkillSuggestionsClient {
   /**
-   * Get skill suggestions based on industry and job context
+   * Получение предложений навыков на основе индустрии и контекста работы
    *
-   * @param request - Suggestion request parameters
-   * @param options - Optional configuration overrides
-   * @returns Filtered and sorted skill suggestions
-   * @throws ApiError if suggestion fails
+   * @param request - Параметры запроса предложений
+   * @param options - Опциональные переопределения конфигурации
+   * @returns Отфильтрованные и отсортированные предложения навыков
+   * @throws ApiError если получение предложений не удалось
    *
    * @example
    * ```ts
@@ -69,7 +69,7 @@ export class SkillSuggestionsClient {
     const limit = request.limit ?? config.limit;
 
     try {
-      // Fetch suggestions from the skill suggestions API
+      // Получение предложений из API предложений навыков
       const response = await industryClassifier.getAxiosInstance().post(
         '/api/skill-suggestions/suggest',
         {
@@ -78,10 +78,10 @@ export class SkillSuggestionsClient {
         }
       );
 
-      // Transform backend response to frontend format
+      // Преобразование ответа backend во фронтенд-формат
       const backendData = response.data;
 
-      // Filter by minimum relevance score and transform
+      // Фильтрация по минимальной оценке релевантности и преобразование
       const transformedSkills: SkillSuggestionItem[] = backendData.suggestions
         .filter((s: SkillSuggestionItem) => s.relevance_score >= config.minRelevanceScore)
         .map((s: SkillSuggestionItem) => ({
@@ -90,7 +90,7 @@ export class SkillSuggestionsClient {
           variants: s.variants,
           relevance_score: s.relevance_score,
           category: s.context || undefined,
-          is_industry_specific: true, // All skills from industry taxonomy are industry-specific
+          is_industry_specific: true, // Все навыки из индустриальной таксономии специфичны для индустрии
         }))
         .sort((a: SkillSuggestionItem, b: SkillSuggestionItem) => b.relevance_score - a.relevance_score);
 
@@ -101,23 +101,23 @@ export class SkillSuggestionsClient {
         total_count: transformedSkills.length,
       };
     } catch (error) {
-      // Re-throw the error as-is (industryClassifier already transforms it)
+      // Переброс ошибки как есть (industryClassifier уже преобразует ее)
       throw error;
     }
   }
 
   /**
-   * Get only industry-specific skills (high relevance)
+   * Получение только специфичных для индустрии навыков (высокая релевантность)
    *
-   * @param request - Suggestion request parameters
-   * @returns Industry-specific skill suggestions
+   * @param request - Параметры запроса предложений
+   * @returns Предложения навыков, специфичных для индустрии
    *
    * @example
    * ```ts
    * const industrySkills = await skillSuggestions.getIndustrySpecificSkills({
    *   industry: 'healthcare',
    *   title: 'Registered Nurse',
-   *   description: 'ICU experience required...',
+   *   description: 'Требуется опыт работы в отделении интенсивной терапии...',
    * });
    * ```
    */
@@ -130,10 +130,10 @@ export class SkillSuggestionsClient {
   }
 
   /**
-   * Get suggestions grouped by category
+   * Получение предложений, сгруппированных по категориям
    *
-   * @param request - Suggestion request parameters
-   * @returns Skills grouped by category
+   * @param request - Параметры запроса предложений
+   * @returns Навыки, сгруппированные по категориям
    *
    * @example
    * ```ts
@@ -167,13 +167,13 @@ export class SkillSuggestionsClient {
 }
 
 /**
- * Default skill suggestions client instance
+ * Экземпляр клиента предложений навыков по умолчанию
  *
- * Use this singleton instance for all skill suggestion calls.
+ * Используйте этот singleton-экземпляр для всех вызовов предложений навыков.
  */
 export const skillSuggestions = new SkillSuggestionsClient();
 
 /**
- * Export skill suggestions client class for custom instances
+ * Экспорт класса клиента предложений навыков для создания кастомных экземпляров
  */
 export default SkillSuggestionsClient;

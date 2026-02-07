@@ -117,6 +117,45 @@ class MetricsRegistry:
             registry=self._registry,
         )
 
+        # Database Pool Metrics
+        self.db_pool_size = Gauge(
+            "db_pool_size",
+            "Database connection pool size",
+            registry=self._registry,
+        )
+
+        self.db_pool_overflow = Gauge(
+            "db_pool_overflow",
+            "Database connection pool overflow connections",
+            registry=self._registry,
+        )
+
+        self.db_pool_checked_out = Gauge(
+            "db_pool_checked_out",
+            "Number of database connections currently checked out",
+            registry=self._registry,
+        )
+
+        self.db_pool_available = Gauge(
+            "db_pool_available",
+            "Number of available database connections in pool",
+            registry=self._registry,
+        )
+
+        self.db_pool_checkout_duration_seconds = Histogram(
+            "db_pool_checkout_duration_seconds",
+            "Database connection checkout time in seconds",
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
+            registry=self._registry,
+        )
+
+        self.db_pool_checkouts_total = Counter(
+            "db_pool_checkouts_total",
+            "Total database connection checkouts",
+            ["status"],  # status: success, timeout, error
+            registry=self._registry,
+        )
+
         # Celery Task Metrics
         self.celery_tasks_total = Counter(
             "celery_tasks_total",
@@ -372,6 +411,57 @@ class MetricsRegistry:
             logger.debug(f"Updated DB connection metrics: {active} active, {idle} idle")
         except Exception as e:
             logger.error(f"Error updating DB connection metrics: {e}", exc_info=True)
+
+    def update_db_pool_metrics(
+        self,
+        size: int,
+        overflow: int,
+        checked_out: int,
+        available: int,
+    ) -> None:
+        """
+        Update database connection pool metrics.
+
+        Args:
+            size: Total pool size
+            overflow: Number of overflow connections
+            checked_out: Number of checked out connections
+            available: Number of available connections
+
+        Example:
+            >>> registry = MetricsRegistry()
+            >>> registry.update_db_pool_metrics(10, 2, 8, 2)
+        """
+        try:
+            self.db_pool_size.set(size)
+            self.db_pool_overflow.set(overflow)
+            self.db_pool_checked_out.set(checked_out)
+            self.db_pool_available.set(available)
+            logger.debug(
+                f"Updated DB pool metrics: size={size}, overflow={overflow}, "
+                f"checked_out={checked_out}, available={available}"
+            )
+        except Exception as e:
+            logger.error(f"Error updating DB pool metrics: {e}", exc_info=True)
+
+    def record_db_pool_checkout(self, duration: float, status: str = "success") -> None:
+        """
+        Record database connection pool checkout metrics.
+
+        Args:
+            duration: Checkout time in seconds
+            status: Checkout status (success, timeout, error)
+
+        Example:
+            >>> registry = MetricsRegistry()
+            >>> registry.record_db_pool_checkout(0.023, "success")
+        """
+        try:
+            self.db_pool_checkouts_total.labels(status=status).inc()
+            self.db_pool_checkout_duration_seconds.observe(duration)
+            logger.debug(f"Recorded DB pool checkout: {duration:.3f}s ({status})")
+        except Exception as e:
+            logger.error(f"Error recording DB pool checkout metric: {e}", exc_info=True)
 
     def update_celery_queue_length(self, queue_name: str, length: int) -> None:
         """

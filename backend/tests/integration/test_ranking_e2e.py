@@ -1,4 +1,5 @@
 """
+import os
 End-to-End Integration Tests for AI Candidate Ranking Flow
 
 Tests the complete ranking workflow:
@@ -14,7 +15,7 @@ import time
 class TestRankingE2E:
     """End-to-end tests for the ranking API."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = os.getenv("API_BASE_URL", "")
 
     @pytest.fixture(scope="class")
     def test_vacancy(self):
@@ -191,7 +192,7 @@ class TestRankingE2E:
 class TestRankingFeedbackE2E:
     """End-to-end tests for ranking feedback flow."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = os.getenv("API_BASE_URL", "")
 
     @pytest.fixture
     def sample_ranking_data(self):
@@ -267,12 +268,15 @@ class TestRankingFeedbackE2E:
 class TestRankingWithCelery:
     """Integration tests with Celery for async ranking tasks."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = os.getenv("API_BASE_URL", "")
 
     @pytest.fixture
     def celery_worker(self):
         """Ensure Celery worker is available."""
-        response = requests.get("http://localhost:5555/api/workers")
+        flower_url = os.getenv("CELERY_FLOWER_URL", "")
+        if not flower_url:
+            pytest.skip("CELERY_FLOWER_URL environment variable not set")
+        response = requests.get(f"{flower_url}/api/workers")
         if response.status_code != 200:
             pytest.skip("Celery worker not available")
         return response.json()

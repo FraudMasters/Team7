@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -9,8 +9,12 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  AppBar,
+  Toolbar,
+  Button,
 } from '@mui/material';
 import { Work as WorkIcon, BusinessCenter as BusinessIcon } from '@mui/icons-material';
+import { useAuth } from 'react-oidc-context';
 
 interface RoleCard {
   title: string;
@@ -40,10 +44,42 @@ const roles: RoleCard[] = [
   },
 ];
 
+const getUserRoles = (auth: any): string[] => {
+  const roles = new Set<string>();
+  const realmAccess = auth.user?.profile?.realm_access;
+  if (realmAccess?.roles && Array.isArray(realmAccess.roles)) {
+    realmAccess.roles.forEach((role: string) => roles.add(role));
+  }
+  const resourceAccess = auth.user?.profile?.resource_access;
+  if (resourceAccess) {
+    Object.keys(resourceAccess).forEach((client) => {
+      const clientRoles = resourceAccess[client]?.roles;
+      if (clientRoles && Array.isArray(clientRoles)) {
+        clientRoles.forEach((role: string) => roles.add(role));
+      }
+    });
+  }
+  return Array.from(roles);
+};
+
 const LandingPage: React.FC = () => {
+  const auth = useAuth();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery('(max-width:900px)');
+
+  // Redirect authenticated users to appropriate page based on role
+  useEffect(() => {
+    if (!auth.isLoading && auth.user) {
+      const roles = getUserRoles(auth);
+      if (roles.includes('admin')) {
+        navigate('/recruiter/dashboard', { replace: true });
+      } else if (roles.includes('recruiter')) {
+        navigate('/recruiter/dashboard', { replace: true });
+      } else {
+        navigate('/jobs', { replace: true });
+      }
+    }
+  }, [auth, navigate]);
 
   return (
     <Box
@@ -77,6 +113,47 @@ const LandingPage: React.FC = () => {
       >
         Skip to main content
       </Box>
+
+      {/* Navigation Bar */}
+      <AppBar
+        position="static"
+        elevation={0}
+        sx={{
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Toolbar sx={{ justifyContent: 'flex-end' }}>
+          <Stack direction="row" spacing={2}>
+            <Button
+              color="primary"
+              onClick={() => navigate('/login')}
+              sx={{
+                fontWeight: 600,
+                textTransform: 'none',
+                px: 3,
+              }}
+              aria-label="Navigate to login page"
+            >
+              Login
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => navigate('/register')}
+              sx={{
+                fontWeight: 600,
+                textTransform: 'none',
+                px: 3,
+              }}
+              aria-label="Navigate to registration page"
+            >
+              Register
+            </Button>
+          </Stack>
+        </Toolbar>
+      </AppBar>
 
       <Container maxWidth="lg">
         <Box

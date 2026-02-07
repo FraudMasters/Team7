@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Typography, Box, Paper, Stepper, Step, StepLabel } from '@mui/material';
+import { config } from '@/config';
 import ResumeUploader from '@components/ResumeUploader';
 
 /**
@@ -86,7 +87,7 @@ const ResumeUploadPage: React.FC = () => {
       {/* Upload Component */}
       <Paper elevation={1} sx={{ p: 4 }}>
         <ResumeUploader
-          uploadUrl="http://localhost:8000/api/resumes/upload"
+          uploadUrl={`${config.api.url}/api/resumes/upload`}
           onUploadComplete={handleUploadComplete}
           onUploadError={handleUploadError}
           onUploadStart={handleUploadStart}
