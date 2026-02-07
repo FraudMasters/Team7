@@ -8,7 +8,8 @@ metric tracking, and statistical analysis to determine optimal weight settings.
 import enum
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -64,4 +65,49 @@ class ABTest(Base, UUIDMixin, TimestampMixin):
         return (
             f"<ABTest(id={self.id}, name={self.name}, "
             f"status={self.status}, org={self.organization_id})>"
+        )
+
+
+class ABTestAssignment(Base, UUIDMixin, TimestampMixin):
+    """
+    ABTestAssignment model for tracking user-to-profile assignments
+
+    This model represents a user's assignment to a specific weight profile
+    within an A/B test. Each user can be assigned to only one profile per test.
+    The assignment is deterministic - the same user will always receive the
+    same profile assignment for a given test.
+
+    Attributes:
+        id: UUID primary key
+        test_id: Foreign key to the ABTest this assignment belongs to
+        user_id: ID of the user being assigned
+        profile_id: Foreign key to the MatchingWeightsProfile assigned to this user
+        assigned_at: Timestamp when the assignment was made
+        created_at: Timestamp when record was created (inherited)
+        updated_at: Timestamp when record was last updated (inherited)
+    """
+
+    __tablename__ = "ab_test_assignments"
+
+    test_id: Mapped[str] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("ab_tests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    profile_id: Mapped[str] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("matching_weights_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    assigned_at: Mapped[Optional[DateTime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<ABTestAssignment(id={self.id}, test_id={self.test_id}, "
+            f"user_id={self.user_id}, profile_id={self.profile_id})>"
         )
