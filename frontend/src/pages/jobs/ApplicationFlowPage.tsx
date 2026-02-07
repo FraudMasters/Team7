@@ -14,6 +14,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
+import { config } from '@/config';
 import { useJob } from '../../hooks/useJobs';
 import ResumeUploader from '../../components/ResumeUploader';
 
@@ -86,7 +87,7 @@ export function ApplicationFlowPage() {
                 Upload your resume and we'll match your skills to this position.
               </Typography>
               <ResumeUploader
-                uploadUrl="http://localhost:8000/api/resumes/upload"
+                uploadUrl={`${config.api.url}/api/resumes/upload`}
                 onUploadComplete={handleUploadComplete}
                 onUploadError={() => {}}
                 onUploadStart={() => {}}

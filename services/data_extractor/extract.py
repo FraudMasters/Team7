@@ -1,8 +1,9 @@
 """
-Resume text extraction from PDF and DOCX files.
+Извлечение текста резюме из PDF и DOCX файлов.
 
-This module provides functions to extract text content from various resume file formats,
-with robust error handling for malformed files.
+# Русский комментарий:
+Этот модуль предоставляет функции для извлечения текстового содержимого из различных
+форматов файлов резюме с надежной обработкой ошибок для некорректных файлов.
 """
 import logging
 from pathlib import Path

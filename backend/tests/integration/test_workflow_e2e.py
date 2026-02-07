@@ -1,4 +1,5 @@
 """
+import os
 End-to-end integration test for candidate workflow stage movement.
 
 This test verifies:

@@ -1,35 +1,19 @@
 import React from 'react';
 import {
   Alert,
-  AlertTitle,
   Box,
   Button,
-  ButtonProps,
+  IconButton,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
-  IconButton,
   Paper,
   Typography,
-  useTheme,
-  alpha,
-} from '@mui/material';
-import {
-  ErrorOutline,
-  WifiOff,
-  Lock,
-  AssignmentLate,
-  UploadFile,
-  CloudOff,
-  SearchOff,
-  Close,
-  Description,
-  Storage,
-  Group,
-  PlaylistAddCheck,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
 
 /**
  * Error type enumeration for all supported error categories
@@ -71,13 +55,13 @@ export interface ErrorAction {
    * Button variant
    * @default 'contained'
    */
-  variant?: ButtonProps['variant'];
+  variant?: 'contained' | 'outlined' | 'text';
 
   /**
    * Button color
    * @default 'primary'
    */
-  color?: ButtonProps['color'];
+  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
 
   /**
    * Whether this is the primary action
@@ -231,38 +215,38 @@ const getDefaultMessage = (errorType: ErrorType): string => {
 /**
  * Get icon for error type
  */
-const getErrorIcon = (errorType: ErrorType) => {
+const getErrorIcon = (errorType: ErrorType): string => {
   switch (errorType) {
     case 'network':
-      return <WifiOff />;
+      return 'wifi-off';
     case 'auth':
-      return <Lock />;
+      return 'lock';
     case 'validation':
-      return <AssignmentLate />;
+      return 'alert-circle';
     case 'fileUpload':
-      return <UploadFile />;
+      return 'upload';
     case 'server':
-      return <CloudOff />;
+      return 'cloud-off';
     case 'notFound':
-      return <SearchOff />;
+      return 'search';
     case 'fileSizeExceeded':
-      return <Storage />;
+      return 'hard-drive';
     case 'invalidFileFormat':
-      return <Description />;
+      return 'file';
     case 'resumeParseError':
-      return <AssignmentLate />;
+      return 'file-text';
     case 'vacancyValidation':
-      return <AssignmentLate />;
+      return 'alert-triangle';
     case 'vacancySaveFailed':
-      return <CloudOff />;
+      return 'database';
     case 'candidateLoadFailed':
-      return <Group />;
+      return 'users';
     case 'candidateMoveFailed':
-      return <Group />;
+      return 'user-check';
     case 'batchActionFailed':
-      return <PlaylistAddCheck />;
+      return 'list-x';
     default:
-      return <ErrorOutline />;
+      return 'alert-circle';
   }
 };
 
@@ -470,7 +454,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
   onClose,
   details,
 }) => {
-  const theme = useTheme();
+  const theme = useEmotionTheme();
 
   // Detect error type
   const errorType: ErrorType = React.useMemo(() => {
@@ -494,18 +478,19 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
   const displayTitle = title || defaultTitle;
   const displayMessage = message || (typeof error === 'string' ? error : error.message) || defaultMessage;
 
-  // Get error icon
-  const icon = getErrorIcon(errorType);
+  // Get error icon name
+  const iconName = getErrorIcon(errorType);
 
   // Inline mode
   if (mode === 'inline') {
     return (
       <Alert
         severity={severity}
-        icon={showIcon ? icon : false}
+        showIcon={showIcon}
+        icon={showIcon ? <Icon name={iconName} size={24} /> : undefined}
         sx={{
           mb: 2,
-          '& .MuiAlert-icon': {
+          '& .alert-icon': {
             fontSize: '2rem',
           },
         }}
@@ -527,14 +512,16 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
           ) : undefined
         }
       >
-        <AlertTitle>{displayTitle}</AlertTitle>
+        <Typography variant="subtitle2" component="div" sx={{ fontWeight: 'bold' }}>
+          {displayTitle}
+        </Typography>
         <Typography variant="body2">{displayMessage}</Typography>
         {details && (
           <Box
             sx={{
               mt: 1,
               p: 1,
-              bgcolor: alpha(theme.palette.common.black, 0.05),
+              bgcolor: 'rgba(0, 0, 0, 0.05)',
               borderRadius: 1,
               fontFamily: 'monospace',
               fontSize: '0.75rem',
@@ -568,22 +555,22 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
               position: 'absolute',
               right: 8,
               top: 8,
-              color: (theme) => theme.palette.grey[500],
+              color: 'grey.500',
             }}
           >
-            <Close />
+            <Icon name="x" size={20} />
           </IconButton>
         )}
         <DialogTitle id="error-dialog-title" sx={{ pr: onClose ? 5 : 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {showIcon && icon}
-            <Typography variant="h6" component="span">
+            {showIcon && <Icon name={iconName} size={24} color="error.main" />}
+            <Typography variant="h6" as="span">
               {displayTitle}
             </Typography>
           </Box>
         </DialogTitle>
         <DialogContent>
-          <DialogContentText id="error-dialog-description" color="text.primary">
+          <DialogContentText id="error-dialog-description" color="primary">
             {displayMessage}
           </DialogContentText>
           {details && (
@@ -591,7 +578,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
               sx={{
                 mt: 2,
                 p: 1.5,
-                bgcolor: alpha(theme.palette.common.black, 0.05),
+                bgcolor: 'rgba(0, 0, 0, 0.05)',
                 borderRadius: 1,
                 fontFamily: 'monospace',
                 fontSize: '0.75rem',
@@ -634,26 +621,26 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
           minHeight: '60vh',
           p: 4,
           textAlign: 'center',
-          bgcolor: alpha(theme.palette.background.paper, 0.8),
+          bgcolor: 'background.paper',
         }}
       >
         {showIcon && (
           <Box
             sx={{
               fontSize: '4rem',
-              color: theme.palette.error.main,
+              color: 'error.main',
               mb: 2,
             }}
           >
-            {icon}
+            <Icon name={iconName} size={64} color="error.main" />
           </Box>
         )}
-        <Typography variant="h4" gutterBottom color="text.primary">
+        <Typography variant="h4" gutterBottom color="primary">
           {displayTitle}
         </Typography>
         <Typography
           variant="body1"
-          color="text.secondary"
+          color="secondary"
           sx={{ maxWidth: 600, mb: 3 }}
         >
           {displayMessage}
@@ -663,7 +650,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
             sx={{
               mb: 3,
               p: 2,
-              bgcolor: alpha(theme.palette.common.black, 0.05),
+              bgcolor: 'rgba(0, 0, 0, 0.05)',
               borderRadius: 1,
               fontFamily: 'monospace',
               fontSize: '0.75rem',

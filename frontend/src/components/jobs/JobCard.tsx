@@ -1,5 +1,8 @@
+// React для создания компонента
 import React from 'react';
+// React Router для навигации
 import { Link } from 'react-router-dom';
+// Компоненты Material UI для создания интерфейса
 import {
   Card,
   CardContent,
@@ -9,25 +12,61 @@ import {
   Chip,
   IconButton,
 } from '@mui/material';
+// Иконки Material UI
 import {
   LocationOn,
   WorkOutline,
   BookmarkBorder,
   Bookmark,
 } from '@mui/icons-material';
+// Типы для работы с вакансиями
 import type { JobVacancy } from '../../hooks/useJobs';
 
+/**
+ * Свойства компонента JobCard
+ */
 interface JobCardProps {
+  /** Данные вакансии */
   job: JobVacancy;
+  /** Сохранена ли вакансия */
   saved?: boolean;
+  /** Обработчик сохранения */
   onSave?: () => void;
 }
 
+/**
+ * Карточка вакансии
+ *
+ * Отображает информацию о вакансии, включая:
+ * - Название должности и местоположение
+ * - Краткое описание (обрезанное до 2 строк)
+ * - Формат работы и требуемый опыт
+ * - Требуемые навыки
+ * - Кнопку сохранения в закладки
+ *
+ * Компонент кликабелен и переходит на страницу вакансии.
+ *
+ * @example
+ * ```tsx
+ * <JobCard
+ *   job={vacancyData}
+ *   saved={false}
+ *   onSave={() => console.log('Saved')}
+ * />
+ * ```
+ */
 export function JobCard({ job, saved = false, onSave }: JobCardProps) {
+  // Максимальное количество навыков для отображения
   const maxSkillsToShow = 4;
+  // Видимые навыки (первые N)
   const visibleSkills = job.required_skills.slice(0, maxSkillsToShow);
+  // Количество оставшихся навыков
   const remainingSkillsCount = Math.max(0, job.required_skills.length - maxSkillsToShow);
 
+  /**
+   * Обработчик клика по закладке
+   * Предотвращает переход по ссылке
+   */
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.preventDefault();
     onSave?.();
@@ -50,7 +89,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
       }}
     >
       <CardContent sx={{ flexGrow: 1, p: 3 }}>
-        {/* Header with title and bookmark */}
+        {/* Заголовок с названием и закладкой */}
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h6" fontWeight={600} color="text.primary" gutterBottom>
@@ -73,7 +112,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
           </IconButton>
         </Stack>
 
-        {/* Description truncated to 2 lines */}
+        {/* Описание, обрезанное до 2 строк */}
         <Typography
           variant="body2"
           color="text.secondary"
@@ -88,7 +127,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
           {job.description}
         </Typography>
 
-        {/* Work format and experience */}
+        {/* Формат работы и опыт */}
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} color="text.secondary">
           <WorkOutline sx={{ fontSize: 16 }} />
           <Typography variant="body2">
@@ -97,7 +136,7 @@ export function JobCard({ job, saved = false, onSave }: JobCardProps) {
           </Typography>
         </Stack>
 
-        {/* Skills chips */}
+        {/* Чипы навыков */}
         <Stack direction="row" spacing={1} flexWrap="wrap" gap={0.5}>
           {visibleSkills.map((skill) => (
             <Chip

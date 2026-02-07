@@ -1,0 +1,391 @@
+// Протокольные определения для Сервиса Кандидатов (Candidate Service)
+// Candidate Service gRPC Protocol Definitions
+//
+// Этот файл определяет интерфейсы gRPC для управления кандидатами,
+// включая заметки, теги, активность и отзывы.
+//
+// This file defines gRPC interfaces for candidate management,
+// including notes, tags, activities, and feedback.
+
+syntax = "proto3";
+
+package candidate;
+
+// ============================================
+// Сообщения для заметок о кандидатах
+// Candidate note messages
+// ============================================
+
+// Заметка о кандидате / Candidate note
+message CandidateNote {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string resume_id = 2;             // ID резюме / Resume ID (candidate reference)
+    string recruiter_id = 3;          // ID рекрутёра / Recruiter ID (author)
+    string content = 4;               // Содержимое заметки / Note content
+    bool is_private = 5;              // Приватная ли заметка / Is note private
+    int64 created_at = 6;             // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 7;             // Время обновления (timestamp) / Update timestamp
+}
+
+// Запрос на создание заметки / Request to create note
+message CreateNoteRequest {
+    string resume_id = 1;             // ID резюме кандидата / Candidate's resume ID
+    string recruiter_id = 2;          // ID рекрутёра / Recruiter ID
+    string content = 3;               // Содержимое заметки / Note content
+    bool is_private = 4;              // Приватная ли заметка / Is note private
+}
+
+// Ответ на создание заметки / Response to create note
+message CreateNoteResponse {
+    CandidateNote note = 1;           // Созданная заметка / Created note
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение заметок резюме / Request to get resume notes
+message GetNotesRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    bool include_private = 2;         // Включить приватные заметки / Include private notes
+    string recruiter_id = 3;          // ID рекрутёра для приватных заметок / Recruiter ID for private notes
+}
+
+// Ответ со списком заметок / Response with notes list
+message GetNotesResponse {
+    repeated CandidateNote notes = 1; // Список заметок / List of notes
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// Запрос на обновление заметки / Request to update note
+message UpdateNoteRequest {
+    string id = 1;                    // ID заметки / Note ID
+    string content = 2;               // Новое содержимое / New content
+    bool is_private = 3;              // Приватная ли заметка / Is note private
+}
+
+// Ответ на обновление заметки / Response to update note
+message UpdateNoteResponse {
+    CandidateNote note = 1;           // Обновлённая заметка / Updated note
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на удаление заметки / Request to delete note
+message DeleteNoteRequest {
+    string id = 1;                    // ID заметки / Note ID
+}
+
+// Ответ на удаление заметки / Response to delete note
+message DeleteNoteResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для тегов кандидатов
+// Candidate tag messages
+// ============================================
+
+// Тег кандидата / Candidate tag
+message CandidateTag {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string organization_id = 2;       // ID организации / Organization ID
+    string tag_name = 3;              // Название тега / Tag name
+    int32 tag_order = 4;              // Порядок отображения / Display order
+    bool is_default = 5;              // Тег по умолчанию / Default tag
+    bool is_active = 6;               // Активен ли тег / Is tag active
+    string color = 7;                 // Цвет тега (hex) / Tag color (hex)
+    string description = 8;           // Описание тега / Tag description
+    int64 created_at = 9;             // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 10;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Запрос на создание тега / Request to create tag
+message CreateTagRequest {
+    string organization_id = 1;       // ID организации / Organization ID
+    string tag_name = 2;              // Название тега / Tag name
+    int32 tag_order = 3;              // Порядок отображения / Display order
+    bool is_default = 4;              // Тег по умолчанию / Default tag
+    string color = 5;                 // Цвет тега (hex) / Tag color (hex)
+    string description = 6;           // Описание тега / Tag description
+}
+
+// Ответ на создание тега / Response to create tag
+message CreateTagResponse {
+    CandidateTag tag = 1;             // Созданный тег / Created tag
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение тегов организации / Request to get organization tags
+message GetTagsRequest {
+    string organization_id = 1;       // ID организации / Organization ID
+    bool include_inactive = 2;        // Включить неактивные теги / Include inactive tags
+}
+
+// Ответ со списком тегов / Response with tags list
+message GetTagsResponse {
+    repeated CandidateTag tags = 1;   // Список тегов / List of tags
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// Запрос на обновление тега / Request to update tag
+message UpdateTagRequest {
+    string id = 1;                    // ID тега / Tag ID
+    string tag_name = 2;              // Название тега / Tag name
+    int32 tag_order = 3;              // Порядок отображения / Display order
+    bool is_active = 4;               // Активен ли тег / Is tag active
+    string color = 5;                 // Цвет тега (hex) / Tag color (hex)
+    string description = 6;           // Описание тега / Tag description
+}
+
+// Ответ на обновление тега / Response to update tag
+message UpdateTagResponse {
+    CandidateTag tag = 1;             // Обновлённый тег / Updated tag
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на удаление тега / Request to delete tag
+message DeleteTagRequest {
+    string id = 1;                    // ID тега / Tag ID
+}
+
+// Ответ на удаление тега / Response to delete tag
+message DeleteTagResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// Запрос на добавление тега резюме / Request to add tag to resume
+message AddTagToResumeRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string tag_id = 2;                // ID тега / Tag ID
+}
+
+// Ответ на добавление тега / Response to add tag
+message AddTagToResumeResponse {
+    bool success = 1;                 // Успешность операции / Operation success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// Запрос на удаление тега резюме / Request to remove tag from resume
+message RemoveTagFromResumeRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string tag_id = 2;                // ID тега / Tag ID
+}
+
+// Ответ на удаление тега / Response to remove tag
+message RemoveTagFromResumeResponse {
+    bool success = 1;                 // Успешность операции / Operation success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение тегов резюме / Request to get resume tags
+message GetResumeTagsRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+}
+
+// Ответ с тегами резюме / Response with resume tags
+message GetResumeTagsResponse {
+    repeated CandidateTag tags = 1;   // Список тегов / List of tags
+}
+
+// ============================================
+// Сообщения для активности кандидатов
+// Candidate activity messages
+// ============================================
+
+// Активность кандидата / Candidate activity
+message CandidateActivity {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string resume_id = 2;             // ID резюме / Resume ID
+    string activity_type = 3;         // Тип активности / Activity type
+    string description = 4;           // Описание / Description
+    map<string, string> metadata = 5; // Дополнительные метаданные / Additional metadata
+    string recruiter_id = 6;          // ID рекрутёра / Recruiter ID
+    int64 created_at = 7;             // Время создания (timestamp) / Creation timestamp
+}
+
+// Запрос на логирование активности / Request to log activity
+message LogActivityRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string activity_type = 2;         // Тип активности / Activity type
+    string description = 3;           // Описание / Description
+    map<string, string> metadata = 4; // Дополнительные метаданные / Additional metadata
+    string recruiter_id = 5;          // ID рекрутёра / Recruiter ID
+}
+
+// Ответ на логирование активности / Response to log activity
+message LogActivityResponse {
+    CandidateActivity activity = 1;   // Созданная активность / Created activity
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение активности резюме / Request to get resume activities
+message GetActivitiesRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string activity_type = 2;         // Фильтр по типу активности / Filter by activity type
+    int32 limit = 3;                  // Лимит записей / Record limit
+    int64 from_date = 4;              // Начальная дата (timestamp) / Start date
+    int64 to_date = 5;                // Конечная дата (timestamp) / End date
+}
+
+// Ответ со списком активности / Response with activities list
+message GetActivitiesResponse {
+    repeated CandidateActivity activities = 1; // Список активности / List of activities
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// ============================================
+// Сообщения для статусов кандидатов
+// Candidate status messages
+// ============================================
+
+// Статус кандидата / Candidate status
+enum CandidateStatus {
+    ACTIVE = 0;                       // Активный кандидат / Active candidate
+    CONTACTED = 1;                    // Контактирован / Contacted
+    SCREENING = 2;                    // Скрининг / Screening
+    INTERVIEW = 3;                    // Интервью / Interview
+    OFFER = 4;                        // Предложение / Offer
+    HIRED = 5;                        // Нанят / Hired
+    REJECTED = 6;                     // Отклонён / Rejected
+    WITHDRAWN = 7;                    // Отозвал candidacy / Withdrew
+    ON_HOLD = 8;                      // На удержании / On hold
+}
+
+// Запрос на обновление статуса / Request to update status
+message UpdateStatusRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    CandidateStatus status = 2;       // Новый статус / New status
+    string reason = 3;                // Причина изменения / Change reason
+    string recruiter_id = 4;          // ID рекрутёра / Recruiter ID
+}
+
+// Ответ на обновление статуса / Response to update status
+message UpdateStatusResponse {
+    bool success = 1;                 // Успешность операции / Operation success
+    string message = 2;               // Сообщение о результате / Result message
+    CandidateStatus current_status = 3; // Текущий статус / Current status
+}
+
+// ============================================
+// Сообщения для обратной связи
+// Feedback messages
+// ============================================
+
+// Обратная связь о навыке / Skill feedback
+message SkillFeedback {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string resume_id = 2;             // ID резюме / Resume ID
+    string skill = 3;                 // Навык / Skill
+    string feedback_type = 4;         // Тип обратной связи / Feedback type
+    string comment = 5;               // Комментарий / Comment
+    string recruiter_id = 6;          // ID рекрутёра / Recruiter ID
+    int64 created_at = 7;             // Время создания (timestamp) / Creation timestamp
+}
+
+// Запрос на добавление обратной связи / Request to add feedback
+message AddFeedbackRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string skill = 2;                 // Навык / Skill
+    string feedback_type = 3;         // Тип обратной связи / Feedback type
+    string comment = 4;               // Комментарий / Comment
+    string recruiter_id = 5;          // ID рекрутёра / Recruiter ID
+}
+
+// Ответ на добавление обратной связи / Response to add feedback
+message AddFeedbackResponse {
+    SkillFeedback feedback = 1;       // Созданная обратная связь / Created feedback
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение обратной связи / Request to get feedback
+message GetFeedbackRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string skill = 2;                 // Фильтр по навыку / Filter by skill
+}
+
+// Ответ с обратной связью / Response with feedback
+message GetFeedbackResponse {
+    repeated SkillFeedback feedback_list = 1; // Список обратной связи / List of feedback
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// ============================================
+// Сервис Candidate Service
+// Candidate Service definition
+// ============================================
+
+// Сервис управления кандидатами / Candidate management service
+service CandidateService {
+    // ========== Заметки / Notes ==========
+    // Создать заметку о кандидате / Create candidate note
+    rpc CreateNote (CreateNoteRequest) returns (CreateNoteResponse);
+
+    // Получить заметки о кандидате / Get candidate notes
+    rpc GetNotes (GetNotesRequest) returns (GetNotesResponse);
+
+    // Обновить заметку / Update note
+    rpc UpdateNote (UpdateNoteRequest) returns (UpdateNoteResponse);
+
+    // Удалить заметку / Delete note
+    rpc DeleteNote (DeleteNoteRequest) returns (DeleteNoteResponse);
+
+    // ========== Теги / Tags ==========
+    // Создать тег / Create tag
+    rpc CreateTag (CreateTagRequest) returns (CreateTagResponse);
+
+    // Получить теги организации / Get organization tags
+    rpc GetTags (GetTagsRequest) returns (GetTagsResponse);
+
+    // Обновить тег / Update tag
+    rpc UpdateTag (UpdateTagRequest) returns (UpdateTagResponse);
+
+    // Удалить тег / Delete tag
+    rpc DeleteTag (DeleteTagRequest) returns (DeleteTagResponse);
+
+    // Добавить тег резюме / Add tag to resume
+    rpc AddTagToResume (AddTagToResumeRequest) returns (AddTagToResumeResponse);
+
+    // Удалить тег резюме / Remove tag from resume
+    rpc RemoveTagFromResume (RemoveTagFromResumeRequest) returns (RemoveTagFromResumeResponse);
+
+    // Получить теги резюме / Get resume tags
+    rpc GetResumeTags (GetResumeTagsRequest) returns (GetResumeTagsResponse);
+
+    // ========== Активность / Activity ==========
+    // Залогировать активность кандидата / Log candidate activity
+    rpc LogActivity (LogActivityRequest) returns (LogActivityResponse);
+
+    // Получить активность кандидата / Get candidate activities
+    rpc GetActivities (GetActivitiesRequest) returns (GetActivitiesResponse);
+
+    // ========== Статус / Status ==========
+    // Обновить статус кандидата / Update candidate status
+    rpc UpdateStatus (UpdateStatusRequest) returns (UpdateStatusResponse);
+
+    // Получить статус кандидата / Get candidate status
+    rpc GetStatus (GetStatusRequest) returns (GetStatusResponse);
+
+    // ========== Обратная связь / Feedback ==========
+    // Добавить обратную связь о навыке / Add skill feedback
+    rpc AddFeedback (AddFeedbackRequest) returns (AddFeedbackResponse);
+
+    // Получить обратную связь о навыках / Get skill feedback
+    rpc GetFeedback (GetFeedbackRequest) returns (GetFeedbackResponse);
+}
+
+// Запрос на получение статуса кандидата / Request to get candidate status
+message GetStatusRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+}
+
+// Ответ со статусом кандидата / Response with candidate status
+message GetStatusResponse {
+    CandidateStatus status = 1;       // Текущий статус / Current status
+    string resume_id = 2;             // ID резюме / Resume ID
+    int64 updated_at = 3;             // Время последнего обновления (timestamp) / Last update timestamp
+}

@@ -1,4 +1,5 @@
 """
+import os
 Integration tests for complete feedback loop (match → feedback → retrain → improved match).
 
 This test suite validates the end-to-end machine learning feedback pipeline:

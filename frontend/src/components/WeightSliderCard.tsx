@@ -22,16 +22,8 @@ import {
   Grid,
   Stack,
   Button,
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Info as InfoIcon,
-  Tune as TuneIcon,
-  Search as KeywordIcon,
-  Analytics as TfidfIcon,
-  Psychology as VectorIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 export interface WeightSliderCardProps {
   /** Type of matching method */
@@ -50,7 +42,7 @@ export interface WeightSliderCardProps {
 
 const METHOD_CONFIG = {
   keyword: {
-    icon: <KeywordIcon />,
+    icon: <Icon name="search" size={20} />,
     color: '#2196F3' as const, // Blue
     labelKey: 'matchingWeights.keyword.label',
     descriptionKey: 'matchingWeights.keyword.description',
@@ -58,7 +50,7 @@ const METHOD_CONFIG = {
     examplesKey: 'matchingWeights.keyword.examples',
   },
   tfidf: {
-    icon: <TfidfIcon />,
+    icon: <Icon name="bar-chart-2" size={20} />,
     color: '#FF9800' as const, // Orange
     labelKey: 'matchingWeights.tfidf.label',
     descriptionKey: 'matchingWeights.tfidf.description',
@@ -66,7 +58,7 @@ const METHOD_CONFIG = {
     examplesKey: 'matchingWeights.tfidf.examples',
   },
   vector: {
-    icon: <VectorIcon />,
+    icon: <Icon name="brain" size={20} />,
     color: '#9C27B0' as const, // Purple
     labelKey: 'matchingWeights.vector.label',
     descriptionKey: 'matchingWeights.vector.description',
@@ -169,7 +161,7 @@ export default function WeightSliderCard({
               onClick={() => setExpanded(!expanded)}
               size="small"
             >
-              {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              {expanded ? <Icon name="chevron-up" size={20} /> : <Icon name="chevron-down" size={20} />}
             </IconButton>
           </Tooltip>
         }
@@ -241,7 +233,7 @@ export default function WeightSliderCard({
             <Box sx={{ mt: 2 }}>
               <Alert
                 severity="info"
-                icon={<InfoIcon />}
+                icon={<Icon name="info" size="small" />}
                 sx={{
                   backgroundColor: `${config.color}10`,
                   '& .MuiAlert-icon': {

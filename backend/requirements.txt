@@ -35,6 +35,7 @@ redis==5.2.0
 httpx==0.27.2
 aiofiles==24.1.0
 python-dotenv==1.0.1
+pyyaml==6.0.2
 
 # Monitoring and Logging
 prometheus-client==0.21.0  # Prometheus metrics export
@@ -45,6 +46,9 @@ openai==1.54.0
 
 # Backup & Storage
 boto3==1.35.45  # S3-compatible storage support
+
+# Security & Encryption
+cryptography==43.0.1  # Sensitive configuration encryption
 
 # Testing
 pytest==8.3.3

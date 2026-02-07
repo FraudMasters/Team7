@@ -73,6 +73,12 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "not_found": "Resource not found",
         "method_not_allowed": "Method not allowed",
         "not_implemented": "Feature not implemented",
+
+        # GDPR / Data Deletion errors
+        "resume_not_found": "Resume with ID '{id}' not found",
+        "deletion_request_not_found": "Deletion request with ID '{id}' not found",
+        "cannot_cancel_request": "Cannot cancel request with status '{status}'. Only pending requests can be cancelled",
+        "internal_error": "An internal error occurred. Please try again",
     },
     "ru": {
         # File upload errors
@@ -129,6 +135,12 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "not_found": "Ресурс не найден",
         "method_not_allowed": "Метод не поддерживается",
         "not_implemented": "Функция не реализована",
+
+        # GDPR / Data Deletion errors
+        "resume_not_found": "Резюме с ID '{id}' не найдено",
+        "deletion_request_not_found": "Запрос на удаление с ID '{id}' не найден",
+        "cannot_cancel_request": "Нельзя отменить запрос со статусом '{status}'. Только ожидающие запросы могут быть отменены",
+        "internal_error": "Произошла внутренняя ошибка. Попробуйте снова",
     },
 }
 
@@ -142,6 +154,7 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "record_created": "Record created successfully",
         "record_updated": "Record updated successfully",
         "record_deleted": "Record deleted successfully",
+        "deletion_request_created": "Data deletion request created successfully. We will process your request shortly.",
     },
     "ru": {
         "file_uploaded": "Резюме успешно загружено",
@@ -150,6 +163,7 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "record_created": "Запись успешно создана",
         "record_updated": "Запись успешно обновлена",
         "record_deleted": "Запись успешно удалена",
+        "deletion_request_created": "Запрос на удаление данных успешно создан. Мы обработаем ваш запрос в ближайшее время.",
     },
 }
 

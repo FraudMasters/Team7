@@ -20,21 +20,9 @@ import {
   Tooltip,
   ToggleButton,
   ToggleButtonGroup,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Cancel as CrossIcon,
-  Refresh as RefreshIcon,
-  Work as WorkIcon,
-  School as SchoolIcon,
-  Business as BusinessIcon,
-  Description as ResumeIcon,
-  BusinessCenter as VacancyIcon,
-  ArrowBack as ArrowBackIcon,
-  Analytics as AnalyticsIcon,
-  Visibility as VisibilityIcon,
-  BarChart as BarChartIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import { useResponsive } from '@/hooks/useResponsive';
 import UnifiedMatchMetrics from './UnifiedMatchMetrics';
 
 /**
@@ -334,7 +322,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
           <Button
             color="inherit"
             onClick={viewMode === 'unified' ? fetchUnifiedComparison : fetchComparison}
-            startIcon={<RefreshIcon />}
+            startIcon={<Icon name="refresh-cw" />}
           >
             {t('common.tryAgain')}
           </Button>
@@ -381,10 +369,10 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Tooltip title="Назад">
                   <IconButton onClick={() => navigate(-1)} size="small">
-                    <ArrowBackIcon />
+                    <Icon name="arrow-left" />
                   </IconButton>
                 </Tooltip>
-                <AnalyticsIcon color="primary" />
+                <Icon name="bar-chart" color="primary" />
                 <Typography variant="h5" fontWeight={600}>
                   AI Анализ совпадения
                 </Typography>
@@ -402,11 +390,11 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                 size="small"
               >
                 <ToggleButton value="unified" aria-label="unified view">
-                  <AnalyticsIcon fontSize="small" />
+                  <Icon name="bar-chart" fontSize="small" />
                   <Box component="span" sx={{ ml: 0.5 }}>AI Метрики</Box>
                 </ToggleButton>
                 <ToggleButton value="simple" aria-label="simple view">
-                  <VisibilityIcon fontSize="small" />
+                  <Icon name="eye" fontSize="small" />
                   <Box component="span" sx={{ ml: 0.5 }}>Простой</Box>
                 </ToggleButton>
               </ToggleButtonGroup>
@@ -415,7 +403,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
                 variant="contained"
                 color="primary"
                 size="small"
-                startIcon={<BarChartIcon />}
+                startIcon={<Icon name="bar-chart-2" />}
                 onClick={() => navigate(`/match-breakdown/${resumeId}/${vacancyId}`)}
               >
                 Detailed Breakdown
@@ -423,7 +411,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
 
               <Button
                 variant="outlined"
-                startIcon={<RefreshIcon />}
+                startIcon={<Icon name="refresh-cw" />}
                 onClick={fetchUnifiedComparison}
                 size="small"
               >
@@ -433,7 +421,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               <Button
                 variant="outlined"
                 size="small"
-                startIcon={<ResumeIcon />}
+                startIcon={<Icon name="file-text" />}
                 onClick={() => navigate(`/results/${resumeId}`)}
               >
                 Резюме
@@ -441,7 +429,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               <Button
                 variant="outlined"
                 size="small"
-                startIcon={<VacancyIcon />}
+                startIcon={<Icon name="building-2" />}
                 onClick={() => navigate(`/recruiter/vacancies/${vacancyId}`)}
               >
                 Вакансия
@@ -493,7 +481,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Tooltip title="Назад">
                 <IconButton onClick={() => navigate(-1)} size="small">
-                  <ArrowBackIcon />
+                  <Icon name="arrow-left" />
                 </IconButton>
               </Tooltip>
               <Typography variant="h5" fontWeight={600}>
@@ -514,11 +502,11 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               size="small"
             >
               <ToggleButton value="unified" aria-label="unified view">
-                <AnalyticsIcon fontSize="small" />
+                <Icon name="bar-chart" fontSize="small" />
                 <Box component="span" sx={{ ml: 0.5 }}>AI</Box>
               </ToggleButton>
               <ToggleButton value="simple" aria-label="simple view">
-                <VisibilityIcon fontSize="small" />
+                <Icon name="eye" fontSize="small" />
                 <Box component="span" sx={{ ml: 0.5 }}>Простой</Box>
               </ToggleButton>
             </ToggleButtonGroup>
@@ -527,7 +515,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               variant="contained"
               color="primary"
               size="small"
-              startIcon={<BarChartIcon />}
+              startIcon={<Icon name="bar-chart-2" />}
               onClick={() => navigate(`/match-breakdown/${resumeId}/${vacancyId}`)}
             >
               Detailed Breakdown
@@ -537,7 +525,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               <Button
                 variant="outlined"
                 size="small"
-                startIcon={<ResumeIcon />}
+                startIcon={<Icon name="file-text" />}
                 onClick={() => navigate(`/results/${resumeId}`)}
               >
                 Резюме
@@ -547,7 +535,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
               <Button
                 variant="outlined"
                 size="small"
-                startIcon={<VacancyIcon />}
+                startIcon={<Icon name="building-2" />}
                 onClick={() => navigate(`/recruiter/vacancies/${vacancyId}`)}
               >
                 Вакансия
@@ -555,7 +543,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
             </Tooltip>
             <Button
               variant="outlined"
-              startIcon={<RefreshIcon />}
+              startIcon={<Icon name="refresh-cw" />}
               onClick={fetchComparison}
               size="small"
             >
@@ -598,7 +586,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
         <Grid item xs={12} md={6}>
           <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <CheckIcon color="success" sx={{ mr: 1, fontSize: 28 }} />
+              <Icon name="check-circle" color="success" sx={{ mr: 1, fontSize: 28 }} />
               <Typography variant="h6" fontWeight={600} color="success.main">
                 {t('compare.matchedSkills')}
               </Typography>
@@ -640,7 +628,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
         <Grid item xs={12} md={6}>
           <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <CrossIcon color="error" sx={{ mr: 1, fontSize: 28 }} />
+              <Icon name="x-circle" color="error" sx={{ mr: 1, fontSize: 28 }} />
               <Typography variant="h6" fontWeight={600} color="error.main">
                 {t('compare.missingSkills')}
               </Typography>
@@ -683,7 +671,7 @@ const JobComparison: React.FC<JobComparisonProps> = ({
       {experience_verification && experience_verification.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <WorkIcon color="primary" sx={{ mr: 1, fontSize: 28 }} />
+            <Icon name="briefcase" color="primary" sx={{ mr: 1, fontSize: 28 }} />
             <Typography variant="h6" fontWeight={600}>
               {t('compare.experienceVerification')}
             </Typography>

@@ -511,12 +511,12 @@ test.describe('Analytics Error Handling', () => {
     await page.goto('/analytics');
 
     // Initially might show loading state
-    const loadingSpinner = page.locator('.MuiCircularProgress-root');
+    const loadingSpinner = page.locator('[role="progressbar"]');
     const isVisible = await loadingSpinner.isVisible().catch(() => false);
 
     if (isVisible) {
       // If loading, wait for it to complete
-      await page.waitForSelector('.MuiCircularProgress-root', { state: 'hidden', timeout: 10000 });
+      await page.waitForSelector('[role="progressbar"]', { state: 'hidden', timeout: 10000 });
     }
 
     // Should eventually show content

@@ -14,6 +14,7 @@ import {
   Chip,
   LinearProgress,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
@@ -77,7 +78,7 @@ interface TaxonomyAnalyticsProps {
  * ```
  */
 const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics/taxonomy-usage',
+  apiUrl = `${config.api.url}/api/analytics/taxonomy-usage`,
   industry,
   limit = 10,
 }) => {

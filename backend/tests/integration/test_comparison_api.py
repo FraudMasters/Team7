@@ -1,4 +1,5 @@
 """
+import os
 Integration tests for resume comparison and ranking API.
 
 This test suite validates the end-to-end integration between:

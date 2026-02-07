@@ -153,7 +153,7 @@ async def suggest_skills(
         ...     "description": "ICU, patient care, medical records...",
         ...     "limit": 20
         ... }
-        >>> response = requests.post("http://localhost:8000/api/skill-suggestions/suggest", json=data)
+        >>> response = requests.post("/api/skill-suggestions/suggest", json=data)
         >>> response.json()
         {
             "industry": "healthcare",

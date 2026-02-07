@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -145,8 +146,8 @@ function TabPanel(props: TabPanelProps) {
  * ```
  */
 const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
-  feedbackApiUrl = 'http://localhost:8000/api/feedback',
-  modelApiUrl = 'http://localhost:8000/api/model-versions',
+  feedbackApiUrl = `${config.api.url}/api/feedback`,
+  modelApiUrl = `${config.api.url}/api/model-versions`,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);

@@ -13,22 +13,8 @@ import {
   Chip,
   Avatar,
   Divider,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon,
-  Edit as EditIcon,
-  Label as LabelIcon,
-  SwapHoriz as SwapHorizIcon,
-  Person as PersonIcon,
-  Schedule as ScheduleIcon,
-  EventAvailable as EventAvailableIcon,
-  Star as StarIcon,
-  Comment as CommentIcon,
-  Tag as TagIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import { candidateActivitiesClient } from '@/api/candidateActivities';
 import type {
@@ -59,62 +45,62 @@ interface CandidateActivityTimelineProps {
 const getActivityTypeDisplay = (activityType: string) => {
   const displays: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
     stage_changed: {
-      icon: <SwapHorizIcon />,
+      icon: <Icon name="swap-horizontal" size={18} />,
       color: 'primary',
       label: 'Stage Changed',
     },
     note_added: {
-      icon: <CommentIcon />,
+      icon: <Icon name="message-square" size={18} />,
       color: 'success',
       label: 'Note Added',
     },
     note_updated: {
-      icon: <EditIcon />,
+      icon: <Icon name="edit-2" size={18} />,
       color: 'info',
       label: 'Note Updated',
     },
     note_deleted: {
-      icon: <ErrorIcon />,
+      icon: <Icon name="alert-circle" size={18} />,
       color: 'error',
       label: 'Note Deleted',
     },
     tag_added: {
-      icon: <TagIcon />,
+      icon: <Icon name="tag" size={18} />,
       color: 'secondary',
       label: 'Tag Added',
     },
     tag_removed: {
-      icon: <LabelIcon />,
+      icon: <Icon name="label" size={18} />,
       color: 'warning',
       label: 'Tag Removed',
     },
     ranking_changed: {
-      icon: <StarIcon />,
+      icon: <Icon name="star" size={18} />,
       color: 'primary',
       label: 'Ranking Changed',
     },
     rating_changed: {
-      icon: <StarIcon />,
+      icon: <Icon name="star" size={18} />,
       color: 'secondary',
       label: 'Rating Changed',
     },
     contact_attempt: {
-      icon: <PersonIcon />,
+      icon: <Icon name="user" size={18} />,
       color: 'info',
       label: 'Contact Attempt',
     },
     interview_scheduled: {
-      icon: <EventAvailableIcon />,
+      icon: <Icon name="calendar-check" size={18} />,
       color: 'success',
       label: 'Interview Scheduled',
     },
     feedback_provided: {
-      icon: <CommentIcon />,
+      icon: <Icon name="message-square" size={18} />,
       color: 'warning',
       label: 'Feedback Provided',
     },
     status_updated: {
-      icon: <InfoIcon />,
+      icon: <Icon name="info" size={18} />,
       color: 'info',
       label: 'Status Updated',
     },
@@ -122,7 +108,7 @@ const getActivityTypeDisplay = (activityType: string) => {
 
   return (
     displays[activityType] || {
-      icon: <ScheduleIcon />,
+      icon: <Icon name="clock" size={18} />,
       color: 'default',
       label: activityType,
     }
@@ -303,10 +289,10 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <Typography variant="h6" color="secondary">
           {t('activityTimeline.loading')}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
           {t('activityTimeline.loadingHint')}
         </Typography>
       </Box>
@@ -321,7 +307,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchActivities} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchActivities} startIcon={<Icon name="refresh-cw" size={16} />}>
             {t('activityTimeline.retry')}
           </Button>
         }
@@ -347,12 +333,12 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ScheduleIcon fontSize="large" color="primary" />
+            <Icon name="clock" size={24} color="primary" />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 {t('activityTimeline.title')}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="secondary">
                 {t('activityTimeline.subtitle', { count: activities.length })}
                 {vacancyId && ` ${t('activityTimeline.forVacancy')}`}
                 {activityType && ` ${t('activityTimeline.filteredBy', { type: activityType })}`}
@@ -361,7 +347,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
           </Box>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            startIcon={<Icon name="refresh-cw" size={16} />}
             onClick={fetchActivities}
             size="small"
           >
@@ -420,7 +406,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
                           color={display.color as any}
                           variant="outlined"
                         />
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           {formatTimestamp(activity.created_at)}
                         </Typography>
                       </Box>
@@ -435,7 +421,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
                     </Box>
 
                     {/* Activity Description */}
-                    <Typography variant="body2" color="text.primary" sx={{ mb: 1 }}>
+                    <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
                       {getActivityDescription(activity)}
                     </Typography>
 
@@ -449,7 +435,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
                               size="small"
                               sx={{ fontSize: '0.7rem', opacity: 0.8 }}
                             />
-                            <SwapHorizIcon fontSize="small" color="action" />
+                            <Icon name="swap-horizontal" size={14} color="action" />
                             <Chip
                               label={activity.to_stage}
                               size="small"
@@ -459,7 +445,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
                           </Box>
                         )}
                         {activity.reason && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          <Typography variant="caption" color="secondary" sx={{ fontStyle: 'italic' }}>
                             "{activity.reason}"
                           </Typography>
                         )}
@@ -478,7 +464,7 @@ const CandidateActivityTimeline: React.FC<CandidateActivityTimelineProps> = ({
                       >
                         {getAuthorInitials(author)}
                       </Avatar>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="secondary">
                         {author}
                       </Typography>
                     </Box>

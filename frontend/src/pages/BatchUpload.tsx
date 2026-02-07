@@ -26,6 +26,7 @@ import {
   DialogActions,
   Tooltip,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   Upload as UploadIcon,
   Delete as DeleteIcon,
@@ -37,7 +38,7 @@ import {
 } from '@mui/icons-material';
 import ErrorBoundary from '@components/ErrorBoundary';
 
-const API_URL = (window as any).env?.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = (window as any).env?.REACT_APP_API_URL || config.api.url;
 
 // LocalStorage key for draft auto-save
 const DRAFT_STORAGE_KEY = 'batch_upload_draft';

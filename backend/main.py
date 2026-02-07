@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
+from config.validation import validate_config, ConfigurationError
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -24,20 +25,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     Lifespan context manager for application startup and shutdown.
 
-    Handles database connection pool initialization and cleanup.
+    Handles configuration validation, database connection pool
+    initialization and cleanup.
 
     Yields:
         None
+
+    Raises:
+        ConfigurationError: If critical configuration validation fails
 
     Example:
         The lifespan is automatically called by FastAPI on startup/shutdown.
     """
     # Startup
     logger.info("Starting Resume Analysis API")
+    logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database URL: {settings.database_url[:30]}...")
     logger.info(f"CORS origins: {settings.cors_origins}")
     logger.info(f"Max upload size: {settings.max_upload_size_mb}MB")
     logger.info(f"Allowed file types: {settings.allowed_file_types}")
+
+    # Validate configuration
+    logger.info("Validating configuration...")
+    try:
+        warnings = validate_config(settings)
+        if warnings:
+            logger.warning(f"Configuration validation completed with {len(warnings)} warning(s)")
+        else:
+            logger.info("Configuration validation passed")
+    except ConfigurationError as e:
+        logger.error(f"Configuration validation failed: {e}")
+        raise
 
     # Initialize models cache directory
     settings.models_cache_path.mkdir(parents=True, exist_ok=True)
@@ -166,7 +184,7 @@ async def health_check() -> JSONResponse:
         JSON response with health status
 
     Example:
-        >>> curl http://localhost:8000/health
+        >>> curl http://API_HOST:PORT/health
         {"status":"healthy","service":"resume-analysis-api","version":"1.0.0"}
     """
     return JSONResponse(
@@ -191,7 +209,7 @@ async def readiness_check() -> JSONResponse:
         JSON response with readiness status
 
     Example:
-        >>> curl http://localhost:8000/ready
+        >>> curl http://API_HOST:PORT/ready
         {"status":"ready"}
     """
     # TODO: Add database connectivity check
@@ -213,7 +231,7 @@ async def root() -> JSONResponse:
         JSON response with API information and links
 
     Example:
-        >>> curl http://localhost:8000/
+        >>> curl http://API_HOST:PORT/
         {
           "message": "Resume Analysis API",
           "version": "1.0.0",
@@ -266,6 +284,7 @@ from api import (
     candidate_notes,
     candidate_activities,
     search,
+    config,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -298,6 +317,7 @@ app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["C
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 
 
 if __name__ == "__main__":

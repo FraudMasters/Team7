@@ -1,6 +1,5 @@
 import React from 'react';
-import { Container, Typography, Box, Grid, Card, CardContent, Button, Paper } from '@mui/material';
-import { Work as WorkIcon, Description as ResumeIcon, Analytics as AnalyticsIcon, Search as SearchIcon, ViewKanban as ViewKanbanIcon } from '@mui/icons-material';
+import { Container, Typography, Box, Grid, Card, CardContent, Button, Paper, Icon } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import RecruitingFunnel from '@components/RecruitingFunnel';
@@ -18,35 +17,35 @@ const RecruiterDashboardPage: React.FC = () => {
     {
       title: t('recruiterDashboard.modules.resumeDatabase.title'),
       description: t('recruiterDashboard.modules.resumeDatabase.description'),
-      icon: <ResumeIcon />,
+      iconName: 'file-text',
       path: '/recruiter/resumes',
       color: '#1976d2',
     },
     {
       title: t('recruiterDashboard.modules.manageVacancies.title'),
       description: t('recruiterDashboard.modules.manageVacancies.description'),
-      icon: <WorkIcon />,
+      iconName: 'briefcase',
       path: '/recruiter/vacancies',
       color: '#388e3c',
     },
     {
       title: t('recruiterDashboard.modules.candidateSearch.title'),
       description: t('recruiterDashboard.modules.candidateSearch.description'),
-      icon: <SearchIcon />,
+      iconName: 'search',
       path: '/recruiter/search',
       color: '#ff9800',
     },
     {
       title: t('recruiterDashboard.modules.analytics.title'),
       description: t('recruiterDashboard.modules.analytics.description'),
-      icon: <AnalyticsIcon />,
+      iconName: 'bar-chart-2',
       path: '/recruiter/analytics',
       color: '#9c27b0',
     },
     {
       title: t('recruiterDashboard.modules.workflowBoard.title'),
       description: t('recruiterDashboard.modules.workflowBoard.description'),
-      icon: <ViewKanbanIcon />,
+      iconName: 'trello',
       path: '/recruiter/workflow',
       color: '#00bcd4',
     },
@@ -55,10 +54,10 @@ const RecruiterDashboardPage: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+        <Typography variant="h4" as="h1" gutterBottom fontWeight={600}>
           {t('recruiterDashboard.title')}
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           {t('recruiterDashboard.welcome')}
         </Typography>
       </Box>
@@ -69,11 +68,11 @@ const RecruiterDashboardPage: React.FC = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <WorkIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Icon name="briefcase" size={24} color="primary" sx={{ mr: 1 }} />
                 <Typography variant="h6">{t('recruiterDashboard.stats.vacancies')}</Typography>
               </Box>
               <Typography variant="h4" color="primary">5</Typography>
-              <Typography variant="caption" color="text.secondary">{t('recruiterDashboard.stats.activeJobPostings')}</Typography>
+              <Typography variant="caption" color="secondary">{t('recruiterDashboard.stats.activeJobPostings')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -82,11 +81,11 @@ const RecruiterDashboardPage: React.FC = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ResumeIcon sx={{ mr: 1, color: 'success.main' }} />
+                <Icon name="file-text" size={24} color="success" sx={{ mr: 1 }} />
                 <Typography variant="h6">{t('recruiterDashboard.stats.resumes')}</Typography>
               </Box>
-              <Typography variant="h4" color="success.main">65</Typography>
-              <Typography variant="caption" color="text.secondary">{t('recruiterDashboard.stats.inDatabase')}</Typography>
+              <Typography variant="h4" color="success">65</Typography>
+              <Typography variant="caption" color="secondary">{t('recruiterDashboard.stats.inDatabase')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -111,7 +110,7 @@ const RecruiterDashboardPage: React.FC = () => {
               }}
               onClick={() => navigate(module.path)}
             >
-              <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <CardContent disableGutters sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Box
                     sx={{
@@ -125,13 +124,13 @@ const RecruiterDashboardPage: React.FC = () => {
                       bgcolor: `${module.color}20`,
                     }}
                   >
-                    {module.icon}
+                    <Icon name={module.iconName} size={24} sx={{ color: module.color }} />
                   </Box>
                   <Typography variant="h6" sx={{ color: module.color }}>
                     {module.title}
                   </Typography>
                 </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                <Typography variant="body2" color="secondary" sx={{ flexGrow: 1 }}>
                   {module.description}
                 </Typography>
                 <Button
@@ -160,7 +159,7 @@ const RecruiterDashboardPage: React.FC = () => {
 
       {/* Info Box */}
       <Box sx={{ mt: 4 }}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="secondary">
           <strong>💡 {t('recruiterDashboard.tip')}</strong>
         </Typography>
       </Box>

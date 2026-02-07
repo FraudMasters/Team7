@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Box, Tabs, Tab } from '@mui/material';
+import { Typography, Box, Tabs, Tab } from '@/components/ui';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AnalysisResults from '@components/AnalysisResults';
@@ -26,7 +26,7 @@ const ResultsPage: React.FC = () => {
         <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
           {t('results.title')}
         </Typography>
-        <Typography variant="body1" color="error.main">
+        <Typography variant="body1" color="error">
           {t('results.noResumeId')}
         </Typography>
       </Box>
@@ -43,7 +43,7 @@ const ResultsPage: React.FC = () => {
         <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
           {t('results.title')}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="secondary">
           Resume ID: {id}
         </Typography>
       </Box>

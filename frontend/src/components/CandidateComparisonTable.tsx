@@ -17,6 +17,7 @@ import {
   LinearProgress,
   Avatar,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   Refresh as RefreshIcon,
   EmojiEvents as TrophyIcon,
@@ -115,7 +116,7 @@ const getScoreLabel = (score: number): string => {
 const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
   vacancyId,
   resumeIds,
-  apiUrl = 'http://localhost:8000/api/matching',
+  apiUrl = `${config.api.url}/api/matching`,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

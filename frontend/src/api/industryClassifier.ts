@@ -27,6 +27,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { config } from '@/config';
 import type {
   IndustryClassificationRequest,
   IndustryClassificationResponse,
@@ -39,7 +40,7 @@ import type {
  * Default API configuration for industry classifier
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: config.api.url,
   timeout: 30000, // 30 seconds for classification
   headers: {
     'Content-Type': 'application/json',

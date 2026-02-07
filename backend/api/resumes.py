@@ -46,8 +46,8 @@ def _extract_locale(request: Optional[Request]) -> str:
     lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
     return lang_code
 
-# Directory for storing uploaded resumes
-UPLOAD_DIR = Path("data/uploads")
+# Directory for storing uploaded resumes (from centralized configuration)
+UPLOAD_DIR = settings.upload_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -163,7 +163,7 @@ async def upload_resume(
     Examples:
         >>> import requests
         >>> with open("resume.pdf", "rb") as f:
-        ...     response = requests.post("http://localhost:8000/api/resumes/upload", files={"file": f})
+        ...     response = requests.post("/api/resumes/upload", files={"file": f})
         >>> response.json()
         {
             "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -285,7 +285,7 @@ async def list_resumes(
         JSON response with list of resumes
 
     Example:
-        >>> response = requests.get("http://localhost:8000/api/resumes/?limit=10")
+        >>> response = requests.get("/api/resumes/?limit=10")
         >>> resumes = response.json()
     """
     try:
@@ -363,7 +363,7 @@ async def get_resume(request: Request, resume_id: str, db: AsyncSession = Depend
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/resumes/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/resumes/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
         {
             "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -402,14 +402,13 @@ async def get_resume(request: Request, resume_id: str, db: AsyncSession = Depend
             filename = resume_record.filename
         else:
             # Fallback: look for file by resume_id
-            upload_dir = Path("data/uploads")
-            resume_files = list(upload_dir.glob(f"{resume_id}.*"))
+            resume_files = list(UPLOAD_DIR.glob(f"{resume_id}.*"))
             if resume_files:
                 file_path = resume_files[0]
                 filename = file_path.name
             else:
                 # Try numeric ID fallback
-                resume_files = list(upload_dir.glob("*.*"))
+                resume_files = list(UPLOAD_DIR.glob("*.*"))
                 filename = f"resume_{resume_id[:8]}"
 
         if not file_path or not file_path.exists():
@@ -622,7 +621,7 @@ async def update_resume_status(
     Examples:
         >>> import requests
         >>> response = requests.patch(
-        ...     "http://localhost:8000/api/resumes/123e4567-e89b-12d3-a456-426614174000",
+        ...     "/api/resumes/123e4567-e89b-12d3-a456-426614174000",
         ...     json={"status": "interview"}
         ... )
         >>> response.json()
@@ -746,7 +745,7 @@ async def delete_resume(
         HTTPException(404): If resume not found
 
     Example:
-        >>> response = requests.delete("http://localhost:8000/api/resumes/123")
+        >>> response = requests.delete("/api/resumes/123")
         >>> response.status_code
         204
     """

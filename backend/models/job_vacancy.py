@@ -2,8 +2,9 @@
 JobVacancy model for storing job vacancy descriptions
 """
 from typing import Optional
+from uuid import UUID
 
-from sqlalchemy import JSON, String, Text
+from sqlalchemy import Boolean, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -15,6 +16,7 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
 
     Attributes:
         id: UUID primary key
+        organization_id: Optional foreign key to Organization
         title: Job title
         description: Full job description
         required_skills: JSON array of required skills
@@ -25,11 +27,15 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
         location: Required location (if any)
         external_id: External system ID (e.g., from job board API)
         source: Source of the vacancy (manual, api, scrape)
+        is_active: Whether the vacancy is currently active for matching
         created_at: Timestamp when vacancy was created (inherited)
     """
 
     __tablename__ = "job_vacancies"
 
+    organization_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     required_skills: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
@@ -52,6 +58,7 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
     employment_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     # Relationships
     weight_profiles: Mapped[list["MatchingWeightProfile"]] = relationship(

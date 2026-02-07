@@ -1,0 +1,151 @@
+# Staging Environment Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml up
+
+services:
+  # Staging mode: production-like build but with staging env and info logging
+  backend:
+    env_file:
+      - .env.staging
+    environment:
+      ENVIRONMENT: staging
+      LOG_LEVEL: INFO
+    volumes:
+      - backend_models:/app/models_cache
+      - backend_logs:/app/logs
+      - backend_backups:/app/data/backups
+      - backend_uploads:/app/data/uploads
+    build:
+      target: production
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --log-level info
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+        reservations:
+          cpus: '1.5'
+          memory: 3G
+
+  celery_worker:
+    env_file:
+      - .env.staging
+    environment:
+      ENVIRONMENT: staging
+      LOG_LEVEL: INFO
+    volumes:
+      - backend_models:/app/models_cache
+      - backend_logs:/app/logs
+      - backend_backups:/app/data/backups
+      - backend_uploads:/app/data/uploads
+    command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=3 --prefetch-multiplier=2 --queues=celery,analysis,learning,reporting
+    deploy:
+      resources:
+        limits:
+          cpus: '4.5'
+          memory: 9G
+        reservations:
+          cpus: '2.25'
+          memory: 4.5G
+
+  celery_beat:
+    env_file:
+      - .env.staging
+    environment:
+      ENVIRONMENT: staging
+      LOG_LEVEL: INFO
+    volumes:
+      - backend_backups:/app/data/backups
+      - celerybeat_data:/app/celerybeat
+    command: celery -A celery_app.celery_app beat --loglevel=info
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 384M
+        reservations:
+          cpus: '0.375'
+          memory: 192M
+
+  frontend:
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: production
+    build:
+      target: production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  postgres:
+    env_file:
+      - .env.staging
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.75'
+          memory: 768M
+
+  redis:
+    env_file:
+      - .env.staging
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.375'
+          memory: 384M
+
+  grafana:
+    env_file:
+      - .env.staging
+    environment:
+      GF_LOG_LEVEL: info
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.375'
+          memory: 384M
+
+  loki:
+    env_file:
+      - .env.staging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.375'
+          memory: 384M
+
+  prometheus:
+    env_file:
+      - .env.staging
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'  # Medium retention for staging
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1.5G
+        reservations:
+          cpus: '0.375'
+          memory: 768M

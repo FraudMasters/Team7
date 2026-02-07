@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -107,7 +108,7 @@ interface CustomSynonymsManagerProps {
  */
 const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
   organizationId,
-  apiUrl = 'http://localhost:8000/api/custom-synonyms',
+  apiUrl = `${config.api.url}/api/custom-synonyms`,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);

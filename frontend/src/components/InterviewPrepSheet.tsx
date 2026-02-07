@@ -22,24 +22,8 @@ import {
   ListItemText,
   TextField,
   IconButton,
-} from '@mui/material';
-import {
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  CheckCircle as CheckIcon,
-  Lightbulb as LightbulbIcon,
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-  School as TechnicalIcon,
-  Psychology as BehavioralIcon,
-  Assignment as SituationalIcon,
-  Verified as VerificationIcon,
-  ThumbUp as ThumbUpIcon,
-  ThumbDown as ThumbDownIcon,
-  Add as AddIcon,
-  PictureAsPdf as PictureAsPdfIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import type { InterviewPrepResponse, InterviewQuestion, ApiError } from '@/types/api';
 
 /**
@@ -58,15 +42,15 @@ interface InterviewPrepSheetProps {
 const getCategoryIcon = (category: string) => {
   switch (category) {
     case 'technical':
-      return <TechnicalIcon />;
+      return 'graduation-cap';
     case 'behavioral':
-      return <BehavioralIcon />;
+      return 'brain';
     case 'situational':
-      return <SituationalIcon />;
+      return 'clipboard-list';
     case 'skill_verification':
-      return <VerificationIcon />;
+      return 'badge-check';
     default:
-      return <InfoIcon />;
+      return 'info';
   }
 };
 
@@ -294,7 +278,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
             <Box sx={{ color: `${categoryColor}.main`, mt: 0.5 }}>
-              {getCategoryIcon(question.category)}
+              <Icon name={getCategoryIcon(question.category)} />
             </Box>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
@@ -333,7 +317,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
                 color={feedbackHelpful ? 'success' : 'default'}
                 disabled={submitting}
               >
-                <ThumbUpIcon fontSize="small" />
+                <Icon name="thumbs-up" fontSize="small" />
               </IconButton>
               <IconButton
                 size="small"
@@ -341,7 +325,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
                 color={feedbackNotHelpful ? 'error' : 'default'}
                 disabled={submitting}
               >
-                <ThumbDownIcon fontSize="small" />
+                <Icon name="thumbs-down" fontSize="small" />
               </IconButton>
             </Box>
           </Box>
@@ -350,7 +334,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
           {question.rationale && (
             <Box sx={{ mb: 2 }}>
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                <InfoIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                <Icon name="info" fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
                 Rationale
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -363,7 +347,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
           {question.expected_answers && question.expected_answers.length > 0 && (
             <Box sx={{ mb: 2 }}>
               <Typography variant="caption" color="success.main" fontWeight={600}>
-                <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                <Icon name="check-circle" fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
                 Expected Answers
               </Typography>
               <List dense sx={{ pl: 2 }}>
@@ -385,7 +369,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
           {/* Follow-up Suggestions */}
           {question.follow_up_suggestions && question.follow_up_suggestions.length > 0 && (
             <Accordion variant="outlined" sx={{ mt: 1 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <AccordionSummary expandIcon={<Icon name="chevron-down" />}>
                 <Typography variant="caption" color="primary.main" fontWeight={600}>
                   Follow-up Suggestions ({question.follow_up_suggestions.length})
                 </Typography>
@@ -480,7 +464,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {successMessage && (
         <Alert
           severity="success"
-          icon={<CheckIcon fontSize="inherit" />}
+          icon={<Icon name="check-circle" fontSize="inherit" />}
           onClose={() => setSuccessMessage(null)}
         >
           {successMessage}
@@ -496,7 +480,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="outlined"
-              startIcon={<PictureAsPdfIcon />}
+              startIcon={<Icon name="file" />}
               onClick={handleExportPDF}
               size="small"
               disabled={exporting}
@@ -504,7 +488,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
             >
               {exporting ? 'Exporting...' : 'Export PDF'}
             </Button>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchPrep} size="small">
+            <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchPrep} size="small">
               Refresh
             </Button>
           </Box>
@@ -574,7 +558,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {areas_to_probe && areas_to_probe.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <WarningIcon color="warning" />
+            <Icon name="alert-triangle" color="warning" />
             Areas to Probe
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -598,7 +582,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {skill_gaps_to_address && skill_gaps_to_address.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ErrorIcon color="error" />
+            <Icon name="alert-circle" color="error" />
             Skill Gaps to Address
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -629,7 +613,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
           }}
         >
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LightbulbIcon color="info" />
+            <Icon name="lightbulb" color="info" />
             Interview Tips
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -653,7 +637,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {technical_questions && technical_questions.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TechnicalIcon color="primary" />
+            <Icon name="graduation-cap" color="primary" />
             Technical Questions
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -667,7 +651,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {behavioral_questions && behavioral_questions.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BehavioralIcon color="secondary" />
+            <Icon name="brain" color="secondary" />
             Behavioral Questions
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -681,7 +665,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {situational_questions && situational_questions.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SituationalIcon color="info" />
+            <Icon name="clipboard-list" color="info" />
             Situational Questions
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -695,7 +679,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {skill_verification_questions && skill_verification_questions.length > 0 && (
         <Paper elevation={1} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <VerificationIcon color="success" />
+            <Icon name="badge-check" color="success" />
             Skill Verification Questions
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -727,7 +711,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
             />
             <Button
               variant="contained"
-              startIcon={submitting ? <CircularProgress size={16} /> : <AddIcon />}
+              startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="plus" />}
               onClick={handleAddCustomQuestion}
               disabled={!newCustomQuestion.trim() || submitting}
               sx={{ alignSelf: 'flex-start' }}
@@ -764,7 +748,7 @@ const InterviewPrepSheet: React.FC<InterviewPrepSheetProps> = ({
       {/* No Questions Message */}
       {totalQuestions === 0 && (
         <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
-          <InfoIcon sx={{ fontSize: 64, color: 'info.main', mb: 2 }} />
+          <Icon name="info" sx={{ fontSize: 64, color: 'info.main', mb: 2 }} />
           <Typography variant="h6" color="info.main" gutterBottom fontWeight={600}>
             No Questions Generated
           </Typography>

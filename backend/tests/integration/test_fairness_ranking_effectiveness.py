@@ -1,4 +1,5 @@
 """
+import os
 Test Fairness-Aware Ranking Effectiveness
 
 This test verifies that fairness-aware ranking reduces bias compared to standard ranking.
@@ -26,7 +27,7 @@ from datetime import datetime
 class TestFairnessRankingEffectiveness:
     """Test that fairness-aware ranking actually reduces bias."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = os.getenv("API_BASE_URL", "")
 
     @pytest.fixture(scope="class")
     def test_vacancy(self):

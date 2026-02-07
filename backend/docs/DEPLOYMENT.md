@@ -128,6 +128,72 @@ open http://localhost:8000/docs
 
 ## Environment Configuration
 
+AgentHR uses a centralized configuration management system with environment-specific YAML files and environment variable overrides.
+
+### Configuration System Overview
+
+The configuration system provides:
+
+- **Environment-specific profiles** - dev, staging, production
+- **YAML config files** - Store settings in version control
+- **Environment variable overrides** - Override any setting
+- **Hot reload** - Update settings without restart
+- **Configuration validation** - Startup validation
+- **Audit logging** - Track configuration changes
+
+### Quick Setup
+
+```bash
+# 1. Set environment
+export ENVIRONMENT=production  # or 'dev', 'staging'
+
+# 2. Copy environment templates
+cp .env.example .env
+cp backend/.env.example backend/.env
+
+# 3. Customize settings
+# Edit .env files with your values
+
+# 4. Start services
+docker-compose up -d
+```
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `backend/config/config.dev.yml` | Development settings |
+| `backend/config/config.staging.yml` | Staging settings |
+| `backend/config/config.production.yml` | Production settings |
+| `.env` | Root environment overrides |
+| `backend/.env` | Backend-specific overrides |
+
+### Configuration Loading Priority
+
+Settings are loaded in this order (highest to lowest):
+
+1. **Environment variables** (`.env` files)
+2. **YAML config files** (`config.{env}.yml`)
+3. **Default values** in code
+
+### Configuration Endpoints
+
+The API provides configuration management endpoints:
+
+```bash
+# Get current configuration
+curl http://localhost:8000/api/config
+
+# Reload configuration from files
+curl -X POST http://localhost:8000/api/config/reload
+
+# Check configuration health
+curl http://localhost:8000/api/config/health
+
+# Get configuration audit logs
+curl http://localhost:8000/api/config/audit-logs
+```
+
 ### Configuration File
 
 Copy `.env.example` to `.env` and customize:

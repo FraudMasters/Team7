@@ -1,17 +1,20 @@
+// Импорт хуков для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для UI
 import {
-  Container,
-  Typography,
-  Box,
-  Paper,
-  Grid,
-  TextField,
-  Button,
-  Slider,
-  Card,
-  CardContent,
-  Chip,
+  Container,       // Контейнер для ограничения ширины содержимого
+  Typography,      // Компонент для текста с различными стилями
+  Box,             // Универсальный контейнер для верстки
+  Paper,           // Контейнер с эффектом elevated (карточка)
+  Grid,            // Сетка для адаптивной верстки
+  TextField,       // Поле ввода текста
+  Button,          // Кнопки
+  Slider,          // Ползунок выбора значения
+  Card,            // Карточка
+  CardContent,     // Содержимое карточки
+  Chip,            // Метки/теги
 } from '@mui/material';
+// Импорт иконок из MUI
 import {
   AttachMoney as SalaryIcon,
   TrendingUp as TrendingUpIcon,
@@ -19,8 +22,10 @@ import {
   LocationOn as LocationIcon,
   Work as WorkIcon,
 } from '@mui/icons-material';
-import { PageTransition } from '../../components/ui/PageTransition';
+// Импорт MUI компонентов
+import { PageTransition } from '@components/mui/PageTransition';
 
+// Интерфейс описывающий результат расчета зарплаты
 interface SalaryData {
   role: string;
   location: string;
@@ -31,6 +36,7 @@ interface SalaryData {
   currency: string;
 }
 
+// Базовые диапазоны зарплат по должностям
 const salaryRanges: Record<string, { min: number; max: number; average: number }> = {
   'Software Engineer': { min: 80000, max: 180000, average: 120000 },
   'Senior Software Engineer': { min: 120000, max: 250000, average: 175000 },
@@ -41,6 +47,7 @@ const salaryRanges: Record<string, { min: number; max: number; average: number }
   'DevOps Engineer': { min: 100000, max: 200000, average: 145000 },
 };
 
+// Список локаций с коэффициентами стоимости жизни
 const locations = [
   { name: 'San Francisco, CA', multiplier: 1.4 },
   { name: 'New York, NY', multiplier: 1.3 },
@@ -52,16 +59,30 @@ const locations = [
   { name: 'Berlin, Germany', multiplier: 0.85 },
 ];
 
+// Список доступных должностей
 const roles = Object.keys(salaryRanges);
 
+/**
+ * Страница калькулятора зарплаты
+ * Позволяет оценить рыночную стоимость на основе должности, локации и опыта
+ */
 export function SalaryCalculatorPage() {
+  // Состояние выбранной должности
   const [role, setRole] = useState('Software Engineer');
+  // Состояние выбранной локации
   const [location, setLocation] = useState(locations[4]);
+  // Состояние опыта (в годах)
   const [experience, setExperience] = useState(3);
+  // Состояние результата расчета
   const [result, setResult] = useState<SalaryData | null>(null);
 
+  /**
+   * Вычисление оценки зарплаты
+   * Учитывает базовую зарплату, локацию и опыт
+   */
   const calculateSalary = () => {
     const baseSalary = salaryRanges[role];
+    // Множитель опыта: +10% за каждый год сверх первого
     const experienceMultiplier = 1 + (experience - 1) * 0.1;
 
     const min = Math.round(baseSalary.min * location.multiplier * experienceMultiplier);
@@ -82,7 +103,7 @@ export function SalaryCalculatorPage() {
   return (
     <PageTransition>
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <SalaryIcon sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -98,7 +119,7 @@ export function SalaryCalculatorPage() {
         </Box>
 
         <Grid container spacing={3}>
-          {/* Calculator Form */}
+          {/* Форма калькулятора */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -106,6 +127,7 @@ export function SalaryCalculatorPage() {
               </Typography>
 
               <Box sx={{ mt: 3 }}>
+                {/* Выбор должности */}
                 <Typography variant="subtitle2" gutterBottom>
                   Role
                 </Typography>
@@ -121,6 +143,7 @@ export function SalaryCalculatorPage() {
                   ))}
                 </Box>
 
+                {/* Выбор локации */}
                 <Typography variant="subtitle2" gutterBottom>
                   Location
                 </Typography>
@@ -139,6 +162,7 @@ export function SalaryCalculatorPage() {
                   ))}
                 </TextField>
 
+                {/* Выбор опыта */}
                 <Typography variant="subtitle2" gutterBottom>
                   Experience: {experience} {experience === 1 ? 'year' : 'years'}
                 </Typography>
@@ -159,7 +183,7 @@ export function SalaryCalculatorPage() {
             </Paper>
           </Grid>
 
-          {/* Results */}
+          {/* Результаты расчета */}
           <Grid item xs={12} md={6}>
             {result ? (
               <Paper sx={{ p: 3 }}>
@@ -167,6 +191,7 @@ export function SalaryCalculatorPage() {
                   Salary Estimate
                 </Typography>
 
+                {/* Основная карточка с оценкой */}
                 <Card sx={{ mt: 2, bgcolor: 'primary.50' }}>
                   <CardContent>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -181,6 +206,7 @@ export function SalaryCalculatorPage() {
                   </CardContent>
                 </Card>
 
+                {/* Детали расчета */}
                 <Grid container spacing={2} sx={{ mt: 2 }}>
                   <Grid item xs={6}>
                     <Card>
@@ -214,6 +240,7 @@ export function SalaryCalculatorPage() {
                   </Grid>
                 </Grid>
 
+                {/* Сравнение с рынком */}
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Market Comparison
@@ -299,6 +326,7 @@ export function SalaryCalculatorPage() {
                 </Button>
               </Paper>
             ) : (
+              // Состояние: введите данные для расчета
               <Paper sx={{ p: 3, textAlign: 'center', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Box>
                   <SalaryIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
@@ -314,7 +342,7 @@ export function SalaryCalculatorPage() {
           </Grid>
         </Grid>
 
-        {/* Salary Trends */}
+        {/* Тренды зарплат по должностям */}
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Salary Trends by Role

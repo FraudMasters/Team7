@@ -4,7 +4,7 @@ Resume model for storing uploaded resume data
 import enum
 from typing import Optional
 
-from sqlalchemy import Enum, String, Text
+from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -33,6 +33,7 @@ class Resume(Base, UUIDMixin, TimestampMixin):
 
     Attributes:
         id: UUID primary key
+        organization_id: Organization that owns this resume
         filename: Original filename of uploaded resume
         file_path: Path to stored resume file
         content_type: MIME type of the file (e.g., application/pdf)
@@ -45,6 +46,9 @@ class Resume(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "resumes"
 
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -56,4 +60,4 @@ class Resume(Base, UUIDMixin, TimestampMixin):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     def __repr__(self) -> str:
-        return f"<Resume(id={self.id}, filename={self.filename}, status={self.status.value})>"
+        return f"<Resume(id={self.id}, org={self.organization_id}, filename={self.filename}, status={self.status.value})>"

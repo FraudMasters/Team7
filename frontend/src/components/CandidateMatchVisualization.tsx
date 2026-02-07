@@ -9,13 +9,8 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-} from '@mui/material';
-import {
-  TrendingUp as TrendingIcon,
-  Work as WorkIcon,
-  School as SchoolIcon,
-  Star as StarIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import axios from 'axios';
 
 interface CandidateMatchVisualizationProps {
@@ -216,7 +211,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
       {vacancies.length > 0 && (
         <Paper sx={{ p: 3, mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <WorkIcon sx={{ mr: 1, color: 'primary.main' }} />
+            <Icon name="briefcase" size={24} color="primary" style={{ marginRight: '8px' }} />
             <Typography variant="h6" fontWeight={600}>
               Recommended Positions
             </Typography>
@@ -241,13 +236,13 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box sx={{ flex: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          {index === 0 && <StarIcon sx={{ fontSize: 16, color: '#ffc107', mr: 0.5 }} />}
+                          {index === 0 && <Icon name="star" size={16} color="warning" style={{ marginRight: '4px', color: '#ffc107' }} />}
                           <Typography variant="subtitle1" fontWeight={600}>
                             {match.vacancyTitle}
                           </Typography>
                         </Box>
                         {match.location && (
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="secondary">
                             📍 {match.location}
                           </Typography>
                         )}
@@ -296,7 +291,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
                     {/* Matched Skills Preview */}
                     {match.matchedSkills.length > 0 && (
                       <Box sx={{ mt: 1 }}>
-                        <Typography variant="caption" color="success.main" fontWeight={600}>
+                        <Typography variant="caption" color="success" fontWeight={600}>
                           ✓ {match.matchedSkills.length} matched skills
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
@@ -326,7 +321,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
       {skillCategories.length > 0 && (
         <Paper sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <SchoolIcon sx={{ mr: 1, color: 'primary.main' }} />
+            <Icon name="graduation-cap" size={24} color="primary" style={{ marginRight: '8px' }} />
             <Typography variant="h6" fontWeight={600}>
               Skills Profile
             </Typography>
@@ -361,7 +356,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
                         />
                       ))}
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    <Typography variant="caption" color="secondary" sx={{ mt: 1, display: 'block' }}>
                       {cat.skills.length} {cat.skills.length === 1 ? 'skill' : 'skills'}
                     </Typography>
                   </CardContent>
@@ -379,7 +374,7 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
             p: 3,
             mt: 3,
             background: (theme) =>
-              `linear-gradient(135deg, ${theme.palette.primary.main}15 0%, ${theme.palette.secondary.main}15 100%)`,
+              `linear-gradient(135deg, ${theme.colors.primary}15 0%, ${theme.colors.secondary}15 100%)`,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
@@ -387,28 +382,28 @@ const CandidateMatchVisualization: React.FC<CandidateMatchVisualizationProps> = 
               <Typography variant="h6" fontWeight={600} gutterBottom>
                 Your Match Potential
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="secondary">
                 Based on your skills profile, you match best with {vacancies[0]?.vacancyTitle}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" fontWeight={700} color="primary.main">
+                <Typography variant="h4" fontWeight={700} color="primary">
                   {skills?.length || 0}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">Total Skills</Typography>
+                <Typography variant="caption" color="secondary">Total Skills</Typography>
               </Box>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" fontWeight={700} color="success.main">
+                <Typography variant="h4" fontWeight={700} color="success">
                   {vacancies[0]?.matchPercentage || 0}%
                 </Typography>
-                <Typography variant="caption" color="text.secondary">Best Match</Typography>
+                <Typography variant="caption" color="secondary">Best Match</Typography>
               </Box>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" fontWeight={700} color="info.main">
+                <Typography variant="h4" fontWeight={700} color="info">
                   {vacancies.filter((v) => v.matchPercentage >= 50).length}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">Good Matches</Typography>
+                <Typography variant="caption" color="secondary">Good Matches</Typography>
               </Box>
             </Box>
           </Box>

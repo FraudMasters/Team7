@@ -45,22 +45,8 @@ import {
   Tooltip,
   Divider,
   Stack,
-} from '@mui/material';
-import {
-  Backup as BackupIcon,
-  Restore as RestoreIcon,
-  Delete as DeleteIcon,
-  CloudUpload as CloudUploadIcon,
-  Settings as SettingsIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Schedule as ScheduleIcon,
-  Storage as StorageIcon,
-  CloudDone as CloudDoneIcon,
-  CloudOff as CloudOffIcon,
-  Refresh as RefreshIcon,
-  Verified as VerifiedIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives/Icon';
 import { format } from 'date-fns';
 import backupApi from '../services/backupApi';
 import type { Backup, BackupStatus as BackupStatusType } from '@/types/api';
@@ -267,21 +253,21 @@ const BackupsPage: React.FC = () => {
   };
 
   const getStatusChip = (status: string) => {
-    type StatusConfig = { color: 'success' | 'info' | 'default' | 'error' | 'warning'; icon: React.ReactNode; label: string };
+    type StatusConfig = { color: 'success' | 'info' | 'default' | 'error' | 'warning'; icon: string; label: string };
     const statusConfig: Record<string, StatusConfig> = {
-      completed: { color: 'success', icon: <CheckCircleIcon />, label: 'Completed' },
-      in_progress: { color: 'info', icon: <ScheduleIcon />, label: 'In Progress' },
-      pending: { color: 'default', icon: <ScheduleIcon />, label: 'Pending' },
-      failed: { color: 'error', icon: <ErrorIcon />, label: 'Failed' },
-      restoring: { color: 'warning', icon: <RestoreIcon />, label: 'Restoring' },
-      expired: { color: 'error', icon: <ErrorIcon />, label: 'Expired' },
+      completed: { color: 'success', icon: 'check-circle', label: 'Completed' },
+      in_progress: { color: 'info', icon: 'clock', label: 'In Progress' },
+      pending: { color: 'default', icon: 'clock', label: 'Pending' },
+      failed: { color: 'error', icon: 'alert-circle', label: 'Failed' },
+      restoring: { color: 'warning', icon: 'refresh-cw', label: 'Restoring' },
+      expired: { color: 'error', icon: 'alert-circle', label: 'Expired' },
     };
 
     const config = statusConfig[status] ?? statusConfig.pending;
     if (!config) return null;
     return (
       <Chip
-        icon={config.icon as React.ReactElement}
+        icon={<Icon name={config.icon} size={16} />}
         label={config.label}
         color={config.color}
         size="small"
@@ -319,14 +305,14 @@ const BackupsPage: React.FC = () => {
         <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            startIcon={<Icon name="refresh-cw" size={20} />}
             onClick={fetchData}
           >
             Refresh
           </Button>
           <Button
             variant="outlined"
-            startIcon={<CloudUploadIcon />}
+            startIcon={<Icon name="cloud" size={20} />}
             onClick={handleSyncS3}
             disabled={!backupStatus?.enabled || !backupStatus?.recent_backups.some((b: Backup) => !b.s3_uploaded)}
           >
@@ -334,14 +320,14 @@ const BackupsPage: React.FC = () => {
           </Button>
           <Button
             variant="outlined"
-            startIcon={<SettingsIcon />}
+            startIcon={<Icon name="settings" size={20} />}
             onClick={() => setConfigDialogOpen(true)}
           >
             Configuration
           </Button>
           <Button
             variant="contained"
-            startIcon={<BackupIcon />}
+            startIcon={<Icon name="hard-drive" size={20} />}
             onClick={() => setCreateDialogOpen(true)}
             disabled={!backupStatus?.enabled}
           >
@@ -368,8 +354,8 @@ const BackupsPage: React.FC = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <BackupIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="body2" color="text.secondary">
+                <Icon name="hard-drive" size={20} sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant="body2" color="secondary">
                   Total Backups
                 </Typography>
               </Box>
@@ -384,8 +370,8 @@ const BackupsPage: React.FC = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <StorageIcon color="success" sx={{ mr: 1 }} />
-                <Typography variant="body2" color="text.secondary">
+                <Icon name="database" size={20} sx={{ mr: 1, color: 'success.main' }} />
+                <Typography variant="body2" color="secondary">
                   Total Size
                 </Typography>
               </Box>
@@ -401,11 +387,11 @@ const BackupsPage: React.FC = () => {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 {backupStatus?.last_backup_status === 'success' ? (
-                  <CheckCircleIcon color="success" sx={{ mr: 1 }} />
+                  <Icon name="check-circle" size={20} sx={{ mr: 1, color: 'success.main' }} />
                 ) : (
-                  <ErrorIcon color="error" sx={{ mr: 1 }} />
+                  <Icon name="alert-circle" size={20} sx={{ mr: 1, color: 'error.main' }} />
                 )}
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Last Backup
                 </Typography>
               </Box>
@@ -423,11 +409,11 @@ const BackupsPage: React.FC = () => {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 {backupStatus?.recent_backups.some((b: Backup) => b.s3_uploaded) ? (
-                  <CloudDoneIcon color="info" sx={{ mr: 1 }} />
+                  <Icon name="cloud" size={20} sx={{ mr: 1, color: 'info.main' }} />
                 ) : (
-                  <CloudOffIcon color="disabled" sx={{ mr: 1 }} />
+                  <Icon name="cloud-off" size={20} sx={{ mr: 1, color: 'disabled' }} />
                 )}
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   S3 Status
                 </Typography>
               </Box>
@@ -450,7 +436,7 @@ const BackupsPage: React.FC = () => {
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Automated Backups
                 </Typography>
                 <Chip
@@ -462,7 +448,7 @@ const BackupsPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Retention Period
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
@@ -472,7 +458,7 @@ const BackupsPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Disk Usage
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
@@ -482,7 +468,7 @@ const BackupsPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Next Scheduled Backup
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
@@ -494,7 +480,7 @@ const BackupsPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   S3 Backup
                 </Typography>
                 <Chip
@@ -506,7 +492,7 @@ const BackupsPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   Cleanup Old Backups
                 </Typography>
                 <Button size="small" onClick={handleCleanup}>
@@ -541,7 +527,7 @@ const BackupsPage: React.FC = () => {
                 {backups.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                      <Typography color="text.secondary">
+                      <Typography color="secondary">
                         No backups found. Create your first backup to get started.
                       </Typography>
                     </TableCell>
@@ -566,7 +552,7 @@ const BackupsPage: React.FC = () => {
                           {backup.size_human || '-'}
                         </Typography>
                         {backup.files_count && (
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="secondary">
                             {backup.files_count} files
                           </Typography>
                         )}
@@ -576,16 +562,16 @@ const BackupsPage: React.FC = () => {
                           {format(new Date(backup.created_at), 'MMM dd, HH:mm')}
                         </Typography>
                         {backup.expires_at && (
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="secondary">
                             Expires: {format(new Date(backup.expires_at), 'MMM dd')}
                           </Typography>
                         )}
                       </TableCell>
                       <TableCell>
                         {backup.s3_uploaded ? (
-                          <CloudDoneIcon color="success" fontSize="small" />
+                          <Icon name="cloud" size={16} sx={{ color: 'success.main' }} />
                         ) : (
-                          <CloudOffIcon color="disabled" fontSize="small" />
+                          <Icon name="cloud-off" size={16} sx={{ color: 'disabled' }} />
                         )}
                       </TableCell>
                       <TableCell align="right">
@@ -595,7 +581,7 @@ const BackupsPage: React.FC = () => {
                             onClick={() => handleVerifyBackup(backup)}
                             disabled={backup.status !== 'completed'}
                           >
-                            <VerifiedIcon fontSize="small" />
+                            <Icon name="check-circle" size={16} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Restore">
@@ -607,7 +593,7 @@ const BackupsPage: React.FC = () => {
                             }}
                             disabled={backup.status !== 'completed'}
                           >
-                            <RestoreIcon fontSize="small" />
+                            <Icon name="refresh-cw" size={16} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
@@ -616,7 +602,7 @@ const BackupsPage: React.FC = () => {
                             color="error"
                             onClick={() => handleDeleteBackup(backup)}
                           >
-                            <DeleteIcon fontSize="small" />
+                            <Icon name="trash-2" size={16} />
                           </IconButton>
                         </Tooltip>
                       </TableCell>
@@ -638,7 +624,6 @@ const BackupsPage: React.FC = () => {
             margin="dense"
             label="Backup Name"
             fullWidth
-            variant="outlined"
             value={backupName}
             onChange={(e) => setBackupName(e.target.value)}
             placeholder={`Backup ${format(new Date(), 'yyyy-MM-dd HH:mm')}`}

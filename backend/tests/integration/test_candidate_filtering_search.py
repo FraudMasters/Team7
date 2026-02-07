@@ -1,4 +1,5 @@
 """
+import os
 Comprehensive integration tests for candidate filtering and searching by stage.
 
 This test suite verifies:

@@ -1,0 +1,332 @@
+# Kong Declarative Configuration
+# Декларативная конфигурация Kong API Gateway
+# Этот файл определяет все маршруты, сервисы и плагины для API Gateway
+
+_format_version: "3.0"
+
+# Services - backend microservices
+# Сервисы - внутренние микросервисы
+services:
+  # Resume Processing Service
+  # Сервис обработки резюме
+  - name: resume_processing
+    url: http://resume_processing:8001
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # Matching Service
+  # Сервис сопоставления
+  - name: matching
+    url: http://matching:8002
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # Candidate Service
+  # Сервис кандидатов
+  - name: candidate
+    url: http://candidate:8003
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # Vacancy Service
+  # Сервис вакансий
+  - name: vacancy
+    url: http://vacancy:8004
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # Taxonomy Service
+  # Сервис таксономии
+  - name: taxonomy
+    url: http://taxonomy:8005
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # Analytics Service
+  # Сервис аналитики
+  - name: analytics
+    url: http://analytics:8006
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # ATS Simulation Service
+  # Сервис симуляции ATS
+  - name: ats_simulation
+    url: http://ats_simulation:8007
+    connect_timeout: 120000
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 3
+
+  # Notification Service
+  # Сервис уведомлений
+  - name: notifications
+    url: http://notifications:8008
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+  # Integration Service
+  # Сервис интеграций
+  - name: integration
+    url: http://integration:8009
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+
+# Routes - public API endpoints
+# Маршруты - публичные API endpoints
+routes:
+  # Resume Processing Routes
+  # Маршруты обработки резюме
+  - name: resume_processing_routes
+    service: resume_processing
+    paths:
+      - /api/resumes
+      - /api/resumes/*
+      - /api/analysis
+      - /api/analysis/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Matching Routes
+  # Маршруты сопоставления
+  - name: matching_routes
+    service: matching
+    paths:
+      - /api/matching
+      - /api/matching/*
+      - /api/comparisons
+      - /api/comparisons/*
+      - /api/ranking
+      - /api/ranking/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Candidate Routes
+  # Маршруты кандидатов
+  - name: candidate_routes
+    service: candidate
+    paths:
+      - /api/candidates
+      - /api/candidates/*
+      - /api/candidate-notes
+      - /api/candidate-notes/*
+      - /api/candidate-tags
+      - /api/candidate-tags/*
+      - /api/candidate-activities
+      - /api/candidate-activities/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Vacancy Routes
+  # Маршруты вакансий
+  - name: vacancy_routes
+    service: vacancy
+    paths:
+      - /api/vacancies
+      - /api/vacancies/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Taxonomy Routes
+  # Маршруты таксономии
+  - name: taxonomy_routes
+    service: taxonomy
+    paths:
+      - /api/skill-taxonomies
+      - /api/skill-taxonomies/*
+      - /api/taxonomy-import-export
+      - /api/taxonomy-import-export/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Analytics Routes
+  # Маршруты аналитики
+  - name: analytics_routes
+    service: analytics
+    paths:
+      - /api/analytics
+      - /api/analytics/*
+      - /api/reports
+      - /api/reports/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # ATS Simulation Routes
+  # Маршруты симуляции ATS
+  - name: ats_simulation_routes
+    service: ats_simulation
+    paths:
+      - /api/ats
+      - /api/ats/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Notification Routes
+  # Маршруты уведомлений
+  - name: notifications_routes
+    service: notifications
+    paths:
+      - /api/notifications
+      - /api/notifications/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+  # Integration Routes
+  # Маршруты интеграций
+  - name: integration_routes
+    service: integration
+    paths:
+      - /api/integrations
+      - /api/integrations/*
+    strip_path: false
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+
+# Plugins - global plugins applied to all routes
+# Плагины - глобальные плагины для всех маршрутов
+plugins:
+  # CORS plugin
+  # Плагин CORS
+  - name: cors
+    config:
+      origins:
+        - http://localhost:5173
+        - http://localhost:3000
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - Authorization
+        - X-Request-ID
+        - X-API-Key
+      exposed_headers:
+        - X-Request-ID
+      credentials: true
+      max_age: 3600
+
+  # Rate Limiting plugin
+  # Плагин ограничения частоты запросов
+  - name: rate-limiting
+    config:
+      second: 100
+      hour: 10000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      redis_database: 1
+      fault_tolerant: true
+
+  # Request Size Limiting
+  # Ограничение размера запроса
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 100  # 100 MB for resume uploads
+
+# Health check route
+# Маршрут проверки работоспособности
+  - name: health_check
+    service: resume_processing
+    paths:
+      - /health
+    strip_path: false
+
+# JWT Authentication Plugin Configuration
+# Конфигурация плагина JWT аутентификации
+# Keycloak Integration: http://keycloak:8080/realms/agenthr
+plugins_config:
+  # JWT authentication enabled per route
+  # JWT аутентификация включается для каждого маршрута отдельно
+
+# Consumer for Keycloak authenticated users
+# Consumer для аутентифицированных пользователей Keycloak
+consumers:
+  - username: keycloak_user
+    custom_id: keycloak_authenticated
+    tags:
+      - keycloak
+      - authenticated
+    # JWT Credential for RS256 (Keycloak public key verification)
+    # JWT учетные данные для RS256 (проверка публичным ключом Keycloak)
+    jwt_secrets:
+      - consumer: keycloak_user
+        algorithm: RS256
+        key: "keycloak-realm-agenthr"
+        # Public key is fetched from Keycloak JWKS endpoint
+        # Публичный ключ получается из JWKS endpoint Keycloak
+        rsa_public_key: ""
+        # JWKS URI: https://keycloak:8080/realms/agenthr/protocol/openid-connect/certs
+
+# Note: JWT authentication is configured per-route in jwt-config.conf
+# Apply JWT plugin to routes that require authentication
+# Примечание: JWT аутентификация настроена для каждого маршрута в jwt-config.conf
+# Примените JWT плагин к маршрутам, требующим аутентификации

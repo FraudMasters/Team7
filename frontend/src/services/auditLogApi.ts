@@ -4,6 +4,7 @@
  * Provides methods for interacting with the audit logs endpoints.
  */
 import axios, { AxiosInstance } from 'axios';
+import { config } from '@/config';
 import type {
   AuditLog,
   AuditLogsQuery,
@@ -17,7 +18,7 @@ class AuditLogApiService {
 
   constructor() {
     this.client = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+      baseURL: config.api.url,
       timeout: 30000, // 30 seconds for audit log queries
       headers: {
         'Content-Type': 'application/json',

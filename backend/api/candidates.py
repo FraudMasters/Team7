@@ -253,13 +253,13 @@ async def list_candidates(
     Examples:
         >>> import requests
         >>> # Get all candidates
-        >>> response = requests.get("http://localhost:8000/api/candidates/")
+        >>> response = requests.get("/api/candidates/")
         >>> # Filter by stage
-        >>> response = requests.get("http://localhost:8000/api/candidates/?stage_id=interview")
+        >>> response = requests.get("/api/candidates/?stage_id=interview")
         >>> # Search by name
-        >>> response = requests.get("http://localhost:8000/api/candidates/?search=john")
+        >>> response = requests.get("/api/candidates/?search=john")
         >>> # Combine filters
-        >>> response = requests.get("http://localhost:8000/api/candidates/?stage_id=interview&search=smith")
+        >>> response = requests.get("/api/candidates/?stage_id=interview&search=smith")
         >>> candidates = response.json()
     """
     try:
@@ -688,7 +688,7 @@ async def move_candidate(
         >>> import requests
         >>> data = {"stage_id": "interview", "vacancy_id": "...", "notes": "Passed screening"}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/candidates/123/stage",
+        ...     "/api/candidates/123/stage",
         ...     json=data
         ... )
     """
@@ -870,7 +870,7 @@ async def bulk_move_candidates(
         ...     "notes": "Bulk moved to screening"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-move",
+        ...     "/api/candidates/bulk-move",
         ...     json=data
         ... )
     """
@@ -1094,7 +1094,7 @@ async def get_candidates_for_vacancy(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/candidates/vacancy/vac-456-ghi/ranked",
+        ...     "/api/candidates/vacancy/vac-456-ghi/ranked",
         ...     params={"limit": 20}
         ... )
         >>> response.json()
@@ -1200,9 +1200,9 @@ async def get_stage_metrics(
     Examples:
         >>> import requests
         >>> # Get metrics for all stages
-        >>> response = requests.get("http://localhost:8000/api/candidates/metrics")
+        >>> response = requests.get("/api/candidates/metrics")
         >>> # Get metrics for a specific stage
-        >>> response = requests.get("http://localhost:8000/api/candidates/metrics?stage_id=interview")
+        >>> response = requests.get("/api/candidates/metrics?stage_id=interview")
         >>> response.json()
         {
             "stage_id": "interview",
@@ -1503,7 +1503,7 @@ async def bulk_action(
         ...     "tag_name": "High Priority"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     "/api/candidates/bulk-action",
         ...     json=data
         ... )
         >>> # Export candidates
@@ -1513,7 +1513,7 @@ async def bulk_action(
         ...     "export_format": "json"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     "/api/candidates/bulk-action",
         ...     json=data
         ... )
         >>> # Add to pipeline
@@ -1523,7 +1523,7 @@ async def bulk_action(
         ...     "stage_id": "interview"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     "/api/candidates/bulk-action",
         ...     json=data
         ... )
     """

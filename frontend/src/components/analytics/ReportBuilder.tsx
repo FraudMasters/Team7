@@ -26,6 +26,7 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -168,7 +169,7 @@ interface ReportBuilderProps {
  */
 const ReportBuilder: React.FC<ReportBuilderProps> = ({
   organizationId = 'default-org',
-  apiUrl = 'http://localhost:8000/api/reports',
+  apiUrl = `${config.api.url}/api/reports`,
   onReportChange,
 }) => {
   const [loading, setLoading] = useState(true);
@@ -531,7 +532,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         filters: {},
       };
 
-      const response = await fetch('http://localhost:8000/api/reports/export/pdf', {
+      const response = await fetch(`${config.api.url}/api/reports/export/pdf`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -583,7 +584,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         filters: {},
       };
 
-      const response = await fetch('http://localhost:8000/api/reports/export/csv', {
+      const response = await fetch(`${config.api.url}/api/reports/export/csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -757,7 +758,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         filters: {},
       };
 
-      const response = await fetch('http://localhost:8000/api/reports/schedule', {
+      const response = await fetch(`${config.api.url}/api/reports/schedule`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

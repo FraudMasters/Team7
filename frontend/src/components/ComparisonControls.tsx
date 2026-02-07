@@ -15,17 +15,8 @@ import {
   Stack,
   Divider,
   Alert,
-} from '@mui/material';
-import {
-  FilterList as FilterIcon,
-  Sort as SortIcon,
-  Add as AddIcon,
-  Remove as RemoveIcon,
-  RestartAlt as ResetIcon,
-  Save as SaveIcon,
-  Share as ShareIcon,
-  Download as DownloadIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Filter settings interface
@@ -415,7 +406,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
       {/* Resume Management Section */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
+          <Icon name="filter" sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
           <Typography variant="h6" fontWeight={600}>
             Resume Selection
           </Typography>
@@ -424,7 +415,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
 
         {/* Resume Count Info */}
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="secondary">
             Selected Resumes: <strong>{resumeIds.length}</strong> / {maxResumes} (minimum {minResumes})
           </Typography>
           {!isValidRange && (
@@ -472,7 +463,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
             />
             <Button
               variant="contained"
-              startIcon={<AddIcon />}
+              startIcon={<Icon name="plus" />}
               onClick={handleAddResume}
               disabled={!newResumeId.trim() || disabled}
             >
@@ -485,7 +476,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
       {/* Filters Section */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
+          <Icon name="filter" sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
           <Typography variant="h6" fontWeight={600}>
             Filters
           </Typography>
@@ -533,7 +524,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
       {/* Sort Section */}
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <SortIcon sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
+          <Icon name="arrow-up-down" sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
           <Typography variant="h6" fontWeight={600}>
             Sorting
           </Typography>
@@ -588,7 +579,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
           <Button
             fullWidth
             variant="outlined"
-            startIcon={<ResetIcon />}
+            startIcon={<Icon name="rotate-ccw" />}
             onClick={handleReset}
             disabled={disabled}
           >
@@ -600,7 +591,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
             <Button
               fullWidth
               variant="outlined"
-              startIcon={<DownloadIcon />}
+              startIcon={<Icon name="download" />}
               onClick={handleExportPDF}
               disabled={disabled || !isValidRange}
               color="success"
@@ -614,7 +605,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
             <Button
               fullWidth
               variant="outlined"
-              startIcon={<DownloadIcon />}
+              startIcon={<Icon name="download" />}
               onClick={handleExport}
               disabled={disabled || !isValidRange || (!comparisonData && !onExport)}
               color="info"
@@ -628,7 +619,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
             <Button
               fullWidth
               variant="contained"
-              startIcon={<SaveIcon />}
+              startIcon={<Icon name="save" />}
               onClick={handleSave}
               disabled={disabled || !isValidRange}
               color="primary"
@@ -642,7 +633,7 @@ const ComparisonControls: React.FC<ComparisonControlsProps> = ({
             <Button
               fullWidth
               variant="contained"
-              startIcon={<ShareIcon />}
+              startIcon={<Icon name="share-2" />}
               onClick={handleShare}
               disabled={disabled || !isValidRange}
               color="secondary"

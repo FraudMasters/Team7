@@ -6,7 +6,7 @@ import {
   Stack,
   Box,
   Divider,
-} from '@mui/material';
+} from '@/components/ui';
 import MatchReportDownload from '@components/MatchReportDownload';
 
 interface MatchedSkill {
@@ -235,7 +235,7 @@ const MatchReportDownloadTest: React.FC = () => {
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Match Report Download - Component Test
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Testing the MatchReportDownload component with various candidate scenarios
           </Typography>
         </Box>
@@ -245,7 +245,7 @@ const MatchReportDownloadTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 1: Good Candidate (82% match)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             This is a typical good match scenario with strong technical skills but some gaps in modern
             technologies like GraphQL and Kubernetes.
           </Typography>
@@ -261,7 +261,7 @@ const MatchReportDownloadTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 2: Excellent Candidate (95% match)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             This represents an ideal candidate with all required skills and strong confidence scores
             across all matching algorithms.
           </Typography>
@@ -277,7 +277,7 @@ const MatchReportDownloadTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 3: Poor Candidate (35% match)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             This represents a weak match with only basic frontend skills and many critical gaps in
             required technologies.
           </Typography>
@@ -291,7 +291,7 @@ const MatchReportDownloadTest: React.FC = () => {
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Verification Checklist:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             ✓ Download button is visible<br />
             ✓ Clicking button triggers file download<br />
             ✓ Downloaded file contains match breakdown data<br />
@@ -310,7 +310,7 @@ const MatchReportDownloadTest: React.FC = () => {
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Testing Instructions:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             1. Click each "Download Match Report" button<br />
             2. Verify that an HTML file is downloaded<br />
             3. Open the downloaded file in a browser<br />

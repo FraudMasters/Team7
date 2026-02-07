@@ -74,6 +74,7 @@ interface SearchFilters {
   dateTo?: Date | null;
   vacancyId?: string;
   stageId?: string;
+  semanticSearch?: boolean;
 }
 
 /**
@@ -136,6 +137,9 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
   // Additional filters
   const [selectedVacancy, setSelectedVacancy] = useState<string>(defaultFilters.vacancyId || '');
   const [selectedStage, setSelectedStage] = useState<string>(defaultFilters.stageId || '');
+
+  // Search mode
+  const [semanticSearch, setSemanticSearch] = useState<boolean>(defaultFilters.semanticSearch || false);
 
   // UI state
   const [expanded, setExpanded] = useState(true);
@@ -225,6 +229,7 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
     setMaxSalary(undefined);
     setSelectedVacancy('');
     setSelectedStage('');
+    setSemanticSearch(false);
   };
 
   /**
@@ -247,6 +252,7 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
       dateTo: dateTo || undefined,
       vacancyId: selectedVacancy || undefined,
       stageId: selectedStage || undefined,
+      semanticSearch,
     };
 
     onSearch(query, filters);
@@ -369,6 +375,29 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
                       </IconButton>
                     ),
                   }}
+                />
+              </Grid>
+
+              {/* Semantic Search Toggle */}
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={semanticSearch}
+                      onChange={(e) => setSemanticSearch(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        {t('advancedSearch.semanticSearch')}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('advancedSearch.semanticSearchDescription')}
+                      </Typography>
+                    </Box>
+                  }
                 />
               </Grid>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Paper, Typography, Box } from '@mui/material';
+import { Container, Paper, Typography, Box } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import FeedbackAnalytics from '@components/FeedbackAnalytics';
 
@@ -18,7 +18,7 @@ const AdminAnalyticsPage: React.FC = () => {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {t('adminAnalytics.title')}
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           {t('adminAnalytics.subtitle')}
         </Typography>
       </Box>

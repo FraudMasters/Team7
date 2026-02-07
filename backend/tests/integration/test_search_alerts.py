@@ -1,4 +1,5 @@
 """
+import os
 Comprehensive integration tests for search alert workflow.
 
 This test suite verifies:

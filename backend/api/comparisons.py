@@ -33,12 +33,15 @@ from analyzers import (
     EnhancedSkillMatcher,
 )
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 # Path to skill synonyms file
 SYNONYMS_FILE = Path(__file__).parent.parent / "models" / "skill_synonyms.json"
@@ -476,7 +479,7 @@ async def create_comparison(
         ...     "resume_ids": ["resume1", "resume2", "resume3"],
         ...     "name": "Senior Developer Candidates"
         ... }
-        >>> response = requests.post("http://localhost:8000/api/comparisons/", json=data)
+        >>> response = requests.post("/api/comparisons/", json=data)
         >>> response.json()
         {
             "id": "comp-123",
@@ -603,11 +606,11 @@ async def list_comparisons(
     Examples:
         >>> import requests
         >>> # List comparisons for a specific vacancy
-        >>> response = requests.get("http://localhost:8000/api/comparisons/?vacancy_id=vac-123")
+        >>> response = requests.get("/api/comparisons/?vacancy_id=vac-123")
         >>> # Sort by match percentage descending
-        >>> response = requests.get("http://localhost:8000/api/comparisons/?sort_by=match_percentage&order=desc")
+        >>> response = requests.get("/api/comparisons/?sort_by=match_percentage&order=desc")
         >>> # Filter by match percentage range
-        >>> response = requests.get("http://localhost:8000/api/comparisons/?min_match_percentage=50&max_match_percentage=90")
+        >>> response = requests.get("/api/comparisons/?min_match_percentage=50&max_match_percentage=90")
         >>> response.json()
     """
     try:
@@ -746,7 +749,7 @@ async def get_comparison(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/comparisons/123e4567-e89b-12d3-a456-426614174000"
+        ...     "/api/comparisons/123e4567-e89b-12d3-a456-426614174000"
         ... )
         >>> response.json()
     """
@@ -831,10 +834,10 @@ async def update_comparison(
         >>> import requests
         >>> # Update notes
         >>> data = {"notes": {"resume-1": "Strong candidate", "resume-2": "Missing skills"}}
-        >>> response = requests.put("http://localhost:8000/api/comparisons/123", json=data)
+        >>> response = requests.put("/api/comparisons/123", json=data)
         >>> # Update multiple fields
         >>> data = {"name": "Updated Name", "notes": {"resume-1": "Interview"}}
-        >>> response = requests.put("http://localhost:8000/api/comparisons/123", json=data)
+        >>> response = requests.put("/api/comparisons/123", json=data)
         >>> response.json()
     """
     try:
@@ -927,7 +930,7 @@ async def delete_comparison(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/comparisons/123")
+        >>> response = requests.delete("/api/comparisons/123")
         >>> response.json()
         {"message": "Comparison deleted successfully"}
     """
@@ -1004,7 +1007,7 @@ async def get_shared_comparison(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/comparisons/shared/abc123def456"
+        ...     "/api/comparisons/shared/abc123def456"
         ... )
         >>> response.json()
         {
@@ -1082,7 +1085,7 @@ async def compare_multiple_endpoint(request: CompareMultipleRequest) -> JSONResp
         ...     }
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/comparisons/compare-multiple",
+        ...     "/api/comparisons/compare-multiple",
         ...     json=data
         ... )
         >>> response.json()

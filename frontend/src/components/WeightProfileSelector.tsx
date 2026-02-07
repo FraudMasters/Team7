@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -131,7 +132,7 @@ const WeightProfileSelector: React.FC<WeightProfileSelectorProps> = ({
   organizationId,
   selectedProfileId,
   onProfileSelect,
-  apiUrl = 'http://localhost:8000/api/matching-weights',
+  apiUrl = `${config.api.url}/api/matching-weights`,
   presetsOnly = false,
   customOnly = false,
   allowClear = false,

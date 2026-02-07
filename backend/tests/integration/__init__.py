@@ -1,1 +1,1 @@
-"""Integration tests for resume analysis system."""
+"""Integration test suite."""

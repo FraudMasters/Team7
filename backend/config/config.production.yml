@@ -1,0 +1,63 @@
+# Production Environment Configuration
+# This file contains environment-specific overrides for production
+
+environment: production
+log_level: WARNING
+
+# Production server configuration
+backend_host: 0.0.0.0
+backend_port: 8000
+frontend_url: https://app.example.com
+
+# Production database (must be overridden by environment variables)
+database_url: postgresql://app_user:CHANGE_ME@prod-db.example.com:5432/resume_analysis
+redis_url: redis://prod-redis.example.com:6379/0
+
+# Celery configuration
+celery_broker_url: redis://prod-redis.example.com:6379/0
+celery_result_backend: redis://prod-redis.example.com:6379/0
+
+# Production upload settings (standard limits)
+max_upload_size_mb: 10
+analysis_timeout_seconds: 300
+
+# Backup enabled in production with full retention
+backup_enabled: true
+backup_retention_days: 30
+backup_schedule: "0 2 * * *"
+backup_dir: ./data/backups
+backup_notification_email: ops@example.com
+
+# Audit log retention (full in production)
+audit_log_retention_days: 90
+
+# LLM Configuration (production keys)
+llm_provider: zai
+llm_model: glm-4.7
+llm_temperature: 0.1
+llm_max_tokens: 4096
+
+# ATS Simulation Configuration
+ats_threshold: 0.6
+ats_visual_check_enabled: true
+ats_keyword_weight: 0.3
+ats_experience_weight: 0.3
+ats_education_weight: 0.2
+ats_fit_weight: 0.2
+
+# S3 Backup (enabled in production)
+backup_s3_enabled: true
+backup_s3_bucket: prod-resume-backups
+backup_s3_endpoint: https://s3.amazonaws.com
+backup_s3_region: us-east-1
+backup_incremental_enabled: true
+backup_compression_enabled: true
+
+# Sensitive values (must be overridden by environment variables)
+# NEVER commit actual secrets to this file!
+# zai_api_key: production_key_here
+# openai_api_key: production_key_here
+# anthropic_api_key: production_key_here
+# google_api_key: production_key_here
+# backup_s3_access_key: access_key_here
+# backup_s3_secret_key: secret_key_here

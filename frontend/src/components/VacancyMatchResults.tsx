@@ -11,14 +11,9 @@ import {
   Button,
   Divider,
   LinearProgress,
-} from '@mui/material';
-import {
-  Work as WorkIcon,
-  CheckCircle as CheckIcon,
-  Cancel as CancelIcon,
-  Star as StarIcon,
-} from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import styled from '@emotion/styled';
 import { FixedSizeList } from 'react-window';
 
 interface MatchResult {
@@ -48,11 +43,11 @@ interface VacancyMatchResultsProps {
 }
 
 const StyledCard = styled(Card)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
+  marginBottom: theme.spacing?.(2) || '16px',
   transition: 'transform 0.2s, box-shadow 0.2s',
   '&:hover': {
     transform: 'translateY(-2px)',
-    boxShadow: theme.shadows[4],
+    boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
   },
 }));
 
@@ -60,14 +55,14 @@ const MatchPercentageBar = styled(LinearProgress)<{ value: number }>(
   ({ theme, value }) => ({
     height: 10,
     borderRadius: 5,
-    backgroundColor: theme.palette.grey[200],
+    backgroundColor: '#e0e0e0',
     '& .MuiLinearProgress-bar': {
       backgroundColor:
         value >= 80
-          ? theme.palette.success.main
+          ? '#4caf50'
           : value >= 50
-          ? theme.palette.warning.main
-          : theme.palette.error.main,
+          ? '#ff9800'
+          : '#f44336',
     },
   })
 );
@@ -263,7 +258,7 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
   if (!matchData || matchData.total_vacancies === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
-        <WorkIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+        <Icon name="briefcase" size={48} color="muted" style={{ marginBottom: '8px' }} />
         <Typography variant="h6" color="text.secondary">
           No vacancies available for matching
         </Typography>
@@ -310,9 +305,7 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
                 mb: 2,
               }}
             >
-              <StarIcon
-                sx={{ fontSize: 32, color: 'primary.main' }}
-              />
+              <Icon name="star" size={32} color="primary" />
               <Box>
                 <Typography variant="h5" fontWeight={600} color="primary.main">
                   Best Match
@@ -348,7 +341,7 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
                   gutterBottom
                   sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                 >
-                  <CheckIcon color="success" fontSize="small" />
+                  <Icon name="check-circle" size="small" color="success" />
                   Matched Skills ({best_match.matched_skills.length})
                 </Typography>
                 <Stack direction="row" spacing={0.5} flexWrap="wrap">
@@ -372,7 +365,7 @@ const VacancyMatchResults: React.FC<VacancyMatchResultsProps> = ({ resumeId }) =
                   gutterBottom
                   sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                 >
-                  <CancelIcon color="error" fontSize="small" />
+                  <Icon name="x-circle" size="small" color="error" />
                   Missing Skills ({best_match.missing_skills.length})
                 </Typography>
                 <Stack direction="row" spacing={0.5} flexWrap="wrap">

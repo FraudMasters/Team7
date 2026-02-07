@@ -9,11 +9,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from analyzers import extract_resume_entities
 from services.data_extractor.extract import extract_text_from_docx
+from config import get_settings
+
+settings = get_settings()
 
 
 async def analyze_cv(cv_num: int):
     """Extract and analyze skills from a CV."""
-    cv_path = Path(f"data/uploads/{cv_num}.docx")
+    cv_path = settings.upload_dir / f"{cv_num}.docx"
     
     if not cv_path.exists():
         return None

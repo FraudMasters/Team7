@@ -140,10 +140,12 @@ def parse_database_url(db_url: str) -> Dict[str, str]:
             port = "5432"
             database = "postgres"
     else:
-        user = "postgres"
-        password = ""
-        host = "localhost"
-        port = "5432"
+        # Fallback to settings for database connection
+        parsed = urlparse(settings.database_url)
+        user = parsed.username or "postgres"
+        password = parsed.password or ""
+        host = parsed.hostname or ""
+        port = str(parsed.port) if parsed.port else "5432"
         database = url.split("/")[-1] if "/" in url else "postgres"
 
     return {

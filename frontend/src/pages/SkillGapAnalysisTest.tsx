@@ -5,7 +5,7 @@ import {
   Typography,
   Stack,
   Box,
-} from '@mui/material';
+} from '@/components/ui';
 import SkillGapAnalysis, {
   MissingSkillWithSuggestions,
 } from '@components/SkillGapAnalysis';
@@ -206,7 +206,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Skill Gap Analysis - Component Test
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Testing the SkillGapAnalysis component with various scenarios including
             missing skills with suggested alternatives
           </Typography>
@@ -217,7 +217,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 1: Mixed Missing Skills with Suggestions
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Showing missing skills with various suggestion types: synonym,
             same_category, related, and fuzzy_match
           </Typography>
@@ -231,7 +231,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 2: Missing Skills with No Suggestions
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Skills that have no similar alternatives found in the resume
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -244,7 +244,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 3: High Confidence Suggestions
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             All suggestions with 85%+ confidence (strong matches)
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -260,7 +260,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 4: Limited Display (Max 3)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Showing only first 3 of 8 missing skills
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -296,7 +296,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 7: Empty State (All Skills Matched)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             When all required skills are found in the resume
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -309,7 +309,7 @@ const SkillGapAnalysisTest: React.FC = () => {
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Verification Checklist:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             ✓ Shows missing required skills with warning styling<br />
             ✓ Displays suggested similar skills from resume<br />
             ✓ Visual distinction between missing and suggested skills<br />
