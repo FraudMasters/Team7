@@ -10,12 +10,8 @@ import {
   Stack,
   Chip,
   LinearProgress,
-} from '@mui/material';
-import {
-  Download as DownloadIcon,
-  PictureAsPdf as PdfIcon,
-  Description as HtmlIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 interface MatchedSkill {
   skill: string;
@@ -496,7 +492,7 @@ const MatchReportDownload: React.FC<MatchReportDownloadProps> = ({
           <Button
             variant="contained"
             color="primary"
-            startIcon={generating ? <CircularProgress size={20} /> : <DownloadIcon />}
+            startIcon={generating ? <CircularProgress size={20} /> : <Icon name="download" />}
             onClick={handleDownload}
             disabled={generating}
             fullWidth
@@ -525,7 +521,7 @@ const MatchReportDownload: React.FC<MatchReportDownloadProps> = ({
 
         {/* Format Info */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <HtmlIcon fontSize="small" color="action" />
+          <Icon name="file-text" fontSize="small" color="action" />
           <Typography variant="caption" color="text.secondary">
             Format: HTML (viewable in any browser, can be printed to PDF)
           </Typography>

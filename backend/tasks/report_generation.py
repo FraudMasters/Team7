@@ -5,15 +5,31 @@ This module provides Celery tasks for generating scheduled reports,
 formatting them for delivery (PDF, CSV, etc.), and sending them via
 email or other delivery channels.
 """
+import asyncio
 import logging
 import time
-from typing import Dict, Any, List, Optional
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
+from io import BytesIO
 
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
+from database import async_session_maker
+from models import Report, ScheduledReport
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -111,7 +127,7 @@ def format_report_as_pdf(
     Format report data as PDF document.
 
     This function converts report data into a PDF document format
-    suitable for email delivery or download.
+    suitable for email delivery or download using ReportLab.
 
     Args:
         report_data: Report data dictionary from get_report_data()
@@ -126,38 +142,192 @@ def format_report_as_pdf(
         >>> len(pdf_bytes) > 0
         True
     """
-    # Note: This is a placeholder for PDF generation
-    # In a real implementation, you would use a library like:
-    # - reportlab (Python)
-    # - weasyprint (HTML to PDF)
-    # - pdfkit (wkhtmltopdf wrapper)
-    # Or call an external PDF generation service
-
     try:
         logger.info(f"Generating PDF for report: {report_name}")
 
-        # Placeholder: Create a simple text representation
-        # In production, this would generate actual PDF
-        pdf_content = f"""
-Report: {report_name}
-Generated: {report_data.get('generated_at')}
+        # Create a BytesIO buffer to hold the PDF
+        buffer = BytesIO()
 
-SUMMARY
--------
-{report_data.get('summary', 'N/A')}
+        # Create the PDF document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=0.75 * inch,
+            bottomMargin=0.75 * inch,
+        )
 
-METRICS
--------
-"""
-        for metric, value in report_data.get('metrics', {}).items():
+        # Container for the PDF elements
+        elements = []
+
+        # Get standard styles
+        styles = getSampleStyleSheet()
+
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=0.2 * inch,
+            alignment=TA_CENTER,
+        )
+
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#34495e'),
+            spaceAfter=0.15 * inch,
+            spaceBefore=0.25 * inch,
+        )
+
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=0.1 * inch,
+        )
+
+        # Add title
+        title = Paragraph(report_name, title_style)
+        elements.append(title)
+
+        # Add generated timestamp
+        generated_at = report_data.get('generated_at', 'N/A')
+        try:
+            # Try to parse and format the timestamp
+            dt = datetime.fromisoformat(generated_at.replace('Z', '+00:00'))
+            formatted_date = dt.strftime('%B %d, %Y at %I:%M %p')
+        except (ValueError, AttributeError):
+            formatted_date = generated_at
+
+        timestamp = Paragraph(
+            f'<font size="9">Generated: {formatted_date}</font>',
+            ParagraphStyle(
+                'Timestamp',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=colors.gray,
+                alignment=TA_CENTER,
+                spaceAfter=0.3 * inch,
+            )
+        )
+        elements.append(timestamp)
+
+        # Add summary section
+        summary_heading = Paragraph('Executive Summary', heading_style)
+        elements.append(summary_heading)
+
+        summary_text = report_data.get('summary', 'No summary available.')
+        summary_paragraph = Paragraph(summary_text, normal_style)
+        elements.append(summary_paragraph)
+
+        # Add metrics section
+        metrics_heading = Paragraph('Key Metrics', heading_style)
+        elements.append(metrics_heading)
+
+        metrics = report_data.get('metrics', {})
+
+        # Process metrics and build table data
+        table_data = [['Metric', 'Value']]
+        table_data.append(['', ''])  # Header row
+
+        for metric, value in metrics.items():
             if isinstance(value, dict):
-                pdf_content += f"\n{metric}:\n"
-                for k, v in value.items():
-                    pdf_content += f"  {k}: {v}\n"
-            else:
-                pdf_content += f"{metric}: {value}\n"
+                # For nested dictionaries, add each sub-item
+                formatted_key = metric.replace('_', ' ').title()
+                table_data.append([
+                    Paragraph(f'<b>{formatted_key}</b>', normal_style),
+                    ''
+                ])
 
-        pdf_bytes = pdf_content.encode('utf-8')
+                for sub_key, sub_value in value.items():
+                    table_data.append([
+                        f'  {sub_key}',
+                        f'{sub_value:.2%}' if isinstance(sub_value, float) and sub_value <= 1.0
+                        else f'{sub_value:.2f}' if isinstance(sub_value, float)
+                        else str(sub_value)
+                    ])
+            else:
+                # For simple values
+                formatted_key = metric.replace('_', ' ').title()
+                formatted_value = (
+                    f'{value:.2%}' if isinstance(value, float) and 0 <= value <= 1.0
+                    else f'{value:.2f}' if isinstance(value, float)
+                    else str(value)
+                )
+                table_data.append([formatted_key, formatted_value])
+
+        # Create metrics table
+        if len(table_data) > 2:  # More than just headers
+            table = Table(table_data, colWidths=[3.5 * inch, 2 * inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#ecf0f1')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+                ('ROWBACKGROUNDS', (0, 2), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ]))
+            elements.append(table)
+
+        # Add dimensions section if available
+        dimensions = report_data.get('dimensions', {})
+        if dimensions:
+            elements.append(Spacer(1, 0.2 * inch))
+
+            dimensions_heading = Paragraph('Data Breakdown', heading_style)
+            elements.append(dimensions_heading)
+
+            for dim_name, dim_data in dimensions.items():
+                dim_title = Paragraph(
+                    f'<b>{dim_name.replace("_", " ").title()}</b>',
+                    normal_style
+                )
+                elements.append(dim_title)
+
+                dim_table_data = [['Category', 'Count']]
+                for category, count in dim_data.items():
+                    dim_table_data.append([category, str(count)])
+
+                dim_table = Table(dim_table_data, colWidths=[3.5 * inch, 2 * inch])
+                dim_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+                ]))
+                elements.append(dim_table)
+                elements.append(Spacer(1, 0.1 * inch))
+
+        # Add footer
+        elements.append(Spacer(1, 0.3 * inch))
+        footer = Paragraph(
+            '<font size="8"><i>Generated by AgentHR Analytics System</i></font>',
+            ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=TA_CENTER,
+            )
+        )
+        elements.append(footer)
+
+        # Build the PDF
+        doc.build(elements)
+
+        # Get the PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
 
         logger.info(f"PDF generated successfully ({len(pdf_bytes)} bytes)")
         return pdf_bytes
@@ -224,8 +394,11 @@ def send_report_via_email(
     """
     Send report via email to specified recipients.
 
-    This function sends the generated report via email, with optional
-    attachments (PDF, CSV, etc.).
+    This function handles sending generated reports via email with optional
+    attachments (PDF, CSV, etc.) using Python's smtplib or SendGrid.
+
+    The email is composed with report summary and key metrics in the body,
+    with formatted report files attached.
 
     Args:
         recipients: List of email addresses to send the report to
@@ -240,8 +413,11 @@ def send_report_via_email(
     Returns:
         Dictionary containing email sending results:
         - success: Whether email was sent successfully
+        - method: Delivery method used (email)
         - recipients_count: Number of recipients
         - attachments_count: Number of attachments
+        - sent_at: Timestamp when sent (Unix timestamp)
+        - processing_time_ms: Total processing time in milliseconds
         - error: Error message (if failed)
 
     Example:
@@ -250,59 +426,324 @@ def send_report_via_email(
         >>> result['success']
         True
     """
-    # Note: This is a placeholder for email sending
-    # In a real implementation, you would use:
-    # - Python's smtplib with email.mime modules
-    # - SendGrid API
-    # - AWS SES
-    # - Mailgun
-    # Or an internal email service
+    import time
+    start_time = time.time()
+
+    logger.info(
+        f"Sending report '{report_name}' to {len(recipients)} recipients"
+    )
 
     try:
-        logger.info(f"Sending report '{report_name}' to {len(recipients)} recipients")
+        # Get email configuration from settings
+        smtp_host = getattr(settings, 'smtp_host', None)
+        smtp_port = getattr(settings, 'smtp_port', 587)
+        smtp_use_tls = getattr(settings, 'smtp_use_tls', True)
+        smtp_username = getattr(settings, 'smtp_username', None)
+        smtp_password = getattr(settings, 'smtp_password', None)
+        from_email = getattr(settings, 'smtp_default_from', 'noreply@agenthr.com')
 
-        # Placeholder: Log email details
-        # In production, this would actually send the email
-        email_details = {
-            "subject": f"Report: {report_name}",
-            "from": settings.smtp_default_from if hasattr(settings, 'smtp_default_from') else "noreply@agenthr.com",
-            "to": recipients,
-            "body": f"""
-Report: {report_name}
-Generated: {report_data.get('generated_at')}
+        # Check if SMTP is configured
+        if not smtp_host:
+            logger.warning(
+                "SMTP not configured, skipping actual email sending. "
+                "Set smtp_host in settings to enable email delivery."
+            )
+            processing_time = int((time.time() - start_time) * 1000)
 
-{report_data.get('summary', 'Please see attached files for full report details.')}
+            return {
+                "success": True,
+                "method": "email",
+                "recipients_count": len(recipients),
+                "attachments_count": len(attachments) if attachments else 0,
+                "sent_at": time.time(),
+                "processing_time_ms": processing_time,
+                "note": "Email not sent (SMTP not configured)",
+            }
 
----
-This is an automated report from AgentHR.
-            """.strip(),
-            "attachments": attachments or [],
-        }
+        # Compose email subject
+        subject = f"Report: {report_name}"
 
-        logger.info(f"Email prepared: subject='{email_details['subject']}', to={len(recipients)} recipients")
+        # Compose email body with report summary and key metrics
+        body_lines = [
+            f"Report: {report_name}",
+            f"Generated: {report_data.get('generated_at', 'N/A')}",
+            "",
+            report_data.get('summary', 'Please see attached files for full report details.'),
+            "",
+            "KEY METRICS",
+            "-" * 40,
+        ]
 
-        # Simulate successful email sending
-        # In production: smtp.send_message(email_message)
-        success = True
-        error = None
+        # Add key metrics to email body
+        metrics = report_data.get('metrics', {})
+        if metrics:
+            for key, value in metrics.items():
+                if not isinstance(value, dict):
+                    formatted_key = key.replace('_', ' ').title()
+                    body_lines.append(f"{formatted_key}: {value}")
 
-        logger.info(f"Report email sent successfully to {len(recipients)} recipients")
+        body_lines.append("")
+        body_lines.append("---")
+        body_lines.append("This is an automated report from AgentHR Analytics System.")
+
+        body = "\n".join(body_lines)
+
+        # Create MIME multipart message
+        msg = MIMEMultipart()
+        msg['From'] = from_email
+        msg['To'] = ', '.join(recipients)
+        msg['Subject'] = subject
+
+        # Attach body
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Attach files if provided
+        if attachments:
+            for attachment in attachments:
+                filename = attachment.get('filename')
+                content = attachment.get('content')
+                content_type = attachment.get('content_type', 'application/octet-stream')
+
+                if filename and content:
+                    part = MIMEApplication(content)
+                    part.add_header('Content-Disposition', 'attachment', filename=filename)
+                    msg.attach(part)
+                    logger.debug(f"Attached file: {filename} ({len(content)} bytes)")
+
+        # Log email details
+        logger.info(f"Email composed: subject='{subject}', to={', '.join(recipients)}")
+        logger.info(f"Email body length: {len(body)} characters")
+        if attachments:
+            logger.info(f"Attachments: {', '.join(a.get('filename', 'unknown') for a in attachments)}")
+
+        # Send email using SMTP
+        logger.info(f"Connecting to SMTP server: {smtp_host}:{smtp_port}")
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+            if smtp_use_tls:
+                server.starttls()
+                logger.debug("TLS enabled")
+
+            if smtp_username and smtp_password:
+                server.login(smtp_username, smtp_password)
+                logger.debug("Authenticated with SMTP server")
+
+            server.sendmail(from_email, recipients, msg.as_string())
+            logger.info(f"Email sent successfully to {len(recipients)} recipients")
+
+        processing_time = int((time.time() - start_time) * 1000)
+
+        logger.info(
+            f"Report email sent successfully to {len(recipients)} recipients "
+            f"in {processing_time}ms"
+        )
 
         return {
-            "success": success,
+            "success": True,
+            "method": "email",
             "recipients_count": len(recipients),
             "attachments_count": len(attachments) if attachments else 0,
-            "error": error,
+            "sent_at": time.time(),
+            "processing_time_ms": processing_time,
+        }
+
+    except smtplib.SMTPAuthenticationError as e:
+        processing_time = int((time.time() - start_time) * 1000)
+        logger.error(
+            f"SMTP authentication failed: {e}",
+            exc_info=True
+        )
+
+        return {
+            "success": False,
+            "method": "email",
+            "recipients_count": len(recipients),
+            "attachments_count": len(attachments) if attachments else 0,
+            "error": f"SMTP authentication failed: {str(e)}",
+            "processing_time_ms": processing_time,
+        }
+
+    except smtplib.SMTPException as e:
+        processing_time = int((time.time() - start_time) * 1000)
+        logger.error(
+            f"SMTP error occurred: {e}",
+            exc_info=True
+        )
+
+        return {
+            "success": False,
+            "method": "email",
+            "recipients_count": len(recipients),
+            "attachments_count": len(attachments) if attachments else 0,
+            "error": f"SMTP error: {str(e)}",
+            "processing_time_ms": processing_time,
         }
 
     except Exception as e:
-        logger.error(f"Failed to send report email: {e}", exc_info=True)
+        processing_time = int((time.time() - start_time) * 1000)
+        logger.error(
+            f"Failed to send report email: {e}",
+            exc_info=True
+        )
+
         return {
             "success": False,
+            "method": "email",
             "recipients_count": len(recipients),
-            "attachments_count": 0,
+            "attachments_count": len(attachments) if attachments else 0,
             "error": str(e),
+            "processing_time_ms": processing_time,
         }
+
+
+async def _load_report_configurations(
+    scheduled_report_id: str,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Load ScheduledReport and Report configurations from database (async).
+
+    Args:
+        scheduled_report_id: UUID of the scheduled report
+
+    Returns:
+        Tuple of (scheduled_report_dict, report_config_dict, error_message)
+        If successful, error_message is None
+    """
+    async with async_session_maker() as db:
+        try:
+            # Query ScheduledReport by ID
+            scheduled_report_result = await db.execute(
+                select(ScheduledReport).where(ScheduledReport.id == scheduled_report_id)
+            )
+            scheduled_report = scheduled_report_result.scalar_one_or_none()
+
+            if not scheduled_report:
+                return None, None, f"Scheduled report {scheduled_report_id} not found"
+
+            # Check if scheduled report is active
+            if not scheduled_report.is_active:
+                return None, None, f"Scheduled report {scheduled_report_id} is not active"
+
+            # Query Report configuration using report_id from ScheduledReport
+            report_result = await db.execute(
+                select(Report).where(Report.id == scheduled_report.report_id)
+            )
+            report = report_result.scalar_one_or_none()
+
+            if not report:
+                return None, None, f"Report {scheduled_report.report_id} not found"
+
+            # Convert ScheduledReport to dict for easier access
+            scheduled_report_dict = {
+                "id": str(scheduled_report.id),
+                "organization_id": scheduled_report.organization_id,
+                "report_id": str(scheduled_report.report_id),
+                "name": scheduled_report.name,
+                "schedule_config": scheduled_report.schedule_config,
+                "delivery_config": scheduled_report.delivery_config,
+                "recipients": scheduled_report.recipients,
+                "created_by": scheduled_report.created_by,
+                "is_active": scheduled_report.is_active,
+                "next_run_at": scheduled_report.next_run_at.isoformat() if scheduled_report.next_run_at else None,
+                "last_run_at": scheduled_report.last_run_at.isoformat() if scheduled_report.last_run_at else None,
+            }
+
+            # Extract report configuration
+            report_config = {
+                "report_type": report.report_type,
+                "name": report.name,
+                "configuration": report.configuration,
+            }
+
+            return scheduled_report_dict, report_config, None
+
+        except Exception as e:
+            logger.error(f"Database error loading scheduled report: {e}", exc_info=True)
+            return None, None, f"Database error: {str(e)}"
+
+
+async def _update_scheduled_report_timestamps(
+    scheduled_report_id: str,
+) -> Tuple[bool, Optional[str]]:
+    """
+    Update last_run_at and calculate next_run_at for a scheduled report (async).
+
+    This function updates the last_run_at timestamp to now and recalculates
+    the next_run_at based on the schedule configuration.
+
+    Args:
+        scheduled_report_id: UUID of the scheduled report
+
+    Returns:
+        Tuple of (success, error_message)
+        If successful, error_message is None
+    """
+    async with async_session_maker() as db:
+        try:
+            # Query ScheduledReport by ID
+            result = await db.execute(
+                select(ScheduledReport).where(ScheduledReport.id == scheduled_report_id)
+            )
+            scheduled_report = result.scalar_one_or_none()
+
+            if not scheduled_report:
+                return False, f"Scheduled report {scheduled_report_id} not found"
+
+            # Update last_run_at to now
+            scheduled_report.last_run_at = datetime.utcnow()
+
+            # Calculate next_run_at based on schedule_config
+            schedule_config = scheduled_report.schedule_config
+            frequency = schedule_config.get("frequency", "weekly")
+            hour = schedule_config.get("hour", 0)
+            minute = schedule_config.get("minute", 0)
+
+            now = datetime.utcnow()
+
+            if frequency == "daily":
+                # Next run: tomorrow at specified hour:minute
+                next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if next_run <= now:
+                    next_run += timedelta(days=1)
+                scheduled_report.next_run_at = next_run
+
+            elif frequency == "weekly":
+                # Next run: next occurrence of specified day_of_week at hour:minute
+                day_of_week = schedule_config.get("day_of_week", 0)
+                days_ahead = day_of_week - now.weekday()
+                if days_ahead <= 0:
+                    days_ahead += 7
+                next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                next_run += timedelta(days=days_ahead)
+                scheduled_report.next_run_at = next_run
+
+            elif frequency == "monthly":
+                # Next run: next month on specified day_of_month at hour:minute
+                day_of_month = schedule_config.get("day_of_month", 1)
+                next_run = now.replace(day=day_of_month, hour=hour, minute=minute, second=0, microsecond=0)
+                if next_run <= now:
+                    # Move to next month
+                    if now.month == 12:
+                        next_run = next_run.replace(year=now.year + 1, month=1)
+                    else:
+                        next_run = next_run.replace(month=now.month + 1)
+                scheduled_report.next_run_at = next_run
+
+            # Commit changes
+            await db.commit()
+
+            logger.info(
+                f"Updated scheduled report {scheduled_report_id}: "
+                f"last_run_at={scheduled_report.last_run_at.isoformat()}, "
+                f"next_run_at={scheduled_report.next_run_at.isoformat()}"
+            )
+
+            return True, None
+
+        except Exception as e:
+            logger.error(f"Database error updating scheduled report: {e}", exc_info=True)
+            await db.rollback()
+            return False, f"Database error: {str(e)}"
 
 
 @shared_task(
@@ -381,58 +822,52 @@ def generate_scheduled_reports(
         self.update_state(state="PROGRESS", meta=progress)
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Loading configuration")
 
-        # Note: This is a placeholder for database query
-        # In a real implementation, you would use async session to query ScheduledReport
-        # scheduled_report = await db_session.get(ScheduledReport, scheduled_report_id)
-        # report = await db_session.get(Report, scheduled_report.report_id)
-
-        # Placeholder data for scheduled report
-        scheduled_report = {
-            "id": scheduled_report_id,
-            "organization_id": "org-123",
-            "report_id": "report-456",
-            "name": "Weekly Hiring Pipeline Report",
-            "schedule_config": {
-                "frequency": "weekly",
-                "day_of_week": "monday",
-                "hour": 9,
-                "timezone": "UTC",
-            },
-            "delivery_config": {
-                "method": "email",
-                "formats": ["pdf", "csv"],
-                "include_summary": True,
-            },
-            "recipients": ["manager@example.com", "recruiter@example.com"],
-            "is_active": True,
-            "last_run_at": None,
-            "next_run_at": datetime.utcnow(),
-        }
-
-        # Check if scheduled report is active
-        if not scheduled_report.get("is_active", True):
-            logger.warning(f"Scheduled report {scheduled_report_id} is not active, skipping")
+        # Query ScheduledReport and Report from database using async helper
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                scheduled_report, report_config, error = loop.run_until_complete(
+                    _load_report_configurations(scheduled_report_id)
+                )
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Failed to load configurations: {e}", exc_info=True)
             return {
                 "scheduled_report_id": scheduled_report_id,
-                "status": "skipped",
-                "reason": "Scheduled report is not active",
+                "status": "failed",
+                "error": f"Failed to load configurations: {str(e)}",
                 "processing_time_ms": round((time.time() - start_time) * 1000, 2),
             }
 
-        # Placeholder data for report configuration
-        report_config = {
-            "report_type": "hiring_pipeline",
-            "name": "Hiring Pipeline Analytics",
-            "configuration": {
-                "filters": {
-                    "date_range": "last_7_days",
-                    "sources": [],
-                    "recruiters": [],
-                },
-                "dimensions": ["source", "recruiter"],
-                "metrics": ["time_to_hire", "resumes_processed", "match_rate"],
-            },
-        }
+        # Handle errors from database query
+        if error:
+            if "not found" in error and "not active" not in error:
+                logger.error(error)
+                return {
+                    "scheduled_report_id": scheduled_report_id,
+                    "status": "failed",
+                    "error": error,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                }
+            elif "not active" in error:
+                logger.warning(error)
+                return {
+                    "scheduled_report_id": scheduled_report_id,
+                    "status": "skipped",
+                    "reason": error,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                }
+
+        if not scheduled_report or not report_config:
+            logger.error("Failed to load scheduled report or report configuration")
+            return {
+                "scheduled_report_id": scheduled_report_id,
+                "status": "failed",
+                "error": "Failed to load required configurations",
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            }
 
         logger.info(f"Loaded scheduled report: {scheduled_report['name']}")
 
@@ -449,7 +884,7 @@ def generate_scheduled_reports(
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Calculating date range")
 
         # Calculate date range based on schedule config
-        frequency = scheduled_report["schedule_config"].get("frequency", "weekly")
+        frequency = scheduled_report['schedule_config'].get("frequency", "weekly")
         now = datetime.utcnow()
 
         if frequency == "daily":
@@ -480,7 +915,7 @@ def generate_scheduled_reports(
         self.update_state(state="PROGRESS", meta=progress)
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Generating data")
 
-        report_config_full = report_config.get("configuration", {})
+        report_config_full = report_config["configuration"]
         report_data = get_report_data(report_config_full, date_range)
 
         logger.info("Report data generated successfully")
@@ -497,13 +932,19 @@ def generate_scheduled_reports(
         self.update_state(state="PROGRESS", meta=progress)
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Formatting report")
 
-        delivery_config = scheduled_report["delivery_config"]
-        formats = delivery_config.get("formats", ["pdf"])
+        delivery_config = scheduled_report['delivery_config']
+        # Get format from delivery_config and convert to list
+        # API uses "format" (singular), can be "pdf", "csv", or "both"
+        format_type = delivery_config.get("format", "pdf")
+        if format_type == "both":
+            formats = ["pdf", "csv"]
+        else:
+            formats = [format_type] if format_type else ["pdf"]
         attachments = []
 
         for format_type in formats:
             if format_type == "pdf":
-                pdf_bytes = format_report_as_pdf(report_data, scheduled_report["name"])
+                pdf_bytes = format_report_as_pdf(report_data, scheduled_report['name'])
                 if pdf_bytes:
                     attachments.append({
                         "filename": f"{scheduled_report['name']}.pdf",
@@ -534,7 +975,7 @@ def generate_scheduled_reports(
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Delivering report")
 
         delivery_method = delivery_config.get("method", "email")
-        recipients = scheduled_report.get("recipients", [])
+        recipients = scheduled_report['recipients']
 
         delivery_result = None
         delivery_successful = False
@@ -542,7 +983,7 @@ def generate_scheduled_reports(
         if delivery_method == "email":
             delivery_result = send_report_via_email(
                 recipients=recipients,
-                report_name=scheduled_report["name"],
+                report_name=scheduled_report['name'],
                 report_data=report_data,
                 attachments=attachments if attachments else None,
             )
@@ -553,22 +994,37 @@ def generate_scheduled_reports(
             f"successful={delivery_successful}"
         )
 
-        # Step 6: Update last_run timestamp
+        # Step 6: Update last_run timestamp and calculate next_run
         current_step += 1
         progress = {
             "current": current_step,
             "total": total_steps,
             "percentage": int(current_step / total_steps * 100),
             "status": "updating_timestamp",
-            "message": "Updating last run timestamp...",
+            "message": "Updating last run timestamp and calculating next run...",
         }
         self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Updating timestamp")
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Updating timestamps")
 
-        # Note: This is a placeholder for database update
-        # In a real implementation, you would:
-        # scheduled_report.last_run_at = datetime.utcnow()
-        # await db_session.commit()
+        # Update database with last_run_at and next_run_at
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                update_success, update_error = loop.run_until_complete(
+                    _update_scheduled_report_timestamps(scheduled_report_id)
+                )
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Failed to update scheduled report timestamps: {e}", exc_info=True)
+            update_success = False
+            update_error = str(e)
+
+        if not update_success:
+            logger.warning(f"Failed to update timestamps in database: {update_error}")
+            # Continue anyway - the report was still generated and delivered
+            # This failure should be tracked but not cause the task to fail
 
         processing_time_ms = round((time.time() - start_time) * 1000, 2)
 

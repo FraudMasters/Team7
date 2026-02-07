@@ -75,7 +75,7 @@ async def get_language_preference() -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/preferences/language")
+        >>> response = requests.get("/api/preferences/language")
         >>> response.json()
         {
             "language": "en"
@@ -124,7 +124,7 @@ async def update_language_preference(request: LanguagePreferenceUpdate) -> JSONR
     Examples:
         >>> import requests
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/preferences/language",
+        ...     "/api/preferences/language",
         ...     json={"language": "ru"}
         ... )
         >>> response.json()

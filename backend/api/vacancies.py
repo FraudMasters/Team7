@@ -25,7 +25,10 @@ from models.job_vacancy import JobVacancy
 from models.audit_log import AuditActionType
 from utils.audit_logger import log_audit_event, get_request_context
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
@@ -144,7 +147,7 @@ async def create_vacancy(
         ...     "required_skills": ["Java", "Spring", "PostgreSQL"],
         ...     "min_experience_months": 36
         ... }
-        >>> response = requests.post("http://localhost:8000/api/vacancies/", json=vacancy_data)
+        >>> response = requests.post("/api/vacancies/", json=vacancy_data)
     """
     try:
         # Create new JobVacancy instance
@@ -219,7 +222,7 @@ async def list_vacancies(
         JSON response with list of vacancies
 
     Example:
-        >>> response = requests.get("http://localhost:8000/api/vacancies/?limit=10")
+        >>> response = requests.get("/api/vacancies/?limit=10")
         >>> vacancies = response.json()
     """
     try:
@@ -306,7 +309,7 @@ async def match_resume_with_all_vacancies(
             file_path = Path(resume_record.file_path)
         else:
             # Fallback: look for file by resume_id in uploads directory
-            upload_dir = Path("data/uploads")
+            upload_dir = settings.upload_dir
             resume_files = list(upload_dir.glob(f"{resume_id}.*"))
             if resume_files:
                 file_path = resume_files[0]
@@ -500,7 +503,7 @@ async def match_resume_with_vacancy(
             file_path = Path(resume_record.file_path)
         else:
             # Fallback: look for file by resume_id in uploads directory
-            upload_dir = Path("data/uploads")
+            upload_dir = settings.upload_dir
             resume_files = list(upload_dir.glob(f"{resume_id}.*"))
             if resume_files:
                 file_path = resume_files[0]
@@ -641,7 +644,7 @@ async def get_vacancy(
         HTTPException(404): If vacancy not found
 
     Example:
-        >>> response = requests.get("http://localhost:8000/api/vacancies/123")
+        >>> response = requests.get("/api/vacancies/123")
         >>> vacancy = response.json()
     """
     try:
@@ -711,7 +714,7 @@ async def update_vacancy(
 
     Example:
         >>> update_data = {"title": "Lead Java Developer"}
-        >>> response = requests.put("http://localhost:8000/api/vacancies/123", json=update_data)
+        >>> response = requests.put("/api/vacancies/123", json=update_data)
     """
     try:
         # Query vacancy from database
@@ -817,7 +820,7 @@ async def delete_vacancy(
         HTTPException(404): If vacancy not found
 
     Example:
-        >>> response = requests.delete("http://localhost:8000/api/vacancies/123")
+        >>> response = requests.delete("/api/vacancies/123")
         >>> response.status_code
         204
     """

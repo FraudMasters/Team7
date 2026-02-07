@@ -1,0 +1,59 @@
+# Staging Environment Configuration
+# This file contains environment-specific overrides for staging (pre-production)
+
+environment: staging
+log_level: INFO
+
+# Staging server configuration
+backend_host: 0.0.0.0
+backend_port: 8000
+frontend_url: https://staging.example.com
+
+# Staging database (production-like)
+database_url: postgresql://app_user:CHANGE_ME@staging-db.example.com:5432/resume_analysis
+redis_url: redis://staging-redis.example.com:6379/0
+
+# Celery configuration
+celery_broker_url: redis://staging-redis.example.com:6379/0
+celery_result_backend: redis://staging-redis.example.com:6379/0
+
+# Staging upload settings (moderate limits)
+max_upload_size_mb: 10
+analysis_timeout_seconds: 300
+
+# Backup enabled in staging with shorter retention
+backup_enabled: true
+backup_retention_days: 7
+backup_schedule: "0 2 * * *"
+backup_dir: ./data/backups
+
+# Audit log retention (moderate in staging)
+audit_log_retention_days: 30
+
+# LLM Configuration (staging keys)
+llm_provider: zai
+llm_model: glm-4.7
+llm_temperature: 0.1
+llm_max_tokens: 4096
+
+# ATS Simulation Configuration
+ats_threshold: 0.6
+ats_visual_check_enabled: true
+ats_keyword_weight: 0.3
+ats_experience_weight: 0.3
+ats_education_weight: 0.2
+ats_fit_weight: 0.2
+
+# S3 Backup (can be enabled in staging)
+backup_s3_enabled: false
+backup_s3_bucket: staging-resume-backups
+backup_s3_endpoint: https://s3.amazonaws.com
+backup_s3_region: us-east-1
+backup_incremental_enabled: true
+backup_compression_enabled: true
+
+# Sensitive values (should be overridden by environment variables)
+# zai_api_key: staging_key_here
+# openai_api_key: staging_key_here
+# anthropic_api_key: staging_key_here
+# google_api_key: staging_key_here

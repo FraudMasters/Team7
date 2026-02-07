@@ -28,10 +28,12 @@ import {
   Work as WorkIcon,
   TrendingUp as TrendingUpIcon,
   Psychology as AIIcon,
+  PsychologyAlt,
   Star as StarIcon,
   FilterList as FilterIcon,
   BookmarkBorder as SavedSearchIcon,
   History as HistoryIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -65,6 +67,9 @@ interface CandidateWithMatch extends Resume {
   hireProbability?: number;
   isTopRecommendation?: boolean;
   modelVersion?: string;
+  semanticScore?: number;
+  semanticSimilarity?: number;
+  semanticPassed?: boolean;
 }
 
 /**
@@ -116,6 +121,13 @@ const CandidateSearchPage: React.FC = () => {
   const [advancedSearchEnabled, setAdvancedSearchEnabled] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  // Store last search parameters for export
+  const [lastSearchParams, setLastSearchParams] = useState<{
+    query: string;
+    filters: any;
+    useSemanticSearch: boolean;
+  } | null>(null);
+
   // Load vacancies on mount
   useEffect(() => {
     const fetchVacancies = async () => {
@@ -158,14 +170,26 @@ const CandidateSearchPage: React.FC = () => {
     setCurrentTab('search');
 
     try {
-      // Call the advanced search API
-      const response = await axios.post('/api/search/candidates', {
+      // Call the advanced search API (microservice endpoint)
+      const useSemanticSearch = filters.semanticSearch || false;
+      const response = await axios.post('/api/candidates/search', {
         query,
         filters: {
           ...filters,
           vacancy_id: filters.vacancyId || selectedVacancy,
         },
+        use_semantic_search: useSemanticSearch,
         limit: 100,
+      });
+
+      // Store search parameters for export
+      setLastSearchParams({
+        query,
+        filters: {
+          ...filters,
+          vacancy_id: filters.vacancyId || selectedVacancy,
+        },
+        useSemanticSearch,
       });
 
       // Transform results to match our candidate format
@@ -175,6 +199,9 @@ const CandidateSearchPage: React.FC = () => {
         matchedSkills: result.matched_skills || [],
         missingSkills: result.missing_skills || [],
         vacancyTitle: result.vacancy_title || vacancies.find((v) => v.id === selectedVacancy)?.title || '',
+        semanticScore: result.semantic_score,
+        semanticSimilarity: result.semantic_similarity,
+        semanticPassed: result.semantic_passed,
       }));
 
       setCandidates(results);
@@ -282,6 +309,17 @@ const CandidateSearchPage: React.FC = () => {
       });
 
       setCandidates(sortedResults);
+
+      // Store search parameters for export (basic search doesn't use the /search endpoint,
+      // but we can construct equivalent parameters)
+      setLastSearchParams({
+        query: '',
+        filters: {
+          vacancy_id: selectedVacancy,
+          min_match_score: minMatchPercentage,
+        },
+        useSemanticSearch: false,
+      });
     } catch (error) {
       console.error('Error searching:', error);
       setSearchError('Search failed. Please try again.');
@@ -307,6 +345,74 @@ const CandidateSearchPage: React.FC = () => {
     if (percentage >= 70) return 'success';
     if (percentage >= 50) return 'warning';
     return 'error';
+  };
+
+  /**
+   * Export candidates to CSV (client-side generation)
+   */
+  const handleExportCSV = () => {
+    if (candidates.length === 0) {
+      setSearchError('No search results to export. Please perform a search first.');
+      return;
+    }
+
+    try {
+      // CSV headers
+      const headers = [
+        'Rank',
+        'Filename',
+        'Vacancy',
+        'Match Percentage',
+        'Matched Skills',
+        'Missing Skills',
+        'AI Ranking Score',
+        'Hire Probability',
+        'Semantic Score',
+      ];
+
+      // Convert candidates to CSV rows
+      const rows = candidates.map((candidate, index) => [
+        index + 1,
+        `"${candidate.filename.replace(/"/g, '""')}"`,
+        `"${candidate.vacancyTitle.replace(/"/g, '""')}"`,
+        candidate.matchPercentage,
+        `"${candidate.matchedSkills.join(', ').replace(/"/g, '""')}"`,
+        `"${candidate.missingSkills.join(', ').replace(/"/g, '""')}"`,
+        candidate.rankingScore ?? 'N/A',
+        candidate.hireProbability ? `${Math.round(candidate.hireProbability * 100)}%` : 'N/A',
+        candidate.semanticScore ? `${Math.round(candidate.semanticScore * 100)}%` : 'N/A',
+      ]);
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(',')),
+      ].join('\n');
+
+      // Add BOM for Excel compatibility
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+
+      // Generate filename based on query or vacancy
+      const sanitizedName = (lastSearchParams?.query || selectedVacancy || 'search')
+        .replace(/[^a-zA-Z0-9\s\-_]/g, '')
+        .trim()
+        .substring(0, 50);
+      const timestamp = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `candidates_${sanitizedName}_${timestamp}.csv`);
+
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      setSearchError('Export failed. Please try again.');
+    }
   };
 
   if (loading) {
@@ -532,7 +638,7 @@ const CandidateSearchPage: React.FC = () => {
           <>
             {/* Summary Stats */}
             <Paper sx={{ p: 3, mb: 3 }}>
-              <Grid container spacing={2}>
+              <Grid container spacing={2} alignItems="center">
                 <Grid item xs={6} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h4" color="primary.main" fontWeight={700}>
@@ -574,6 +680,18 @@ const CandidateSearchPage: React.FC = () => {
                   </Box>
                 </Grid>
               </Grid>
+
+              {/* Export Button */}
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleExportCSV}
+                  size="small"
+                >
+                  Export to CSV
+                </Button>
+              </Box>
             </Paper>
 
             {/* Candidate List */}
@@ -682,6 +800,31 @@ const CandidateSearchPage: React.FC = () => {
                                 color={candidate.rankingScore >= 70 ? 'success' : 'warning'}
                               />
                             )}
+                          </Box>
+                        </Tooltip>
+                      )}
+                      {/* Semantic Similarity Score */}
+                      {candidate.semanticScore !== undefined && candidate.semanticScore !== null && (
+                        <Tooltip title={`Semantic Similarity: ${Math.round(candidate.semanticScore * 100)}%`}>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Chip
+                              label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <PsychologyAlt sx={{ fontSize: 14 }} />
+                                  <Typography variant="body2" fontWeight={700}>
+                                    {Math.round(candidate.semanticScore * 100)}%
+                                  </Typography>
+                                </Box>
+                              }
+                              color={
+                                candidate.semanticScore >= 0.7
+                                  ? 'success'
+                                  : candidate.semanticScore >= 0.4
+                                    ? 'warning'
+                                    : 'error'
+                              }
+                              sx={{ fontWeight: 700, fontSize: '1rem' }}
+                            />
                           </Box>
                         </Tooltip>
                       )}

@@ -84,7 +84,7 @@ async def get_key_metrics(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/key-metrics")
+        >>> response = requests.get("/api/analytics/key-metrics")
         >>> response.json()
         {
             "time_to_hire": {
@@ -208,7 +208,7 @@ async def get_quality_metrics(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/quality-metrics")
+        >>> response = requests.get("/api/analytics/quality-metrics")
         >>> response.json()
         {
             "text_extraction_success_rate": 0.98,
@@ -416,7 +416,7 @@ async def get_taxonomy_usage(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/taxonomy-usage?limit=10")
+        >>> response = requests.get("/api/analytics/taxonomy-usage?limit=10")
         >>> response.json()
         {
             "most_used_taxonomies": [...],
@@ -553,7 +553,7 @@ async def get_stage_duration_metrics(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/stage-duration")
+        >>> response = requests.get("/api/analytics/stage-duration")
         >>> response.json()
         {
             "stages": [
@@ -762,7 +762,7 @@ async def get_funnel_metrics(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/funnel")
+        >>> response = requests.get("/api/analytics/funnel")
         >>> response.json()
         {
             "stages": [
@@ -1066,7 +1066,7 @@ async def get_recruiter_performance(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/recruiter-performance?limit=10")
+        >>> response = requests.get("/api/analytics/recruiter-performance?limit=10")
         >>> response.json()
         {
             "recruiters": [
@@ -1368,7 +1368,7 @@ async def get_skill_demand(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/skill-demand?limit=15")
+        >>> response = requests.get("/api/analytics/skill-demand?limit=15")
         >>> response.json()
         {
             "skills": [
@@ -1541,7 +1541,7 @@ async def get_source_tracking(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/analytics/source-tracking")
+        >>> response = requests.get("/api/analytics/source-tracking")
         >>> response.json()
         {
             "sources": [

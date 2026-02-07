@@ -1,5 +1,8 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -15,6 +18,7 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Refresh as RefreshIcon,
   TrendingDown as TrendingDownIcon,
@@ -30,7 +34,7 @@ import {
 } from '@mui/icons-material';
 
 /**
- * Funnel stage interface from backend
+ * Интерфейс этапа funnel с бэкенда
  */
 interface FunnelStage {
   stage_name: string;
@@ -39,7 +43,7 @@ interface FunnelStage {
 }
 
 /**
- * Funnel metrics response from backend
+ * Ответ с метриками funnel с бэкенда
  */
 interface FunnelMetricsResponse {
   stages: FunnelStage[];
@@ -48,19 +52,19 @@ interface FunnelMetricsResponse {
 }
 
 /**
- * FunnelVisualization Component Props
+ * Свойства компонента FunnelVisualization
  */
 interface FunnelVisualizationProps {
-  /** API endpoint URL for funnel metrics */
+  /** URL API endpoint для метрик funnel */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
 }
 
 /**
- * Format stage name for display
+ * Форматирование имени этапа для отображения
  */
 const formatStageName = (stageName: string): string => {
   const nameMap: Record<string, string> = {
@@ -75,7 +79,7 @@ const formatStageName = (stageName: string): string => {
 };
 
 /**
- * Get icon for stage
+ * Получить иконку для этапа
  */
 const getStageIcon = (stageName: string) => {
   const iconMap: Record<string, React.ReactElement> = {
@@ -90,7 +94,7 @@ const getStageIcon = (stageName: string) => {
 };
 
 /**
- * Get color for conversion rate
+ * Получить цвет для коэффициента конверсии
  */
 const getConversionColor = (rate: number): string => {
   if (rate >= 0.7) return 'success.main';
@@ -99,13 +103,13 @@ const getConversionColor = (rate: number): string => {
 };
 
 /**
- * FunnelVisualization Component
+ * Компонент FunnelVisualization
  *
- * Displays recruitment funnel visualization showing:
- * - Candidate progression through each pipeline stage
- * - Conversion rates between stages
- * - Overall hire rate
- * - Visual representation of drop-offs
+ * Отображает визуализацию recruitment funnel включая:
+ * - Прогресс кандидатов через каждый этап пайплайна
+ * - Коэффициенты конверсии между этапами
+ * - Общий коэффициент найма
+ * - Визуальное представление отсева кандидатов
  *
  * @example
  * ```tsx
@@ -122,13 +126,14 @@ const FunnelVisualization: React.FC<FunnelVisualizationProps> = ({
   startDate,
   endDate,
 }) => {
+  // Состояния для загрузки, ошибки, данных funnel и автообновления
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [funnelData, setFunnelData] = useState<FunnelMetricsResponse | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   /**
-   * Fetch funnel metrics from backend
+   * Загрузка метрик funnel с бэкенда
    */
   const fetchFunnelData = async () => {
     try {

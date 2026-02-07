@@ -19,7 +19,10 @@ from models.job_vacancy import JobVacancy
 from analyzers import EnhancedSkillMatcher
 from analyzers.hf_skill_extractor import extract_resume_keywords, extract_resume_entities
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
@@ -498,7 +501,7 @@ async def match_resume_against_all_vacancies(
 
     try:
         # Find resume file
-        upload_dir = Path("data/uploads")
+        upload_dir = settings.upload_dir
         resume_files = list(upload_dir.glob(f"{resume_id}.*"))
 
         if not resume_files:

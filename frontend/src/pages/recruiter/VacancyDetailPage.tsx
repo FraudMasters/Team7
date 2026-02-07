@@ -1,4 +1,15 @@
+/**
+ * Страница деталей вакансии
+ *
+ * Отображает подробную информацию о вакансии: заголовок, местоположение,
+ * зарплату, требуемые навыки и описание. Использует MUI компоненты для
+ * отображения информации и кнопок навигации.
+ */
+
+// Импорт хуков React Router для навигации и получения параметров URL
 import { useParams, useNavigate } from 'react-router-dom';
+
+// Импорт компонентов MUI для верстки и отображения контента
 import {
   Box,
   Container,
@@ -9,6 +20,8 @@ import {
   Button,
   Divider,
 } from '@mui/material';
+
+// Импорт иконок MUI для визуализации информации
 import {
   LocationOn,
   WorkOutline,
@@ -17,16 +30,26 @@ import {
   Edit,
   People,
 } from '@mui/icons-material';
+
+// Импорт кастомных хуков для получения данных о вакансии
 import { useJob } from '../../hooks/useJobs';
-import { PageTransition } from '../../components/ui/PageTransition';
-import { LoadingState } from '../../components/ui/LoadingState';
-import { ErrorState } from '../../components/ui/ErrorState';
+
+// Импорт MUI компонентов для анимации переходов и состояний загрузки
+import { PageTransition } from '@components/mui/PageTransition';
+import { LoadingState } from '@components/mui/LoadingState';
+import { ErrorState } from '@components/mui/ErrorState';
 
 export function VacancyDetailPage() {
+  // Получаем ID вакансии из параметров URL
   const { id } = useParams<{ id: string }>();
+
+  // Хук для навигации между страницами
   const navigate = useNavigate();
+
+  // Загружаем данные о вакансии
   const { data: vacancy, isLoading, error } = useJob(id || '');
 
+  // Отображаем состояние загрузки
   if (isLoading) {
     return (
       <PageTransition>
@@ -37,6 +60,7 @@ export function VacancyDetailPage() {
     );
   }
 
+  // Отображаем состояние ошибки
   if (error || !vacancy) {
     return (
       <PageTransition>
@@ -56,7 +80,7 @@ export function VacancyDetailPage() {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Paper sx={{ p: { xs: 3, md: 5 } }}>
           <Stack spacing={4}>
-          {/* Header */}
+          {/* Заголовок вакансии с метаданными */}
           <Box>
             <Typography variant="h3" fontWeight={700} gutterBottom>
               {vacancy.title}
@@ -86,7 +110,7 @@ export function VacancyDetailPage() {
 
           <Divider />
 
-          {/* Salary */}
+          {/* Информация о зарплате */}
           {vacancy.salary_min && (
             <Stack direction="row" spacing={1} alignItems="center" color="success.main">
               <AttachMoney sx={{ fontSize: 20 }} />
@@ -97,7 +121,7 @@ export function VacancyDetailPage() {
             </Stack>
           )}
 
-          {/* Required Skills */}
+          {/* Требуемые навыки */}
           <Box>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Required Skills
@@ -119,7 +143,7 @@ export function VacancyDetailPage() {
 
           <Divider />
 
-          {/* Description */}
+          {/* Описание вакансии */}
           <Box>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Description
@@ -136,7 +160,7 @@ export function VacancyDetailPage() {
             </Typography>
           </Box>
 
-          {/* Action Buttons */}
+          {/* Кнопки действий */}
           <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
             <Button
               variant="contained"

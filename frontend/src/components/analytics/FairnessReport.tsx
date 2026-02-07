@@ -1,4 +1,6 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -23,6 +25,7 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Refresh as RefreshIcon,
   Balance as FairnessIcon,
@@ -36,7 +39,9 @@ import {
   DateRange as DateIcon,
   Assessment as ReportIcon,
 } from '@mui/icons-material';
+// API клиент для получения данных о fairness
 import { fairness } from '@/api/fairness';
+// Типы API для типизации данных
 import type {
   BiasReport,
   FairnessMetric,
@@ -44,7 +49,7 @@ import type {
 } from '@/types/api';
 
 /**
- * Demographic breakdown data
+ * Данные демографического распределения
  */
 interface DemographicBreakdown {
   attribute: string;
@@ -58,7 +63,7 @@ interface DemographicBreakdown {
 }
 
 /**
- * Fairness chart data point
+ * Точка данных графика fairness
  */
 interface FairnessChartData {
   label: string;
@@ -68,23 +73,24 @@ interface FairnessChartData {
 }
 
 /**
- * FairnessReport Component Props
+ * Свойства компонента FairnessReport
+ * @description Определяет параметры для генерации отчета о fairness
  */
 interface FairnessReportProps {
-  /** Model name to generate report for */
+  /** Имя модели для генерации отчета */
   modelName?: string;
-  /** Model version */
+  /** Версия модели */
   modelVersion?: string;
-  /** Report type */
+  /** Тип отчета */
   reportType?: string;
-  /** API endpoint URL */
+  /** URL API endpoint */
   apiUrl?: string;
-  /** Callback when report data changes */
+  /** Колбэк при изменении данных отчета */
   onReportChange?: (report: BiasReport) => void;
 }
 
 /**
- * Get severity color for display
+ * Получить цвет серьезности для отображения
  */
 function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | 'info' {
   switch (severity.toLowerCase()) {
@@ -102,7 +108,7 @@ function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | '
 }
 
 /**
- * Get severity icon component
+ * Получить компонент иконки серьезности
  */
 function getSeverityIcon(severity: string) {
   switch (severity.toLowerCase()) {
@@ -120,7 +126,7 @@ function getSeverityIcon(severity: string) {
 }
 
 /**
- * Format metric type for display
+ * Форматирование типа метрики для отображения
  */
 function formatMetricType(metricType: string): string {
   return metricType
@@ -130,13 +136,13 @@ function formatMetricType(metricType: string): string {
 }
 
 /**
- * FairnessReport Component
+ * Компонент FairnessReport
  *
- * Displays detailed fairness analysis reports including:
- * - Demographic breakdown by protected attribute
- * - Fairness metric charts with thresholds
- * - Bias detection alerts and recommendations
- * - Historical trend data
+ * Отображает подробные отчеты об анализе fairness включая:
+ * - Демографическое распределение по защищаемым атрибутам
+ * - Графики метрик fairness с порогами
+ * - Оповещения об обнаружении bias и рекомендации
+ * - Данные исторических трендов
  *
  * @example
  * ```tsx
@@ -158,6 +164,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
   reportType = 'demographic_analysis',
   onReportChange,
 }) => {
+  // Состояния для загрузки, генерации, ошибки, отчета, метрик, оповещений и демографических данных
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +174,7 @@ const FairnessReport: React.FC<FairnessReportProps> = ({
   const [demographicData, setDemographicData] = useState<DemographicBreakdown[]>([]);
 
   /**
-   * Fetch report data from backend
+   * Загрузка данных отчета с бэкенда
    */
   const fetchReportData = async () => {
     setLoading(true);

@@ -172,6 +172,88 @@ export interface HealthResponse {
 }
 
 /**
+ * Component health status
+ */
+export interface ComponentHealthStatus {
+  name: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  essential: boolean;
+  category: string;
+  response_time_ms?: number;
+  details?: Record<string, unknown>;
+  error?: string | null;
+  last_check: string;
+}
+
+/**
+ * Detailed health check response
+ */
+export interface DetailedHealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  service: string;
+  version: string;
+  checks: Record<string, ComponentHealthStatus>;
+  overall_health_percentage: number;
+  critical_issues: string[];
+  warnings: string[];
+}
+
+/**
+ * Ready check response
+ */
+export interface ReadyCheckResponse {
+  status: string;
+  checks: Record<string, string>;
+}
+
+/**
+ * Service dependency information
+ */
+export interface ServiceDependencyInfo {
+  name: string;
+  display_name: string;
+  description: string;
+  essential: boolean;
+  category: string;
+  dependencies: string[];
+  dependents: string[];
+}
+
+/**
+ * Dependency graph summary
+ */
+export interface DependencyGraphSummary {
+  total_services: number;
+  essential_services: number;
+  non_essential_services: number;
+  max_dependency_depth: number;
+  critical_path: string[];
+}
+
+/**
+ * Dependency graph response
+ */
+export interface DependencyGraphResponse {
+  services: Record<string, ServiceDependencyInfo>;
+  summary: DependencyGraphSummary;
+}
+
+/**
+ * Component health check response
+ */
+export interface ComponentHealthCheckResponse {
+  name: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  essential: boolean;
+  category: string;
+  response_time_ms: number;
+  details: Record<string, unknown>;
+  error: string | null;
+  last_check: string;
+}
+
+/**
  * Upload progress callback
  */
 export type UploadProgressCallback = (progress: number) => void;

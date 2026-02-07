@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useMemo } from 'react';
 import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
-import { Box, Paper, Typography, Chip, Checkbox, IconButton, CircularProgress } from '@mui/material';
-import { Person as PersonIcon, Work as WorkIcon, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
+import { Box, Paper, Typography, Chip, Checkbox, IconButton, CircularProgress } from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 
 interface Candidate {
@@ -168,7 +168,7 @@ const VirtualKanbanBoard: React.FC<VirtualKanbanBoardProps> = ({
                       onClick={(e) => e.stopPropagation()}
                       sx={{
                         p: { xs: 0.25, sm: 0.5 },
-                        '& .MuiSvgIcon-root': {
+                        '& svg': {
                           fontSize: { xs: 18, sm: 20 },
                         },
                       }}
@@ -500,7 +500,7 @@ const VirtualKanbanBoard: React.FC<VirtualKanbanBoardProps> = ({
                                     onClick={(e) => e.stopPropagation()}
                                     sx={{
                                       p: { xs: 0.25, sm: 0.5 },
-                                      '& .MuiSvgIcon-root': {
+                                      '& svg': {
                                         fontSize: { xs: 18, sm: 20 },
                                       },
                                     }}

@@ -28,12 +28,15 @@ from models.resume import Resume
 from analyzers import get_unified_matcher
 from i18n.backend_translations import get_error_message, get_success_message
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 
 def _extract_locale(request: Optional[Request]) -> str:
@@ -159,7 +162,7 @@ async def compare_candidates(
         ...     "resume_ids": ["resume-1", "resume-2", "resume-3"]
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/compare-candidates",
+        ...     "/api/matching/compare-candidates",
         ...     json=data
         ... )
         >>> response.json()

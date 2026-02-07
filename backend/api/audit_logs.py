@@ -97,7 +97,7 @@ async def get_audit_logs(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/audit-logs/?limit=10")
+        >>> response = requests.get("/api/audit-logs/?limit=10")
         >>> response.json()
         {
             "logs": [
@@ -266,7 +266,7 @@ async def get_action_types() -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/audit-logs/types")
+        >>> response = requests.get("/api/audit-logs/types")
         >>> response.json()
         {
             "action_types": [
@@ -350,7 +350,7 @@ async def get_entity_types() -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/audit-logs/entity-types")
+        >>> response = requests.get("/api/audit-logs/entity-types")
         >>> response.json()
         {
             "entity_types": [

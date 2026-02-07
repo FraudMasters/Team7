@@ -1,4 +1,5 @@
 """
+import os
 Comprehensive integration tests for advanced candidate search workflow.
 
 This test suite verifies:

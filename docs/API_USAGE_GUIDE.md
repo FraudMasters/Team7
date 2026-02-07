@@ -30,6 +30,88 @@ This comprehensive guide provides practical examples and complete workflow docum
 
 ---
 
+## Configuration
+
+AgentHR uses a centralized configuration management system. Before using the API, ensure your backend is properly configured.
+
+### Quick Setup
+
+```bash
+# 1. Set environment
+export ENVIRONMENT=dev  # or 'staging' or 'production'
+
+# 2. Copy environment templates
+cp backend/.env.example backend/.env
+
+# 3. Start the backend
+docker-compose up -d backend
+```
+
+### Configuration Endpoints
+
+The API provides endpoints to manage configuration:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/config` | GET | Get current configuration |
+| `/api/config/reload` | POST | Reload configuration from files |
+| `/api/config/health` | GET | Check configuration health |
+| `/api/config/audit-logs` | GET | Get configuration change history |
+
+### Example: Get Current Configuration
+
+```bash
+curl http://localhost:8000/api/config
+```
+
+**Response:**
+```json
+{
+  "environment": "production",
+  "log_level": "WARNING",
+  "max_upload_size_mb": 10,
+  "llm_provider": "zai",
+  "llm_model": "glm-4.7",
+  "ats_threshold": 0.6,
+  "last_reload": "2026-02-07T00:00:00Z"
+}
+```
+
+### Example: Reload Configuration
+
+```bash
+curl -X POST http://localhost:8000/api/config/reload
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Configuration reloaded successfully",
+  "changed_settings": ["log_level"],
+  "reloaded_at": "2026-02-07T00:30:00Z"
+}
+```
+
+### Environment Variables
+
+Key environment variables that affect API behavior:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ENVIRONMENT` | Environment name (dev/staging/production) | `development` |
+| `BACKEND_HOST` | API server host | `0.0.0.0` |
+| `BACKEND_PORT` | API server port | `8000` |
+| `MAX_UPLOAD_SIZE_MB` | Max file upload size | `10` |
+| `LLM_PROVIDER` | LLM provider (zai/openai/anthropic/google) | `zai` |
+| `LOG_LEVEL` | Logging level | `INFO` |
+
+For complete configuration documentation, see:
+- **[Configuration Management](configuration.md)** - Full configuration guide
+- **[Configuration Reference](configuration/reference.md)** - All configuration options
+
+---
+
 ## Quick Start
 
 ### 1. Health Check

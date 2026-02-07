@@ -37,7 +37,7 @@ test.describe('Error Handling - Upload Errors', () => {
     await page.waitForTimeout(500);
 
     // Verify error message appears (not alert)
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"]').filter({ hasText: /invalid/i });
+    const errorMessage = page.locator('[role="alert"]').filter({ hasText: /invalid/i });
     await expect(errorMessage.first()).toBeVisible();
 
     // Verify it's not an alert dialog
@@ -74,7 +74,7 @@ test.describe('Error Handling - Upload Errors', () => {
     await page.waitForTimeout(500);
 
     // Verify error message appears (not alert)
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"]').filter({ hasText: /large|size|mb/i });
+    const errorMessage = page.locator('[role="alert"]').filter({ hasText: /large|size|mb/i });
     await expect(errorMessage.first()).toBeVisible();
 
     // Verify it's not an alert dialog
@@ -108,7 +108,7 @@ test.describe('Error Handling - Upload Errors', () => {
     await page.waitForTimeout(1000);
 
     // Verify error message appears
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"]').filter({ hasText: /error|fail|network/i });
+    const errorMessage = page.locator('[role="alert"]').filter({ hasText: /error|fail|network/i });
     await expect(errorMessage.first()).toBeVisible();
 
     // Verify error message suggests retry
@@ -134,7 +134,7 @@ test.describe('Error Handling - Upload Errors', () => {
     await page.waitForTimeout(1000);
 
     // Verify error appears
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"]').first();
+    const errorMessage = page.locator('[role="alert"]').first();
     await expect(errorMessage).toBeVisible();
 
     // Second attempt - allow upload to succeed (or fail gracefully)
@@ -162,7 +162,7 @@ test.describe('Error Handling - Validation Errors', () => {
     await page.waitForTimeout(300);
 
     // Verify ErrorMessage appears (not alert)
-    const errorMessage = page.locator('.MuiSnackbar-root .MuiAlert-root');
+    const errorMessage = page.locator('.toast [role="alert"]');
     await expect(errorMessage.first()).toBeVisible();
 
     // Verify it's not an alert dialog
@@ -184,7 +184,7 @@ test.describe('Error Handling - Validation Errors', () => {
     await page.waitForTimeout(300);
 
     // Check for validation error messages (could be in various forms)
-    const validationErrors = page.locator('.Mui-error, [role="alert"], .MuiFormHelperText-error');
+    const validationErrors = page.locator('.error, [role="alert"], .helper-text.error');
 
     const count = await validationErrors.count();
     if (count > 0) {
@@ -205,7 +205,7 @@ test.describe('Error Handling - Network Errors', () => {
     await page.waitForTimeout(1000);
 
     // Check for error message
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"], .MuiSnackbar-root').filter({
+    const errorMessage = page.locator('[role="alert"], .toast').filter({
       hasText: /error|network|connect|fail/i
     });
 
@@ -227,7 +227,7 @@ test.describe('Error Handling - Network Errors', () => {
     await page.waitForTimeout(1000);
 
     // Look for error with action buttons (Retry, etc.)
-    const actionButtons = page.locator('.MuiAlert-root button').filter({
+    const actionButtons = page.locator('[role="alert"] button').filter({
       hasText: /retry|refresh|try again/i
     });
 
@@ -253,7 +253,7 @@ test.describe('Error Handling - Error Message Structure', () => {
 
     await page.waitForTimeout(500);
 
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"]').first();
+    const errorMessage = page.locator('[role="alert"]').first();
     const errorText = await errorMessage.textContent();
 
     // Should clearly state what the problem is
@@ -273,7 +273,7 @@ test.describe('Error Handling - Error Message Structure', () => {
 
     await page.waitForTimeout(500);
 
-    const errorMessage = page.locator('.MuiAlert-root, [role="alert"]').first();
+    const errorMessage = page.locator('[role="alert"]').first();
     const errorText = await errorMessage.textContent();
 
     // Should provide actionable guidance
@@ -288,7 +288,7 @@ test.describe('Error Handling - Error Message Structure', () => {
     await page.waitForTimeout(1000);
 
     // Look for error messages with action buttons
-    const errorWithActions = page.locator('.MuiAlert-root').filter(async (el) => {
+    const errorWithActions = page.locator('[role="alert"]').filter(async (el) => {
       const buttons = await el.locator('button').count();
       return buttons > 0;
     });
@@ -367,11 +367,11 @@ test.describe('Error Handling - No Alert Dialogs', () => {
 
       await page.waitForTimeout(500);
 
-      // Check for MUI error components
-      const muiError = page.locator('.MuiSnackbar-root .MuiAlert-root');
+      // Check for error components (toast or alert)
+      const toastError = page.locator('.toast [role="alert"]');
 
-      // If there's an error, it should use MUI components
-      const errorExists = await muiError.count() > 0;
+      // If there's an error, it should use proper error components
+      const errorExists = await toastError.count() > 0;
       if (errorExists) {
         await expect(muiError.first()).toBeVisible();
       }
@@ -394,7 +394,7 @@ test.describe('Error Handling - Error Recovery', () => {
     await page.waitForTimeout(500);
 
     // Look for close button
-    const closeButton = page.locator('.MuiAlert-root .MuiIconButton-root').first();
+    const closeButton = page.locator('[role="alert"] button').first();
 
     const hasCloseButton = await closeButton.count() > 0;
     if (hasCloseButton) {
@@ -420,7 +420,7 @@ test.describe('Error Handling - Error Recovery', () => {
     });
 
     // Wait for error to appear
-    const errorMessage = page.locator('.MuiSnackbar-root .MuiAlert-root');
+    const errorMessage = page.locator('.toast [role="alert"]');
     await expect(errorMessage.first()).toBeVisible();
 
     // Wait for auto-hide (typically 6 seconds)
@@ -440,7 +440,7 @@ test.describe('Error Handling - Error Recovery', () => {
     await page.waitForTimeout(1000);
 
     // Look for error with action buttons
-    const errorWithActions = page.locator('.MuiAlert-root').filter(async (el) => {
+    const errorWithActions = page.locator('[role="alert"]').filter(async (el) => {
       const buttons = await el.locator('button').count();
       const text = await el.textContent();
       return buttons > 0 && text?.includes(/retry|refresh/i);
@@ -474,7 +474,7 @@ test.describe('Error Handling - Accessibility', () => {
     await page.waitForTimeout(500);
 
     // Check for proper ARIA role
-    const errorMessage = page.locator('[role="alert"], .MuiAlert-root').first();
+    const errorMessage = page.locator('[role="alert"]').first();
     await expect(errorMessage).toBeVisible();
 
     // Should have role="alert" or be in an alert component
@@ -499,7 +499,7 @@ test.describe('Error Handling - Accessibility', () => {
     await page.keyboard.press('Tab');
 
     // Close button should be focusable
-    const closeButton = page.locator('.MuiAlert-root .MuiIconButton-root').first();
+    const closeButton = page.locator('[role="alert"] button').first();
     const hasCloseButton = await closeButton.count() > 0;
 
     if (hasCloseButton) {
@@ -534,7 +534,7 @@ test.describe('Error Handling - Dark Mode Compatibility', () => {
     await page.waitForTimeout(500);
 
     // Error should be visible in dark mode
-    const errorMessage = page.locator('.MuiAlert-root').first();
+    const errorMessage = page.locator('[role="alert"]').first();
     await expect(errorMessage).toBeVisible();
 
     // Check contrast (text should be readable)
@@ -564,7 +564,7 @@ test.describe('Error Handling - Mobile Responsiveness', () => {
     await page.waitForTimeout(500);
 
     // Error should be visible and readable
-    const errorMessage = page.locator('.MuiAlert-root').first();
+    const errorMessage = page.locator('[role="alert"]').first();
     await expect(errorMessage).toBeVisible();
 
     // Should fit within mobile viewport (no horizontal overflow)
@@ -582,7 +582,7 @@ test.describe('Error Handling - Mobile Responsiveness', () => {
     await page.waitForTimeout(1000);
 
     // Look for action buttons in error messages
-    const actionButtons = page.locator('.MuiAlert-root button').filter({
+    const actionButtons = page.locator('[role="alert"] button').filter({
       hasText: /retry|refresh|try again|close/i
     });
 

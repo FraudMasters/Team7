@@ -1,4 +1,6 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -13,6 +15,7 @@ import {
   Stack,
   Chip,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Refresh as RefreshIcon,
   Balance as FairnessIcon,
@@ -21,7 +24,9 @@ import {
   Error as ErrorIcon,
   Analytics as MetricsIcon,
 } from '@mui/icons-material';
+// API клиент для получения данных о fairness
 import { fairness } from '@/api/fairness';
+// Типы API для типизации данных
 import type {
   FairnessSummary,
   FairnessAlert,
@@ -29,19 +34,20 @@ import type {
 } from '@/types/api';
 
 /**
- * FairnessDashboard Component Props
+ * Свойства компонента FairnessDashboard
+ * @description Определяет параметры для дашборда мониторинга fairness
  */
 interface FairnessDashboardProps {
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
-  /** Number of days to look back for alerts */
+  /** Количество дней для отображения оповещений */
   alertDays?: number;
 }
 
 /**
- * Get severity color for display
+ * Получить цвет серьезности для отображения
  */
 function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | 'info' {
   switch (severity.toLowerCase()) {
@@ -60,7 +66,7 @@ function getSeverityColor(severity: string): 'success' | 'warning' | 'error' | '
 }
 
 /**
- * Get severity icon
+ * Получить иконку серьезности
  */
 function getSeverityIcon(severity: string) {
   switch (severity.toLowerCase()) {
@@ -78,12 +84,12 @@ function getSeverityIcon(severity: string) {
 }
 
 /**
- * FairnessDashboard Component
+ * Компонент FairnessDashboard
  *
- * Displays fairness monitoring metrics including:
- * - Overall fairness summary (models monitored, issues detected)
- * - Recent fairness alerts with severity levels
- * - Key fairness metrics across protected attributes
+ * Отображает метрики мониторинга fairness включая:
+ * - Общую сводку fairness (мониторинг моделей, обнаруженные проблемы)
+ * - Последние оповещения fairness с уровнями серьезности
+ * - Ключевые метрики fairness по защищаемым атрибутам
  *
  * @example
  * ```tsx
@@ -100,6 +106,7 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
   endDate,
   alertDays = 30,
 }) => {
+  // Состояния для загрузки, ошибки, сводки, оповещений и метрик
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<FairnessSummary | null>(null);
@@ -107,14 +114,14 @@ const FairnessDashboard: React.FC<FairnessDashboardProps> = ({
   const [metrics, setMetrics] = useState<FairnessMetric[]>([]);
 
   /**
-   * Fetch fairness data from backend
+   * Загрузка данных fairness с бэкенда
    */
   const fetchFairnessData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch summary, alerts, and metrics in parallel
+      // Параллельная загрузка сводки, оповещений и метрик
       const [summaryResponse, alertsResponse, metricsResponse] = await Promise.all([
         fairness.getSummary(),
         fairness.getAlerts({ days: alertDays, limit: 10, acknowledged: false }),

@@ -36,12 +36,15 @@ from analyzers.learning_recommendation_engine import (
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 
 def _extract_locale(request: Optional[Request]) -> str:
@@ -620,7 +623,7 @@ async def analyze_skill_gaps(
         ...     }
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/skill-gap/analyze",
+        ...     "/api/skill-gap/analyze",
         ...     json={"resume_id": "abc123", "vacancy_data": vacancy}
         ... )
         >>> response.json()
@@ -971,7 +974,7 @@ async def list_skill_gap_reports(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/skill-gap/")
+        >>> response = requests.get("/api/skill-gap/")
         >>> response.json()
         {
             "reports": [...],
@@ -1106,7 +1109,7 @@ async def get_skill_gap_report(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/skill-gap/abc-123-def")
+        >>> response = requests.get("/api/skill-gap/abc-123-def")
         >>> response.json()
         {
             "id": "abc-123-def",
@@ -1242,7 +1245,7 @@ async def list_learning_resources(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/learning-resources/?skill=Python")
+        >>> response = requests.get("/api/learning-resources/?skill=Python")
         >>> response.json()
         {
             "resources": [...],
@@ -1417,7 +1420,7 @@ async def get_learning_resource(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/learning-resources/abc-123-def")
+        >>> response = requests.get("/api/learning-resources/abc-123-def")
         >>> response.json()
         {
             "id": "abc-123-def",
@@ -1531,7 +1534,7 @@ async def get_learning_recommendations(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/learning-resources/recommendations",
+        ...     "/api/learning-resources/recommendations",
         ...     json={
         ...         "skills": ["Python", "Docker"],
         ...         "max_cost_per_resource": 50,
@@ -1731,7 +1734,7 @@ async def create_development_plan(
         ...     ]
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/development-plans/",
+        ...     "/api/development-plans/",
         ...     json=data
         ... )
         >>> response.json()
@@ -1925,7 +1928,7 @@ async def list_development_plans(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/development-plans/?resume_id=abc-123")
+        >>> response = requests.get("/api/development-plans/?resume_id=abc-123")
         >>> response.json()
         {
             "plans": [...],
@@ -2094,7 +2097,7 @@ async def get_development_plan(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/development-plans/abc-123-def")
+        >>> response = requests.get("/api/development-plans/abc-123-def")
         >>> response.json()
         {
             "id": "abc-123-def",
@@ -2223,7 +2226,7 @@ async def update_development_plan(
         ...     "title": "Updated Plan Title"
         ... }
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/development-plans/abc-123",
+        ...     "/api/development-plans/abc-123",
         ...     json=data
         ... )
         >>> response.json()
@@ -2425,7 +2428,7 @@ async def update_development_plan_progress(
         ...     "notes": "Completed React hooks module"
         ... }
         >>> response = requests.patch(
-        ...     "http://localhost:8000/api/development-plans/abc-123/progress",
+        ...     "/api/development-plans/abc-123/progress",
         ...     json=data
         ... )
         >>> response.json()
@@ -2585,7 +2588,7 @@ async def delete_development_plan(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/development-plans/abc-123")
+        >>> response = requests.delete("/api/development-plans/abc-123")
         >>> response.json()
         {"message": "Development plan deleted successfully"}
     """

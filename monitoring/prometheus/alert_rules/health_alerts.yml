@@ -1,0 +1,95 @@
+groups:
+  - name: health_check_alerts
+    interval: 30s
+    rules:
+      - alert: DatabaseHealthCheckFailing
+        expr: health_check_status{component="database"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "Database health check failing"
+          description: "Database health check has been failing for 2 minutes"
+
+      - alert: RedisHealthCheckFailing
+        expr: health_check_status{component="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "Redis health check failing"
+          description: "Redis health check has been failing for 2 minutes"
+
+      - alert: CeleryWorkersHealthCheckFailing
+        expr: health_check_status{component="celery"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "Celery workers health check failing"
+          description: "Celery workers health check has been failing for 2 minutes"
+
+      - alert: MLModelsHealthCheckFailing
+        expr: health_check_status{component="ml_models"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "ML models health check failing"
+          description: "ML models health check has been failing for 5 minutes"
+
+      - alert: MLModelsHealthCheckCritical
+        expr: health_check_status{component="ml_models"} == 0
+        for: 15m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "ML models health check critical failure"
+          description: "ML models health check has been failing for 15 minutes"
+
+      - alert: LanguageToolHealthCheckFailing
+        expr: health_check_status{component="languagetool"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "LanguageTool health check failing"
+          description: "LanguageTool health check has been failing for 10 minutes (non-critical service)"
+
+      - alert: S3HealthCheckFailing
+        expr: health_check_status{component="s3"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "S3 backup health check failing"
+          description: "S3 backup health check has been failing for 10 minutes (non-critical service)"
+
+      - alert: MultipleHealthChecksFailing
+        expr: |
+          count(health_check_status == 0) >= 2
+        for: 1m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "Multiple health checks failing"
+          description: "{{ $value }} or more system components are failing health checks"
+
+      - alert: AllCriticalHealthChecksFailing
+        expr: |
+          count(health_check_status{component=~"database|redis|celery"} == 0) == 3
+        for: 1m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "All critical services failing health checks"
+          description: "Database, Redis, and Celery are all failing health checks - system is down"

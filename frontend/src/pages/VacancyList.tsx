@@ -27,7 +27,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-} from '@mui/material';
+} from '@/components/ui';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -39,7 +39,6 @@ import {
   Clear as ClearIcon,
   Save as SaveIcon,
   Close as CloseIcon,
-} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
@@ -555,7 +554,7 @@ const VacancyList: React.FC = () => {
     };
 
     return (
-      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box as="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {saveError && (
           <ErrorMessage
             error={saveError}
@@ -775,7 +774,7 @@ const VacancyList: React.FC = () => {
           }}
         >
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h4" component="h1" fontWeight={600} gutterBottom sx={{ color: 'text.primary' }}>
+            <Typography variant="h4" as="h1" fontWeight={600} gutterBottom sx={{ color: 'text.primary' }}>
               {t('vacancyList.title')}
             </Typography>
           </Box>
@@ -794,7 +793,7 @@ const VacancyList: React.FC = () => {
         </Box>
 
         {/* Loading Message */}
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+        <Typography variant="body2" color="secondary" sx={{ mb: 2, textAlign: 'center' }}>
           Loading vacancies...
         </Typography>
 
@@ -827,10 +826,10 @@ const VacancyList: React.FC = () => {
         }}
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="h4" component="h1" fontWeight={600} gutterBottom>
+          <Typography variant="h4" as="h1" fontWeight={600} gutterBottom>
             {t('vacancyList.title')}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             {t('vacancyList.subtitle')}
           </Typography>
         </Box>
@@ -861,13 +860,13 @@ const VacancyList: React.FC = () => {
             ),
           }}
           sx={{
-            '& .MuiOutlinedInput-root': {
+            '& .textfield-input': {
               borderRadius: 2,
             },
           }}
         />
         {searchQuery && (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          <Typography variant="caption" color="secondary" sx={{ mt: 1, display: 'block' }}>
             {t('vacancyList.results', { count: filteredVacancies.length })}
           </Typography>
         )}
@@ -899,7 +898,7 @@ const VacancyList: React.FC = () => {
           <AccordionSummary
             expandIcon={<ExpandMoreIcon />}
             sx={{
-              '& .MuiAccordionSummary-content': {
+              '& .accordion-summary-content': {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1014,7 +1013,7 @@ const VacancyList: React.FC = () => {
 
               {/* Filter Actions */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('vacancyList.results', { count: filteredVacancies.length })}
                 </Typography>
                 {hasActiveFilters && (
@@ -1059,10 +1058,10 @@ const VacancyList: React.FC = () => {
       {filteredVacancies.length === 0 && searchQuery ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <SearchIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Typography variant="h6" color="secondary" gutterBottom>
             {t('vacancyList.noResults')}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             {t('vacancyList.tryDifferentSearch')}
           </Typography>
           <Button variant="outlined" onClick={() => setSearchQuery('')}>
@@ -1072,10 +1071,10 @@ const VacancyList: React.FC = () => {
       ) : filteredVacancies.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <WorkIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Typography variant="h6" color="secondary" gutterBottom>
             {t('vacancyList.noActiveRequests')}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             {t('vacancyList.createFirstRequest')}
           </Typography>
           <Button
@@ -1137,7 +1136,7 @@ const VacancyList: React.FC = () => {
 
                   {/* Experience */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="secondary">
                       {t('vacancyList.experience')}:
                     </Typography>
                     <Typography variant="body2" fontWeight={500}>
@@ -1147,7 +1146,7 @@ const VacancyList: React.FC = () => {
 
                   {/* Skills */}
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="secondary" display="block" sx={{ mb: 1 }}>
                       {t('vacancyList.requiredSkills', { count: vacancy.required_skills.length })}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>

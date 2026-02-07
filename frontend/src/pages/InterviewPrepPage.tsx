@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, Container } from '@mui/material';
+import { Box, Container } from '@/components/ui';
 import InterviewPrepSheet from '@/components/InterviewPrepSheet';
 
 /**

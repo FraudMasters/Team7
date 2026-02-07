@@ -12,6 +12,18 @@ from .backup import (
     BackupStatusResponse,
     S3Config,
 )
+from .plugin_manifest import (
+    PluginManifest,
+    PluginManifestResponse,
+    PluginManifestCreate,
+    PluginManifestValidate,
+    PluginManifestValidateResponse,
+    PluginPermission,
+    PluginPermissionType,
+    PluginDependency,
+    PluginEntryPoint,
+    PluginCategory,
+)
 
 __all__ = [
     "BackupResponse",
@@ -21,4 +33,14 @@ __all__ = [
     "BackupConfigUpdate",
     "BackupStatusResponse",
     "S3Config",
+    "PluginManifest",
+    "PluginManifestResponse",
+    "PluginManifestCreate",
+    "PluginManifestValidate",
+    "PluginManifestValidateResponse",
+    "PluginPermission",
+    "PluginPermissionType",
+    "PluginDependency",
+    "PluginEntryPoint",
+    "PluginCategory",
 ]

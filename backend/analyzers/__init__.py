@@ -103,6 +103,11 @@ from .interview_question_generator import (
     get_interview_question_generator,
     generate_interview_questions,
 )
+from .llm_matcher import (
+    LLMSemanticMatcher,
+    LLMMatchResult,
+    get_llm_matcher,
+)
 
 __all__ = [
     "extract_keywords",
@@ -163,6 +168,9 @@ __all__ = [
     "QuestionCategory",
     "get_interview_question_generator",
     "generate_interview_questions",
+    "LLMSemanticMatcher",
+    "LLMMatchResult",
+    "get_llm_matcher",
     "save_resume_analysis",
     "get_resume_analysis",
     "delete_resume_analysis",

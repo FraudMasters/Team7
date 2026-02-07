@@ -27,12 +27,15 @@ from analyzers import (
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 
 def _extract_locale(request: Optional[Request]) -> str:
@@ -262,7 +265,7 @@ async def analyze_resume(http_request: Request, request: AnalysisRequest) -> JSO
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/resumes/analyze",
+        ...     "/api/resumes/analyze",
         ...     json={"resume_id": "abc123", "check_grammar": True, "extract_experience": True}
         ... )
         >>> response.json()
@@ -538,7 +541,7 @@ async def get_analysis_result(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/resumes/abc123")
+        >>> response = requests.get("/api/resumes/abc123")
         >>> response.json()
         {
             "resume_id": "abc123",

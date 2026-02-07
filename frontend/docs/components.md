@@ -347,4 +347,117 @@ interface Candidate {
 
 ---
 
-Last updated: 2025-02-01
+## New API Integration Hooks
+
+### useApiMetrics
+
+Track API performance metrics across all requests.
+
+```tsx
+import { useApiMetrics } from '@/hooks/useApiMetrics';
+
+function ApiStats() {
+  const { stats, reset } = useApiMetrics();
+
+  return (
+    <Box>
+      <Typography>Total Calls: {stats.totalCalls}</Typography>
+      <Typography>Average Duration: {stats.averageDuration}ms</Typography>
+      <Typography>Success Rate: {stats.successRate}%</Typography>
+      <Button onClick={reset}>Reset Metrics</Button>
+    </Box>
+  );
+}
+```
+
+### useCandidateWorkflow
+
+Manage candidate workflow stages with optimistic updates.
+
+```tsx
+import { useCandidateWorkflow } from '@/hooks/useCandidateWorkflow';
+
+function CandidateStage({ candidateId }: { candidateId: string }) {
+  const { candidate, moveStage, isLoading } = useCandidateWorkflow(candidateId);
+
+  const handleMove = async (newStage: string) => {
+    await moveStage(newStage, { vacancy_id: 'vac-123' });
+  };
+
+  return (
+    <Select
+      value={candidate?.current_stage}
+      onChange={(e) => handleMove(e.target.value)}
+      disabled={isLoading}
+    >
+      <MenuItem value="applied">Applied</MenuItem>
+      <MenuItem value="screening">Screening</MenuItem>
+      <MenuItem value="interview">Interview</MenuItem>
+    </Select>
+  );
+}
+```
+
+### useATSAnalysis
+
+ATS simulation for resume evaluation.
+
+```tsx
+import { useATSAnalysis } from '@/hooks/useATSAnalysis';
+
+function ATSEvaluation({ resumeId, vacancyId }: { resumeId: string; vacancyId: string }) {
+  const { evaluate, result, isEvaluating } = useATSAnalysis();
+
+  const handleEvaluate = async () => {
+    await evaluate({ resume_id: resumeId, vacancy_id: vacancyId, use_llm: true });
+  };
+
+  return (
+    <Box>
+      <Button onClick={handleEvaluate} disabled={isEvaluating}>
+        Evaluate ATS Score
+      </Button>
+      {result && (
+        <Alert severity={result.passed ? 'success' : 'warning'}>
+          Score: {Math.round(result.overall_score * 100)}%
+          {result.passed ? ' - Passed' : ' - Failed'}
+        </Alert>
+      )}
+    </Box>
+  );
+}
+```
+
+### useMatchingWeights
+
+Customize matching algorithm weights per vacancy.
+
+```tsx
+import { useMatchingWeights } from '@/hooks/useMatchingWeights';
+
+function WeightSelector({ vacancyId }: { vacancyId: string }) {
+  const { profiles, activeProfile, applyProfile, createProfile } = useMatchingWeights();
+
+  return (
+    <Box>
+      <FormControl>
+        <InputLabel>Matching Profile</InputLabel>
+        <Select
+          value={activeProfile?.id || ''}
+          onChange={(e) => applyProfile(vacancyId, e.target.value)}
+        >
+          {profiles?.map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              {p.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
+  );
+}
+```
+
+---
+
+Last updated: 2026-02-05

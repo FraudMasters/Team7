@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import PublicTaxonomyBrowser from './PublicTaxonomyBrowser';
 import {
   Box,
@@ -151,7 +152,7 @@ interface IndustryTaxonomyManagerProps {
  */
 const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
   organizationId = 'default',
-  apiUrl = 'http://localhost:8000/api/skill-taxonomies',
+  apiUrl = `${config.api.url}/api/skill-taxonomies`,
 }) => {
   const { t } = useTranslation();
   const [currentTab, setCurrentTab] = useState<'manage' | 'browse'>('manage');
@@ -456,7 +457,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
     setVersions([]);
 
     try {
-      const response = await fetch(`http://localhost:8000/api/taxonomy-versions/${taxonomy.id}`);
+      const response = await fetch(`${config.api.url}/api/taxonomy-versions/${taxonomy.id}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch versions: ${response.statusText}`);
@@ -482,7 +483,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
     setRollingBack(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/taxonomy-versions/${selectedTaxonomyForHistory.id}/rollback/${versionId}`,
+        `${config.api.url}/api/taxonomy-versions/${selectedTaxonomyForHistory.id}/rollback/${versionId}`,
         {
           method: 'POST',
         }

@@ -27,8 +27,8 @@ settings = get_settings()
 
 router = APIRouter()
 
-# Directory for storing uploaded resumes
-UPLOAD_DIR = Path("data/uploads")
+# Directory for storing uploaded resumes (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

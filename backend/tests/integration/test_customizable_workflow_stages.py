@@ -1,4 +1,5 @@
 """
+import os
 End-to-end integration test for customizable workflow stages functionality.
 
 This test verifies:

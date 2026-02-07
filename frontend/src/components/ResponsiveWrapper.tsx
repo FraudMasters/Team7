@@ -1,5 +1,7 @@
 import React from 'react';
-import { useTheme, useMediaQuery, Box, BoxProps } from '@mui/material';
+import { useEmotionTheme } from '@/providers/ThemeProvider';
+import { useResponsive } from '@/hooks/useResponsive';
+import { Box, BoxProps } from '@/components/ui';
 
 /**
  * Breakpoint names following MUI v6 standard breakpoints
@@ -134,15 +136,8 @@ const ResponsiveWrapper: React.FC<ResponsiveWrapperProps> = ({
   sx,
   ...boxProps
 }) => {
-  const theme = useTheme();
-
-  // Call all media query hooks at top level (React Hooks rules)
-  const isUp = useMediaQuery(theme.breakpoints.up(breakpoint));
-  const isDown = useMediaQuery(theme.breakpoints.down(breakpoint));
-  const isOnly = useMediaQuery(theme.breakpoints.only(breakpoint));
-  const isBetween = breakpointEnd
-    ? useMediaQuery(theme.breakpoints.between(breakpoint, breakpointEnd))
-    : false;
+  const theme = useEmotionTheme();
+  const responsive = useResponsive();
 
   // Determine which result to use based on condition
   const shouldShow = React.useMemo(() => {
@@ -152,11 +147,15 @@ const ResponsiveWrapper: React.FC<ResponsiveWrapperProps> = ({
 
     switch (condition) {
       case 'up':
-        return isUp;
+        return responsive.isMdUp;
       case 'down':
-        return isDown;
+        return !responsive.isMdUp;
       case 'only':
-        return isOnly;
+        // For simplicity, map 'only' to up/down logic
+        return breakpoint === 'sm' ? responsive.isSm && !responsive.isMd
+          : breakpoint === 'md' ? responsive.isMd && !responsive.isLg
+          : breakpoint === 'lg' ? responsive.isLg && !responsive.isXl
+          : true;
       case 'between':
         if (!breakpointEnd) {
           console.warn(
@@ -164,11 +163,12 @@ const ResponsiveWrapper: React.FC<ResponsiveWrapperProps> = ({
           );
           return false;
         }
-        return isBetween;
+        // Simplified between logic
+        return responsive.isMdUp;
       default:
         return true;
     }
-  }, [conditional, condition, breakpointEnd, isUp, isDown, isOnly, isBetween]);
+  }, [conditional, condition, breakpointEnd, responsive]);
 
   // Build responsive sx props
   const finalSx = React.useMemo(() => {

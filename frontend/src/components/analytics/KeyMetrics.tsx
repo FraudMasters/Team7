@@ -1,5 +1,8 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -13,6 +16,7 @@ import {
   AlertTitle,
   Stack,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Refresh as RefreshIcon,
   Schedule as TimeIcon,
@@ -24,7 +28,7 @@ import {
 } from '@mui/icons-material';
 
 /**
- * Time-to-hire metrics from backend
+ * Метрики time-to-hire с бэкенда
  */
 interface TimeToHireMetrics {
   average_days: number;
@@ -36,7 +40,7 @@ interface TimeToHireMetrics {
 }
 
 /**
- * Resume processing metrics from backend
+ * Метрики обработки резюме с бэкенда
  */
 interface ResumeMetrics {
   total_processed: number;
@@ -46,7 +50,7 @@ interface ResumeMetrics {
 }
 
 /**
- * Match rate metrics from backend
+ * Метрики match rate с бэкенда
  */
 interface MatchRateMetrics {
   overall_match_rate: number;
@@ -56,7 +60,7 @@ interface MatchRateMetrics {
 }
 
 /**
- * Key metrics response from backend
+ * Ответ с ключевыми метриками с бэкенда
  */
 interface KeyMetricsResponse {
   time_to_hire: TimeToHireMetrics;
@@ -65,24 +69,24 @@ interface KeyMetricsResponse {
 }
 
 /**
- * KeyMetrics Component Props
+ * Свойства компонента KeyMetrics
  */
 interface KeyMetricsProps {
-  /** API endpoint URL for key metrics */
+  /** URL API endpoint для ключевых метрик */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
 }
 
 /**
- * KeyMetrics Component
+ * Компонент KeyMetrics
  *
- * Displays key hiring metrics including:
- * - Time-to-hire statistics (average, median, min, max, percentiles)
- * - Resume processing metrics (total, monthly, weekly, processing rate)
- * - Match rates (overall, high/low confidence, average confidence)
+ * Отображает ключевые метрики найма включая:
+ * - Статистику time-to-hire (среднее, медиана, мин, макс, процентили)
+ * - Метрики обработки резюме (всего, за месяц, за неделю, скорость обработки)
+ * - Match rates (общий, высокой/низкой уверенности, средняя уверенность)
  *
  * @example
  * ```tsx
@@ -99,13 +103,14 @@ const KeyMetrics: React.FC<KeyMetricsProps> = ({
   startDate,
   endDate,
 }) => {
+  // Состояния для загрузки, ошибки, метрик и автообновления
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<KeyMetricsResponse | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   /**
-   * Fetch key metrics from backend
+   * Загрузка ключевых метрик с бэкенда
    */
   const fetchMetrics = async () => {
     try {

@@ -1,0 +1,340 @@
+// Протокольные определения для Сервиса Сопоставления (Matching Service)
+// Matching Service gRPC Protocol Definitions
+//
+// Этот файл определяет интерфейсы gRPC для сопоставления резюме с вакансиями,
+// включая расчет оценок совместимости, сравнение кандидатов и анализ пробелов в навыках.
+//
+// This file defines gRPC interfaces for matching resumes with vacancies,
+// including compatibility scoring, candidate comparison, and skill gap analysis.
+
+syntax = "proto3";
+
+package matching;
+
+// Import common types from other services if needed
+// import "resume.proto";
+// import "vacancy.proto";
+
+// ============================================
+// Сообщения для результатов сопоставления
+// Match result messages
+// ============================================
+
+// Результат сопоставления резюме с вакансией / Resume-vacancy match result
+message MatchResult {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string resume_id = 2;             // ID резюме / Resume ID
+    string vacancy_id = 3;            // ID вакансии / Vacancy ID
+
+    // Устаревшие поля (для обратной совместимости) / Legacy fields (for backward compatibility)
+    float match_percentage = 4;       // Общий процент совпадения / Overall match percentage
+    repeated SkillMatch matched_skills = 5;      // Совпавшие навыки / Matched skills
+    repeated string missing_skills = 6;          // Отсутствующие навыки / Missing skills
+    repeated string additional_skills_matched = 7;// Дополнительные совпавшие навыки / Additional matched skills
+    bool experience_verified = 8;     // Проверен ли опыт / Whether experience is verified
+    map<string, ExperienceDetail> experience_details = 9; // Детали опыта по навыкам / Experience details by skill
+
+    // Единые метрики сопоставления / Unified matching metrics
+    float overall_score = 10;         // Общая оценка (0-1) / Overall score
+    float keyword_score = 11;         // Оценка по ключевым словам (0-1) / Keyword score
+    float tfidf_score = 12;           // Оценка TF-IDF (0-1) / TF-IDF score
+    float vector_score = 13;          // Оценка векторной схожести (0-1) / Vector similarity score
+    float vector_similarity = 14;     // Сырая косинусная схожесть (-1 to 1) / Raw cosine similarity
+    string recommendation = 15;       // Рекомендация (excellent/good/maybe/poor) / Recommendation
+    bool keyword_passed = 16;         // Пройден ли порог по ключевым словам / Keyword threshold passed
+    bool tfidf_passed = 17;           // Пройден ли порог TF-IDF / TF-IDF threshold passed
+    bool vector_passed = 18;          // Пройден ли порог векторной схожести / Vector threshold passed
+    repeated KeywordMatch tfidf_matched = 19;     // Совпавшие ключевые слова TF-IDF / TF-IDF matched keywords
+    repeated string tfidf_missing = 20;           // Отсутствующие ключевые слова TF-IDF / TF-IDF missing keywords
+    string matcher_version = 21;      // Версия алгоритма сопоставления / Matcher version
+
+    int64 created_at = 22;            // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 23;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Совпавший навык с деталями / Matched skill with details
+message SkillMatch {
+    string skill = 1;                 // Навык / Skill name
+    float confidence = 2;             // Уверенность совпадения / Match confidence
+    string context = 3;               // Контекст использования / Usage context
+    int32 experience_months = 4;      // Опыт в месяцах / Experience in months
+}
+
+// Детали опыта по навыку / Experience detail for skill
+message ExperienceDetail {
+    int32 total_months = 1;           // Общий опыт в месяцах / Total experience in months
+    repeated string projects = 2;     // Связанные проекты / Related projects
+    float proficiency_level = 3;      // Уровень владения (0-1) / Proficiency level
+}
+
+// Совпадение ключевого слова TF-IDF / TF-IDF keyword match
+message KeywordMatch {
+    string keyword = 1;               // Ключевое слово / Keyword
+    float score = 2;                  // Оценка TF-IDF / TF-IDF score
+    float frequency = 3;              // Частота в резюме / Frequency in resume
+}
+
+// ============================================
+// Сообщения для сравнения резюме
+// Resume comparison messages
+// ============================================
+
+// Сохранённое сравнение резюме / Saved resume comparison
+message ResumeComparison {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string vacancy_id = 2;            // ID вакансии / Vacancy ID
+    string name = 3;                  // Название сравнения / Comparison name
+    repeated string resume_ids = 4;   // ID сравниваемых резюме / Resume IDs being compared
+    ComparisonFilters filters = 5;    // Фильтры сравнения / Comparison filters
+    map<string, string> comparison_notes = 6; // Заметки сравнения / Comparison notes
+    string created_by = 7;            // Создатель сравнения / Comparison creator
+    repeated string shared_with = 8;  // Поделиться с / Shared with
+
+    int64 created_at = 9;             // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 10;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Фильтры сравнения / Comparison filters
+message ComparisonFilters {
+    float min_match = 1;              // Минимальный процент совпадения / Minimum match percentage
+    float max_match = 2;              // Максимальный процент совпадения / Maximum match percentage
+    string sort_field = 3;            // Поле сортировки / Sort field
+    string sort_order = 4;            // Порядок сортировки / Sort order
+    repeated string required_skills = 5; // Обязательные навыки / Required skills
+}
+
+// ============================================
+// Сообщения для анализа пробелов в навыках
+// Skill gap analysis messages
+// ============================================
+
+// Отчёт о пробелах в навыках / Skill gap report
+message SkillGapReport {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string resume_id = 2;             // ID резюме / Resume ID
+    string vacancy_id = 3;            // ID вакансии / Vacancy ID
+
+    // Данные о навыках кандидата / Candidate skills data
+    repeated string candidate_skills = 4;           // Навыки кандидата / Candidate's skills
+    map<string, float> candidate_skill_levels = 5;  // Уровни навыков кандидата / Candidate's skill levels
+
+    // Данные о требуемых навыках / Required skills data
+    repeated string required_skills = 6;            // Требуемые навыки / Required skills
+    map<string, float> required_skill_levels = 7;   // Требуемые уровни навыков / Required skill levels
+
+    // Анализ пробелов / Gap analysis
+    repeated string missing_skills = 8;                     // Отсутствующие навыки / Missing skills
+    map<string, MissingSkillDetail> missing_skill_details = 9; // Детали отсутствующих навыков / Missing skill details
+    repeated string matched_skills = 10;                   // Совпавшие навыки / Matched skills
+    repeated string partial_match_skills = 11;             // Частично совпавшие навыки / Partially matched skills
+
+    // Общая оценка / Overall assessment
+    string gap_severity = 12;         // Серьёзность пробелов (critical/moderate/minimal/none) / Gap severity
+    float gap_percentage = 13;        // Процент отсутствующих навыков (0-100) / Percentage of missing skills
+    float bridgeability_score = 14;   // Оценка возможности восполнения (0-1) / Bridgeability score
+    int32 estimated_time_to_bridge = 15; // Оценочное время для восполнения (часы) / Estimated time to bridge (hours)
+
+    // Рекомендации / Recommendations
+    int32 recommended_resources_count = 16; // Количество рекомендуемых ресурсов / Number of recommended resources
+    repeated string priority_ordering = 17; // Порядок приоритетов / Priority ordering
+
+    int64 created_at = 18;            // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 19;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Детали отсутствующего навыка / Missing skill detail
+message MissingSkillDetail {
+    float gap_severity = 1;           // Серьёзность пробела (0-1) / Gap severity
+    string importance = 2;            // Важность (critical/important/nice_to_have) / Importance
+    string category = 3;              // Категория навыка / Skill category
+    repeated string alternatives = 4; // Альтернативные навыки / Alternative skills
+}
+
+// ============================================
+// Сообщения для запросов сопоставления
+// Matching request messages
+// ============================================
+
+// Запрос на сопоставление резюме с вакансией / Request to match resume with vacancy
+message MatchRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string vacancy_id = 2;            // ID вакансии / Vacancy ID
+    bool force_refresh = 3;           // Принудительный пересчёт / Force re-calculation
+}
+
+// Ответ на запрос сопоставления / Response to match request
+message MatchResponse {
+    MatchResult result = 1;           // Результат сопоставления / Match result
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на массовое сопоставление / Request for batch matching
+message BatchMatchRequest {
+    string vacancy_id = 1;            // ID вакансии / Vacancy ID
+    repeated string resume_ids = 2;   // ID резюме для сопоставления / Resume IDs to match
+    bool force_refresh = 3;           // Принудительный пересчёт / Force re-calculation
+}
+
+// Ответ на массовое сопоставление / Response to batch match request
+message BatchMatchResponse {
+    repeated MatchResult results = 1; // Результаты сопоставления / Match results
+    int32 total_count = 2;            // Общее количество / Total count
+    int32 successful_count = 3;       // Успешных сопоставлений / Successful matches
+    repeated string failed_resume_ids = 4; // ID неудачных резюме / Failed resume IDs
+    string message = 5;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение результатов сопоставления / Request to get match results
+message GetMatchResultsRequest {
+    string resume_id = 1;             // ID резюме (опционально) / Resume ID (optional)
+    string vacancy_id = 2;            // ID вакансии (опционально) / Vacancy ID (optional)
+    int32 page = 3;                   // Номер страницы / Page number
+    int32 page_size = 4;              // Размер страницы / Page size
+    float min_score = 5;              // Минимальная оценка / Minimum score
+}
+
+// Ответ с результатами сопоставления / Response with match results
+message GetMatchResultsResponse {
+    repeated MatchResult results = 1; // Результаты сопоставления / Match results
+    int32 total = 2;                  // Общее количество / Total count
+    int32 page = 3;                   // Текущая страница / Current page
+    int32 page_size = 4;              // Размер страницы / Page size
+}
+
+// ============================================
+// Сообщения для запросов анализа пробелов
+// Skill gap request messages
+// ============================================
+
+// Запрос на анализ пробелов в навыках / Request for skill gap analysis
+message AnalyzeSkillGapRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string vacancy_id = 2;            // ID вакансии / Vacancy ID
+    bool force_refresh = 3;           // Принудительный пересчёт / Force re-calculation
+}
+
+// Ответ на анализ пробелов / Response to skill gap analysis
+message AnalyzeSkillGapResponse {
+    SkillGapReport report = 1;        // Отчёт о пробелах / Gap report
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение отчёта о пробелах / Request to get skill gap report
+message GetSkillGapReportRequest {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string vacancy_id = 2;            // ID вакансии / Vacancy ID
+}
+
+// Ответ с отчётом о пробелах / Response with skill gap report
+message GetSkillGapReportResponse {
+    SkillGapReport report = 1;        // Отчёт о пробелах / Gap report
+    bool found = 2;                   // Найден ли отчёт / Whether report was found
+}
+
+// ============================================
+// Сообщения для запросов сравнения
+// Comparison request messages
+// ============================================
+
+// Запрос на создание сравнения / Request to create comparison
+message CreateComparisonRequest {
+    string vacancy_id = 1;            // ID вакансии / Vacancy ID
+    repeated string resume_ids = 2;   // ID резюме для сравнения / Resume IDs to compare
+    string name = 3;                  // Название сравнения / Comparison name
+    ComparisonFilters filters = 4;    // Фильтры сравнения / Comparison filters
+    string created_by = 5;            // Создатель / Creator
+}
+
+// Ответ на создание сравнения / Response to create comparison
+message CreateComparisonResponse {
+    ResumeComparison comparison = 1;  // Созданное сравнение / Created comparison
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение сравнения / Request to get comparison
+message GetComparisonRequest {
+    string id = 1;                    // ID сравнения / Comparison ID
+}
+
+// Ответ с данными сравнения / Response with comparison data
+message GetComparisonResponse {
+    ResumeComparison comparison = 1;  // Данные сравнения / Comparison data
+    repeated ComparisonResumeData resumes_data = 2; // Данные резюме для сравнения / Resumes data for comparison
+    bool found = 3;                   // Найдено ли сравнение / Whether comparison was found
+}
+
+// Данные резюме для сравнения / Resume data for comparison
+message ComparisonResumeData {
+    string resume_id = 1;             // ID резюме / Resume ID
+    string filename = 2;              // Имя файла / Filename
+    float match_score = 3;            // Оценка совпадения / Match score
+    repeated string matched_skills = 4; // Совпавшие навыки / Matched skills
+    repeated string missing_skills = 5; // Отсутствующие навыки / Missing skills
+    int32 total_experience_months = 6; // Общий опыт / Total experience
+    string recommendation = 7;        // Рекомендация / Recommendation
+}
+
+// Запрос на список сравнений / Request for comparison list
+message ListComparisonsRequest {
+    string vacancy_id = 1;            // Фильтр по ID вакансии / Filter by vacancy ID
+    string created_by = 2;            // Фильтр по создателю / Filter by creator
+    int32 page = 3;                   // Номер страницы / Page number
+    int32 page_size = 4;              // Размер страницы / Page size
+}
+
+// Ответ со списком сравнений / Response with comparison list
+message ListComparisonsResponse {
+    repeated ResumeComparison comparisons = 1; // Список сравнений / List of comparisons
+    int32 total = 2;                  // Общее количество / Total count
+    int32 page = 3;                   // Текущая страница / Current page
+    int32 page_size = 4;              // Размер страницы / Page size
+}
+
+// ============================================
+// Сервис Matching Service
+// Matching Service definition
+// ============================================
+
+// Сервис сопоставления резюме с вакансиями / Resume-vacancy matching service
+service MatchingService {
+    // Сопоставить резюме с вакансией / Match resume with vacancy
+    rpc MatchResume (MatchRequest) returns (MatchResponse);
+
+    // Массовое сопоставление резюме с вакансией / Batch match resumes with vacancy
+    rpc BatchMatch (BatchMatchRequest) returns (BatchMatchResponse);
+
+    // Получить результаты сопоставления / Get match results
+    rpc GetMatchResults (GetMatchResultsRequest) returns (GetMatchResultsResponse);
+
+    // Проанализировать пробелы в навыках / Analyze skill gaps
+    rpc AnalyzeSkillGap (AnalyzeSkillGapRequest) returns (AnalyzeSkillGapResponse);
+
+    // Получить отчёт о пробелах в навыках / Get skill gap report
+    rpc GetSkillGapReport (GetSkillGapReportRequest) returns (GetSkillGapReportResponse);
+
+    // Создать сравнение резюме / Create resume comparison
+    rpc CreateComparison (CreateComparisonRequest) returns (CreateComparisonResponse);
+
+    // Получить сравнение резюме / Get resume comparison
+    rpc GetComparison (GetComparisonRequest) returns (GetComparisonResponse);
+
+    // Получить список сравнений / Get comparison list
+    rpc ListComparisons (ListComparisonsRequest) returns (ListComparisonsResponse);
+
+    // Удалить сравнение / Delete comparison
+    rpc DeleteComparison (DeleteComparisonRequest) returns (DeleteComparisonResponse);
+}
+
+// Запрос на удаление сравнения / Request to delete comparison
+message DeleteComparisonRequest {
+    string id = 1;                    // ID сравнения / Comparison ID
+}
+
+// Ответ на удаление сравнения / Response to delete comparison
+message DeleteComparisonResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}

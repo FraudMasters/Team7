@@ -35,7 +35,7 @@ test.describe('Recruiter Flow - Landing Page Entry', () => {
 
     // Click on recruiter option
     const recruiterButton = page.getByRole('button', { name: /Recruiter|Employer|Hiring/i }).or(
-      page.locator('.MuiCard-root').filter({ hasText: /Recruiter|Employer/i })
+      page.locator('.card').filter({ hasText: /Recruiter|Employer/i })
     );
 
     const count = await recruiterButton.count();
@@ -251,7 +251,7 @@ test.describe('Recruiter Flow - Candidate Detail Page', () => {
 
   test('should display tabs for different information views', async ({ page }) => {
     // Look for tab navigation
-    const tabs = page.locator('[role="tab"]').or(page.locator('.MuiTabs-root'));
+    const tabs = page.locator('[role="tab"]');
 
     const tabsCount = await tabs.count();
     if (tabsCount > 0) {
@@ -283,7 +283,7 @@ test.describe('Recruiter Flow - Weights Page', () => {
 
   test('should display weight distribution visualization', async ({ page }) => {
     // Look for progress bars or visual indicators
-    const progressBars = page.locator('.MuiLinearProgress-root').or(
+    const progressBars = page.locator('[role="progressbar"]').or(
       page.locator('[role="progressbar"]')
     );
 
@@ -295,7 +295,7 @@ test.describe('Recruiter Flow - Weights Page', () => {
 
   test('should display tabs for presets, custom, and saved profiles', async ({ page }) => {
     // Look for tab navigation
-    const tabs = page.locator('[role="tab"]').or(page.locator('.MuiTabs-root'));
+    const tabs = page.locator('[role="tab"]');
 
     const tabsCount = await tabs.count();
     if (tabsCount > 0) {
@@ -312,7 +312,7 @@ test.describe('Recruiter Flow - Weights Page', () => {
 
   test('should display preset configurations', async ({ page }) => {
     // Look for preset cards
-    const presetCards = page.locator('.MuiCard-root').filter({ hasText: /Preset|Technical|Creative|Balanced/i });
+    const presetCards = page.locator('.card').filter({ hasText: /Preset|Technical|Creative|Balanced/i });
 
     const cardCount = await presetCards.count();
     if (cardCount > 0) {
@@ -534,7 +534,7 @@ test.describe('Recruiter Flow - Desktop Responsive', () => {
 
     // Look for kanban columns
     const columns = page.locator('[class*="column" i], [class*="lane" i]').or(
-      page.locator('.MuiStack-root').filter({ has: page.getByText(/To Do|Applied|Shortlisted|Interview/i) })
+      page.locator('.stack').filter({ has: page.getByText(/To Do|Applied|Shortlisted|Interview/i) })
     );
 
     const columnCount = await columns.count();
@@ -548,7 +548,7 @@ test.describe('Recruiter Flow - Desktop Responsive', () => {
     await page.waitForLoadState('networkidle');
 
     // Check for grid layout (cards should be arranged horizontally)
-    const cards = page.locator('.MuiCard-root');
+    const cards = page.locator('.card');
     const count = await cards.count();
 
     if (count >= 2) {
@@ -604,7 +604,7 @@ test.describe('Recruiter Flow - Error Handling', () => {
     // Page should not crash - should show loading, error, or content
     const loading = page.getByText(/Loading/i);
     const error = page.getByText(/Error|Failed/i);
-    const content = page.locator('h1, h2, .MuiCard-root');
+    const content = page.locator('h1, h2, .card');
 
     await expect(loading.or(error).or(content)).toBeVisible();
   });
@@ -653,7 +653,7 @@ test.describe('Recruiter Flow - Weights Page Functionality', () => {
 
   test('should select preset configuration', async ({ page }) => {
     // Look for preset cards
-    const presetCards = page.locator('.MuiCard-root').filter({ hasText: /Technical|Creative|Executive|Balanced/i });
+    const presetCards = page.locator('.card').filter({ hasText: /Technical|Creative|Executive|Balanced/i });
 
     const cardCount = await presetCards.count();
     if (cardCount > 0) {
@@ -662,7 +662,7 @@ test.describe('Recruiter Flow - Weights Page Functionality', () => {
       await page.waitForTimeout(300);
 
       // Should update weight visualization (progress bars)
-      const progressBars = page.locator('.MuiLinearProgress-root');
+      const progressBars = page.locator('[role="progressbar"]');
       const barCount = await progressBars.count();
       if (barCount > 0) {
         await expect(progressBars.first()).toBeVisible();
@@ -699,7 +699,7 @@ test.describe('Recruiter Flow - Weights Page Functionality', () => {
 
       // Should show success message or update UI
       const success = page.getByText(/normalized|updated/i);
-      const progressBars = page.locator('.MuiLinearProgress-root');
+      const progressBars = page.locator('[role="progressbar"]');
 
       await expect(success.or(progressBars)).toBeVisible();
     }
@@ -714,7 +714,7 @@ test.describe('Recruiter Flow - Weights Page Functionality', () => {
       await page.waitForTimeout(300);
 
       // Should show dialog or success message
-      const dialog = page.locator('.MuiDialog-root').or(page.getByRole('dialog'));
+      const dialog = page.getByRole('dialog');
       const success = page.getByText(/saved|success/i);
 
       await expect(dialog.or(success)).toBeVisible();

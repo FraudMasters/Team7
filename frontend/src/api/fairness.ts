@@ -34,6 +34,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { config } from '@/config';
 import type {
   FairnessMetric,
   FairnessMetricsListResponse,
@@ -51,7 +52,7 @@ import type {
  * Default API configuration
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: config.api.url,
   timeout: 120000,
 };
 

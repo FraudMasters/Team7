@@ -61,8 +61,8 @@ from config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 
 def find_resume_file(resume_id: str) -> Path:

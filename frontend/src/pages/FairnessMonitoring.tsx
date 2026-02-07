@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Paper, Typography, Box, Tabs, Tab } from '@mui/material';
+import { Container, Paper, Typography, Box, Tabs, Tab } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import FairnessDashboard from '@components/analytics/FairnessDashboard';
 import FairnessReport from '@components/analytics/FairnessReport';
@@ -24,7 +24,7 @@ const FairnessMonitoringPage: React.FC = () => {
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {t('fairnessMonitoring.title')}
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           {t('fairnessMonitoring.subtitle')}
         </Typography>
       </Box>

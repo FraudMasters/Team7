@@ -27,18 +27,8 @@ import {
   Collapse,
   IconButton,
   Tooltip,
-} from '@mui/material';
-import {
-  CheckCircle as PassedIcon,
-  Cancel as FailedIcon,
-  Warning as WarningIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Visibility as VisualIcon,
-  VisibilityOff as VisualOffIcon,
-  Psychology as LLMIcon,
-  Rule as RuleIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import type { ATSEvaluationResponse } from '@/types/api';
 
 interface ATSEvaluationProps {
@@ -99,11 +89,11 @@ function ScoreCard({ title, score, icon, description }: ScoreCardProps) {
       <Typography variant="h4" color={`${color}.main`}>
         {percentage}%
       </Typography>
-      <Typography variant="caption" color="text.secondary" gutterBottom>
+      <Typography variant="caption" color="secondary" gutterBottom>
         {title}
       </Typography>
       {description && (
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="secondary">
           {description}
         </Typography>
       )}
@@ -155,7 +145,7 @@ function ExpandableSection({
           </Typography>
         </Box>
         <IconButton size="small">
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          <Icon name={expanded ? 'chevron-up' : 'chevron-down'} />
         </IconButton>
       </Box>
       <Collapse in={expanded}>
@@ -200,7 +190,12 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
       {/* Main Status Alert */}
       <Alert
         severity={disqualified ? 'error' : passed ? 'success' : 'warning'}
-        icon={disqualified ? <FailedIcon /> : passed ? <PassedIcon /> : <WarningIcon />}
+        icon={disqualified
+          ? <Icon name="x-circle" />
+          : passed
+            ? <Icon name="check-circle" />
+            : <Icon name="alert-triangle" />
+        }
       >
         <AlertTitle>
           {disqualified
@@ -220,14 +215,19 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
           <ScoreCard
             title={t('ats.overallScore', { defaultValue: 'Overall Score' })}
             score={overall_score}
-            icon={disqualified ? <FailedIcon color="error" /> : passed ? <PassedIcon color="success" /> : <WarningIcon color="warning" />}
+            icon={disqualified
+              ? <Icon name="x-circle" color="error" />
+              : passed
+                ? <Icon name="check-circle" color="success" />
+                : <Icon name="alert-triangle" color="warning" />
+            }
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <ScoreCard
             title={t('ats.keywordScore', { defaultValue: 'Keyword Match' })}
             score={keyword_score}
-            icon={<Typography variant="h6" color="action">#</Typography>}
+            icon={<Typography variant="h6" color="muted">#</Typography>}
             description={t('ats.keywordScoreDesc', { defaultValue: 'Required skills found' })}
           />
         </Grid>
@@ -235,7 +235,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
           <ScoreCard
             title={t('ats.experienceScore', { defaultValue: 'Experience' })}
             score={experience_score}
-            icon={<Typography variant="h6" color="action">📅</Typography>}
+            icon={<Typography variant="h6" color="muted">📅</Typography>}
             description={t('ats.experienceScoreDesc', { defaultValue: 'Relevant experience' })}
           />
         </Grid>
@@ -243,7 +243,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
           <ScoreCard
             title={t('ats.fitScore', { defaultValue: 'Overall Fit' })}
             score={fit_score}
-            icon={<Typography variant="h6" color="action">🎯</Typography>}
+            icon={<Typography variant="h6" color="muted">🎯</Typography>}
             description={t('ats.fitScoreDesc', { defaultValue: 'Job fit assessment' })}
           />
         </Grid>
@@ -263,7 +263,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
                 color={getScoreColor(education_score)}
                 sx={{ flexGrow: 1 }}
               />
-              <Typography variant="body2" color="text.secondary" minWidth={40} textAlign="right">
+              <Typography variant="body2" color="secondary" minWidth={40} textAlign="right">
                 {Math.round(education_score * 100)}%
               </Typography>
             </Box>
@@ -277,9 +277,9 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
           <Grid item xs={12} sm={6}>
             <Box display="flex" alignItems="center" gap={1}>
               {looks_professional ? (
-                <VisualIcon color="success" />
+                <Icon name="eye" color="success" />
               ) : (
-                <VisualOffIcon color="error" />
+                <Icon name="eye-off" color="error" />
               )}
               <Typography variant="subtitle2">
                 {t('ats.professionalAppearance', { defaultValue: 'Professional Appearance' })}
@@ -303,7 +303,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
       {missing_keywords.length > 0 && (
         <ExpandableSection
           title={t('ats.missingKeywords', { defaultValue: 'Missing Keywords' })}
-          icon={<WarningIcon color="error" />}
+          icon={<Icon name="alert-triangle" color="error" />}
           itemCount={missing_keywords.length}
           defaultExpanded
           color="error"
@@ -326,7 +326,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
       {visual_issues.length > 0 && (
         <ExpandableSection
           title={t('ats.visualIssues', { defaultValue: 'Visual/Format Issues' })}
-          icon={<WarningIcon color="warning" />}
+          icon={<Icon name="alert-triangle" color="warning" />}
           itemCount={visual_issues.length}
           color="warning"
         >
@@ -334,7 +334,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
             {visual_issues.map((issue, index) => (
               <ListItem key={index}>
                 <ListItemIcon>
-                  <WarningIcon color="warning" fontSize="small" />
+                  <Icon name="alert-triangle" color="warning" size="small" />
                 </ListItemIcon>
                 <ListItemText primary={issue} />
               </ListItem>
@@ -347,7 +347,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
       {ats_issues.length > 0 && (
         <ExpandableSection
           title={t('ats.atsIssues', { defaultValue: 'ATS-Specific Issues' })}
-          icon={<WarningIcon color="error" />}
+          icon={<Icon name="alert-triangle" color="error" />}
           itemCount={ats_issues.length}
           color="error"
         >
@@ -355,7 +355,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
             {ats_issues.map((issue, index) => (
               <ListItem key={index}>
                 <ListItemIcon>
-                  <FailedIcon color="error" fontSize="small" />
+                  <Icon name="x-circle" color="error" size="small" />
                 </ListItemIcon>
                 <ListItemText primary={issue} />
               </ListItem>
@@ -396,14 +396,14 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
               <Box display="flex" alignItems="center" gap={1}>
                 {isLLM ? (
                   <Tooltip title={t('ats.llmTooltip', { defaultValue: 'Evaluated using LLM-based analysis' })}>
-                    <LLMIcon fontSize="small" color="action" />
+                    <Icon name="brain" size="small" color="muted" />
                   </Tooltip>
                 ) : (
                   <Tooltip title={t('ats.ruleTooltip', { defaultValue: 'Evaluated using rule-based analysis' })}>
-                    <RuleIcon fontSize="small" color="action" />
+                    <Icon name="scale" size="small" color="muted" />
                   </Tooltip>
                 )}
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {isLLM
                     ? `${provider} / ${model}`
                     : t('ats.ruleBased', { defaultValue: 'Rule-based evaluation' })
@@ -412,7 +412,7 @@ export function ATSEvaluation({ result }: ATSEvaluationProps) {
               </Box>
             </Grid>
             <Grid item>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="secondary">
                 {t('ats.processingTime', {
                   defaultValue: '{{ms}}ms',
                   ms: Math.round(processing_time_ms),
@@ -461,7 +461,7 @@ export function ATSScoreBadge({ result, showDetails = false }: ATSScoreBadgeProp
       }
     >
       <Chip
-        icon={result.passed ? <PassedIcon /> : <FailedIcon />}
+        icon={result.passed ? <Icon name="check-circle" /> : <Icon name="x-circle" />}
         label={`${percentage}%`}
         color={color}
         size={showDetails ? 'medium' : 'small'}

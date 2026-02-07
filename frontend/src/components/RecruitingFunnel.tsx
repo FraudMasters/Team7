@@ -7,14 +7,8 @@ import {
   Card,
   CardContent,
   CircularProgress,
-} from '@mui/material';
-import {
-  Description as ResumeIcon,
-  Work as VacancyIcon,
-  CheckCircle as HighMatchIcon,
-  TrendingUp as TrendingIcon,
-  FilterAlt as FunnelIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 
@@ -148,7 +142,7 @@ const RecruitingFunnel: React.FC = () => {
   if (!funnelData) {
     return (
       <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           {t('funnel.noData')}
         </Typography>
       </Paper>
@@ -156,11 +150,11 @@ const RecruitingFunnel: React.FC = () => {
   }
 
   const funnelStages = [
-    { label: t('funnel.allResumes'), count: funnelData.totalResumes, color: '#1976d2', icon: <ResumeIcon /> },
-    { label: t('funnel.activeVacancies'), count: funnelData.totalVacancies, color: '#9c27b0', icon: <VacancyIcon /> },
-    { label: t('funnel.lowMatch'), count: funnelData.lowMatch, color: '#ff9800', icon: <TrendingIcon /> },
-    { label: t('funnel.mediumMatch'), count: funnelData.mediumMatch, color: '#2196f3', icon: <TrendingIcon /> },
-    { label: t('funnel.highMatch'), count: funnelData.highMatch, color: '#4caf50', icon: <HighMatchIcon /> },
+    { label: t('funnel.allResumes'), count: funnelData.totalResumes, color: '#1976d2', iconName: 'file-text' },
+    { label: t('funnel.activeVacancies'), count: funnelData.totalVacancies, color: '#9c27b0', iconName: 'briefcase' },
+    { label: t('funnel.lowMatch'), count: funnelData.lowMatch, color: '#ff9800', iconName: 'trending-up' },
+    { label: t('funnel.mediumMatch'), count: funnelData.mediumMatch, color: '#2196f3', iconName: 'trending-up' },
+    { label: t('funnel.highMatch'), count: funnelData.highMatch, color: '#4caf50', iconName: 'check-circle-2' },
   ];
 
   const maxCount = Math.max(...funnelStages.map((s) => s.count), 1);
@@ -169,7 +163,7 @@ const RecruitingFunnel: React.FC = () => {
     <Box>
       {/* Funnel Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <FunnelIcon sx={{ mr: 1, fontSize: 28, color: 'primary.main' }} />
+        <Icon name="filter" size={28} color="primary" sx={{ mr: 1 }} />
         <Typography variant="h5" fontWeight={600}>
           {t('funnel.title')}
         </Typography>
@@ -177,7 +171,7 @@ const RecruitingFunnel: React.FC = () => {
 
       {/* Visual Funnel */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+        <Typography variant="subtitle2" color="secondary" gutterBottom>
           {t('funnel.pipelineOverview')}
         </Typography>
         <Box sx={{ mt: 2 }}>
@@ -193,7 +187,7 @@ const RecruitingFunnel: React.FC = () => {
             >
               <Box sx={{ width: 160, flexShrink: 0 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ color: stage.color, mr: 0.5 }}>{stage.icon}</Box>
+                  <Icon name={stage.iconName} size={18} sx={{ mr: 0.5, color: stage.color }} />
                   <Typography variant="body2" fontWeight={500}>
                     {stage.label}
                   </Typography>
@@ -231,7 +225,7 @@ const RecruitingFunnel: React.FC = () => {
                     top: '50%',
                     transform: 'translateY(-50%)',
                     fontWeight: 600,
-                    color: stage.count > maxCount * 0.3 ? 'white' : 'text.primary',
+                    color: stage.count > maxCount * 0.3 ? '#fff' : 'inherit',
                   }}
                 >
                   {stage.count}
@@ -264,26 +258,26 @@ const RecruitingFunnel: React.FC = () => {
           }}
         >
           <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="primary.main" fontWeight={700}>
+            <Typography variant="h4" color="primary" fontWeight={700}>
               {funnelData.avgMatchPercentage}%
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               {t('funnel.avgMatchRate')}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="success.main" fontWeight={700}>
+            <Typography variant="h4" color="success" fontWeight={700}>
               {funnelData.highMatch}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               {t('funnel.highQualityMatches')}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="info.main" fontWeight={700}>
+            <Typography variant="h4" color="info" fontWeight={700}>
               {funnelData.mediumMatch}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               {t('funnel.potentialCandidates')}
             </Typography>
           </Box>
@@ -293,7 +287,7 @@ const RecruitingFunnel: React.FC = () => {
       {/* Top Vacancies by High Matches */}
       {vacancyStats.length > 0 && (
         <Paper sx={{ p: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          <Typography variant="subtitle2" color="secondary" gutterBottom>
             {t('funnel.topVacancies')}
           </Typography>
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -304,7 +298,7 @@ const RecruitingFunnel: React.FC = () => {
                   sx={{
                     height: '100%',
                     borderLeft: 3,
-                    borderColor: stat.highMatch > 0 ? 'success.main' : 'grey.300',
+                    borderColor: stat.highMatch > 0 ? '#4caf50' : '#e0e0e0',
                   }}
                 >
                   <CardContent sx={{ pb: 2 }}>
@@ -313,26 +307,26 @@ const RecruitingFunnel: React.FC = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
                       <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="success.main" fontWeight={700}>
+                        <Typography variant="h6" color="success" fontWeight={700}>
                           {stat.highMatch}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           70%+
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="info.main" fontWeight={700}>
+                        <Typography variant="h6" color="info" fontWeight={700}>
                           {stat.mediumMatch}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           50%+
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="primary.main" fontWeight={700}>
+                        <Typography variant="h6" color="primary" fontWeight={700}>
                           {stat.totalMatch}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           Total
                         </Typography>
                       </Box>

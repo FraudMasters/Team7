@@ -14,28 +14,14 @@ import {
   Drawer,
   List,
   ListItem,
-  ListItemButton,
   ListItemIcon,
   ListItemText,
   Divider,
   Collapse,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
-import {
-  Description as ResumeIcon,
-  Work as WorkIcon,
-  Person as PersonIcon,
-  BusinessCenter as RecruiterIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Settings as SettingsIcon,
-  Upload as UploadIcon,
-  School as SchoolIcon,
-  Tune as TuneIcon,
-  Menu as MenuIcon,
-  ViewKanban as KanbanIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
+import { useResponsive } from '@/hooks/useResponsive';
 import LanguageSwitcher from './LanguageSwitcher';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 import { useGlobalKeyboardShortcuts, COMMON_SHORTCUTS } from '@/hooks/useGlobalKeyboardShortcuts';
@@ -54,12 +40,8 @@ const Layout: React.FC<LayoutProps> = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const theme = useTheme();
-
-  // Responsive breakpoints
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'lg'));
-  const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
+  const { theme } = useEmotionTheme();
+  const responsive = useResponsive();
 
   // Desktop menu states
   const [jobSeekerAnchorEl, setJobSeekerAnchorEl] = useState<null | HTMLElement>(null);
@@ -205,29 +187,29 @@ const Layout: React.FC<LayoutProps> = () => {
 
   // Job Seeker Module menu items
   const jobSeekerItems = [
-    { labelKey: 'nav.browseJobs', path: '/jobs', icon: <WorkIcon fontSize="small" /> },
-    { labelKey: 'nav.uploadResumeNav', path: '/jobs/upload', icon: <ResumeIcon fontSize="small" /> },
-    { labelKey: 'nav.batchUpload', path: '/jobs/batch-upload', icon: <UploadIcon fontSize="small" /> },
-    { labelKey: 'nav.myApplications', path: '/jobs/applications', icon: <PersonIcon fontSize="small" /> },
+    { labelKey: 'nav.browseJobs', path: '/jobs', iconName: 'briefcase' },
+    { labelKey: 'nav.uploadResumeNav', path: '/jobs/upload', iconName: 'file-text' },
+    { labelKey: 'nav.batchUpload', path: '/jobs/batch-upload', iconName: 'upload-cloud' },
+    { labelKey: 'nav.myApplications', path: '/jobs/applications', iconName: 'user' },
   ];
 
   // Recruiter Module menu items
   const recruiterItems = [
-    { labelKey: 'nav.dashboard', path: '/recruiter', icon: <RecruiterIcon fontSize="small" /> },
-    { labelKey: 'nav.manageVacancies', path: '/recruiter/vacancies', icon: <WorkIcon fontSize="small" /> },
-    { labelKey: 'nav.candidatePipeline', path: '/recruiter/candidates', icon: <KanbanIcon fontSize="small" /> },
-    { labelKey: 'nav.resumeDatabase', path: '/recruiter/resumes', icon: <PersonIcon fontSize="small" /> },
-    { labelKey: 'nav.searchCandidates', path: '/recruiter/search', icon: <RecruiterIcon fontSize="small" /> },
-    { labelKey: 'nav.skillGapAnalysis', path: '/recruiter/skill-gap', icon: <SchoolIcon fontSize="small" /> },
-    { labelKey: 'nav.matchingWeights', path: '/recruiter/weights', icon: <TuneIcon fontSize="small" /> },
+    { labelKey: 'nav.dashboard', path: '/recruiter', iconName: 'layout-dashboard' },
+    { labelKey: 'nav.manageVacancies', path: '/recruiter/vacancies', iconName: 'briefcase' },
+    { labelKey: 'nav.candidatePipeline', path: '/recruiter/candidates', iconName: 'columns' },
+    { labelKey: 'nav.resumeDatabase', path: '/recruiter/resumes', iconName: 'users' },
+    { labelKey: 'nav.searchCandidates', path: '/recruiter/search', iconName: 'search' },
+    { labelKey: 'nav.skillGapAnalysis', path: '/recruiter/skill-gap', iconName: 'graduation-cap' },
+    { labelKey: 'nav.matchingWeights', path: '/recruiter/weights', iconName: 'sliders' },
   ];
 
   // Admin Module menu items
   const adminItems = [
-    { labelKey: 'nav.adminSynonyms', path: '/admin/synonyms', icon: <SettingsIcon fontSize="small" /> },
-    { labelKey: 'nav.adminTaxonomies', path: '/admin/taxonomies', icon: <SettingsIcon fontSize="small" /> },
-    { labelKey: 'nav.adminTaxonomyAnalytics', path: '/admin/taxonomy-analytics', icon: <SettingsIcon fontSize="small" /> },
-    { labelKey: 'nav.adminPublicTaxonomies', path: '/admin/public-taxonomies', icon: <SettingsIcon fontSize="small" /> },
+    { labelKey: 'nav.adminSynonyms', path: '/admin/synonyms', iconName: 'settings' },
+    { labelKey: 'nav.adminTaxonomies', path: '/admin/taxonomies', iconName: 'settings' },
+    { labelKey: 'nav.adminTaxonomyAnalytics', path: '/admin/taxonomy-analytics', iconName: 'settings' },
+    { labelKey: 'nav.adminPublicTaxonomies', path: '/admin/public-taxonomies', iconName: 'settings' },
   ];
 
   return (
@@ -235,13 +217,23 @@ const Layout: React.FC<LayoutProps> = () => {
       {/* App Bar / Navigation */}
       <AppBar position="static" elevation={2}>
         <Container maxWidth="lg">
-          <Toolbar disableGutters sx={{ px: { xs: 1, sm: 2 } }}>
+          <Toolbar disableGutters sx={{ px: { xs: theme.spacing.sm, sm: theme.spacing.md, md: theme.spacing.xl } }}>
             {/* Logo / Brand */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mr: { xs: 1, sm: 2, md: 4 } }}>
-              <ResumeIcon sx={{ mr: 1, fontSize: { xs: 24, sm: 28, md: 32 } }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', mr: { xs: theme.spacing.sm, sm: theme.spacing.md, md: theme.spacing.xl } }}>
+              <Box
+                sx={{
+                  mr: theme.spacing.sm,
+                  fontSize: { xs: '24px', sm: '28px', md: '32px' },
+                  color: 'inherit',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Icon name="file-text" size="large" color="inherit" />
+              </Box>
               <Typography
-                variant={isMobile ? 'body1' : 'h6'}
-                component={Link}
+                variant={responsive.isSmDown ? 'body1' : 'h6'}
+                as={Link}
                 to="/"
                 onClick={() => {
                   handleMobileMenuClose();
@@ -260,201 +252,180 @@ const Layout: React.FC<LayoutProps> = () => {
             </Box>
 
             {/* Desktop Navigation - Hidden on Mobile */}
-            {!isMobile && (
+            {!responsive.isSmDown && (
               <Box
                 sx={{
                   flexGrow: 1,
                   display: 'flex',
-                  gap: { sm: 0.5, md: 1 },
+                  gap: { sm: theme.spacing.xs, md: theme.spacing.sm },
                   alignItems: 'center',
                 }}
               >
                 {/* Job Seeker Module */}
-                <Button
-                  color="inherit"
-                  startIcon={!isTablet && <WorkIcon />}
-                  endIcon={<ExpandMoreIcon />}
-                  onClick={handleJobSeekerMenuClick}
-                  aria-expanded={jobSeekerMenuOpen}
-                  aria-haspopup="true"
-                  aria-label={t('nav.findJobs')}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    borderRadius: 1,
-                    px: { sm: 1, md: 2 },
-                    fontSize: { sm: '0.875rem', md: '1rem' },
-                    minWidth: 'auto',
-                  }}
-                >
-                  {isTablet ? <WorkIcon /> : t('nav.findJobs')}
-                </Button>
-                <Menu
-                  anchorEl={jobSeekerAnchorEl}
-                  open={jobSeekerMenuOpen}
-                  onClose={handleJobSeekerMenuClose}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'left',
-                  }}
-                  MenuListProps={{
-                    'aria-labelledby': 'job-seeker-menu-button',
-                    role: 'menu',
-                  }}
-                  slotProps={{
-                    paper: {
-                      sx: { minWidth: 200 },
-                    },
-                  }}
-                >
-                  {jobSeekerItems.map((item) => (
-                    <MenuItem
-                      key={item.path}
-                      component={Link}
-                      to={item.path}
-                      onClick={handleJobSeekerMenuClose}
-                      selected={location.pathname === item.path}
-                      role="menuitem"
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 180 }}>
-                        {item.icon}
-                        <Typography variant="body2">{t(item.labelKey)}</Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Menu>
+                <Box sx={{ position: 'relative' }}>
+                  <Button
+                    color="inherit"
+                    startIcon={!responsive.isMdUp && <Icon name="briefcase" size="small" />}
+                    endIcon={<Icon name="chevron-down" size="small" />}
+                    onClick={handleJobSeekerMenuClick}
+                    aria-expanded={jobSeekerMenuOpen}
+                    aria-haspopup="true"
+                    aria-label={t('nav.findJobs')}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      borderRadius: theme.borderRadius.sm,
+                      px: { sm: theme.spacing.sm, md: theme.spacing.md },
+                      fontSize: { sm: '0.875rem', md: '1rem' },
+                      minWidth: 'auto',
+                    }}
+                  >
+                    {responsive.isMdUp ? t('nav.findJobs') : null}
+                  </Button>
+                  <Menu
+                    anchorEl={jobSeekerAnchorEl}
+                    open={jobSeekerMenuOpen}
+                    onClose={handleJobSeekerMenuClose}
+                    anchorOrigin={{
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    }}
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'left',
+                    }}
+                    minWidth={200}
+                  >
+                    {jobSeekerItems.map((item) => (
+                      <MenuItem
+                        key={item.path}
+                        as={Link}
+                        to={item.path}
+                        onClick={handleJobSeekerMenuClose}
+                        selected={location.pathname === item.path}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, minWidth: 180 }}>
+                          <Icon name={item.iconName} size="small" />
+                          <Typography variant="body2">{t(item.labelKey)}</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </Box>
 
                 {/* Recruiter Module */}
-                <Button
-                  color="inherit"
-                  startIcon={!isTablet && <RecruiterIcon />}
-                  endIcon={<ExpandMoreIcon />}
-                  onClick={handleRecruiterMenuClick}
-                  aria-expanded={recruiterMenuOpen}
-                  aria-haspopup="true"
-                  aria-label={t('nav.findEmployees')}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    borderRadius: 1,
-                    px: { sm: 1, md: 2 },
-                    fontSize: { sm: '0.875rem', md: '1rem' },
-                    minWidth: 'auto',
-                  }}
-                >
-                  {isTablet ? <RecruiterIcon /> : t('nav.findEmployees')}
-                </Button>
-                <Menu
-                  anchorEl={recruiterAnchorEl}
-                  open={recruiterMenuOpen}
-                  onClose={handleRecruiterMenuClose}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'left',
-                  }}
-                  MenuListProps={{
-                    'aria-labelledby': 'recruiter-menu-button',
-                    role: 'menu',
-                  }}
-                  slotProps={{
-                    paper: {
-                      sx: { minWidth: 200 },
-                    },
-                  }}
-                >
-                  {recruiterItems.map((item) => (
-                    <MenuItem
-                      key={item.path}
-                      component={Link}
-                      to={item.path}
-                      onClick={handleRecruiterMenuClose}
-                      selected={location.pathname === item.path}
-                      role="menuitem"
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 180 }}>
-                        {item.icon}
-                        <Typography variant="body2">{t(item.labelKey)}</Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Menu>
+                <Box sx={{ position: 'relative' }}>
+                  <Button
+                    color="inherit"
+                    startIcon={!responsive.isMdUp && <Icon name="briefcase" size="small" />}
+                    endIcon={<Icon name="chevron-down" size="small" />}
+                    onClick={handleRecruiterMenuClick}
+                    aria-expanded={recruiterMenuOpen}
+                    aria-haspopup="true"
+                    aria-label={t('nav.findEmployees')}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      borderRadius: theme.borderRadius.sm,
+                      px: { sm: theme.spacing.sm, md: theme.spacing.md },
+                      fontSize: { sm: '0.875rem', md: '1rem' },
+                      minWidth: 'auto',
+                    }}
+                  >
+                    {responsive.isMdUp ? t('nav.findEmployees') : null}
+                  </Button>
+                  <Menu
+                    anchorEl={recruiterAnchorEl}
+                    open={recruiterMenuOpen}
+                    onClose={handleRecruiterMenuClose}
+                    anchorOrigin={{
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    }}
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'left',
+                    }}
+                    minWidth={200}
+                  >
+                    {recruiterItems.map((item) => (
+                      <MenuItem
+                        key={item.path}
+                        as={Link}
+                        to={item.path}
+                        onClick={handleRecruiterMenuClose}
+                        selected={location.pathname === item.path}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, minWidth: 180 }}>
+                          <Icon name={item.iconName} size="small" />
+                          <Typography variant="body2">{t(item.labelKey)}</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </Box>
 
                 {/* Admin Module */}
-                <Button
-                  color="inherit"
-                  startIcon={!isTablet && <SettingsIcon />}
-                  endIcon={<ExpandMoreIcon />}
-                  onClick={handleAdminMenuClick}
-                  aria-expanded={adminMenuOpen}
-                  aria-haspopup="true"
-                  aria-label={t('nav.admin')}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    borderRadius: 1,
-                    px: { sm: 1, md: 2 },
-                    fontSize: { sm: '0.875rem', md: '1rem' },
-                    minWidth: 'auto',
-                  }}
-                >
-                  {isTablet ? <SettingsIcon /> : t('nav.admin')}
-                </Button>
-                <Menu
-                  anchorEl={adminAnchorEl}
-                  open={adminMenuOpen}
-                  onClose={handleAdminMenuClose}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'left',
-                  }}
-                  MenuListProps={{
-                    'aria-labelledby': 'admin-menu-button',
-                    role: 'menu',
-                  }}
-                  slotProps={{
-                    paper: {
-                      sx: { minWidth: 220 },
-                    },
-                  }}
-                >
-                  {adminItems.map((item) => (
-                    <MenuItem
-                      key={item.path}
-                      component={Link}
-                      to={item.path}
-                      onClick={handleAdminMenuClose}
-                      selected={location.pathname === item.path}
-                      role="menuitem"
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                        {item.icon}
-                        <Typography variant="body2">{t(item.labelKey)}</Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Menu>
+                <Box sx={{ position: 'relative' }}>
+                  <Button
+                    color="inherit"
+                    startIcon={!responsive.isMdUp && <Icon name="settings" size="small" />}
+                    endIcon={<Icon name="chevron-down" size="small" />}
+                    onClick={handleAdminMenuClick}
+                    aria-expanded={adminMenuOpen}
+                    aria-haspopup="true"
+                    aria-label={t('nav.admin')}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      borderRadius: theme.borderRadius.sm,
+                      px: { sm: theme.spacing.sm, md: theme.spacing.md },
+                      fontSize: { sm: '0.875rem', md: '1rem' },
+                      minWidth: 'auto',
+                    }}
+                  >
+                    {responsive.isMdUp ? t('nav.admin') : null}
+                  </Button>
+                  <Menu
+                    anchorEl={adminAnchorEl}
+                    open={adminMenuOpen}
+                    onClose={handleAdminMenuClose}
+                    anchorOrigin={{
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    }}
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'left',
+                    }}
+                    minWidth={220}
+                  >
+                    {adminItems.map((item) => (
+                      <MenuItem
+                        key={item.path}
+                        as={Link}
+                        to={item.path}
+                        onClick={handleAdminMenuClose}
+                        selected={location.pathname === item.path}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, minWidth: 200 }}>
+                          <Icon name={item.iconName} size="small" />
+                          <Typography variant="body2">{t(item.labelKey)}</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </Box>
               </Box>
             )}
 
             {/* Right side actions */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
               {/* Language Switcher */}
               <LanguageSwitcher />
 
               {/* Mobile Menu Button */}
-              {isMobile && (
+              {responsive.isSmDown && (
                 <IconButton
                   edge="end"
                   color="inherit"
@@ -462,10 +433,9 @@ const Layout: React.FC<LayoutProps> = () => {
                   aria-controls="mobile-menu-drawer"
                   aria-haspopup="true"
                   onClick={handleDrawerToggle}
-                  sx={{ ml: 1 }}
-                >
-                  <MenuIcon />
-                </IconButton>
+                  sx={{ ml: theme.spacing.sm }}
+                  name="menu"
+                />
               )}
             </Box>
           </Toolbar>
@@ -482,12 +452,7 @@ const Layout: React.FC<LayoutProps> = () => {
           keepMounted: true, // Better mobile performance
           onBackdropClick: handleMobileMenuClose,
         }}
-        sx={{
-          '& .MuiDrawer-paper': {
-            width: 280,
-            boxSizing: 'border-box',
-          },
-        }}
+        width={280}
       >
         <Box
           sx={{
@@ -500,53 +465,61 @@ const Layout: React.FC<LayoutProps> = () => {
           {/* Drawer Header */}
           <Box
             sx={{
-              p: 2,
+              p: theme.spacing.md,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              borderBottom: 1,
-              borderColor: 'divider',
+              borderBottom: `1px solid ${theme.divider}`,
             }}
           >
-            <Typography variant="h6" component="div">
+            <Typography variant="h6" as="div">
               Menu
             </Typography>
             <IconButton
               edge="end"
               onClick={handleMobileMenuClose}
               aria-label="Close menu"
-            >
-              <MenuIcon />
-            </IconButton>
+              name="x"
+              color="inherit"
+            />
           </Box>
 
           {/* Navigation Menu */}
-          <List sx={{ flexGrow: 1, py: 1 }}>
+          <List sx={{ flexGrow: 1, py: theme.spacing.sm }}>
             {/* Job Seeker Module */}
             <>
-              <ListItemButton onClick={handleMobileJobSeekerToggle} aria-expanded={mobileJobSeekerOpen}>
+              <ListItem
+                disablePadding
+                onClick={handleMobileJobSeekerToggle}
+                aria-expanded={mobileJobSeekerOpen}
+              >
                 <ListItemIcon>
-                  <WorkIcon />
+                  <Icon name="briefcase" size="small" />
                 </ListItemIcon>
                 <ListItemText primary={t('nav.findJobs')} />
-                {mobileJobSeekerOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </ListItemButton>
+                <Icon
+                  name={mobileJobSeekerOpen ? 'chevron-up' : 'chevron-down'}
+                  size="small"
+                  color="secondary"
+                />
+              </ListItem>
               <Collapse in={mobileJobSeekerOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
+                <List as="div" disablePadding>
                   {jobSeekerItems.map((item) => (
-                    <ListItemButton
+                    <ListItem
                       key={item.path}
-                      component={Link}
+                      as={Link}
                       to={item.path}
                       onClick={() => handleMobileNavClick(item.path)}
                       selected={location.pathname === item.path}
-                      sx={{ pl: 4 }}
+                      sx={{ pl: theme.spacing.xl }}
+                      disablePadding
                     >
                       <ListItemIcon sx={{ minWidth: 32 }}>
-                        {item.icon}
+                        <Icon name={item.iconName} size="small" />
                       </ListItemIcon>
                       <ListItemText primary={t(item.labelKey)} />
-                    </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
               </Collapse>
@@ -556,29 +529,38 @@ const Layout: React.FC<LayoutProps> = () => {
 
             {/* Recruiter Module */}
             <>
-              <ListItemButton onClick={handleMobileRecruiterToggle} aria-expanded={mobileRecruiterOpen}>
+              <ListItem
+                disablePadding
+                onClick={handleMobileRecruiterToggle}
+                aria-expanded={mobileRecruiterOpen}
+              >
                 <ListItemIcon>
-                  <RecruiterIcon />
+                  <Icon name="briefcase" size="small" />
                 </ListItemIcon>
                 <ListItemText primary={t('nav.findEmployees')} />
-                {mobileRecruiterOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </ListItemButton>
+                <Icon
+                  name={mobileRecruiterOpen ? 'chevron-up' : 'chevron-down'}
+                  size="small"
+                  color="secondary"
+                />
+              </ListItem>
               <Collapse in={mobileRecruiterOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
+                <List as="div" disablePadding>
                   {recruiterItems.map((item) => (
-                    <ListItemButton
+                    <ListItem
                       key={item.path}
-                      component={Link}
+                      as={Link}
                       to={item.path}
                       onClick={() => handleMobileNavClick(item.path)}
                       selected={location.pathname === item.path}
-                      sx={{ pl: 4 }}
+                      sx={{ pl: theme.spacing.xl }}
+                      disablePadding
                     >
                       <ListItemIcon sx={{ minWidth: 32 }}>
-                        {item.icon}
+                        <Icon name={item.iconName} size="small" />
                       </ListItemIcon>
                       <ListItemText primary={t(item.labelKey)} />
-                    </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
               </Collapse>
@@ -588,29 +570,38 @@ const Layout: React.FC<LayoutProps> = () => {
 
             {/* Admin Module */}
             <>
-              <ListItemButton onClick={handleMobileAdminToggle} aria-expanded={mobileAdminOpen}>
+              <ListItem
+                disablePadding
+                onClick={handleMobileAdminToggle}
+                aria-expanded={mobileAdminOpen}
+              >
                 <ListItemIcon>
-                  <SettingsIcon />
+                  <Icon name="settings" size="small" />
                 </ListItemIcon>
                 <ListItemText primary={t('nav.admin')} />
-                {mobileAdminOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </ListItemButton>
+                <Icon
+                  name={mobileAdminOpen ? 'chevron-up' : 'chevron-down'}
+                  size="small"
+                  color="secondary"
+                />
+              </ListItem>
               <Collapse in={mobileAdminOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
+                <List as="div" disablePadding>
                   {adminItems.map((item) => (
-                    <ListItemButton
+                    <ListItem
                       key={item.path}
-                      component={Link}
+                      as={Link}
                       to={item.path}
                       onClick={() => handleMobileNavClick(item.path)}
                       selected={location.pathname === item.path}
-                      sx={{ pl: 4 }}
+                      sx={{ pl: theme.spacing.xl }}
+                      disablePadding
                     >
                       <ListItemIcon sx={{ minWidth: 32 }}>
-                        {item.icon}
+                        <Icon name={item.iconName} size="small" />
                       </ListItemIcon>
                       <ListItemText primary={t(item.labelKey)} />
-                    </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
               </Collapse>
@@ -620,7 +611,7 @@ const Layout: React.FC<LayoutProps> = () => {
       </Drawer>
 
       {/* Main Content Area */}
-      <Box sx={{ flexGrow: 1, py: 4 }}>
+      <Box sx={{ flexGrow: 1, py: theme.spacing.xl }}>
         <Container maxWidth="lg">
           <Outlet />
         </Container>
@@ -628,15 +619,12 @@ const Layout: React.FC<LayoutProps> = () => {
 
       {/* Footer */}
       <Box
-        component="footer"
+        as="footer"
         sx={{
-          py: 3,
-          px: 2,
+          py: theme.spacing.md,
+          px: theme.spacing.sm,
           mt: 'auto',
-          backgroundColor: (theme) =>
-            theme.palette.mode === 'light'
-              ? theme.palette.grey[200]
-              : theme.palette.grey[800],
+          backgroundColor: theme.mode === 'light' ? theme.grey[200] : theme.grey[800],
         }}
       >
         <Container maxWidth="lg">

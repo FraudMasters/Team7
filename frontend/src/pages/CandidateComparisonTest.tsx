@@ -7,7 +7,7 @@ import {
   Box,
   TextField,
   Button,
-} from '@mui/material';
+} from '@/components/ui';
 import CandidateComparisonTable from '@components/CandidateComparisonTable';
 
 const CandidateComparisonTest: React.FC = () => {
@@ -24,7 +24,7 @@ const CandidateComparisonTest: React.FC = () => {
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Candidate Comparison Table - Component Test
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Testing the CandidateComparisonTable component with top 3 candidates
           </Typography>
         </Box>
@@ -50,7 +50,7 @@ const CandidateComparisonTest: React.FC = () => {
               helperText="List of resume IDs to compare (1-10 candidates)"
               placeholder="resume-1,resume-2,resume-3"
             />
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               Active Resume IDs: {resumeIdArray.length > 0 ? resumeIdArray.join(', ') : 'None'}
             </Typography>
           </Stack>
@@ -61,7 +61,7 @@ const CandidateComparisonTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 1: Real API Integration
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Fetching comparison for {resumeIdArray.length} candidate(s)
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -83,7 +83,7 @@ const CandidateComparisonTest: React.FC = () => {
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Verification Checklist:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             ✓ Table displays 3 candidates side-by-side<br />
             ✓ Shows overall score and component scores<br />
             ✓ Highlighting for best scores in each column<br />
@@ -97,23 +97,23 @@ const CandidateComparisonTest: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Component Features:
           </Typography>
-          <Box component="ul" sx={{ pl: 2, mt: 1 }}>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+          <Box as="ul" sx={{ pl: 2, mt: 1 }}>
+            <Typography as="li" variant="body2" sx={{ mb: 1 }}>
               <strong>Side-by-side comparison:</strong> Shows top 3 candidates in a clear table format
             </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+            <Typography as="li" variant="body2" sx={{ mb: 1 }}>
               <strong>Score breakdown:</strong> Displays overall score plus component scores (Keyword 50%, TF-IDF 30%, Vector 20%)
             </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+            <Typography as="li" variant="body2" sx={{ mb: 1 }}>
               <strong>Best score highlighting:</strong> Trophy icon and visual emphasis for best scores in each category
             </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+            <Typography as="li" variant="body2" sx={{ mb: 1 }}>
               <strong>Responsive design:</strong> Desktop table view and mobile card view for optimal readability
             </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+            <Typography as="li" variant="body2" sx={{ mb: 1 }}>
               <strong>Visual score bars:</strong> Linear progress bars showing percentage for each algorithm component
             </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+            <Typography as="li" variant="body2" sx={{ mb: 1 }}>
               <strong>Skills summary:</strong> Shows count of matched and missing skills for each candidate
             </Typography>
           </Box>
