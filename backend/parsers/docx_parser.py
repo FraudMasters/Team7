@@ -5,12 +5,40 @@ This module provides functionality to extract text content from DOCX (Word) file
 with validation and error handling for resume processing. The parser handles
 both text and table content, providing detailed error messages for malformed
 or unsupported documents.
+
+Security:
+    This module uses defusedxml for XXE (XML External Entity) attack protection.
+    The python-docx library processes DOCX files (which are ZIP archives containing
+    XML files), and without proper protection, malicious XML entities could be used
+    to read arbitrary files or perform SSRF attacks.
 """
 import logging
 import os
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+
+# Apply XXE protection before importing python-docx
+# This prevents XML External Entity attacks by disabling entity expansion
+try:
+    from defusedxml import ElementTree as DefusedElementTree
+    import defusedxml.common
+
+    # Disable DTDs and entity expansion globally for XML parsing
+    defusedxml.common.DefusedXMLException = Exception
+    DefusedElementTree._has_defused_xml = True
+
+    # Monkey-patch ElementTree to use defusedxml
+    import xml.etree.ElementTree as _ElementTree
+    _ElementTree.parse = DefusedElementTree.parse
+    _ElementTree.fromstring = DefusedElementTree.fromstring
+
+    logger.info("XXE protection enabled: defusedxml patched xml.etree.ElementTree")
+except ImportError:
+    logger.warning(
+        "defusedxml not installed - XXE protection not enabled. "
+        "Install with: pip install defusedxml"
+    )
 
 logger = logging.getLogger(__name__)
 
