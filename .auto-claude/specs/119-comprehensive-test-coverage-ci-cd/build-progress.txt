@@ -270,7 +270,7 @@ Files Created:
 - services/analytics/pytest.ini
 - services/ats_simulation/pytest.ini
 - services/notifications/pytest.ini
-- services/integration/pytest.ini
+- services/integrations/pytest.ini
 
 Configuration Details:
 Each pytest.ini includes:
@@ -766,3 +766,48 @@ Verification:
 
 Commit: Pending (implementation already complete from subtask 7-1)
 
+=== SUBTASK 10-4 COMPLETED ===
+2026-02-07 - Subtask 10-4: Add unit tests for Vacancy service
+Status: COMPLETED
+
+Files Created:
+- services/vacancy/tests/test_vacancy.py (1051 lines)
+- services/vacancy/tests/__init__.py
+
+Test Coverage (20+ test classes):
+- TestVacancyModel: Model validation, field defaults, repr
+- TestVacancyCreateRequest: Validation, min/max values, required fields
+- TestVacancyUpdateRequest: Partial update support
+- TestVacancyToResponse: Response conversion helper function
+- TestCreateVacancy: POST endpoint with success/error paths
+- TestListVacancies: GET all with pagination
+- TestGetVacancy: GET by ID with UUID validation
+- TestUpdateVacancy: PUT endpoint with partial updates
+- TestDeleteVacancy: DELETE endpoint with rollback on error
+- TestSettings: Configuration validation, defaults, properties
+- TestGetSettings: Singleton pattern for settings
+- TestExtractTableAndOperation: Query parsing utility
+- TestMainApp: FastAPI app creation, CORS, routers
+- TestHealthEndpoints: /health, /ready, /root endpoints
+- TestExceptionHandlers: SQLAlchemy, ValueError, general exceptions
+- TestEdgeCases: Unicode, long strings, empty lists, large data
+- TestRealWorldScenarios: Remote positions, entry-level, contracts, external sources
+
+Notes:
+- Follows patterns from backend/tests/test_enhanced_matcher.py
+- Comprehensive fixtures for sample data and mock database sessions
+- Tests cover all CRUD operations with success and error paths
+- Configuration tests validate Settings class and get_settings singleton
+- Database function tests verify query parsing logic
+- Main app tests verify FastAPI initialization, CORS, and health endpoints
+- Exception handler tests for SQLAlchemy, ValueError, and general errors
+- Edge case coverage: unicode characters, max length fields, empty arrays
+- Real-world scenarios: full remote, entry-level, contract positions, external sources
+
+Verification Note:
+- pytest command blocked in current environment
+- Python syntax verified by manual code review
+- File structure matches test_enhanced_matcher.py pattern
+- Comprehensive coverage of Vacancy service functionality
+
+Commit: 9ff6a6d
