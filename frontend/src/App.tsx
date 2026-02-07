@@ -46,10 +46,7 @@ import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
-
-// Admin Pages
-import ModelTrainingPage from './pages/admin/ModelTrainingPage';
-import ModelVersionsPage from './pages/admin/ModelVersionsPage';
+import HealthDashboard from './pages/HealthDashboard';
 
 /**
  * Main App Component
@@ -111,14 +108,7 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
-        </Route>
-
-        {/* Admin Flow */}
-        <Route path="/admin/model-training" element={<RecruiterLayout />}>
-          <Route index element={<ModelTrainingPage />} />
-        </Route>
-        <Route path="/admin/model-versions" element={<RecruiterLayout />}>
-          <Route index element={<ModelVersionsPage />} />
+          <Route path="health" element={<HealthDashboard />} />
         </Route>
 
         {/* Catch-all route - redirect to landing */}

@@ -43,7 +43,5 @@ export { default as ReportBuilder } from './analytics/ReportBuilder';
 export { default as SkillDemandChart } from './analytics/SkillDemandChart';
 export { default as SourceTracking } from './analytics/SourceTracking';
 export { default as ModelQualityMetrics } from './ModelQualityMetrics';
-export { default as NotificationCenter } from './NotificationCenter';
-export { default as NotificationItem } from './NotificationItem';
-export type { NotificationItemProps } from './NotificationItem';
 export { default as UnifiedMatchMetrics } from './UnifiedMatchMetrics';
+export { default as ExplainabilityDashboard } from './explainability/ExplainabilityDashboard';

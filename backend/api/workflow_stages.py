@@ -100,7 +100,7 @@ async def create_workflow_stage(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/workflow-stages/",
+        ...     "/api/workflow-stages/",
         ...     json={
         ...         "organization_id": "org-123",
         ...         "stage_name": "Technical Interview",
@@ -214,7 +214,7 @@ async def list_workflow_stages(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/workflow-stages/?organization_id=org-123")
+        >>> response = requests.get("/api/workflow-stages/?organization_id=org-123")
         >>> response.json()
         {
             "organization_id": "org-123",
@@ -303,7 +303,7 @@ async def get_workflow_stage(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/workflow-stages/stage-uuid")
+        >>> response = requests.get("/api/workflow-stages/stage-uuid")
         >>> response.json()
         {
             "id": "stage-uuid",
@@ -389,7 +389,7 @@ async def update_workflow_stage(
     Examples:
         >>> import requests
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/workflow-stages/stage-uuid",
+        ...     "/api/workflow-stages/stage-uuid",
         ...     json={
         ...         "stage_name": "Updated Technical Interview",
         ...         "is_active": False
@@ -509,7 +509,7 @@ async def delete_workflow_stage(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/workflow-stages/stage-uuid")
+        >>> response = requests.delete("/api/workflow-stages/stage-uuid")
         >>> response.json()
         {
             "message": "Workflow stage deleted successfully",

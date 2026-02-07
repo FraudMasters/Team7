@@ -13,7 +13,7 @@ export { candidateActivitiesClient, CandidateActivitiesClient } from './candidat
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
 export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
 export { candidateSearchClient, CandidateSearchClient } from './search';
-export { semanticSearchClient, SemanticSearchClient } from './semanticSearch';
+export * from './health';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -30,6 +30,13 @@ export type {
   JobVacancy,
   ApiError,
   HealthResponse,
+  ComponentHealthStatus,
+  DetailedHealthResponse,
+  ReadyCheckResponse,
+  ServiceDependencyInfo,
+  DependencyGraphSummary,
+  DependencyGraphResponse,
+  ComponentHealthCheckResponse,
   UploadProgressCallback,
   ApiClientConfig,
   SkillGapAnalysisRequest,
@@ -76,13 +83,4 @@ export type {
   CandidateSearchRequest,
   CandidateSearchResult,
   CandidateSearchResponse,
-  SemanticSearchFilters,
-  SemanticSearchRequest,
-  SemanticSearchResponse,
-  SemanticMatchExplanation,
-  SemanticCandidateResult,
-  HybridSearchRequest,
-  HybridSearchResponse,
-  MatchExplanationRequest,
-  MatchExplanationResponse,
 } from '@/types/api';

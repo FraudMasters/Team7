@@ -106,7 +106,7 @@ async def create_custom_synonyms(request: CustomSynonymCreate) -> JSONResponse:
         ...         }
         ...     ]
         ... }
-        >>> response = requests.post("http://localhost:8000/api/custom-synonyms/", json=data)
+        >>> response = requests.post("/api/custom-synonyms/", json=data)
         >>> response.json()
         {
             "organization_id": "org123",
@@ -194,7 +194,7 @@ async def list_custom_synonyms(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/custom-synonyms/?organization_id=org123")
+        >>> response = requests.get("/api/custom-synonyms/?organization_id=org123")
         >>> response.json()
     """
     try:
@@ -238,7 +238,7 @@ async def get_custom_synonym(synonym_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/custom-synonyms/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/custom-synonyms/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
     """
     try:
@@ -292,7 +292,7 @@ async def update_custom_synonym(
         >>> import requests
         >>> data = {"custom_synonyms": ["React", "ReactJS", "React.js", "React Framework"]}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/custom-synonyms/123",
+        ...     "/api/custom-synonyms/123",
         ...     json=data
         ... )
         >>> response.json()
@@ -342,7 +342,7 @@ async def delete_custom_synonym(synonym_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/custom-synonyms/123")
+        >>> response = requests.delete("/api/custom-synonyms/123")
         >>> response.json()
         {"message": "Custom synonym deleted successfully"}
     """
@@ -380,7 +380,7 @@ async def delete_custom_synonyms_by_organization(organization_id: str) -> JSONRe
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/custom-synonyms/organization/org123")
+        >>> response = requests.delete("/api/custom-synonyms/organization/org123")
         >>> response.json()
         {"message": "Deleted 5 custom synonyms for organization: org123"}
     """

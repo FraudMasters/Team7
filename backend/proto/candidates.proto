@@ -1,0 +1,234 @@
+// Candidate service gRPC definitions
+// Defines messages and services for managing candidates and their hiring pipeline stages
+
+syntax = "proto3";
+
+package agenthr.candidates;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
+
+// Candidate information in list view
+message Candidate {
+  string id = 1;                                 // Unique identifier (resume ID)
+  string filename = 2;                           // Resume filename
+  string current_stage = 3;                      // Current workflow stage
+  string stage_name = 4;                         // Display name of current stage
+  google.protobuf.StringValue vacancy_id = 5;    // Associated vacancy ID if any
+  google.protobuf.Timestamp created_at = 6;      // Creation timestamp
+  google.protobuf.Timestamp updated_at = 7;      // Last update timestamp
+  google.protobuf.StringValue notes = 8;         // Stage notes
+  repeated TagInfo tags = 9;                     // Tags assigned to this candidate
+  int32 notes_count = 10;                        // Number of notes for this candidate
+  LatestActivity latest_activity = 11;           // Latest activity for this candidate
+}
+
+// Tag information
+message TagInfo {
+  string id = 1;              // Tag ID
+  string tag_name = 2;        // Tag name
+  google.protobuf.StringValue color = 3;  // Tag color code
+  string organization_id = 4; // Organization ID that owns this tag
+}
+
+// Latest activity information
+message LatestActivity {
+  string activity_type = 1;                      // Type of activity
+  google.protobuf.Timestamp created_at = 2;      // When the activity occurred
+}
+
+// Request to list candidates
+message ListCandidatesRequest {
+  google.protobuf.StringValue stage_id = 1;      // Filter by workflow stage ID or name
+  google.protobuf.StringValue vacancy_id = 2;    // Filter by vacancy ID
+  google.protobuf.StringValue search = 3;        // Search term to filter by filename
+  int32 skip = 4;                                // Number of records to skip (pagination)
+  int32 limit = 5;                               // Maximum number of records to return
+}
+
+// Response with list of candidates
+message ListCandidatesResponse {
+  repeated Candidate candidates = 1;  // List of candidates
+}
+
+// Request to get a specific candidate
+message GetCandidateRequest {
+  string candidate_id = 1;  // Resume UUID
+}
+
+// Response with candidate details
+message GetCandidateResponse {
+  Candidate candidate = 1;  // Candidate details
+}
+
+// Request to move a candidate to a different stage
+message MoveCandidateRequest {
+  string candidate_id = 1;                         // Resume UUID
+  string stage_id = 2;                             // Target stage ID or name
+  google.protobuf.StringValue vacancy_id = 3;      // Optional vacancy ID to associate
+  google.protobuf.StringValue notes = 4;           // Optional notes about the stage change
+}
+
+// Response after moving candidate
+message MoveCandidateResponse {
+  string id = 1;              // Hiring stage record ID
+  string resume_id = 2;       // Resume ID
+  string previous_stage = 3;  // Previous stage name
+  string new_stage = 4;       // New stage name
+  string message = 5;         // Success message
+}
+
+// Request to bulk move candidates
+message BulkMoveCandidatesRequest {
+  repeated string resume_ids = 1;  // List of resume IDs to move
+  string stage_id = 2;              // Target stage ID or name
+  google.protobuf.StringValue vacancy_id = 3;   // Optional vacancy ID to associate
+  google.protobuf.StringValue notes = 4;        // Optional notes about the stage change
+}
+
+// Result of moving a single candidate
+message BulkMoveCandidateResult {
+  string resume_id = 1;                       // Resume ID
+  bool success = 2;                           // Whether the move was successful
+  google.protobuf.StringValue previous_stage = 3;  // Previous stage name
+  google.protobuf.StringValue new_stage = 4;       // New stage name
+  string message = 5;                          // Success or error message
+}
+
+// Response for bulk move operation
+message BulkMoveCandidatesResponse {
+  int32 total_requested = 1;                          // Total number of candidates requested
+  int32 successful = 2;                               // Number successfully moved
+  int32 failed = 3;                                   // Number that failed
+  repeated BulkMoveCandidateResult results = 4;       // Individual results
+}
+
+// Ranked candidate information
+message RankedCandidate {
+  string resume_id = 1;                               // Resume UUID
+  string vacancy_id = 2;                              // Vacancy UUID
+  double rank_score = 3;                              // Overall ranking score (0-1)
+  google.protobuf.Int32Value rank_position = 4;       // Position in ranked list
+  string recommendation = 5;                          // Hiring recommendation
+  double confidence = 6;                              // Model confidence (0-1)
+  map<string, double> feature_contributions = 7;      // Feature contribution scores
+  map<string, google.protobuf.Any> ranking_factors = 8; // Detailed factor scores
+}
+
+// Request to get ranked candidates for a vacancy
+message GetRankedCandidatesRequest {
+  string vacancy_id = 1;  // Vacancy UUID
+  int32 limit = 2;        // Maximum candidates to return (default: 50, max: 200)
+}
+
+// Response with ranked candidates
+message GetRankedCandidatesResponse {
+  string vacancy_id = 1;                       // Vacancy UUID
+  int32 total_candidates = 2;                  // Total number of candidates
+  repeated RankedCandidate candidates = 3;     // List of ranked candidates
+}
+
+// Stage time metrics
+message StageTimeMetrics {
+  double average_days = 1;    // Average time in stage (days)
+  double median_days = 2;     // Median time in stage (days)
+  double min_days = 3;        // Minimum time in stage (days)
+  double max_days = 4;        // Maximum time in stage (days)
+  int32 candidate_count = 5;  // Number of candidates who passed through
+}
+
+// Stage drop-off metrics
+message StageDropoffMetrics {
+  int32 candidates_entered = 1;   // Number who entered this stage
+  int32 candidates_exited = 2;     // Number who left this stage
+  int32 candidates_current = 3;    // Number currently in stage
+  double dropoff_rate = 4;         // Drop-off rate (0-1)
+}
+
+// Combined stage metrics
+message StageMetrics {
+  google.protobuf.StringValue stage_id = 1;    // Stage UUID (for custom stages)
+  string stage_name = 2;                        // Stage name
+  google.protobuf.StringValue display_name = 3; // Display name for custom stages
+  StageTimeMetrics time_metrics = 4;            // Time-based metrics
+  StageDropoffMetrics dropoff_metrics = 5;      // Drop-off metrics
+}
+
+// Request to get stage metrics
+message GetStageMetricsRequest {
+  google.protobuf.StringValue stage_id = 1;    // Filter by specific stage ID or name
+  google.protobuf.StringValue start_date = 2;  // Start date filter (ISO 8601)
+  google.protobuf.StringValue end_date = 3;    // End date filter (ISO 8601)
+}
+
+// Response with stage metrics
+message GetStageMetricsResponse {
+  repeated StageMetrics metrics = 1;  // List of stage metrics
+  int32 total_stages = 2;             // Total number of stages
+}
+
+// Bulk action types
+enum BulkActionType {
+  BULK_ACTION_UNSPECIFIED = 0;
+  BULK_ACTION_EXPORT = 1;        // Export candidate data
+  BULK_ACTION_TAG = 2;           // Add tags to candidates
+  BULK_ACTION_ADD_TO_PIPELINE = 3; // Add candidates to pipeline stage
+}
+
+// Request for bulk action
+message BulkActionRequest {
+  BulkActionType action = 1;               // Action type
+  repeated string resume_ids = 2;          // Resume IDs to perform action on
+  // For 'tag' action
+  google.protobuf.StringValue tag_name = 3;       // Tag name (required for 'tag')
+  google.protobuf.StringValue tag_color = 4;      // Tag color hex code
+  // For 'add_to_pipeline' action
+  google.protobuf.StringValue stage_id = 5;       // Target stage ID (required for pipeline)
+  google.protobuf.StringValue vacancy_id = 6;     // Optional vacancy ID
+  google.protobuf.StringValue notes = 7;          // Optional notes
+  // For 'export' action
+  string export_format = 8;                // Export format: 'json' or 'csv'
+}
+
+// Result of single bulk action
+message BulkActionResult {
+  string resume_id = 1;                           // Resume ID
+  bool success = 2;                               // Whether action succeeded
+  string message = 3;                             // Success or error message
+  google.protobuf.Any data = 4;                   // Additional data
+}
+
+// Response for bulk action
+message BulkActionResponse {
+  BulkActionType action = 1;                      // Action performed
+  int32 total_requested = 2;                      // Total number requested
+  int32 successful = 3;                           // Number successful
+  int32 failed = 4;                               // Number failed
+  repeated BulkActionResult results = 5;          // Individual results
+  google.protobuf.Any export_data = 6;            // Exported data (for export)
+}
+
+// Candidate service
+service CandidateService {
+  // List all candidates with optional filters
+  rpc ListCandidates(ListCandidatesRequest) returns (ListCandidatesResponse);
+
+  // Get a specific candidate
+  rpc GetCandidate(GetCandidateRequest) returns (GetCandidateResponse);
+
+  // Move a candidate to a different stage
+  rpc MoveCandidate(MoveCandidateRequest) returns (MoveCandidateResponse);
+
+  // Bulk move multiple candidates
+  rpc BulkMoveCandidates(BulkMoveCandidatesRequest) returns (BulkMoveCandidatesResponse);
+
+  // Get ranked candidates for a vacancy
+  rpc GetRankedCandidates(GetRankedCandidatesRequest) returns (GetRankedCandidatesResponse);
+
+  // Get stage metrics
+  rpc GetStageMetrics(GetStageMetricsRequest) returns (GetStageMetricsResponse);
+
+  // Perform bulk action on candidates
+  rpc BulkAction(BulkActionRequest) returns (BulkActionResponse);
+}

@@ -1,14 +1,15 @@
 /**
  * Skill Gap Analysis API Client
  *
- * Этот модуль предоставляет удобный интерфейс для анализа разрыва в навыках
- * между кандидатами и вакансиями, а также получения персонализированных рекомендаций по обучению.
+ * This module provides a convenient interface for analyzing skill gaps
+ * between candidates and job vacancies, and getting personalized learning
+ * recommendations.
  *
  * @example
  * ```ts
  * import { skillGap } from '@/api/skillGap';
  *
- * // Анализ разрыва в навыках
+ * // Analyze skill gaps
  * const analysis = await skillGap.analyze({
  *   resume_id: 'abc123',
  *   vacancy_data: {
@@ -18,7 +19,7 @@
  *   },
  * });
  *
- * // Получение рекомендаций по обучению
+ * // Get learning recommendations
  * const recommendations = await skillGap.getRecommendations({
  *   skills: ['React', 'TypeScript'],
  *   max_cost_per_resource: 50,
@@ -27,6 +28,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { config } from '@/config';
 import type {
   SkillGapAnalysisRequest,
   SkillGapAnalysisResponse,
@@ -39,15 +41,15 @@ import type {
 } from '@/types/api';
 
 /**
- * Конфигурация API по умолчанию
+ * Default API configuration
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: config.api.url,
   timeout: 120000,
 };
 
 /**
- * Преобразование ошибки Axios в стандартизированную ошибку API
+ * Transform Axios error to standardized API error
  */
 function transformError(error: unknown): ApiError {
   const axiosError = error as {
@@ -62,17 +64,17 @@ function transformError(error: unknown): ApiError {
 }
 
 /**
- * Класс клиента анализа разрыва в навыках
+ * Skill Gap Analysis Client class
  *
- * Предоставляет методы для анализа разрыва в навыках и рекомендаций по обучению.
+ * Provides methods for skill gap analysis and learning recommendations.
  */
 export class SkillGapClient {
   private client: AxiosInstance;
 
   /**
-   * Создание нового экземпляра клиента анализа разрыва в навыках
+   * Create a new Skill Gap client instance
    *
-   * @param config - Опциональные переопределения конфигурации
+   * @param config - Optional configuration overrides
    */
   constructor(config = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
@@ -81,20 +83,20 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение базового экземпляра axios для кастомных запросов
+   * Get the underlying axios instance for custom requests
    *
-   * @returns Экземпляр Axios
+   * @returns Axios instance
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
   }
 
   /**
-   * Анализ разрыва в навыках между кандидатом и вакансией
+   * Analyze skill gaps between a candidate and job vacancy
    *
-   * @param request - Запрос на анализ разрыва в навыках
-   * @returns Результаты анализа разрыва в навыках
-   * @throws ApiError если анализ не удался
+   * @param request - Skill gap analysis request
+   * @returns Skill gap analysis results
+   * @throws ApiError if analysis fails
    *
    * @example
    * ```ts
@@ -103,7 +105,7 @@ export class SkillGapClient {
    *   vacancy_data: {
    *     id: 'vacancy-1',
    *     title: 'Senior React Developer',
-   *     description: 'Ищем разработчика React...',
+   *     description: 'Looking for React developer...',
    *     required_skills: ['React', 'TypeScript', 'Node.js'],
    *     required_skill_levels: {
    *       'React': 'advanced',
@@ -126,11 +128,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение рекомендаций по обучению для указанных навыков
+   * Get learning recommendations for specified skills
    *
-   * @param request - Запрос на рекомендации по обучению
-   * @returns Персонализированные рекомендации по обучению
-   * @throws ApiError если получение рекомендаций не удалось
+   * @param request - Learning recommendations request
+   * @returns Personalized learning recommendations
+   * @throws ApiError if recommendation fails
    *
    * @example
    * ```ts
@@ -170,11 +172,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение отчетов о разрыве в навыках для конкретного резюме
+   * Get skill gap reports for a specific resume
    *
-   * @param resumeId - ID резюме
-   * @returns Список отчетов о разрыве в навыках
-   * @throws ApiError если получение не удалось
+   * @param resumeId - Resume ID
+   * @returns List of skill gap reports
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -193,11 +195,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение конкретного отчета о разрыве в навыках по ID
+   * Get a specific skill gap report by ID
    *
-   * @param reportId - ID отчета
-   * @returns Детали отчета о разрыве в навыках
-   * @throws ApiError если получение не удалось
+   * @param reportId - Report ID
+   * @returns Skill gap report details
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -216,11 +218,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Поиск учебных ресурсов с фильтрами
+   * Query learning resources with filters
    *
-   * @param query - Параметры запроса для фильтрации ресурсов
-   * @returns Отфильтрованные учебные ресурсы
-   * @throws ApiError если поиск не удался
+   * @param query - Query parameters for filtering resources
+   * @returns Filtered learning resources
+   * @throws ApiError if query fails
    *
    * @example
    * ```ts
@@ -256,11 +258,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение учебных ресурсов для конкретного отчета о разрыве в навыках
+   * Get learning resources for a specific skill gap report
    *
-   * @param reportId - ID отчета о разрыве в навыках
-   * @returns Учебные ресурсы, связанные с отчетом
-   * @throws ApiError если получение не удалось
+   * @param reportId - Skill gap report ID
+   * @returns Learning resources associated with the report
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -279,11 +281,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение плана развития навыков для кандидата
+   * Get skill development plan for a candidate
    *
-   * @param planId - ID плана развития
-   * @returns Детали плана развития навыков
-   * @throws ApiError если получение не удалось
+   * @param planId - Development plan ID
+   * @returns Skill development plan details
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -302,11 +304,11 @@ export class SkillGapClient {
   }
 
   /**
-   * Получение планов развития навыков для резюме
+   * Get skill development plans for a resume
    *
-   * @param resumeId - ID резюме
-   * @returns Список планов развития навыков
-   * @throws ApiError если получение не удалось
+   * @param resumeId - Resume ID
+   * @returns List of skill development plans
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -325,14 +327,14 @@ export class SkillGapClient {
   }
 
   /**
-   * Анализ разрыва в навыках и получение рекомендаций за один вызов
+   * Analyze skill gaps and get recommendations in one call
    *
-   * Это удобный метод, объединяющий analyze() и getRecommendations()
+   * This is a convenience method that combines analyze() and getRecommendations()
    *
-   * @param request - Запрос на анализ разрыва в навыках
-   * @param options - Опциональные настройки рекомендаций
-   * @returns Комбинированный анализ и рекомендации
-   * @throws ApiError если анализ или рекомендации не удались
+   * @param request - Skill gap analysis request
+   * @param options - Optional recommendation settings
+   * @returns Combined analysis and recommendations
+   * @throws ApiError if analysis or recommendations fail
    *
    * @example
    * ```ts
@@ -358,7 +360,7 @@ export class SkillGapClient {
   }> {
     const analysis = await this.analyze(request);
 
-    // Получение рекомендаций для отсутствующих навыков
+    // Get recommendations for missing skills
     const skillsToLearn = analysis.missing_skills.length > 0
       ? analysis.missing_skills
       : analysis.partial_match_skills;
@@ -386,13 +388,13 @@ export class SkillGapClient {
 }
 
 /**
- * Экземпляр клиента анализа разрыва в навыках по умолчанию
+ * Default skill gap client instance
  *
- * Используйте этот singleton-экземпляр для всех вызовов API анализа разрыва в навыках.
+ * Use this singleton instance for all skill gap API calls.
  */
 export const skillGap = new SkillGapClient();
 
 /**
- * Экспорт класса клиента анализа разрыва в навыках для создания кастомных экземпляров
+ * Export skill gap client class for custom instances
  */
 export default SkillGapClient;

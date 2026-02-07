@@ -129,7 +129,7 @@ async def get_work_experiences_by_resume(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/work-experiences/resumes/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/work-experiences/resumes/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
         {
             "experiences": [
@@ -241,7 +241,7 @@ async def get_work_experience(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/work-experiences/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/work-experiences/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
         {
             "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -354,7 +354,7 @@ async def create_work_experience(
         ...     "start_date": "2020-01-01",
         ...     "description": "Led development of scalable systems"
         ... }
-        >>> response = requests.post("http://localhost:8000/api/work-experiences", json=data)
+        >>> response = requests.post("/api/work-experiences", json=data)
         >>> response.json()
         {
             "id": "...",
@@ -506,7 +506,7 @@ async def update_work_experience(
         ...     "description": "Led team of 5 developers"
         ... }
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/work-experiences/123e4567-e89b-12d3-a456-426614174000",
+        ...     "/api/work-experiences/123e4567-e89b-12d3-a456-426614174000",
         ...     json=data
         ... )
         >>> response.json()
@@ -650,7 +650,7 @@ async def delete_work_experience(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/work-experiences/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.delete("/api/work-experiences/123e4567-e89b-12d3-a456-426614174000")
         >>> response.status_code
         204
     """

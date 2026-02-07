@@ -61,8 +61,8 @@ from config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 
 def find_resume_file(resume_id: str) -> Path:
@@ -353,19 +353,6 @@ def analyze_resume_async(
             detect_errors=detect_errors,
         )
 
-        # Trigger auto-screening if analysis was successful
-        if result.get("status") == "completed":
-            try:
-                from celery import current_app
-                current_app.send_task(
-                    "tasks.screening_tasks.auto_screen_candidate",
-                    args=[resume_id],
-                    kwargs={"vacancy_id": None},
-                )
-                logger.info(f"Auto-screening task triggered for resume_id: {resume_id}")
-            except Exception as e:
-                logger.warning(f"Failed to trigger auto-screening task: {e}")
-
         # Step 3: Complete
         progress = {
             "current": 3,
@@ -460,19 +447,8 @@ def batch_analyze_resumes(
             )
             results.append(result)
 
-            # Trigger auto-screening if analysis was successful
             if result.get("status") == "completed":
                 successful += 1
-                try:
-                    from celery import current_app
-                    current_app.send_task(
-                        "tasks.screening_tasks.auto_screen_candidate",
-                        args=[resume_id],
-                        kwargs={"vacancy_id": None},
-                    )
-                    logger.info(f"Auto-screening task triggered for resume_id: {resume_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to trigger auto-screening for resume {resume_id}: {e}")
             else:
                 failed += 1
 

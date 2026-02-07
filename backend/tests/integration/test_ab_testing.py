@@ -1,4 +1,5 @@
 """
+import os
 Integration tests for A/B testing allocation and model comparison.
 
 This test suite validates the end-to-end integration between:

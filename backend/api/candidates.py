@@ -31,9 +31,6 @@ from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
-from models.user import User
-from models.role import UserRole
-from middleware.auth import get_current_active_user, require_role
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +228,6 @@ async def list_candidates(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     List all candidates (resumes) with their current workflow stages.
@@ -257,13 +253,13 @@ async def list_candidates(
     Examples:
         >>> import requests
         >>> # Get all candidates
-        >>> response = requests.get("http://localhost:8000/api/candidates/")
+        >>> response = requests.get("/api/candidates/")
         >>> # Filter by stage
-        >>> response = requests.get("http://localhost:8000/api/candidates/?stage_id=interview")
+        >>> response = requests.get("/api/candidates/?stage_id=interview")
         >>> # Search by name
-        >>> response = requests.get("http://localhost:8000/api/candidates/?search=john")
+        >>> response = requests.get("/api/candidates/?search=john")
         >>> # Combine filters
-        >>> response = requests.get("http://localhost:8000/api/candidates/?stage_id=interview&search=smith")
+        >>> response = requests.get("/api/candidates/?stage_id=interview&search=smith")
         >>> candidates = response.json()
     """
     try:
@@ -494,7 +490,6 @@ async def get_candidate(
     request: Request,
     candidate_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get a specific candidate's current stage information.
@@ -668,7 +663,6 @@ async def move_candidate(
     candidate_id: str,
     stage_data: MoveCandidateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Move a candidate to a different workflow stage.
@@ -694,7 +688,7 @@ async def move_candidate(
         >>> import requests
         >>> data = {"stage_id": "interview", "vacancy_id": "...", "notes": "Passed screening"}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/candidates/123/stage",
+        ...     "/api/candidates/123/stage",
         ...     json=data
         ... )
     """
@@ -847,7 +841,6 @@ async def bulk_move_candidates(
     request: Request,
     bulk_data: BulkMoveCandidatesRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Bulk move multiple candidates to a different workflow stage.
@@ -877,7 +870,7 @@ async def bulk_move_candidates(
         ...     "notes": "Bulk moved to screening"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-move",
+        ...     "/api/candidates/bulk-move",
         ...     json=data
         ... )
     """
@@ -1070,7 +1063,6 @@ async def get_candidates_for_vacancy(
     vacancy_id: str,
     limit: int = Query(50, ge=1, le=200, description="Maximum candidates to return"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get ranked candidates for a specific vacancy.
@@ -1102,7 +1094,7 @@ async def get_candidates_for_vacancy(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/candidates/vacancy/vac-456-ghi/ranked",
+        ...     "/api/candidates/vacancy/vac-456-ghi/ranked",
         ...     params={"limit": 20}
         ... )
         >>> response.json()
@@ -1182,7 +1174,6 @@ async def get_stage_metrics(
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get stage metrics including time in stage and drop-off rates.
@@ -1209,9 +1200,9 @@ async def get_stage_metrics(
     Examples:
         >>> import requests
         >>> # Get metrics for all stages
-        >>> response = requests.get("http://localhost:8000/api/candidates/metrics")
+        >>> response = requests.get("/api/candidates/metrics")
         >>> # Get metrics for a specific stage
-        >>> response = requests.get("http://localhost:8000/api/candidates/metrics?stage_id=interview")
+        >>> response = requests.get("/api/candidates/metrics?stage_id=interview")
         >>> response.json()
         {
             "stage_id": "interview",
@@ -1481,7 +1472,6 @@ async def bulk_action(
     request: Request,
     bulk_data: BulkActionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Perform bulk actions on search results.
@@ -1513,7 +1503,7 @@ async def bulk_action(
         ...     "tag_name": "High Priority"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     "/api/candidates/bulk-action",
         ...     json=data
         ... )
         >>> # Export candidates
@@ -1523,7 +1513,7 @@ async def bulk_action(
         ...     "export_format": "json"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     "/api/candidates/bulk-action",
         ...     json=data
         ... )
         >>> # Add to pipeline
@@ -1533,7 +1523,7 @@ async def bulk_action(
         ...     "stage_id": "interview"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidates/bulk-action",
+        ...     "/api/candidates/bulk-action",
         ...     json=data
         ... )
     """

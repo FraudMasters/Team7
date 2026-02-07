@@ -1,0 +1,129 @@
+// Vacancy service gRPC definitions
+// Defines messages and services for managing job vacancies
+
+syntax = "proto3";
+
+package agenthr.vacancies;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+// Job vacancy information
+message Vacancy {
+  string id = 1;                                    // Unique identifier
+  string title = 2;                                 // Job title
+  string description = 3;                           // Full job description
+  repeated string required_skills = 4;              // Required skills
+  google.protobuf.Int32Value min_experience_months = 5;  // Minimum experience in months
+  repeated string additional_requirements = 6;      // Additional requirements
+  google.protobuf.StringValue industry = 7;         // Industry sector
+  google.protobuf.StringValue work_format = 8;      // Work format (remote, office, hybrid)
+  google.protobuf.StringValue location = 9;         // Location
+  google.protobuf.Int32Value salary_min = 10;       // Minimum salary
+  google.protobuf.Int32Value salary_max = 11;       // Maximum salary
+  google.protobuf.StringValue english_level = 12;   // English proficiency level
+  google.protobuf.StringValue employment_type = 13; // Employment type
+  google.protobuf.StringValue external_id = 14;     // External system ID
+  google.protobuf.StringValue source = 15;          // Source (manual, api, scrape)
+  google.protobuf.Timestamp created_at = 16;        // Creation timestamp
+  google.protobuf.Timestamp updated_at = 17;        // Last update timestamp
+}
+
+// Request to create a new vacancy
+message CreateVacancyRequest {
+  string title = 1;                                 // Job title
+  string description = 2;                           // Full job description
+  repeated string required_skills = 3;              // Required skills
+  google.protobuf.Int32Value min_experience_months = 4;  // Minimum experience in months
+  repeated string additional_requirements = 5;      // Additional requirements
+  google.protobuf.StringValue industry = 6;         // Industry sector
+  google.protobuf.StringValue work_format = 7;      // Work format
+  google.protobuf.StringValue location = 8;         // Location
+  google.protobuf.Int32Value salary_min = 9;        // Minimum salary
+  google.protobuf.Int32Value salary_max = 10;       // Maximum salary
+  google.protobuf.StringValue english_level = 11;   // English level
+  google.protobuf.StringValue employment_type = 12; // Employment type
+  google.protobuf.StringValue external_id = 13;     // External ID
+  google.protobuf.StringValue source = 14;          // Source
+}
+
+// Response after creating vacancy
+message CreateVacancyResponse {
+  Vacancy vacancy = 1;  // Created vacancy
+}
+
+// Request to list vacancies
+message ListVacanciesRequest {
+  google.protobuf.StringValue search = 1;      // Search term to filter by title or description
+  google.protobuf.StringValue industry = 2;    // Filter by industry
+  google.protobuf.StringValue work_format = 3; // Filter by work format
+  int32 skip = 4;                             // Number of records to skip (pagination)
+  int32 limit = 5;                            // Maximum number of records to return
+}
+
+// Response with list of vacancies
+message ListVacanciesResponse {
+  repeated Vacancy vacancies = 1;  // List of vacancies
+  int32 total_count = 2;           // Total count (for pagination)
+}
+
+// Request to get a specific vacancy
+message GetVacancyRequest {
+  string vacancy_id = 1;  // Vacancy UUID
+}
+
+// Response with vacancy details
+message GetVacancyResponse {
+  Vacancy vacancy = 1;  // Vacancy details
+}
+
+// Request to update a vacancy
+message UpdateVacancyRequest {
+  string vacancy_id = 1;                           // Vacancy UUID
+  google.protobuf.StringValue title = 2;           // New job title
+  google.protobuf.StringValue description = 3;     // New description
+  repeated string required_skills = 4;             // New required skills
+  google.protobuf.Int32Value min_experience_months = 5;  // New minimum experience
+  repeated string additional_requirements = 6;     // New additional requirements
+  google.protobuf.StringValue industry = 7;        // New industry
+  google.protobuf.StringValue work_format = 8;     // New work format
+  google.protobuf.StringValue location = 9;        // New location
+  google.protobuf.Int32Value salary_min = 10;      // New min salary
+  google.protobuf.Int32Value salary_max = 11;      // New max salary
+  google.protobuf.StringValue english_level = 12;  // New english level
+  google.protobuf.StringValue employment_type = 13;// New employment type
+}
+
+// Response after updating vacancy
+message UpdateVacancyResponse {
+  Vacancy vacancy = 1;  // Updated vacancy
+}
+
+// Request to delete a vacancy
+message DeleteVacancyRequest {
+  string vacancy_id = 1;  // Vacancy UUID
+}
+
+// Response after deleting vacancy
+message DeleteVacancyResponse {
+  bool success = 1;  // Whether deletion was successful
+  string message = 2; // Success message
+}
+
+// Vacancy service
+service VacancyService {
+  // Create a new vacancy
+  rpc CreateVacancy(CreateVacancyRequest) returns (CreateVacancyResponse);
+
+  // List all vacancies with optional filters
+  rpc ListVacancies(ListVacanciesRequest) returns (ListVacanciesResponse);
+
+  // Get a specific vacancy
+  rpc GetVacancy(GetVacancyRequest) returns (GetVacancyResponse);
+
+  // Update a vacancy
+  rpc UpdateVacancy(UpdateVacancyRequest) returns (UpdateVacancyResponse);
+
+  // Delete a vacancy
+  rpc DeleteVacancy(DeleteVacancyRequest) returns (DeleteVacancyResponse);
+}

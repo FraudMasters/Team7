@@ -1,37 +1,37 @@
 /**
- * API Client для резюме и вакансий
+ * API Client for Resume Analysis Backend
  *
- * Этот модуль предоставляет типизированный Axios клиент для взаимодействия с
- * backend сервисами. Обрабатывает загрузку резюме, анализ, сравнение с вакансиями,
- * работу с таксономиями навыков, кастомными синонимами, обратной связью,
- * версиями моделей, сравнениями резюме и проверку работоспособности.
+ * This module provides a typed Axios client for communicating with the
+ * backend resume analysis service. Handles resume upload, analysis,
+ * job matching, skill taxonomies, custom synonyms, feedback, model versions,
+ * resume comparisons, and health check endpoints.
  *
  * @example
  * ```ts
  * import { apiClient } from '@/api/client';
  *
- * // Загрузка резюме
+ * // Upload resume
  * const uploadResult = await apiClient.uploadResume(file);
  *
- * // Анализ резюме
+ * // Analyze resume
  * const analysis = await apiClient.analyzeResume(uploadResult.id);
  *
- * // Сравнение с вакансией
+ * // Compare with job vacancy
  * const match = await apiClient.compareWithVacancy(resumeId, vacancyData);
  *
- * // Сравнение нескольких резюме
+ * // Compare multiple resumes
  * const comparison = await apiClient.compareMultipleResumes({
  *   vacancy_id: 'vacancy-123',
  *   resume_ids: ['resume1', 'resume2', 'resume3'],
  * });
  *
- * // Создание кастомных синонимов
+ * // Create custom synonyms
  * const synonyms = await apiClient.createCustomSynonyms({
  *   organization_id: 'org123',
  *   synonyms: [{ canonical_skill: 'React', custom_synonyms: ['ReactJS'], is_active: true }],
  * });
  *
- * // Отправка обратной связи
+ * // Submit feedback
  * const feedback = await apiClient.submitMatchFeedback({
  *   match_id: 'match123',
  *   skill: 'React',
@@ -47,6 +47,7 @@ import {
   getPerformanceStats as getPerformanceStatsUtil,
   type PerformanceStats,
 } from '@/utils/performanceTracker';
+import { config } from '@/config';
 import type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -116,41 +117,41 @@ import type {
 } from '@/types/api';
 
 /**
- * Конфигурация API по умолчанию
+ * Default API configuration
  *
- * API Gateway работает на порту 8888 для агрегации сервисов
+ * Uses centralized configuration service for all values.
  */
 const DEFAULT_CONFIG: ApiClientConfig = {
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8888',
-  timeout: 120000, // 2 минуты для длительного анализа
+  baseURL: config.api.url,
+  timeout: config.api.timeout,
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Класс API клиента
+ * API Client class
  *
- * Предоставляет методы для всех endpoint'ов backend API с proper обработкой ошибок,
- * типобезопасностью и отслеживанием прогресса загрузки файлов.
+ * Provides methods for all backend API endpoints with proper error handling,
+ * type safety, and progress tracking for file uploads.
  */
 export class ApiClient {
   private client: AxiosInstance;
 
   /**
-   * Создание нового экземпляра API клиента
+   * Create a new API client instance
    *
-   * @param config - Опциональные переопределения конфигурации
+   * @param config - Optional configuration overrides
    */
   constructor(config: ApiClientConfig = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Интерцептор запросов
+    // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
-        // Добавление метки времени для отладки
+        // Add timestamp for debugging
         config.metadata = { startTime: Date.now() };
         return config;
       },
@@ -159,14 +160,14 @@ export class ApiClient {
       }
     );
 
-    // Интерцептор ответов
+    // Response interceptor
     this.client.interceptors.response.use(
       (response) => {
-        // Вычисление длительности запроса
+        // Calculate request duration
         const duration = Date.now() - (response.config.metadata?.startTime || 0);
         response.config.metadata = { ...response.config.metadata, duration };
 
-        // Отслеживание метрик производительности
+        // Track performance metrics
         trackApiCall({
           endpoint: response.config.url || '',
           method: (response.config.method?.toUpperCase() || 'GET'),
@@ -182,10 +183,10 @@ export class ApiClient {
         return response;
       },
       (error) => {
-        // Вычисление длительности запроса для неудачных запросов
+        // Calculate request duration for failed requests
         const duration = Date.now() - (error.config?.metadata?.startTime || 0);
 
-        // Отслеживание метрик неудачных запросов
+        // Track failed request metrics
         if (error.config) {
           trackApiCall({
             endpoint: error.config.url || '',
@@ -204,70 +205,70 @@ export class ApiClient {
   }
 
   /**
-   * Преобразование ошибки Axios в стандартизированную ошибку API
+   * Transform Axios error to standardized API error
    *
-   * @param error - Ошибка Axios
-   * @returns Преобразованная ошибка API
+   * @param error - Axios error
+   * @returns Transformed API error
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Ошибка сети (нет ответа)
+    // Network error (no response)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
+          detail: 'Request timeout. Please check your connection and try again.',
           status: 408,
         };
       }
       return {
-        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
+        detail: 'Network error. Please check your connection and try again.',
         status: 0,
       };
     }
 
-    // Сервер вернул ошибку
+    // Server returned error response
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Используем сообщение об ошибке от сервера, если доступно
+    // Use server's error message if available
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Сообщения об ошибках по умолчанию для разных кодов статуса
+    // Default error messages by status code
     const defaultMessages: Record<number, string> = {
-      400: 'Неверный запрос. Проверьте введенные данные.',
-      401: 'Не авторизован. Войдите в систему.',
-      403: 'Доступ запрещен. У вас нет прав.',
-      404: 'Ресурс не найден.',
-      413: 'Файл слишком большой. Загрузите файл меньшего размера.',
-      415: 'Неподдерживаемый тип файла. Загрузите PDF или DOCX.',
-      422: 'Ошибка валидации. Проверьте введенные данные.',
-      429: 'Слишком много запросов. Попробуйте позже.',
-      500: 'Ошибка сервера. Попробуйте позже.',
-      502: 'Ошибка шлюза. Попробуйте позже.',
-      503: 'Сервис недоступен. Попробуйте позже.',
+      400: 'Invalid request. Please check your input.',
+      401: 'Unauthorized. Please log in.',
+      403: 'Forbidden. You do not have permission.',
+      404: 'Resource not found.',
+      413: 'File too large. Please upload a smaller file.',
+      415: 'Unsupported file type. Please upload PDF or DOCX.',
+      422: 'Validation error. Please check your input.',
+      429: 'Too many requests. Please try again later.',
+      500: 'Server error. Please try again later.',
+      502: 'Bad gateway. Please try again later.',
+      503: 'Service unavailable. Please try again later.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
+      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
       status,
     };
   }
 
   /**
-   * Загрузка файла резюме
+   * Upload a resume file
    *
-   * @param file - Файл резюме (PDF или DOCX)
-   * @param onProgress - Опциональный колбэк прогресса (0-100)
-   * @returns Ответ загрузки с ID резюме
-   * @throws ApiError если загрузка не удалась
+   * @param file - Resume file (PDF or DOCX)
+   * @param onProgress - Optional progress callback (0-100)
+   * @returns Upload response with resume ID
+   * @throws ApiError if upload fails
    *
    * @example
    * ```ts
    * const result = await apiClient.uploadResume(file, (progress) => {
-   *   console.log(`Прогресс загрузки: ${progress}%`);
+   *   console.log(`Upload progress: ${progress}%`);
    * });
    * ```
    */
@@ -302,11 +303,11 @@ export class ApiClient {
   }
 
   /**
-   * Анализ резюме
+   * Analyze a resume
    *
-   * @param request - Запрос на анализ с ID резюме и опциями
-   * @returns Результаты анализа с ключевыми словами, сущностями, грамматикой и опытом
-   * @throws ApiError если анализ не удался
+   * @param request - Analysis request with resume ID and options
+   * @returns Analysis results with keywords, entities, grammar, and experience
+   * @throws ApiError if analysis fails
    *
    * @example
    * ```ts
@@ -331,12 +332,12 @@ export class ApiClient {
   }
 
   /**
-   * Сравнение резюме с вакансией
+   * Compare resume with job vacancy
    *
-   * @param resumeId - ID резюме для сравнения
-   * @param vacancy - Данные вакансии
-   * @returns Результаты сравнения с процентом мэтча и детализацией по навыкам
-   * @throws ApiError если сравнение не удалось
+   * @param resumeId - Resume ID to compare
+   * @param vacancy - Job vacancy data
+   * @returns Match results with skill comparison and experience verification
+   * @throws ApiError if comparison fails
    *
    * @example
    * ```ts
@@ -365,10 +366,10 @@ export class ApiClient {
   }
 
   /**
-   * Проверка работоспособности backend
+   * Check backend health status
    *
-   * @returns Статус работоспособности
-   * @throws ApiError если проверка не удалась
+   * @returns Health status
+   * @throws ApiError if health check fails
    */
   async healthCheck(): Promise<HealthResponse> {
     try {
@@ -380,10 +381,10 @@ export class ApiClient {
   }
 
   /**
-   * Проверка готовности backend
+   * Check if backend is ready
    *
-   * @returns Статус готовности
-   * @throws ApiError если проверка не удалась
+   * @returns Ready status
+   * @throws ApiError if check fails
    */
   async readyCheck(): Promise<{ status: string }> {
     try {
@@ -395,29 +396,29 @@ export class ApiClient {
   }
 
   /**
-   * Получение базового экземпляра Axios
+   * Get the underlying Axios instance
    *
-   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
+   * This is useful for making custom requests not covered by the convenience methods.
    *
-   * @returns Экземпляр Axios
+   * @returns Axios instance
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
   }
 
   /**
-   * Получение статистики производительности API
+   * Get API performance statistics
    *
-   * Возвращает метрики производительности для всех API вызовов через этот клиент.
-   * Полезно для мониторинга и отладки проблем с производительностью.
+   * Returns performance metrics for all API calls made through this client.
+   * Useful for monitoring and debugging performance issues.
    *
-   * @returns Статистика производительности
+   * @returns Performance statistics
    *
    * @example
    * ```ts
    * const stats = apiClient.getPerformanceStats();
-   * console.log(`Средняя длительность: ${stats.averageDuration}мс`);
-   * console.log(`Всего вызовов: ${stats.totalCalls}`);
+   * console.log(`Average duration: ${stats.averageDuration}ms`);
+   * console.log(`Total calls: ${stats.totalCalls}`);
    * ```
    */
   getPerformanceStats(): PerformanceStats {
@@ -425,18 +426,18 @@ export class ApiClient {
   }
 
   /**
-   * Вывод сводки производительности API в консоль
+   * Log API performance summary to console
    *
-   * Выводит форматированную сводку всех метрик производительности API в консоль.
-   * Полезно для разработки и отладки.
+   * Outputs a formatted summary of all API performance metrics to the console.
+   * Useful for development and debugging.
    *
    * @example
    * ```ts
    * apiClient.logPerformanceSummary();
-   * // Вывод:
-   * // [Сводка производительности API]
-   * // Всего вызовов: 45
-   * // Средняя длительность: 245мс
+   * // Output:
+   * // [API Performance Summary]
+   * // Total calls: 45
+   * // Average duration: 245ms
    * ```
    */
   logPerformanceSummary(): void {
@@ -444,12 +445,12 @@ export class ApiClient {
   }
 
   /**
-   * Generic POST запрос для кастомных endpoint'ов
+   * Generic POST request for custom endpoints
    *
-   * @param url - URL endpoint'а
-   * @param data - Тело запроса
-   * @returns Данные ответа
-   * @throws ApiError если запрос не удался
+   * @param url - Endpoint URL
+   * @param data - Request payload
+   * @returns Response data
+   * @throws ApiError if request fails
    */
   async post<T = unknown>(url: string, data?: unknown): Promise<AxiosResponse<T>> {
     try {
@@ -459,14 +460,14 @@ export class ApiClient {
     }
   }
 
-  // ==================== Таксономии навыков ====================
+  // ==================== Skill Taxonomies ====================
 
   /**
-   * Создание записей таксономии навыков для индустрии
+   * Create skill taxonomy entries for an industry
    *
-   * @param request - Запрос на создание с индустрией и списком навыков
-   * @returns Созданные записи таксономии
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with industry and list of skills
+   * @returns Created taxonomy entries
+   * @throws ApiError if creation fails
    *
    * @example
    * ```ts
@@ -498,12 +499,12 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка таксономий навыков с опциональными фильтрами
+   * List skill taxonomies with optional filters
    *
-   * @param industry - Опциональный фильтр по индустрии
-   * @param isActive - Опциональный фильтр по статусу активности
-   * @returns Список записей таксономии навыков
-   * @throws ApiError если получение списка не удалось
+   * @param industry - Optional industry filter
+   * @param isActive - Optional active status filter
+   * @returns List of skill taxonomy entries
+   * @throws ApiError if listing fails
    */
   async listSkillTaxonomies(
     industry?: string,
@@ -523,11 +524,11 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретной записи таксономии навыков по ID
+   * Get a specific skill taxonomy entry by ID
    *
-   * @param id - ID записи таксономии
-   * @returns Запись таксономии навыков
-   * @throws ApiError если запись не найдена
+   * @param id - Taxonomy entry ID
+   * @returns Skill taxonomy entry
+   * @throws ApiError if not found
    */
   async getSkillTaxonomy(id: string): Promise<SkillTaxonomyResponse> {
     try {
@@ -541,12 +542,12 @@ export class ApiClient {
   }
 
   /**
-   * Обновление записи таксономии навыков
+   * Update a skill taxonomy entry
    *
-   * @param id - ID записи таксономии
-   * @param request - Запрос на обновление
-   * @returns Обновленная запись таксономии
-   * @throws ApiError если обновление не удалось
+   * @param id - Taxonomy entry ID
+   * @param request - Update request
+   * @returns Updated taxonomy entry
+   * @throws ApiError if update fails
    */
   async updateSkillTaxonomy(
     id: string,
@@ -564,10 +565,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление конкретной записи таксономии навыков
+   * Delete a specific skill taxonomy entry
    *
-   * @param id - ID записи таксономии
-   * @throws ApiError если удаление не удалось
+   * @param id - Taxonomy entry ID
+   * @throws ApiError if deletion fails
    */
   async deleteSkillTaxonomy(id: string): Promise<void> {
     try {
@@ -578,10 +579,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление всех таксономий навыков для индустрии
+   * Delete all skill taxonomies for an industry
    *
-   * @param industry - Сектор индустрии
-   * @throws ApiError если удаление не удалось
+   * @param industry - Industry sector
+   * @throws ApiError if deletion fails
    */
   async deleteSkillTaxonomiesByIndustry(industry: string): Promise<void> {
     try {
@@ -591,14 +592,14 @@ export class ApiClient {
     }
   }
 
-  // ==================== Кастомные синонимы ====================
+  // ==================== Custom Synonyms ====================
 
   /**
-   * Создание записей кастомных синонимов для организации
+   * Create custom synonym entries for an organization
    *
-   * @param request - Запрос на создание с organization_id и списком синонимов
-   * @returns Созданные записи синонимов
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with organization_id and list of synonyms
+   * @returns Created synonym entries
+   * @throws ApiError if creation fails
    *
    * @example
    * ```ts
@@ -631,13 +632,13 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка кастомных синонимов с опциональными фильтрами
+   * List custom synonyms with optional filters
    *
-   * @param organizationId - Опциональный фильтр по ID организации
-   * @param canonicalSkill - Опциональный фильтр по каноническому навыку
-   * @param isActive - Опциональный фильтр по статусу активности
-   * @returns Список записей кастомных синонимов
-   * @throws ApiError если получение списка не удалось
+   * @param organizationId - Optional organization ID filter
+   * @param canonicalSkill - Optional canonical skill filter
+   * @param isActive - Optional active status filter
+   * @returns List of custom synonym entries
+   * @throws ApiError if listing fails
    */
   async listCustomSynonyms(
     organizationId?: string,
@@ -659,11 +660,11 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретной записи кастомных синонимов по ID
+   * Get a specific custom synonym entry by ID
    *
-   * @param id - ID записи синонимов
-   * @returns Запись кастомных синонимов
-   * @throws ApiError если запись не найдена
+   * @param id - Synonym entry ID
+   * @returns Custom synonym entry
+   * @throws ApiError if not found
    */
   async getCustomSynonym(id: string): Promise<CustomSynonymResponse> {
     try {
@@ -677,12 +678,12 @@ export class ApiClient {
   }
 
   /**
-   * Обновление записи кастомных синонимов
+   * Update a custom synonym entry
    *
-   * @param id - ID записи синонимов
-   * @param request - Запрос на обновление
-   * @returns Обновленная запись синонимов
-   * @throws ApiError если обновление не удалось
+   * @param id - Synonym entry ID
+   * @param request - Update request
+   * @returns Updated synonym entry
+   * @throws ApiError if update fails
    */
   async updateCustomSynonym(
     id: string,
@@ -700,10 +701,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление конкретной записи кастомных синонимов
+   * Delete a specific custom synonym entry
    *
-   * @param id - ID записи синонимов
-   * @throws ApiError если удаление не удалось
+   * @param id - Synonym entry ID
+   * @throws ApiError if deletion fails
    */
   async deleteCustomSynonym(id: string): Promise<void> {
     try {
@@ -714,10 +715,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление всех кастомных синонимов для организации
+   * Delete all custom synonyms for an organization
    *
-   * @param organizationId - ID организации
-   * @throws ApiError если удаление не удалось
+   * @param organizationId - Organization ID
+   * @throws ApiError if deletion fails
    */
   async deleteCustomSynonymsByOrganization(organizationId: string): Promise<void> {
     try {
@@ -727,14 +728,14 @@ export class ApiClient {
     }
   }
 
-  // ==================== Обратная связь ====================
+  // ==================== Feedback ====================
 
   /**
-   * Создание записей обратной связи
+   * Create feedback entries
    *
-   * @param request - Запрос на создание со списком записей обратной связи
-   * @returns Созданные записи обратной связи
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with list of feedback entries
+   * @returns Created feedback entries
+   * @throws ApiError if creation fails
    *
    * @example
    * ```ts
@@ -765,16 +766,16 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка записей обратной связи с опциональными фильтрами
+   * List feedback entries with optional filters
    *
-   * @param resumeId - Опциональный фильтр по ID резюме
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param skill - Опциональный фильтр по навыку
-   * @param wasCorrect - Опциональный фильтр по правильности
-   * @param processed - Опциональный фильтр по статусу обработки
-   * @param feedbackSource - Опциональный фильтр по источнику обратной связи
-   * @returns Список записей обратной связи
-   * @throws ApiError если получение списка не удалось
+   * @param resumeId - Optional resume ID filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param skill - Optional skill filter
+   * @param wasCorrect - Optional correctness filter
+   * @param processed - Optional processed status filter
+   * @param feedbackSource - Optional feedback source filter
+   * @returns List of feedback entries
+   * @throws ApiError if listing fails
    */
   async listFeedback(
     resumeId?: string,
@@ -804,11 +805,11 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретной записи обратной связи по ID
+   * Get a specific feedback entry by ID
    *
-   * @param id - ID записи обратной связи
-   * @returns Запись обратной связи
-   * @throws ApiError если запись не найдена
+   * @param id - Feedback entry ID
+   * @returns Feedback entry
+   * @throws ApiError if not found
    */
   async getFeedback(id: string): Promise<FeedbackResponse> {
     try {
@@ -822,12 +823,12 @@ export class ApiClient {
   }
 
   /**
-   * Обновление записи обратной связи
+   * Update a feedback entry
    *
-   * @param id - ID записи обратной связи
-   * @param request - Запрос на обновление
-   * @returns Обновленная запись обратной связи
-   * @throws ApiError если обновление не удалось
+   * @param id - Feedback entry ID
+   * @param request - Update request
+   * @returns Updated feedback entry
+   * @throws ApiError if update fails
    */
   async updateFeedback(
     id: string,
@@ -845,10 +846,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление записи обратной связи
+   * Delete a specific feedback entry
    *
-   * @param id - ID записи обратной связи
-   * @throws ApiError если удаление не удалось
+   * @param id - Feedback entry ID
+   * @throws ApiError if deletion fails
    */
   async deleteFeedback(id: string): Promise<void> {
     try {
@@ -858,14 +859,14 @@ export class ApiClient {
     }
   }
 
-  // ==================== Версии моделей ====================
+  // ==================== Model Versions ====================
 
   /**
-   * Создание записей версий моделей
+   * Create model version entries
    *
-   * @param request - Запрос на создание со списком версий моделей
-   * @returns Созданные записи версий моделей
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with list of model versions
+   * @returns Created model version entries
+   * @throws ApiError if creation fails
    *
    * @example
    * ```ts
@@ -898,13 +899,13 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка версий моделей с опциональными фильтрами
+   * List model versions with optional filters
    *
-   * @param modelName - Опциональный фильтр по имени модели
-   * @param isActive - Опциональный фильтр по статусу активности
-   * @param isExperiment - Опциональный фильтр по статусу эксперимента
-   * @returns Список записей версий моделей
-   * @throws ApiError если получение списка не удалось
+   * @param modelName - Optional model name filter
+   * @param isActive - Optional active status filter
+   * @param isExperiment - Optional experiment status filter
+   * @returns List of model version entries
+   * @throws ApiError if listing fails
    */
   async listModelVersions(
     modelName?: string,
@@ -928,11 +929,11 @@ export class ApiClient {
   }
 
   /**
-   * Получение активной модели по имени
+   * Get the active model by name
    *
-   * @param modelName - Имя модели
-   * @returns Активная версия модели
-   * @throws ApiError если модель не найдена
+   * @param modelName - Model name
+   * @returns Active model version
+   * @throws ApiError if not found
    */
   async getActiveModel(modelName: string): Promise<ModelVersionResponse> {
     try {
@@ -947,11 +948,11 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретной версии модели по ID
+   * Get a specific model version by ID
    *
-   * @param id - ID версии модели
-   * @returns Запись версии модели
-   * @throws ApiError если запись не найдена
+   * @param id - Model version ID
+   * @returns Model version entry
+   * @throws ApiError if not found
    */
   async getModelVersion(id: string): Promise<ModelVersionResponse> {
     try {
@@ -965,12 +966,12 @@ export class ApiClient {
   }
 
   /**
-   * Обновление версии модели
+   * Update a model version
    *
-   * @param id - ID версии модели
-   * @param request - Запрос на обновление
-   * @returns Обновленная версия модели
-   * @throws ApiError если обновление не удалось
+   * @param id - Model version ID
+   * @param request - Update request
+   * @returns Updated model version
+   * @throws ApiError if update fails
    */
   async updateModelVersion(
     id: string,
@@ -988,10 +989,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление конкретной версии модели
+   * Delete a specific model version
    *
-   * @param id - ID версии модели
-   * @throws ApiError если удаление не удалось
+   * @param id - Model version ID
+   * @throws ApiError if deletion fails
    */
   async deleteModelVersion(id: string): Promise<void> {
     try {
@@ -1002,11 +1003,11 @@ export class ApiClient {
   }
 
   /**
-   * Активация версии модели
+   * Activate a model version
    *
-   * @param id - ID версии модели
-   * @returns Обновленная версия модели
-   * @throws ApiError если активация не удалась
+   * @param id - Model version ID
+   * @returns Updated model version
+   * @throws ApiError if activation fails
    */
   async activateModelVersion(id: string): Promise<ModelVersionResponse> {
     try {
@@ -1021,11 +1022,11 @@ export class ApiClient {
   }
 
   /**
-   * Деактивация версии модели
+   * Deactivate a model version
    *
-   * @param id - ID версии модели
-   * @returns Обновленная версия модели
-   * @throws ApiError если деактивация не удалась
+   * @param id - Model version ID
+   * @returns Updated model version
+   * @throws ApiError if deactivation fails
    */
   async deactivateModelVersion(id: string): Promise<ModelVersionResponse> {
     try {
@@ -1039,14 +1040,14 @@ export class ApiClient {
     }
   }
 
-  // ==================== Обратная связь по мэтчингу ====================
+  // ==================== Matching Feedback ====================
 
   /**
-   * Отправка обратной связи на результат мэтчинга навыка
+   * Submit feedback on a skill match result
    *
-   * @param request - Запрос обратной связи с match_id, skill и правильностью
-   * @returns Созданная запись обратной связи
-   * @throws ApiError если отправка не удалась
+   * @param request - Feedback request with match_id, skill, and correctness
+   * @returns Created feedback entry
+   * @throws ApiError if submission fails
    *
    * @example
    * ```ts
@@ -1070,14 +1071,14 @@ export class ApiClient {
     }
   }
 
-  // ==================== Сравнения ====================
+  // ==================== Comparisons ====================
 
   /**
-   * Создание нового представления сравнения резюме
+   * Create a new resume comparison view
    *
-   * @param request - Запрос на создание с vacancy_id, resume_ids и опциональными настройками
-   * @returns Созданное сравнение с результатами
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with vacancy_id, resume_ids, and optional settings
+   * @returns Created comparison view
+   * @throws ApiError if creation fails
    *
    * @example
    * ```ts
@@ -1102,18 +1103,18 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка представлений сравнений с фильтрами и сортировкой
+   * List resume comparison views with optional filters and sorting
    *
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param createdBy - Опциональный фильтр по ID создателя
-   * @param minMatchPercentage - Опциональный фильтр минимального процента мэтча
-   * @param maxMatchPercentage - Опциональный фильтр максимального процента мэтча
-   * @param sortBy - Поле сортировки - created_at, match_percentage, name или updated_at
-   * @param order - Порядок сортировки - asc или desc
-   * @param limit - Максимум результатов для возврата (default: 50, max: 100)
-   * @param offset - Количество результатов для пропуска (default: 0)
-   * @returns Список представлений сравнений
-   * @throws ApiError если получение списка не удалось
+   * @param vacancyId - Optional vacancy ID filter
+   * @param createdBy - Optional creator user ID filter
+   * @param minMatchPercentage - Optional minimum match percentage filter (0-100)
+   * @param maxMatchPercentage - Optional maximum match percentage filter (0-100)
+   * @param sortBy - Sort field - created_at, match_percentage, name, or updated_at
+   * @param order - Sort order - asc or desc
+   * @param limit - Maximum number of results to return (default: 50, max: 100)
+   * @param offset - Number of results to skip (default: 0)
+   * @returns List of comparison views
+   * @throws ApiError if listing fails
    *
    * @example
    * ```ts
@@ -1161,11 +1162,11 @@ export class ApiClient {
   }
 
   /**
-   * Получение сравнения по ID
+   * Get a specific comparison view by ID
    *
-   * @param id - ID сравнения
-   * @returns Детали сравнения с результатами
-   * @throws ApiError если сравнение не найдено
+   * @param id - Comparison view ID
+   * @returns Comparison view details
+   * @throws ApiError if not found
    *
    * @example
    * ```ts
@@ -1184,17 +1185,18 @@ export class ApiClient {
   }
 
   /**
-   * Обновление сравнения
+   * Update a comparison view
    *
-   * @param id - ID сравнения
-   * @param request - Запрос на обновление с полями для изменения
-   * @returns Обновленное сравнение
-   * @throws ApiError если обновление не удалось
+   * @param id - Comparison view ID
+   * @param request - Update request with fields to modify
+   * @returns Updated comparison view
+   * @throws ApiError if update fails
    *
    * @example
    * ```ts
    * const updated = await apiClient.updateComparison('comp-123', {
    *   name: 'Updated Comparison Name',
+   *   filters: { min_match_percentage: 60 },
    * });
    * ```
    */
@@ -1214,10 +1216,10 @@ export class ApiClient {
   }
 
   /**
-   * Удаление сравнения
+   * Delete a comparison view
    *
-   * @param id - ID сравнения
-   * @throws ApiError если удаление не удалось
+   * @param id - Comparison view ID
+   * @throws ApiError if deletion fails
    *
    * @example
    * ```ts
@@ -1233,14 +1235,15 @@ export class ApiClient {
   }
 
   /**
-   * Сравнение нескольких резюме с вакансией
+   * Compare multiple resumes against a job vacancy
    *
-   * Выполняет интеллектуальное сопоставление навыков каждого резюме
-   * с требованиями вакансии, обрабатывая синонимы и релевантность опыта.
+   * This endpoint performs intelligent matching between each resume's skills
+   * and the job vacancy requirements, handling synonyms (e.g., PostgreSQL ≈ SQL)
+   * and providing aggregated results with ranking by match percentage.
    *
-   * @param request - Запрос на сравнение с vacancy_id и resume_ids
-   * @returns Матрица сравнения с ранжированными результатами
-   * @throws ApiError если сравнение не удалось
+   * @param request - Compare request with vacancy_id and resume_ids
+   * @returns Comparison matrix data with ranked results
+   * @throws ApiError if comparison fails
    *
    * @example
    * ```ts
@@ -1248,6 +1251,7 @@ export class ApiClient {
    *   vacancy_id: 'vacancy-123',
    *   resume_ids: ['resume1', 'resume2', 'resume3'],
    * });
+   * // Returns ranked comparison results with match percentages
    * ```
    */
   async compareMultipleResumes(request: CompareMultipleRequest): Promise<ComparisonMatrixData> {
@@ -1262,19 +1266,24 @@ export class ApiClient {
     }
   }
 
-  // ==================== Аналитика ====================
+  // ==================== Analytics ====================
 
   /**
-   * Получение ключевых метрик найма
+   * Get key hiring metrics
    *
-   * @param startDate - Опциональная начальная дата для фильтрации (ISO 8601 формат)
-   * @param endDate - Опциональная конечная дата для фильтрации (ISO 8601 формат)
-   * @returns Ключевые метрики включая time-to-hire, обработку резюме и rates мэтчинга
-   * @throws ApiError если запрос не удался
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Key metrics including time-to-hire, resume processing, and match rates
+   * @throws ApiError if request fails
    *
    * @example
    * ```ts
    * const metrics = await apiClient.getKeyMetrics();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const metrics = await apiClient.getKeyMetrics('2024-01-01', '2024-12-31');
    * ```
    */
   async getKeyMetrics(
@@ -1297,12 +1306,22 @@ export class ApiClient {
   }
 
   /**
-   * Получение метрик воронки визуализации
+   * Get funnel visualization metrics
    *
-   * @param startDate - Опциональная начальная дата для фильтрации (ISO 8601 формат)
-   * @param endDate - Опциональная конечная дата для фильтрации (ISO 8601 формат)
-   * @returns Метрики воронки показывающие прогресс кандидатов через pipeline
-   * @throws ApiError если запрос не удался
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Funnel metrics showing candidate progression through pipeline
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const funnel = await apiClient.getFunnelMetrics();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const funnel = await apiClient.getFunnelMetrics('2024-01-01', '2024-12-31');
+   * ```
    */
   async getFunnelMetrics(
     startDate?: string,
@@ -1324,13 +1343,23 @@ export class ApiClient {
   }
 
   /**
-   * Получение аналитики спроса на навыки
+   * Get skill demand analytics
    *
-   * @param startDate - Опциональная начальная дата для фильтрации (ISO 8601 формат)
-   * @param endDate - Опциональная конечная дата для фильтрации (ISO 8601 формат)
-   * @param limit - Опциональное максимальное количество навыков для возврата (1-100, default 20)
-   * @returns Данные спроса на навыки с трендовыми навыками
-   * @throws ApiError если запрос не удался
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @param limit - Optional maximum number of skills to return (1-100, default 20)
+   * @returns Skill demand data with trending skills
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const skills = await apiClient.getSkillDemand();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const skills = await apiClient.getSkillDemand('2024-01-01', '2024-12-31', 30);
+   * ```
    */
   async getSkillDemand(
     startDate?: string,
@@ -1354,12 +1383,22 @@ export class ApiClient {
   }
 
   /**
-   * Получение аналитики отслеживания источников
+   * Get source tracking analytics
    *
-   * @param startDate - Опциональная начальная дата для фильтрации (ISO 8601 формат)
-   * @param endDate - Опциональная конечная дата для фильтрации (ISO 8601 формат)
-   * @returns Данные отслеживания источников с распределением вакансий по источникам
-   * @throws ApiError если запрос не удался
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Source tracking data with vacancy distribution by source
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const sources = await apiClient.getSourceTracking();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const sources = await apiClient.getSourceTracking('2024-01-01', '2024-12-31');
+   * ```
    */
   async getSourceTracking(
     startDate?: string,
@@ -1381,13 +1420,23 @@ export class ApiClient {
   }
 
   /**
-   * Получение метрик производительности рекрутеров
+   * Get recruiter performance metrics
    *
-   * @param startDate - Опциональная начальная дата для фильтрации (ISO 8601 формат)
-   * @param endDate - Опциональная конечная дата для фильтрации (ISO 8601 формат)
-   * @param limit - Опциональное максимальное количество рекрутеров для возврата (1-100, default 20)
-   * @returns Данные сравнения производительности рекрутеров
-   * @throws ApiError если запрос не удался
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @param limit - Optional maximum number of recruiters to return (1-100, default 20)
+   * @returns Recruiter performance comparison data
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const recruiters = await apiClient.getRecruiterPerformance();
+   * ```
+   *
+   * @example
+   * ```ts
+   * const recruiters = await apiClient.getRecruiterPerformance('2024-01-01', '2024-12-31', 10);
+   * ```
    */
   async getRecruiterPerformance(
     startDate?: string,
@@ -1411,10 +1460,10 @@ export class ApiClient {
   }
 
   /**
-   * Обновление языковых предпочтений
+   * Update language preference
    *
-   * @param language - Код языка для установки как предпочтения
-   * @returns Ответ языковых предпочтений
+   * @param language - Language code to set as preference
+   * @returns Language preference response
    */
   async updateLanguagePreference(language: string): Promise<LanguagePreferenceResponse> {
     try {
@@ -1428,17 +1477,23 @@ export class ApiClient {
     }
   }
 
-  // ==================== Веса мэтчинга ====================
+  // ==================== Matching Weights ====================
 
   /**
-   * Получение всех профилей весов мэтчинга
+   * List all matching weight profiles
    *
-   * @param organizationId - Опциональный фильтр по ID организации
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param isPreset - Опциональный фильтр по статусу пресета
-   * @param isActive - Опциональный фильтр по статусу активности (default: true)
-   * @returns Список профилей весов
-   * @throws ApiError если получение списка не удалось
+   * @param organizationId - Optional organization ID filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param isPreset - Optional preset status filter
+   * @param isActive - Optional active status filter (default: true)
+   * @returns List of weight profiles
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.listWeightProfiles();
+   * console.log(result.profiles.length); // Total profiles
+   * ```
    */
   async listWeightProfiles(
     organizationId?: string,
@@ -1464,12 +1519,20 @@ export class ApiClient {
   }
 
   /**
-   * Получение пресетных профилей весов
+   * Get preset weight profiles
    *
-   * Возвращает системные пресетные профили (Technical, Creative, Executive, Balanced).
+   * Returns system-defined preset profiles (Technical, Creative, Executive, Balanced).
    *
-   * @returns Пресетные профили
-   * @throws ApiError если запрос не удался
+   * @returns Preset profiles
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const presets = await apiClient.getPresetProfiles();
+   * presets.presets.forEach(p => {
+   *   console.log(`${p.name}: ${p.use_case}`);
+   * });
+   * ```
    */
   async getPresetProfiles(): Promise<PresetsResponse> {
     try {
@@ -1483,11 +1546,17 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретного профиля весов по ID
+   * Get a specific weight profile by ID
    *
-   * @param id - ID профиля
-   * @returns Детали профиля весов
-   * @throws ApiError если профиль не найден
+   * @param id - Profile ID
+   * @returns Weight profile details
+   * @throws ApiError if not found
+   *
+   * @example
+   * ```ts
+   * const profile = await apiClient.getWeightProfile('profile-123');
+   * console.log(profile.weights_percentage);
+   * ```
    */
   async getWeightProfile(id: string): Promise<MatchingWeightsProfile> {
     try {
@@ -1501,11 +1570,22 @@ export class ApiClient {
   }
 
   /**
-   * Создание кастомного профиля весов
+   * Create a custom weight profile
    *
-   * @param request - Запрос на создание с весами и метаданными
-   * @returns Созданный профиль весов
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with weights and metadata
+   * @returns Created weight profile
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const profile = await apiClient.createWeightProfile({
+   *   name: 'My Technical Profile',
+   *   description: 'High keyword weight for technical roles',
+   *   keyword_weight: 0.6,
+   *   tfidf_weight: 0.25,
+   *   vector_weight: 0.15,
+   * });
+   * ```
    */
   async createWeightProfile(request: MatchingWeightsCreate): Promise<MatchingWeightsProfile> {
     try {
@@ -1520,12 +1600,20 @@ export class ApiClient {
   }
 
   /**
-   * Обновление профиля весов
+   * Update a weight profile
    *
-   * @param id - ID профиля
-   * @param request - Запрос на обновление с полями для изменения
-   * @returns Обновленный профиль весов
-   * @throws ApiError если обновление не удалось
+   * @param id - Profile ID
+   * @param request - Update request with fields to modify
+   * @returns Updated weight profile
+   * @throws ApiError if update fails
+   *
+   * @example
+   * ```ts
+   * const updated = await apiClient.updateWeightProfile('profile-123', {
+   *   keyword_weight: 0.7,
+   *   change_reason: 'Increased keyword weight for senior roles',
+   * });
+   * ```
    */
   async updateWeightProfile(
     id: string,
@@ -1543,10 +1631,15 @@ export class ApiClient {
   }
 
   /**
-   * Удаление кастомного профиля весов
+   * Delete a custom weight profile
    *
-   * @param id - ID профиля
-   * @throws ApiError если удаление не удалось
+   * @param id - Profile ID
+   * @throws ApiError if deletion fails
+   *
+   * @example
+   * ```ts
+   * await apiClient.deleteWeightProfile('profile-123');
+   * ```
    */
   async deleteWeightProfile(id: string): Promise<void> {
     try {
@@ -1557,11 +1650,19 @@ export class ApiClient {
   }
 
   /**
-   * Получение истории версий для профиля весов
+   * Get version history for a weight profile
    *
-   * @param id - ID профиля
-   * @returns Записи истории версий
-   * @throws ApiError если запрос не удался
+   * @param id - Profile ID
+   * @returns Version history entries
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const history = await apiClient.getWeightProfileHistory('profile-123');
+   * history.versions.forEach(v => {
+   *   console.log(`Version ${v.version}: ${v.change_reason}`);
+   * });
+   * ```
    */
   async getWeightProfileHistory(id: string): Promise<VersionHistoryResponse> {
     try {
@@ -1575,11 +1676,21 @@ export class ApiClient {
   }
 
   /**
-   * Нормализация весов так, чтобы они суммировались до 1.0
+   * Normalize weights so they sum to 1.0
    *
-   * @param request - Веса для нормализации
-   * @returns Нормализованные веса
-   * @throws ApiError если запрос не удался
+   * @param request - Weights to normalize
+   * @returns Normalized weights
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const normalized = await apiClient.normalizeWeights({
+   *   keyword_weight: 0.5,
+   *   tfidf_weight: 0.3,
+   *   vector_weight: 0.3, // Sum = 1.1
+   * });
+   * // Returns normalized values that sum to 1.0
+   * ```
    */
   async normalizeWeights(request: NormalizeWeightsRequest): Promise<NormalizedWeightsResponse> {
     try {
@@ -1594,11 +1705,20 @@ export class ApiClient {
   }
 
   /**
-   * Применение кастомных весов к вакансии
+   * Apply custom weights to a vacancy
    *
-   * @param request - Запрос на применение с ID вакансии и весами
-   * @returns Результат применения
-   * @throws ApiError если применение не удалось
+   * @param request - Apply request with vacancy ID and weights
+   * @returns Application result
+   * @throws ApiError if application fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.applyWeights({
+   *   vacancy_id: 'vacancy-123',
+   *   profile_id: 'profile-456',
+   *   re_match_candidates: true,
+   * });
+   * ```
    */
   async applyWeights(request: ApplyWeightsRequest): Promise<ApplyWeightsResponse> {
     try {
@@ -1612,14 +1732,26 @@ export class ApiClient {
     }
   }
 
-  // ==================== ATS симуляция ====================
+  // ==================== ATS Simulation ====================
 
   /**
-   * Оценка резюме против вакансии с использованием ATS симуляции
+   * Evaluate a resume against a job posting using ATS simulation
    *
-   * @param request - Запрос ATS оценки с resume_id, vacancy_id и опциональным флагом use_llm
-   * @returns Комплексные результаты ATS оценки
-   * @throws ApiError если оценка не удалась
+   * @param request - ATS evaluation request with resume_id, vacancy_id, and optional use_llm flag
+   * @returns Comprehensive ATS evaluation results
+   * @throws ApiError if evaluation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.evaluateATS({
+   *   resume_id: 'resume-123',
+   *   vacancy_id: 'vacancy-456',
+   *   use_llm: true,
+   * });
+   * console.log(result.passed); // true/false
+   * console.log(result.overall_score); // 0-1
+   * console.log(result.missing_keywords); // ["Docker", "Kubernetes"]
+   * ```
    */
   async evaluateATS(request: ATSEvaluationRequest): Promise<ATSEvaluationResponse> {
     try {
@@ -1634,12 +1766,18 @@ export class ApiClient {
   }
 
   /**
-   * Получение кэшированного результата ATS оценки для пары резюме-вакансия
+   * Get cached ATS evaluation result for a resume-vacancy pair
    *
-   * @param resumeId - ID резюме
-   * @param vacancyId - ID вакансии
-   * @returns Кэшированный результат ATS оценки
-   * @throws ApiError если результат не найден
+   * @param resumeId - Resume ID
+   * @param vacancyId - Job Vacancy ID
+   * @returns Cached ATS evaluation result
+   * @throws ApiError if result not found
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.getATSResult('resume-123', 'vacancy-456');
+   * console.log(result.passed, result.overall_score);
+   * ```
    */
   async getATSResult(resumeId: string, vacancyId: string): Promise<ATSEvaluationResponse> {
     try {
@@ -1653,11 +1791,21 @@ export class ApiClient {
   }
 
   /**
-   * Оценка нескольких резюме против одной вакансии
+   * Evaluate multiple resumes against a single job posting
    *
-   * @param request - Batch запрос оценки с vacancy_id и списком resume_ids
-   * @returns Batch результаты оценки с сводной статистикой
-   * @throws ApiError если оценка не удалась
+   * @param request - Batch evaluation request with vacancy_id and list of resume_ids
+   * @returns Batch evaluation results with summary statistics
+   * @throws ApiError if evaluation fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.batchEvaluateATS({
+   *   vacancy_id: 'vacancy-456',
+   *   resume_ids: ['resume-1', 'resume-2', 'resume-3'],
+   *   use_llm: true,
+   * });
+   * console.log(`${result.passed_count}/${result.total_count} passed`);
+   * ```
    */
   async batchEvaluateATS(request: BatchATSEvaluationRequest): Promise<BatchATSEvaluationResponse> {
     try {
@@ -1672,10 +1820,18 @@ export class ApiClient {
   }
 
   /**
-   * Получение текущей конфигурации ATS симуляции
+   * Get current ATS simulation configuration
    *
-   * @returns Конфигурация ATS включая провайдер, модель, threshold и веса
-   * @throws ApiError если запрос не удался
+   * @returns ATS configuration including provider, model, threshold, and weights
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const config = await apiClient.getATSConfig();
+   * console.log(config.llm_configured); // true/false
+   * console.log(config.provider); // "openai"
+   * console.log(config.threshold); // 0.6
+   * ```
    */
   async getATSConfig(): Promise<ATSConfigResponse> {
     try {
@@ -1689,16 +1845,22 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка результатов ATS с опциональными фильтрами
+   * List ATS results with optional filters
    *
-   * @param resumeId - Опциональный фильтр по ID резюме
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param passed - Опциональный фильтр по статусу passed
-   * @param minScore - Опциональный фильтр минимального общего балла
-   * @param limit - Максимум результатов для возврата
-   * @param offset - Количество результатов для пропуска
-   * @returns Список результатов ATS с общим количеством
-   * @throws ApiError если получение списка не удалось
+   * @param resumeId - Optional resume ID filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param passed - Optional passed status filter
+   * @param minScore - Optional minimum overall score filter
+   * @param limit - Maximum number of results to return
+   * @param offset - Number of results to skip
+   * @returns List of ATS results with total count
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * const results = await apiClient.listATSResults('vacancy-456');
+   * console.log(`${results.total_count} results found`);
+   * ```
    */
   async listATSResults(
     resumeId?: string,
@@ -1727,17 +1889,29 @@ export class ApiClient {
     }
   }
 
-  // ==================== Кандидаты ====================
+  // ==================== Candidates ====================
 
   /**
-   * Получение списка всех кандидатов (резюме) с их текущими этапами workflow
+   * List all candidates (resumes) with their current workflow stages
    *
-   * @param stageId - Опциональный фильтр по ID или имени этапа workflow
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param skip - Количество записей для пропуска (пагинация)
-   * @param limit - Максимум количества записей для возврата
-   * @returns Список кандидатов с их текущими этапами
-   * @throws ApiError если получение списка не удалось
+   * @param stageId - Optional filter by workflow stage ID or name
+   * @param vacancyId - Optional filter by vacancy ID
+   * @param skip - Number of records to skip (pagination)
+   * @param limit - Maximum number of records to return
+   * @returns List of candidates with their current stages
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * // Get all candidates
+   * const candidates = await apiClient.listCandidates();
+   *
+   * // Filter by stage
+   * const interviewCandidates = await apiClient.listCandidates('interview');
+   *
+   * // Filter by vacancy
+   * const vacancyCandidates = await apiClient.listCandidates(undefined, 'vacancy-123');
+   * ```
    */
   async listCandidates(
     stageId?: string,
@@ -1746,9 +1920,11 @@ export class ApiClient {
     limit: number = 100
   ): Promise<CandidateListItem[]> {
     try {
-      const params: Record<string, string | number> = { skip, limit };
+      const params: Record<string, string | number> = {};
       if (stageId) params.stage_id = stageId;
       if (vacancyId) params.vacancy_id = vacancyId;
+      params.skip = skip;
+      params.limit = limit;
 
       const response: AxiosResponse<CandidateListItem[]> = await this.client.get(
         '/api/candidates/',
@@ -1761,11 +1937,17 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретной информации об этапе кандидата
+   * Get a specific candidate's current stage information
    *
-   * @param candidateId - UUID резюме
-   * @returns Детали кандидата с текущим этапом
-   * @throws ApiError если кандидат не найден
+   * @param candidateId - Resume UUID
+   * @returns Candidate details with current stage
+   * @throws ApiError if not found
+   *
+   * @example
+   * ```ts
+   * const candidate = await apiClient.getCandidate('resume-uuid');
+   * console.log(candidate.current_stage, candidate.stage_name);
+   * ```
    */
   async getCandidate(candidateId: string): Promise<CandidateListItem> {
     try {
@@ -1779,15 +1961,25 @@ export class ApiClient {
   }
 
   /**
-   * Перемещение кандидата на другой этап workflow
+   * Move a candidate to a different workflow stage
    *
-   * Создает новую запись этапа найма для отслеживания переходов этапов.
-   * Это позволяет поддерживать полную историю прогресса кандидата.
+   * Creates a new hiring stage record to track the stage transition.
+   * This allows maintaining a complete history of candidate progression.
    *
-   * @param candidateId - UUID резюме
-   * @param request - Детали перемещения этапа (stage_id, опциональный vacancy_id, опциональные notes)
-   * @returns Новая информация об этапе
-   * @throws ApiError если перемещение не удалось
+   * @param candidateId - Resume UUID
+   * @param request - Stage movement details (stage_id, optional vacancy_id, optional notes)
+   * @returns New stage information
+   * @throws ApiError if movement fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.moveCandidate('resume-uuid', {
+   *   stage_id: 'interview',
+   *   vacancy_id: 'vacancy-123',
+   *   notes: 'Passed screening'
+   * });
+   * console.log(result.previous_stage, result.new_stage);
+   * ```
    */
   async moveCandidate(
     candidateId: string,
@@ -1804,14 +1996,26 @@ export class ApiClient {
     }
   }
 
-  // ==================== Этапы workflow ====================
+  // ==================== Workflow Stages ====================
 
   /**
-   * Создание этапа workflow для организации
+   * Create a workflow stage for an organization
    *
-   * @param request - Запрос на создание с деталями этапа workflow
-   * @returns Созданный этап workflow
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with workflow stage details
+   * @returns Created workflow stage
+   * @throws ApiError if creation fails
+   *
+   * @example
+   * ```ts
+   * const stage = await apiClient.createWorkflowStage({
+   *   organization_id: 'org-123',
+   *   stage_name: 'Technical Interview',
+   *   stage_order: 3,
+   *   is_active: true,
+   *   color: '#3B82F6',
+   *   description: 'Technical assessment with engineering team'
+   * });
+   * ```
    */
   async createWorkflowStage(request: WorkflowStageCreate): Promise<WorkflowStageResponse> {
     try {
@@ -1826,13 +2030,22 @@ export class ApiClient {
   }
 
   /**
-   * Получение списка этапов workflow с опциональными фильтрами
+   * List workflow stages with optional filters
    *
-   * @param organizationId - Опциональный фильтр по ID организации
-   * @param isActive - Опциональный фильтр по статусу активности
-   * @param isDefault - Опциональный фильтр по статусу default
-   * @returns Список этапов workflow
-   * @throws ApiError если получение списка не удалось
+   * @param organizationId - Optional organization ID filter
+   * @param isActive - Optional active status filter
+   * @param isDefault - Optional default status filter
+   * @returns List of workflow stages
+   * @throws ApiError if listing fails
+   *
+   * @example
+   * ```ts
+   * // Get all stages for an organization
+   * const stages = await apiClient.listWorkflowStages('org-123');
+   *
+   * // Get only active stages
+   * const activeStages = await apiClient.listWorkflowStages('org-123', true);
+   * ```
    */
   async listWorkflowStages(
     organizationId?: string,
@@ -1856,11 +2069,16 @@ export class ApiClient {
   }
 
   /**
-   * Получение конкретного этапа workflow по ID
+   * Get a specific workflow stage by ID
    *
-   * @param stageId - ID этапа workflow
-   * @returns Детали этапа workflow
-   * @throws ApiError если этап не найден
+   * @param stageId - Workflow stage ID
+   * @returns Workflow stage details
+   * @throws ApiError if not found
+   *
+   * @example
+   * ```ts
+   * const stage = await apiClient.getWorkflowStage('stage-uuid');
+   * ```
    */
   async getWorkflowStage(stageId: string): Promise<WorkflowStageResponse> {
     try {
@@ -1874,12 +2092,20 @@ export class ApiClient {
   }
 
   /**
-   * Обновление этапа workflow
+   * Update a workflow stage
    *
-   * @param stageId - ID этапа workflow
-   * @param request - Запрос на обновление с полями для изменения
-   * @returns Обновленный этап workflow
-   * @throws ApiError если обновление не удалось
+   * @param stageId - Workflow stage ID
+   * @param request - Update request with fields to modify
+   * @returns Updated workflow stage
+   * @throws ApiError if update fails
+   *
+   * @example
+   * ```ts
+   * const updated = await apiClient.updateWorkflowStage('stage-uuid', {
+   *   stage_name: 'Updated Technical Interview',
+   *   is_active: false
+   * });
+   * ```
    */
   async updateWorkflowStage(
     stageId: string,
@@ -1897,10 +2123,15 @@ export class ApiClient {
   }
 
   /**
-   * Удаление этапа workflow
+   * Delete a workflow stage
    *
-   * @param stageId - ID этапа workflow
-   * @throws ApiError если удаление не удалось
+   * @param stageId - Workflow stage ID
+   * @throws ApiError if deletion fails
+   *
+   * @example
+   * ```ts
+   * await apiClient.deleteWorkflowStage('stage-uuid');
+   * ```
    */
   async deleteWorkflowStage(stageId: string): Promise<void> {
     try {
@@ -1911,7 +2142,7 @@ export class ApiClient {
   }
 }
 
-// Расширение AxiosRequestConfig для включения metadata
+// Extend AxiosRequestConfig to include metadata
 declare module 'axios' {
   interface AxiosRequestConfig {
     metadata?: {
@@ -1922,13 +2153,13 @@ declare module 'axios' {
 }
 
 /**
- * Экземпляр API клиента по умолчанию
+ * Default API client instance
  *
- * Используйте этот singleton экземпляр для всех API вызовов.
+ * Use this singleton instance for all API calls.
  */
 export const apiClient = new ApiClient();
 
 /**
- * Экспорт класса API клиента для кастомных экземпляров
+ * Export API client class for custom instances
  */
 export default ApiClient;

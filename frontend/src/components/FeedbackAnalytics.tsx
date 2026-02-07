@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -26,8 +27,17 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+import {
+  CheckCircle as CheckIcon,
+  Error as ErrorIcon,
+  Info as InfoIcon,
+  Refresh as RefreshIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  School as LearningIcon,
+  Science as ModelIcon,
+} from '@mui/icons-material';
 
 /**
  * Feedback entry interface from backend
@@ -136,8 +146,8 @@ function TabPanel(props: TabPanelProps) {
  * ```
  */
 const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
-  feedbackApiUrl = 'http://localhost:8000/api/feedback',
-  modelApiUrl = 'http://localhost:8000/api/model-versions',
+  feedbackApiUrl = `${config.api.url}/api/feedback`,
+  modelApiUrl = `${config.api.url}/api/model-versions`,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -260,7 +270,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchAnalytics} startIcon={<Icon name="refresh-cw" size={16} />}>
+          <Button color="inherit" onClick={fetchAnalytics} startIcon={<RefreshIcon />}>
             {t('common.tryAgain')}
           </Button>
         }
@@ -279,7 +289,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
           <Typography variant="h5" fontWeight={600}>
             {t('adminAnalytics.title')}
           </Typography>
-          <Button variant="outlined" startIcon={<Icon name="refresh-cw" size={16} />} onClick={fetchAnalytics} size="small">
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchAnalytics} size="small">
             {t('adminAnalytics.refreshButton')}
           </Button>
         </Box>
@@ -340,9 +350,9 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                     {feedbackStats.accuracy.toFixed(1)}%
                   </Typography>
                   {feedbackStats.accuracy >= 70 ? (
-                    <Icon name="trending-up" size="small" color="success" />
+                    <TrendingUpIcon fontSize="small" color="success" />
                   ) : (
-                    <Icon name="trending-down" size="small" color="error" />
+                    <TrendingDownIcon fontSize="small" color="error" />
                   )}
                 </Box>
                 <Typography variant="caption" color="text.secondary">
@@ -370,7 +380,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
         <TabPanel value={tabValue} index={0}>
           <Paper elevation={1} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
-              <Icon name="graduation-cap" size="small" style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+              <LearningIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 1 }} />
               {t('adminAnalytics.learningProgress.title')}
             </Typography>
             <Divider sx={{ mb: 3 }} />
@@ -475,9 +485,9 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                             {Math.max(0, 90 - feedbackStats.accuracy).toFixed(1)}%
                           </Typography>
                           {Math.max(0, 90 - feedbackStats.accuracy) <= 10 ? (
-                            <Icon name="trending-up" size="small" color="success" />
+                            <TrendingUpIcon fontSize="small" color="success" />
                           ) : (
-                            <Icon name="trending-down" size="small" color="warning" />
+                            <TrendingDownIcon fontSize="small" color="warning" />
                           )}
                         </Box>
                       }
@@ -493,7 +503,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
         <TabPanel value={tabValue} index={1}>
           <Paper elevation={1} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
-              <Icon name="flask-conical" size="small" style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+              <ModelIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 1 }} />
               {t('adminAnalytics.models.title')}
             </Typography>
             <Divider sx={{ mb: 3 }} />
@@ -509,7 +519,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                 {activeModel && (
                   <Box>
                     <Typography variant="subtitle2" color="success.main" gutterBottom fontWeight={600}>
-                      <Icon name="check-circle" size="small" style={{ verticalAlign: 'middle', marginRight: '2px' }} />
+                      <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
                       {t('adminAnalytics.models.activeProductionModel')}
                     </Typography>
                     <Card variant="outlined" sx={{ borderColor: 'success.main' }}>
@@ -557,7 +567,7 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                 {experimentModels.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" color="primary.main" gutterBottom fontWeight={600}>
-                      <Icon name="info" size="small" style={{ verticalAlign: 'middle', marginRight: '2px' }} />
+                      <InfoIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
                       {t('adminAnalytics.models.abTestingExperiments', { count: experimentModels.length })}
                     </Typography>
                     <Grid container spacing={2}>
@@ -646,9 +656,9 @@ const FeedbackAnalytics: React.FC<FeedbackAnalyticsProps> = ({
                         </TableCell>
                         <TableCell>
                           {entry.was_correct ? (
-                            <Chip label={t('common.yes')} size="small" color="success" icon={<Icon name="check-circle" size="small" />} />
+                            <Chip label={t('common.yes')} size="small" color="success" icon={<CheckIcon />} />
                           ) : (
-                            <Chip label={t('common.no')} size="small" color="error" icon={<Icon name="alert-circle" size="small" />} />
+                            <Chip label={t('common.no')} size="small" color="error" icon={<ErrorIcon />} />
                           )}
                         </TableCell>
                         <TableCell>

@@ -1,10 +1,10 @@
 # AgentHR - AI-Powered Resume Analysis & Candidate Ranking
 
-AI-powered resume analysis system built on a **microservices architecture** with intelligent job matching, ML-based candidate ranking, and comprehensive monitoring.
+AI-powered resume analysis system with intelligent job matching, ML-based candidate ranking, and comprehensive monitoring.
 
 ## Features
 
-- **Resume Upload & Analysis**: Support for PDF and DOCX formats with NLP-based parsing
+- **Resume Upload & Analysis**: Support for PDF and DOCX formats
 - **Unified Matching System**: Three-method matching (Keyword, TF-IDF, Vector similarity)
 - **AI Candidate Ranking**: ML-based ranking with 13 features and A/B testing support
 - **Recruiter Feedback**: Feedback loop for continuous model improvement
@@ -13,7 +13,6 @@ AI-powered resume analysis system built on a **microservices architecture** with
 - **Modern Monitoring**: Grafana + Loki + Promtail + Prometheus stack
 - **Async Processing**: Celery + Redis for background tasks
 - **Modern UI**: React 18 + Material-UI with responsive design
-- **Microservices Architecture**: 10 independently deployable services
 
 ## Quick Start
 
@@ -38,121 +37,55 @@ docker-compose ps
 
 ### Access URLs
 
-#### Application Services
-
-| Service | URL | Description |
-|---------|-----|-------------|
-| Frontend | http://localhost:3000 | React web application |
-| API Gateway | http://localhost:8888 | Single entry point for all API requests |
-| API Docs | http://localhost:8888/docs | Interactive API documentation (Swagger) |
-
-#### Core Microservices (Direct Access)
-
-| Service | Port | Description |
-|---------|------|-------------|
-| Resume Processing | 8001 | Resume upload, parsing, and analysis |
-| Matching | 8002 | Skill matching and candidate ranking |
-| Candidate | 8003 | Candidate CRUD and management |
-| Vacancy | 8004 | Job vacancy management |
-| Taxonomy | 8005 | Skill taxonomies and synonyms |
-| Analytics | 8006 | Dashboards and reports |
-| ATS Simulation | 8007 | ATS scoring and screening |
-| Notifications | 8008 | Email, SMS, webhook notifications |
-| Integrations | 8009 | Third-party service integrations |
-
-#### Infrastructure Services
-
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| Keycloak | http://localhost:8080 | admin/admin (SSO/Auth) |
+| Frontend | http://localhost:3000 | - |
+| Backend API | http://localhost:8000 | - |
+| API Docs | http://localhost:8000/docs | - |
 | Grafana | http://localhost:3001 | admin/admin |
 | Prometheus | http://localhost:9090 | - |
 | Loki | http://localhost:3100 | - |
-| PostgreSQL | localhost:5432 | postgres/postgres |
-| Redis | localhost:6379 | - |
 
 ### Load Test Data
 
 ```bash
 # Load 65 resumes and 5 vacancies
-docker-compose exec api-gateway python scripts/reset_and_reload.py
+docker-compose exec backend python scripts/reset_and_reload.py
 ```
 
 ## Architecture
 
-### Microservices Overview
-
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              API Gateway (Port 8888)                            │
-│                     Routing, Auth, Rate Limiting, CORS                         │
-└──────────────────────────────┬─────────────────────────────────────────────────┘
-                               │
-        ┌──────────────────────┼──────────────────────┐
-        │                      │                      │
-        ▼                      ▼                      ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│   Frontend    │    │   Keycloak    │    │  Monitoring   │
-│  (React:3000) │    │    (8080)     │    │   (Grafana)   │
-└───────────────┘    └───────────────┘    └───────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────────────────────────┐
-        │                       │                                           │
-        ▼                       ▼                                           ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         Core Microservices (8001-8009)                         │
-├─────────────┬─────────────┬─────────────┬─────────────┬─────────────────────┤
-│  Resume     │  Matching   │  Candidate  │  Vacancy   │    Taxonomy        │
-│ Processing  │             │             │            │                     │
-│    (8001)   │   (8002)    │   (8003)    │   (8004)   │      (8005)        │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│  Analytics  │    ATS      │Notification │Integration  │                     │
-│             │ Simulation  │            │             │                     │
-│   (8006)    │   (8007)    │   (8008)    │   (8009)    │                     │
-└─────────────┴─────────────┴─────────────┴─────────────┴─────────────────────┘
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│  PostgreSQL   │    │     Redis     │    │   Celery      │
-│    (5432)     │    │    (6379)     │    │   Workers     │
-└───────────────┘    └───────────────┘    └───────────────┘
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│  Frontend   │─────▶│   Backend    │─────▶│   Database  │
+│ (React+MUI) │      │   (FastAPI)  │      │ (PostgreSQL)│
+└─────────────┘      └──────────────┘      └─────────────┘
+                            │
+                    ┌───────┴────────────────────────┐
+                    ▼                ▼               ▼
+              ┌─────────┐      ┌──────────┐   ┌──────────┐
+              │ Celery  │      │  Redis   │   │  Ranking │
+              │ Worker  │      │  Broker  │   │  Service │
+              └─────────┘      └──────────┘   └──────────┘
+                                                       │
+                                          ┌────────────┴─────────┐
+                                          ▼          ▼           ▼
+                                    ┌────────┐  ┌──────┐  ┌─────────┐
+                                    │Grafana │  │ Loki │  │Prometheus│
+                                    └────────┘  └──────┘  └─────────┘
 ```
-
-### Microservices Description
-
-| Service | Port | Purpose | Key Features |
-|---------|------|---------|--------------|
-| **API Gateway** | 8888 | Single entry point, routing, JWT validation | Rate limiting, CORS, API versioning |
-| **Resume Processing** | 8001 | Upload, parse, analyze resumes | PDF/DOCX extraction, NLP parsing |
-| **Matching** | 8002 | Skill matching and ranking | 3-method matcher, TF-IDF, vectors |
-| **Candidate** | 8003 | Candidate management | CRUD, notes, tags, activities |
-| **Vacancy** | 8004 | Job vacancy management | Bulk operations, saved searches |
-| **Taxonomy** | 8005 | Skill taxonomies | Custom synonyms, classifications |
-| **Analytics** | 8006 | Dashboards and reports | Performance metrics, batch jobs |
-| **ATS Simulation** | 8007 | Resume screening | ATS scoring, LLM-based analysis |
-| **Notifications** | 8008 | Alerts and communications | Email, SMS, webhooks |
-| **Integrations** | 8009 | Third-party connections | LinkedIn, job boards, HRIS |
-
-### Inter-Service Communication
-
-- **Protocol**: gRPC (recommended) or REST for service-to-service calls
-- **Authentication**: JWT tokens validated at API Gateway
-- **Service Discovery**: Consul or Kubernetes native
-- **Distributed Tracing**: Jaeger integration for observability
 
 ## API Endpoints
-
-All API requests go through the **API Gateway** at `http://localhost:8888`
 
 ### Resume Analysis
 
 ```bash
 # Upload resume
-curl -X POST http://localhost:8888/api/resumes/upload \
+curl -X POST http://localhost:8000/api/resumes/upload \
   -F "file=@resume.pdf"
 
 # Analyze resume
-curl -X POST http://localhost:8888/api/resumes/analyze \
+curl -X POST http://localhost:8000/api/resumes/analyze \
   -H "Content-Type: application/json" \
   -d '{"resume_id": "uuid"}'
 ```
@@ -161,7 +94,7 @@ curl -X POST http://localhost:8888/api/resumes/analyze \
 
 ```bash
 # Unified matching (AI-powered)
-curl -X POST http://localhost:8888/api/matching/compare-unified \
+curl -X POST http://localhost:8000/api/matching/compare-unified \
   -H "Content-Type: application/json" \
   -d '{
     "resume_id": "uuid",
@@ -178,7 +111,7 @@ curl -X POST http://localhost:8888/api/matching/compare-unified \
 
 ```bash
 # Rank single candidate for vacancy
-curl -X POST http://localhost:8888/api/ranking/rank \
+curl -X POST http://localhost:8000/api/ranking/rank \
   -H "Content-Type: application/json" \
   -d '{
     "resume_id": "resume_uuid",
@@ -187,10 +120,10 @@ curl -X POST http://localhost:8888/api/ranking/rank \
   }'
 
 # Get ranked candidates for vacancy
-curl -X GET "http://localhost:8888/api/ranking/vacancy/{vacancy_id}/ranked?limit=10"
+curl -X GET "http://localhost:8000/api/ranking/vacancy/{vacancy_id}/ranked?limit=10"
 
 # Submit feedback on ranking
-curl -X POST http://localhost:8888/api/ranking/feedback \
+curl -X POST http://localhost:8000/api/ranking/feedback \
   -H "Content-Type: application/json" \
   -d '{
     "rank_id": "rank_uuid",
@@ -199,17 +132,17 @@ curl -X POST http://localhost:8888/api/ranking/feedback \
   }'
 
 # Get feature importance
-curl -X GET http://localhost:8888/api/ranking/models/importance
+curl -X GET http://localhost:8000/api/ranking/models/importance
 ```
 
 ### Vacancies
 
 ```bash
 # Get all vacancies
-curl -X GET http://localhost:8888/api/vacancies/
+curl -X GET http://localhost:8000/api/vacancies/
 
 # Create vacancy
-curl -X POST http://localhost:8888/api/vacancies/ \
+curl -X POST http://localhost:8000/api/vacancies/ \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Python Developer",
@@ -256,20 +189,22 @@ Candidates can be assigned to experiment groups for model comparison:
 ## Project Structure
 
 ```
-├── services/                    # Microservices
-│   ├── api-gateway/            # API Gateway (Port 8888)
-│   ├── resume-processing/      # Resume Service (Port 8001)
-│   ├── matching/               # Matching Service (Port 8002)
-│   ├── candidate/              # Candidate Service (Port 8003)
-│   ├── vacancy/                # Vacancy Service (Port 8004)
-│   ├── taxonomy/               # Taxonomy Service (Port 8005)
-│   ├── analytics/              # Analytics Service (Port 8006)
-│   ├── ats-simulation/         # ATS Service (Port 8007)
-│   ├── notifications/          # Notification Service (Port 8008)
-│   └── integrations/           # Integration Service (Port 8009)
-├── shared_models/              # Shared SQLAlchemy models
-│   ├── base.py                 # Base classes and mixins
-│   └── common.py               # Common models
+├── backend/                    # FastAPI backend
+│   ├── analyzers/              # ML/NLP analyzers
+│   │   ├── unified_matcher.py   # Combined 3-method matcher
+│   │   ├── ranking_service.py   # ML-based candidate ranking
+│   │   └── hf_skill_extractor.py
+│   ├── api/                    # API endpoints
+│   │   ├── ranking.py           # Ranking API
+│   │   ├── matching.py          # Matching API
+│   │   └── vacancies.py         # Vacancies API
+│   ├── models/                 # SQLAlchemy models
+│   │   ├── candidate_rank.py    # Ranking models
+│   │   ├── resume.py
+│   │   └── job_vacancy.py
+│   ├── scripts/                # Utility scripts
+│   │   └── reset_and_reload.py # Test data loader
+│   └── alembic/                # Database migrations
 ├── frontend/                   # React + Vite frontend
 │   └── src/
 │       ├── components/
@@ -281,6 +216,8 @@ Candidates can be assigned to experiment groups for model comparison:
 │   ├── loki/
 │   ├── prometheus/
 │   └── promtail/
+├── services/                   # Shared services
+│   └── data_extractor/         # PDF/DOCX extraction
 ├── testdata/                   # Test data
 │   └── vacancy-resume-matching-dataset-main/
 │       ├── CV/                 # 65 resume files
@@ -290,46 +227,32 @@ Candidates can be assigned to experiment groups for model comparison:
 
 ## Tech Stack
 
-### Backend Microservices
-- **Framework**: FastAPI with Python 3.14
-- **Database**: PostgreSQL 14 with SQLAlchemy 2.0 (async)
-- **Inter-service Comm**: gRPC with protocol buffers
-- **Task Queue**: Celery 5.4.0 with Redis 5.2.0
-- **ML**: scikit-learn, sentence-transformers, spaCy 3.8.2
-- **Authentication**: Keycloak (JWT)
+### Backend
+- **Framework**: FastAPI with Python 3.11
+- **Database**: PostgreSQL 14 with SQLAlchemy 2.0
+- **ML**: scikit-learn (ranking), sentence-transformers (vectors)
+- **Async**: Celery + Redis
 
 ### Frontend
 - **Framework**: React 18 with TypeScript
 - **Build**: Vite 5.4
 - **UI**: Material-UI (MUI) v6
-- **State**: TanStack React Query
 
-### Infrastructure
-- **API Gateway**: Kong or Traefik
-- **Service Discovery**: Consul
-- **Distributed Tracing**: Jaeger
-- **Monitoring**:
-  - Grafana - Visualization dashboards
-  - Loki - Log aggregation
-  - Promtail - Log collector
-  - Prometheus - Metrics collection
+### Monitoring
+- **Grafana** - Visualization dashboards
+- **Loki** - Log aggregation
+- **Promtail** - Log collector
+- **Prometheus** - Metrics collection
 
 ## Common Commands
 
 ```bash
-# View logs for specific service
-docker-compose logs -f api-gateway
-docker-compose logs -f resume-processing
-docker-compose logs -f matching
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f grafana
 
-# View all service logs
-docker-compose logs -f
-
-# Restart specific service
-docker-compose restart api-gateway
-
-# Restart all services
-docker-compose restart
+# Restart services
+docker-compose restart backend
 
 # Stop all services
 docker-compose down
@@ -337,75 +260,68 @@ docker-compose down
 # Stop and remove data
 docker-compose down -v
 
-# Run database migration for a service
-docker-compose exec resume-processing alembic upgrade head
+# Run database migration
+docker-compose exec backend alembic upgrade head
 
-# Check service health
-curl http://localhost:8888/health
-curl http://localhost:8001/health
-curl http://localhost:8002/health
+# Load test data
+docker-compose exec backend python scripts/reset_and_reload.py
 ```
 
-## Database Schemas
+## Configuration
 
-Each microservice has its own database schema for isolation:
+AgentHR uses a centralized configuration management system with:
 
-| Service | Schema | Tables |
-|---------|--------|--------|
-| Resume Processing | `resumes_service` | resumes, resume_analyses, work_experiences |
-| Matching | `matching_service` | match_results, candidate_ranks, skill_gaps |
-| Candidate | `candidates_service` | candidates, candidate_notes, candidate_tags |
-| Vacancy | `vacancies_service` | vacancies, saved_searches |
-| Taxonomy | `taxonomies_service` | skill_taxonomies, custom_synonyms |
-| Analytics | `analytics_service` | reports, batch_jobs, analytics_* |
-| ATS | `ats_service` | ats_results, screening_questions |
-| Notifications | `notifications_service` | notifications, email_templates |
-| Integrations | `integrations_service` | integrations, linkedin_tokens |
+- **Environment-specific profiles** - Separate configurations for dev, staging, and production
+- **YAML config files** - Store settings in version control
+- **Environment variable overrides** - Override any setting via environment variables
+- **Hot reload support** - Update non-critical settings without restarting
+- **Configuration validation** - Startup validation prevents invalid configurations
+- **Audit logging** - Track all configuration changes
 
-## Development
-
-### Running Individual Services
+### Quick Configuration
 
 ```bash
-# Run API Gateway
-cd services/api-gateway
-uvicorn main:app --host 0.0.0.0 --port 8888 --reload
+# 1. Set environment
+export ENVIRONMENT=dev  # or 'staging' or 'production'
 
-# Run Resume Processing Service
-cd services/resume-processing
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+# 2. Copy environment templates
+cp .env.example .env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 
-# Run Matching Service
-cd services/matching
-uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+# 3. Update with your values
+# Edit .env files with your database URLs, API keys, etc.
+
+# 4. Start services
+docker-compose up -d
 ```
 
-### Running Celery Workers
+### Configuration Files
 
-Each service has its own Celery worker:
+| File | Purpose |
+|------|---------|
+| `backend/config/config.dev.yml` | Development environment settings |
+| `backend/config/config.staging.yml` | Staging environment settings |
+| `backend/config/config.production.yml` | Production environment settings |
+| `.env` | Root environment variables (overrides) |
+| `backend/.env` | Backend-specific variables |
+| `frontend/.env` | Frontend-specific variables |
 
-```bash
-# Resume Processing Worker
-cd services/resume-processing
-celery -A celery_app.celery_app worker --loglevel=info --queues=resume_processing
-
-# Matching Worker
-cd services/matching
-celery -A celery_app.celery_app worker --loglevel=info --queues=matching
-
-# Analytics Worker
-cd services/analytics
-celery -A celery_app.celery_app worker --loglevel=info --queues=analytics,reporting
-```
+For complete configuration documentation, see:
+- **[Configuration Management](docs/configuration.md)** - Complete configuration guide
+- **[Configuration Reference](docs/configuration/reference.md)** - All configuration options
+- **[Backend Config README](backend/config/README.md)** - Backend config module documentation
 
 ## Documentation
 
-- **[API Usage Guide](docs/API_USAGE_GUIDE.md)** - Comprehensive API documentation
+- **[Configuration Management](docs/configuration.md)** - Complete configuration guide with examples
+- **[Configuration Reference](docs/configuration/reference.md)** - All configuration options reference
+- **[API Usage Guide](docs/API_USAGE_GUIDE.md)** - Comprehensive API documentation with workflow examples
 - [SETUP.md](SETUP.md) - Detailed installation instructions
 - [ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Complete environment variables reference
 - [README_RU.md](README_RU.md) - Версия на русском языке
 - [ML_PIPELINE.md](ML_PIPELINE.md) - ML/NLP pipeline details
-- [Dataset Usage Guide](docs/dataset-usage-guide.md) - External dataset integration
+- [Dataset Usage Guide](docs/dataset-usage-guide.md) - External dataset integration guide
 
 ## License
 

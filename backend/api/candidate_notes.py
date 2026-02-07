@@ -91,7 +91,7 @@ async def create_candidate_note(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/candidate-notes/",
+        ...     "/api/candidate-notes/",
         ...     json={
         ...         "resume_id": "resume-uuid",
         ...         "content": "Great candidate, strong technical skills",
@@ -189,7 +189,7 @@ async def list_candidate_notes(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/candidate-notes/?resume_id=resume-uuid")
+        >>> response = requests.get("/api/candidate-notes/?resume_id=resume-uuid")
         >>> response.json()
         {
             "resume_id": "resume-uuid",
@@ -280,7 +280,7 @@ async def get_candidate_note(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/candidate-notes/note-uuid")
+        >>> response = requests.get("/api/candidate-notes/note-uuid")
         >>> response.json()
         {
             "id": "note-uuid",
@@ -363,7 +363,7 @@ async def update_candidate_note(
     Examples:
         >>> import requests
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/candidate-notes/note-uuid",
+        ...     "/api/candidate-notes/note-uuid",
         ...     json={
         ...         "content": "Updated note content",
         ...         "is_private": True
@@ -458,7 +458,7 @@ async def delete_candidate_note(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/candidate-notes/note-uuid")
+        >>> response = requests.delete("/api/candidate-notes/note-uuid")
         >>> response.json()
         {
             "message": "Candidate note deleted successfully",

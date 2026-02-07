@@ -170,9 +170,9 @@ const CandidateSearchPage: React.FC = () => {
     setCurrentTab('search');
 
     try {
-      // Call the advanced search API
+      // Call the advanced search API (microservice endpoint)
       const useSemanticSearch = filters.semanticSearch || false;
-      const response = await axios.post('/api/search/candidates', {
+      const response = await axios.post('/api/candidates/search', {
         query,
         filters: {
           ...filters,

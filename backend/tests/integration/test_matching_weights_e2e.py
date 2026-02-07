@@ -1,4 +1,5 @@
 """
+import os
 End-to-end integration tests for Matching Weights Customization feature.
 
 This test suite validates the complete weight customization workflow:

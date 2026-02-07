@@ -1,39 +1,40 @@
 /**
  * Fairness Monitoring API Client
  *
- * Этот модуль предоставляет удобный интерфейс для мониторинга справедливости AI моделей,
- * включая получение метрик справедливости, отчетов о смещении и оповещений о дискриминации.
+ * This module provides a convenient interface for monitoring AI model fairness,
+ * including retrieving fairness metrics, bias reports, and discrimination alerts.
  *
  * @example
  * ```ts
  * import { fairness } from '@/api/fairness';
  *
- * // Получение сводки справедливости
+ * // Get fairness summary
  * const summary = await fairness.getSummary();
  *
- * // Получение метрик справедливости
+ * // Get fairness metrics
  * const metrics = await fairness.getMetrics({
  *   model_name: 'ranking',
  *   protected_attribute: 'gender',
  * });
  *
- * // Получение отчетов о смещении
+ * // Get bias reports
  * const reports = await fairness.getReports({
  *   severity_level: 'high',
  * });
  *
- * // Генерация нового отчета о смещении
+ * // Generate a new bias report
  * const report = await fairness.generateReport({
  *   model_name: 'ranking',
  *   report_type: 'system-wide',
  * });
  *
- * // Подтверждение оповещения
+ * // Acknowledge an alert
  * await fairness.acknowledgeAlert('alert-123');
  * ```
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { config } from '@/config';
 import type {
   FairnessMetric,
   FairnessMetricsListResponse,
@@ -48,15 +49,15 @@ import type {
 } from '@/types/api';
 
 /**
- * Конфигурация API по умолчанию
+ * Default API configuration
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: config.api.url,
   timeout: 120000,
 };
 
 /**
- * Преобразование ошибки Axios в стандартизированную ошибку API
+ * Transform Axios error to standardized API error
  */
 function transformError(error: unknown): ApiError {
   const axiosError = error as {
@@ -71,17 +72,17 @@ function transformError(error: unknown): ApiError {
 }
 
 /**
- * Класс клиента мониторинга справедливости
+ * Fairness Monitoring Client class
  *
- * Предоставляет методы для метрик справедливости, отчетов о смещении и оповещений.
+ * Provides methods for fairness metrics, bias reports, and alerts.
  */
 export class FairnessClient {
   private client: AxiosInstance;
 
   /**
-   * Создание нового экземпляра клиента справедливости
+   * Create a new Fairness client instance
    *
-   * @param config - Опциональные переопределения конфигурации
+   * @param config - Optional configuration overrides
    */
   constructor(config = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
@@ -90,20 +91,20 @@ export class FairnessClient {
   }
 
   /**
-   * Получение базового экземпляра axios для кастомных запросов
+   * Get the underlying axios instance for custom requests
    *
-   * @returns Экземпляр Axios
+   * @returns Axios instance
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
   }
 
   /**
-   * Получение метрик справедливости для AI моделей
+   * Get fairness metrics for AI models
    *
-   * @param options - Опциональные фильтры для метрик
-   * @returns Список метрик справедливости
-   * @throws ApiError если получение не удалось
+   * @param options - Optional filters for metrics
+   * @returns Fairness metrics list
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -145,11 +146,11 @@ export class FairnessClient {
   }
 
   /**
-   * Получение отчетов об анализе смещения
+   * Get bias analysis reports
    *
-   * @param options - Опциональные фильтры для отчетов
-   * @returns Список отчетов о смещении
-   * @throws ApiError если получение не удалось
+   * @param options - Optional filters for reports
+   * @returns Bias reports list
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -190,11 +191,11 @@ export class FairnessClient {
   }
 
   /**
-   * Получение оповещений о справедливости
+   * Get fairness alerts
    *
-   * @param options - Опциональные фильтры для оповещений
-   * @returns Список оповещений о справедливости
-   * @throws ApiError если получение не удалось
+   * @param options - Optional filters for alerts
+   * @returns Fairness alerts list
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -236,10 +237,10 @@ export class FairnessClient {
   }
 
   /**
-   * Получение сводки справедливости по всем моделям
+   * Get fairness summary across all models
    *
-   * @returns Сводка справедливости
-   * @throws ApiError если получение не удалось
+   * @returns Fairness summary
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -258,11 +259,11 @@ export class FairnessClient {
   }
 
   /**
-   * Генерация нового отчета об анализе смещения
+   * Generate a new bias analysis report
    *
-   * @param request - Запрос на генерацию отчета
-   * @returns Сгенерированный отчет о смещении
-   * @throws ApiError если генерация не удалась
+   * @param request - Report generation request
+   * @returns Generated bias report
+   * @throws ApiError if generation fails
    *
    * @example
    * ```ts
@@ -290,11 +291,11 @@ export class FairnessClient {
   }
 
   /**
-   * Подтверждение оповещения о справедливости
+   * Acknowledge a fairness alert
    *
-   * @param alertId - ID оповещения для подтверждения
-   * @returns Ответ о подтверждении
-   * @throws ApiError если подтверждение не удалось
+   * @param alertId - ID of the alert to acknowledge
+   * @returns Acknowledgment response
+   * @throws ApiError if acknowledgment fails
    *
    * @example
    * ```ts
@@ -314,11 +315,11 @@ export class FairnessClient {
   }
 
   /**
-   * Получение конкретного отчета о смещении по ID
+   * Get a specific bias report by ID
    *
-   * @param reportId - ID отчета
-   * @returns Детали отчета о смещении
-   * @throws ApiError если получение не удалось
+   * @param reportId - Report ID
+   * @returns Bias report details
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -335,12 +336,12 @@ export class FairnessClient {
   }
 
   /**
-   * Получение метрик справедливости для конкретной модели
+   * Get fairness metrics for a specific model
    *
-   * @param modelName - Название модели
-   * @param options - Опциональные фильтры
-   * @returns Метрики справедливости для модели
-   * @throws ApiError если получение не удалось
+   * @param modelName - Model name
+   * @param options - Optional filters
+   * @returns Fairness metrics for the model
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -365,12 +366,12 @@ export class FairnessClient {
   }
 
   /**
-   * Получение оповещений для конкретной модели
+   * Get alerts for a specific model
    *
-   * @param modelName - Название модели
-   * @param options - Опциональные фильтры
-   * @returns Оповещения для модели
-   * @throws ApiError если получение не удалось
+   * @param modelName - Model name
+   * @param options - Optional filters
+   * @returns Alerts for the model
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -397,12 +398,12 @@ export class FairnessClient {
   }
 
   /**
-   * Получение критических неподтвержденных оповещений
+   * Get critical unacknowledged alerts
    *
-   * Удобный метод для получения высокоприоритетных оповещений, требующих внимания.
+   * Convenience method for getting high-priority alerts that need attention.
    *
-   * @returns Критические оповещения
-   * @throws ApiError если получение не удалось
+   * @returns Critical alerts
+   * @throws ApiError if fetch fails
    *
    * @example
    * ```ts
@@ -420,13 +421,13 @@ export class FairnessClient {
 }
 
 /**
- * Экземпляр клиента справедливости по умолчанию
+ * Default fairness client instance
  *
- * Используйте этот singleton-экземпляр для всех вызовов API справедливости.
+ * Use this singleton instance for all fairness API calls.
  */
 export const fairness = new FairnessClient();
 
 /**
- * Экспорт класса клиента справедливости для создания кастомных экземпляров
+ * Export fairness client class for custom instances
  */
 export default FairnessClient;

@@ -1,6 +1,4 @@
-// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
-// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -28,7 +26,7 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
-// Иконки Material UI
+import { config } from '@/config';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -49,7 +47,7 @@ import {
 } from '@mui/icons-material';
 
 /**
- * Определение доступной метрики
+ * Available metric definition
  */
 interface AvailableMetric {
   id: string;
@@ -59,7 +57,7 @@ interface AvailableMetric {
 }
 
 /**
- * Выбранная метрика в отчете
+ * Selected metric in report
  */
 interface SelectedMetric {
   id: string;
@@ -69,7 +67,7 @@ interface SelectedMetric {
 }
 
 /**
- * Данные конфигурации отчета
+ * Report configuration data
  */
 interface ReportData {
   metrics: string[];
@@ -77,7 +75,7 @@ interface ReportData {
 }
 
 /**
- * Отчет с бэкенда
+ * Report from backend
  */
 interface Report {
   id: string;
@@ -93,7 +91,7 @@ interface Report {
 }
 
 /**
- * Ответ списка с бэкенда
+ * List response from backend
  */
 interface ReportListResponse {
   organization_id?: string;
@@ -102,7 +100,7 @@ interface ReportListResponse {
 }
 
 /**
- * Данные формы для создания/редактирования отчетов
+ * Form data for creating/editing reports
  */
 interface ReportFormData {
   name: string;
@@ -111,18 +109,18 @@ interface ReportFormData {
 }
 
 /**
- * Конфигурация расписания для запланированных отчетов
+ * Schedule configuration for scheduled reports
  */
 interface ScheduleConfig {
   frequency: 'daily' | 'weekly' | 'monthly';
-  day_of_week?: number; // 0-6 (воскресенье-суббота) для еженедельных
-  day_of_month?: number; // 1-31 для ежемесячных
+  day_of_week?: number; // 0-6 (Sunday-Saturday) for weekly
+  day_of_month?: number; // 1-31 for monthly
   hour: number; // 0-23
   minute: number; // 0-59
 }
 
 /**
- * Конфигурация доставки для запланированных отчетов
+ * Delivery configuration for scheduled reports
  */
 interface DeliveryConfig {
   format: 'pdf' | 'csv' | 'both';
@@ -131,7 +129,7 @@ interface DeliveryConfig {
 }
 
 /**
- * Данные формы для запланированных отчетов
+ * Form data for scheduled reports
  */
 interface ScheduledReportFormData {
   name: string;
@@ -142,27 +140,27 @@ interface ScheduledReportFormData {
 }
 
 /**
- * Свойства компонента ReportBuilder
+ * ReportBuilder Component Props
  */
 interface ReportBuilderProps {
-  /** ID организации для отчетов */
+  /** Organization ID for reports */
   organizationId?: string;
-  /** URL API endpoint для отчетов */
+  /** API endpoint URL for reports */
   apiUrl?: string;
-  /** Колбэк при создании/обновлении отчета */
+  /** Callback when report is created/updated */
   onReportChange?: (report: Report) => void;
 }
 
 /**
- * Компонент ReportBuilder
+ * ReportBuilder Component
  *
- * Предоставляет интерфейс drag-and-drop для создания пользовательских аналитических отчетов.
- * Функции включают:
- * - Просмотр и выбор доступных метрик
- * - Перетаскивание для упорядочения выбранных метрик
- * - Сохранение и загрузку пользовательских отчетов
- * - Редактирование и удаление существующих отчетов
- * - Предварительный просмотр конфигурации отчета в реальном времени
+ * Provides a drag-and-drop interface for building custom analytics reports.
+ * Features include:
+ * - Browse and select available metrics
+ * - Drag to reorder selected metrics
+ * - Save and load custom reports
+ * - Edit and delete existing reports
+ * - Real-time preview of report configuration
  *
  * @example
  * ```tsx
@@ -171,10 +169,9 @@ interface ReportBuilderProps {
  */
 const ReportBuilder: React.FC<ReportBuilderProps> = ({
   organizationId = 'default-org',
-  apiUrl = 'http://localhost:8000/api/reports',
+  apiUrl = `${config.api.url}/api/reports`,
   onReportChange,
 }) => {
-  // Состояния для загрузки, ошибки, отчетов, выбранных метрик и доступных метрик
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -242,7 +239,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
     },
   ]);
 
-  // Состояния диалогов
+  // Dialog states
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -253,14 +250,14 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
 
-  // Состояние формы
+  // Form state
   const [formData, setFormData] = useState<ReportFormData>({
     name: '',
     description: '',
     is_public: false,
   });
 
-  // Состояние формы запланированного отчета
+  // Scheduled report form state
   const [scheduleFormData, setScheduleFormData] = useState<ScheduledReportFormData>({
     name: '',
     schedule_config: {
@@ -278,14 +275,14 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
     is_active: true,
   });
 
-  // Ввод получателя для запланированных отчетов
+  // Recipient input for scheduled reports
   const [recipientEmail, setRecipientEmail] = useState('');
 
-  // Состояние drag and drop
+  // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   /**
-   * Загрузка сохраненных отчетов с бэкенда
+   * Fetch saved reports from backend
    */
   const fetchReports = async () => {
     setLoading(true);
@@ -535,7 +532,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         filters: {},
       };
 
-      const response = await fetch('http://localhost:8000/api/reports/export/pdf', {
+      const response = await fetch(`${config.api.url}/api/reports/export/pdf`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -587,7 +584,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         filters: {},
       };
 
-      const response = await fetch('http://localhost:8000/api/reports/export/csv', {
+      const response = await fetch(`${config.api.url}/api/reports/export/csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -761,7 +758,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         filters: {},
       };
 
-      const response = await fetch('http://localhost:8000/api/reports/schedule', {
+      const response = await fetch(`${config.api.url}/api/reports/schedule`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -25,8 +26,15 @@ import {
   MenuItem,
   Slider,
   Chip,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
+  Close as CloseIcon,
+  Save as SaveIcon,
+} from '@mui/icons-material';
 
 /**
  * Weight profile entry interface
@@ -150,7 +158,7 @@ const PRESET_PROFILES: PresetProfile[] = [
  */
 const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
   organizationId,
-  apiUrl = 'http://localhost:8000/api/matching-weights',
+  apiUrl = `${config.api.url}/api/matching-weights`,
   onProfileSave,
 }) => {
   const { t } = useTranslation();
@@ -445,7 +453,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchProfiles} startIcon={<Icon name="refresh-cw" />}>
+          <Button color="inherit" onClick={fetchProfiles} startIcon={<RefreshIcon />}>
             Try Again
           </Button>
         }
@@ -517,7 +525,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
-            startIcon={<Icon name="plus" />}
+            startIcon={<AddIcon />}
             onClick={handleCreate}
             size="large"
           >
@@ -645,14 +653,14 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
                           onClick={() => handleEdit(profile)}
                           color="primary"
                         >
-                          <Icon name="edit" fontSize="small" />
+                          <EditIcon fontSize="small" />
                         </IconButton>
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteClick(profile)}
                           color="error"
                         >
-                          <Icon name="trash-2" fontSize="small" />
+                          <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Stack>
                     </Box>
@@ -725,7 +733,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
               disabled={submitting}
               size="small"
             >
-              <Icon name="x" />
+              <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -871,7 +879,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
             onClick={handleSubmit}
             variant="contained"
             disabled={submitting || !formData.name}
-            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="save" />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <SaveIcon />}
           >
             {submitting ? 'Saving...' : editingProfile ? 'Update Profile' : 'Create Profile'}
           </Button>
@@ -898,7 +906,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
             variant="contained"
             color="error"
             disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="trash-2" />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
           >
             {submitting ? 'Deleting...' : 'Delete'}
           </Button>

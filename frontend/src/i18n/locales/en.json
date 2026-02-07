@@ -806,111 +806,213 @@
       "saved": "Weights saved successfully!"
     }
   },
-  "semanticSearch": {
-    "title": "Semantic Search",
-    "tooltip": "Use natural language to describe your ideal candidate",
-    "placeholder": "Describe your ideal candidate in natural language...\n\nExample: 'Find me a senior Python developer with experience in fintech who has led teams of 5+ people'",
-    "helperText": "Type your search query and press Enter or click Search",
-    "search": "Search",
-    "searching": "Searching...",
-    "showSuggestions": "Show Suggestions",
-    "hideSuggestions": "Hide Suggestions",
-    "suggestionsTitle": "Quick Search Suggestions",
-    "examplesTitle": "Try these examples:",
-    "modes": {
-      "semantic": "Semantic",
-      "hybrid": "Hybrid",
-      "keyword": "Keyword"
+  "explainability": {
+    "title": "AI Ranking Explanation",
+    "rankScore": "Ranking Score",
+    "rankPosition": "Position",
+    "recommendation": {
+      "excellent": "Excellent Candidate",
+      "good": "Good Candidate",
+      "fair": "Fair Candidate",
+      "poor": "Poor Candidate"
     },
-    "modeDescriptions": {
-      "semantic": "AI-powered search that understands meaning and context. Finds candidates based on intent, not just keywords.",
-      "hybrid": "Combines semantic understanding with keyword matching for comprehensive results.",
-      "keyword": "Traditional keyword-based search. Matches exact terms in resumes."
+    "confidenceInterval": {
+      "title": "Confidence Interval",
+      "confidence": "confidence",
+      "range": "Predicted range"
     },
-    "examples": {
-      "seniorDeveloper": "Senior Python developer with fintech experience",
-      "teamLead": "Full stack developer who has led teams",
-      "fullStack": "React and TypeScript developer with cloud experience"
+    "strengths": {
+      "title": "Key Strengths",
+      "none": "No significant strengths identified"
     },
-    "results": {
-      "title": "Semantic Search Results",
-      "searching": "Searching...",
-      "understandingQuery": "Understanding your query using AI...",
-      "searchQuery": "Search Query",
-      "candidate": "Candidate",
-      "yearsExperience": "years experience",
-      "skills": "{{count}} skills",
-      "seeExplanation": "See why this candidate matched",
-      "quickMatch": "Quick Match Explanation",
-      "semanticScoreTooltip": "Semantic similarity score based on AI understanding of meaning",
-      "keywordScoreTooltip": "Keyword match score based on explicit term matching",
-      "finalScoreTooltip": "Final combined score",
-      "semanticUsed": "Semantic AI Used",
-      "fallbackUsed": "Fallback to Keyword Search",
-      "keywordOnly": "Keyword Search Only",
-      "candidates": "{{count}} Candidates Found",
-      "error": {
-        "title": "Search Failed",
-        "failedToLoad": "Failed to load search results"
-      },
-      "noResults": {
-        "title": "No Results Found",
-        "message": "Try rephrasing your query or use broader terms."
-      },
-      "noCandidates": {
-        "title": "No Candidates",
-        "message": "No candidates match your search criteria. Try adjusting your query or filters."
+    "weaknesses": {
+      "title": "Areas for Improvement",
+      "none": "No significant weaknesses"
+    },
+    "candidateStrengths": "Candidate Strengths",
+    "improvementAreas": "Improvement Areas",
+    "featureDetails": {
+      "title": "Detailed Feature Analysis",
+      "tooltip": "Shows how each feature contributed to the ranking",
+      "contributions": "Feature Contributions",
+      "metrics": "Ranking Metrics"
+    },
+    "metrics": {
+      "rankScore": "Ranking Score",
+      "rankPosition": "Position",
+      "recommendation": "Recommendation",
+      "positiveFactors": "Positive Factors",
+      "negativeFactors": "Negative Factors",
+      "notAvailable": "N/A"
+    },
+    "legend": {
+      "title": "Legend",
+      "positive": "Positive contribution to ranking",
+      "negative": "Negative contribution to ranking"
+    },
+    "highlightSections": {
+      "title": "Resume Sections Highlighting",
+      "description": "Showing {{count}} influential section(s) that affected the ranking",
+      "expandAll": "Expand All",
+      "collapseAll": "Collapse All",
+      "expand": "Show full content",
+      "collapse": "Hide content",
+      "mappingLegend": "These sections from the resume had the most influence on the AI ranking decision",
+      "associatedFeatures": "Associated Features",
+      "noData": {
+        "title": "No Section Highlights",
+        "message": "No resume section highlights available for this analysis."
       },
       "stats": {
-        "candidatesFound": "Candidates Found",
-        "highMatch": "High Match (70%+)",
-        "semanticMatches": "Semantic Matches",
-        "executionTime": "Execution Time"
-      },
-      "explanation": {
-        "semanticScore": "Semantic Score",
-        "skillMatch": "Skill Match",
-        "experienceRelevance": "Experience Relevance",
-        "contextFit": "Context Fit",
-        "matchedSkills": "Matched Skills ({{count}})",
-        "inferredSkills": "Inferred Skills ({{count}})",
-        "inferredTooltip": "Skills inferred from context based on related experience",
-        "transferableSkills": "Transferable Skills ({{count}})",
-        "transferableTooltip": "Skills from other contexts that apply to this role",
-        "missingSkills": "Missing Skills ({{count}})",
-        "whyMatched": "Why This Candidate Matched"
+        "positive": "Positive",
+        "neutral": "Neutral",
+        "negative": "Negative"
       }
+    },
+    "method": "Method",
+    "provider": "Provider",
+    "model": "Model",
+    "features": "Features",
+    "aiModel": "AI Model",
+    "loading": {
+      "title": "Loading Explanation...",
+      "subtitle": "Analyzing candidate ranking factors"
+    },
+    "error": {
+      "title": "Failed to Load Explanation",
+      "failedToLoad": "Failed to load explainability data. Please try again.",
+      "retry": "Retry"
+    },
+    "noData": {
+      "title": "No Explanation Available",
+      "message": "No explanation data found for the specified resume and vacancy."
     }
   },
-  "advancedSearch": {
-    "title": "Advanced Filters",
-    "filters": "filters",
-    "searchQuery": "Search Query",
-    "searchPlaceholder": "Enter your search query...",
-    "addFilter": "Add Filter",
+  "candidateComparison": {
+    "title": "Side-by-Side Candidate Comparison",
+    "subtitle": "Comparing {{count}} candidates for this vacancy",
+    "refresh": "Refresh",
+    "overallScore": "Overall Score",
+    "scoreBreakdown": "Score Breakdown",
+    "keywordScore": "Keyword",
+    "tfidfScore": "TF-IDF",
+    "vectorScore": "Vector",
     "skills": "Skills",
-    "selectSkills": "Select skills...",
-    "location": "Location",
-    "languages": "Languages",
-    "selectLanguages": "Select languages...",
-    "educationLevel": "Education Level",
-    "any": "Any",
-    "highSchool": "High School",
-    "bachelor": "Bachelor's",
-    "master": "Master's",
-    "phd": "PhD",
-    "experienceYears": "Experience: {{min}} - {{max}} years",
-    "matchScore": "Match Score: {{min}}% - {{max}}%",
-    "dateFrom": "From",
-    "dateTo": "To",
-    "minSalary": "Min Salary",
-    "maxSalary": "Max Salary",
-    "vacancy": "Vacancy",
-    "allVacancies": "All Vacancies",
-    "stage": "Stage",
-    "allStages": "All Stages",
-    "clear": "Clear All",
-    "search": "Search",
-    "searching": "Searching..."
+    "matched": "matched",
+    "missing": "missing",
+    "featureContributions": "Feature Contributions",
+    "recommendation": "Recommendation",
+    "best": "Best",
+    "average": "Average",
+    "passed": "Passed",
+    "keyDifferences": "Key Differences Between Candidates",
+    "keyDifferencesDescription": "Understanding why one candidate ranks higher than another",
+    "processingTime": "Comparison completed in {{seconds}} seconds",
+    "loading": {
+      "title": "Comparing Candidates...",
+      "subtitle": "Analyzing {{count}} candidate(s)"
+    },
+    "error": {
+      "title": "Comparison Failed",
+      "failedToLoad": "Failed to load comparison data",
+      "retry": "Retry",
+      "noCandidates": "At least one candidate is required for comparison"
+    },
+    "noData": {
+      "title": "No Comparison Data",
+      "message": "No candidates found for comparison. Check that the vacancy and resume IDs are valid."
+    },
+    "legend": {
+      "best": "Best score in category",
+      "better": "Better than reference",
+      "worse": "Worse than reference",
+      "equal": "Equal to reference"
+    }
+  },
+  "whatIfAnalysis": {
+    "title": "What-If Analysis",
+    "subtitle": "Explore how changes to candidate attributes would affect their ranking",
+    "reset": "Reset All",
+    "originalScore": "Original Score",
+    "adjustedScore": "Adjusted Score",
+    "scoreChange": "Score Change",
+    "changeFromOriginal": "from original",
+    "updating": "Updating analysis...",
+    "presets": {
+      "title": "Quick Scenarios",
+      "description": "Click a preset to see how different changes would affect the ranking",
+      "moreExperience": "More Experience (+12 months)",
+      "improveSkills": "Improve Skills (+15%)",
+      "higherEducation": "Higher Education (+1 level)",
+      "betterKeywords": "Better Keywords (+10%)",
+      "allImprovements": "All Improvements"
+    },
+    "categories": {
+      "experience": "Experience",
+      "skills": "Skills",
+      "scoring": "Scoring",
+      "education": "Education"
+    },
+    "features": {
+      "experience_months": "Experience",
+      "experience_monthsDescription": "Add or remove months of work experience",
+      "skills_match_ratio": "Skills Match",
+      "skills_match_ratioDescription": "Adjust the overall skills matching percentage",
+      "keyword_score": "Keyword Score",
+      "keyword_scoreDescription": "Adjust the exact keyword matching score",
+      "tfidf_score": "TF-IDF Score",
+      "tfidf_scoreDescription": "Adjust the TF-IDF based matching score",
+      "vector_score": "Vector Score",
+      "vector_scoreDescription": "Adjust the semantic vector similarity score",
+      "education_level": "Education Level",
+      "education_levelDescription": "Adjust the education level (e.g., Bachelor's → Master's)"
+    },
+    "adjustments": {
+      "title": "Feature Adjustments",
+      "description": "Adjust the sliders to see how different feature values would affect the candidate's ranking",
+      "hint": "Positive values improve the feature, negative values reduce it. The analysis updates automatically after you stop adjusting."
+    },
+    "loading": {
+      "title": "Analyzing Scenario..."
+    },
+    "error": {
+      "title": "Analysis Failed",
+      "failedToLoad": "Failed to load what-if analysis. Please try again."
+    },
+    "results": {
+      "title": "Analysis Results",
+      "scenarioAnalysis": "Scenario Analysis",
+      "featureChanges": "Feature Changes",
+      "featureImpacts": "Feature Impacts on Score"
+    }
+  },
+  "resumeHighlighter": {
+    "title": "Resume Sections Highlighting",
+    "description": "Showing {{count}} influential section(s) that affected the ranking",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All",
+    "expand": "Show full content",
+    "collapse": "Hide content",
+    "mappingLegend": "These sections from the resume had the most influence on the AI ranking decision",
+    "associatedFeatures": "Associated Features",
+    "noData": {
+      "title": "No Section Highlights",
+      "message": "No resume section highlights available for this analysis."
+    },
+    "stats": {
+      "positive": "Positive",
+      "neutral": "Neutral",
+      "negative": "Negative"
+    }
+  },
+  "explanationReportExport": {
+    "title": "Export Explanation Report",
+    "exportButton": "Export Explanation Report",
+    "generating": "Generating report...",
+    "success": "Report generated successfully",
+    "error": "Failed to generate report",
+    "reportContents": "Report Contents: AI narrative explanation, feature contributions, confidence intervals, candidate strengths and weaknesses, and resume section highlights",
+    "formatPdf": "Format: PDF (professional document)",
+    "formatHtml": "Format: HTML (viewable in any browser, can be printed to PDF)"
   }
 }

@@ -1,346 +1,409 @@
 """
-Health monitoring tasks for automated system health checks.
+Celery tasks for automated health monitoring and alerting.
 
-This module provides Celery tasks for comprehensive health monitoring of
-all system components including database, Redis, Celery workers, ML models,
-and external services. These tasks are designed to run periodically via
-Celery Beat for automated health monitoring and early issue detection.
+This module provides scheduled and manual health monitoring tasks including:
+- Periodic health checks for all system components
+- Automated alerting when services become unhealthy
+- Alert cooldown management to prevent alert fatigue
+- Component-specific health checks
+- Health monitoring task scheduling via Celery beat
 """
 import asyncio
 import logging
-from typing import Dict, Any
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from celery import shared_task
 
+from config import get_settings
+from services.alerting import Alert, AlertingService, get_alerting_service
+from services.health_check import HealthCheckService, get_health_check_service
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 @shared_task(
-    name="tasks.health_check",
+    name="tasks.health_monitoring.monitor_health_and_alert",
     bind=True,
     max_retries=3,
-    default_retry_delay=60,
+    default_retry_delay=300,  # 5 minutes
 )
-def health_check_task(self) -> Dict[str, Any]:
+def monitor_health_and_alert(self) -> Dict[str, Any]:
     """
-    Comprehensive health check task for Celery worker monitoring.
+    Scheduled health monitoring task with automated alerting.
 
-    This task verifies that the Celery worker is functioning correctly
-    and that critical ML models are loaded and ready. It's designed to
-    run periodically via Celery Beat for automated health monitoring.
+    Runs comprehensive health checks on all system components and sends
+    alerts when services become unhealthy or degraded. Configured via
+    Celery beat to run at specified intervals (default: every 5 minutes).
 
-    The task checks:
-    - Worker responsiveness and hostname
-    - ML model availability (NER, zero-shot classification, LanguageTool)
-    - Returns appropriate status based on model availability
-
-    This periodic health check helps detect worker issues early and
-    ensures the worker is ready to process analysis tasks.
-
-    Args:
-        self: Celery task instance (bind=True)
+    This task:
+    1. Checks all registered health checkers (database, Redis, Celery, ML models, external APIs)
+    2. Determines overall system health status
+    3. Sends alerts for unhealthy or degraded essential components
+    4. Respects cooldown periods to prevent alert fatigue
+    5. Returns summary of health status and alerts sent
 
     Returns:
-        Dictionary containing health status information:
-        - status: Overall health status (healthy/degraded/unhealthy)
-        - worker: Worker hostname
-        - task_id: Celery task ID
-        - models_status: Dict with status of each model type
-        - message: Human-readable status message
+        Dictionary with health check results and alert status
 
     Example:
-        >>> from tasks.health_monitoring import health_check_task
-        >>> result = health_check_task.delay()
-        >>> print(result.get())
-        {
-            'status': 'healthy',
-            'worker': 'celery@hostname',
-            'task_id': 'abc-123',
-            'models_status': {
-                'ner_loaded': True,
-                'zero_shot_loaded': True,
-                'language_tools_loaded': True
-            },
-            'message': 'Worker operational and all models loaded'
-        }
+        >>> result = monitor_health_and_alert()
+        >>> print(result['overall_status'])
+        'healthy'
     """
-    logger.info("Periodic health check executed")
+    logger.info("Starting automated health monitoring")
 
-    # Check if ML models are loaded by attempting to access them
-    models_status = {}
     try:
-        from backend.analyzers.hf_skill_extractor import (
-            _ner_pipeline,
-            _zero_shot_pipeline,
-        )
-        from backend.analyzers.grammar_checker import _language_tools
+        # Run health checks in async context
+        loop = asyncio.get_event_loop()
+        health_result = loop.run_until_complete(_perform_health_checks_and_alerts())
 
-        models_status["ner_loaded"] = _ner_pipeline is not None
-        models_status["zero_shot_loaded"] = _zero_shot_pipeline is not None
-        models_status["language_tools_loaded"] = any(
-            tool is not None for tool in _language_tools.values()
+        logger.info(
+            f"Health monitoring completed: {health_result['overall_status']} "
+            f"({health_result.get('alerts_sent', 0)} alerts sent)"
         )
 
-        all_models_loaded = all(models_status.values())
-
-        if all_models_loaded:
-            overall_status = "healthy"
-            message = "Worker operational and all models loaded"
-        elif models_status.get("ner_loaded") and models_status.get("zero_shot_loaded"):
-            # Core models loaded, but LanguageTool missing - acceptable degradation
-            overall_status = "degraded"
-            message = "Worker operational with core models (LanguageTool not loaded)"
-        else:
-            # Critical models missing - unhealthy
-            overall_status = "unhealthy"
-            message = "Worker operational but critical ML models not loaded"
-
-        return {
-            "status": overall_status,
-            "worker": self.request.hostname,
-            "task_id": self.request.id,
-            "models_status": models_status,
-            "message": message,
-        }
+        return health_result
 
     except Exception as e:
-        logger.error(f"Error checking model status during health check: {e}")
-        return {
-            "status": "unhealthy",
-            "worker": self.request.hostname,
-            "task_id": self.request.id,
-            "models_status": models_status,
-            "message": f"Worker operational but model check failed: {str(e)}",
-        }
+        logger.error(f"Health monitoring failed: {e}", exc_info=True)
 
-
-@shared_task(
-    name="tasks.monitor_health",
-    bind=True,
-    max_retries=3,
-    default_retry_delay=60,
-)
-def monitor_health(self) -> Dict[str, Any]:
-    """
-    Comprehensive automated health monitoring task for all system components.
-
-    This task performs comprehensive health checks across all system components:
-    - Database connectivity and query performance
-    - Redis availability and response time
-    - Celery worker status and queue length
-    - ML model loading status (NER, zero-shot, LanguageTool)
-    - External service availability (LanguageTool API, S3 backup)
-
-    Designed to run periodically via Celery Beat for automated health monitoring,
-    early issue detection, and alerting integration. Returns aggregated status
-    that can be consumed by monitoring systems and alerting services.
-
-    The task executes all health checks concurrently using asyncio for efficiency,
-    then aggregates results to determine overall system health status.
-
-    Args:
-        self: Celery task instance (bind=True)
-
-    Returns:
-        Dictionary containing comprehensive health status:
-        - overall_status: Overall system health (healthy/degraded/unhealthy)
-        - worker: Worker hostname executing the check
-        - task_id: Celery task ID
-        - timestamp: ISO 8601 timestamp of the check
-        - checks: Dict with results from each component check:
-            - database: Database health status
-            - redis: Redis health status
-            - celery_workers: Celery worker status
-            - ml_models: ML model loading status
-            - languagetool: LanguageTool service status
-            - s3: S3 backup service status
-        - summary: Summary statistics and status counts
-
-    Example:
-        >>> from tasks.health_monitoring import monitor_health
-        >>> result = monitor_health.delay()
-        >>> print(result.get())
-        {
-            'overall_status': 'healthy',
-            'worker': 'celery@hostname',
-            'task_id': 'abc-123',
-            'timestamp': '2026-02-03T12:00:00Z',
-            'checks': {
-                'database': {'status': 'healthy', 'latency_seconds': 0.023},
-                'redis': {'status': 'healthy', 'latency_seconds': 0.001},
-                'celery_workers': {'status': 'healthy', 'worker_count': 2},
-                'ml_models': {'status': 'healthy', 'models_loaded': 3},
-                'languagetool': {'status': 'healthy'},
-                's3': {'status': 'healthy', 'enabled': True}
-            },
-            'summary': {
-                'total_checks': 6,
-                'healthy': 6,
-                'degraded': 0,
-                'unhealthy': 0
+        # Retry with backoff
+        try:
+            raise self.retry(exc=e, countdown=300)
+        except self.MaxRetriesExceededError:
+            logger.error("Health monitoring max retries exceeded")
+            return {
+                "status": "failed",
+                "error": str(e),
+                "overall_status": "unknown",
             }
-        }
+
+
+@shared_task(
+    name="tasks.health_monitoring.check_component",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def check_component_task(
+    self,
+    component_name: str,
+    send_alert_if_unhealthy: bool = True,
+) -> Dict[str, Any]:
     """
-    import time
-    from datetime import datetime
+    Check health of a specific component.
 
-    logger.info("Starting comprehensive automated health monitoring...")
+    Args:
+        component_name: Name of the component to check
+        send_alert_if_unhealthy: Send alert if component is unhealthy
 
-    start_time = time.time()
-    timestamp = datetime.utcnow().isoformat() + "Z"
+    Returns:
+        Dictionary with component health status
 
-    # Import health check utilities
+    Example:
+        >>> result = check_component_task("database")
+        >>> print(result['status'])
+        'healthy'
+    """
+    logger.info(f"Checking component: {component_name}")
+
     try:
-        from backend.utils.health_checks import (
-            check_database,
-            check_redis,
-            check_celery_workers,
-            check_ml_models,
-            check_languagetool,
-            check_s3,
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(
+            _check_component_and_alert(component_name, send_alert_if_unhealthy)
         )
-    except ImportError as e:
-        logger.error(f"Failed to import health check utilities: {e}")
-        return {
-            "overall_status": "unhealthy",
-            "worker": self.request.hostname,
-            "task_id": self.request.id,
-            "timestamp": timestamp,
-            "error": f"Health check utilities not available: {str(e)}",
-            "checks": {},
-            "summary": {},
-        }
 
-    # Run all health checks asynchronously
-    async def run_all_checks() -> Dict[str, Any]:
-        """Run all health checks concurrently."""
-        checks = {}
+        logger.info(f"Component check completed: {component_name} - {result.get('status')}")
 
-        # Run database check
-        try:
-            checks["database"] = await check_database()
-        except Exception as e:
-            logger.error(f"Database health check failed: {e}")
-            checks["database"] = {"status": "unhealthy", "error": str(e)}
+        return result
 
-        # Run Redis check
-        try:
-            checks["redis"] = await check_redis()
-        except Exception as e:
-            logger.error(f"Redis health check failed: {e}")
-            checks["redis"] = {"status": "unhealthy", "error": str(e)}
-
-        # Run Celery workers check
-        try:
-            checks["celery_workers"] = await check_celery_workers()
-        except Exception as e:
-            logger.error(f"Celery workers health check failed: {e}")
-            checks["celery_workers"] = {"status": "unhealthy", "error": str(e)}
-
-        # Run ML models check
-        try:
-            checks["ml_models"] = await check_ml_models()
-        except Exception as e:
-            logger.error(f"ML models health check failed: {e}")
-            checks["ml_models"] = {"status": "unhealthy", "error": str(e)}
-
-        # Run LanguageTool check
-        try:
-            checks["languagetool"] = await check_languagetool()
-        except Exception as e:
-            logger.error(f"LanguageTool health check failed: {e}")
-            checks["languagetool"] = {"status": "unhealthy", "error": str(e)}
-
-        # Run S3 check
-        try:
-            checks["s3"] = await check_s3()
-        except Exception as e:
-            logger.error(f"S3 health check failed: {e}")
-            checks["s3"] = {"status": "unhealthy", "error": str(e)}
-
-        return checks
-
-    # Execute async health checks
-    try:
-        checks = asyncio.run(run_all_checks())
     except Exception as e:
-        logger.error(f"Failed to execute health checks: {e}")
+        logger.error(f"Component check failed for {component_name}: {e}", exc_info=True)
+
+        try:
+            raise self.retry(exc=e)
+        except self.MaxRetriesExceededError:
+            return {
+                "status": "failed",
+                "error": str(e),
+                "component": component_name,
+            }
+
+
+@shared_task(
+    name="tasks.health_monitoring.check_essential_services",
+    bind=True,
+)
+def check_essential_services_task(self) -> Dict[str, Any]:
+    """
+    Check health of essential services only (database, Redis, Celery).
+
+    This is useful for readiness probes and quick health checks where
+    we only need to verify critical services are available.
+
+    Returns:
+        Dictionary with essential service health status
+    """
+    logger.info("Checking essential services")
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(_check_essential_services())
+
+        logger.info(
+            f"Essential services check completed: {result['overall_status']}"
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Essential services check failed: {e}", exc_info=True)
         return {
-            "overall_status": "unhealthy",
-            "worker": self.request.hostname,
-            "task_id": self.request.id,
-            "timestamp": timestamp,
-            "error": f"Health check execution failed: {str(e)}",
-            "checks": {},
-            "summary": {},
+            "status": "failed",
+            "error": str(e),
+            "overall_status": "unknown",
         }
 
-    # Calculate summary statistics
-    total_checks = len(checks)
-    healthy_count = sum(1 for c in checks.values() if c.get("status") == "healthy")
-    degraded_count = sum(1 for c in checks.values() if c.get("status") == "degraded")
-    unhealthy_count = sum(1 for c in checks.values() if c.get("status") == "unhealthy")
 
-    # Determine overall status based on critical components
-    # Critical components: database, celery_workers, ml_models
-    critical_checks = ["database", "celery_workers", "ml_models"]
-    critical_unhealthy = any(
-        checks.get(name, {}).get("status") == "unhealthy"
-        for name in critical_checks
-    )
+async def _perform_health_checks_and_alerts() -> Dict[str, Any]:
+    """
+    Perform comprehensive health checks and send alerts if needed.
 
-    if critical_unhealthy:
-        overall_status = "unhealthy"
-    elif unhealthy_count > 0 or degraded_count > 0:
-        # Non-critical components failed or degraded
-        overall_status = "degraded" if degraded_count > 0 else "healthy"
-        # If any component is unhealthy (even non-critical), mark as degraded
-        if unhealthy_count > 0:
-            overall_status = "degraded"
-    else:
-        overall_status = "healthy"
+    Returns:
+        Dictionary with health check results and alert status
+    """
+    # Get health check service
+    health_service = get_health_check_service()
 
-    # Calculate total execution time
-    execution_time = round(time.time() - start_time, 3)
+    # Run all health checks
+    health_result = await health_service.check_all()
 
-    # Build result
-    result = {
-        "overall_status": overall_status,
-        "worker": self.request.hostname,
-        "task_id": self.request.id,
-        "timestamp": timestamp,
-        "execution_time_seconds": execution_time,
-        "checks": checks,
-        "summary": {
-            "total_checks": total_checks,
-            "healthy": healthy_count,
-            "degraded": degraded_count,
-            "unhealthy": unhealthy_count,
-        },
+    # Get alerting service
+    alerting_service = get_alerting_service()
+
+    # Track alerts sent
+    alerts_sent: List[Dict[str, Any]] = []
+    components_by_status: Dict[str, List[str]] = {
+        "unhealthy": [],
+        "degraded": [],
+        "healthy": [],
     }
 
-    # Log summary
-    logger.info(
-        f"Health monitoring completed: {overall_status} "
-        f"({healthy_count} healthy, {degraded_count} degraded, {unhealthy_count} unhealthy) "
-        f"in {execution_time}s"
+    # Categorize components by status
+    for component_name, component_result in health_result.get("components", {}).items():
+        status = component_result.get("status", "unknown")
+        if status in components_by_status:
+            components_by_status[status].append(component_name)
+
+    # Send alerts for unhealthy essential components
+    for component_name in components_by_status["unhealthy"]:
+        is_essential = component_name in health_service.ESSENTIAL_COMPONENTS
+        if is_essential:
+            component_result = health_result["components"][component_name]
+            alert = _create_health_alert(
+                component_name=component_name,
+                status="unhealthy",
+                component_result=component_result,
+            )
+            await _send_alert_if_needed(alerting_service, alert, alerts_sent)
+
+    # Send alerts for degraded essential components (if warning alerts enabled)
+    if alerting_service.alert_on_warning:
+        for component_name in components_by_status["degraded"]:
+            is_essential = component_name in health_service.ESSENTIAL_COMPONENTS
+            if is_essential:
+                component_result = health_result["components"][component_name]
+                alert = _create_health_alert(
+                    component_name=component_name,
+                    status="degraded",
+                    component_result=component_result,
+                )
+                await _send_alert_if_needed(alerting_service, alert, alerts_sent)
+
+    # Build response
+    return {
+        "status": "success",
+        "overall_status": health_result.get("overall_status", "unknown"),
+        "total_time_ms": health_result.get("summary", {}).get("total_time_ms", 0),
+        "components_checked": health_result.get("summary", {}).get("components_checked", 0),
+        "components_healthy": health_result.get("summary", {}).get("components_healthy", 0),
+        "components_degraded": health_result.get("summary", {}).get("components_degraded", 0),
+        "components_unhealthy": health_result.get("summary", {}).get("components_unhealthy", 0),
+        "alerts_sent": len(alerts_sent),
+        "alert_details": alerts_sent,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+async def _check_component_and_alert(
+    component_name: str,
+    send_alert_if_unhealthy: bool,
+) -> Dict[str, Any]:
+    """
+    Check a specific component and send alert if needed.
+
+    Args:
+        component_name: Name of the component to check
+        send_alert_if_unhealthy: Whether to send alert if unhealthy
+
+    Returns:
+        Dictionary with component health status
+    """
+    # Get health check service
+    health_service = get_health_check_service()
+
+    # Check component
+    try:
+        component_result = await health_service.check_component(component_name)
+    except ValueError as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "component": component_name,
+        }
+
+    # Send alert if component is unhealthy and alerting is enabled
+    alerts_sent = []
+    if send_alert_if_unhealthy and not component_result.is_operational():
+        alerting_service = get_alerting_service()
+        alert = _create_health_alert(
+            component_name=component_name,
+            status=component_result.status,
+            component_result=component_result.to_dict(),
+        )
+        await _send_alert_if_needed(alerting_service, alert, alerts_sent)
+
+    return {
+        "status": "success",
+        "component": component_name,
+        "component_status": component_result.status,
+        "response_time_ms": component_result.response_time_ms,
+        "message": component_result.message,
+        "details": component_result.details,
+        "alerts_sent": len(alerts_sent),
+        "error": component_result.error,
+    }
+
+
+async def _check_essential_services() -> Dict[str, Any]:
+    """
+    Check health of essential services only.
+
+    Returns:
+        Dictionary with essential service health status
+    """
+    # Get health check service
+    health_service = get_health_check_service()
+
+    # Check essential services
+    health_result = await health_service.check_essential_only()
+
+    return {
+        "status": "success",
+        "overall_status": health_result.get("overall_status", "unknown"),
+        "total_time_ms": health_result.get("summary", {}).get("total_time_ms", 0),
+        "components": health_result.get("components", {}),
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def _create_health_alert(
+    component_name: str,
+    status: str,
+    component_result: Dict[str, Any],
+) -> Alert:
+    """
+    Create an alert from health check results.
+
+    Args:
+        component_name: Name of the component
+        status: Health status (unhealthy, degraded, healthy)
+        component_result: Component health check result
+
+    Returns:
+        Alert object
+    """
+    # Determine severity based on status
+    if status == "unhealthy":
+        severity = Alert.SEVERITY_CRITICAL
+        title = f"{component_name.title()} Unhealthy"
+    elif status == "degraded":
+        severity = Alert.SEVERITY_WARNING
+        title = f"{component_name.title()} Degraded"
+    else:
+        # Healthy - for recovery notifications
+        severity = Alert.SEVERITY_INFO
+        title = f"{component_name.title()} Recovered"
+
+    # Build message
+    error = component_result.get("error")
+    message = component_result.get("message", "")
+    response_time = component_result.get("response_time_ms", 0)
+
+    if error:
+        full_message = f"{message} - Error: {error}"
+    else:
+        full_message = message
+
+    if response_time > 0:
+        full_message += f" (Response time: {response_time:.2f}ms)"
+
+    # Create alert
+    return Alert(
+        title=title,
+        message=full_message,
+        severity=severity,
+        component=component_name,
+        status=status,
+        details=component_result,
     )
 
-    # Log warnings for unhealthy components
-    for component_name, component_status in checks.items():
-        if component_status.get("status") == "unhealthy":
-            error_msg = component_status.get("error", "Unknown error")
-            logger.warning(
-                f"Component '{component_name}' is unhealthy: {error_msg}"
+
+async def _send_alert_if_needed(
+    alerting_service: AlertingService,
+    alert: Alert,
+    alerts_sent: List[Dict[str, Any]],
+) -> None:
+    """
+    Send alert through alerting service and track result.
+
+    Args:
+        alerting_service: Alerting service instance
+        alert: Alert to send
+        alerts_sent: List to track sent alerts
+    """
+    try:
+        results = await alerting_service.send_alert(alert)
+
+        # Record successful sends
+        successful_channels = [
+            channel for channel, success in results.items() if success
+        ]
+
+        if successful_channels:
+            alerts_sent.append({
+                "alert_id": alert.alert_id,
+                "component": alert.component,
+                "severity": alert.severity,
+                "channels": successful_channels,
+                "message": alert.message,
+            })
+
+            logger.info(
+                f"Alert sent for {alert.component} ({alert.severity}) "
+                f"via {len(successful_channels)} channel(s)"
             )
-        elif component_status.get("status") == "degraded":
-            logger.warning(f"Component '{component_name}' is degraded")
+        else:
+            logger.warning(f"No channels available for alert: {alert.alert_id}")
 
-    return result
+    except Exception as e:
+        logger.error(f"Failed to send alert: {e}", exc_info=True)
 
 
-# Export tasks for use by celery_app.py
 __all__ = [
-    "health_check_task",
-    "monitor_health",
+    "monitor_health_and_alert",
+    "check_component_task",
+    "check_essential_services_task",
 ]

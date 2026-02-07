@@ -20,7 +20,9 @@ import json
 class RankingBenchmark:
     """Benchmark ranking API performance."""
 
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str):
+        if not base_url:
+            raise ValueError("base_url must be provided")
         self.base_url = base_url
         self.results: List[Dict[str, Any]] = []
 
@@ -230,8 +232,8 @@ def main():
     parser.add_argument(
         "--url",
         type=str,
-        default="http://localhost:8000",
-        help="Backend API URL (default: http://localhost:8000)"
+        default=os.getenv("API_BASE_URL", ""),
+        help="Backend API URL (required, or set API_BASE_URL env var)"
     )
     parser.add_argument(
         "--output",
@@ -240,6 +242,9 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if not args.url:
+        parser.error("--url is required or API_BASE_URL environment variable must be set")
 
     benchmark = RankingBenchmark(args.url)
 

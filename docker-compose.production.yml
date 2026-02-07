@@ -1,0 +1,227 @@
+# Production Environment Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.production.yml up
+
+services:
+  # Production mode: production build, warning logging, no source mounts
+  backend:
+    env_file:
+      - .env.production
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: WARNING
+    volumes:
+      - backend_models:/app/models_cache
+      - backend_logs:/app/logs
+      - backend_backups:/app/data/backups
+      - backend_uploads:/app/data/uploads
+    build:
+      target: production
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --log-level warning --workers 4
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  celery_worker:
+    env_file:
+      - .env.production
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: WARNING
+    volumes:
+      - backend_models:/app/models_cache
+      - backend_logs:/app/logs
+      - backend_backups:/app/data/backups
+      - backend_uploads:/app/data/uploads
+    command: celery -A celery_app.celery_app worker --loglevel=warning --concurrency=4 --prefetch-multiplier=2 --queues=celery,analysis,learning,reporting --max-tasks-per-child=1000
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 12G
+        reservations:
+          cpus: '3.0'
+          memory: 6G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  celery_beat:
+    env_file:
+      - .env.production
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: WARNING
+    volumes:
+      - backend_backups:/app/data/backups
+      - celerybeat_data:/app/celerybeat
+    command: celery -A celery_app.celery_app beat --loglevel=warning
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  frontend:
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+    build:
+      target: production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart_policy:
+      condition: on-failure
+      max_attempts: 3
+      delay: 5s
+
+  postgres:
+    env_file:
+      - .env.production
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  redis:
+    env_file:
+      - .env.production
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  postgres_exporter:
+    env_file:
+      - .env.production
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  celery_exporter:
+    env_file:
+      - .env.production
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  cadvisor:
+    env_file:
+      - .env.production
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  grafana:
+    env_file:
+      - .env.production
+    environment:
+      GF_LOG_LEVEL: warn
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_TELEMETRY_ENABLED: "false"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  loki:
+    env_file:
+      - .env.production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  promtail:
+    env_file:
+      - .env.production
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  prometheus:
+    env_file:
+      - .env.production
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s

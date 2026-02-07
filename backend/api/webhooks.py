@@ -1,32 +1,34 @@
 """
-Webhook endpoints for receiving real-time updates from external HRIS/ATS platforms.
+Webhook management endpoints.
 
 This module provides endpoints for:
-- Receiving webhook events from Workday, Greenhouse, Lever, BambooHR, and Ashby
-- Validating webhook signatures for security
-- Processing platform-specific event formats
-- Logging webhook events for audit and debugging
-- Triggering sync operations based on webhook events
+- Creating webhook subscriptions for event notifications
+- Listing and managing webhook subscriptions
+- Viewing webhook delivery logs
+- Enabling/disabling webhook subscriptions
+- Managing webhook secrets for signature verification
 
-Supports real-time data synchronization from external systems.
+Supports comprehensive webhook management with event filtering,
+delivery tracking, and retry logic monitoring.
 """
 import logging
-import hmac
-import hashlib
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from pydantic import BaseModel, Field, validator
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models.integration import Integration, IntegrationPlatform, IntegrationStatus
-from models.sync_log import SyncLog, SyncType, SyncStatus
-from models.audit_log import AuditActionType
-from utils.audit_logger import log_audit_event, get_request_context
+from models.webhook import (
+    WebhookSubscription,
+    WebhookDeliveryLog,
+    WebhookEventType,
+    WebhookDeliveryStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,650 +36,1125 @@ router = APIRouter()
 
 
 # Request/Response Models
-class WebhookEventRequest(BaseModel):
-    """Base model for webhook event data."""
+class CreateWebhookSubscriptionRequest(BaseModel):
+    """Request model for creating a webhook subscription."""
 
-    event: str = Field(..., description="Event type (e.g., 'candidate.updated', 'employee.created')")
-    data: Dict[str, Any] = Field(..., description="Event payload data")
-    timestamp: Optional[str] = Field(None, description="Event timestamp from platform")
-    platform: Optional[str] = Field(None, description="Platform identifier (optional, inferred from URL)")
+    url: str = Field(
+        ...,
+        description="HTTP/HTTPS endpoint URL to receive webhook deliveries",
+        min_length=1,
+        max_length=2048,
+    )
+    events: List[str] = Field(
+        ...,
+        description="List of event types to subscribe to",
+        min_length=1,
+    )
+    secret: Optional[str] = Field(
+        None,
+        description="Optional HMAC secret for webhook signature verification",
+        max_length=255,
+    )
+    api_key_id: Optional[str] = Field(
+        None,
+        description="Optional API key ID to associate with this subscription",
+    )
 
+    @validator("url")
+    def validate_url(cls, v):
+        """Validate that URL starts with http:// or https://."""
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
+        return v
 
-class WebhookResponse(BaseModel):
-    """Response model for webhook endpoints."""
-
-    success: bool = Field(..., description="Whether webhook was processed successfully")
-    message: str = Field(..., description="Response message")
-    event_id: Optional[str] = Field(None, description="Internal event ID for tracking")
-
-
-class WebhookValidationRequest(BaseModel):
-    """Request model for manual webhook validation testing."""
-
-    platform: str = Field(..., description="Platform to validate against")
-    payload: Dict[str, Any] = Field(..., description="Webhook payload to validate")
-    signature: Optional[str] = Field(None, description="Webhook signature if available")
-
-
-class WebhookValidationResponse(BaseModel):
-    """Response model for webhook validation."""
-
-    valid: bool = Field(..., description="Whether webhook payload is valid")
-    platform: str = Field(..., description="Platform that was validated")
-    message: str = Field(..., description="Validation result message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional validation details")
-
-
-async def _verify_webhook_signature(
-    payload: bytes,
-    signature: Optional[str],
-    secret: Optional[str],
-    platform: IntegrationPlatform
-) -> bool:
-    """
-    Verify webhook signature for security.
-
-    Args:
-        payload: Raw request payload bytes
-        signature: Signature from request headers
-        secret: Webhook secret from integration config
-        platform: Platform type for signature algorithm
-
-    Returns:
-        True if signature is valid or signature verification is not required
-    """
-    if not signature:
-        logger.warning(f"Missing signature for {platform.value} webhook")
-        return False
-
-    if not secret:
-        logger.warning(f"No webhook secret configured for {platform.value}")
-        return False
-
-    try:
-        # Different platforms use different signature formats
-        if platform == IntegrationPlatform.GREENHOUSE:
-            # Greenhouse uses HMAC-SHA256
-            expected_signature = hmac.new(
-                secret.encode(),
-                payload,
-                hashlib.sha256
-            ).hexdigest()
-            # Greenhouse sends signature as "sha256=<hex>"
-            if signature.startswith("sha256="):
-                signature = signature[7:]
-            return hmac.compare_digest(signature, expected_signature)
-
-        elif platform == IntegrationPlatform.LEVER:
-            # Lever uses HMAC-SHA256
-            expected_signature = hmac.new(
-                secret.encode(),
-                payload,
-                hashlib.sha256
-            ).hexdigest()
-            return hmac.compare_digest(signature, expected_signature)
-
-        elif platform == IntegrationPlatform.WORKDAY:
-            # Workday uses HMAC-SHA256
-            expected_signature = hmac.new(
-                secret.encode(),
-                payload,
-                hashlib.sha256
-            ).hexdigest()
-            return hmac.compare_digest(signature, expected_signature)
-
-        elif platform == IntegrationPlatform.BAMBOOHR:
-            # BambooHR uses HMAC-SHA256
-            expected_signature = hmac.new(
-                secret.encode(),
-                payload,
-                hashlib.sha256
-            ).hexdigest()
-            return hmac.compare_digest(signature, expected_signature)
-
-        elif platform == IntegrationPlatform.ASHBY:
-            # Ashby uses HMAC-SHA256
-            expected_signature = hmac.new(
-                secret.encode(),
-                payload,
-                hashlib.sha256
-            ).hexdigest()
-            return hmac.compare_digest(signature, expected_signature)
-
-        else:
-            logger.warning(f"Signature verification not implemented for {platform.value}")
-            return True
-
-    except Exception as e:
-        logger.error(f"Error verifying webhook signature: {e}", exc_info=True)
-        return False
-
-
-async def _process_webhook_event(
-    platform: IntegrationPlatform,
-    event_type: str,
-    event_data: Dict[str, Any],
-    integration_id: UUID,
-    db: AsyncSession
-) -> Dict[str, Any]:
-    """
-    Process webhook event and trigger appropriate actions.
-
-    Args:
-        platform: Platform that sent the webhook
-        event_type: Type of event (e.g., 'candidate.updated')
-        event_data: Event payload data
-        integration_id: Integration ID that received the webhook
-        db: Database session
-
-    Returns:
-        Processing result metadata
-    """
-    try:
-        logger.info(
-            f"Processing {platform.value} webhook event: {event_type} "
-            f"(integration: {integration_id})"
-        )
-
-        # Map webhook events to sync types
-        sync_type = None
-        should_trigger_sync = False
-
-        # Candidate-related events
-        if "candidate" in event_type.lower():
-            if "created" in event_type.lower() or "applied" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-            elif "updated" in event_type.lower() or "stage" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-            elif "deleted" in event_type.lower() or "removed" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-
-        # Employee-related events
-        elif "employee" in event_type.lower():
-            if "created" in event_type.lower() or "hired" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-            elif "updated" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-            elif "terminated" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-
-        # Vacancy/Job-related events
-        elif "vacancy" in event_type.lower() or "job" in event_type.lower():
-            if "created" in event_type.lower() or "opened" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-            elif "updated" in event_type.lower() or "closed" in event_type.lower():
-                sync_type = SyncType.INCREMENTAL_SYNC
-                should_trigger_sync = True
-
-        # If event indicates data changes, trigger incremental sync
-        if should_trigger_sync and sync_type:
-            # Check if there's already a sync in progress
-            existing_sync_query = select(SyncLog).where(
-                SyncLog.integration_id == integration_id,
-                SyncLog.status.in_([SyncStatus.PENDING, SyncStatus.RUNNING])
-            ).order_by(SyncLog.created_at.desc())
-
-            existing_sync_result = await db.execute(existing_sync_query)
-            existing_sync = existing_sync_result.first()
-
-            if existing_sync:
-                logger.info(
-                    f"Sync already in progress for integration {integration_id}, "
-                    f"not triggering new sync from webhook"
+    @validator("events")
+    def validate_events(cls, v):
+        """Validate that all events are valid WebhookEventType values."""
+        valid_events = [event.value for event in WebhookEventType]
+        for event in v:
+            if event not in valid_events:
+                raise ValueError(
+                    f"Invalid event type: {event}. "
+                    f"Valid events are: {', '.join(valid_events)}"
                 )
-                return {
-                    "sync_triggered": False,
-                    "reason": "Sync already in progress",
-                }
+        return v
 
-            # Create new sync log entry
-            new_sync = SyncLog(
-                integration_id=integration_id,
-                sync_type=sync_type,
-                status=SyncStatus.PENDING,
-                records_processed=0,
-                records_successful=0,
-                records_failed=0,
-                sync_metadata={
-                    "triggered_by": "webhook",
-                    "webhook_event": event_type,
-                    "webhook_data": event_data,
-                },
-            )
+    @validator("secret")
+    def validate_secret(cls, v):
+        """Validate secret length if provided."""
+        if v is not None and len(v) < 8:
+            raise ValueError("Secret must be at least 8 characters long")
+        return v
 
-            db.add(new_sync)
-            await db.commit()
-            await db.refresh(new_sync)
 
-            logger.info(
-                f"Triggered {sync_type.value} sync from webhook event {event_type} "
-                f"(sync_id: {new_sync.id})"
-            )
+class UpdateWebhookSubscriptionRequest(BaseModel):
+    """Request model for updating a webhook subscription."""
 
-            # TODO: Trigger Celery task for actual sync execution
-            # This will be implemented in phase-4 (worker tasks)
-            # Example: sync_integration_task.delay(str(new_sync.id))
+    url: Optional[str] = Field(
+        None,
+        description="HTTP/HTTPS endpoint URL to receive webhook deliveries",
+        min_length=1,
+        max_length=2048,
+    )
+    events: Optional[List[str]] = Field(
+        None,
+        description="List of event types to subscribe to",
+        min_length=1,
+    )
+    secret: Optional[str] = Field(
+        None,
+        description="HMAC secret for webhook signature verification",
+        max_length=255,
+    )
 
-            return {
-                "sync_triggered": True,
-                "sync_id": str(new_sync.id),
-                "sync_type": sync_type.value,
-            }
+    @validator("url")
+    def validate_url(cls, v):
+        """Validate that URL starts with http:// or https://."""
+        if v is not None and not v.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
+        return v
 
-        return {
-            "sync_triggered": False,
-            "reason": "Event type does not require sync",
-        }
+    @validator("events")
+    def validate_events(cls, v):
+        """Validate that all events are valid WebhookEventType values."""
+        if v is not None:
+            valid_events = [event.value for event in WebhookEventType]
+            for event in v:
+                if event not in valid_events:
+                    raise ValueError(
+                        f"Invalid event type: {event}. "
+                        f"Valid events are: {', '.join(valid_events)}"
+                    )
+        return v
 
-    except Exception as e:
-        logger.error(f"Error processing webhook event: {e}", exc_info=True)
-        return {
-            "sync_triggered": False,
-            "error": str(e),
-        }
+    @validator("secret")
+    def validate_secret(cls, v):
+        """Validate secret length if provided."""
+        if v is not None and len(v) < 8:
+            raise ValueError("Secret must be at least 8 characters long")
+        return v
+
+
+class WebhookSubscriptionResponse(BaseModel):
+    """Response model for webhook subscription creation."""
+
+    id: str = Field(..., description="Subscription UUID")
+    url: str = Field(..., description="Webhook endpoint URL")
+    events: List[str] = Field(..., description="Subscribed event types")
+    is_active: bool = Field(..., description="Whether subscription is active")
+    api_key_id: Optional[str] = Field(None, description="Associated API key ID")
+    last_delivery_at: Optional[str] = Field(None, description="Last successful delivery timestamp")
+    failure_count: int = Field(..., description="Number of consecutive failures")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    message: str = Field(..., description="Success message")
+
+
+class WebhookSubscriptionListItem(BaseModel):
+    """Response model for a webhook subscription in list view."""
+
+    id: str = Field(..., description="Subscription UUID")
+    url: str = Field(..., description="Webhook endpoint URL")
+    events: List[str] = Field(..., description="Subscribed event types")
+    is_active: bool = Field(..., description="Whether subscription is active")
+    api_key_id: Optional[str] = Field(None, description="Associated API key ID")
+    last_delivery_at: Optional[str] = Field(None, description="Last successful delivery timestamp")
+    failure_count: int = Field(..., description="Number of consecutive failures")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class DeliveryLogInfo(BaseModel):
+    """Information about a delivery log entry."""
+
+    id: str = Field(..., description="Delivery log UUID")
+    event_type: str = Field(..., description="Event type delivered")
+    status: str = Field(..., description="Delivery status")
+    status_code: Optional[int] = Field(None, description="HTTP status code")
+    attempt_count: int = Field(..., description="Number of delivery attempts")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+    created_at: str = Field(..., description="Creation timestamp")
+
+
+class WebhookSubscriptionWithLogs(BaseModel):
+    """Response model for webhook subscription with delivery logs."""
+
+    id: str = Field(..., description="Subscription UUID")
+    url: str = Field(..., description="Webhook endpoint URL")
+    events: List[str] = Field(..., description="Subscribed event types")
+    is_active: bool = Field(..., description="Whether subscription is active")
+    api_key_id: Optional[str] = Field(None, description="Associated API key ID")
+    last_delivery_at: Optional[str] = Field(None, description="Last successful delivery timestamp")
+    failure_count: int = Field(..., description="Number of consecutive failures")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    recent_deliveries: List[DeliveryLogInfo] = Field(
+        default_factory=list,
+        description="Recent delivery logs",
+    )
+
+
+class DeliveryLogDetail(BaseModel):
+    """Detailed response model for a delivery log entry."""
+
+    id: str = Field(..., description="Delivery log UUID")
+    subscription_id: str = Field(..., description="Subscription UUID")
+    event_type: str = Field(..., description="Event type delivered")
+    event_data: Dict[str, Any] = Field(..., description="Event payload")
+    status: str = Field(..., description="Delivery status")
+    status_code: Optional[int] = Field(None, description="HTTP status code")
+    response_body: Optional[str] = Field(None, description="Response body")
+    attempt_count: int = Field(..., description="Number of delivery attempts")
+    next_retry_at: Optional[str] = Field(None, description="Next retry timestamp")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class ToggleSubscriptionResponse(BaseModel):
+    """Response model for enabling/disabling subscriptions."""
+
+    id: str = Field(..., description="Subscription UUID")
+    is_active: bool = Field(..., description="New active status")
+    message: str = Field(..., description="Success message")
 
 
 @router.post(
-    "/{platform}",
-    response_model=WebhookResponse,
+    "/subscribe",
+    response_model=WebhookSubscriptionResponse,
+    status_code=status.HTTP_201_CREATED,
     tags=["Webhooks"],
 )
-async def receive_webhook(
+async def create_webhook_subscription(
     request: Request,
-    platform: str,
-    x_webhook_signature: Optional[str] = Header(None, alias="X-Webhook-Signature"),
-    x_hub_signature: Optional[str] = Header(None, alias="X-Hub-Signature"),
-    x_hub_signature_256: Optional[str] = Header(None, alias="X-Hub-Signature-256"),
-    db: AsyncSession = Depends(get_db)
+    subscription_data: CreateWebhookSubscriptionRequest,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
-    Receive webhook events from external HRIS/ATS platforms.
+    Create a new webhook subscription.
 
-    This endpoint accepts real-time webhook notifications from supported platforms:
-    - Workday: candidate and employee events
-    - Greenhouse: candidate application and stage changes
-    - Lever: candidate and opportunity updates
-    - BambooHR: employee data changes
-    - Ashby: candidate and application events
-
-    Webhooks are validated using signature verification when available.
+    Creates a webhook subscription to receive real-time notifications
+    for specified events. The subscription will send HTTP POST requests
+    to the provided URL when events occur.
 
     Args:
         request: FastAPI request object
-        platform: Platform identifier (workday, greenhouse, lever, bamboohr, ashby)
-        x_webhook_signature: Webhook signature header (varies by platform)
-        x_hub_signature: GitHub-style signature header
-        x_hub_signature_256: GitHub-style SHA256 signature header
+        subscription_data: Subscription details (url, events, optional secret, optional api_key_id)
         db: Database session
 
     Returns:
-        JSON response acknowledging webhook receipt
+        JSON response with created subscription details
 
     Raises:
-        HTTPException(400): Invalid platform
-        HTTPException(401): Signature verification failed
-        HTTPException(404): No active integration found for platform
-        HTTPException(500): Webhook processing failed
+        HTTPException(422): If validation fails
+        HTTPException(404): If api_key_id is provided but key not found
+        HTTPException(500): If database operation fails
 
     Examples:
         >>> import requests
-        >>> webhook_data = {
-        ...     "event": "candidate.updated",
-        ...     "data": {"candidate_id": "123", "name": "John Doe"}
+        >>> data = {
+        ...     "url": "https://example.com/webhook",
+        ...     "events": ["candidate.created", "stage.changed"]
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/webhooks/greenhouse",
-        ...     json=webhook_data,
-        ...     headers={"X-Webhook-Signature": "sha256=..."}
+        ...     "http://localhost:8000/api/webhooks/subscribe",
+        ...     json=data
         ... )
+        >>> subscription = response.json()
     """
     try:
-        # Normalize platform name
-        platform_normalized = platform.lower().strip()
+        logger.info(
+            f"Creating webhook subscription - url: {subscription_data.url}, "
+            f"events: {subscription_data.events}"
+        )
 
-        # Map to enum
-        platform_map = {
-            "workday": IntegrationPlatform.WORKDAY,
-            "greenhouse": IntegrationPlatform.GREENHOUSE,
-            "lever": IntegrationPlatform.LEVER,
-            "bamboohr": IntegrationPlatform.BAMBOOHR,
-            "ashby": IntegrationPlatform.ASHBY,
-        }
-
-        if platform_normalized not in platform_map:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid platform: {platform}. Supported platforms: {', '.join(platform_map.keys())}",
-            )
-
-        platform_enum = platform_map[platform_normalized]
-
-        # Get raw payload for signature verification
-        raw_payload = await request.body()
-
-        # Parse request body
-        try:
-            webhook_data = await request.json()
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid JSON payload: {str(e)}",
-            )
-
-        # Validate using request model
-        try:
-            webhook_event = WebhookEventRequest(**webhook_data)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid webhook data format: {str(e)}",
-            )
-
-        # Find active integration for this platform
-        # TODO: Handle multiple integrations per platform
-        integration_query = select(Integration).where(
-            Integration.platform == platform_enum,
-            Integration.status == IntegrationStatus.ACTIVE
-        ).order_by(Integration.created_at.desc())
-
-        integration_result = await db.execute(integration_query)
-        integration = integration_result.scalar_one_or_none()
-
-        if not integration:
-            logger.warning(f"No active integration found for platform: {platform_enum.value}")
-            # For security, still return success but log the issue
-            # This prevents information leakage about configured integrations
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "success": True,
-                    "message": "Webhook received (no active integration)",
-                    "event_id": None,
-                },
-            )
-
-        # Verify webhook signature if secret is configured
-        webhook_secret = integration.credentials.get("webhook_secret")
-        signature = x_webhook_signature or x_hub_signature or x_hub_signature_256
-
-        if webhook_secret and signature:
-            signature_valid = await _verify_webhook_signature(
-                raw_payload,
-                signature,
-                webhook_secret,
-                platform_enum
-            )
-
-            if not signature_valid:
-                logger.warning(
-                    f"Invalid webhook signature for platform {platform_enum.value} "
-                    f"(integration: {integration.id})"
-                )
+        # Validate api_key_id if provided
+        api_key_uuid = None
+        if subscription_data.api_key_id:
+            try:
+                api_key_uuid = UUID(subscription_data.api_key_id)
+                # Verify API key exists
+                from models.api_key import APIKey
+                api_key_query = select(APIKey).where(APIKey.id == api_key_uuid)
+                api_key_result = await db.execute(api_key_query)
+                api_key = api_key_result.scalar_one_or_none()
+                if not api_key:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"API key not found: {subscription_data.api_key_id}",
+                    )
+            except ValueError:
                 raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook signature",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid API key ID format: {subscription_data.api_key_id}",
                 )
 
-        # Log audit event for webhook receipt
-        ip_address, user_agent = get_request_context(request)
-        await log_audit_event(
-            db=db,
-            action_type=AuditActionType.INTEGRATION_UPDATED,  # Using existing audit type
-            entity_type="webhook",
-            entity_id=integration.id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            after_value={
-                "platform": platform_enum.value,
-                "event": webhook_event.event,
-                "integration_id": str(integration.id),
-            },
+        # Create the subscription
+        new_subscription = WebhookSubscription(
+            url=subscription_data.url,
+            events=subscription_data.events,
+            secret=subscription_data.secret,
+            api_key_id=api_key_uuid,
+            is_active=True,
+            failure_count=0,
         )
 
-        # Process the webhook event
-        processing_result = await _process_webhook_event(
-            platform_enum,
-            webhook_event.event,
-            webhook_event.data,
-            integration.id,
-            db
-        )
+        db.add(new_subscription)
+        await db.commit()
+        await db.refresh(new_subscription)
 
         logger.info(
-            f"Webhook processed successfully: {platform_enum.value} - {webhook_event.event} "
-            f"(integration: {integration.id})"
+            f"Webhook subscription created successfully: {new_subscription.id}"
         )
 
         return JSONResponse(
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_201_CREATED,
             content={
-                "success": True,
-                "message": f"Webhook received and processed for {platform_enum.value}",
-                "event_id": processing_result.get("sync_id"),
+                "id": str(new_subscription.id),
+                "url": new_subscription.url,
+                "events": new_subscription.events,
+                "is_active": new_subscription.is_active,
+                "api_key_id": str(new_subscription.api_key_id) if new_subscription.api_key_id else None,
+                "last_delivery_at": new_subscription.last_delivery_at.isoformat() if new_subscription.last_delivery_at else None,
+                "failure_count": new_subscription.failure_count,
+                "created_at": new_subscription.created_at.isoformat() if new_subscription.created_at else None,
+                "updated_at": new_subscription.updated_at.isoformat() if new_subscription.updated_at else None,
+                "message": "Webhook subscription created successfully",
             },
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error processing webhook: {e}", exc_info=True)
+        logger.error(f"Error creating webhook subscription: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process webhook: {str(e)}",
-        ) from e
-
-
-@router.post(
-    "/validate",
-    response_model=WebhookValidationResponse,
-    tags=["Webhooks"],
-)
-async def validate_webhook(
-    request: Request,
-    validation: WebhookValidationRequest,
-    db: AsyncSession = Depends(get_db)
-) -> JSONResponse:
-    """
-    Validate a webhook payload manually (for testing and debugging).
-
-    This endpoint allows manual validation of webhook payloads without actually
-    processing them. Useful for testing webhook integrations and debugging issues.
-
-    Args:
-        request: FastAPI request object
-        validation: Validation request with platform, payload, and optional signature
-        db: Database session
-
-    Returns:
-        JSON response with validation result
-
-    Raises:
-        HTTPException(400): Invalid platform or payload
-
-    Examples:
-        >>> import requests
-        >>> validation_data = {
-        ...     "platform": "greenhouse",
-        ...     "payload": {"event": "candidate.updated", "data": {}},
-        ...     "signature": "sha256=..."
-        ... }
-        >>> response = requests.post(
-        ...     "http://localhost:8000/api/webhooks/validate",
-        ...     json=validation_data
-        ... )
-    """
-    try:
-        # Normalize platform name
-        platform_normalized = validation.platform.lower().strip()
-
-        # Map to enum
-        platform_map = {
-            "workday": IntegrationPlatform.WORKDAY,
-            "greenhouse": IntegrationPlatform.GREENHOUSE,
-            "lever": IntegrationPlatform.LEVER,
-            "bamboohr": IntegrationPlatform.BAMBOOHR,
-            "ashby": IntegrationPlatform.ASHBY,
-        }
-
-        if platform_normalized not in platform_map:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid platform: {validation.platform}",
-            )
-
-        platform_enum = platform_map[platform_normalized]
-
-        # Validate payload structure
-        try:
-            webhook_event = WebhookEventRequest(**validation.payload)
-        except Exception as e:
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "valid": False,
-                    "platform": validation.platform,
-                    "message": f"Invalid payload structure: {str(e)}",
-                    "details": {"error": str(e)},
-                },
-            )
-
-        # Find active integration for signature validation
-        integration_query = select(Integration).where(
-            Integration.platform == platform_enum,
-            Integration.status == IntegrationStatus.ACTIVE
-        ).order_by(Integration.created_at.desc())
-
-        integration_result = await db.execute(integration_query)
-        integration = integration_result.scalar_one_or_none()
-
-        validation_details = {
-            "event_type": webhook_event.event,
-            "payload_size": len(str(validation.payload)),
-            "integration_found": integration is not None,
-        }
-
-        # Validate signature if provided
-        if validation.signature and integration:
-            webhook_secret = integration.credentials.get("webhook_secret")
-            if webhook_secret:
-                # Create a mock payload bytes
-                import json
-                payload_bytes = json.dumps(validation.payload).encode()
-
-                signature_valid = await _verify_webhook_signature(
-                    payload_bytes,
-                    validation.signature,
-                    webhook_secret,
-                    platform_enum
-                )
-
-                validation_details["signature_valid"] = signature_valid
-
-                if not signature_valid:
-                    return JSONResponse(
-                        status_code=status.HTTP_200_OK,
-                        content={
-                            "valid": False,
-                            "platform": validation.platform,
-                            "message": "Signature validation failed",
-                            "details": validation_details,
-                        },
-                    )
-
-        logger.info(
-            f"Webhook validation successful for platform {validation.platform}"
-        )
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "valid": True,
-                "platform": validation.platform,
-                "message": "Webhook payload is valid",
-                "details": validation_details,
-            },
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error validating webhook: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to validate webhook: {str(e)}",
+            detail=f"Failed to create webhook subscription: {str(e)}",
         ) from e
 
 
 @router.get(
     "/",
+    response_model=List[WebhookSubscriptionListItem],
     tags=["Webhooks"],
 )
-async def list_webhook_endpoints(
-    request: Request
+async def list_webhook_subscriptions(
+    request: Request,
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=100, description="Maximum number of records to return"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
-    List available webhook endpoints.
+    List all webhook subscriptions.
 
-    Returns a list of supported webhook platforms and their endpoint URLs.
-    Useful for configuring external systems to send webhooks.
+    Returns a paginated list of webhook subscriptions with their metadata.
+    Can be filtered by active status and event type.
+
+    Args:
+        request: FastAPI request object
+        is_active: Optional filter by active status
+        event_type: Optional filter by event type (subscriptions must have this event)
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        db: Database session
 
     Returns:
-        JSON response with list of webhook endpoints
+        JSON response with list of webhook subscriptions
+
+    Raises:
+        HTTPException(500): If data retrieval fails
 
     Examples:
+        >>> import requests
+        >>> # Get all subscriptions
         >>> response = requests.get("http://localhost:8000/api/webhooks/")
-        >>> endpoints = response.json()
-        >>> {
-        ...     "platforms": [
-        ...         {"platform": "workday", "url": "/api/webhooks/workday"},
-        ...         {"platform": "greenhouse", "url": "/api/webhooks/greenhouse"},
-        ...         ...
-        ...     ]
-        ... }
+        >>> # Get only active subscriptions
+        >>> response = requests.get("http://localhost:8000/api/webhooks/?is_active=true")
+        >>> # Get subscriptions for specific event
+        >>> response = requests.get("http://localhost:8000/api/webhooks/?event_type=candidate.created")
+        >>> subscriptions = response.json()
     """
-    # Get base URL from request
-    base_url = f"{request.url.scheme}://{request.url.netloc}"
+    try:
+        logger.info(
+            f"Fetching webhook subscriptions - is_active: {is_active}, "
+            f"event_type: {event_type}, skip: {skip}, limit: {limit}"
+        )
 
-    platforms = [
-        {
-            "platform": "workday",
-            "url": f"{base_url}/api/webhooks/workday",
-            "description": "Workday HRIS webhooks for employee and candidate events",
-        },
-        {
-            "platform": "greenhouse",
-            "url": f"{base_url}/api/webhooks/greenhouse",
-            "description": "Greenhouse ATS webhooks for candidate and application events",
-        },
-        {
-            "platform": "lever",
-            "url": f"{base_url}/api/webhooks/lever",
-            "description": "Lever ATS webhooks for candidate and opportunity events",
-        },
-        {
-            "platform": "bamboohr",
-            "url": f"{base_url}/api/webhooks/bamboohr",
-            "description": "BambooHR HRIS webhooks for employee data events",
-        },
-        {
-            "platform": "ashby",
-            "url": f"{base_url}/api/webhooks/ashby",
-            "description": "Ashby ATS webhooks for candidate and application events",
-        },
-    ]
+        # Build query
+        query = select(WebhookSubscription)
 
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "platforms": platforms,
-            "total": len(platforms),
-        },
-    )
+        # Apply filters
+        if is_active is not None:
+            query = query.where(WebhookSubscription.is_active == is_active)
+
+        if event_type:
+            # Filter subscriptions that have this event in their events list
+            query = query.where(WebhookSubscription.events.contains([event_type]))
+
+        # Order by most recently created
+        query = query.order_by(
+            WebhookSubscription.created_at.desc()
+        ).offset(skip).limit(limit)
+
+        # Execute query
+        result = await db.execute(query)
+        subscriptions = result.scalars().all()
+
+        # Convert to response format
+        subscriptions_list = []
+        for sub in subscriptions:
+            subscriptions_list.append({
+                "id": str(sub.id),
+                "url": sub.url,
+                "events": sub.events,
+                "is_active": sub.is_active,
+                "api_key_id": str(sub.api_key_id) if sub.api_key_id else None,
+                "last_delivery_at": sub.last_delivery_at.isoformat() if sub.last_delivery_at else None,
+                "failure_count": sub.failure_count,
+                "created_at": sub.created_at.isoformat() if sub.created_at else None,
+                "updated_at": sub.updated_at.isoformat() if sub.updated_at else None,
+            })
+
+        logger.info(f"Retrieved {len(subscriptions_list)} webhook subscriptions")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=subscriptions_list,
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing webhook subscriptions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list webhook subscriptions: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/{subscription_id}",
+    response_model=WebhookSubscriptionWithLogs,
+    tags=["Webhooks"],
+)
+async def get_webhook_subscription(
+    request: Request,
+    subscription_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get a specific webhook subscription with recent delivery logs.
+
+    Returns details for a specific webhook subscription including
+    recent delivery logs for monitoring and debugging.
+
+    Args:
+        request: FastAPI request object
+        subscription_id: Subscription UUID
+        db: Database session
+
+    Returns:
+        JSON response with subscription details and recent delivery logs
+
+    Raises:
+        HTTPException(400): If subscription_id is not a valid UUID
+        HTTPException(404): If subscription not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     f"http://localhost:8000/api/webhooks/{subscription_id}"
+        ... )
+        >>> subscription = response.json()
+    """
+    try:
+        logger.info(f"Fetching webhook subscription: {subscription_id}")
+
+        # Parse subscription_id as UUID
+        try:
+            subscription_uuid = UUID(subscription_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid subscription ID format: {subscription_id}",
+            )
+
+        # Get the subscription
+        query = select(WebhookSubscription).where(
+            WebhookSubscription.id == subscription_uuid
+        )
+        result = await db.execute(query)
+        subscription = result.scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Webhook subscription not found: {subscription_id}",
+            )
+
+        # Get recent delivery logs (last 10)
+        logs_query = (
+            select(WebhookDeliveryLog)
+            .where(WebhookDeliveryLog.subscription_id == subscription_uuid)
+            .order_by(WebhookDeliveryLog.created_at.desc())
+            .limit(10)
+        )
+        logs_result = await db.execute(logs_query)
+        delivery_logs = logs_result.scalars().all()
+
+        # Convert logs to response format
+        recent_deliveries = []
+        for log in delivery_logs:
+            recent_deliveries.append({
+                "id": str(log.id),
+                "event_type": log.event_type,
+                "status": log.status.value,
+                "status_code": log.status_code,
+                "attempt_count": log.attempt_count,
+                "error_message": log.error_message,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+            })
+
+        subscription_data = {
+            "id": str(subscription.id),
+            "url": subscription.url,
+            "events": subscription.events,
+            "is_active": subscription.is_active,
+            "api_key_id": str(subscription.api_key_id) if subscription.api_key_id else None,
+            "last_delivery_at": subscription.last_delivery_at.isoformat() if subscription.last_delivery_at else None,
+            "failure_count": subscription.failure_count,
+            "created_at": subscription.created_at.isoformat() if subscription.created_at else None,
+            "updated_at": subscription.updated_at.isoformat() if subscription.updated_at else None,
+            "recent_deliveries": recent_deliveries,
+        }
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=subscription_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting webhook subscription {subscription_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get webhook subscription: {str(e)}",
+        ) from e
+
+
+@router.put(
+    "/{subscription_id}",
+    response_model=WebhookSubscriptionResponse,
+    tags=["Webhooks"],
+)
+async def update_webhook_subscription(
+    request: Request,
+    subscription_id: str,
+    subscription_data: UpdateWebhookSubscriptionRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update a webhook subscription.
+
+    Updates the URL, events, or secret of an existing webhook subscription.
+
+    Args:
+        request: FastAPI request object
+        subscription_id: Subscription UUID
+        subscription_data: Updated subscription details
+        db: Database session
+
+    Returns:
+        JSON response with updated subscription details
+
+    Raises:
+        HTTPException(400): If subscription_id is not a valid UUID
+        HTTPException(404): If subscription not found
+        HTTPException(422): If validation fails
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "url": "https://example.com/webhook-v2",
+        ...     "events": ["candidate.created", "stage.changed", "ranking.updated"]
+        ... }
+        >>> response = requests.put(
+        ...     f"http://localhost:8000/api/webhooks/{subscription_id}",
+        ...     json=data
+        ... )
+        >>> subscription = response.json()
+    """
+    try:
+        logger.info(f"Updating webhook subscription: {subscription_id}")
+
+        # Parse subscription_id as UUID
+        try:
+            subscription_uuid = UUID(subscription_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid subscription ID format: {subscription_id}",
+            )
+
+        # Get the subscription
+        query = select(WebhookSubscription).where(
+            WebhookSubscription.id == subscription_uuid
+        )
+        result = await db.execute(query)
+        subscription = result.scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Webhook subscription not found: {subscription_id}",
+            )
+
+        # Update fields if provided
+        if subscription_data.url is not None:
+            subscription.url = subscription_data.url
+        if subscription_data.events is not None:
+            subscription.events = subscription_data.events
+        if subscription_data.secret is not None:
+            subscription.secret = subscription_data.secret
+
+        await db.commit()
+        await db.refresh(subscription)
+
+        logger.info(f"Webhook subscription updated successfully: {subscription_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(subscription.id),
+                "url": subscription.url,
+                "events": subscription.events,
+                "is_active": subscription.is_active,
+                "api_key_id": str(subscription.api_key_id) if subscription.api_key_id else None,
+                "last_delivery_at": subscription.last_delivery_at.isoformat() if subscription.last_delivery_at else None,
+                "failure_count": subscription.failure_count,
+                "created_at": subscription.created_at.isoformat() if subscription.created_at else None,
+                "updated_at": subscription.updated_at.isoformat() if subscription.updated_at else None,
+                "message": "Webhook subscription updated successfully",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating webhook subscription {subscription_id}: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update webhook subscription: {str(e)}",
+        ) from e
+
+
+@router.delete(
+    "/{subscription_id}",
+    tags=["Webhooks"],
+)
+async def delete_webhook_subscription(
+    request: Request,
+    subscription_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Delete a webhook subscription.
+
+    Permanently deletes a webhook subscription and all its delivery logs.
+
+    Args:
+        request: FastAPI request object
+        subscription_id: Subscription UUID
+        db: Database session
+
+    Returns:
+        JSON response with deletion confirmation
+
+    Raises:
+        HTTPException(400): If subscription_id is not a valid UUID
+        HTTPException(404): If subscription not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.delete(
+        ...     f"http://localhost:8000/api/webhooks/{subscription_id}"
+        ... )
+        >>> result = response.json()
+    """
+    try:
+        logger.info(f"Deleting webhook subscription: {subscription_id}")
+
+        # Parse subscription_id as UUID
+        try:
+            subscription_uuid = UUID(subscription_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid subscription ID format: {subscription_id}",
+            )
+
+        # Get the subscription
+        query = select(WebhookSubscription).where(
+            WebhookSubscription.id == subscription_uuid
+        )
+        result = await db.execute(query)
+        subscription = result.scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Webhook subscription not found: {subscription_id}",
+            )
+
+        # Delete the subscription (cascade will delete delivery logs)
+        await db.delete(subscription)
+        await db.commit()
+
+        logger.info(f"Webhook subscription deleted successfully: {subscription_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": subscription_id,
+                "message": "Webhook subscription deleted successfully",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting webhook subscription {subscription_id}: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete webhook subscription: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/{subscription_id}/disable",
+    response_model=ToggleSubscriptionResponse,
+    tags=["Webhooks"],
+)
+async def disable_webhook_subscription(
+    request: Request,
+    subscription_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Disable a webhook subscription.
+
+    Disables a webhook subscription without deleting it.
+    The subscription will not receive events until re-enabled.
+
+    Args:
+        request: FastAPI request object
+        subscription_id: Subscription UUID
+        db: Database session
+
+    Returns:
+        JSON response with disabled subscription details
+
+    Raises:
+        HTTPException(400): If subscription_id is not a valid UUID
+        HTTPException(404): If subscription not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     f"http://localhost:8000/api/webhooks/{subscription_id}/disable"
+        ... )
+        >>> result = response.json()
+        >>> assert result["is_active"] == False
+    """
+    try:
+        logger.info(f"Disabling webhook subscription: {subscription_id}")
+
+        # Parse subscription_id as UUID
+        try:
+            subscription_uuid = UUID(subscription_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid subscription ID format: {subscription_id}",
+            )
+
+        # Get the subscription
+        query = select(WebhookSubscription).where(
+            WebhookSubscription.id == subscription_uuid
+        )
+        result = await db.execute(query)
+        subscription = result.scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Webhook subscription not found: {subscription_id}",
+            )
+
+        # Check if already disabled
+        if not subscription.is_active:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "id": subscription_id,
+                    "is_active": False,
+                    "message": "Webhook subscription is already disabled",
+                },
+            )
+
+        # Disable the subscription
+        subscription.is_active = False
+        await db.commit()
+        await db.refresh(subscription)
+
+        logger.info(f"Webhook subscription disabled successfully: {subscription_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(subscription.id),
+                "is_active": subscription.is_active,
+                "message": "Webhook subscription disabled successfully",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error disabling webhook subscription {subscription_id}: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to disable webhook subscription: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/{subscription_id}/enable",
+    response_model=ToggleSubscriptionResponse,
+    tags=["Webhooks"],
+)
+async def enable_webhook_subscription(
+    request: Request,
+    subscription_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Enable a webhook subscription.
+
+    Enables a previously disabled webhook subscription.
+    The subscription will resume receiving events.
+
+    Args:
+        request: FastAPI request object
+        subscription_id: Subscription UUID
+        db: Database session
+
+    Returns:
+        JSON response with enabled subscription details
+
+    Raises:
+        HTTPException(400): If subscription_id is not a valid UUID
+        HTTPException(404): If subscription not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     f"http://localhost:8000/api/webhooks/{subscription_id}/enable"
+        ... )
+        >>> result = response.json()
+        >>> assert result["is_active"] == True
+    """
+    try:
+        logger.info(f"Enabling webhook subscription: {subscription_id}")
+
+        # Parse subscription_id as UUID
+        try:
+            subscription_uuid = UUID(subscription_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid subscription ID format: {subscription_id}",
+            )
+
+        # Get the subscription
+        query = select(WebhookSubscription).where(
+            WebhookSubscription.id == subscription_uuid
+        )
+        result = await db.execute(query)
+        subscription = result.scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Webhook subscription not found: {subscription_id}",
+            )
+
+        # Check if already enabled
+        if subscription.is_active:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "id": subscription_id,
+                    "is_active": True,
+                    "message": "Webhook subscription is already enabled",
+                },
+            )
+
+        # Reset failure count and enable the subscription
+        subscription.failure_count = 0
+        subscription.is_active = True
+        await db.commit()
+        await db.refresh(subscription)
+
+        logger.info(f"Webhook subscription enabled successfully: {subscription_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(subscription.id),
+                "is_active": subscription.is_active,
+                "message": "Webhook subscription enabled successfully",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error enabling webhook subscription {subscription_id}: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to enable webhook subscription: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/{subscription_id}/logs",
+    tags=["Webhooks"],
+)
+async def get_webhook_delivery_logs(
+    request: Request,
+    subscription_id: str,
+    status: Optional[str] = Query(None, description="Filter by delivery status"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=100, description="Maximum number of records to return"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get delivery logs for a webhook subscription.
+
+    Returns a paginated list of delivery logs for a specific webhook
+    subscription, useful for monitoring and debugging.
+
+    Args:
+        request: FastAPI request object
+        subscription_id: Subscription UUID
+        status: Optional filter by delivery status (pending, success, failed, retrying)
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        db: Database session
+
+    Returns:
+        JSON response with list of delivery logs
+
+    Raises:
+        HTTPException(400): If subscription_id is not a valid UUID
+        HTTPException(404): If subscription not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     f"http://localhost:8000/api/webhooks/{subscription_id}/logs"
+        ... )
+        >>> logs = response.json()
+    """
+    try:
+        logger.info(
+            f"Fetching delivery logs for subscription {subscription_id} - "
+            f"status: {status}, skip: {skip}, limit: {limit}"
+        )
+
+        # Parse subscription_id as UUID
+        try:
+            subscription_uuid = UUID(subscription_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid subscription ID format: {subscription_id}",
+            )
+
+        # Verify subscription exists
+        sub_query = select(WebhookSubscription).where(
+            WebhookSubscription.id == subscription_uuid
+        )
+        sub_result = await db.execute(sub_query)
+        subscription = sub_result.scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Webhook subscription not found: {subscription_id}",
+            )
+
+        # Build query for delivery logs
+        query = select(WebhookDeliveryLog).where(
+            WebhookDeliveryLog.subscription_id == subscription_uuid
+        )
+
+        # Apply status filter if provided
+        if status:
+            try:
+                status_enum = WebhookDeliveryStatus(status)
+                query = query.where(WebhookDeliveryLog.status == status_enum)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status: {status}. Valid values are: pending, success, failed, retrying",
+                )
+
+        # Order by most recently created
+        query = query.order_by(
+            WebhookDeliveryLog.created_at.desc()
+        ).offset(skip).limit(limit)
+
+        # Execute query
+        result = await db.execute(query)
+        logs = result.scalars().all()
+
+        # Convert to response format
+        logs_list = []
+        for log in logs:
+            logs_list.append({
+                "id": str(log.id),
+                "subscription_id": str(log.subscription_id),
+                "event_type": log.event_type,
+                "event_data": log.event_data,
+                "status": log.status.value,
+                "status_code": log.status_code,
+                "response_body": log.response_body,
+                "attempt_count": log.attempt_count,
+                "next_retry_at": log.next_retry_at.isoformat() if log.next_retry_at else None,
+                "error_message": log.error_message,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "updated_at": log.updated_at.isoformat() if log.updated_at else None,
+            })
+
+        logger.info(f"Retrieved {len(logs_list)} delivery logs")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "subscription_id": subscription_id,
+                "total_logs": len(logs_list),
+                "logs": logs_list,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching delivery logs: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch delivery logs: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/logs/{log_id}",
+    response_model=DeliveryLogDetail,
+    tags=["Webhooks"],
+)
+async def get_delivery_log(
+    request: Request,
+    log_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get a specific delivery log entry.
+
+    Returns detailed information about a specific webhook delivery attempt,
+    including the event payload, response status, and error messages.
+
+    Args:
+        request: FastAPI request object
+        log_id: Delivery log UUID
+        db: Database session
+
+    Returns:
+        JSON response with delivery log details
+
+    Raises:
+        HTTPException(400): If log_id is not a valid UUID
+        HTTPException(404): If delivery log not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     f"http://localhost:8000/api/webhooks/logs/{log_id}"
+        ... )
+        >>> log = response.json()
+    """
+    try:
+        logger.info(f"Fetching delivery log: {log_id}")
+
+        # Parse log_id as UUID
+        try:
+            log_uuid = UUID(log_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid log ID format: {log_id}",
+            )
+
+        # Get the delivery log
+        query = select(WebhookDeliveryLog).where(WebhookDeliveryLog.id == log_uuid)
+        result = await db.execute(query)
+        log = result.scalar_one_or_none()
+
+        if not log:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Delivery log not found: {log_id}",
+            )
+
+        log_data = {
+            "id": str(log.id),
+            "subscription_id": str(log.subscription_id),
+            "event_type": log.event_type,
+            "event_data": log.event_data,
+            "status": log.status.value,
+            "status_code": log.status_code,
+            "response_body": log.response_body,
+            "attempt_count": log.attempt_count,
+            "next_retry_at": log.next_retry_at.isoformat() if log.next_retry_at else None,
+            "error_message": log.error_message,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "updated_at": log.updated_at.isoformat() if log.updated_at else None,
+        }
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=log_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting delivery log {log_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get delivery log: {str(e)}",
+        ) from e

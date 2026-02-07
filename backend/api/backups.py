@@ -8,8 +8,6 @@ This module provides REST endpoints for managing backups including:
 - Managing backup configuration
 - Verifying backup integrity
 - Syncing with S3 storage
-
-All endpoints require authentication and admin-level access.
 """
 import logging
 import os
@@ -24,9 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
-from dependencies.auth import get_current_user
 from models.backup import Backup, BackupConfig, BackupType, BackupStatus
-from models.user import User
 from schemas.backup import (
     BackupResponse,
     BackupCreate,
@@ -144,7 +140,6 @@ async def list_backups(
     limit: int = Query(50, ge=1, le=200, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     List all backups with optional filtering.
@@ -163,7 +158,7 @@ async def list_backups(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/?backup_type=full&limit=10")
+        >>> response = requests.get("/api/backups/?backup_type=full&limit=10")
         >>> backups = response.json()
     """
     try:
@@ -220,7 +215,6 @@ async def list_backups(
 async def create_backup(
     request: BackupCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Create a new backup.
@@ -243,7 +237,7 @@ async def create_backup(
         ...     "retention_days": 30,
         ...     "upload_to_s3": true
         ... }
-        >>> response = requests.post("http://localhost:8000/api/backups/", json=data)
+        >>> response = requests.post("/api/backups/", json=data)
         >>> backup = response.json()
     """
     try:
@@ -305,7 +299,6 @@ async def create_backup(
 )
 async def get_backup_status(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Get overall backup system status.
@@ -324,7 +317,7 @@ async def get_backup_status(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/status")
+        >>> response = requests.get("/api/backups/status")
         >>> status = response.json()
     """
     try:
@@ -385,7 +378,6 @@ async def get_backup_status(
 )
 async def get_backup_config_endpoint(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Get backup configuration.
@@ -401,7 +393,7 @@ async def get_backup_config_endpoint(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/config")
+        >>> response = requests.get("/api/backups/config")
         >>> config = response.json()
     """
     try:
@@ -441,7 +433,6 @@ async def get_backup_config_endpoint(
 async def update_backup_config(
     request: BackupConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Update backup configuration.
@@ -463,7 +454,7 @@ async def update_backup_config(
         ...     "s3_enabled": true,
         ...     "s3_bucket": "my-backup-bucket"
         ... }
-        >>> response = requests.put("http://localhost:8000/api/backups/config", json=data)
+        >>> response = requests.put("/api/backups/config", json=data)
         >>> config = response.json()
     """
     try:
@@ -542,7 +533,6 @@ async def update_backup_config(
 async def get_backup(
     backup_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Get details of a specific backup.
@@ -556,7 +546,7 @@ async def get_backup(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/backups/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/backups/123e4567-e89b-12d3-a456-426614174000")
         >>> backup = response.json()
     """
     try:
@@ -592,7 +582,6 @@ async def restore_backup(
     backup_id: str,
     request: BackupRestoreRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Restore from a backup.
@@ -618,7 +607,7 @@ async def restore_backup(
         ...     "restore_type": "full"
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/backups/123/restore",
+        ...     "/api/backups/123/restore",
         ...     json=data
         ... )
         >>> result = response.json()
@@ -690,7 +679,6 @@ async def restore_backup(
 async def delete_backup(
     backup_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Delete a backup.
@@ -706,7 +694,7 @@ async def delete_backup(
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/backups/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.delete("/api/backups/123e4567-e89b-12d3-a456-426614174000")
         >>> result = response.json()
     """
     try:
@@ -754,7 +742,6 @@ async def delete_backup(
 async def verify_backup(
     backup_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Verify backup integrity.
@@ -770,7 +757,7 @@ async def verify_backup(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/backups/123/verify")
+        >>> response = requests.post("/api/backups/123/verify")
         >>> result = response.json()
         >>> print(result['valid'])
         True
@@ -824,7 +811,6 @@ async def verify_backup(
 )
 async def sync_s3(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Manually trigger S3 sync for all backups.
@@ -839,7 +825,7 @@ async def sync_s3(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/backups/sync-s3")
+        >>> response = requests.post("/api/backups/sync-s3")
         >>> result = response.json()
     """
     try:
@@ -885,7 +871,6 @@ async def cleanup_backups(
         description="Retention period in days (uses config default if not specified)"
     ),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Manually trigger cleanup of old backups.
@@ -901,7 +886,7 @@ async def cleanup_backups(
 
     Examples:
         >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/backups/cleanup?retention_days=30")
+        >>> response = requests.post("/api/backups/cleanup?retention_days=30")
         >>> result = response.json()
     """
     try:

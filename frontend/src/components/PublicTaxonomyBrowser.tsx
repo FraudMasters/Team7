@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -23,8 +24,11 @@ import {
   Select,
   SelectChangeEvent,
   MenuItem,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+import {
+  Download as DownloadIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
 
 /**
  * Public taxonomy response from backend
@@ -79,7 +83,7 @@ interface PublicTaxonomyBrowserProps {
  */
 const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
   organizationId = 'default',
-  apiUrl = 'http://localhost:8000/api/taxonomy-sharing',
+  apiUrl = `${config.api.url}/api/taxonomy-sharing`,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -233,7 +237,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchTaxonomies} startIcon={<Icon name="refresh-cw" />}>
+          <Button color="inherit" onClick={fetchTaxonomies} startIcon={<RefreshIcon />}>
             Try Again
           </Button>
         }
@@ -252,7 +256,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
           <Typography variant="h5" fontWeight={600}>
             Browse Public Taxonomies
           </Typography>
-          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchTaxonomies} size="small">
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchTaxonomies} size="small">
             Refresh
           </Button>
         </Box>
@@ -312,7 +316,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
                       variant="outlined"
                       size="small"
                       startIcon={
-                        forking === taxonomy.id ? <CircularProgress size={14} /> : <Icon name="download" />
+                        forking === taxonomy.id ? <CircularProgress size={14} /> : <DownloadIcon />
                       }
                       onClick={() => handleForkClick(taxonomy)}
                       disabled={forking !== null}
@@ -403,7 +407,7 @@ const PublicTaxonomyBrowser: React.FC<PublicTaxonomyBrowserProps> = ({
             onClick={handleForkConfirm}
             variant="contained"
             disabled={forking !== null}
-            startIcon={forking ? <CircularProgress size={16} /> : <Icon name="download" />}
+            startIcon={forking ? <CircularProgress size={16} /> : <DownloadIcon />}
           >
             {forking ? 'Forking...' : 'Fork'}
           </Button>

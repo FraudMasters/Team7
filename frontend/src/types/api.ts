@@ -172,6 +172,88 @@ export interface HealthResponse {
 }
 
 /**
+ * Component health status
+ */
+export interface ComponentHealthStatus {
+  name: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  essential: boolean;
+  category: string;
+  response_time_ms?: number;
+  details?: Record<string, unknown>;
+  error?: string | null;
+  last_check: string;
+}
+
+/**
+ * Detailed health check response
+ */
+export interface DetailedHealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  service: string;
+  version: string;
+  checks: Record<string, ComponentHealthStatus>;
+  overall_health_percentage: number;
+  critical_issues: string[];
+  warnings: string[];
+}
+
+/**
+ * Ready check response
+ */
+export interface ReadyCheckResponse {
+  status: string;
+  checks: Record<string, string>;
+}
+
+/**
+ * Service dependency information
+ */
+export interface ServiceDependencyInfo {
+  name: string;
+  display_name: string;
+  description: string;
+  essential: boolean;
+  category: string;
+  dependencies: string[];
+  dependents: string[];
+}
+
+/**
+ * Dependency graph summary
+ */
+export interface DependencyGraphSummary {
+  total_services: number;
+  essential_services: number;
+  non_essential_services: number;
+  max_dependency_depth: number;
+  critical_path: string[];
+}
+
+/**
+ * Dependency graph response
+ */
+export interface DependencyGraphResponse {
+  services: Record<string, ServiceDependencyInfo>;
+  summary: DependencyGraphSummary;
+}
+
+/**
+ * Component health check response
+ */
+export interface ComponentHealthCheckResponse {
+  name: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  essential: boolean;
+  category: string;
+  response_time_ms: number;
+  details: Record<string, unknown>;
+  error: string | null;
+  last_check: string;
+}
+
+/**
  * Upload progress callback
  */
 export type UploadProgressCallback = (progress: number) => void;
@@ -1851,135 +1933,5 @@ export interface SearchHistoryResponse {
   history: SearchHistoryItem[];
   skip: number;
   limit: number;
-}
-
-// ==================== Semantic Search Types ====================
-
-/**
- * Semantic search filter configuration
- */
-export interface SemanticSearchFilters {
-  skills?: string[];
-  min_experience_years?: number;
-  max_experience_years?: number;
-  location?: string;
-  education_level?: string;
-}
-
-/**
- * Semantic search request
- */
-export interface SemanticSearchRequest {
-  query: string;
-  vacancy_id?: string | null;
-  min_semantic_score?: number;
-  semantic_weight?: number;
-  keyword_weight?: number;
-  use_hybrid?: boolean;
-  language?: string | null;
-  filters?: SemanticSearchFilters | null;
-  skip?: number;
-  limit?: number;
-}
-
-/**
- * Match explanation for a candidate
- */
-export interface SemanticMatchExplanation {
-  semantic_score: number;
-  skill_match_score: number;
-  experience_relevance_score: number;
-  context_fit_score: number;
-  matched_skills: string[];
-  inferred_skills: string[];
-  transferable_skills: string[];
-  explanation: string;
-}
-
-/**
- * Single candidate semantic search result
- */
-export interface SemanticCandidateResult {
-  id: string;
-  filename: string;
-  status: string;
-  created_at: string;
-  semantic_score: number;
-  keyword_score: number;
-  final_score: number;
-  skills: string[];
-  experience_years: number | null;
-  language: string | null;
-  match_explanation?: SemanticMatchExplanation | null;
-}
-
-/**
- * Semantic search response
- */
-export interface SemanticSearchResponse {
-  total: number;
-  candidates: Array<Record<string, unknown>>;
-  query: string;
-  execution_time_seconds: number;
-  semantic_scores_used: boolean;
-  fallback_used: boolean;
-  filters_applied: Record<string, unknown>;
-  skip: number;
-  limit: number;
-}
-
-/**
- * Hybrid search request
- */
-export interface HybridSearchRequest {
-  query: string;
-  semantic_weight: number;
-  keyword_weight: number;
-  filters?: Record<string, unknown> | null;
-  skip?: number;
-  limit?: number;
-}
-
-/**
- * Hybrid search response
- */
-export interface HybridSearchResponse {
-  total: number;
-  candidates: Array<Record<string, unknown>>;
-  query: string;
-  execution_time_seconds: number;
-  semantic_scores_used: boolean;
-  fallback_used: boolean;
-  semantic_weight: number;
-  keyword_weight: number;
-  filters_applied: Record<string, unknown>;
-  skip: number;
-  limit: number;
-}
-
-/**
- * Match explanation request
- */
-export interface MatchExplanationRequest {
-  query: string;
-  resume_id: string;
-  vacancy_id?: string | null;
-}
-
-/**
- * Match explanation response
- */
-export interface MatchExplanationResponse {
-  resume_id: string;
-  semantic_score: number;
-  skill_match_score: number;
-  experience_relevance_score: number;
-  context_fit_score: number;
-  matched_skills: string[];
-  inferred_skills: string[];
-  transferable_skills: string[];
-  missing_skills: string[];
-  explanation: string;
-  used_embeddings: boolean;
 }
 

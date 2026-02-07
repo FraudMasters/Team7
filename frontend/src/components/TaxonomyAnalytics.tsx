@@ -13,8 +13,14 @@ import {
   Grid,
   Chip,
   LinearProgress,
-} from '@/components/ui';
-import Icon from '@/components/ui/primitives/Icon';
+} from '@mui/material';
+import { config } from '@/config';
+import {
+  Refresh as RefreshIcon,
+  TrendingUp as TrendingUpIcon,
+  Business as BusinessIcon,
+  CheckCircle as CheckIcon,
+} from '@mui/icons-material';
 
 /**
  * Taxonomy usage statistics interface from backend
@@ -72,7 +78,7 @@ interface TaxonomyAnalyticsProps {
  * ```
  */
 const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
-  apiUrl = 'http://localhost:8000/api/analytics/taxonomy-usage',
+  apiUrl = `${config.api.url}/api/analytics/taxonomy-usage`,
   industry,
   limit = 10,
 }) => {
@@ -133,10 +139,10 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="secondary">
+        <Typography variant="h6" color="text.secondary">
           Loading taxonomy analytics...
         </Typography>
-        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           This may take a few moments
         </Typography>
       </Box>
@@ -151,7 +157,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchTaxonomyAnalytics} startIcon={<Icon name="refresh-cw" />}>
+          <Button color="inherit" onClick={fetchTaxonomyAnalytics} startIcon={<RefreshIcon />}>
             Retry
           </Button>
         }
@@ -186,18 +192,18 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Icon name="building" fontSize="large" color="primary" />
+            <BusinessIcon fontSize="large" color="primary" />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 Taxonomy Usage Analytics
               </Typography>
-              <Typography variant="body2" color="secondary">
+              <Typography variant="body2" color="text.secondary">
                 Industry-specific skill taxonomy performance metrics
                 {taxonomyData.industry_filter && ` - Filtered by: ${taxonomyData.industry_filter}`}
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchTaxonomyAnalytics} size="small">
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchTaxonomyAnalytics} size="small">
             Refresh
           </Button>
         </Box>
@@ -207,10 +213,10 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="primary" fontWeight={700}>
+                <Typography variant="h4" color="primary.main" fontWeight={700}>
                   {taxonomyData.total_taxonomies_analyzed}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Total Taxonomies
                 </Typography>
               </CardContent>
@@ -219,10 +225,10 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="success" fontWeight={700}>
+                <Typography variant="h4" color="success.main" fontWeight={700}>
                   {totalUsage.toLocaleString()}
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Total Usage
                 </Typography>
               </CardContent>
@@ -234,7 +240,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                 <Typography variant="h4" fontWeight={700}>
                   {avgMatchScore.toFixed(1)}%
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Avg Match Score
                 </Typography>
               </CardContent>
@@ -243,10 +249,10 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
           <Grid item xs={6} sm={3}>
             <Card variant="outlined">
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h4" color="info" fontWeight={700}>
+                <Typography variant="h4" color="info.main" fontWeight={700}>
                   {(avgSuccessRate * 100).toFixed(1)}%
                 </Typography>
-                <Typography variant="caption" color="secondary">
+                <Typography variant="caption" color="text.secondary">
                   Avg Success Rate
                 </Typography>
               </CardContent>
@@ -260,7 +266,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
         <Typography variant="h6" gutterBottom fontWeight={600}>
           Most Used Taxonomies
         </Typography>
-        <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Taxonomies ranked by frequency of usage in job postings
         </Typography>
 
@@ -289,8 +295,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                         sx={{
                           fontWeight: 700,
                           minWidth: 45,
-                          ...(index < 3 && { bgcolor: 'primary' }),
-                          ...(index >= 3 && { bgcolor: '#e0e0e0' }),
+                          bgcolor: index < 3 ? 'primary.main' : 'action.disabledBackground',
                         }}
                       />
                       <Box>
@@ -298,7 +303,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                           {taxonomy.taxonomy_name}
                         </Typography>
                         {taxonomy.industry && (
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             {taxonomy.industry}
                           </Typography>
                         )}
@@ -311,7 +316,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Box sx={{ flexGrow: 1 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             Usage
                           </Typography>
                           <Typography variant="body2" fontWeight={600}>
@@ -321,10 +326,13 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                         <LinearProgress
                           variant="determinate"
                           value={(taxonomy.usage_count / totalUsage) * 100}
-                          color={index < 3 ? 'success' : 'primary'}
-                          height={8}
                           sx={{
+                            height: 8,
                             borderRadius: 1,
+                            bgcolor: 'action.hover',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: index < 3 ? 'success.main' : 'success.light',
+                            },
                           }}
                         />
                       </Box>
@@ -341,8 +349,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                         gap: 0.5,
                       }}
                     >
-                      <Icon
-                        name="check-circle"
+                      <CheckIcon
                         fontSize="small"
                         color={taxonomy.success_rate >= 0.8 ? 'success' : taxonomy.success_rate >= 0.6 ? 'warning' : 'error'}
                       />
@@ -355,7 +362,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                       >
                         {(taxonomy.success_rate * 100).toFixed(1)}%
                       </Typography>
-                      <Typography variant="caption" color="secondary">
+                      <Typography variant="caption" color="text.secondary">
                         success
                       </Typography>
                     </Box>
@@ -372,7 +379,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
         <Typography variant="h6" gutterBottom fontWeight={600}>
           Most Effective Taxonomies
         </Typography>
-        <Typography variant="body2" color="secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Taxonomies ranked by average match score and success rate
         </Typography>
 
@@ -401,8 +408,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                         sx={{
                           fontWeight: 700,
                           minWidth: 45,
-                          ...(index < 3 && { bgcolor: 'success' }),
-                          ...(index >= 3 && { bgcolor: '#e0e0e0' }),
+                          bgcolor: index < 3 ? 'success.main' : 'action.disabledBackground',
                         }}
                       />
                       <Box>
@@ -410,7 +416,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                           {taxonomy.taxonomy_name}
                         </Typography>
                         {taxonomy.industry && (
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             {taxonomy.industry}
                           </Typography>
                         )}
@@ -423,7 +429,7 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Box sx={{ flexGrow: 1 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             Match Score
                           </Typography>
                           <Typography variant="body2" fontWeight={600}>
@@ -433,10 +439,13 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                         <LinearProgress
                           variant="determinate"
                           value={taxonomy.avg_match_score}
-                          color="primary"
-                          height={8}
                           sx={{
+                            height: 8,
                             borderRadius: 1,
+                            bgcolor: 'action.hover',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: index < 3 ? 'primary.main' : 'primary.light',
+                            },
                           }}
                         />
                       </Box>
@@ -453,11 +462,11 @@ const TaxonomyAnalytics: React.FC<TaxonomyAnalyticsProps> = ({
                         gap: 0.5,
                       }}
                     >
-                      <Icon name="trending-up" fontSize="small" color="primary" />
-                      <Typography variant="body2" fontWeight={600} color="primary">
+                      <TrendingUpIcon fontSize="small" color="primary" />
+                      <Typography variant="body2" fontWeight={600} color="primary.main">
                         {taxonomy.total_candidates_matched.toLocaleString()}
                       </Typography>
-                      <Typography variant="caption" color="secondary">
+                      <Typography variant="caption" color="text.secondary">
                         candidates
                       </Typography>
                     </Box>

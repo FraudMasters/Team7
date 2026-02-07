@@ -1,29 +1,30 @@
 /**
  * Candidate Activities API Client
  *
- * Этот модуль предоставляет клиент для получения истории активности кандидата,
- * включая изменения этапов, добавление/изменение заметок, модификацию тегов
- * и другие значимые события кандидата в течение процесса найма.
+ * This module provides a client for retrieving candidate activity history,
+ * including stage changes, notes additions/changes, tag modifications,
+ * and other significant candidate events throughout the hiring process.
  *
  * @example
  * ```ts
  * import { candidateActivitiesClient } from '@/api/candidateActivities';
  *
- * // Получение всех активностей для кандидата
+ * // List all activities for a candidate
  * const activities = await candidateActivitiesClient.listActivities('resume-123');
  *
- * // Фильтрация активностей по типу
+ * // Filter activities by type
  * const stageChanges = await candidateActivitiesClient.filterByType(
  *   'resume-123',
  *   'stage_changed'
  * );
  *
- * // Получение доступных типов активностей
+ * // Get available activity types
  * const types = await candidateActivitiesClient.getActivityTypes();
  * ```
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { config } from '@/config';
 import type {
   ActivityItem,
   ActivityTimelineResponse,
@@ -32,36 +33,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Конфигурация по умолчанию для клиента активностей кандидата
+ * Default API configuration for candidate activities client
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 секунд
+  baseURL: config.api.url,
+  timeout: 10000, // 10 seconds
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Класс клиента API для работы с активностями кандидата
+ * Candidate Activities API Client class
  *
- * Предоставляет методы для получения истории активности кандидата с proper
- * обработкой ошибок и типобезопасностью.
+ * Provides methods for retrieving candidate activity history with proper
+ * error handling and type safety.
  */
 export class CandidateActivitiesClient {
   private client: AxiosInstance;
 
   /**
-   * Создание нового экземпляра клиента активностей кандидата
+   * Create a new CandidateActivities client instance
    *
-   * @param config - Опциональные переопределения конфигурации
+   * @param config - Optional configuration overrides
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Интерцептор ответов для обработки ошибок
+    // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -69,73 +70,73 @@ export class CandidateActivitiesClient {
   }
 
   /**
-   * Преобразование ошибки Axios в стандартизированную ошибку API
+   * Transform Axios error to standardized API error
    *
-   * @param error - Ошибка Axios
-   * @returns Преобразованная ошибка API
+   * @param error - Axios error
+   * @returns Transformed API error
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Ошибка сети (нет ответа)
+    // Network error (no response)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
+          detail: 'Request timeout. Please check your connection and try again.',
           status: 408,
         };
       }
       return {
-        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
+        detail: 'Network error. Please check your connection and try again.',
         status: 0,
       };
     }
 
-    // Сервер вернул ошибку
+    // Server returned error response
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Используем сообщение об ошибке от сервера, если доступно
+    // Use server's error message if available
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Сообщения об ошибках по умолчанию для разных кодов статуса
+    // Default error messages by status code
     const defaultMessages: Record<number, string> = {
-      400: 'Неверный запрос. Проверьте введенные данные.',
-      401: 'Не авторизован. Войдите в систему.',
-      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
-      404: 'Ресурс не найден.',
-      422: 'Ошибка валидации. Проверьте введенные данные.',
-      429: 'Слишком много запросов. Попробуйте позже.',
-      500: 'Ошибка сервера. Попробуйте позже.',
-      502: 'Ошибка шлюза. Попробуйте позже.',
-      503: 'Сервис недоступен. Попробуйте позже.',
+      400: 'Invalid request. Please check your input.',
+      401: 'Unauthorized. Please log in.',
+      403: 'Forbidden. You do not have permission.',
+      404: 'Resource not found.',
+      422: 'Validation error. Please check your input.',
+      429: 'Too many requests. Please try again later.',
+      500: 'Server error. Please try again later.',
+      502: 'Bad gateway. Please try again later.',
+      503: 'Service unavailable. Please try again later.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
+      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
       status,
     };
   }
 
   /**
-   * Получение списка активностей кандидата с опциональными фильтрами
+   * List candidate activities with optional filters
    *
-   * @param resumeId - ID резюме (кандидата)
-   * @param activityType - Опциональный фильтр по типу активности
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param limit - Максимальное количество активностей для возврата (по умолчанию: 100)
-   * @param offset - Количество активностей для пропуска при пагинации (по умолчанию: 0)
-   * @returns Список активностей в хронологическом порядке
-   * @throws ApiError если получение списка не удалось
+   * @param resumeId - Resume (candidate) ID
+   * @param activityType - Optional activity type filter
+   * @param vacancyId - Optional vacancy ID filter
+   * @param limit - Maximum number of activities to return (default: 100)
+   * @param offset - Number of activities to skip for pagination (default: 0)
+   * @returns List of activities in chronological order
+   * @throws ApiError if listing fails
    *
    * @example
    * ```ts
-   * // Получение всех активностей для кандидата
+   * // Get all activities for a candidate
    * const activities = await candidateActivitiesClient.listActivities('resume-123');
    *
-   * // Получение активностей с пагинацией
+   * // Get activities with pagination
    * const page1 = await candidateActivitiesClient.listActivities(
    *   'resume-123',
    *   undefined,
@@ -144,7 +145,7 @@ export class CandidateActivitiesClient {
    *   0
    * );
    *
-   * // Фильтрация по вакансии
+   * // Filter by vacancy
    * const vacancyActivities = await candidateActivitiesClient.listActivities(
    *   'resume-123',
    *   undefined,
@@ -179,33 +180,33 @@ export class CandidateActivitiesClient {
   }
 
   /**
-   * Фильтрация активностей кандидата по типу
+   * Filter candidate activities by type
    *
-   * Это удобный метод-обертка для listActivities с фильтром по типу активности.
+   * This is a convenience method that wraps listActivities with an activity type filter.
    *
-   * @param resumeId - ID резюме (кандидата)
-   * @param activityType - Тип активности для фильтрации (например, 'stage_changed', 'note_added')
-   * @param vacancyId - Опциональный фильтр по ID вакансии
-   * @param limit - Максимальное количество активностей для возврата (по умолчанию: 100)
-   * @param offset - Количество активностей для пропуска при пагинации (по умолчанию: 0)
-   * @returns Отфильтрованный список активностей
-   * @throws ApiError если фильтрация не удалась
+   * @param resumeId - Resume (candidate) ID
+   * @param activityType - Activity type to filter by (e.g., 'stage_changed', 'note_added')
+   * @param vacancyId - Optional vacancy ID filter
+   * @param limit - Maximum number of activities to return (default: 100)
+   * @param offset - Number of activities to skip for pagination (default: 0)
+   * @returns Filtered list of activities
+   * @throws ApiError if filtering fails
    *
    * @example
    * ```ts
-   * // Получение только изменений этапов
+   * // Get only stage changes
    * const stageChanges = await candidateActivitiesClient.filterByType(
    *   'resume-123',
    *   'stage_changed'
    * );
    *
-   * // Получение только добавленных заметок
+   * // Get only note additions
    * const notes = await candidateActivitiesClient.filterByType(
    *   'resume-123',
    *   'note_added'
    * );
    *
-   * // Получение добавленных тегов для конкретной вакансии
+   * // Get tag additions for a specific vacancy
    * const tags = await candidateActivitiesClient.filterByType(
    *   'resume-123',
    *   'tag_added',
@@ -240,10 +241,10 @@ export class CandidateActivitiesClient {
   }
 
   /**
-   * Получение доступных типов активностей
+   * Get available activity types
    *
-   * @returns Список доступных типов активностей, которые можно использовать для фильтрации
-   * @throws ApiError если получение не удалось
+   * @returns List of available activity types that can be used for filtering
+   * @throws ApiError if retrieval fails
    *
    * @example
    * ```ts
@@ -277,11 +278,11 @@ export class CandidateActivitiesClient {
   }
 
   /**
-   * Получение базового экземпляра Axios
+   * Get the underlying Axios instance
    *
-   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
+   * This is useful for making custom requests not covered by the convenience methods.
    *
-   * @returns Экземпляр Axios
+   * @returns Axios instance
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -289,13 +290,13 @@ export class CandidateActivitiesClient {
 }
 
 /**
- * Экземпляр клиента активностей кандидата по умолчанию
+ * Default candidate activities client instance
  *
- * Используйте этот singleton-экземпляр для всех операций с активностями кандидата.
+ * Use this singleton instance for all candidate activities calls.
  */
 export const candidateActivitiesClient = new CandidateActivitiesClient();
 
 /**
- * Экспорт класса активностей кандидата для создания кастомных экземпляров
+ * Export candidate activities client class for custom instances
  */
 export default CandidateActivitiesClient;

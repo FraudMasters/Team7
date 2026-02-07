@@ -161,7 +161,7 @@ async def create_matching_weights_profile(request: MatchingWeightsProfileCreate)
         ...     "is_default": False,
         ...     "created_by": "user456"
         ... }
-        >>> response = requests.post("http://localhost:8000/api/matching-weights/", json=data)
+        >>> response = requests.post("/api/matching-weights/", json=data)
         >>> response.json()
     """
     try:
@@ -246,7 +246,7 @@ async def list_matching_weights_profiles(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/matching-weights/?organization_id=org123")
+        >>> response = requests.get("/api/matching-weights/?organization_id=org123")
         >>> response.json()
     """
     try:
@@ -292,7 +292,7 @@ async def get_matching_weights_profile(profile_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/matching-weights/abc-123-def")
+        >>> response = requests.get("/api/matching-weights/abc-123-def")
         >>> response.json()
     """
     try:
@@ -348,7 +348,7 @@ async def update_matching_weights_profile(
     Examples:
         >>> import requests
         >>> data = {"keyword_weight": 0.7, "tfidf_weight": 0.2, "vector_weight": 0.1}
-        >>> response = requests.put("http://localhost:8000/api/matching-weights/abc-123-def", json=data)
+        >>> response = requests.put("/api/matching-weights/abc-123-def", json=data)
         >>> response.json()
     """
     try:
@@ -433,7 +433,7 @@ async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/matching-weights/abc-123-def")
+        >>> response = requests.delete("/api/matching-weights/abc-123-def")
         >>> response.json()
     """
     try:
@@ -488,7 +488,7 @@ async def rematch_candidates_with_profile(
     Examples:
         >>> import requests
         >>> data = {"vacancy_id": "vacancy-uuid"}
-        >>> response = requests.post("http://localhost:8000/api/matching-weights/profile-123/rematch", json=data)
+        >>> response = requests.post("/api/matching-weights/profile-123/rematch", json=data)
         >>> response.json()
     """
     try:
@@ -567,7 +567,7 @@ async def compare_weight_profiles(request: CompareWeightsRequest) -> JSONRespons
         ...     "profile_b_id": "profile-b-uuid",
         ...     "vacancy_id": "vacancy-uuid"
         ... }
-        >>> response = requests.post("http://localhost:8000/api/matching-weights/compare", json=data)
+        >>> response = requests.post("/api/matching-weights/compare", json=data)
         >>> comparison = response.json()
         >>> print(comparison['vacancy_id'])
         'vacancy-uuid'

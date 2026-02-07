@@ -2,8 +2,11 @@
 
 Comprehensive guide to all environment variables used in AgentHR for configuration, deployment, and operation.
 
+> **New Configuration System**: AgentHR now uses a centralized configuration management system with environment-specific YAML files, hot-reload support, and validation. For the complete configuration guide, see [**Configuration Management**](configuration.md) and [**Configuration Reference**](configuration/reference.md).
+
 ## Table of Contents
 
+- [Quick Start with New Config System](#quick-start-with-new-config-system)
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [Variable Interdependencies](#variable-interdependencies)
@@ -25,6 +28,51 @@ Comprehensive guide to all environment variables used in AgentHR for configurati
 - [Quick Reference Tables](#quick-reference-tables)
 - [Environment-Specific Examples](#environment-specific-examples)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Quick Start with New Config System
+
+### 1. Set Environment
+
+```bash
+export ENVIRONMENT=dev  # or 'staging' or 'production'
+```
+
+### 2. Configuration Loading Priority
+
+Settings are loaded in this priority order (highest to lowest):
+
+1. **Environment variables** (`.env` files) - Highest priority
+2. **YAML config files** (`backend/config/config.{env}.yml`)
+3. **Default values** in code
+
+### 3. Environment-Specific Config Files
+
+| Environment | Config File | Key Characteristics |
+|-------------|-------------|---------------------|
+| Development | `config.dev.yml` | DEBUG logging, 20MB uploads, backups disabled |
+| Staging | `config.staging.yml` | INFO logging, 10MB uploads, 7-day retention |
+| Production | `config.production.yml` | WARNING logging, 10MB uploads, 30-day retention |
+
+### 4. Override with Environment Variables
+
+Any setting can be overridden via environment variables:
+
+```bash
+# Override log level
+export LOG_LEVEL=DEBUG
+
+# Override LLM model
+export LLM_MODEL=gpt-4
+
+# Override upload size
+export MAX_UPLOAD_SIZE_MB=50
+```
+
+For complete configuration documentation, see:
+- **[Configuration Management Guide](configuration.md)** - Full configuration system overview
+- **[Configuration Reference](configuration/reference.md)** - All configuration options
 
 ---
 

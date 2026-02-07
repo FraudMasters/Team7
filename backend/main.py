@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
-from services.graphiti_service import get_graphiti_service
+from config.validation import validate_config, ConfigurationError
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -25,46 +25,50 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     Lifespan context manager for application startup and shutdown.
 
-    Handles database connection pool initialization and cleanup.
+    Handles configuration validation, database connection pool
+    initialization and cleanup.
 
     Yields:
         None
+
+    Raises:
+        ConfigurationError: If critical configuration validation fails
 
     Example:
         The lifespan is automatically called by FastAPI on startup/shutdown.
     """
     # Startup
     logger.info("Starting Resume Analysis API")
+    logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database URL: {settings.database_url[:30]}...")
     logger.info(f"CORS origins: {settings.cors_origins}")
     logger.info(f"Max upload size: {settings.max_upload_size_mb}MB")
     logger.info(f"Allowed file types: {settings.allowed_file_types}")
 
+    # Validate configuration
+    logger.info("Validating configuration...")
+    try:
+        warnings = validate_config(settings)
+        if warnings:
+            logger.warning(f"Configuration validation completed with {len(warnings)} warning(s)")
+        else:
+            logger.info("Configuration validation passed")
+    except ConfigurationError as e:
+        logger.error(f"Configuration validation failed: {e}")
+        raise
+
     # Initialize models cache directory
     settings.models_cache_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Models cache directory: {settings.models_cache_path}")
 
-    # Initialize Graphiti service
-    try:
-        graphiti_service = get_graphiti_service()
-        await graphiti_service.initialize()
-        logger.info("Graphiti service initialized successfully")
-    except Exception as e:
-        logger.warning(f"Failed to initialize Graphiti service: {e}")
-        logger.warning("Graph features will be unavailable")
+    # Initialize backup directories
+    settings.backup_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Backup directory: {settings.backup_dir}")
 
     yield
 
     # Shutdown
     logger.info("Shutting down Resume Analysis API")
-
-    # Close Graphiti service
-    try:
-        graphiti_service = get_graphiti_service()
-        await graphiti_service.close()
-        logger.info("Graphiti service closed successfully")
-    except Exception as e:
-        logger.error(f"Error closing Graphiti service: {e}")
 
 
 # Create FastAPI application
@@ -180,7 +184,7 @@ async def health_check() -> JSONResponse:
         JSON response with health status
 
     Example:
-        >>> curl http://localhost:8000/health
+        >>> curl http://API_HOST:PORT/health
         {"status":"healthy","service":"resume-analysis-api","version":"1.0.0"}
     """
     return JSONResponse(
@@ -205,7 +209,7 @@ async def readiness_check() -> JSONResponse:
         JSON response with readiness status
 
     Example:
-        >>> curl http://localhost:8000/ready
+        >>> curl http://API_HOST:PORT/ready
         {"status":"ready"}
     """
     # TODO: Add database connectivity check
@@ -227,7 +231,7 @@ async def root() -> JSONResponse:
         JSON response with API information and links
 
     Example:
-        >>> curl http://localhost:8000/
+        >>> curl http://API_HOST:PORT/
         {
           "message": "Resume Analysis API",
           "version": "1.0.0",
@@ -263,6 +267,7 @@ from api import (
     reports,
     vacancies,
     ranking,
+    candidates,
     industry_classifier,
     skill_suggestions,
     taxonomy_import_export,
@@ -271,7 +276,15 @@ from api import (
     batch,
     work_experience,
     skill_gap_analysis,
-    context,
+    backups,
+    ats_simulation,
+    performance_monitoring,
+    workflow_stages,
+    candidate_tags,
+    candidate_notes,
+    candidate_activities,
+    search,
+    config,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -287,6 +300,7 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
+app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
 app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
 app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
@@ -295,7 +309,15 @@ app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", ta
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
-app.include_router(context.router, prefix="/api/v1/context", tags=["Context"])
+app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
+app.include_router(ats_simulation.router, prefix="/api/ats", tags=["ATS Simulation"])
+app.include_router(performance_monitoring.router, prefix="/api/performance", tags=["Performance Monitoring"])
+app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=["Workflow Stages"])
+app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["Candidate Tags"])
+app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
+app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
+app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 
 
 if __name__ == "__main__":

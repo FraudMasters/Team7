@@ -5,10 +5,8 @@ This module provides endpoints for uploading multiple resume files at once,
 tracking batch processing status, and retrieving batch results.
 """
 import logging
-import zipfile
-from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
@@ -22,7 +20,6 @@ from database import get_db
 from models.batch_job import BatchJob, BatchJobStatus
 from models.resume import Resume, ResumeStatus
 from tasks.analysis_task import batch_analyze_resumes
-from tasks.email_task import send_batch_completion_notification
 from celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -30,211 +27,9 @@ settings = get_settings()
 
 router = APIRouter()
 
-# Directory for storing uploaded resumes
-UPLOAD_DIR = Path("data/uploads")
+# Directory for storing uploaded resumes (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def extract_zip_files(
-    zip_bytes: bytes,
-    *,
-    max_file_size_mb: int = 100,
-    max_files: int = 100,
-    allowed_extensions: Optional[List[str]] = None,
-) -> Dict[str, Optional[Union[List[Dict[str, Union[str, int, bytes]]], str, int]]]:
-    """
-    Extract and validate files from a ZIP archive.
-
-    This function extracts files from a ZIP archive provided as bytes, with validation
-    for file count, size limits, and allowed extensions. It includes security checks
-    to prevent ZIP bomb attacks (path traversal and excessive compression).
-
-    Args:
-        zip_bytes: ZIP file content as bytes
-        max_file_size_mb: Maximum allowed size of the ZIP file in megabytes (default: 100MB)
-        max_files: Maximum number of files to extract from the ZIP (default: 100)
-        allowed_extensions: List of allowed file extensions (e.g., [".pdf", ".docx"])
-                         If None, all extensions are allowed
-
-    Returns:
-        Dictionary containing:
-            - files: List of extracted file dictionaries with keys:
-                - filename: Original filename from ZIP
-                - extension: File extension (lowercase, with dot)
-                - size: File size in bytes
-                - content: File content as bytes
-            - total_files: Total number of files found in ZIP
-            - extracted_count: Number of successfully extracted files
-            - error: Error message if extraction failed (None if successful)
-            - skipped_count: Number of files skipped due to extension filter
-
-    Examples:
-        >>> with open("resumes.zip", "rb") as f:
-        ...     zip_bytes = f.read()
-        >>> result = extract_zip_files(zip_bytes, allowed_extensions=[".pdf", ".docx"])
-        >>> if result["error"]:
-        ...     print(f"Error: {result['error']}")
-        ... else:
-        ...     print(f"Extracted {result['extracted_count']} files")
-
-    Security:
-        - Protects against ZIP bomb attacks by checking for path traversal (..)
-        - Validates uncompressed size to prevent denial of service
-        - Limits number of extracted files to prevent resource exhaustion
-    """
-    # Set default allowed extensions if not provided
-    if allowed_extensions is None:
-        allowed_extensions = [".pdf", ".docx", ".doc"]
-
-    # Validate input
-    if not zip_bytes:
-        logger.error("Empty ZIP bytes provided")
-        return {
-            "files": None,
-            "total_files": 0,
-            "extracted_count": 0,
-            "skipped_count": 0,
-            "error": "Empty ZIP bytes provided",
-        }
-
-    # Check ZIP file size
-    zip_size_mb = len(zip_bytes) / (1024 * 1024)
-    if zip_size_mb > max_file_size_mb:
-        logger.error(f"ZIP file too large: {zip_size_mb:.2f}MB (max: {max_file_size_mb}MB)")
-        return {
-            "files": None,
-            "total_files": 0,
-            "extracted_count": 0,
-            "skipped_count": 0,
-            "error": f"ZIP file too large: {zip_size_mb:.2f}MB (max: {max_file_size_mb}MB)",
-        }
-
-    try:
-        # Open ZIP file from bytes
-        zip_file = BytesIO(zip_bytes)
-
-        with zipfile.ZipFile(zip_file, mode='r') as zip_ref:
-            # Validate ZIP structure
-            file_list = zip_ref.namelist()
-            total_files = len([f for f in file_list if not f.endswith('/')])
-
-            if total_files == 0:
-                logger.error("ZIP file contains no files")
-                return {
-                    "files": None,
-                    "total_files": 0,
-                    "extracted_count": 0,
-                    "skipped_count": 0,
-                    "error": "ZIP file contains no files",
-                }
-
-            if total_files > max_files:
-                logger.error(f"ZIP contains too many files: {total_files} (max: {max_files})")
-                return {
-                    "files": None,
-                    "total_files": total_files,
-                    "extracted_count": 0,
-                    "skipped_count": 0,
-                    "error": f"ZIP contains too many files: {total_files} (max: {max_files})",
-                }
-
-            logger.info(f"Extracting files from ZIP: {total_files} files found, {zip_size_mb:.2f}MB")
-
-            extracted_files = []
-            skipped_count = 0
-
-            for file_path in file_list:
-                # Skip directories
-                if file_path.endswith('/'):
-                    continue
-
-                # Security check: Prevent path traversal attacks
-                if '..' in file_path or file_path.startswith('/'):
-                    logger.warning(f"Skipping potentially malicious file: {file_path}")
-                    skipped_count += 1
-                    continue
-
-                # Get filename without path
-                filename = Path(file_path).name
-
-                # Skip if no filename (e.g., just a directory entry)
-                if not filename:
-                    continue
-
-                # Check file extension
-                file_extension = Path(file_path).suffix.lower()
-                if allowed_extensions and file_extension not in allowed_extensions:
-                    logger.debug(f"Skipping file with disallowed extension: {file_path} ({file_extension})")
-                    skipped_count += 1
-                    continue
-
-                try:
-                    # Get file info
-                    info = zip_ref.getinfo(file_path)
-
-                    # Security check: Validate uncompressed size to prevent ZIP bomb
-                    uncompressed_size = info.file_size
-                    if uncompressed_size > max_file_size_mb * 1024 * 1024:
-                        logger.warning(f"Skipping file too large after extraction: {file_path} ({uncompressed_size / 1024 / 1024:.2f}MB)")
-                        skipped_count += 1
-                        continue
-
-                    # Extract file content
-                    with zip_ref.open(file_path) as extracted_file:
-                        file_content = extracted_file.read()
-
-                    extracted_files.append({
-                        "filename": filename,
-                        "extension": file_extension,
-                        "size": uncompressed_size,
-                        "content": file_content,
-                    })
-
-                    logger.debug(f"Extracted: {filename} ({uncompressed_size} bytes)")
-
-                except (zipfile.BadZipFile, KeyError) as e:
-                    logger.warning(f"Failed to extract file {file_path}: {e}")
-                    skipped_count += 1
-                    continue
-
-            if not extracted_files:
-                logger.error("No valid files extracted from ZIP")
-                return {
-                    "files": None,
-                    "total_files": total_files,
-                    "extracted_count": 0,
-                    "skipped_count": skipped_count,
-                    "error": "No valid files extracted from ZIP (all files may have disallowed extensions or failed extraction)",
-                }
-
-            logger.info(f"Successfully extracted {len(extracted_files)} files from ZIP (skipped: {skipped_count})")
-
-            return {
-                "files": extracted_files,
-                "total_files": total_files,
-                "extracted_count": len(extracted_files),
-                "skipped_count": skipped_count,
-                "error": None,
-            }
-
-    except zipfile.BadZipFile as e:
-        logger.error(f"Invalid ZIP file: {e}")
-        return {
-            "files": None,
-            "total_files": 0,
-            "extracted_count": 0,
-            "skipped_count": 0,
-            "error": f"Invalid ZIP file: {str(e)}",
-        }
-    except Exception as e:
-        logger.error(f"Failed to extract ZIP files: {e}")
-        return {
-            "files": None,
-            "total_files": 0,
-            "extracted_count": 0,
-            "skipped_count": 0,
-            "error": f"ZIP extraction failed: {str(e)}",
-        }
 
 
 def _extract_locale(request: Optional[Request]) -> str:
@@ -266,32 +61,6 @@ def validate_file_size(file_size: int, locale: str = "en") -> None:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File too large: {size_mb:.1f}MB. Maximum allowed: {max_mb}MB",
-        )
-
-
-def validate_zip_file_size(file_size: int, locale: str = "en") -> None:
-    """Validate that the ZIP file size is within allowed limits.
-
-    ZIP files can contain multiple resumes, so they have a higher size limit
-    than individual file uploads.
-
-    Args:
-        file_size: Size of the ZIP file in bytes
-        locale: Locale for error messages (not currently used)
-
-    Raises:
-        HTTPException(413): If ZIP file size exceeds maximum allowed
-    """
-    # ZIP files have a higher limit since they contain multiple files
-    # Default to 100MB which matches the extract_zip_files default
-    max_zip_size_mb = 100
-    max_zip_size = max_zip_size_mb * 1024 * 1024
-
-    if file_size > max_zip_size:
-        size_mb = file_size / 1024 / 1024
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"ZIP file too large: {size_mb:.1f}MB. Maximum allowed: {max_zip_size_mb}MB",
         )
 
 
@@ -362,14 +131,12 @@ async def upload_batch(
     """
     Upload multiple resume files for batch processing.
 
-    This endpoint accepts multiple resume files (PDF, DOCX, or ZIP archives),
-    validates each file, stores them, creates database records, and initiates
-    batch processing. ZIP files are automatically extracted and their contents
-    are processed individually.
+    This endpoint accepts multiple resume files (PDF or DOCX), validates each file,
+    stores them, creates database records, and initiates batch processing.
 
     Args:
         request: FastAPI request object
-        files: List of uploaded resume files or ZIP archives
+        files: List of uploaded resume files
         notification_email: Optional email for completion notification
         analyze: Whether to analyze resumes after upload
         db: Database session
@@ -383,14 +150,6 @@ async def upload_batch(
         HTTPException(500): If file storage or database operation fails
     """
     locale = _extract_locale(request)
-
-    # Validate content type - endpoint expects multipart/form-data
-    content_type = request.headers.get("content-type", "")
-    if not content_type.startswith("multipart/form-data"):
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Content-Type must be multipart/form-data",
-        )
 
     if not files:
         raise HTTPException(
@@ -422,99 +181,39 @@ async def upload_batch(
         # Store files and create resume records
         resume_ids = []
         failed_uploads = []
-        zip_files_processed = 0
 
         for file in files:
             try:
                 # Read file content
                 file_content = await file.read()
                 file_size = len(file_content)
-                file_filename = file.filename or "unknown"
 
-                # Check if file is a ZIP archive
-                file_extension = Path(file_filename).suffix.lower()
-                is_zip_file = file_extension == ".zip"
+                # Validate
+                validate_file_type(file.filename or "unknown", file.content_type or "application/octet-stream", locale)
+                validate_file_size(file_size, locale)
 
-                if is_zip_file:
-                    # Validate ZIP file size before extraction
-                    validate_zip_file_size(file_size, locale)
+                # Generate resume ID and save file
+                resume_id = uuid4()
+                safe_filename = Path(file.filename or "resume").name
+                file_extension = Path(safe_filename).suffix
+                stored_filename = f"{resume_id}{file_extension}"
+                file_path = UPLOAD_DIR / stored_filename
 
-                    # Extract files from ZIP archive
-                    logger.info(f"Detected ZIP file: {file_filename}, extracting...")
+                with open(file_path, "wb") as f:
+                    f.write(file_content)
 
-                    zip_result = extract_zip_files(
-                        file_content,
-                        max_file_size_mb=100,
-                        max_files=100,
-                        allowed_extensions=[".pdf", ".docx", ".doc"],
-                    )
+                # Create resume record
+                resume = Resume(
+                    id=resume_id,
+                    filename=file.filename or "unknown",
+                    file_path=str(file_path),
+                    content_type=file.content_type or "application/octet-stream",
+                    status=ResumeStatus.PENDING,
+                )
+                db.add(resume)
+                resume_ids.append(str(resume_id))
 
-                    if zip_result["error"]:
-                        logger.error(f"Failed to extract ZIP file {file_filename}: {zip_result['error']}")
-                        failed_uploads.append(f"{file_filename} (ZIP extraction failed: {zip_result['error']})")
-                        continue
-
-                    extracted_files = zip_result["files"]
-                    zip_files_processed += 1
-
-                    logger.info(f"Extracted {zip_result['extracted_count']} files from {file_filename} (skipped: {zip_result['skipped_count']})")
-
-                    # Process each extracted file
-                    for extracted_file in extracted_files:
-                        try:
-                            # Generate resume ID and save file
-                            resume_id = uuid4()
-                            ext = extracted_file["extension"]
-                            stored_filename = f"{resume_id}{ext}"
-                            file_path = UPLOAD_DIR / stored_filename
-
-                            with open(file_path, "wb") as f:
-                                f.write(extracted_file["content"])
-
-                            # Create resume record
-                            resume = Resume(
-                                id=resume_id,
-                                filename=extracted_file["filename"],
-                                file_path=str(file_path),
-                                content_type=f"application/{ext[1:]}",  # Remove dot for content type
-                                status=ResumeStatus.PENDING,
-                            )
-                            db.add(resume)
-                            resume_ids.append(str(resume_id))
-
-                            logger.info(f"Stored extracted file: {extracted_file['filename']} -> {resume_id}")
-
-                        except Exception as e:
-                            failed_uploads.append(extracted_file["filename"])
-                            logger.error(f"Failed to store extracted file {extracted_file['filename']}: {e}")
-                else:
-                    # Process regular (non-ZIP) file
-                    # Validate
-                    validate_file_type(file_filename, file.content_type or "application/octet-stream", locale)
-                    validate_file_size(file_size, locale)
-
-                    # Generate resume ID and save file
-                    resume_id = uuid4()
-                    safe_filename = Path(file_filename).name
-                    file_extension = Path(safe_filename).suffix
-                    stored_filename = f"{resume_id}{file_extension}"
-                    file_path = UPLOAD_DIR / stored_filename
-
-                    with open(file_path, "wb") as f:
-                        f.write(file_content)
-
-                    # Create resume record
-                    resume = Resume(
-                        id=resume_id,
-                        filename=file_filename,
-                        file_path=str(file_path),
-                        content_type=file.content_type or "application/octet-stream",
-                        status=ResumeStatus.PENDING,
-                    )
-                    db.add(resume)
-                    resume_ids.append(str(resume_id))
-
-                    logger.info(f"Stored file: {file_filename} -> {resume_id}")
+                logger.info(f"Stored file: {file.filename} -> {resume_id}")
 
             except HTTPException:
                 failed_uploads.append(file.filename)
@@ -567,18 +266,13 @@ async def upload_batch(
             logger.info(f"Batch analysis not requested. analyze={analyze}, resume_ids count={len(resume_ids) if resume_ids else 0}")
             await db.commit()
 
-        # Build success message with ZIP processing info
-        message_parts = [f"Batch upload started with {len(resume_ids)} files"]
-        if zip_files_processed > 0:
-            message_parts.append(f"from {zip_files_processed} ZIP archive{'s' if zip_files_processed > 1 else ''}")
-
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content={
                 "batch_id": str(batch_id),
                 "total_files": len(resume_ids),
                 "status": batch_job.status.value,
-                "message": " ".join(message_parts),
+                "message": f"Batch upload started with {len(resume_ids)} files",
             }
         )
 
@@ -637,9 +331,6 @@ async def get_batch_status(
 
     # Check Celery task status if processing
     if batch.celery_task_id and batch.status == BatchJobStatus.processing:
-        # Store previous status to detect transition
-        previous_status = batch.status
-
         try:
             celery_result = celery_app.AsyncResult(batch.celery_task_id)
             if celery_result.state == "SUCCESS":
@@ -655,46 +346,6 @@ async def get_batch_status(
                 from datetime import datetime, timezone
                 batch.completed_at = datetime.now(timezone.utc)
             await db.commit()
-
-            # Send email notification if status changed and notification email is provided
-            if batch.status != previous_status and batch.notification_email:
-                try:
-                    from datetime import datetime, timezone
-
-                    # Prepare batch results for notification
-                    batch_results = {
-                        "operation_type": "upload",
-                        "status": batch.status.value,
-                        "total_items": batch.total_files,
-                        "successful_count": batch.processed_files,
-                        "failed_count": batch.failed_files,
-                        "started_at": batch.created_at.isoformat() if batch.created_at else None,
-                        "completed_at": batch.completed_at.isoformat() if batch.completed_at else None,
-                        "errors": [batch.error_message] if batch.error_message else [],
-                        "metadata": {
-                            "batch_id": str(batch.id),
-                            "celery_task_id": batch.celery_task_id,
-                        }
-                    }
-
-                    # Trigger email notification asynchronously
-                    send_batch_completion_notification.delay(
-                        batch_id=str(batch.id),
-                        recipient_email=batch.notification_email,
-                        batch_results=batch_results
-                    )
-
-                    logger.info(
-                        f"Batch completion notification dispatched for batch {batch.id} "
-                        f"to {batch.notification_email}"
-                    )
-                except Exception as email_error:
-                    # Don't fail the request if email sending fails
-                    logger.error(
-                        f"Failed to dispatch batch completion notification for batch {batch.id}: {email_error}",
-                        exc_info=True
-                    )
-
         except Exception as e:
             logger.warning(f"Failed to check Celery task status: {e}")
 

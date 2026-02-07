@@ -4,6 +4,7 @@
  * Provides methods for interacting with the backup and restore endpoints.
  */
 import axios, { AxiosInstance } from 'axios';
+import { config } from '@/config';
 import type {
   Backup,
   BackupCreate,
@@ -19,7 +20,7 @@ class BackupApiService {
 
   constructor() {
     this.client = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8888',
+      baseURL: config.api.url,
       timeout: 300000, // 5 minutes for backup operations
       headers: {
         'Content-Type': 'application/json',

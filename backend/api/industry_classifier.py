@@ -282,7 +282,7 @@ async def classify_industry(request: ClassifyRequest) -> JSONResponse:
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/industry-classifier/classify",
+        ...     "/api/industry-classifier/classify",
         ...     json={
         ...         "title": "Senior Registered Nurse",
         ...         "description": "Looking for an experienced RN with ICU experience..."
@@ -338,7 +338,7 @@ async def list_industries() -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/industry-classifier/industries")
+        >>> response = requests.get("/api/industry-classifier/industries")
         >>> response.json()
         {
             "industries": [

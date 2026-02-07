@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -22,8 +23,11 @@ import {
   FormControlLabel,
   Button,
   Tooltip,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+import {
+  CheckCircle as CheckCircleIcon,
+  Info as InfoIcon,
+} from '@mui/icons-material';
 
 /**
  * Weight profile entry interface
@@ -128,7 +132,7 @@ const WeightProfileSelector: React.FC<WeightProfileSelectorProps> = ({
   organizationId,
   selectedProfileId,
   onProfileSelect,
-  apiUrl = 'http://localhost:8000/api/matching-weights',
+  apiUrl = `${config.api.url}/api/matching-weights`,
   presetsOnly = false,
   customOnly = false,
   allowClear = false,

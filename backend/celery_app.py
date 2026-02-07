@@ -17,8 +17,6 @@ from tasks import (
     batch_analyze_resumes,
     generate_scheduled_reports,
     process_all_pending_reports,
-    automated_retraining_task,
-    manual_retraining_task,
 )
 
 # Import model preloading to register the worker_ready signal handler
@@ -28,6 +26,14 @@ import tasks.model_preloading  # noqa: F401
 # Import cache warming to register periodic cache warming tasks
 # This ensures cache warming tasks are available for Celery beat
 import tasks.cache_warming  # noqa: F401
+
+# Import webhook tasks to register webhook delivery tasks
+# This ensures webhook tasks are available for Celery workers
+import tasks.webhook_tasks  # noqa: F401
+
+# Import workflow tasks to register workflow execution tasks
+# This ensures workflow tasks are available for Celery workers
+import tasks.workflow_tasks  # noqa: F401
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -291,12 +297,25 @@ __all__ = [
     "batch_analyze_resumes",
     "generate_scheduled_reports",
     "process_all_pending_reports",
-    "automated_retraining_task",
-    "manual_retraining_task",
     "preload_ml_models",
     "health_check_with_models",
     "warm_frequently_accessed_data",
     "periodic_cache_warming",
+    "deliver_webhook_task",
+    "trigger_webhook_event_task",
+    "process_webhook_retry_queue_task",
+    "bulk_deliver_webhooks_task",
+    "webhook_health_check_task",
+    "cleanup_old_webhook_logs_task",
+    "update_subscription_stats_task",
+    "redeliver_webhook_event_task",
+    "execute_workflow_task",
+    "trigger_webhook_workflow_task",
+    "execute_scheduled_workflows_task",
+    "batch_execute_workflows_task",
+    "get_workflow_stats_task",
+    "cleanup_old_executions_task",
+    "workflow_health_check_task",
     "get_task_status",
     "revoke_task",
 ]

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -25,8 +26,14 @@ import {
   Select,
   MenuItem,
   Fab,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
+  Close as CloseIcon,
+} from '@mui/icons-material';
 
 /**
  * Individual custom synonym entry interface
@@ -101,7 +108,7 @@ interface CustomSynonymsManagerProps {
  */
 const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
   organizationId,
-  apiUrl = 'http://localhost:8000/api/custom-synonyms',
+  apiUrl = `${config.api.url}/api/custom-synonyms`,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -350,7 +357,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchSynonyms} startIcon={<Icon name="refresh-cw" size={16} />}>
+          <Button color="inherit" onClick={fetchSynonyms} startIcon={<RefreshIcon />}>
             {t('common.tryAgain')}
           </Button>
         }
@@ -372,7 +379,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
           <Typography variant="h5" fontWeight={600}>
             {t('adminSynonyms.title')}
           </Typography>
-          <Button variant="outlined" startIcon={<Icon name="refresh-cw" size={16} />} onClick={fetchSynonyms} size="small">
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSynonyms} size="small">
             {t('adminSynonyms.refreshButton')}
           </Button>
         </Box>
@@ -421,7 +428,7 @@ const CustomSynonymsManager: React.FC<CustomSynonymsManagerProps> = ({
         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
-startIcon={<Icon name="plus" size={16} />}
+            startIcon={<AddIcon />}
             onClick={handleCreate}
             size="large"
           >
@@ -462,14 +469,14 @@ startIcon={<Icon name="plus" size={16} />}
                         onClick={() => handleEdit(synonym)}
                         color="primary"
                       >
-                        <Icon name="edit-2" size="small" />
+                        <EditIcon fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteClick(synonym)}
                         color="error"
                       >
-                        <Icon name="trash-2" size="small" />
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Stack>
                   </Box>
@@ -538,7 +545,7 @@ startIcon={<Icon name="plus" size={16} />}
               disabled={submitting}
               size="small"
             >
-              <Icon name="x" size={16} />
+              <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -634,7 +641,7 @@ startIcon={<Icon name="plus" size={16} />}
             variant="contained"
             color="error"
             disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="trash-2" size={16} />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
           >
             {submitting ? t('adminSynonyms.deleteDialog.deleting') : t('adminSynonyms.deleteDialog.confirm')}
           </Button>

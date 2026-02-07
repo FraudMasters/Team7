@@ -1,21 +1,21 @@
 /**
  * Taxonomies API Client
  *
- * Этот модуль предоставляет клиент для получения и объединения таксономий из
- * нескольких источников: статические навыки, специфичные для индустрии навыки и
- * кастомные синонимы организации.
+ * This module provides a client for fetching and merging taxonomies from
+ * multiple sources: static skills, industry-specific skills, and custom
+ * organization synonyms.
  *
  * @example
  * ```ts
  * import { taxonomiesClient } from '@/api/taxonomies';
  *
- * // Получение всех объединенных таксономий (статические + индустрия + кастомные)
+ * // Get all merged taxonomies (static + industry + custom)
  * const allSkills = await taxonomiesClient.getMergedTaxonomies({
  *   industry: 'healthcare',
  *   organizationId: 'org123',
  * });
  *
- * // Поиск навыков с автозаполнением
+ * // Search skills with autocomplete
  * const matches = await taxonomiesClient.searchSkills('java', {
  *   industry: 'tech',
  *   organizationId: 'org123',
@@ -25,6 +25,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { config } from '@/config';
 import type {
   CustomSynonymListResponse,
   ApiError,
@@ -42,18 +43,18 @@ import {
 } from '@/data/industryTaxonomies';
 
 /**
- * Конфигурация API по умолчанию для клиента таксономий
+ * Default API configuration for taxonomies client
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 секунд
+  baseURL: config.api.url,
+  timeout: 10000, // 10 seconds
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Результат объединенной таксономии
+ * Merged taxonomy result
  */
 export interface MergedTaxonomy {
   static: SkillDefinition[];
@@ -63,7 +64,7 @@ export interface MergedTaxonomy {
 }
 
 /**
- * Опции поиска
+ * Search options
  */
 export interface SearchOptions {
   industry?: string;
@@ -72,28 +73,28 @@ export interface SearchOptions {
 }
 
 /**
- * Класс клиента API таксономий
+ * Taxonomies API Client class
  *
- * Предоставляет методы для получения и объединения таксономий из нескольких источников
- * с proper обработкой ошибок и типобезопасностью.
+ * Provides methods for fetching and merging taxonomies from multiple sources
+ * with proper error handling and type safety.
  */
 export class TaxonomiesClient {
   private client: AxiosInstance;
   private customSynonymsCache: Map<string, SkillDefinition[]> = new Map();
   private cacheExpiry: Map<string, number> = new Map();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 минут
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   /**
-   * Создание нового экземпляра клиента таксономий
+   * Create a new Taxonomies client instance
    *
-   * @param config - Опциональные переопределения конфигурации
+   * @param config - Optional configuration overrides
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Интерцептор ответов для обработки ошибок
+    // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -101,69 +102,69 @@ export class TaxonomiesClient {
   }
 
   /**
-   * Преобразование ошибки Axios в стандартизированную ошибку API
+   * Transform Axios error to standardized API error
    *
-   * @param error - Ошибка Axios
-   * @returns Преобразованная ошибка API
+   * @param error - Axios error
+   * @returns Transformed API error
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Ошибка сети (нет ответа)
+    // Network error (no response)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
+          detail: 'Request timeout. Please check your connection and try again.',
           status: 408,
         };
       }
       return {
-        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
+        detail: 'Network error. Please check your connection and try again.',
         status: 0,
       };
     }
 
-    // Сервер вернул ошибку
+    // Server returned error response
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Используем сообщение об ошибке от сервера, если доступно
+    // Use server's error message if available
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Сообщения об ошибках по умолчанию для разных кодов статуса
+    // Default error messages by status code
     const defaultMessages: Record<number, string> = {
-      400: 'Неверный запрос. Проверьте введенные данные.',
-      401: 'Не авторизован. Войдите в систему.',
-      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
-      404: 'Ресурс не найден.',
-      422: 'Ошибка валидации. Проверьте введенные данные.',
-      429: 'Слишком много запросов. Попробуйте позже.',
-      500: 'Ошибка сервера. Попробуйте позже.',
-      502: 'Ошибка шлюза. Попробуйте позже.',
-      503: 'Сервис недоступен. Попробуйте позже.',
+      400: 'Invalid request. Please check your input.',
+      401: 'Unauthorized. Please log in.',
+      403: 'Forbidden. You do not have permission.',
+      404: 'Resource not found.',
+      422: 'Validation error. Please check your input.',
+      429: 'Too many requests. Please try again later.',
+      500: 'Server error. Please try again later.',
+      502: 'Bad gateway. Please try again later.',
+      503: 'Service unavailable. Please try again later.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
+      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
       status,
     };
   }
 
   /**
-   * Получение кастомных синонимов из backend для организации
+   * Fetch custom synonyms from backend for an organization
    *
-   * @param organizationId - ID организации
-   * @returns Список определений навыков кастомных синонимов
-   * @throws ApiError если получение не удалось
+   * @param organizationId - Organization ID
+   * @returns List of custom synonym skill definitions
+   * @throws ApiError if fetch fails
    */
   async fetchCustomSynonyms(organizationId: string): Promise<SkillDefinition[]> {
     const cacheKey = `custom_${organizationId}`;
     const now = Date.now();
     const cachedExpiry = this.cacheExpiry.get(cacheKey);
 
-    // Возврат кэшированных данных, если они все еще действительны
+    // Return cached data if still valid
     if (cachedExpiry && cachedExpiry > now && this.customSynonymsCache.has(cacheKey)) {
       return this.customSynonymsCache.get(cacheKey)!;
     }
@@ -175,9 +176,9 @@ export class TaxonomiesClient {
       };
 
       const response: AxiosResponse<CustomSynonymListResponse[]> =
-        await this.client.get('/api/custom-correct-synonyms/', { params });
+        await this.client.get('/api/custom-synonyms/', { params });
 
-      // Преобразование в формат SkillDefinition
+      // Transform to SkillDefinition format
       const skillDefs: SkillDefinition[] = response.data.flatMap((item) =>
         item.synonyms.map((synonym) => ({
           id: `custom_${synonym.id}`,
@@ -187,23 +188,23 @@ export class TaxonomiesClient {
         }))
       );
 
-      // Кэширование результатов
+      // Cache the results
       this.customSynonymsCache.set(cacheKey, skillDefs);
       this.cacheExpiry.set(cacheKey, now + this.CACHE_TTL);
 
       return skillDefs;
     } catch (error) {
-      // Возврат пустого массива при ошибке (soft fail)
-      // Это позволяет статическим + индустриальным таксономиям продолжать работать
+      // Return empty array on error (fail gracefully)
+      // This allows static + industry taxonomies to still work
       return [];
     }
   }
 
   /**
-   * Получение всех объединенных таксономий (статические + индустрия + кастомные)
+   * Get all merged taxonomies (static + industry + custom)
    *
-   * @param options - Опции поиска, включая индустрию и ID организации
-   * @returns Объединенная таксономия со всеми источниками
+   * @param options - Search options including industry and organization ID
+   * @returns Merged taxonomy with all sources
    *
    * @example
    * ```ts
@@ -212,19 +213,19 @@ export class TaxonomiesClient {
    *   organizationId: 'org123',
    * });
    *
-   * console.log(merged.all.length); // Общее количество уникальных навыков
-   * console.log(merged.static.length); // Статические технические навыки
-   * console.log(merged.industry.length); // Специфичные для индустрии навыки
-   * console.log(merged.custom.length); // Кастомные навыки организации
+   * console.log(merged.all.length); // Total unique skills
+   * console.log(merged.static.length); // Static tech skills
+   * console.log(merged.industry.length); // Industry-specific skills
+   * console.log(merged.custom.length); // Custom organization skills
    * ```
    */
   async getMergedTaxonomies(options: SearchOptions = {}): Promise<MergedTaxonomy> {
     const { industry, organizationId } = options;
 
-    // Получение статических навыков (всегда доступно)
+    // Get static skills (always available)
     const staticSkills = getStaticSkills();
 
-    // Получение специфичных для индустрии навыков, если указана индустрия
+    // Get industry-specific skills if industry provided
     let industrySkills: SkillDefinition[] = [];
     if (industry) {
       const industryTaxonomy = this.getIndustryTaxonomy(industry);
@@ -233,13 +234,13 @@ export class TaxonomiesClient {
       }
     }
 
-    // Получение кастомных синонимов, если указан ID организации
+    // Get custom synonyms if organization ID provided
     let customSkills: SkillDefinition[] = [];
     if (organizationId) {
       customSkills = await this.fetchCustomSynonyms(organizationId);
     }
 
-    // Объединение всех навыков и удаление дубликатов по названию
+    // Merge all skills and deduplicate by name
     const allSkills = this.deduplicateSkills([
       ...staticSkills,
       ...industrySkills,
@@ -255,11 +256,11 @@ export class TaxonomiesClient {
   }
 
   /**
-   * Поиск навыков по всем источникам таксономий
+   * Search skills across all taxonomy sources
    *
-   * @param query - Поисковый запрос
-   * @param options - Опции поиска, включая индустрию и ID организации
-   * @returns Совпадающие навыки, отсортированные по релевантности
+   * @param query - Search query
+   * @param options - Search options including industry and organization ID
+   * @returns Matching skills sorted by relevance
    *
    * @example
    * ```ts
@@ -276,23 +277,23 @@ export class TaxonomiesClient {
     const { industry, organizationId, limit = 20 } = options;
     const normalized = query.toLowerCase().trim();
 
-    // Получение объединенных таксономий
+    // Get merged taxonomies
     const merged = await this.getMergedTaxonomies({ industry, organizationId });
 
-    // Фильтрация навыков, соответствующих запросу (название или синонимы)
+    // Filter skills that match query (name or synonyms)
     const matches = merged.all.filter((skill) => {
-      // Проверка точного совпадения названия
+      // Check exact name match
       if (skill.name.toLowerCase().includes(normalized)) {
         return true;
       }
 
-      // Проверка синонимов
+      // Check synonyms
       return skill.synonyms.some((synonym) =>
         synonym.toLowerCase().includes(normalized)
       );
     });
 
-    // Сортировка по релевантности (сначала точное совпадение названия, затем начинается с, затем включает)
+    // Sort by relevance (exact name match first, then starts with, then includes)
     matches.sort((a, b) => {
       const aExact = a.name.toLowerCase() === normalized;
       const bExact = b.name.toLowerCase() === normalized;
@@ -313,11 +314,11 @@ export class TaxonomiesClient {
   }
 
   /**
-   * Получение канонического названия навыка (обрабатывает синонимы по всем источникам)
+   * Get canonical skill name (handles synonyms across all sources)
    *
-   * @param input - Введенное пользователем название навыка
-   * @param options - Опции поиска, включая индустрию и ID организации
-   * @returns Каноническое название навыка или null, если не найдено
+   * @param input - User input skill name
+   * @param options - Search options including industry and organization ID
+   * @returns Canonical skill name or null if not found
    *
    * @example
    * ```ts
@@ -337,26 +338,26 @@ export class TaxonomiesClient {
     const merged = await this.getMergedTaxonomies(options);
 
     for (const skill of merged.all) {
-      // Точное совпадение названия
+      // Exact name match
       if (skill.name.toLowerCase() === normalized) {
         return skill.name;
       }
 
-      // Совпадение синонима
+      // Synonym match
       if (skill.synonyms.some((s) => s.toLowerCase() === normalized)) {
         return skill.name;
       }
     }
 
-    return null; // Не найдено
+    return null; // Not found
   }
 
   /**
-   * Получение предложений навыков на основе частичного ввода
+   * Get skill suggestions based on partial input
    *
-   * @param input - Частичный ввод навыка
-   * @param options - Опции поиска
-   * @returns Массив предложенных названий навыков
+   * @param input - Partial skill input
+   * @param options - Search options
+   * @returns Array of suggested skill names
    */
   async getSkillSuggestions(
     input: string,
@@ -367,11 +368,11 @@ export class TaxonomiesClient {
   }
 
   /**
-   * Очистка кэша кастомных синонимов
+   * Clear the custom synonyms cache
    *
-   * Вызовите этот метод, если кастомные синонимы были обновлены и вы хотите обновить данные.
+   * Call this if custom synonyms are updated and you want to refresh the data.
    *
-   * @param organizationId - Опциональный ID организации для очистки конкретного кэша
+   * @param organizationId - Optional organization ID to clear specific cache
    */
   clearCache(organizationId?: string): void {
     if (organizationId) {
@@ -384,24 +385,24 @@ export class TaxonomiesClient {
   }
 
   /**
-   * Получение таксономии индустрии по ID
+   * Get industry taxonomy by ID
    *
-   * @param industryId - ID индустрии (healthcare, finance, marketing и т.д.)
-   * @returns Таксономия индустрии или null, если не найдена
+   * @param industryId - Industry ID (healthcare, finance, marketing, etc.)
+   * @returns Industry taxonomy or null if not found
    */
   private getIndustryTaxonomy(industryId: string): IndustryTaxonomy | null {
-    // Это обрабатывается импортом из модуля industryTaxonomies
-    // Фактическая реализация находится в слое данных
+    // This is handled by importing from industryTaxonomies module
+    // The actual implementation is in the data layer
     return null;
   }
 
   /**
-   * Удаление дубликатов навыков по названию
+   * Deduplicate skills by name
    *
-   * Когда несколько источников имеют одно и то же название навыка, объединяет их синонимы.
+   * When multiple sources have the same skill name, merge their synonyms.
    *
-   * @param skills - Массив определений навыков
-   * @returns Определения навыков без дубликатов
+   * @param skills - Array of skill definitions
+   * @returns Deduplicated skill definitions
    */
   private deduplicateSkills(skills: SkillDefinition[]): SkillDefinition[] {
     const skillMap = new Map<string, SkillDefinition>();
@@ -410,7 +411,7 @@ export class TaxonomiesClient {
       const existing = skillMap.get(skill.name);
 
       if (existing) {
-        // Объединение синонимов
+        // Merge synonyms
         const mergedSynonyms = Array.from(
           new Set([...existing.synonyms, ...skill.synonyms])
         );
@@ -424,11 +425,11 @@ export class TaxonomiesClient {
   }
 
   /**
-   * Получение базового экземпляра Axios
+   * Get the underlying Axios instance
    *
-   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
+   * This is useful for making custom requests not covered by the convenience methods.
    *
-   * @returns Экземпляр Axios
+   * @returns Axios instance
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -436,13 +437,13 @@ export class TaxonomiesClient {
 }
 
 /**
- * Экземпляр клиента таксономий по умолчанию
+ * Default taxonomies client instance
  *
- * Используйте этот singleton-экземпляр для всех вызовов таксономий.
+ * Use this singleton instance for all taxonomy calls.
  */
 export const taxonomiesClient = new TaxonomiesClient();
 
 /**
- * Экспорт класса клиента таксономий для создания кастомных экземпляров
+ * Export taxonomies client class for custom instances
  */
 export default TaxonomiesClient;

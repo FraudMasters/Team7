@@ -16,8 +16,16 @@ import {
   Chip,
   LinearProgress,
   Avatar,
-} from '@/components/ui';
-import { Icon } from '@/components/ui/primitives';
+} from '@mui/material';
+import { config } from '@/config';
+import {
+  Refresh as RefreshIcon,
+  EmojiEvents as TrophyIcon,
+  Person as PersonIcon,
+  Key as KeywordIcon,
+  Tune as TfidfIcon,
+  Psychology as VectorIcon,
+} from '@mui/icons-material';
 
 /**
  * Individual candidate score breakdown from backend
@@ -108,7 +116,7 @@ const getScoreLabel = (score: number): string => {
 const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
   vacancyId,
   resumeIds,
-  apiUrl = 'http://localhost:8000/api/matching',
+  apiUrl = `${config.api.url}/api/matching`,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,10 +188,10 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
         }}
       >
         <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="secondary">
+        <Typography variant="h6" color="text.secondary">
           Comparing candidates...
         </Typography>
-        <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           Analyzing {resumeIds.length} candidate(s) for vacancy requirements
         </Typography>
       </Box>
@@ -198,7 +206,7 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchComparison} startIcon={<Icon name="refresh-cw" />}>
+          <Button color="inherit" onClick={fetchComparison} startIcon={<RefreshIcon />}>
             Retry
           </Button>
         }
@@ -246,9 +254,9 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
     return (
       <Stack spacing={0.5} sx={{ width: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="body2" fontWeight={600} color={isBest ? `${color}.main` : 'primary'}>
+          <Typography variant="body2" fontWeight={600} color={isBest ? `${color}.main` : 'text.primary'}>
             {percentage}%
-            {isBest && <Icon name="award" sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle' }} />}
+            {isBest && <TrophyIcon sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle' }} />}
           </Typography>
         </Box>
         <LinearProgress
@@ -295,13 +303,13 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
               height: 48,
             }}
           >
-            {rank === 1 ? <Icon name="award" /> : <Icon name="user" />}
+            {rank === 1 ? <TrophyIcon /> : <PersonIcon />}
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" fontWeight={700}>
               #{rank} {candidate.filename}
             </Typography>
-            <Typography variant="caption" color="secondary">
+            <Typography variant="caption" color="text.secondary">
               {getScoreLabel(candidate.match_score.overall_score)} Match
             </Typography>
           </Box>
@@ -316,8 +324,8 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
           {/* Keyword Score */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-              <Icon name="key" sx={{ fontSize: 16, mr: 0.5, color: 'primary.main' }} />
-              <Typography variant="caption" color="secondary">
+              <KeywordIcon sx={{ fontSize: 16, mr: 0.5, color: 'primary.main' }} />
+              <Typography variant="caption" color="text.secondary">
                 Keyword (50%)
               </Typography>
             </Box>
@@ -330,8 +338,8 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
           {/* TF-IDF Score */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-              <Icon name="sliders" sx={{ fontSize: 16, mr: 0.5, color: 'secondary.main' }} />
-              <Typography variant="caption" color="secondary">
+              <TfidfIcon sx={{ fontSize: 16, mr: 0.5, color: 'secondary.main' }} />
+              <Typography variant="caption" color="text.secondary">
                 TF-IDF (30%)
               </Typography>
             </Box>
@@ -344,8 +352,8 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
           {/* Vector Score */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-              <Icon name="brain" sx={{ fontSize: 16, mr: 0.5, color: 'info.main' }} />
-              <Typography variant="caption" color="secondary">
+              <VectorIcon sx={{ fontSize: 16, mr: 0.5, color: 'info.main' }} />
+              <Typography variant="caption" color="text.secondary">
                 Vector (20%)
               </Typography>
             </Box>
@@ -386,11 +394,11 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
             <Typography variant="h5" fontWeight={600}>
               Top {data.candidates.length} Candidates Comparison
             </Typography>
-            <Typography variant="body2" color="secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {data.vacancy_title} • Score breakdown by algorithm
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchComparison} size="small">
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
             Refresh
           </Button>
         </Box>
@@ -398,26 +406,26 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
         {/* Legend */}
         <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Icon name="award" sx={{ fontSize: 18, color: 'secondary' }} />
-            <Typography variant="caption" color="secondary">
+            <TrophyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+            <Typography variant="caption" color="text.secondary">
               Best score in category
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 16, height: 16, bgcolor: 'primary.main', borderRadius: 0.5 }} />
-            <Typography variant="caption" color="secondary">
+            <Typography variant="caption" color="text.secondary">
               Keyword (50%)
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 16, height: 16, bgcolor: 'secondary.main', borderRadius: 0.5 }} />
-            <Typography variant="caption" color="secondary">
+            <Typography variant="caption" color="text.secondary">
               TF-IDF (30%)
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 16, height: 16, bgcolor: 'info.main', borderRadius: 0.5 }} />
-            <Typography variant="caption" color="secondary">
+            <Typography variant="caption" color="text.secondary">
               Vector (20%)
             </Typography>
           </Box>
@@ -451,7 +459,7 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
                 </TableCell>
                 <TableCell align="center" sx={{ fontWeight: 700, bgcolor: 'grey.100', minWidth: 180 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                    <Icon name="key" sx={{ fontSize: 16 }} />
+                    <KeywordIcon sx={{ fontSize: 16 }} />
                     <Typography variant="body2" fontWeight={600}>
                       Keyword (50%)
                     </Typography>
@@ -459,7 +467,7 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
                 </TableCell>
                 <TableCell align="center" sx={{ fontWeight: 700, bgcolor: 'grey.100', minWidth: 180 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                    <Icon name="sliders" sx={{ fontSize: 16 }} />
+                    <TfidfIcon sx={{ fontSize: 16 }} />
                     <Typography variant="body2" fontWeight={600}>
                       TF-IDF (30%)
                     </Typography>
@@ -467,7 +475,7 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
                 </TableCell>
                 <TableCell align="center" sx={{ fontWeight: 700, bgcolor: 'grey.100', minWidth: 180 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                    <Icon name="brain" sx={{ fontSize: 16 }} />
+                    <VectorIcon sx={{ fontSize: 16 }} />
                     <Typography variant="body2" fontWeight={600}>
                       Vector (20%)
                     </Typography>
@@ -513,13 +521,13 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
                             bgcolor: index === 0 ? 'warning.main' : 'primary.main',
                           }}
                         >
-                          {index === 0 ? <Icon name="award" sx={{ fontSize: 18 }} /> : index + 1}
+                          {index === 0 ? <TrophyIcon sx={{ fontSize: 18 }} /> : index + 1}
                         </Avatar>
                         <Box>
                           <Typography variant="body2" fontWeight={600}>
                             {candidate.filename}
                           </Typography>
-                          <Typography variant="caption" color="secondary">
+                          <Typography variant="caption" color="text.secondary">
                             {getScoreLabel(candidate.match_score.overall_score)}
                           </Typography>
                         </Box>
@@ -585,7 +593,7 @@ const CandidateComparisonTable: React.FC<CandidateComparisonTableProps> = ({
 
       {/* Processing Time */}
       {data.processing_time_ms && (
-        <Typography variant="caption" color="secondary" align="center" display="block">
+        <Typography variant="caption" color="text.secondary" align="center" display="block">
           Comparison completed in {(data.processing_time_ms / 1000).toFixed(2)} seconds
         </Typography>
       )}

@@ -17,7 +17,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))
@@ -37,12 +36,15 @@ from analyzers import (
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 # Path to skill synonyms file
 SYNONYMS_FILE = Path(__file__).parent.parent / "models" / "skill_synonyms.json"
@@ -352,150 +354,6 @@ def _generate_match_cache_key(resume_id: str, vacancy_data: Dict[str, Any]) -> s
     return f"match:{resume_id}:{vacancy_hash}"
 
 
-@router.get(
-    "/jobs/{vacancy_id}/resumes/{resume_id}",
-    status_code=status.HTTP_200_OK,
-    tags=["Matching"],
-)
-async def get_match_result(
-    vacancy_id: str,
-    resume_id: str,
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """
-    Get match result for a specific resume-vacancy pair with eager loading.
-
-    This endpoint fetches a match result along with its associated Resume and
-    JobVacancy data in a single query using explicit joins, eliminating N+1
-    query patterns.
-
-    Args:
-        vacancy_id: UUID of the job vacancy
-        resume_id: UUID of the resume
-        db: Database session
-
-    Returns:
-        JSON response with match result including related resume and vacancy data
-
-    Raises:
-        HTTPException(404): If match result not found
-        HTTPException(422): If UUID format is invalid
-
-    Examples:
-        >>> import requests
-        >>> response = requests.get(
-        ...     "http://localhost:8000/api/matching/jobs/abc-123/resumes/def-456"
-        ... )
-        >>> response.json()
-        {
-            "id": "match-id",
-            "resume_id": "def-456",
-            "vacancy_id": "abc-123",
-            "match_percentage": 85.5,
-            "overall_score": 0.855,
-            "recommendation": "good",
-            "resume": {
-                "id": "def-456",
-                "filename": "resume.pdf",
-                ...
-            },
-            "vacancy": {
-                "id": "abc-123",
-                "title": "Developer",
-                ...
-            }
-        }
-    """
-    try:
-        # Parse UUIDs
-        vacancy_uuid = UUID(vacancy_id)
-        resume_uuid = UUID(resume_id)
-
-        # Import models needed for join
-        from models.resume import Resume as ResumeModel
-        from models.job_vacancy import JobVacancy
-
-        # Use explicit JOIN to fetch MatchResult, Resume, and JobVacancy in a single query
-        # This eliminates N+1 queries by loading all related data at once
-        combined_query = select(MatchResult, ResumeModel, JobVacancy).join(
-            ResumeModel, MatchResult.resume_id == ResumeModel.id
-        ).join(
-            JobVacancy, MatchResult.vacancy_id == JobVacancy.id
-        ).where(
-            MatchResult.resume_id == resume_uuid,
-            MatchResult.vacancy_id == vacancy_uuid
-        )
-
-        result = await db.execute(combined_query)
-        row = result.first()
-
-        if not row:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Match result not found for vacancy {vacancy_id} and resume {resume_id}"
-            )
-
-        match_result, resume, vacancy = row
-
-        # Build response with all related data
-        response_data = {
-            "id": str(match_result.id),
-            "resume_id": str(match_result.resume_id),
-            "vacancy_id": str(match_result.vacancy_id),
-            "match_percentage": float(match_result.match_percentage) if match_result.match_percentage else 0.0,
-            "overall_score": float(match_result.overall_score) if match_result.overall_score else None,
-            "keyword_score": float(match_result.keyword_score) if match_result.keyword_score else None,
-            "tfidf_score": float(match_result.tfidf_score) if match_result.tfidf_score else None,
-            "vector_score": float(match_result.vector_score) if match_result.vector_score else None,
-            "vector_similarity": float(match_result.vector_similarity) if match_result.vector_similarity else None,
-            "recommendation": match_result.recommendation,
-            "matched_skills": match_result.matched_skills or [],
-            "missing_skills": match_result.missing_skills or [],
-            "additional_skills_matched": match_result.additional_skills_matched or [],
-            "experience_verified": match_result.experience_verified,
-            "keyword_passed": match_result.keyword_passed,
-            "tfidf_passed": match_result.tfidf_passed,
-            "vector_passed": match_result.vector_passed,
-            "matcher_version": match_result.matcher_version,
-            "created_at": match_result.created_at.isoformat() if match_result.created_at else None,
-            "updated_at": match_result.updated_at.isoformat() if match_result.updated_at else None,
-            # Related entities (eagerly loaded via JOIN)
-            "resume": {
-                "id": str(resume.id),
-                "filename": resume.filename,
-                "status": resume.status.value if resume.status else None,
-                "language": resume.language,
-            },
-            "vacancy": {
-                "id": str(vacancy.id),
-                "title": vacancy.title,
-                "required_skills": vacancy.required_skills or [],
-                "min_experience_months": vacancy.min_experience_months,
-            },
-        }
-
-        logger.info(f"Retrieved match result for vacancy {vacancy_id} and resume {resume_id}")
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data,
-        )
-
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid UUID format: {str(e)}"
-        ) from e
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching match result: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch match result: {str(e)}"
-        ) from e
-
-
 @router.post(
     "/compare",
     response_model=MatchResponse,
@@ -539,7 +397,7 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
         ...     "min_experience_months": 36
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/compare",
+        ...     "/api/matching/compare",
         ...     json={"resume_id": "abc123", "vacancy_data": vacancy}
         ... )
         >>> response.json()
@@ -868,7 +726,7 @@ async def submit_match_feedback(http_request: Request, request: MatchFeedbackReq
         ...     "recruiter_correction": None
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/feedback",
+        ...     "/api/matching/feedback",
         ...     json=data
         ... )
         >>> response.json()
@@ -990,7 +848,7 @@ async def compare_resume_to_vacancy_unified(
         ...     "required_skills": ["React", "TypeScript", "JavaScript"]
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/compare-unified",
+        ...     "/api/matching/compare-unified",
         ...     json={"resume_id": "abc123", "vacancy_data": vacancy}
         ... )
         >>> response.json()
@@ -1067,32 +925,29 @@ async def compare_resume_to_vacancy_unified(
                 logger.error(f"Error extracting text from file: {e}")
                 resume_text = None
 
-        # Fallback: Try to get text from database with optimized query
+        # Fallback: Try to get text from database
         if not resume_text:
             try:
                 from models.resume import Resume as ResumeModel
                 from models.resume_analysis import ResumeAnalysis
 
                 resume_uuid = UUID(request.resume_id)
+                resume_query = select(ResumeModel).where(ResumeModel.id == resume_uuid)
+                resume_result = await db.execute(resume_query)
+                resume_record = resume_result.scalar_one_or_none()
 
-                # Use single query with LEFT JOIN to fetch both Resume and ResumeAnalysis
-                # This eliminates the N+1 pattern of sequential queries
-                combined_query = select(ResumeModel, ResumeAnalysis).outerjoin(
-                    ResumeAnalysis, ResumeModel.id == ResumeAnalysis.resume_id
-                ).where(ResumeModel.id == resume_uuid)
+                if resume_record and resume_record.raw_text:
+                    resume_text = resume_record.raw_text
+                    logger.info(f"Using raw_text from database for resume {request.resume_id}")
+                elif resume_record:
+                    # Try to get from ResumeAnalysis
+                    analysis_query = select(ResumeAnalysis).where(
+                        ResumeAnalysis.resume_id == resume_uuid
+                    )
+                    analysis_result = await db.execute(analysis_query)
+                    analysis_record = analysis_result.scalar_one_or_none()
 
-                combined_result = await db.execute(combined_query)
-                row = combined_result.first()
-
-                if row:
-                    resume_record, analysis_record = row
-
-                    # First try to get raw_text from Resume
-                    if resume_record and resume_record.raw_text:
-                        resume_text = resume_record.raw_text
-                        logger.info(f"Using raw_text from database for resume {request.resume_id}")
-                    # Fallback to ResumeAnalysis
-                    elif analysis_record and analysis_record.raw_text:
+                    if analysis_record and analysis_record.raw_text:
                         resume_text = analysis_record.raw_text
                         logger.info(f"Using raw_text from ResumeAnalysis for resume {request.resume_id}")
                     else:

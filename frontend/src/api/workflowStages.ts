@@ -1,36 +1,37 @@
 /**
  * Workflow Stages API Client
  *
- * Этот модуль предоставляет клиент для управления специфичными для организации
- * этапами workflow найма, включая создание, чтение, обновление и удаление
- * конфигураций этапов workflow.
+ * This module provides a client for managing organization-specific hiring
+ * workflow stages, including creating, reading, updating, and deleting
+ * workflow stage configurations.
  *
  * @example
  * ```ts
  * import { workflowStagesClient } from '@/api/workflowStages';
  *
- * // Получение всех этапов workflow для организации
+ * // List all workflow stages for an organization
  * const stages = await workflowStagesClient.listStages('org-123');
  *
- * // Создание нового этапа workflow
+ * // Create a new workflow stage
  * const newStage = await workflowStagesClient.createStage({
  *   organization_id: 'org-123',
- *   stage_name: 'Техническое собеседование',
+ *   stage_name: 'Technical Interview',
  *   stage_order: 3,
  *   is_active: true,
  *   color: '#3B82F6',
- *   description: 'Техническая оценка с командой инженеров'
+ *   description: 'Technical assessment with engineering team'
  * });
  *
- * // Обновление этапа workflow
+ * // Update a workflow stage
  * const updated = await workflowStagesClient.updateStage('stage-id', {
- *   stage_name: 'Обновленное техническое собеседование',
+ *   stage_name: 'Updated Technical Interview',
  *   is_active: false
  * });
  * ```
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { config } from '@/config';
 import type {
   WorkflowStageCreate,
   WorkflowStageUpdate,
@@ -40,36 +41,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Конфигурация по умолчанию для клиента этапов workflow
+ * Default API configuration for workflow stages client
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 секунд
+  baseURL: config.api.url,
+  timeout: 10000, // 10 seconds
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Класс клиента API для работы с этапами workflow
+ * Workflow Stages API Client class
  *
- * Предоставляет методы для управления конфигурациями этапов workflow с proper
- * обработкой ошибок и типобезопасностью.
+ * Provides methods for managing workflow stage configurations with proper
+ * error handling and type safety.
  */
 export class WorkflowStagesClient {
   private client: AxiosInstance;
 
   /**
-   * Создание нового экземпляра клиента этапов workflow
+   * Create a new WorkflowStages client instance
    *
-   * @param config - Опциональные переопределения конфигурации
+   * @param config - Optional configuration overrides
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Интерцептор ответов для обработки ошибок
+    // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -77,73 +78,73 @@ export class WorkflowStagesClient {
   }
 
   /**
-   * Преобразование ошибки Axios в стандартизированную ошибку API
+   * Transform Axios error to standardized API error
    *
-   * @param error - Ошибка Axios
-   * @returns Преобразованная ошибка API
+   * @param error - Axios error
+   * @returns Transformed API error
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Ошибка сети (нет ответа)
+    // Network error (no response)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
+          detail: 'Request timeout. Please check your connection and try again.',
           status: 408,
         };
       }
       return {
-        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
+        detail: 'Network error. Please check your connection and try again.',
         status: 0,
       };
     }
 
-    // Сервер вернул ошибку
+    // Server returned error response
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Используем сообщение об ошибке от сервера, если доступно
+    // Use server's error message if available
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Сообщения об ошибках по умолчанию для разных кодов статуса
+    // Default error messages by status code
     const defaultMessages: Record<number, string> = {
-      400: 'Неверный запрос. Проверьте введенные данные.',
-      401: 'Не авторизован. Войдите в систему.',
-      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
-      404: 'Ресурс не найден.',
-      409: 'Этап workflow с таким названием уже существует.',
-      422: 'Ошибка валидации. Проверьте введенные данные.',
-      429: 'Слишком много запросов. Попробуйте позже.',
-      500: 'Ошибка сервера. Попробуйте позже.',
-      502: 'Ошибка шлюза. Попробуйте позже.',
-      503: 'Сервис недоступен. Попробуйте позже.',
+      400: 'Invalid request. Please check your input.',
+      401: 'Unauthorized. Please log in.',
+      403: 'Forbidden. You do not have permission.',
+      404: 'Resource not found.',
+      409: 'A workflow stage with this name already exists.',
+      422: 'Validation error. Please check your input.',
+      429: 'Too many requests. Please try again later.',
+      500: 'Server error. Please try again later.',
+      502: 'Bad gateway. Please try again later.',
+      503: 'Service unavailable. Please try again later.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
+      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
       status,
     };
   }
 
   /**
-   * Создание этапа workflow для организации
+   * Create a workflow stage for an organization
    *
-   * @param request - Запрос на создание с деталями этапа workflow
-   * @returns Созданный этап workflow
-   * @throws ApiError если создание не удалось
+   * @param request - Create request with workflow stage details
+   * @returns Created workflow stage
+   * @throws ApiError if creation fails
    *
    * @example
    * ```ts
    * const stage = await workflowStagesClient.createStage({
    *   organization_id: 'org-123',
-   *   stage_name: 'Техническое собеседование',
+   *   stage_name: 'Technical Interview',
    *   stage_order: 3,
    *   is_active: true,
    *   color: '#3B82F6',
-   *   description: 'Техническая оценка с командой инженеров'
+   *   description: 'Technical assessment with engineering team'
    * });
    * ```
    */
@@ -160,20 +161,20 @@ export class WorkflowStagesClient {
   }
 
   /**
-   * Получение списка этапов workflow с опциональными фильтрами
+   * List workflow stages with optional filters
    *
-   * @param organizationId - Опциональный фильтр по ID организации
-   * @param isActive - Опциональный фильтр по активному статусу
-   * @param isDefault - Опциональный фильтр по статусу по умолчанию
-   * @returns Список этапов workflow
-   * @throws ApiError если получение списка не удалось
+   * @param organizationId - Optional organization ID filter
+   * @param isActive - Optional active status filter
+   * @param isDefault - Optional default status filter
+   * @returns List of workflow stages
+   * @throws ApiError if listing fails
    *
    * @example
    * ```ts
-   * // Получение всех этапов для организации
+   * // Get all stages for an organization
    * const stages = await workflowStagesClient.listStages('org-123');
    *
-   * // Получение только активных этапов
+   * // Get only active stages
    * const activeStages = await workflowStagesClient.listStages('org-123', true);
    * ```
    */
@@ -199,11 +200,11 @@ export class WorkflowStagesClient {
   }
 
   /**
-   * Получение конкретного этапа workflow по ID
+   * Get a specific workflow stage by ID
    *
-   * @param stageId - ID этапа workflow
-   * @returns Детали этапа workflow
-   * @throws ApiError если этап не найден
+   * @param stageId - Workflow stage ID
+   * @returns Workflow stage details
+   * @throws ApiError if not found
    *
    * @example
    * ```ts
@@ -222,17 +223,17 @@ export class WorkflowStagesClient {
   }
 
   /**
-   * Обновление этапа workflow
+   * Update a workflow stage
    *
-   * @param stageId - ID этапа workflow
-   * @param request - Запрос на обновление с полями для изменения
-   * @returns Обновленный этап workflow
-   * @throws ApiError если обновление не удалось
+   * @param stageId - Workflow stage ID
+   * @param request - Update request with fields to modify
+   * @returns Updated workflow stage
+   * @throws ApiError if update fails
    *
    * @example
    * ```ts
    * const updated = await workflowStagesClient.updateStage('stage-uuid', {
-   *   stage_name: 'Обновленное техническое собеседование',
+   *   stage_name: 'Updated Technical Interview',
    *   is_active: false
    * });
    * ```
@@ -253,10 +254,10 @@ export class WorkflowStagesClient {
   }
 
   /**
-   * Удаление этапа workflow
+   * Delete a workflow stage
    *
-   * @param stageId - ID этапа workflow
-   * @throws ApiError если удаление не удалось
+   * @param stageId - Workflow stage ID
+   * @throws ApiError if deletion fails
    *
    * @example
    * ```ts
@@ -272,11 +273,11 @@ export class WorkflowStagesClient {
   }
 
   /**
-   * Получение базового экземпляра Axios
+   * Get the underlying Axios instance
    *
-   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
+   * This is useful for making custom requests not covered by the convenience methods.
    *
-   * @returns Экземпляр Axios
+   * @returns Axios instance
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -284,13 +285,13 @@ export class WorkflowStagesClient {
 }
 
 /**
- * Экземпляр клиента этапов workflow по умолчанию
+ * Default workflow stages client instance
  *
- * Используйте этот singleton-экземпляр для всех операций с этапами workflow.
+ * Use this singleton instance for all workflow stages calls.
  */
 export const workflowStagesClient = new WorkflowStagesClient();
 
 /**
- * Экспорт класса этапов workflow для создания кастомных экземпляров
+ * Export workflow stages client class for custom instances
  */
 export default WorkflowStagesClient;

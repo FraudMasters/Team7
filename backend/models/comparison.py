@@ -4,7 +4,7 @@ ResumeComparison model for storing saved resume comparison views
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, JSON, String
+from sqlalchemy import DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -22,6 +22,9 @@ class ResumeComparison(Base, UUIDMixin, TimestampMixin):
         comparison_notes: JSON object with recruiter notes about the comparison
         created_by: User identifier who created the comparison
         shared_with: JSON array of user IDs/emails the comparison is shared with
+        share_id: Optional unique string identifier for public/private link sharing
+        share_expires_at: Optional timestamp when the share link expires
+        share_permissions: Optional JSON object with permission settings (view_only, can_edit, etc.)
         created_at: Timestamp when comparison was created (inherited)
         updated_at: Timestamp when comparison was last updated (inherited)
     """
@@ -37,6 +40,9 @@ class ResumeComparison(Base, UUIDMixin, TimestampMixin):
     comparison_notes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     shared_with: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
+    share_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True, unique=True)
+    share_expires_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    share_permissions: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     def __repr__(self) -> str:
         return f"<ResumeComparison(id={self.id}, vacancy_id={self.vacancy_id}, resumes={len(self.resume_ids)})>"

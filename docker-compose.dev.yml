@@ -1,0 +1,151 @@
+# Development Environment Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # Development mode: mount source for hot-reload, debug logging
+  backend:
+    env_file:
+      - .env.dev
+    environment:
+      ENVIRONMENT: development
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./backend:/app
+      - ./services:/app/services
+      - ./testdata:/app/testdata:ro
+    build:
+      target: development
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  celery_worker:
+    env_file:
+      - .env.dev
+    environment:
+      ENVIRONMENT: development
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./backend:/app
+      - ./services:/app/services
+    command: celery -A celery_app.celery_app worker --loglevel=debug --concurrency=2 --prefetch-multiplier=1 --queues=celery,analysis,learning,reporting
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+        reservations:
+          cpus: '1.5'
+          memory: 3G
+
+  celery_beat:
+    env_file:
+      - .env.dev
+    environment:
+      ENVIRONMENT: development
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./backend:/app
+      - ./services:/app/services
+    command: celery -A celery_app.celery_app beat --loglevel=debug
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  frontend:
+    env_file:
+      - .env.dev
+    environment:
+      NODE_ENV: development
+    build:
+      target: development
+    volumes:
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  postgres:
+    env_file:
+      - .env.dev
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  redis:
+    env_file:
+      - .env.dev
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  grafana:
+    env_file:
+      - .env.dev
+    environment:
+      GF_LOG_LEVEL: debug
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  loki:
+    env_file:
+      - .env.dev
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  prometheus:
+    env_file:
+      - .env.dev
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'  # Shorter retention for dev
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M

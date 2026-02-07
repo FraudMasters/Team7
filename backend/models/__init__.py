@@ -32,7 +32,8 @@ from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
-from .retraining_config import RetrainingConfig
+from .audit_log import AuditLog, AuditActionType
+from .config_change import ConfigChange, ConfigChangeAction
 
 __all__ = [
     "Base",
@@ -75,5 +76,8 @@ __all__ = [
     "SavedSearch",
     "SearchAlert",
     "SearchHistory",
-    "RetrainingConfig",
+    "AuditLog",
+    "AuditActionType",
+    "ConfigChange",
+    "ConfigChangeAction",
 ]
