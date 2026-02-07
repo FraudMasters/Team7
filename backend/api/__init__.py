@@ -8,6 +8,7 @@ from . import (
     analysis,
     analytics,
     ats_simulation,
+    backups,
     batch,
     candidate_activities,
     candidate_notes,
@@ -21,6 +22,7 @@ from . import (
     matching,
     matching_weights,
     model_versions,
+    performance_monitoring,
     ranking,
     reports,
     resumes,
@@ -35,14 +37,13 @@ from . import (
     vacancies,
     work_experience,
     workflow_stages,
-    backups,
-    performance_monitoring,
 )
 
 __all__ = [
     "analysis",
     "analytics",
     "ats_simulation",
+    "backups",
     "batch",
     "candidate_activities",
     "candidate_notes",
@@ -56,6 +57,7 @@ __all__ = [
     "matching",
     "matching_weights",
     "model_versions",
+    "performance_monitoring",
     "ranking",
     "reports",
     "resumes",
@@ -70,6 +72,4 @@ __all__ = [
     "vacancies",
     "work_experience",
     "workflow_stages",
-    "backups",
-    "performance_monitoring",
 ]

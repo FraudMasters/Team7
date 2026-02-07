@@ -1734,3 +1734,305 @@ async def get_source_tracking(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve source tracking: {str(e)}",
         ) from e
+
+
+@router.get(
+    "/candidate-source-attribution",
+    response_model=CandidateSourceAttributionResponse,
+    tags=["Analytics"],
+)
+async def get_candidate_source_attribution(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get candidate source attribution analytics with detailed metrics.
+
+    This endpoint provides comprehensive analytics about candidate sources including
+    conversion rates, time-to-hire metrics, and hiring stage distribution for each source.
+    It helps recruitment teams understand which sourcing channels produce the best candidates
+    and how candidates from different sources progress through the hiring pipeline.
+
+    For each source, the endpoint tracks:
+    - Total candidates sourced
+    - Number of candidates hired (conversion)
+    - Conversion rate (hired/uploaded)
+    - Average time-to-hire in days
+    - Distribution across all hiring stages
+
+    Args:
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with detailed source metrics including conversion rates,
+        time-to-hire, and stage distribution for each source
+
+    Raises:
+        HTTPException(400): If date format is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8000/api/analytics/candidate-source-attribution")
+        >>> response.json()
+        {
+            "sources": [
+                {
+                    "source": "referral",
+                    "candidate_count": 120,
+                    "hired_count": 18,
+                    "conversion_rate": 0.15,
+                    "average_time_to_hire_days": 28.5,
+                    "stage_distribution": [
+                        {"stage_name": "applied", "count": 30, "percentage": 0.25},
+                        {"stage_name": "screening", "count": 45, "percentage": 0.375},
+                        {"stage_name": "interview", "count": 20, "percentage": 0.167},
+                        {"stage_name": "offered", "count": 7, "percentage": 0.058},
+                        {"stage_name": "hired", "count": 18, "percentage": 0.15}
+                    ]
+                },
+                {
+                    "source": "LinkedIn",
+                    "candidate_count": 350,
+                    "hired_count": 28,
+                    "conversion_rate": 0.08,
+                    "average_time_to_hire_days": 35.2,
+                    "stage_distribution": [
+                        {"stage_name": "applied", "count": 200, "percentage": 0.571},
+                        {"stage_name": "screening", "count": 80, "percentage": 0.229},
+                        {"stage_name": "interview", "count": 35, "percentage": 0.1},
+                        {"stage_name": "offered", "count": 7, "percentage": 0.02},
+                        {"stage_name": "hired", "count": 28, "percentage": 0.08}
+                    ]
+                }
+            ],
+            "total_candidates": 720,
+            "date_range": null
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching candidate source attribution - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        from datetime import datetime
+        from sqlalchemy import func
+        from models import AnalyticsEvent, HiringStage
+        from database import get_db
+        from collections import defaultdict
+
+        # Track data by source
+        source_candidates = defaultdict(int)  # source -> candidate count
+        source_hired = defaultdict(int)  # source -> hired count
+        source_time_to_hire = defaultdict(list)  # source -> list of time-to-hire days
+        source_stages = defaultdict(lambda: defaultdict(int))  # source -> stage_name -> count
+
+        async for db in get_db():
+            # Query resume_uploaded events to get source information
+            upload_query = select(AnalyticsEvent).where(
+                AnalyticsEvent.event_type == "resume_uploaded"
+            )
+
+            # Apply date filters if provided
+            if start_date:
+                try:
+                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    upload_query = upload_query.where(AnalyticsEvent.created_at >= start_dt)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
+                    )
+
+            if end_date:
+                try:
+                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    upload_query = upload_query.where(AnalyticsEvent.created_at <= end_dt)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
+                    )
+
+            upload_result = await db.execute(upload_query)
+            upload_events = upload_result.scalars().all()
+
+            # Extract source from event_data and count candidates per source
+            resume_to_source = {}  # resume_id -> source mapping
+
+            for event in upload_events:
+                # Get source from event_data JSON field
+                source = "unknown"
+                if event.event_data and isinstance(event.event_data, dict):
+                    source = event.event_data.get("source", "unknown")
+                    if not source or not isinstance(source, str):
+                        source = "unknown"
+                    # Normalize source name (lowercase, strip whitespace)
+                    source = source.strip().lower() if source.strip() else "unknown"
+
+                # Track resume to source mapping
+                if event.entity_id:
+                    resume_to_source[str(event.entity_id)] = source
+                    source_candidates[source] += 1
+
+            # Get all hiring stages to calculate stage distribution and time-to-hire
+            stages_query = select(HiringStage).where(
+                HiringStage.resume_id.in_(list(resume_to_source.keys()))
+            )
+
+            # Apply date filters if provided
+            if start_date:
+                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00')) if start_date else None
+                if start_dt:
+                    stages_query = stages_query.where(HiringStage.created_at >= start_dt)
+
+            if end_date:
+                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00')) if end_date else None
+                if end_dt:
+                    stages_query = stages_query.where(HiringStage.created_at <= end_dt)
+
+            stages_result = await db.execute(stages_query)
+            all_stages = stages_result.scalars().all()
+
+            # Process all hiring stages
+            for stage in all_stages:
+                resume_id = str(stage.resume_id)
+                source = resume_to_source.get(resume_id, "unknown")
+
+                # Count candidates at each stage
+                source_stages[source][stage.stage_name] += 1
+
+                # Track hired candidates and calculate time-to-hire
+                if stage.stage_name == "hired":
+                    source_hired[source] += 1
+
+                    # Calculate time-to-hire if we have created_at timestamp
+                    # Time-to-hire is the time from resume upload to hiring
+                    if stage.created_at:
+                        # Find the upload event for this resume to get the start time
+                        upload_event = next(
+                            (e for e in upload_events if str(e.entity_id) == resume_id),
+                            None
+                        )
+                        if upload_event and upload_event.created_at:
+                            days_to_hire = (stage.created_at - upload_event.created_at).days
+                            if days_to_hire >= 0:  # Only include valid positive values
+                                source_time_to_hire[source].append(days_to_hire)
+
+            break
+
+        # Build sources list with metrics
+        sources_list = []
+        for source, candidate_count in source_candidates.items():
+            hired_count = source_hired.get(source, 0)
+
+            # Calculate conversion rate
+            if candidate_count > 0:
+                conversion_rate = hired_count / candidate_count
+            else:
+                conversion_rate = 0.0
+
+            # Calculate average time-to-hire
+            time_to_hire_list = source_time_to_hire.get(source, [])
+            if time_to_hire_list:
+                average_time_to_hire = round(sum(time_to_hire_list) / len(time_to_hire_list), 1)
+            else:
+                average_time_to_hire = 0.0
+
+            # Build stage distribution
+            stage_dist_list = []
+            stage_counts = source_stages.get(source, {})
+            total_stage_count = sum(stage_counts.values()) if stage_counts else candidate_count
+
+            for stage_name, count in stage_counts.items():
+                if total_stage_count > 0:
+                    percentage = round(count / total_stage_count, 3)
+                else:
+                    percentage = 0.0
+
+                stage_dist_list.append({
+                    "stage_name": stage_name,
+                    "count": count,
+                    "percentage": percentage,
+                })
+
+            # Sort stage distribution by count descending
+            stage_dist_list.sort(key=lambda x: x["count"], reverse=True)
+
+            sources_list.append({
+                "source": source,
+                "candidate_count": candidate_count,
+                "hired_count": hired_count,
+                "conversion_rate": round(conversion_rate, 3),
+                "average_time_to_hire_days": average_time_to_hire,
+                "stage_distribution": stage_dist_list,
+            })
+
+        # Sort by candidate count descending
+        sources_list.sort(key=lambda x: x["candidate_count"], reverse=True)
+
+        # Calculate total candidates
+        total_candidates = sum(source_candidates.values())
+
+        # Build date range string for response
+        date_range_str = None
+        if start_date or end_date:
+            range_parts = []
+            if start_date:
+                range_parts.append(f"from {start_date}")
+            if end_date:
+                range_parts.append(f"to {end_date}")
+            date_range_str = " ".join(range_parts)
+
+        response_data = {
+            "sources": sources_list,
+            "total_candidates": total_candidates,
+            "date_range": date_range_str,
+        }
+
+        logger.info(
+            f"Candidate source attribution retrieved successfully - {len(sources_list)} sources, "
+            f"{total_candidates} total candidates"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving candidate source attribution: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve candidate source attribution: {str(e)}",
+        ) from e
+
+
+class StageDistribution(BaseModel):
+    """Hiring stage distribution for a candidate source."""
+
+    stage_name: str = Field(..., description="Name of the hiring stage")
+    count: int = Field(..., description="Number of candidates at this stage")
+    percentage: float = Field(..., description="Percentage of candidates at this stage (0-1)")
+
+
+class CandidateSourceMetrics(BaseModel):
+    """Candidate source attribution metrics."""
+
+    source: str = Field(..., description="Candidate source (e.g., referral, LinkedIn, website, etc.)")
+    candidate_count: int = Field(..., description="Number of candidates from this source")
+    hired_count: int = Field(..., description="Number of candidates hired from this source")
+    conversion_rate: float = Field(..., description="Conversion rate (hired/uploaded) for this source (0-1)")
+    average_time_to_hire_days: float = Field(..., description="Average time-to-hire in days for this source")
+    stage_distribution: list[StageDistribution] = Field(..., description="Distribution of candidates across hiring stages")
+
+
+class CandidateSourceAttributionResponse(BaseModel):
+    """Response model for candidate source attribution analytics."""
+
+    sources: list[CandidateSourceMetrics] = Field(..., description="List of candidate source metrics")
+    total_candidates: int = Field(..., description="Total candidates across all sources")
+    date_range: Optional[str] = Field(None, description="Applied date range filter (if any)")

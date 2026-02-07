@@ -1815,7 +1815,7 @@ export interface ActivityTypesResponse {
 export interface SavedSearchCreate {
   name: string;
   query: string;
-  filters?: Record<string, unknown>;
+  filters?: SearchFilters | VacancySearchFilters;
 }
 
 /**
@@ -1824,7 +1824,7 @@ export interface SavedSearchCreate {
 export interface SavedSearchUpdate {
   name?: string;
   query?: string;
-  filters?: Record<string, unknown>;
+  filters?: SearchFilters | VacancySearchFilters;
 }
 
 /**
@@ -1834,7 +1834,7 @@ export interface SavedSearchResponse {
   id: string;
   name: string;
   query: string;
-  filters: Record<string, unknown>;
+  filters: SearchFilters | VacancySearchFilters;
   created_at: string;
   updated_at: string;
 }
@@ -1865,6 +1865,17 @@ export interface SearchFilters {
   date_to?: string;
   vacancy_id?: string;
   stage_id?: string;
+}
+
+/**
+ * Search filter configuration for vacancy search
+ */
+export interface VacancySearchFilters {
+  work_format?: string;
+  location?: string;
+  salary_min?: number;
+  salary_max?: number;
+  employment_type?: string;
 }
 
 /**
@@ -1903,6 +1914,30 @@ export interface CandidateSearchResult {
 export interface CandidateSearchResponse {
   total: number;
   candidates: Array<Record<string, unknown>>;
+  query: string;
+  filters_applied: Record<string, unknown>;
+  execution_time_seconds: number;
+  skip: number;
+  limit: number;
+}
+
+/**
+ * Vacancy search request
+ */
+export interface VacancySearchRequest {
+  query?: string | null;
+  filters?: VacancySearchFilters | null;
+  skip?: number;
+  limit?: number;
+  sort_by?: string;
+}
+
+/**
+ * Vacancy search response
+ */
+export interface VacancySearchResponse {
+  total: number;
+  vacancies: Array<Record<string, unknown>>;
   query: string;
   filters_applied: Record<string, unknown>;
   execution_time_seconds: number;
