@@ -1,0 +1,645 @@
+{
+  "feature": "Secure Upload Module Refactoring",
+  "workflow_type": "refactor",
+  "workflow_rationale": "Security-critical refactoring requiring: (1) Dependency hardening (PyPDF2, add defusedxml), (2) Security enhancements (magic number validation, XXE protection, SQLi prevention), (3) Architectural consolidation (merge duplicate upload endpoints and frontend pages). The refactor-add-remove pattern is appropriate: add secure unified service, migrate consumers, then remove old insecure code.",
+  "phases": [
+    {
+      "id": "phase-1-backend-security",
+      "name": "Backend Security Hardening",
+      "type": "implementation",
+      "description": "Upgrade vulnerable dependencies and add security middleware for file validation",
+      "depends_on": [],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Upgrade vulnerable dependencies in requirements.txt",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/requirements.txt"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/requirements.txt"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pip list | grep -E '(PyPDF2|defusedxml|filetype|pdfplumber)'",
+            "expected": "PyPDF2 >= 6.1.3, defusedxml >= 0.7.1, filetype >= 1.2.0, no pdfplumber"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Integrate magic number validation into upload endpoints",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/resumes/upload.py",
+            "backend/api/batch.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/utils/file_validation.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && grep -n 'validate_magic_number\\|validate_file_structure' api/resumes/upload.py api/batch.py",
+            "expected": "Both files call validate_magic_number before processing files"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Add XXE protection wrapper for python-docx",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/parsers/docx_parser.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/parsers/docx_parser.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && grep -n 'defusedxml\\|DefusedXmlParser' parsers/docx_parser.py",
+            "expected": "defusedxml integration found in docx_parser.py"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-4",
+          "description": "Add filename sanitization to prevent path traversal",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/resumes/upload.py",
+            "backend/api/batch.py"
+          ],
+          "files_to_create": [
+            "backend/utils/sanitization.py"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && grep -n 'sanitize_filename\\|path traversal' api/resumes/upload.py api/batch.py utils/sanitization.py",
+            "expected": "Filename sanitization implemented in upload endpoints"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-5",
+          "description": "Audit database queries for SQL injection vectors",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/models/resume.py"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Review upload endpoints and verify: (1) No use of text() with user input, (2) All queries use ORM methods (select, insert, update, delete), (3) All Resume() creations use keyword arguments not f-strings"
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-backend-consolidation",
+      "name": "Backend Upload Service Consolidation",
+      "type": "implementation",
+      "description": "Create unified upload service that handles both single and batch uploads securely",
+      "depends_on": [
+        "phase-1-backend-security"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create unified upload service module",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/services/upload_service.py"
+          ],
+          "patterns_from": [
+            "backend/api/resumes/upload.py",
+            "backend/api/batch.py",
+            "backend/utils/file_validation.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c \"from services.upload_service import UnifiedUploadService; print('UnifiedUploadService imported successfully')\"",
+            "expected": "UnifiedUploadService imported successfully"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Create unified upload API endpoint",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/resumes/__init__.py"
+          ],
+          "files_to_create": [
+            "backend/api/resumes/unified_upload.py"
+          ],
+          "patterns_from": [
+            "backend/api/resumes/upload.py",
+            "backend/api/batch.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8000/api/resumes/unified-upload",
+            "body": {
+              "files": [
+                {
+                  "name": "test.pdf",
+                  "size": 1024
+                }
+              ]
+            },
+            "expected_status": 400
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Route old upload endpoints to new unified service (compatibility layer)",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/resumes/upload.py",
+            "backend/api/batch.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/services/upload_service.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8000/api/resumes/upload",
+            "body": {},
+            "expected_status": 415
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-frontend-consolidation",
+      "name": "Frontend Upload Interface Unification",
+      "type": "implementation",
+      "description": "Create unified upload page that supports both single and mass upload",
+      "depends_on": [
+        "phase-2-backend-consolidation"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Create unified upload page component",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/pages/UnifiedUpload.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/pages/Upload.tsx",
+            "frontend/src/pages/BatchUpload.tsx",
+            "frontend/src/components/ResumeUploader.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/recruiter/unified-upload",
+            "checks": [
+              "Page renders without errors",
+              "Single file upload works",
+              "Multiple file upload works",
+              "Progress indicators show"
+            ]
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Add route for unified upload page",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/App.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/App.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/recruiter/unified-upload",
+            "checks": [
+              "Route loads unified upload page"
+            ]
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Update navigation to point to unified upload page",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/layouts/RecruiterLayout.tsx",
+            "frontend/src/layouts/JobSeekerLayout.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/layouts/RecruiterLayout.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173",
+            "checks": [
+              "Navigation links to unified upload page"
+            ]
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-security-tests",
+      "name": "Security Test Implementation",
+      "type": "implementation",
+      "description": "Create comprehensive security tests for upload functionality",
+      "depends_on": [
+        "phase-2-backend-consolidation"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Create magic number validation tests",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/unit/test_magic_number_validation.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_secure_upload_flow.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/unit/test_magic_number_validation.py -v",
+            "expected": "All tests pass"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Create XXE protection tests",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/unit/test_xxe_protection.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_secure_upload_flow.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/unit/test_xxe_protection.py -v",
+            "expected": "All tests pass - XXE payloads neutralized"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Create SQL injection protection tests",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/unit/test_sqli_protection.py"
+          ],
+          "patterns_from": [
+            "backend/tests/api/test_analytics.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/unit/test_sqli_protection.py -v",
+            "expected": "All tests pass - SQLi attempts neutralized"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-4-4",
+          "description": "Create file spoofing tests",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/integration/test_file_spoofing.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_secure_upload_flow.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/integration/test_file_spoofing.py -v",
+            "expected": "All tests pass - spoofed files rejected"
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-integration-testing",
+      "name": "Integration Testing",
+      "type": "integration",
+      "description": "End-to-end testing of secure upload flow",
+      "depends_on": [
+        "phase-3-frontend-consolidation",
+        "phase-4-security-tests"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Test secure single file upload flow",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Navigate to unified upload page",
+              "Select valid PDF file",
+              "Upload file",
+              "Verify file passes magic number validation",
+              "Verify file processed successfully",
+              "Verify no security errors in logs"
+            ]
+          },
+          "status": "completed",
+          "notes": "Implementation verified complete. Frontend UnifiedUpload.tsx page integrates with backend UnifiedUploadService for secure file upload. Magic number validation, filename sanitization, and file size limits all implemented. Integration test suite created. See subtask-5-1-verification-summary.md for details."
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Test secure batch upload flow",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Navigate to unified upload page",
+              "Select multiple files (PDF + DOCX)",
+              "Upload all files",
+              "Verify all files pass validation",
+              "Verify batch processing completes",
+              "Check security logs for violations"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-3",
+          "description": "Test malicious file rejection",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Create file with spoofed extension (EXE renamed to PDF)",
+              "Attempt upload via unified page",
+              "Verify rejection at magic number check",
+              "Verify appropriate error message shown",
+              "Check security log for violation record"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-6-cleanup",
+      "name": "Cleanup and Deprecation",
+      "type": "cleanup",
+      "description": "Remove deprecated upload pages and endpoints after migration",
+      "depends_on": [
+        "phase-5-integration-testing"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-6-1",
+          "description": "Mark old upload endpoints as deprecated",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/resumes/upload.py",
+            "backend/api/batch.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8000/api/resumes/upload",
+            "body": {},
+            "expected_status": 301
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-6-2",
+          "description": "Remove old frontend upload pages",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/App.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/App.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/upload",
+            "checks": [
+              "Route redirects to /unified-upload or shows 404"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-6-3",
+          "description": "Update or remove ResumeUploader component if superseded",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/components/ResumeUploader.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/components/ResumeUploader.tsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run build",
+            "expected": "Build succeeds without TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 6,
+    "total_subtasks": 19,
+    "services_involved": [
+      "backend",
+      "frontend"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-3-frontend-consolidation",
+            "phase-4-security-tests"
+          ],
+          "reason": "Frontend consolidation and security tests can run in parallel after backend consolidation"
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution recommended due to tight dependencies"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 122 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "critical",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration",
+      "e2e",
+      "security"
+    ],
+    "security_scanning_required": true,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All new security tests pass (magic number, XXE, SQLi, file spoofing)",
+      "All existing tests pass (no regressions)",
+      "Unified upload page handles 1-100 files",
+      "Malicious files rejected with proper error messages",
+      "No security vulnerabilities introduced",
+      "Security logging active for violations",
+      "Old upload endpoints deprecated or removed"
+    ],
+    "verification_steps": [
+      {
+        "name": "Security Tests",
+        "command": "cd backend && pytest tests/unit/test_magic_number_validation.py tests/unit/test_xxe_protection.py tests/unit/test_sqli_protection.py -v",
+        "expected_outcome": "All security tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Integration Tests",
+        "command": "cd backend && pytest tests/integration/test_secure_upload_flow.py tests/integration/test_file_spoofing.py -v",
+        "expected_outcome": "All integration tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Existing Tests",
+        "command": "cd backend && pytest tests/ -v --ignore=tests/unit/test_magic_number_validation.py --ignore=tests/unit/test_xxe_protection.py --ignore=tests/unit/test_sqli_protection.py --ignore=tests/integration/test_file_spoofing.py",
+        "expected_outcome": "All existing tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Security Scan",
+        "command": "cd backend && python -m bandit -r api/ services/ parsers/ -f json -o security_scan_results.json || true",
+        "expected_outcome": "No high/critical severity issues",
+        "type": "security",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Frontend Build",
+        "command": "cd frontend && npm run build",
+        "expected_outcome": "Build succeeds",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "Critical risk security refactoring requires comprehensive testing including security scans for injection attacks, file spoofing, and XXE. All security tests must pass before sign-off."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "pytest tests/unit/test_magic_number_validation.py -v",
+        "pytest tests/unit/test_xxe_protection.py -v",
+        "pytest tests/unit/test_sqli_protection.py -v"
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "pytest tests/integration/test_secure_upload_flow.py -v",
+        "pytest tests/integration/test_file_spoofing.py -v"
+      ],
+      "services_to_test": [
+        "backend"
+      ]
+    },
+    "e2e_tests": {
+      "required": true,
+      "commands": [
+        "npm run test:e2e"
+      ],
+      "flows": [
+        "single-file-upload",
+        "batch-upload",
+        "malicious-file-rejection"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:5173/unified-upload",
+          "checks": [
+            "renders",
+            "no-console-errors",
+            "single-upload-works",
+            "batch-upload-works"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    },
+    "security_verification": {
+      "required": true,
+      "checks": [
+        "magic-number-validation-active",
+        "xxe-protection-active",
+        "sqli-prevention-verified",
+        "filename-sanitization-active",
+        "security-violations-logged"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "updated_at": "2026-02-07T15:47:49.824Z"
+}
