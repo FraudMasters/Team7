@@ -54,6 +54,7 @@ from . import (
     analysis,
     listing,
     management,
+    unified_upload,
     upload,
 )
 
@@ -62,10 +63,12 @@ from . import (
 router = APIRouter()
 
 # Include sub-routers in logical order:
-# 1. upload - Entry point for new resumes
-# 2. listing - Browse existing resumes
-# 3. analysis - View detailed analysis
-# 4. management - Update status and delete resumes
+# 1. unified_upload - Unified endpoint for single and batch uploads
+# 2. upload - Legacy single file upload endpoint (kept for compatibility)
+# 3. listing - Browse existing resumes
+# 4. analysis - View detailed analysis
+# 5. management - Update status and delete resumes
+router.include_router(unified_upload.router)
 router.include_router(upload.router)
 router.include_router(listing.router)
 router.include_router(analysis.router)
@@ -77,6 +80,7 @@ __all__ = [
     "analysis",
     "listing",
     "management",
+    "unified_upload",
     "upload",
     "router",
 ]
