@@ -7,6 +7,7 @@ are combined for resume-job matching.
 """
 import logging
 from typing import List, Literal, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -134,7 +135,10 @@ class CompareWeightsResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["Matching Weights"],
 )
-async def create_matching_weights_profile(request: MatchingWeightsProfileCreate) -> JSONResponse:
+async def create_matching_weights_profile(
+    request: MatchingWeightsProfileCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Create a custom matching weights profile for an organization.
 
@@ -145,6 +149,7 @@ async def create_matching_weights_profile(request: MatchingWeightsProfileCreate)
 
     Args:
         request: Create request with profile configuration
+        db: Database session
 
     Returns:
         JSON response with created profile details
@@ -188,38 +193,57 @@ async def create_matching_weights_profile(request: MatchingWeightsProfileCreate)
                 detail="Profile name cannot be empty",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        profile_response = {
-            "id": "placeholder-id",
-            "organization_id": request.organization_id,
-            "name": request.name,
-            "description": request.description,
-            "keyword_weight": request.keyword_weight,
-            "tfidf_weight": request.tfidf_weight,
-            "vector_weight": request.vector_weight,
-            "is_default": request.is_default,
-            "is_preset": request.is_preset,
-            "preset_type": request.preset_type,
-            "created_by": request.created_by,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
+        # Create new profile with UUID
+        profile_id = str(uuid4())
+        new_profile = MatchingWeightsProfile(
+            id=profile_id,
+            organization_id=request.organization_id,
+            name=request.name,
+            description=request.description,
+            keyword_weight=request.keyword_weight,
+            tfidf_weight=request.tfidf_weight,
+            vector_weight=request.vector_weight,
+            is_default=request.is_default,
+            is_preset=request.is_preset,
+            preset_type=request.preset_type,
+            created_by=request.created_by,
+        )
+        db.add(new_profile)
+        await db.flush()
+
+        response_data = {
+            "id": new_profile.id,
+            "organization_id": new_profile.organization_id,
+            "name": new_profile.name,
+            "description": new_profile.description,
+            "keyword_weight": new_profile.keyword_weight,
+            "tfidf_weight": new_profile.tfidf_weight,
+            "vector_weight": new_profile.vector_weight,
+            "is_default": new_profile.is_default,
+            "is_preset": new_profile.is_preset,
+            "preset_type": new_profile.preset_type,
+            "created_by": new_profile.created_by,
+            "created_at": new_profile.created_at.isoformat(),
+            "updated_at": new_profile.updated_at.isoformat(),
         }
+
+        await db.commit()
 
         logger.info(
             f"Created matching weights profile '{request.name}' "
-            f"for organization: {request.organization_id}"
+            f"for organization: {request.organization_id} with ID: {new_profile.id}"
         )
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
-            content=profile_response,
+            content=response_data,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating matching weights profile: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create matching weights profile: {str(e)}",
