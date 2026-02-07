@@ -24,16 +24,11 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  OutlinedInput,
   Autocomplete,
   Tabs,
   Tab,
-} from '@mui/material';
-import {
-  Search as SearchIcon,
-  AutoAwesome as AnalyzeIcon,
-  School as LearningIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import Icon from '@/components/ui/primitives/Icon';
 import { useNavigate } from 'react-router-dom';
 import { skillGap } from '@/api/skillGap';
 import type { SkillGapAnalysisResponse, LearningRecommendationsResponse } from '@/types/api';
@@ -214,7 +209,7 @@ export default function SkillGapAnalysisPage() {
           <Typography variant="h4" gutterBottom>
             {t('skillGap.title', { defaultValue: 'Skill Gap Analysis' })}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             {t('skillGap.subtitle', {
               defaultValue: 'Analyze skill gaps between a candidate and job requirements, and get personalized learning recommendations.',
             })}
@@ -357,7 +352,7 @@ export default function SkillGapAnalysisPage() {
                 </Button>
                 <Button
                   variant="contained"
-                  startIcon={analyzing ? <CircularProgress size={20} /> : <AnalyzeIcon />}
+                  startIcon={analyzing ? <CircularProgress size={20} /> : <Icon name="sparkles" />}
                   onClick={handleAnalyze}
                   disabled={analyzing}
                 >
@@ -386,11 +381,11 @@ export default function SkillGapAnalysisPage() {
               sx={{ borderBottom: 1, borderColor: 'divider' }}
             >
               <Tab
-                icon={<AnalyzeIcon />}
+                icon={<Icon name="sparkles" />}
                 label={t('skillGap.tabs.analysis', { defaultValue: 'Analysis' })}
               />
               <Tab
-                icon={<LearningIcon />}
+                icon={<Icon name="graduation-cap" />}
                 label={t('skillGap.tabs.recommendations', { defaultValue: 'Recommendations' })}
                 disabled={!recommendations}
               />

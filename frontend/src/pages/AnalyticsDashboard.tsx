@@ -10,11 +10,8 @@ import {
   IconButton,
   CircularProgress,
   Alert,
-} from '@mui/material';
-import {
-  Close as CloseIcon,
-  PictureAsPdf as PdfIcon,
-} from '@mui/icons-material';
+  Icon,
+} from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
 import KeyMetrics from '@components/analytics/KeyMetrics';
@@ -102,16 +99,16 @@ const AnalyticsDashboardPage: React.FC = () => {
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+            <Typography variant="h4" as="h1" fontWeight={700} gutterBottom>
               {t('analyticsDashboard.title')}
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography variant="body1" color="secondary">
               {t('analyticsDashboard.subtitle')}
             </Typography>
           </Box>
           <Button
             variant="contained"
-            startIcon={<PdfIcon />}
+            startIcon={<Icon name="file" size={20} />}
             onClick={handleOpenReportBuilder}
             color="primary"
           >
@@ -166,7 +163,7 @@ const AnalyticsDashboardPage: React.FC = () => {
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Button
                 variant="contained"
-                startIcon={generatingReport ? <CircularProgress size={16} /> : <PdfIcon />}
+                startIcon={generatingReport ? <CircularProgress size={16} /> : <Icon name="file" size={20} />}
                 onClick={handleGeneratePDF}
                 disabled={generatingReport}
                 color="primary"
@@ -178,7 +175,7 @@ const AnalyticsDashboardPage: React.FC = () => {
                 disabled={generatingReport}
                 size="small"
               >
-                <CloseIcon />
+                <Icon name="x" size={20} />
               </IconButton>
             </Box>
           </Box>
@@ -202,7 +199,7 @@ const AnalyticsDashboardPage: React.FC = () => {
       {/* Print-specific styles - only applied when printing */}
       <style>{`
         @media print {
-          .analytics-dashboard .MuiButton-root:not([data-print-include]) {
+          .analytics-dashboard button:not([data-print-include]) {
             display: none !important;
           }
           body {

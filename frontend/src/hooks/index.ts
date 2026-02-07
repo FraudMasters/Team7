@@ -25,3 +25,14 @@ export {
   COMMON_SHORTCUTS,
   type GlobalShortcutConfig,
 } from './useGlobalKeyboardShortcuts';
+
+export {
+  useRoles,
+  isValidRole,
+  normalizeRole,
+  getRoleLevel,
+  compareRoles,
+  type UserRole,
+  type RolesResult,
+  type UserInfo,
+} from './useRoles';

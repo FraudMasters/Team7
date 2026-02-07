@@ -1,4 +1,6 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -26,6 +28,7 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -46,7 +49,7 @@ import {
 } from '@mui/icons-material';
 
 /**
- * Available metric definition
+ * Определение доступной метрики
  */
 interface AvailableMetric {
   id: string;
@@ -56,7 +59,7 @@ interface AvailableMetric {
 }
 
 /**
- * Selected metric in report
+ * Выбранная метрика в отчете
  */
 interface SelectedMetric {
   id: string;
@@ -66,7 +69,7 @@ interface SelectedMetric {
 }
 
 /**
- * Report configuration data
+ * Данные конфигурации отчета
  */
 interface ReportData {
   metrics: string[];
@@ -74,7 +77,7 @@ interface ReportData {
 }
 
 /**
- * Report from backend
+ * Отчет с бэкенда
  */
 interface Report {
   id: string;
@@ -90,7 +93,7 @@ interface Report {
 }
 
 /**
- * List response from backend
+ * Ответ списка с бэкенда
  */
 interface ReportListResponse {
   organization_id?: string;
@@ -99,7 +102,7 @@ interface ReportListResponse {
 }
 
 /**
- * Form data for creating/editing reports
+ * Данные формы для создания/редактирования отчетов
  */
 interface ReportFormData {
   name: string;
@@ -108,18 +111,18 @@ interface ReportFormData {
 }
 
 /**
- * Schedule configuration for scheduled reports
+ * Конфигурация расписания для запланированных отчетов
  */
 interface ScheduleConfig {
   frequency: 'daily' | 'weekly' | 'monthly';
-  day_of_week?: number; // 0-6 (Sunday-Saturday) for weekly
-  day_of_month?: number; // 1-31 for monthly
+  day_of_week?: number; // 0-6 (воскресенье-суббота) для еженедельных
+  day_of_month?: number; // 1-31 для ежемесячных
   hour: number; // 0-23
   minute: number; // 0-59
 }
 
 /**
- * Delivery configuration for scheduled reports
+ * Конфигурация доставки для запланированных отчетов
  */
 interface DeliveryConfig {
   format: 'pdf' | 'csv' | 'both';
@@ -128,7 +131,7 @@ interface DeliveryConfig {
 }
 
 /**
- * Form data for scheduled reports
+ * Данные формы для запланированных отчетов
  */
 interface ScheduledReportFormData {
   name: string;
@@ -139,27 +142,27 @@ interface ScheduledReportFormData {
 }
 
 /**
- * ReportBuilder Component Props
+ * Свойства компонента ReportBuilder
  */
 interface ReportBuilderProps {
-  /** Organization ID for reports */
+  /** ID организации для отчетов */
   organizationId?: string;
-  /** API endpoint URL for reports */
+  /** URL API endpoint для отчетов */
   apiUrl?: string;
-  /** Callback when report is created/updated */
+  /** Колбэк при создании/обновлении отчета */
   onReportChange?: (report: Report) => void;
 }
 
 /**
- * ReportBuilder Component
+ * Компонент ReportBuilder
  *
- * Provides a drag-and-drop interface for building custom analytics reports.
- * Features include:
- * - Browse and select available metrics
- * - Drag to reorder selected metrics
- * - Save and load custom reports
- * - Edit and delete existing reports
- * - Real-time preview of report configuration
+ * Предоставляет интерфейс drag-and-drop для создания пользовательских аналитических отчетов.
+ * Функции включают:
+ * - Просмотр и выбор доступных метрик
+ * - Перетаскивание для упорядочения выбранных метрик
+ * - Сохранение и загрузку пользовательских отчетов
+ * - Редактирование и удаление существующих отчетов
+ * - Предварительный просмотр конфигурации отчета в реальном времени
  *
  * @example
  * ```tsx
@@ -171,6 +174,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   apiUrl = 'http://localhost:8000/api/reports',
   onReportChange,
 }) => {
+  // Состояния для загрузки, ошибки, отчетов, выбранных метрик и доступных метрик
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -238,7 +242,7 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
     },
   ]);
 
-  // Dialog states
+  // Состояния диалогов
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -249,14 +253,14 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
 
-  // Form state
+  // Состояние формы
   const [formData, setFormData] = useState<ReportFormData>({
     name: '',
     description: '',
     is_public: false,
   });
 
-  // Scheduled report form state
+  // Состояние формы запланированного отчета
   const [scheduleFormData, setScheduleFormData] = useState<ScheduledReportFormData>({
     name: '',
     schedule_config: {
@@ -274,14 +278,14 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
     is_active: true,
   });
 
-  // Recipient input for scheduled reports
+  // Ввод получателя для запланированных отчетов
   const [recipientEmail, setRecipientEmail] = useState('');
 
-  // Drag and drop state
+  // Состояние drag and drop
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   /**
-   * Fetch saved reports from backend
+   * Загрузка сохраненных отчетов с бэкенда
    */
   const fetchReports = async () => {
     setLoading(true);

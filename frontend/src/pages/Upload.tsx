@@ -1,8 +1,8 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Typography, Box, Paper, Skeleton, Grid2 } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { Typography, Box, Paper, Skeleton, Grid } from '@/components/ui';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
 import ResumeUploader, { ResumeUploaderHandle } from '@components/ResumeUploader';
 import ErrorBoundary from '@components/ErrorBoundary';
 import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
@@ -19,7 +19,7 @@ import ErrorMessage, { ErrorType, ErrorAction } from '@components/ErrorMessage';
 const UploadPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const theme = useTheme();
+  const theme = useEmotionTheme();
   const uploaderRef = useRef<ResumeUploaderHandle>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -246,9 +246,9 @@ const UploadPage: React.FC = () => {
           />
 
           {/* Content Grid Skeleton */}
-          <Grid2 container spacing={3}>
+          <Grid container spacing={3}>
             {/* Upload Area Skeleton */}
-            <Grid2 size={{ xs: 12, md: 7, lg: 8 }}>
+            <Grid item xs={12} md={7} lg={8}>
               <Box
                 sx={{
                   p: 4,
@@ -298,10 +298,10 @@ const UploadPage: React.FC = () => {
                   <Skeleton variant="rectangular" width={160} height={40} animation="wave" />
                 </Box>
               </Box>
-            </Grid2>
+            </Grid>
 
             {/* Instructions Section Skeleton */}
-            <Grid2 size={{ xs: 12, md: 5, lg: 4 }}>
+            <Grid item xs={12} md={5} lg={4}>
               <Box
                 sx={{
                   p: 3,
@@ -345,8 +345,8 @@ const UploadPage: React.FC = () => {
                   animation="wave"
                 />
               </Box>
-            </Grid2>
-          </Grid2>
+            </Grid>
+          </Grid>
         </Box>
       )}
 
@@ -364,9 +364,9 @@ const UploadPage: React.FC = () => {
       </Typography>
 
       {/* Content Grid - Upload and Instructions */}
-      <Grid2 container spacing={3} sx={{ mt: 0 }}>
+      <Grid container spacing={3} sx={{ mt: 0 }}>
         {/* Upload Area */}
-        <Grid2 size={{ xs: 12, md: 7, lg: 8 }}>
+        <Grid item xs={12} md={7} lg={8}>
           <Paper elevation={1} sx={{ p: 4 }}>
             {/* Comprehensive Error Message */}
             {uploadError && errorType && (
@@ -388,10 +388,10 @@ const UploadPage: React.FC = () => {
               onUploadingChange={handleUploadingChange}
             />
           </Paper>
-        </Grid2>
+        </Grid>
 
         {/* Instructions Section */}
-        <Grid2 size={{ xs: 12, md: 5, lg: 4 }}>
+        <Grid item xs={12} md={5} lg={4}>
           <Paper elevation={0} sx={{ p: 3, bgcolor: 'action.hover' }}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               {t('upload.whatHappensNext.title')}
@@ -409,8 +409,8 @@ const UploadPage: React.FC = () => {
               {t('upload.whatHappensNext.timeline')}
             </Typography>
           </Paper>
-        </Grid2>
-      </Grid2>
+        </Grid>
+      </Grid>
       </Box>
     </ErrorBoundary>
   );

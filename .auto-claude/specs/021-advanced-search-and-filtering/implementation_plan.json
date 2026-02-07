@@ -649,7 +649,8 @@
     }
   },
   "qa_signoff": null,
-  "status": "in_progress",
-  "planStatus": "in_progress",
-  "updated_at": "2026-01-31T23:35:49.595Z"
+  "status": "backlog",
+  "planStatus": "pending",
+  "updated_at": "2026-02-03T00:13:49.492Z",
+  "recoveryNote": "Task recovered from stuck state at 2026-02-03T00:13:41.482Z"
 }

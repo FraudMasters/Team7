@@ -22,11 +22,8 @@ import {
   FormControlLabel,
   Button,
   Tooltip,
-} from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Weight profile entry interface

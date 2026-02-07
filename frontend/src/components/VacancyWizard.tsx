@@ -18,12 +18,8 @@ import {
   Grid,
   Alert,
   IconButton,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ArrowBack as ArrowBackIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -249,7 +245,7 @@ const VacancyWizard: React.FC<VacancyWizardProps> = ({ onComplete, initialData }
                   onKeyPress={(e) => e.key === 'Enter' && addRequiredSkill()}
                   placeholder="Добавьте навык (например: Java, Python, React)"
                 />
-                <Button variant="contained" onClick={addRequiredSkill} startIcon={<AddIcon />}>
+                <Button variant="contained" onClick={addRequiredSkill} startIcon={<Icon name="plus" size={16} />}>
                   Добавить
                 </Button>
               </Stack>
@@ -260,7 +256,7 @@ const VacancyWizard: React.FC<VacancyWizardProps> = ({ onComplete, initialData }
                     label={skill}
                     onDelete={() => removeRequiredSkill(skill)}
                     color="primary"
-                    deleteIcon={<DeleteIcon />}
+                    deleteIcon={<Icon name="trash-2" size="small" />}
                   />
                 ))}
               </Box>
@@ -276,7 +272,7 @@ const VacancyWizard: React.FC<VacancyWizardProps> = ({ onComplete, initialData }
                   onKeyPress={(e) => e.key === 'Enter' && addAdditionalSkill()}
                   placeholder="Дополнительные навыки"
                 />
-                <Button variant="outlined" onClick={addAdditionalSkill} startIcon={<AddIcon />}>
+                <Button variant="outlined" onClick={addAdditionalSkill} startIcon={<Icon name="plus" size={16} />}>
                   Добавить
                 </Button>
               </Stack>
@@ -287,7 +283,7 @@ const VacancyWizard: React.FC<VacancyWizardProps> = ({ onComplete, initialData }
                     label={skill}
                     onDelete={() => removeAdditionalSkill(skill)}
                     color="secondary"
-                    deleteIcon={<DeleteIcon />}
+                    deleteIcon={<Icon name="trash-2" size="small" />}
                   />
                 ))}
               </Box>
@@ -421,7 +417,7 @@ const VacancyWizard: React.FC<VacancyWizardProps> = ({ onComplete, initialData }
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton onClick={() => navigate('/vacancies')}>
-            <ArrowBackIcon />
+            <Icon name="arrow-left" size={20} />
           </IconButton>
           <Typography variant="h4" component="h1" fontWeight={600}>
             Создать запрос на сотрудника

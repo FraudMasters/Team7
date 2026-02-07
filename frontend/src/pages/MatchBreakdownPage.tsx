@@ -9,7 +9,7 @@ import {
   Alert,
   CircularProgress,
   Grid,
-} from '@mui/material';
+} from '@/components/ui';
 import { useParams } from 'react-router-dom';
 import { apiClient } from '@/api/client';
 import MatchScoreBreakdown from '@components/MatchScoreBreakdown';
@@ -135,7 +135,7 @@ const MatchBreakdownPage: React.FC = () => {
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
           <Stack alignItems="center" spacing={2}>
             <CircularProgress size={60} />
-            <Typography variant="h6" color="text.secondary">
+            <Typography variant="h6" color="secondary">
               Loading match breakdown...
             </Typography>
           </Stack>
@@ -194,7 +194,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Match Score Breakdown
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Detailed analysis for {matchData.filename} vs {matchData.vacancyTitle}
           </Typography>
         </Box>
@@ -204,7 +204,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Score Breakdown
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Overall match: {Math.round(matchData.overallScore * 100)}% ({matchData.recommendation})
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -223,7 +223,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Matched Skills
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Skills found in resume with confidence scores and match types
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -238,7 +238,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Skill Gap Analysis
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Required skills missing from the resume with suggested alternatives
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -253,7 +253,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Resume Text Explorer
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Interactive exploration of skill matches in resume text
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -268,7 +268,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Top Candidates Comparison
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Side-by-side comparison with other candidates for this position
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -286,7 +286,7 @@ const MatchBreakdownPage: React.FC = () => {
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Export Report
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Download detailed match analysis as a shareable report
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -296,7 +296,7 @@ const MatchBreakdownPage: React.FC = () => {
 
         {/* Processing Info */}
         <Box sx={{ mt: 2 }}>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="secondary">
             Processing time: {matchData.processingTimeMs?.toFixed(0)}ms
           </Typography>
         </Box>

@@ -3,6 +3,54 @@ Resume comparison endpoints for multi-resume analysis and ranking.
 
 This module provides endpoints for creating, retrieving, and managing
 multi-resume comparison views with ranking, filtering, and sorting capabilities.
+
+## Eager Loading and Query Optimization
+
+This module has been audited for N+1 query patterns (see QUERY_AUDIT.md lines 461-478, 580-584).
+
+### Current State
+The ResumeComparison model currently has no explicit SQLAlchemy relationships defined.
+It stores:
+- vacancy_id: Foreign key to JobVacancy (no relationship attribute)
+- resume_ids: JSON array of resume IDs
+- filters, comparison_notes, shared_with: JSON fields
+
+### Query Patterns
+All database queries in this module use simple SELECT statements without eager loading:
+
+1. **list_comparisons (GET /**): Simple select with filters
+   - Lines 646-688: `select(ResumeComparison)` with optional filters
+   - No relationship access - no N+1 risk
+
+2. **get_comparison (GET /{id})**: Single record fetch
+   - Lines 766-768: `select(ResumeComparison).where(ResumeComparison.id == comparison_uuid)`
+   - No relationship access - no N+1 risk
+
+3. **update_comparison (PUT /{id})**: Single record fetch and update
+   - Lines 853-855: Single query with no relationship access
+   - No N+1 risk
+
+4. **delete_comparison (DELETE /{id})**: Single record fetch and delete
+   - Lines 947-949: Single query with no relationship access
+   - No N+1 risk
+
+### Future Optimization
+If relationships are added to the ResumeComparison model, apply eager loading using:
+
+```python
+from sqlalchemy.orm import selectinload
+
+# Example: If a relationship to JobVacancy is added
+query = select(ResumeComparison).options(
+    selectinload(ResumeComparison.vacancy)
+).where(ResumeComparison.id == comparison_uuid)
+```
+
+### ML Processing Optimization
+The compare_multiple_resumes function (lines 47-398) performs skill matching using ML models.
+This is not a database N+1 issue, but could benefit from batch processing optimizations:
+- Lines 236-292: Individual skill matching calls in loops
+- Consider implementing batch matching for better performance
 """
 import json
 import logging
@@ -18,6 +66,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 # Add parent directory to path to import from data_extractor service
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "services" / "data_extractor"))

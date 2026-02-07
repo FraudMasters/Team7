@@ -4,14 +4,32 @@ Analytics and reporting endpoints.
 This module provides endpoints for retrieving recruitment analytics metrics,
 including time-to-hire statistics, resume processing metrics, match rates,
 and other key performance indicators for the recruitment process.
-"""
-import logging
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+Database Query Optimization:
+This module implements eager loading patterns to eliminate N+1 query issues:
+
+1. Bulk Loading with .in_() Clauses:
+   - Fetch multiple related records in a single query using WHERE field IN (...)
+   - Example: Fetching all SkillTaxonomy records for multiple industries at once
+   - Pattern: select(Model).where(Model.field.in_(list_of_values))
+
+2. SQL Aggregations:
+   - Use SQL aggregate functions (COUNT, AVG, MAX, etc.) instead of Python loops
+   - Example: Calculating averages and counts directly in SQL
+   - Pattern: select(func.avg(Model.field)).where(...)
+
+3. Window Functions:
+   - Use ROW_NUMBER() with PARTITION BY for latest-record-per-group queries
+   - Example: Getting the most recent hiring stage for each resume
+   - Pattern: func.row_number().over(partition_by=..., order_by=...)
+
+4. Lookup Dictionaries:
+   - Build O(1) lookup dicts from bulk-fetched results
+   - Example: taxonomies_lookup = {tax.industry: tax for tax in taxonomies_list}
+   - Eliminates repeated queries within loops
+
+These patterns reduce query counts from O(n) to O(1) for common operations.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -276,17 +294,27 @@ async def get_quality_metrics(
                     "total_analyzed": 0
                 }
             else:
-                # Fetch all analyses to calculate metrics
-                all_analyses = await db.execute(
+                # EAGER LOADING: Use SQL aggregations instead of Python loops for better performance
+                # This eliminates N+1 query patterns and reduces database round trips
+
+                # Calculate average processing time using SQL aggregation - single query
+                avg_time_result = await db.execute(
+                    select(func.avg(ResumeAnalysis.processing_time_seconds)).where(
+                        ResumeAnalysis.processing_time_seconds.isnot(None)
+                    )
+                )
+                avg_analysis_time = avg_time_result.scalar() or 10.0
+
+                # Fetch all analyses in a single query for in-memory processing
+                # This is more efficient than querying for each resume individually
+                all_analyses_result = await db.execute(
                     select(ResumeAnalysis)
                 )
-                analyses = all_analyses.scalars().all()
+                analyses = all_analyses_result.scalars().all()
 
-                # Calculate metrics from ResumeAnalysis data
                 total_keywords = 0
                 total_entities = 0
                 total_grammar_issues = 0
-                total_processing_time = 0.0
 
                 for analysis in analyses:
                     # Count keywords
@@ -303,14 +331,9 @@ async def get_quality_metrics(
                     if analysis.grammar_issues and isinstance(analysis.grammar_issues, list):
                         total_grammar_issues += len(analysis.grammar_issues)
 
-                    # Sum processing time
-                    if analysis.processing_time_seconds:
-                        total_processing_time += analysis.processing_time_seconds
-
                 entities_per_resume = total_entities / total_analyses if total_analyses > 0 else 15.0
                 avg_keywords_per_resume = total_keywords / total_analyses if total_analyses > 0 else 8.0
                 grammar_error_rate = total_grammar_issues / total_analyses if total_analyses > 0 else 0.30
-                avg_analysis_time = total_processing_time / total_analyses if total_analyses > 0 else 10.0
 
                 extraction_success_rate = total_analyses / total_resumes if total_resumes > 0 else 0.98
                 error_rate = failed_count / total_resumes if total_resumes > 0 else 0.05
@@ -462,15 +485,28 @@ async def get_taxonomy_usage(
             vacancy_stats = vacancy_result.all()
 
             # Build most used taxonomies from vacancy data
+            # EAGER LOADING: Apply bulk loading pattern to eliminate N+1 queries
+            # Instead of querying SkillTaxonomy for each industry in a loop,
+            # we fetch all taxonomies in a single query using .in_() clause
+            industries = [ind for ind, count in vacancy_stats]
+
+            # Fetch all taxonomies in bulk using IN clause - single query
+            if industries:
+                taxonomies_query = select(SkillTaxonomy).where(
+                    SkillTaxonomy.industry.in_(industries)
+                )
+                taxonomies_result = await db.execute(taxonomies_query)
+                taxonomies_list = taxonomies_result.scalars().all()
+
+                # Build lookup dictionary for O(1) access - avoids N+1 queries
+                taxonomies_lookup = {tax.industry: tax for tax in taxonomies_list}
+            else:
+                taxonomies_lookup = {}
+
             most_used = []
             for vac_industry, count in vacancy_stats:
-                # Find matching taxonomy
-                tax_result = await db.execute(
-                    select(SkillTaxonomy).where(
-                        SkillTaxonomy.industry == vac_industry
-                    ).limit(1)
-                )
-                taxonomy = tax_result.scalar_one_or_none()
+                # Use lookup instead of querying database
+                taxonomy = taxonomies_lookup.get(vac_industry)
 
                 most_used.append({
                     "taxonomy_id": str(taxonomy.id) if taxonomy else vac_industry,
@@ -848,8 +884,8 @@ async def get_funnel_metrics(
                         detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
                     )
 
-            # Get the most recent stage for each resume
-            # We need to find the latest HiringStage record for each resume_id
+            # EAGER LOADING: Get the most recent stage for each resume using window functions
+            # This avoids N+1 queries by using row_number() instead of separate queries per resume
             from sqlalchemy import literal_column
             subquery = (
                 select(
@@ -1173,7 +1209,8 @@ async def get_recruiter_performance(
             hired_result = await db.execute(hired_query)
             hired_resume_ids = [row[0] for row in hired_result]
 
-            # For each hired resume, find the recruiter who uploaded it
+            # EAGER LOADING: For each hired resume, find the recruiter who uploaded it
+            # Use .in_() clause to fetch all upload events in a single query
             if hired_resume_ids:
                 # Find the upload event for these resumes
                 upload_events_query = select(
@@ -1241,7 +1278,8 @@ async def get_recruiter_performance(
             interview_result = await db.execute(interview_query)
             interview_resume_ids = [row[0] for row in interview_result]
 
-            # For each interview resume, find the recruiter
+            # EAGER LOADING: For each interview resume, find the recruiter
+            # Use .in_() clause to fetch all interview upload events in a single query
             if interview_resume_ids:
                 interview_upload_query = select(
                     AnalyticsEvent.recruiter_id,
@@ -1403,7 +1441,9 @@ async def get_skill_demand(
         total_vacancies = 0
 
         async for db in get_db():
-            # Build query for JobVacancy
+            # EAGER LOADING: Build query for JobVacancy with date filters
+            # Fetch all matching vacancies in a single query, then process in-memory
+            # This is more efficient than querying for each skill individually
             query = select(JobVacancy)
 
             # Apply date filters if provided
@@ -1656,7 +1696,8 @@ async def get_source_tracking(
             hired_result = await db.execute(hired_query)
             hired_resume_ids = [str(row[0]) for row in hired_result]
 
-            # For each hired resume, find its source from the upload event
+            # EAGER LOADING: For each hired resume, find its source from the upload event
+            # Use .in_() clause to fetch all hired resume sources in a single query
             if hired_resume_ids:
                 hired_source_query = select(
                     AnalyticsEvent.entity_id,

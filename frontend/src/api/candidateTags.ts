@@ -1,37 +1,37 @@
 /**
  * Candidate Tags API Client
  *
- * This module provides a client for managing organization-specific candidate tags,
- * including creating, reading, updating, and deleting tag configurations, as well as
- * assigning and removing tags from candidates (resumes). Tags enable flexible
- * categorization and prioritization (e.g., 'High Priority', 'Remote', 'Referral').
+ * Этот модуль предоставляет клиент для управления тегами кандидатов организации,
+ * включая создание, чтение, обновление и удаление конфигураций тегов, а также
+ * назначение и удаление тегов у кандидатов (резюме). Теги обеспечивают гибкую
+ * категоризацию и приоритизацию (например, 'Высокий приоритет', 'Удаленно', 'Рекомендация').
  *
  * @example
  * ```ts
  * import { candidateTagsClient } from '@/api/candidateTags';
  *
- * // List all tags for an organization
+ * // Получение всех тегов для организации
  * const tags = await candidateTagsClient.listTags('org-123');
  *
- * // Create a new tag
+ * // Создание нового тега
  * const newTag = await candidateTagsClient.createTag({
  *   organization_id: 'org-123',
- *   tag_name: 'High Priority',
+ *   tag_name: 'Высокий приоритет',
  *   tag_order: 1,
  *   is_active: true,
  *   color: '#EF4444',
- *   description: 'For urgent or high-priority candidates'
+ *   description: 'Для срочных или высокоприоритетных кандидатов'
  * });
  *
- * // Assign tag to a resume
+ * // Назначение тега резюме
  * await candidateTagsClient.assignTagToResume('resume-id', {
  *   tag_id: 'tag-id',
  *   recruiter_id: 'recruiter-id'
  * });
  *
- * // Update a tag
+ * // Обновление тега
  * const updated = await candidateTagsClient.updateTag('tag-id', {
- *   tag_name: 'Updated Tag Name',
+ *   tag_name: 'Обновленное название тега',
  *   is_active: false
  * });
  * ```
@@ -49,36 +49,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Default API configuration for candidate tags client
+ * Конфигурация по умолчанию для клиента тегов кандидата
  */
 const DEFAULT_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  timeout: 10000, // 10 секунд
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Candidate Tags API Client class
+ * Класс клиента API для работы с тегами кандидата
  *
- * Provides methods for managing candidate tag configurations with proper
- * error handling and type safety.
+ * Предоставляет методы для управления конфигурациями тегов кандидата с proper
+ * обработкой ошибок и типобезопасностью.
  */
 export class CandidateTagsClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new CandidateTags client instance
+   * Создание нового экземпляра клиента тегов кандидата
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -86,73 +86,73 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid request. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      409: 'A tag with this name already exists.',
-      422: 'Validation error. Please check your input.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Ресурс не найден.',
+      409: 'Тег с таким названием уже существует.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * Create a candidate tag for an organization
+   * Создание тега кандидата для организации
    *
-   * @param request - Create request with tag details
-   * @returns Created candidate tag
-   * @throws ApiError if creation fails
+   * @param request - Запрос на создание с деталями тега
+   * @returns Созданный тег кандидата
+   * @throws ApiError если создание не удалось
    *
    * @example
    * ```ts
    * const tag = await candidateTagsClient.createTag({
    *   organization_id: 'org-123',
-   *   tag_name: 'High Priority',
+   *   tag_name: 'Высокий приоритет',
    *   tag_order: 1,
    *   is_active: true,
    *   color: '#EF4444',
-   *   description: 'For urgent or high-priority candidates'
+   *   description: 'Для срочных или высокоприоритетных кандидатов'
    * });
    * ```
    */
@@ -169,20 +169,20 @@ export class CandidateTagsClient {
   }
 
   /**
-   * List candidate tags with optional filters
+   * Получение списка тегов кандидата с опциональными фильтрами
    *
-   * @param organizationId - Optional organization ID filter
-   * @param isActive - Optional active status filter
-   * @param isDefault - Optional default status filter
-   * @returns List of candidate tags
-   * @throws ApiError if listing fails
+   * @param organizationId - Опциональный фильтр по ID организации
+   * @param isActive - Опциональный фильтр по активному статусу
+   * @param isDefault - Опциональный фильтр по статусу по умолчанию
+   * @returns Список тегов кандидата
+   * @throws ApiError если получение списка не удалось
    *
    * @example
    * ```ts
-   * // Get all tags for an organization
+   * // Получение всех тегов для организации
    * const tags = await candidateTagsClient.listTags('org-123');
    *
-   * // Get only active tags
+   * // Получение только активных тегов
    * const activeTags = await candidateTagsClient.listTags('org-123', true);
    * ```
    */
@@ -208,11 +208,11 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Get a specific candidate tag by ID
+   * Получение конкретного тега кандидата по ID
    *
-   * @param tagId - Candidate tag ID
-   * @returns Candidate tag details
-   * @throws ApiError if not found
+   * @param tagId - ID тега кандидата
+   * @returns Детали тега кандидата
+   * @throws ApiError если тег не найден
    *
    * @example
    * ```ts
@@ -231,11 +231,11 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Get all tags assigned to a specific resume
+   * Получение всех тегов, назначенных конкретному резюме
    *
-   * @param resumeId - Resume ID
-   * @returns Tags assigned to this resume
-   * @throws ApiError if resume not found
+   * @param resumeId - ID резюме
+   * @returns Теги, назначенные этому резюме
+   * @throws ApiError если резюме не найдено
    *
    * @example
    * ```ts
@@ -254,17 +254,17 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Update a candidate tag
+   * Обновление тега кандидата
    *
-   * @param tagId - Candidate tag ID
-   * @param request - Update request with fields to modify
-   * @returns Updated candidate tag
-   * @throws ApiError if update fails
+   * @param tagId - ID тега кандидата
+   * @param request - Запрос на обновление с полями для изменения
+   * @returns Обновленный тег кандидата
+   * @throws ApiError если обновление не удалось
    *
    * @example
    * ```ts
    * const updated = await candidateTagsClient.updateTag('tag-uuid', {
-   *   tag_name: 'Updated Tag Name',
+   *   tag_name: 'Обновленное название тега',
    *   is_active: false
    * });
    * ```
@@ -285,10 +285,10 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Delete a candidate tag
+   * Удаление тега кандидата
    *
-   * @param tagId - Candidate tag ID
-   * @throws ApiError if deletion fails
+   * @param tagId - ID тега кандидата
+   * @throws ApiError если удаление не удалось
    *
    * @example
    * ```ts
@@ -304,12 +304,12 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Assign a tag to a candidate (resume)
+   * Назначение тега кандидату (резюме)
    *
-   * @param resumeId - Resume ID
-   * @param request - Assign tag request
-   * @returns Success response with activity ID
-   * @throws ApiError if assignment fails
+   * @param resumeId - ID резюме
+   * @param request - Запрос на назначение тега
+   * @returns Ответ об успехе с ID активности
+   * @throws ApiError если назначение не удалось
    *
    * @example
    * ```ts
@@ -335,13 +335,13 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Remove a tag from a candidate (resume)
+   * Удаление тега у кандидата (резюме)
    *
-   * @param resumeId - Resume ID
-   * @param tagId - Tag ID to remove
-   * @param recruiterId - Optional recruiter ID who is removing the tag
-   * @returns Success response with activity ID
-   * @throws ApiError if removal fails
+   * @param resumeId - ID резюме
+   * @param tagId - ID тега для удаления
+   * @param recruiterId - Опциональный ID рекрутера, который удаляет тег
+   * @returns Ответ об успехе с ID активности
+   * @throws ApiError если удаление не удалось
    *
    * @example
    * ```ts
@@ -372,11 +372,11 @@ export class CandidateTagsClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение базового экземпляра Axios
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
    *
-   * @returns Axios instance
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -384,13 +384,13 @@ export class CandidateTagsClient {
 }
 
 /**
- * Default candidate tags client instance
+ * Экземпляр клиента тегов кандидата по умолчанию
  *
- * Use this singleton instance for all candidate tags calls.
+ * Используйте этот singleton-экземпляр для всех операций с тегами кандидата.
  */
 export const candidateTagsClient = new CandidateTagsClient();
 
 /**
- * Export candidate tags client class for custom instances
+ * Экспорт класса тегов кандидата для создания кастомных экземпляров
  */
 export default CandidateTagsClient;

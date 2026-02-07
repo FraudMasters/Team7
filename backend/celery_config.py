@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Any
 
 from config import get_settings
+from celery_beat_schedule import get_beat_schedule
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -117,6 +118,7 @@ def get_celery_config() -> Dict[str, Any]:
 
     This function returns the Celery configuration loaded from application
     settings. It provides a centralized point for accessing Celery configuration.
+    The beat_schedule from celery_beat_schedule.py is merged with the base schedule.
 
     Returns:
         Dictionary containing Celery configuration settings
@@ -127,7 +129,20 @@ def get_celery_config() -> Dict[str, Any]:
         >>> print(config['broker_url'])
         'redis://localhost:6379/0'
     """
-    return celery_config
+    # Merge model retraining beat schedule with base beat schedule
+    config = celery_config.copy()
+    retraining_schedule = get_beat_schedule(enabled_only=True)
+
+    if retraining_schedule:
+        config["beat_schedule"] = {
+            **config["beat_schedule"],
+            **retraining_schedule,
+        }
+        logger.info(
+            f"Merged {len(retraining_schedule)} model retraining tasks into beat schedule"
+        )
+
+    return config
 
 
 def update_celery_config(**kwargs: Any) -> None:

@@ -18,14 +18,8 @@ import {
   LinearProgress,
   Alert,
   AlertTitle,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Cancel as MissingIcon,
-  Warning as PartialIcon,
-  TrendingUp as BridgeabilityIcon,
-  AccessTime as TimeIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import type { SkillGapAnalysisResponse, MissingSkillDetail } from '@/types/api';
 
 interface SkillGapVisualizationProps {
@@ -88,11 +82,11 @@ function SkillChip({ skill, detail, type }: SkillChipProps) {
   if (type === 'matched') {
     return (
       <Chip
-        icon={<CheckIcon />}
+        iconName="check-circle"
         label={skill}
         color="success"
         size="small"
-        sx={{ m: 0.5 }}
+        css={{ m: 0.5 }}
       />
     );
   }
@@ -100,11 +94,11 @@ function SkillChip({ skill, detail, type }: SkillChipProps) {
   if (type === 'partial') {
     return (
       <Chip
-        icon={<PartialIcon />}
+        iconName="alert-triangle"
         label={skill}
         color="warning"
         size="small"
-        sx={{ m: 0.5 }}
+        css={{ m: 0.5 }}
       />
     );
   }
@@ -115,11 +109,11 @@ function SkillChip({ skill, detail, type }: SkillChipProps) {
 
   return (
     <Chip
-      icon={<MissingIcon />}
+      iconName="x-circle"
       label={`${skill}${level ? ` (${level})` : ''}`}
       color={importance === 'high' ? 'error' : 'default'}
       size="small"
-      sx={{ m: 0.5 }}
+      css={{ m: 0.5 }}
     />
   );
 }
@@ -168,7 +162,7 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
             severity: t(`skillGap.severity.${gap_severity}`, { defaultValue: gap_severity })
           })}
         </AlertTitle>
-        <Typography variant="body2">
+        <Typography>
           {t('skillGap.summaryMessage', {
             defaultValue: '{{match}}% of required skills matched. {{missing}} skills missing.',
             match: matchPercentage.toFixed(0),
@@ -181,53 +175,53 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
       <Grid container spacing={2}>
         {/* Match Percentage */}
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
-            <Typography variant="h4" color={matchPercentage >= 70 ? 'success.main' : matchPercentage >= 40 ? 'warning.main' : 'error.main'}>
+          <Paper css={{ p: 2, textAlign: 'center' }}>
+            <Typography color={matchPercentage >= 70 ? 'success.main' : matchPercentage >= 40 ? 'warning.main' : 'error.main'}>
               {matchPercentage.toFixed(0)}%
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography color="text.secondary">
               {t('skillGap.matchPercentage', { defaultValue: 'Skill Match' })}
             </Typography>
             <LinearProgress
               variant="determinate"
               value={matchPercentage}
               color={matchPercentage >= 70 ? 'success' : matchPercentage >= 40 ? 'warning' : 'error'}
-              sx={{ mt: 1 }}
+              css={{ mt: 1 }}
             />
           </Paper>
         </Grid>
 
         {/* Bridgeability Score */}
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
-            <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
-              <BridgeabilityIcon color="action" fontSize="small" />
+          <Paper css={{ p: 2, textAlign: 'center' }}>
+            <Box css={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+              <Icon name="trending-up" />
             </Box>
-            <Typography variant="h4" color={bridgeability_score > 0.6 ? 'success.main' : bridgeability_score > 0.3 ? 'warning.main' : 'error.main'}>
+            <Typography color={bridgeability_score > 0.6 ? 'success.main' : bridgeability_score > 0.3 ? 'warning.main' : 'error.main'}>
               {(bridgeability_score * 100).toFixed(0)}%
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography color="text.secondary">
               {t('skillGap.bridgeability', { defaultValue: 'Bridgeability' })}
             </Typography>
             <LinearProgress
               variant="determinate"
               value={bridgeability_score * 100}
               color={bridgeability_score > 0.6 ? 'success' : bridgeability_score > 0.3 ? 'warning' : 'error'}
-              sx={{ mt: 1 }}
+              css={{ mt: 1 }}
             />
           </Paper>
         </Grid>
 
         {/* Estimated Time to Bridge */}
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
-            <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
-              <TimeIcon color="action" fontSize="small" />
+          <Paper css={{ p: 2, textAlign: 'center' }}>
+            <Box css={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+              <Icon name="clock" />
             </Box>
-            <Typography variant="h4">
+            <Typography>
               {formatTimeToBridge(estimated_time_to_bridge)}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography color="text.secondary">
               {t('skillGap.timeToBridge', { defaultValue: 'Time to Bridge' })}
             </Typography>
           </Paper>
@@ -235,13 +229,13 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
 
         {/* Gap Severity */}
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Paper css={{ p: 2, textAlign: 'center' }}>
             <Chip
               label={t(`skillGap.severity.${gap_severity}`, { defaultValue: gap_severity })}
               color={getSeverityChipColor(gap_severity)}
-              sx={{ mb: 1 }}
+              css={{ mb: 1 }}
             />
-            <Typography variant="caption" color="text.secondary" display="block">
+            <Typography color="text.secondary">
               {t('skillGap.gapSeverity', { defaultValue: 'Gap Severity' })}
             </Typography>
           </Paper>
@@ -250,11 +244,11 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
 
       {/* Matched Skills */}
       {matched_skills.length > 0 && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>
+        <Paper css={{ p: 2 }}>
+          <Typography>
             {t('skillGap.matchedSkills', { defaultValue: 'Matched Skills' })} ({matched_skills.length})
           </Typography>
-          <Box flexWrap="wrap" display="flex">
+          <Box css={{ flexWrap: 'wrap', display: 'flex' }}>
             {matched_skills.map((skill) => (
               <SkillChip key={skill} skill={skill} type="matched" />
             ))}
@@ -264,11 +258,11 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
 
       {/* Partial Match Skills */}
       {partial_match_skills.length > 0 && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>
+        <Paper css={{ p: 2 }}>
+          <Typography>
             {t('skillGap.partialSkills', { defaultValue: 'Partial Match Skills' })} ({partial_match_skills.length})
           </Typography>
-          <Box flexWrap="wrap" display="flex">
+          <Box css={{ flexWrap: 'wrap', display: 'flex' }}>
             {partial_match_skills.map((skill) => (
               <SkillChip
                 key={skill}
@@ -283,11 +277,11 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
 
       {/* Missing Skills */}
       {missing_skills.length > 0 && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom color="error.main">
+        <Paper css={{ p: 2 }}>
+          <Typography color="error.main">
             {t('skillGap.missingSkills', { defaultValue: 'Missing Skills' })} ({missing_skills.length})
           </Typography>
-          <Box flexWrap="wrap" display="flex">
+          <Box css={{ flexWrap: 'wrap', display: 'flex' }}>
             {missing_skills.map((skill) => (
               <SkillChip
                 key={skill}
@@ -302,11 +296,11 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
 
       {/* Priority Ordering */}
       {priority_ordering.length > 0 && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>
+        <Paper css={{ p: 2 }}>
+          <Typography>
             {t('skillGap.recommendedOrder', { defaultValue: 'Recommended Learning Order' })}
           </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Stack css={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             {priority_ordering.map((skill, index) => (
               <Chip
                 key={skill}
@@ -321,7 +315,7 @@ export function SkillGapVisualization({ analysis }: SkillGapVisualizationProps) 
       )}
 
       {/* Processing Time */}
-      <Typography variant="caption" color="text.secondary" align="center" display="block">
+      <Typography color="text.secondary" align="center">
         {t('skillGap.processingTime', {
           defaultValue: 'Analysis completed in {{ms}}ms',
           ms: processing_time_ms.toFixed(0),

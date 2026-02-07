@@ -1,6 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Box, Typography, Button, Paper, Container } from '@mui/material';
-import { ErrorOutline, Refresh as RefreshIcon, Home as HomeIcon } from '@mui/icons-material';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -111,24 +111,23 @@ const ErrorFallback: React.FC<{
                 justifyContent: 'center',
               }}
             >
-              <ErrorOutline
-                sx={{
-                  fontSize: 48,
-                  color: 'error.main',
-                }}
+              <Icon
+                name="alert-circle"
+                size={48}
+                color="error.main"
               />
             </Box>
           </Box>
 
           {/* Error Title */}
-          <Typography variant="h4" gutterBottom color="text.primary">
+          <Typography variant="h4" gutterBottom color="primary">
             {t('errorBoundary.title', 'Something went wrong')}
           </Typography>
 
           {/* Error Message */}
           <Typography
             variant="body1"
-            color="text.secondary"
+            color="secondary"
             sx={{ mb: 4, maxWidth: 500, mx: 'auto' }}
           >
             {t(
@@ -142,7 +141,7 @@ const ErrorFallback: React.FC<{
             <Button
               variant="contained"
               color="primary"
-              startIcon={<RefreshIcon />}
+              startIcon={<Icon name="refresh-cw" size={20} />}
               onClick={handleRefresh}
               size="large"
             >
@@ -151,7 +150,7 @@ const ErrorFallback: React.FC<{
             <Button
               variant="outlined"
               color="primary"
-              startIcon={<HomeIcon />}
+              startIcon={<Icon name="home" size={20} />}
               onClick={handleGoHome}
               size="large"
             >
@@ -172,12 +171,12 @@ const ErrorFallback: React.FC<{
                 maxHeight: 300,
               }}
             >
-              <Typography variant="subtitle2" gutterBottom color="text.primary">
+              <Typography variant="subtitle2" gutterBottom color="primary">
                 {t('errorBoundary.errorDetails', 'Error Details:')}
               </Typography>
               <Typography
                 variant="body2"
-                component="pre"
+                as="pre"
                 sx={{
                   fontFamily: 'monospace',
                   fontSize: '0.875rem',
@@ -191,16 +190,16 @@ const ErrorFallback: React.FC<{
               </Typography>
               {error.stack && (
                 <>
-                  <Typography variant="subtitle2" gutterBottom color="text.primary">
+                  <Typography variant="subtitle2" gutterBottom color="primary">
                     {t('errorBoundary.stackTrace', 'Stack Trace:')}
                   </Typography>
                   <Typography
                     variant="body2"
-                    component="pre"
+                    as="pre"
                     sx={{
                       fontFamily: 'monospace',
                       fontSize: '0.75rem',
-                      color: 'text.secondary',
+                      color: 'secondary',
                       mb: 2,
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
@@ -212,16 +211,16 @@ const ErrorFallback: React.FC<{
               )}
               {errorInfo && errorInfo.componentStack && (
                 <>
-                  <Typography variant="subtitle2" gutterBottom color="text.primary">
+                  <Typography variant="subtitle2" gutterBottom color="primary">
                     {t('errorBoundary.componentStack', 'Component Stack:')}
                   </Typography>
                   <Typography
                     variant="body2"
-                    component="pre"
+                    as="pre"
                     sx={{
                       fontFamily: 'monospace',
                       fontSize: '0.75rem',
-                      color: 'text.secondary',
+                      color: 'secondary',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
                     }}

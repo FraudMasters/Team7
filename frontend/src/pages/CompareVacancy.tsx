@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Box, Container, Typography, Paper, Alert, Stack, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, CircularProgress, IconButton } from '@mui/material';
-import { ContentCopy as CopyIcon, Check as CheckIcon } from '@mui/icons-material';
+import { Box, Container, Typography, Paper, Alert, Stack, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, CircularProgress, IconButton } from '@/components/ui';
 import ResumeComparisonMatrix from '@components/ResumeComparisonMatrix';
 import ComparisonControls from '@components/ComparisonControls';
 import { apiClient } from '@/api/client';
@@ -215,10 +214,10 @@ const CompareVacancyPage: React.FC = () => {
       <Stack spacing={3}>
         {/* Page Header */}
         <Box>
-          <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+          <Typography variant="h4" as="h1" gutterBottom fontWeight={600}>
             Compare Resumes for Vacancy
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Compare multiple resumes side-by-side to identify the best candidates for this position.
             Select 2-5 resumes to see a detailed skill matrix and rankings.
           </Typography>
@@ -258,7 +257,7 @@ const CompareVacancyPage: React.FC = () => {
             <Typography variant="body2" paragraph>
               Use the controls above to add resume IDs one at a time, or visit a URL like:
             </Typography>
-            <Typography variant="body2" component="div" sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1, fontFamily: 'monospace' }}>
+            <Typography variant="body2" as="div" sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1, fontFamily: 'monospace' }}>
               /compare-vacancy/{vacancyId}?resumes=resume-1,resume-2,resume-3
             </Typography>
           </Paper>
@@ -291,7 +290,7 @@ const CompareVacancyPage: React.FC = () => {
               autoFocus
               disabled={isSaving}
             />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            <Typography variant="body2" color="secondary" sx={{ mt: 2 }}>
               This will save the current comparison with {resumeIds.length} resume(s) for vacancy{' '}
               <strong>{vacancyId}</strong>.
             </Typography>
@@ -334,7 +333,7 @@ const CompareVacancyPage: React.FC = () => {
               </IconButton>
             </Box>
             {copiedToClipboard && (
-              <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+              <Typography variant="body2" color="success" sx={{ mt: 1 }}>
                 URL copied to clipboard!
               </Typography>
             )}

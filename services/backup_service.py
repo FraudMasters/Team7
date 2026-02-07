@@ -1,14 +1,15 @@
 """
-Backup service for automated database, files, and models backup
+Сервис резервного копирования для автоматического создания копий базы данных, файлов и моделей.
 
-This module provides comprehensive backup functionality including:
-- PostgreSQL database dumps using pg_dump
-- File system backups (resumes, models)
-- Incremental backups using rsync
-- Checksum calculation for integrity verification
-- S3-compatible off-site storage
-- Restore functionality
-- Retention policy management
+# Русский комментарий:
+Этот модуль предоставляет полную функциональность резервного копирования, включая:
+- Дампы базы данных PostgreSQL с использованием pg_dump
+- Резервное копирование файловой системы (резюме, модели)
+- Инкрементальное резервное копирование с использованием rsync
+- Вычисление контрольных сумм для проверки целостности
+- Off-site хранилище, совместимое с S3
+- Функциональность восстановления
+- Управление политикой хранения
 """
 import asyncio
 import bz2

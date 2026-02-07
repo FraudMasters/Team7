@@ -805,5 +805,112 @@
     "success": {
       "saved": "Weights saved successfully!"
     }
+  },
+  "semanticSearch": {
+    "title": "Semantic Search",
+    "tooltip": "Use natural language to describe your ideal candidate",
+    "placeholder": "Describe your ideal candidate in natural language...\n\nExample: 'Find me a senior Python developer with experience in fintech who has led teams of 5+ people'",
+    "helperText": "Type your search query and press Enter or click Search",
+    "search": "Search",
+    "searching": "Searching...",
+    "showSuggestions": "Show Suggestions",
+    "hideSuggestions": "Hide Suggestions",
+    "suggestionsTitle": "Quick Search Suggestions",
+    "examplesTitle": "Try these examples:",
+    "modes": {
+      "semantic": "Semantic",
+      "hybrid": "Hybrid",
+      "keyword": "Keyword"
+    },
+    "modeDescriptions": {
+      "semantic": "AI-powered search that understands meaning and context. Finds candidates based on intent, not just keywords.",
+      "hybrid": "Combines semantic understanding with keyword matching for comprehensive results.",
+      "keyword": "Traditional keyword-based search. Matches exact terms in resumes."
+    },
+    "examples": {
+      "seniorDeveloper": "Senior Python developer with fintech experience",
+      "teamLead": "Full stack developer who has led teams",
+      "fullStack": "React and TypeScript developer with cloud experience"
+    },
+    "results": {
+      "title": "Semantic Search Results",
+      "searching": "Searching...",
+      "understandingQuery": "Understanding your query using AI...",
+      "searchQuery": "Search Query",
+      "candidate": "Candidate",
+      "yearsExperience": "years experience",
+      "skills": "{{count}} skills",
+      "seeExplanation": "See why this candidate matched",
+      "quickMatch": "Quick Match Explanation",
+      "semanticScoreTooltip": "Semantic similarity score based on AI understanding of meaning",
+      "keywordScoreTooltip": "Keyword match score based on explicit term matching",
+      "finalScoreTooltip": "Final combined score",
+      "semanticUsed": "Semantic AI Used",
+      "fallbackUsed": "Fallback to Keyword Search",
+      "keywordOnly": "Keyword Search Only",
+      "candidates": "{{count}} Candidates Found",
+      "error": {
+        "title": "Search Failed",
+        "failedToLoad": "Failed to load search results"
+      },
+      "noResults": {
+        "title": "No Results Found",
+        "message": "Try rephrasing your query or use broader terms."
+      },
+      "noCandidates": {
+        "title": "No Candidates",
+        "message": "No candidates match your search criteria. Try adjusting your query or filters."
+      },
+      "stats": {
+        "candidatesFound": "Candidates Found",
+        "highMatch": "High Match (70%+)",
+        "semanticMatches": "Semantic Matches",
+        "executionTime": "Execution Time"
+      },
+      "explanation": {
+        "semanticScore": "Semantic Score",
+        "skillMatch": "Skill Match",
+        "experienceRelevance": "Experience Relevance",
+        "contextFit": "Context Fit",
+        "matchedSkills": "Matched Skills ({{count}})",
+        "inferredSkills": "Inferred Skills ({{count}})",
+        "inferredTooltip": "Skills inferred from context based on related experience",
+        "transferableSkills": "Transferable Skills ({{count}})",
+        "transferableTooltip": "Skills from other contexts that apply to this role",
+        "missingSkills": "Missing Skills ({{count}})",
+        "whyMatched": "Why This Candidate Matched"
+      }
+    }
+  },
+  "advancedSearch": {
+    "title": "Advanced Filters",
+    "filters": "filters",
+    "searchQuery": "Search Query",
+    "searchPlaceholder": "Enter your search query...",
+    "addFilter": "Add Filter",
+    "skills": "Skills",
+    "selectSkills": "Select skills...",
+    "location": "Location",
+    "languages": "Languages",
+    "selectLanguages": "Select languages...",
+    "educationLevel": "Education Level",
+    "any": "Any",
+    "highSchool": "High School",
+    "bachelor": "Bachelor's",
+    "master": "Master's",
+    "phd": "PhD",
+    "experienceYears": "Experience: {{min}} - {{max}} years",
+    "matchScore": "Match Score: {{min}}% - {{max}}%",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "minSalary": "Min Salary",
+    "maxSalary": "Max Salary",
+    "vacancy": "Vacancy",
+    "allVacancies": "All Vacancies",
+    "stage": "Stage",
+    "allStages": "All Stages",
+    "clear": "Clear All",
+    "search": "Search",
+    "searching": "Searching..."
   }
 }

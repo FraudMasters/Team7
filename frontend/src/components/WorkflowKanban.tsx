@@ -20,8 +20,9 @@ import {
   Tabs,
   Tab,
   useMediaQuery,
-  useTheme,
-} from '@mui/material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import { useEmotionTheme } from '@/contexts/EmotionThemeContext';
 import {
   DragDropContext,
   Droppable,
@@ -30,13 +31,6 @@ import {
 } from '@hello-pangea/dnd';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import {
-  Search as SearchIcon,
-  ExpandMore as ExpandMoreIcon,
-  Close as CloseIcon,
-  Notes as NotesIcon,
-  History as HistoryIcon,
-} from '@mui/icons-material';
 import CandidateTags from './CandidateTags';
 import CandidateNotes from './CandidateNotes';
 import CandidateActivityTimeline from './CandidateActivityTimeline';
@@ -55,7 +49,7 @@ import type {
  */
 const WorkflowKanban: React.FC = () => {
   const { t } = useTranslation();
-  const theme = useTheme();
+  const theme = useEmotionTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
   const [stages, setStages] = useState<WorkflowStageResponse[]>([]);

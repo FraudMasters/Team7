@@ -1,4 +1,6 @@
+// Импорт хука для получения параметров маршрута
 import { useParams } from 'react-router-dom';
+// Импорт компонентов Material UI
 import {
   Box,
   Container,
@@ -11,18 +13,27 @@ import {
   CircularProgress,
   Grid,
 } from '@mui/material';
+// Импорт иконок Material UI
 import {
   LocationOn,
   WorkOutline,
   AttachMoney,
   Business,
 } from '@mui/icons-material';
+// Импорт хука для получения данных о вакансии
 import { useJob } from '../../hooks/useJobs';
 
+/**
+ * Компонент страницы детализации вакансии
+ * Отображает полную информацию о вакансии с возможностью подачи заявки
+ */
 export function JobDetailPage() {
+  // Получение ID вакансии из параметров маршрута
   const { id } = useParams<{ id: string }>();
+  // Получение данных о вакансии, состояния загрузки и ошибок
   const { data: job, isLoading, error } = useJob(id || '');
 
+  // Отображение индикатора загрузки
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
@@ -31,6 +42,7 @@ export function JobDetailPage() {
     );
   }
 
+  // Отображение состояния ошибки или отсутствия вакансии
   if (error || !job) {
     return (
       <Box sx={{ textAlign: 'center', py: 12 }}>
@@ -58,11 +70,12 @@ export function JobDetailPage() {
         }}
       >
         <Stack spacing={4}>
-          {/* Header */}
+          {/* Заголовок вакансии */}
           <Box>
             <Typography variant="h3" fontWeight={700} gutterBottom>
               {job.title}
             </Typography>
+            {/* Метаданные вакансии: индустрия, локация, формат работы, опыт */}
             <Stack direction="row" spacing={2} flexWrap="wrap" color="text.secondary">
               {job.industry && (
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -88,7 +101,7 @@ export function JobDetailPage() {
 
           <Divider />
 
-          {/* Salary */}
+          {/* Заработная плата */}
           {job.salary_min && (
             <Stack direction="row" spacing={1} alignItems="center" color="success.main">
               <AttachMoney sx={{ fontSize: 20 }} />
@@ -99,11 +112,12 @@ export function JobDetailPage() {
             </Stack>
           )}
 
-          {/* Required Skills */}
+          {/* Требуемые навыки */}
           <Box>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Required Skills
             </Typography>
+            {/* Список навыков в виде чипов */}
             <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
               {job.required_skills.map((skill) => (
                 <Chip
@@ -121,7 +135,7 @@ export function JobDetailPage() {
 
           <Divider />
 
-          {/* Description */}
+          {/* Описание вакансии */}
           <Box>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Description
@@ -138,8 +152,9 @@ export function JobDetailPage() {
             </Typography>
           </Box>
 
-          {/* Action Buttons */}
+          {/* Кнопки действий */}
           <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+            {/* Кнопка подачи заявки на вакансию */}
             <Button
               variant="contained"
               size="large"
@@ -148,6 +163,7 @@ export function JobDetailPage() {
             >
               Apply Now
             </Button>
+            {/* Кнопка сохранения вакансии */}
             <Button
               variant="outlined"
               size="large"

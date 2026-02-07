@@ -60,6 +60,13 @@ class AuditActionType(str, enum.Enum):
     LOGOUT = "logout"
     PASSWORD_CHANGED = "password_changed"
 
+    # Security operations
+    SSO_LOGIN = "sso_login"
+    TFA_ENABLED = "2fa_enabled"
+    TFA_DISABLED = "2fa_disabled"
+    SESSION_REVOKED = "session_revoked"
+    IP_BLOCKED = "ip_blocked"
+
 
 class AuditLog(Base, UUIDMixin, TimestampMixin):
     """

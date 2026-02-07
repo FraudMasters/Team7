@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container } from '@mui/material';
+import { Box, Container } from '@/components/ui';
 import { useParams } from 'react-router-dom';
 import JobComparison from '@components/JobComparison';
 

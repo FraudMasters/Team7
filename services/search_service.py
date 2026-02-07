@@ -1,18 +1,19 @@
 """
-Advanced Search Service for Candidates
+Расширенный сервис поиска кандидатов
 
-This module provides PostgreSQL full-text search with multi-field filtering
-and boolean operator support for finding candidates.
+# Русский комментарий:
+Этот модуль предоставляет полнотекстовый поиск PostgreSQL с многострочной фильтрацией
+и поддержкой логических операторов для поиска кандидатов.
 
-Features:
-- Full-text search using PostgreSQL tsvector for fast text queries
-- Multi-field filtering: skills, experience, education, location, languages
-- Boolean operators: AND, OR, NOT for complex queries
-- Range filters: experience years, match score, date ranges
-- Performance optimized with proper indexing
+Возможности:
+- Полнотекстовый поиск с использованием PostgreSQL tsvector для быстрых текстовых запросов
+- Многострочная фильтрация: навыки, опыт, образование, местоположение, языки
+- Логические операторы: AND, OR, NOT для сложных запросов
+- Фильтры диапазонов: годы опыта, оценка соответствия, диапазоны дат
+- Оптимизация производительности с правильной индексацией
 
-The service builds on the existing resume_analyses table which contains
-extracted data from resumes including skills, experience, education, etc.
+Сервис построен на основе существующей таблицы resume_analyses, которая содержит
+извлеченные данные из резюме, включая навыки, опыт, образование и т.д.
 """
 import logging
 from dataclasses import dataclass

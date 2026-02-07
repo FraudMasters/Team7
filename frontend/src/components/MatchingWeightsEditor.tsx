@@ -25,15 +25,8 @@ import {
   MenuItem,
   Slider,
   Chip,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  Save as SaveIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Weight profile entry interface
@@ -452,7 +445,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchProfiles} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchProfiles} startIcon={<Icon name="refresh-cw" />}>
             Try Again
           </Button>
         }
@@ -524,7 +517,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={<Icon name="plus" />}
             onClick={handleCreate}
             size="large"
           >
@@ -652,14 +645,14 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
                           onClick={() => handleEdit(profile)}
                           color="primary"
                         >
-                          <EditIcon fontSize="small" />
+                          <Icon name="edit" fontSize="small" />
                         </IconButton>
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteClick(profile)}
                           color="error"
                         >
-                          <DeleteIcon fontSize="small" />
+                          <Icon name="trash-2" fontSize="small" />
                         </IconButton>
                       </Stack>
                     </Box>
@@ -732,7 +725,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
               disabled={submitting}
               size="small"
             >
-              <CloseIcon />
+              <Icon name="x" />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -878,7 +871,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
             onClick={handleSubmit}
             variant="contained"
             disabled={submitting || !formData.name}
-            startIcon={submitting ? <CircularProgress size={16} /> : <SaveIcon />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="save" />}
           >
             {submitting ? 'Saving...' : editingProfile ? 'Update Profile' : 'Create Profile'}
           </Button>
@@ -905,7 +898,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
             variant="contained"
             color="error"
             disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="trash-2" />}
           >
             {submitting ? 'Deleting...' : 'Delete'}
           </Button>

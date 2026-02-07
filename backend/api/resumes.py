@@ -22,7 +22,9 @@ from i18n.backend_translations import get_error_message, get_success_message
 from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
+from models.role import UserRole
 from utils.audit_logger import log_audit_event, get_request_context
+from middleware.auth import require_role
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -598,7 +600,8 @@ async def update_resume_status(
     request: Request,
     resume_id: str,
     status_update: ResumeStatusUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(require_role(UserRole.RECRUITER))
 ) -> JSONResponse:
     """
     Update resume status (for Kanban board drag-and-drop).
@@ -729,7 +732,8 @@ async def update_resume_status(
 async def delete_resume(
     request: Request,
     resume_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(require_role(UserRole.RECRUITER))
 ) -> JSONResponse:
     """
     Delete a resume by ID.

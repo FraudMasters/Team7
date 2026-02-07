@@ -27,6 +27,20 @@ from .backup_tasks import (
     backup_health_check_task,
 )
 from .audit_cleanup import cleanup_old_audit_logs_task
+from .data_validation import FeedbackValidator
+from .concept_drift_detection import (
+    ConceptDriftDetector,
+    detect_concept_drift,
+    get_drift_detector,
+)
+from .feature_extraction import (
+    FeatureExtractor,
+    extract_training_features,
+)
+from .model_retraining import (
+    automated_retraining_task,
+    manual_retraining_task,
+)
 
 __all__ = [
     "analyze_resume_async",
@@ -46,4 +60,12 @@ __all__ = [
     "sync_all_to_s3_task",
     "backup_health_check_task",
     "cleanup_old_audit_logs_task",
+    "FeedbackValidator",
+    "ConceptDriftDetector",
+    "detect_concept_drift",
+    "get_drift_detector",
+    "FeatureExtractor",
+    "extract_training_features",
+    "automated_retraining_task",
+    "manual_retraining_task",
 ]

@@ -17,6 +17,8 @@ from tasks import (
     batch_analyze_resumes,
     generate_scheduled_reports,
     process_all_pending_reports,
+    automated_retraining_task,
+    manual_retraining_task,
 )
 
 # Import model preloading to register the worker_ready signal handler
@@ -289,6 +291,8 @@ __all__ = [
     "batch_analyze_resumes",
     "generate_scheduled_reports",
     "process_all_pending_reports",
+    "automated_retraining_task",
+    "manual_retraining_task",
     "preload_ml_models",
     "health_check_with_models",
     "warm_frequently_accessed_data",

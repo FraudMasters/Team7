@@ -29,20 +29,8 @@ import {
   Tabs,
   Menu,
   LinearProgress,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  History as HistoryIcon,
-  Public as PublicIcon,
-  CloudUpload as CloudUploadIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  FileDownload as FileDownloadIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Individual skill taxonomy entry interface
@@ -785,7 +773,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchTaxonomies} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchTaxonomies} startIcon={<Icon name="refresh-cw" />}>
             {t('common.tryAgain')}
           </Button>
         }
@@ -821,14 +809,14 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Stack direction="row" spacing={1}>
-                <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchTaxonomies} size="small">
+                <Button variant="outlined" startIcon={<Icon name="refresh-cw" />} onClick={fetchTaxonomies} size="small">
                   {t('industryTaxonomy.refreshButton')}
                 </Button>
                 {selectedIndustry === 'it' && (
                   <Button
                     variant="contained"
                     color="primary"
-                    startIcon={<CloudUploadIcon />}
+                    startIcon={<Icon name="cloud-upload" />}
                     onClick={loadITTaxonomy}
                     size="small"
                   >
@@ -837,7 +825,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                 )}
                 <Button
                   variant="outlined"
-                  startIcon={<UploadIcon />}
+                  startIcon={<Icon name="upload" />}
                   onClick={() => setImportDialogOpen(true)}
                   size="small"
                 >
@@ -845,7 +833,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                 </Button>
                 <Button
                   variant="outlined"
-                  startIcon={<DownloadIcon />}
+                  startIcon={<Icon name="download" />}
                   onClick={(e) => setExportMenuAnchor(e.currentTarget)}
                   size="small"
                 >
@@ -861,11 +849,11 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
               onClose={() => setExportMenuAnchor(null)}
             >
               <MenuItem onClick={exportAsJSON} disabled={taxonomies.length === 0}>
-                <FileDownloadIcon sx={{ mr: 1 }} />
+                <Icon name="download" sx={{ mr: 1 }} />
                 Export as JSON
               </MenuItem>
               <MenuItem onClick={exportAsCSV} disabled={taxonomies.length === 0}>
-                <FileDownloadIcon sx={{ mr: 1 }} />
+                <Icon name="download" sx={{ mr: 1 }} />
                 Export as CSV
               </MenuItem>
             </Menu>
@@ -932,7 +920,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
               <Button
                 variant="contained"
-                startIcon={<AddIcon />}
+                startIcon={<Icon name="plus" />}
                 onClick={handleCreate}
                 size="large"
               >
@@ -983,28 +971,28 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                         color={taxonomy.is_public ? 'success' : 'default'}
                         title={taxonomy.is_public ? 'Unpublish' : 'Publish as public'}
                       >
-                        <PublicIcon fontSize="small" />
+                        <Icon name="globe" fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleViewHistory(taxonomy)}
                         color="info"
                       >
-                        <HistoryIcon fontSize="small" />
+                        <Icon name="history" fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleEdit(taxonomy)}
                         color="primary"
                       >
-                        <EditIcon fontSize="small" />
+                        <Icon name="edit" fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteClick(taxonomy)}
                         color="error"
                       >
-                        <DeleteIcon fontSize="small" />
+                        <Icon name="trash-2" fontSize="small" />
                       </IconButton>
                     </Stack>
                   </Box>
@@ -1026,7 +1014,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                       />
                       {taxonomy.is_public && (
                         <Chip
-                          icon={<PublicIcon fontSize="small" />}
+                          icon={<Icon name="globe" fontSize="small" />}
                           label="Public"
                           size="small"
                           color="info"
@@ -1046,7 +1034,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                       />
                       {taxonomy.is_public && (
                         <Chip
-                          icon={<PublicIcon fontSize="small" />}
+                          icon={<Icon name="globe" fontSize="small" />}
                           label="Public"
                           size="small"
                           color="info"
@@ -1119,7 +1107,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
               disabled={submitting}
               size="small"
             >
-              <CloseIcon />
+              <Icon name="x" />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -1215,7 +1203,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
             variant="contained"
             color="error"
             disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="trash-2" />}
           >
             {submitting ? t('industryTaxonomy.deleteDialog.deleting') : t('industryTaxonomy.deleteDialog.confirm')}
           </Button>
@@ -1239,7 +1227,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
               disabled={loadingVersions || rollingBack}
               size="small"
             >
-              <CloseIcon />
+              <Icon name="x" />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -1289,7 +1277,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                           size="small"
                           onClick={() => handleRollback(version.id)}
                           disabled={rollingBack}
-                          startIcon={rollingBack ? <CircularProgress size={14} /> : <HistoryIcon />}
+                          startIcon={rollingBack ? <CircularProgress size={14} /> : <Icon name="history" />}
                         >
                           {t('industryTaxonomy.historyDialog.rollback')}
                         </Button>
@@ -1371,7 +1359,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
             variant="contained"
             color={taxonomyToPublish?.is_public ? 'warning' : 'primary'}
             disabled={togglingPublic}
-            startIcon={togglingPublic ? <CircularProgress size={16} /> : (taxonomyToPublish?.is_public ? null : <CloudUploadIcon />)}
+            startIcon={togglingPublic ? <CircularProgress size={16} /> : (taxonomyToPublish?.is_public ? null : <Icon name="cloud-upload" />)}
           >
             {togglingPublic ? 'Updating...' : taxonomyToPublish?.is_public ? 'Unpublish' : 'Publish'}
           </Button>
@@ -1393,7 +1381,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
               disabled={importing}
               size="small"
             >
-              <CloseIcon />
+              <Icon name="x" />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -1464,7 +1452,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                   textAlign: 'center',
                 }}
               >
-                <CloudUploadIcon
+                <Icon name="cloud-upload"
                   sx={{
                     fontSize: 48,
                     color: 'action.disabled',
@@ -1484,7 +1472,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                 {!importing && (
                   <Button
                     variant="contained"
-                    startIcon={<UploadIcon />}
+                    startIcon={<Icon name="upload" />}
                     onClick={(e) => {
                       e.stopPropagation();
                       fileInputRef.current?.click();

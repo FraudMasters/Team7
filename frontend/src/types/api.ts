@@ -1853,3 +1853,133 @@ export interface SearchHistoryResponse {
   limit: number;
 }
 
+// ==================== Semantic Search Types ====================
+
+/**
+ * Semantic search filter configuration
+ */
+export interface SemanticSearchFilters {
+  skills?: string[];
+  min_experience_years?: number;
+  max_experience_years?: number;
+  location?: string;
+  education_level?: string;
+}
+
+/**
+ * Semantic search request
+ */
+export interface SemanticSearchRequest {
+  query: string;
+  vacancy_id?: string | null;
+  min_semantic_score?: number;
+  semantic_weight?: number;
+  keyword_weight?: number;
+  use_hybrid?: boolean;
+  language?: string | null;
+  filters?: SemanticSearchFilters | null;
+  skip?: number;
+  limit?: number;
+}
+
+/**
+ * Match explanation for a candidate
+ */
+export interface SemanticMatchExplanation {
+  semantic_score: number;
+  skill_match_score: number;
+  experience_relevance_score: number;
+  context_fit_score: number;
+  matched_skills: string[];
+  inferred_skills: string[];
+  transferable_skills: string[];
+  explanation: string;
+}
+
+/**
+ * Single candidate semantic search result
+ */
+export interface SemanticCandidateResult {
+  id: string;
+  filename: string;
+  status: string;
+  created_at: string;
+  semantic_score: number;
+  keyword_score: number;
+  final_score: number;
+  skills: string[];
+  experience_years: number | null;
+  language: string | null;
+  match_explanation?: SemanticMatchExplanation | null;
+}
+
+/**
+ * Semantic search response
+ */
+export interface SemanticSearchResponse {
+  total: number;
+  candidates: Array<Record<string, unknown>>;
+  query: string;
+  execution_time_seconds: number;
+  semantic_scores_used: boolean;
+  fallback_used: boolean;
+  filters_applied: Record<string, unknown>;
+  skip: number;
+  limit: number;
+}
+
+/**
+ * Hybrid search request
+ */
+export interface HybridSearchRequest {
+  query: string;
+  semantic_weight: number;
+  keyword_weight: number;
+  filters?: Record<string, unknown> | null;
+  skip?: number;
+  limit?: number;
+}
+
+/**
+ * Hybrid search response
+ */
+export interface HybridSearchResponse {
+  total: number;
+  candidates: Array<Record<string, unknown>>;
+  query: string;
+  execution_time_seconds: number;
+  semantic_scores_used: boolean;
+  fallback_used: boolean;
+  semantic_weight: number;
+  keyword_weight: number;
+  filters_applied: Record<string, unknown>;
+  skip: number;
+  limit: number;
+}
+
+/**
+ * Match explanation request
+ */
+export interface MatchExplanationRequest {
+  query: string;
+  resume_id: string;
+  vacancy_id?: string | null;
+}
+
+/**
+ * Match explanation response
+ */
+export interface MatchExplanationResponse {
+  resume_id: string;
+  semantic_score: number;
+  skill_match_score: number;
+  experience_relevance_score: number;
+  context_fit_score: number;
+  matched_skills: string[];
+  inferred_skills: string[];
+  transferable_skills: string[];
+  missing_skills: string[];
+  explanation: string;
+  used_embeddings: boolean;
+}
+

@@ -13,13 +13,8 @@ import {
   Menu,
   MenuItem,
   Divider,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Close as CloseIcon,
-  Label as LabelIcon,
-  CheckCircle as CheckCircleIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import { candidateTagsClient } from '@/api/candidateTags';
 import type {
@@ -227,7 +222,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
         <CircularProgress size={20} />
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="secondary">
           {t('tags.loading')}
         </Typography>
       </Box>
@@ -248,7 +243,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
         <Alert
           severity="success"
           sx={{ mb: 1 }}
-          icon={<CheckCircleIcon fontSize="inherit" />}
+          icon={<Icon name="check-circle" size={20} />}
           onClose={() => setSuccessMessage(null)}
         >
           {successMessage}
@@ -268,17 +263,16 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
         }}
       >
         {/* Label Icon */}
-        <LabelIcon
-          sx={{
-            color: 'text.secondary',
-            fontSize: chipSize === 'small' ? 20 : 24,
-            mr: 0.5,
-          }}
+        <Icon
+          name="tag"
+          size={chipSize === 'small' ? 20 : 24}
+          color="muted"
+          style={{ marginRight: '4px' }}
         />
 
         {/* Assigned Tags */}
         {assignedTags.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="secondary">
             {t('tags.noTags')}
           </Typography>
         ) : (
@@ -307,7 +301,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
                   removing === tag.id ? (
                     <CircularProgress size={14} sx={{ color: 'white' }} />
                   ) : (
-                    <CloseIcon sx={{ fontSize: chipSize === 'small' ? 16 : 18 }} />
+                    <Icon name="x" size={chipSize === 'small' ? 16 : 18} />
                   )
                 }
               />
@@ -320,7 +314,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
           <>
             <Button
               size="small"
-              startIcon={<AddIcon />}
+              startIcon={<Icon name="plus" size={16} />}
               onClick={handleOpenMenu}
               sx={{ ml: 'auto' }}
               disabled={maxTags > 0 && assignedTags.length >= maxTags}
@@ -372,7 +366,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
               ))}
               {availableTags.length === 0 && (
                 <MenuItem disabled>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="secondary">
                     {t('tags.noAvailable')}
                   </Typography>
                 </MenuItem>
@@ -385,7 +379,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
         {showCount && assignedTags.length > 0 && (
           <Typography
             variant="caption"
-            color="text.secondary"
+            color="secondary"
             sx={{ ml: 'auto', pl: 1 }}
           >
             {assignedTags.length} {assignedTags.length === 1 ? 'tag' : 'tags'}
@@ -395,7 +389,7 @@ const CandidateTags: React.FC<CandidateTagsProps> = ({
 
       {/* Tag Limit Warning */}
       {maxTags > 0 && assignedTags.length >= maxTags && (
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+        <Typography variant="caption" color="secondary" sx={{ mt: 1, display: 'block' }}>
           {t('tags.maxReached', { max: maxTags })}
         </Typography>
       )}

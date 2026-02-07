@@ -1,27 +1,27 @@
 /**
  * Saved Searches API Client
  *
- * This module provides a client for managing saved searches,
- * including creating, reading, updating, and deleting
- * saved search configurations.
+ * Этот модуль предоставляет клиент для управления сохраненными поисками,
+ * включая создание, чтение, обновление и удаление
+ * конфигураций сохраненных поисков.
  *
  * @example
  * ```ts
  * import { savedSearchesClient } from '@/api/savedSearches';
  *
- * // List all saved searches
+ * // Получение всех сохраненных поисков
  * const searches = await savedSearchesClient.listSavedSearches();
  *
- * // Create a new saved search
+ * // Создание нового сохраненного поиска
  * const newSearch = await savedSearchesClient.createSavedSearch({
- *   name: 'Senior Python Developers',
+ *   name: 'Senior Python разработчики',
  *   query: 'Python AND Django',
  *   filters: { min_experience_years: 5 }
  * });
  *
- * // Update a saved search
+ * // Обновление сохраненного поиска
  * const updated = await savedSearchesClient.updateSavedSearch('search-id', {
- *   name: 'Updated Search Name'
+ *   name: 'Обновленное название поиска'
  * });
  * ```
  */
@@ -36,36 +36,36 @@ import type {
 } from '@/types/api';
 
 /**
- * Default API configuration for saved searches client
+ * Конфигурация по умолчанию для клиента сохраненных поисков
  */
 const DEFAULT_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 10000, // 10 seconds
+  timeout: 10000, // 10 секунд
   headers: {
     'Content-Type': 'application/json',
   },
 };
 
 /**
- * Saved Searches API Client class
+ * Класс клиента API для работы с сохраненными поисками
  *
- * Provides methods for managing saved search configurations with proper
- * error handling and type safety.
+ * Предоставляет методы для управления конфигурациями сохраненных поисков с proper
+ * обработкой ошибок и типобезопасностью.
  */
 export class SavedSearchesClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new SavedSearches client instance
+   * Создание нового экземпляра клиента сохраненных поисков
    *
-   * @param config - Optional configuration overrides
+   * @param config - Опциональные переопределения конфигурации
    */
   constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
     this.client = axios.create(finalConfig);
 
-    // Response interceptor for error handling
+    // Интерцептор ответов для обработки ошибок
     this.client.interceptors.response.use(
       (response) => response,
       (error) => Promise.reject(this.transformError(error))
@@ -73,68 +73,68 @@ export class SavedSearchesClient {
   }
 
   /**
-   * Transform Axios error to standardized API error
+   * Преобразование ошибки Axios в стандартизированную ошибку API
    *
-   * @param error - Axios error
-   * @returns Transformed API error
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
     const axiosError = error as AxiosError<{ detail?: string }>;
 
-    // Network error (no response)
+    // Ошибка сети (нет ответа)
     if (!axiosError.response) {
       if (axiosError.code === 'ECONNABORTED') {
         return {
-          detail: 'Request timeout. Please check your connection and try again.',
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
           status: 408,
         };
       }
       return {
-        detail: 'Network error. Please check your connection and try again.',
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
         status: 0,
       };
     }
 
-    // Server returned error response
+    // Сервер вернул ошибку
     const status = axiosError.response.status;
     const data = axiosError.response.data;
 
-    // Use server's error message if available
+    // Используем сообщение об ошибке от сервера, если доступно
     if (data?.detail) {
       return { detail: data.detail, status };
     }
 
-    // Default error messages by status code
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
     const defaultMessages: Record<number, string> = {
-      400: 'Invalid request. Please check your input.',
-      401: 'Unauthorized. Please log in.',
-      403: 'Forbidden. You do not have permission.',
-      404: 'Resource not found.',
-      409: 'A saved search with this name already exists.',
-      422: 'Validation error. Please check your input.',
-      429: 'Too many requests. Please try again later.',
-      500: 'Server error. Please try again later.',
-      502: 'Bad gateway. Please try again later.',
-      503: 'Service unavailable. Please try again later.',
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Ресурс не найден.',
+      409: 'Сохраненный поиск с таким названием уже существует.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
     };
 
     return {
-      detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
       status,
     };
   }
 
   /**
-   * Create a saved search
+   * Создание сохраненного поиска
    *
-   * @param request - Create request with saved search details
-   * @returns Created saved search
-   * @throws ApiError if creation fails
+   * @param request - Запрос на создание с деталями сохраненного поиска
+   * @returns Созданный сохраненный поиск
+   * @throws ApiError если создание не удалось
    *
    * @example
    * ```ts
    * const search = await savedSearchesClient.createSavedSearch({
-   *   name: 'Senior Python Developers',
+   *   name: 'Senior Python разработчики',
    *   query: 'Python AND Django',
    *   filters: { min_experience_years: 5 }
    * });
@@ -153,20 +153,20 @@ export class SavedSearchesClient {
   }
 
   /**
-   * List saved searches with optional filters
+   * Получение списка сохраненных поисков с опциональными фильтрами
    *
-   * @param skip - Number of records to skip (pagination)
-   * @param limit - Maximum number of records to return
-   * @param search - Optional filter by name (case-insensitive partial match)
-   * @returns List of saved searches
-   * @throws ApiError if listing fails
+   * @param skip - Количество записей для пропуска (пагинация)
+   * @param limit - Максимальное количество записей для возврата
+   * @param search - Опциональный фильтр по названию (без учета регистра, частичное совпадение)
+   * @returns Список сохраненных поисков
+   * @throws ApiError если получение списка не удалось
    *
    * @example
    * ```ts
-   * // Get all saved searches
+   * // Получение всех сохраненных поисков
    * const searches = await savedSearchesClient.listSavedSearches();
    *
-   * // Search by name
+   * // Поиск по названию
    * const pythonSearches = await savedSearchesClient.listSavedSearches(0, 100, 'python');
    * ```
    */
@@ -190,11 +190,11 @@ export class SavedSearchesClient {
   }
 
   /**
-   * Get a specific saved search by ID
+   * Получение конкретного сохраненного поиска по ID
    *
-   * @param savedSearchId - Saved search ID
-   * @returns Saved search details
-   * @throws ApiError if not found
+   * @param savedSearchId - ID сохраненного поиска
+   * @returns Детали сохраненного поиска
+   * @throws ApiError если поиск не найден
    *
    * @example
    * ```ts
@@ -213,17 +213,17 @@ export class SavedSearchesClient {
   }
 
   /**
-   * Update a saved search
+   * Обновление сохраненного поиска
    *
-   * @param savedSearchId - Saved search ID
-   * @param request - Update request with fields to modify
-   * @returns Updated saved search
-   * @throws ApiError if update fails
+   * @param savedSearchId - ID сохраненного поиска
+   * @param request - Запрос на обновление с полями для изменения
+   * @returns Обновленный сохраненный поиск
+   * @throws ApiError если обновление не удалось
    *
    * @example
    * ```ts
    * const updated = await savedSearchesClient.updateSavedSearch('search-uuid', {
-   *   name: 'Updated Search Name',
+   *   name: 'Обновленное название поиска',
    *   query: 'Python OR Django'
    * });
    * ```
@@ -244,10 +244,10 @@ export class SavedSearchesClient {
   }
 
   /**
-   * Delete a saved search
+   * Удаление сохраненного поиска
    *
-   * @param savedSearchId - Saved search ID
-   * @throws ApiError if deletion fails
+   * @param savedSearchId - ID сохраненного поиска
+   * @throws ApiError если удаление не удалось
    *
    * @example
    * ```ts
@@ -263,11 +263,11 @@ export class SavedSearchesClient {
   }
 
   /**
-   * Get the underlying Axios instance
+   * Получение базового экземпляра Axios
    *
-   * This is useful for making custom requests not covered by the convenience methods.
+   * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
    *
-   * @returns Axios instance
+   * @returns Экземпляр Axios
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
@@ -275,13 +275,13 @@ export class SavedSearchesClient {
 }
 
 /**
- * Default saved searches client instance
+ * Экземпляр клиента сохраненных поисков по умолчанию
  *
- * Use this singleton instance for all saved searches calls.
+ * Используйте этот singleton-экземпляр для всех операций с сохраненными поисками.
  */
 export const savedSearchesClient = new SavedSearchesClient();
 
 /**
- * Export saved searches client class for custom instances
+ * Экспорт класса сохраненных поисков для создания кастомных экземпляров
  */
 export default SavedSearchesClient;

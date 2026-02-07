@@ -4,6 +4,7 @@
  * Provides comprehensive audit trail viewing functionality including:
  * - Filterable list of all audit logs
  * - Search by action type, entity type, user, and date range
+ * - Security events quick filter for compliance monitoring
  * - Export functionality for compliance reporting
  * - Detailed log inspection dialog
  */
@@ -41,6 +42,8 @@ import {
   IconButton,
   Stack,
   Pagination,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -53,10 +56,24 @@ import {
   Event as EventIcon,
   Category as CategoryIcon,
   Clear as ClearIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import auditLogApi from '../services/auditLogApi';
 import type { AuditLog, AuditLogsQuery } from '@/types/api';
+
+// Security-related action types for quick filtering
+const SECURITY_ACTION_TYPES = [
+  'sso_login',
+  '2fa_enabled',
+  '2fa_disabled',
+  'session_revoked',
+  'ip_blocked',
+  'login_success',
+  'login_failed',
+  'logout',
+  'password_changed',
+];
 
 interface FilterState {
   action_type: string;
@@ -64,6 +81,7 @@ interface FilterState {
   user_id: string;
   start_date: string;
   end_date: string;
+  security_events_only: boolean;
 }
 
 const AuditLogsPage: React.FC = () => {
@@ -85,6 +103,7 @@ const AuditLogsPage: React.FC = () => {
     user_id: '',
     start_date: '',
     end_date: '',
+    security_events_only: false,
   });
   const [filterOptions, setFilterOptions] = useState({
     action_types: [] as string[],
@@ -110,8 +129,17 @@ const AuditLogsPage: React.FC = () => {
       if (filters.end_date) queryParams.end_date = filters.end_date;
 
       const response = await auditLogApi.getAuditLogs(queryParams);
-      setLogs(response.logs);
-      setTotalCount(response.total_count);
+
+      // Filter client-side for security events if toggle is enabled
+      let filteredLogs = response.logs;
+      if (filters.security_events_only) {
+        filteredLogs = response.logs.filter(log =>
+          SECURITY_ACTION_TYPES.includes(log.action_type)
+        );
+      }
+
+      setLogs(filteredLogs);
+      setTotalCount(filters.security_events_only ? filteredLogs.length : response.total_count);
       setError(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to fetch audit logs';
@@ -154,9 +182,17 @@ const AuditLogsPage: React.FC = () => {
 
       const response = await auditLogApi.getAuditLogs(queryParams);
 
+      // Filter for security events if enabled
+      let logsToExport = response.logs;
+      if (filters.security_events_only) {
+        logsToExport = response.logs.filter(log =>
+          SECURITY_ACTION_TYPES.includes(log.action_type)
+        );
+      }
+
       // Convert to CSV
       const headers = ['Timestamp', 'Action', 'Entity Type', 'Entity ID', 'User ID', 'Organization ID', 'IP Address', 'Details'];
-      const rows = response.logs.map((log) => [
+      const rows = logsToExport.map((log) => [
         format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
         log.action_type,
         log.entity_type || '',
@@ -177,13 +213,14 @@ const AuditLogsPage: React.FC = () => {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `audit-logs-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`);
+      const prefix = filters.security_events_only ? 'security-events' : 'audit-logs';
+      link.setAttribute('download', `${prefix}-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      setSuccess(`Exported ${response.logs.length} audit logs to CSV.`);
+      setSuccess(`Exported ${logsToExport.length} audit logs to CSV.`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to export audit logs';
       setError(message);
@@ -197,11 +234,22 @@ const AuditLogsPage: React.FC = () => {
       user_id: '',
       start_date: '',
       end_date: '',
+      security_events_only: false,
     });
     setPage(1);
   };
 
   const getActionTypeColor = (actionType: string): 'success' | 'info' | 'warning' | 'error' | 'default' => {
+    // Security events get specific colors
+    if (SECURITY_ACTION_TYPES.includes(actionType)) {
+      if (actionType === 'sso_login' || actionType === 'login_success') return 'success';
+      if (actionType === 'login_failed' || actionType === 'ip_blocked') return 'error';
+      if (actionType === '2fa_enabled') return 'success';
+      if (actionType === '2fa_disabled') return 'warning';
+      if (actionType === 'session_revoked') return 'warning';
+      return 'info';
+    }
+    // Regular events
     if (actionType.includes('create') || actionType.includes('upload')) return 'success';
     if (actionType.includes('update') || actionType.includes('modify')) return 'info';
     if (actionType.includes('delete') || actionType.includes('remove')) return 'error';
@@ -214,6 +262,10 @@ const AuditLogsPage: React.FC = () => {
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+  };
+
+  const isSecurityEvent = (actionType: string): boolean => {
+    return SECURITY_ACTION_TYPES.includes(actionType);
   };
 
   if (loading && logs.length === 0) {
@@ -274,7 +326,7 @@ const AuditLogsPage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <FilterListIcon sx={{ mr: 1 }} />
             <Typography variant="h6">Filters</Typography>
-            {(filters.action_type || filters.entity_type || filters.user_id || filters.start_date || filters.end_date) && (
+            {(filters.action_type || filters.entity_type || filters.user_id || filters.start_date || filters.end_date || filters.security_events_only) && (
               <Button
                 size="small"
                 startIcon={<ClearIcon />}
@@ -286,6 +338,33 @@ const AuditLogsPage: React.FC = () => {
             )}
           </Box>
           <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: 'info.dark',
+                  borderRadius: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SecurityIcon />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Security Events Only
+                  </Typography>
+                </Box>
+                <Switch
+                  checked={filters.security_events_only}
+                  onChange={(e) => {
+                    setFilters({ ...filters, security_events_only: e.target.checked });
+                    setPage(1);
+                  }}
+                  color="primary"
+                />
+              </Box>
+            </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Action Type</InputLabel>
@@ -377,7 +456,7 @@ const AuditLogsPage: React.FC = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -393,7 +472,23 @@ const AuditLogsPage: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <SecurityIcon color="info" sx={{ mr: 1 }} />
+                <Typography variant="body2" color="text.secondary">
+                  Security Events
+                </Typography>
+              </Box>
+              <Typography variant="h4" fontWeight={600}>
+                {logs.filter(log => isSecurityEvent(log.action_type)).length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -409,7 +504,7 @@ const AuditLogsPage: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -425,7 +520,7 @@ const AuditLogsPage: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -479,11 +574,22 @@ const AuditLogsPage: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={getActionLabel(log.action_type)}
-                          size="small"
-                          color={getActionTypeColor(log.action_type)}
-                        />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {isSecurityEvent(log.action_type) && (
+                            <Tooltip title="Security Event">
+                              <SecurityIcon
+                                fontSize="small"
+                                color="info"
+                                sx={{ opacity: 0.7 }}
+                              />
+                            </Tooltip>
+                          )}
+                          <Chip
+                            label={getActionLabel(log.action_type)}
+                            size="small"
+                            color={getActionTypeColor(log.action_type)}
+                          />
+                        </Box>
                       </TableCell>
                       <TableCell>
                         {log.entity_type ? (

@@ -13,6 +13,7 @@ export { candidateActivitiesClient, CandidateActivitiesClient } from './candidat
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
 export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
 export { candidateSearchClient, CandidateSearchClient } from './search';
+export { semanticSearchClient, SemanticSearchClient } from './semanticSearch';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -75,4 +76,13 @@ export type {
   CandidateSearchRequest,
   CandidateSearchResult,
   CandidateSearchResponse,
+  SemanticSearchFilters,
+  SemanticSearchRequest,
+  SemanticSearchResponse,
+  SemanticMatchExplanation,
+  SemanticCandidateResult,
+  HybridSearchRequest,
+  HybridSearchResponse,
+  MatchExplanationRequest,
+  MatchExplanationResponse,
 } from '@/types/api';

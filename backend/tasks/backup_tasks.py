@@ -39,6 +39,22 @@ try:
 except (ImportError, ModuleNotFoundError):
     get_backup_service, ensure_backup_dirs = _get_backup_functions
 
+# Import backup metrics exporter
+try:
+    from services.backup_metrics_exporter import get_backup_metrics
+except (ImportError, ModuleNotFoundError):
+    # Metrics exporter not available, will be no-op
+    def get_backup_metrics():
+        return None
+
+# Import email notification service
+try:
+    from services.email_notification_service import send_backup_notification
+except (ImportError, ModuleNotFoundError):
+    # Email notification not available, will be no-op
+    def send_backup_notification(*args, **kwargs):
+        return False
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -61,6 +77,12 @@ def daily_backup_task(self) -> Dict[str, Any]:
     """
     logger.info("Starting daily automated backup")
 
+    # Record backup start metrics
+    metrics = get_backup_metrics()
+    if metrics:
+        metrics.record_backup_start("full")
+    backup_start_time = datetime.utcnow()
+
     try:
         # Get backup service
         backup_service = get_backup_service()
@@ -77,6 +99,15 @@ def daily_backup_task(self) -> Dict[str, Any]:
 
         logger.info(f"Daily backup completed: {backup_name}")
 
+        # Record backup success metrics
+        if metrics:
+            duration_seconds = result.get("elapsed_seconds", 0)
+            metrics.record_backup_success(
+                backup_type="full",
+                size_bytes=result.get("size_bytes", 0),
+                duration_seconds=duration_seconds,
+            )
+
         # Schedule S3 upload if enabled
         # This is done in a separate task for parallel execution
         upload_to_s3_task.delay(result["path"], backup_name)
@@ -91,6 +122,16 @@ def daily_backup_task(self) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Daily backup failed: {e}", exc_info=True)
+
+        # Record backup failure metrics
+        if metrics:
+            duration_seconds = (datetime.utcnow() - backup_start_time).total_seconds()
+            error_type = _classify_error(e)
+            metrics.record_backup_failure(
+                backup_type="full",
+                error_type=error_type,
+                duration_seconds=duration_seconds,
+            )
 
         # Send notification
         send_backup_failure_notification("daily_backup", str(e))
@@ -133,6 +174,12 @@ def create_backup_task(
     """
     logger.info(f"Creating {backup_type} backup (incremental={is_incremental})")
 
+    # Record backup start metrics
+    metrics = get_backup_metrics()
+    if metrics:
+        metrics.record_backup_start(backup_type)
+    backup_start_time = datetime.utcnow()
+
     try:
         backup_service = get_backup_service()
 
@@ -172,6 +219,15 @@ def create_backup_task(
             "elapsed_seconds": result["elapsed_seconds"],
         }
 
+        # Record backup success metrics
+        if metrics:
+            duration_seconds = result.get("elapsed_seconds", 0)
+            metrics.record_backup_success(
+                backup_type=backup_type,
+                size_bytes=result.get("size_bytes", 0),
+                duration_seconds=duration_seconds,
+            )
+
         # Upload to S3 if requested
         if upload_to_s3:
             upload_to_s3_task.delay(result["path"], name or result["path"].split("/")[-1])
@@ -182,6 +238,17 @@ def create_backup_task(
 
     except Exception as e:
         logger.error(f"Backup creation failed: {e}", exc_info=True)
+
+        # Record backup failure metrics
+        if metrics:
+            duration_seconds = (datetime.utcnow() - backup_start_time).total_seconds()
+            error_type = _classify_error(e)
+            metrics.record_backup_failure(
+                backup_type=backup_type,
+                error_type=error_type,
+                duration_seconds=duration_seconds,
+            )
+
         send_backup_failure_notification(f"create_{backup_type}", str(e))
 
         try:
@@ -223,6 +290,31 @@ def cleanup_old_backups_task(self, retention_days: Optional[int] = None) -> Dict
 
         logger.info(f"Backup cleanup completed: {len(deleted)} backups deleted")
 
+        # Update retention metrics
+        metrics = get_backup_metrics()
+        if metrics:
+            try:
+                # Get current backup counts and sizes by type
+                backups_list = backup_service.get_backups_list()
+                # Group by backup type and calculate totals
+                type_stats = {}
+                for backup in backups_list:
+                    backup_type = backup.get("type", "unknown")
+                    if backup_type not in type_stats:
+                        type_stats[backup_type] = {"count": 0, "size": 0}
+                    type_stats[backup_type]["count"] += 1
+                    type_stats[backup_type]["size"] += backup.get("size_bytes", 0)
+
+                # Update metrics for each type
+                for backup_type, stats in type_stats.items():
+                    metrics.set_backup_retention_metrics(
+                        backup_type=backup_type,
+                        count=stats["count"],
+                        total_size_bytes=stats["size"],
+                    )
+            except Exception as metric_error:
+                logger.warning(f"Failed to update retention metrics: {metric_error}")
+
         return {
             "status": "success",
             "deleted_count": len(deleted),
@@ -261,6 +353,12 @@ def upload_to_s3_task(
     """
     logger.info(f"Uploading backup to S3: {backup_path}")
 
+    # Record S3 sync start metrics
+    metrics = get_backup_metrics()
+    if metrics:
+        metrics.record_s3_sync_start()
+    upload_start_time = datetime.utcnow()
+
     try:
         # Get S3 configuration from database
         s3_config = get_s3_config()
@@ -282,6 +380,14 @@ def upload_to_s3_task(
 
         logger.info(f"S3 upload completed: {result['s3_key']}")
 
+        # Record S3 sync success metrics
+        if metrics:
+            duration_seconds = (datetime.utcnow() - upload_start_time).total_seconds()
+            metrics.record_s3_sync_success(
+                bytes_uploaded=result.get("size_bytes", 0),
+                duration_seconds=duration_seconds,
+            )
+
         return {
             "status": "success",
             "s3_key": result["s3_key"],
@@ -291,6 +397,11 @@ def upload_to_s3_task(
 
     except Exception as e:
         logger.error(f"S3 upload failed: {e}", exc_info=True)
+
+        # Record S3 sync failure metrics
+        if metrics:
+            error_type = _classify_error(e)
+            metrics.record_s3_sync_failure(error_type=error_type)
 
         try:
             raise self.retry(exc=e, countdown=300)
@@ -322,6 +433,9 @@ def verify_backup_integrity_task(
     """
     logger.info(f"Verifying backup integrity: {backup_path}")
 
+    # Get metrics instance
+    metrics = get_backup_metrics()
+
     try:
         backup_service = get_backup_service()
         result = backup_service.verify_backup_integrity(
@@ -334,10 +448,19 @@ def verify_backup_integrity_task(
         else:
             logger.warning(f"Backup integrity check failed: {backup_path}")
 
+        # Record integrity check metrics
+        if metrics:
+            metrics.record_integrity_check(result="pass" if result.get("valid") else "fail")
+
         return result
 
     except Exception as e:
         logger.error(f"Backup verification failed: {e}", exc_info=True)
+
+        # Record integrity check failure
+        if metrics:
+            metrics.record_integrity_check(result="fail")
+
         return {
             "valid": False,
             "error": str(e),
@@ -367,6 +490,12 @@ def restore_from_backup_task(
     """
     logger.info(f"Starting restore from: {backup_path}")
 
+    # Record restore start metrics
+    metrics = get_backup_metrics()
+    if metrics:
+        metrics.record_restore_start(backup_type)
+    restore_start_time = datetime.utcnow()
+
     try:
         backup_service = get_backup_service()
 
@@ -388,6 +517,14 @@ def restore_from_backup_task(
 
         logger.info(f"Restore completed successfully in {result.get('elapsed_seconds', 0):.1f}s")
 
+        # Record restore success metrics
+        if metrics:
+            duration_seconds = result.get("elapsed_seconds", 0)
+            metrics.record_restore_success(
+                backup_type=backup_type,
+                duration_seconds=duration_seconds,
+            )
+
         return {
             "status": "success",
             "backup_path": backup_path,
@@ -396,6 +533,15 @@ def restore_from_backup_task(
 
     except Exception as e:
         logger.error(f"Restore failed: {e}", exc_info=True)
+
+        # Record restore failure metrics
+        if metrics:
+            error_type = _classify_error(e)
+            metrics.record_restore_failure(
+                backup_type=backup_type,
+                error_type=error_type,
+            )
+
         return {
             "status": "failed",
             "error": str(e),
@@ -417,6 +563,12 @@ def sync_all_to_s3_task(self) -> Dict[str, Any]:
     """
     logger.info("Starting S3 sync for all backups")
 
+    # Record S3 sync start metrics
+    metrics = get_backup_metrics()
+    if metrics:
+        metrics.record_s3_sync_start()
+    sync_start_time = datetime.utcnow()
+
     try:
         s3_config = get_s3_config()
 
@@ -435,22 +587,32 @@ def sync_all_to_s3_task(self) -> Dict[str, Any]:
 
         uploaded = []
         skipped = []
+        total_bytes_uploaded = 0
 
         for backup in local_backups:
             backup_name = backup["path"].split("/")[-1]
             if backup_name not in s3_keys:
                 try:
-                    backup_service.upload_to_s3(
+                    result = backup_service.upload_to_s3(
                         backup["path"],
                         s3_key=f"backups/{backup_name}",
                     )
                     uploaded.append(backup["path"])
+                    total_bytes_uploaded += result.get("size_bytes", 0)
                 except Exception as e:
                     logger.error(f"Failed to upload {backup_name}: {e}")
             else:
                 skipped.append(backup["path"])
 
         logger.info(f"S3 sync completed: {len(uploaded)} uploaded, {len(skipped)} skipped")
+
+        # Record S3 sync success metrics
+        if metrics:
+            duration_seconds = (datetime.utcnow() - sync_start_time).total_seconds()
+            metrics.record_s3_sync_success(
+                bytes_uploaded=total_bytes_uploaded,
+                duration_seconds=duration_seconds,
+            )
 
         return {
             "status": "success",
@@ -461,6 +623,12 @@ def sync_all_to_s3_task(self) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"S3 sync failed: {e}", exc_info=True)
+
+        # Record S3 sync failure metrics
+        if metrics:
+            error_type = _classify_error(e)
+            metrics.record_s3_sync_failure(error_type=error_type)
+
         return {
             "status": "failed",
             "error": str(e),
@@ -487,33 +655,78 @@ def get_s3_config() -> Dict[str, Any]:
     }
 
 
-def send_backup_failure_notification(operation: str, error_message: str) -> None:
+def send_backup_failure_notification(operation: str, error_message: str, context: Optional[Dict[str, Any]] = None) -> None:
     """
     Send notification on backup failure.
 
     Args:
         operation: Name of the failed operation
         error_message: Error message
+        context: Optional additional context (backup_type, timestamp, etc.)
     """
-    # Get notification email from config
-    notification_email = os.getenv("BACKUP_NOTIFICATION_EMAIL")
-
-    if not notification_email:
-        logger.warning("No notification email configured")
-        return
-
-    # In a full implementation, this would send an email
-    # For now, just log the notification
+    # Always log the failure
     logger.error(
-        f"BACKUP FAILURE NOTIFICATION for {operation}: {error_message} "
-        f"(would send to: {notification_email})"
+        f"BACKUP FAILURE: {operation} - {error_message}"
     )
 
-    # TODO: Implement email notification
-    # Could use Celery with tasks like:
-    # - send_email_task
-    # - send_slack_notification
-    # - send_webhook_notification
+    # Send email notification
+    try:
+        send_backup_notification(
+            notification_type="failure",
+            operation=operation,
+            error_message=error_message,
+            context=context,
+        )
+    except Exception as e:
+        # Don't let notification errors break the backup flow
+        logger.error(f"Failed to send backup failure notification: {e}")
+
+
+def _classify_error(error: Exception) -> str:
+    """
+    Classify an error into a category for metrics.
+
+    Args:
+        error: The exception to classify
+
+    Returns:
+        Error type string (e.g., 'disk_full', 'database_error', 'network_error')
+    """
+    error_message = str(error).lower()
+    error_type = type(error).__name__
+
+    # Disk space errors
+    if "disk" in error_message or "space" in error_message or "no space left" in error_message:
+        return "disk_full"
+    if "permission" in error_message and "denied" in error_message:
+        return "permission_error"
+
+    # Database errors
+    if "database" in error_message or "connection" in error_message or "pg_dump" in error_message:
+        return "database_error"
+    if "sql" in error_message or "query" in error_message:
+        return "database_error"
+
+    # Network/S3 errors
+    if "network" in error_message or "connection" in error_message:
+        return "network_error"
+    if "s3" in error_message or "aws" in error_message or "boto" in error_message:
+        return "s3_error"
+    if "timeout" in error_message:
+        return "timeout_error"
+
+    # Authentication errors
+    if "auth" in error_message or "credential" in error_message or "unauthorized" in error_message:
+        return "auth_error"
+
+    # File/IO errors
+    if "file" in error_message or "io" in error_message or "not found" in error_message:
+        return "file_error"
+    if "corrupt" in error_message or "checksum" in error_message:
+        return "corruption_error"
+
+    # Default: use exception type
+    return error_type.lower() if error_type else "unknown_error"
 
 
 @shared_task(
@@ -583,6 +796,15 @@ def backup_health_check_task(self) -> Dict[str, Any]:
         import shutil
         disk_usage = shutil.disk_usage("./data/backups")
         free_gb = disk_usage.free / (1024**3)
+
+        # Update disk usage metrics
+        metrics = get_backup_metrics()
+        if metrics:
+            metrics.set_disk_usage_metrics(
+                used_bytes=disk_usage.used,
+                free_bytes=disk_usage.free,
+                total_bytes=disk_usage.total,
+            )
 
         if free_gb < 1:  # Less than 1GB
             results["checks"]["disk_space"] = {

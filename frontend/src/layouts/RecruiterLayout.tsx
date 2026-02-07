@@ -43,8 +43,10 @@ import {
   Upload as UploadIcon,
 } from '@mui/icons-material';
 
+// Ширина боковой панели навигации
 const DRAWER_WIDTH = 280;
 
+// Интерфейс элемента навигации
 interface NavItem {
   label: string;
   path: string;
@@ -52,11 +54,13 @@ interface NavItem {
   children?: NavItem[];
 }
 
+// Интерфейс секции навигации
 interface NavSection {
   title?: string;
   items: NavItem[];
 }
 
+// Конфигурация секций навигации для рекрутера
 const navSections: NavSection[] = [
   {
     items: [
@@ -105,10 +109,14 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Основной компонент макета рекрутера
 const RecruiterLayout: React.FC = () => {
   const theme = useTheme();
+  // Проверка, является ли устройство мобильным
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  // Состояние открытости мобильного меню
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Состояние раскрытых секций навигации
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     Hiring: true,
     Resumes: false,
@@ -120,17 +128,20 @@ const RecruiterLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Обработчик переключения мобильного меню
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  // Обработчик переключения секции навигации
   const handleSectionToggle = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
+  // Контент боковой панели ( drawer)
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Logo */}
+      {/* Логотип */}
       <Box
         sx={{
           height: 64,
@@ -156,7 +167,7 @@ const RecruiterLayout: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Navigation Sections */}
+      {/* Секции навигации */}
       <nav aria-label="Main navigation" sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <List
           sx={{ px: 2, py: 2 }}
@@ -165,6 +176,7 @@ const RecruiterLayout: React.FC = () => {
         >
           {navSections.map((section, sectionIdx) => (
             <Box key={sectionIdx || 'root'}>
+              {/* Заголовок секции с возможностью раскрытия/скрытия */}
               {section.title && (
                 <>
                   <ListItem
@@ -199,8 +211,10 @@ const RecruiterLayout: React.FC = () => {
                 </>
               )}
 
+              {/* Элементы навигации секции */}
               <Collapse in={!section.title || expandedSections[section.title!]} timeout="auto" unmountOnExit>
                 {section.items.map((item) => {
+                  // Определение активного элемента на основе текущего пути
                   const isActive = location.pathname === item.path ||
                     (item.path !== '/recruiter/dashboard' && location.pathname.startsWith(item.path + '/'));
 
@@ -211,6 +225,7 @@ const RecruiterLayout: React.FC = () => {
                         aria-current={isActive ? 'page' : undefined}
                         onClick={() => {
                           navigate(item.path);
+                          // Закрытие мобильного меню после навигации
                           if (isMobile) setMobileOpen(false);
                         }}
                         sx={{
@@ -252,6 +267,7 @@ const RecruiterLayout: React.FC = () => {
                 })}
               </Collapse>
 
+              {/* Разделитель между секциями */}
               {sectionIdx < navSections.length - 1 && (
                 <Divider sx={{ my: 1, mx: 2 }} />
               )}
@@ -264,7 +280,7 @@ const RecruiterLayout: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* Skip Link for Keyboard Users */}
+      {/* Ссылка для быстрого перехода к основному контенту (для пользователей клавиатуры) */}
       <Box
         component="a"
         href="#main-content"
@@ -286,7 +302,7 @@ const RecruiterLayout: React.FC = () => {
         Skip to main content
       </Box>
 
-      {/* Top AppBar */}
+      {/* Верхняя панель приложения (AppBar) */}
       <AppBar
         position="fixed"
         elevation={0}
@@ -299,6 +315,7 @@ const RecruiterLayout: React.FC = () => {
         }}
       >
         <Toolbar>
+          {/* Кнопка меню для мобильных устройств */}
           <IconButton
             color="inherit"
             edge="start"
@@ -310,9 +327,11 @@ const RecruiterLayout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
+          {/* Заголовок панели */}
           <Typography variant="h6" fontWeight={600} color="text.primary" component="h2">
             Recruiter Portal
           </Typography>
+          {/* Кнопки быстрого доступа */}
           <Box sx={{ ml: 'auto', display: { xs: 'none', md: 'flex' }, gap: 1 }}>
             <Tooltip title="Quick Search (Ctrl+K)">
               <IconButton
@@ -327,14 +346,14 @@ const RecruiterLayout: React.FC = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar */}
+      {/* Боковая панель навигации */}
       <Box
         component="nav"
         sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
         aria-label="Recruiter sidebar navigation"
         id="drawer-menu"
       >
-        {/* Mobile Drawer */}
+        {/* Мобильная версия боковой панели */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -351,7 +370,7 @@ const RecruiterLayout: React.FC = () => {
           {drawerContent}
         </Drawer>
 
-        {/* Desktop Drawer */}
+        {/* Десктопная версия боковой панели */}
         <Drawer
           variant="permanent"
           sx={{
@@ -369,7 +388,7 @@ const RecruiterLayout: React.FC = () => {
         </Drawer>
       </Box>
 
-      {/* Main Content */}
+      {/* Основной контент */}
       <Box
         component="main"
         id="main-content"

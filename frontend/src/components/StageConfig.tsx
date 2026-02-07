@@ -24,15 +24,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  DragIndicator as DragIndicatorIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { workflowStagesClient } from '@/api/workflowStages';
 import type {
   WorkflowStageResponse,
@@ -273,7 +266,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" onClick={fetchStages} startIcon={<RefreshIcon />}>
+          <Button color="inherit" onClick={fetchStages} startIcon={<Icon name="refresh-cw" size={16} />}>
             Try Again
           </Button>
         }
@@ -297,7 +290,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
           </Typography>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            startIcon={<Icon name="refresh-cw" size={16} />}
             onClick={fetchStages}
             size="small"
           >
@@ -353,7 +346,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={<Icon name="plus" size={16} />}
             onClick={handleCreate}
             size="large"
           >
@@ -389,7 +382,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <DragIndicatorIcon color="action" fontSize="small" />
+                        <Icon name="grip-vertical" size="small" color="muted" />
                         <Typography variant="h6" fontWeight={600}>
                           {stage.stage_name}
                         </Typography>
@@ -400,7 +393,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
                           onClick={() => handleEdit(stage)}
                           color="primary"
                         >
-                          <EditIcon fontSize="small" />
+                          <Icon name="edit-2" size="small" />
                         </IconButton>
                         <IconButton
                           size="small"
@@ -409,7 +402,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
                           disabled={stage.is_default}
                           title={stage.is_default ? 'Cannot delete default stage' : 'Delete stage'}
                         >
-                          <DeleteIcon fontSize="small" />
+                          <Icon name="trash-2" size="small" />
                         </IconButton>
                       </Stack>
                     </Box>
@@ -485,7 +478,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
               disabled={submitting}
               size="small"
             >
-              <CloseIcon />
+              <Icon name="x" size={16} />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -527,7 +520,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
                   ? 'Invalid hex color format (use #RRGGBB)'
                   : 'Hex color code for stage visualization'
               }
-              InputProps={{
+              inputProps={{
                 startAdornment: (
                   <Box
                     sx={{
@@ -604,7 +597,7 @@ const StageConfig: React.FC<StageConfigProps> = ({
             variant="contained"
             color="error"
             disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            startIcon={submitting ? <CircularProgress size={16} /> : <Icon name="trash-2" size={16} />}
           >
             {submitting ? 'Deleting...' : 'Delete'}
           </Button>

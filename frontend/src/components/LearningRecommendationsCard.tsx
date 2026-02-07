@@ -26,20 +26,8 @@ import {
   Divider,
   Rating,
   Tooltip,
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  School as CourseIcon,
-  Verified as CertificationIcon,
-  MenuBook as BookIcon,
-  PlayCircle as VideoIcon,
-  Work as WorkshopIcon,
-  Code as TutorialIcon,
-  Launch as LaunchIcon,
-  AttachMoney as CostIcon,
-  FreeBreakfast as FreeIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import type { LearningRecommendationsResponse, LearningResource } from '@/types/api';
 
 interface LearningRecommendationsCardProps {
@@ -53,19 +41,19 @@ interface LearningRecommendationsCardProps {
 function getResourceIcon(type: string) {
   switch (type) {
     case 'course':
-      return <CourseIcon />;
+      return <Icon name="graduation-cap" />;
     case 'certification':
-      return <CertificationIcon />;
+      return <Icon name="badge-check" />;
     case 'book':
-      return <BookIcon />;
+      return <Icon name="book" />;
     case 'video':
-      return <VideoIcon />;
+      return <Icon name="play-circle" />;
     case 'workshop':
-      return <WorkshopIcon />;
+      return <Icon name="briefcase" />;
     case 'tutorial':
-      return <TutorialIcon />;
+      return <Icon name="code" />;
     default:
-      return <CourseIcon />;
+      return <Icon name="graduation-cap" />;
   }
 }
 
@@ -118,7 +106,7 @@ function SkillSection({ skill, resources, onResourceClick }: SkillSectionProps) 
           </Typography>
           <Badge badgeContent={resources.length} color="primary" />
         </Box>
-        {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        {expanded ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
       </Box>
 
       <Collapse in={expanded}>
@@ -145,7 +133,7 @@ function SkillSection({ skill, resources, onResourceClick }: SkillSectionProps) 
                       />
                       {resource.certificate_offered && (
                         <Tooltip title={t('skillGap.offersCertificate', { defaultValue: 'Offers Certificate' })}>
-                          <CertificationIcon color="primary" fontSize="small" />
+                          <Icon name="badge-check" color="primary" fontSize="small" />
                         </Tooltip>
                       )}
                     </Box>
@@ -192,7 +180,7 @@ function SkillSection({ skill, resources, onResourceClick }: SkillSectionProps) 
                         <Chip label={resource.skill_level} size="small" variant="outlined" />
                       )}
                       <Chip
-                        icon={resource.access_type === 'free' ? <FreeIcon fontSize="small" /> : <CostIcon fontSize="small" />}
+                        icon={resource.access_type === 'free' ? <Icon name="coffee" fontSize="small" /> : <Icon name="dollar-sign" fontSize="small" />}
                         label={resource.access_type === 'free' ? t('skillGap.free', { defaultValue: 'Free' }) : `$${resource.cost_amount || 0}`}
                         size="small"
                         color={resource.access_type === 'free' ? 'success' : 'default'}
@@ -223,7 +211,7 @@ function SkillSection({ skill, resources, onResourceClick }: SkillSectionProps) 
                         LinkComponent={'a' as const}
                         target="_blank"
                         rel="noopener noreferrer"
-                        startIcon={<LaunchIcon />}
+                        startIcon={<Icon name="external-link" />}
                         onClick={() => onResourceClick?.(resource)}
                       >
                         {t('skillGap.viewResource', { defaultValue: 'View' })}
@@ -231,7 +219,7 @@ function SkillSection({ skill, resources, onResourceClick }: SkillSectionProps) 
                     ) : (
                       <Button
                         size="small"
-                        startIcon={<LaunchIcon />}
+                        startIcon={<Icon name="external-link" />}
                         disabled
                       >
                         {t('skillGap.viewResource', { defaultValue: 'View' })}

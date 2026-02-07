@@ -1,18 +1,18 @@
 /**
  * User Preferences API
  *
- * This module provides API functions for managing user preferences,
- * including language preference for UI localization.
+ * Этот модуль предоставляет API функции для управления пользовательскими предпочтениями,
+ * включая языковые предпочтения для локализации UI.
  *
  * @example
  * ```ts
  * import { getLanguagePreference, updateLanguagePreference } from '@/api/preferences';
  *
- * // Get current language preference
+ * // Получение текущего языкового предпочтения
  * const preference = await getLanguagePreference();
  * console.log(preference.language); // 'en' or 'ru'
  *
- * // Update language preference
+ * // Обновление языкового предпочтения
  * await updateLanguagePreference('ru');
  * ```
  */
@@ -25,18 +25,18 @@ import type {
 } from '@/types/api';
 
 /**
- * Get the current language preference from the backend
+ * Получение текущего языкового предпочтения из backend
  *
- * Retrieves the currently selected language for the UI.
- * Default is 'en' (English) if not previously set.
+ * Получает текущий выбранный язык для UI.
+ * По умолчанию 'en' (английский), если ранее не был установлен.
  *
- * @returns Promise resolving to language preference response
- * @throws ApiError if request fails
+ * @returns Promise, разрешающий в ответ о языковом предпочтении
+ * @throws ApiError если запрос не удался
  *
  * @example
  * ```ts
  * const preference = await getLanguagePreference();
- * console.log(`Current language: ${preference.language}`);
+ * console.log(`Текущий язык: ${preference.language}`);
  * ```
  */
 export async function getLanguagePreference(): Promise<LanguagePreferenceResponse> {
@@ -48,26 +48,26 @@ export async function getLanguagePreference(): Promise<LanguagePreferenceRespons
   } catch (error) {
     const apiError = error as ApiError;
     throw new Error(
-      apiError.detail || 'Failed to retrieve language preference'
+      apiError.detail || 'Не удалось получить языковое предпочтение'
     );
   }
 }
 
 /**
- * Update the language preference
+ * Обновление языкового предпочтения
  *
- * Sets the language preference for the UI. Supported languages are:
- * - 'en' (English)
- * - 'ru' (Russian)
+ * Устанавливает языковое предпочтение для UI. Поддерживаемые языки:
+ * - 'en' (английский)
+ * - 'ru' (русский)
  *
- * @param language - Language code to set ('en' or 'ru')
- * @returns Promise resolving to updated language preference response
- * @throws ApiError if request fails or language is not supported
+ * @param language - Код языка для установки ('en' или 'ru')
+ * @returns Promise, разрешающий в обновленный ответ о языковом предпочтении
+ * @throws ApiError если запрос не удался или язык не поддерживается
  *
  * @example
  * ```ts
  * await updateLanguagePreference('ru');
- * console.log('Language updated to Russian');
+ * console.log('Язык обновлен на русский');
  * ```
  */
 export async function updateLanguagePreference(
@@ -83,7 +83,7 @@ export async function updateLanguagePreference(
   } catch (error) {
     const apiError = error as ApiError;
     throw new Error(
-      apiError.detail || 'Failed to update language preference'
+      apiError.detail || 'Не удалось обновить языковое предпочтение'
     );
   }
 }

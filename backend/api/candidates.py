@@ -31,6 +31,9 @@ from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
+from models.user import User
+from models.role import UserRole
+from middleware.auth import get_current_active_user, require_role
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +231,7 @@ async def list_candidates(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     List all candidates (resumes) with their current workflow stages.
@@ -490,6 +494,7 @@ async def get_candidate(
     request: Request,
     candidate_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get a specific candidate's current stage information.
@@ -663,6 +668,7 @@ async def move_candidate(
     candidate_id: str,
     stage_data: MoveCandidateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Move a candidate to a different workflow stage.
@@ -841,6 +847,7 @@ async def bulk_move_candidates(
     request: Request,
     bulk_data: BulkMoveCandidatesRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Bulk move multiple candidates to a different workflow stage.
@@ -1063,6 +1070,7 @@ async def get_candidates_for_vacancy(
     vacancy_id: str,
     limit: int = Query(50, ge=1, le=200, description="Maximum candidates to return"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get ranked candidates for a specific vacancy.
@@ -1174,6 +1182,7 @@ async def get_stage_metrics(
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """
     Get stage metrics including time in stage and drop-off rates.
@@ -1472,6 +1481,7 @@ async def bulk_action(
     request: Request,
     bulk_data: BulkActionRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
 ) -> JSONResponse:
     """
     Perform bulk actions on search results.

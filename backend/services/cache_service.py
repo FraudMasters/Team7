@@ -11,6 +11,7 @@ The cache service supports:
 - Pattern-based cache invalidation
 - Health checks and connection monitoring
 - Graceful fallback when Redis is unavailable
+- Specialized embedding cache for LLM semantic search
 
 Cache key format: {prefix}:{namespace}:{key}
 Example: agenthr:candidate:12345
@@ -63,6 +64,7 @@ class CacheService:
     NAMESPACE_ANALYTICS = "analytics"
     NAMESPACE_TAXONOMY = "taxonomy"
     NAMESPACE_SESSION = "session"
+    NAMESPACE_EMBEDDING = "embedding"
 
     def __init__(
         self,
@@ -554,6 +556,107 @@ class CacheService:
 
         return result
 
+    def get_embedding(self, text_hash: str) -> Optional[List[float]]:
+        """
+        Retrieve a cached embedding by text hash.
+
+        Args:
+            text_hash: Hash of the text content used as cache key
+
+        Returns:
+            List of embedding floats or None if not found
+
+        Example:
+            >>> cache = CacheService()
+            >>> embedding = cache.get_embedding('abc123hash')
+            >>> if embedding:
+            ...     print(f"Found cached embedding: {len(embedding)} dimensions")
+        """
+        return self.get(self.NAMESPACE_EMBEDDING, text_hash)
+
+    def set_embedding(
+        self, text_hash: str, embedding: List[float], ttl: Optional[int] = None
+    ) -> bool:
+        """
+        Store an embedding in cache.
+
+        Args:
+            text_hash: Hash of the text content used as cache key
+            embedding: List of embedding floats to cache
+            ttl: Time-to-live in seconds (defaults to instance default_ttl)
+
+        Returns:
+            True if successful, False otherwise
+
+        Example:
+            >>> cache = CacheService()
+            >>> embedding = [0.1, 0.2, 0.3, ...]  # 1536 dimensions
+            >>> cache.set_embedding('abc123hash', embedding, ttl=86400)
+        """
+        if not isinstance(embedding, list):
+            logger.error(f"Embedding must be a list, got {type(embedding)}")
+            return False
+
+        return self.set(self.NAMESPACE_EMBEDDING, text_hash, embedding, ttl=ttl)
+
+    def get_embeddings_batch(self, text_hashes: List[str]) -> Dict[str, List[float]]:
+        """
+        Retrieve multiple cached embeddings.
+
+        Args:
+            text_hashes: List of text content hashes
+
+        Returns:
+            Dictionary mapping hashes to their embeddings (only cached ones)
+
+        Example:
+            >>> cache = CacheService()
+            >>> hashes = ['hash1', 'hash2', 'hash3']
+            >>> embeddings = cache.get_embeddings_batch(hashes)
+            >>> print(f"Found {len(embeddings)} cached embeddings")
+        """
+        return self.get_many(self.NAMESPACE_EMBEDDING, text_hashes)
+
+    def set_embeddings_batch(
+        self, embeddings: Dict[str, List[float]], ttl: Optional[int] = None
+    ) -> int:
+        """
+        Store multiple embeddings in cache.
+
+        Args:
+            embeddings: Dictionary mapping text hashes to embedding lists
+            ttl: Time-to-live in seconds (defaults to instance default_ttl)
+
+        Returns:
+            Number of embeddings successfully cached
+
+        Example:
+            >>> cache = CacheService()
+            >>> embeddings = {
+            ...     'hash1': [0.1, 0.2, ...],
+            ...     'hash2': [0.3, 0.4, ...],
+            ... }
+            >>> count = cache.set_embeddings_batch(embeddings, ttl=86400)
+        """
+        return self.set_many(self.NAMESPACE_EMBEDDING, embeddings, ttl=ttl)
+
+    def invalidate_embeddings(self) -> int:
+        """
+        Clear all cached embeddings.
+
+        Useful for invalidating embeddings after model updates or
+        when embedding dimensionality changes.
+
+        Returns:
+            Number of cache keys deleted
+
+        Example:
+            >>> cache = CacheService()
+            >>> count = cache.invalidate_embeddings()
+            >>> print(f"Cleared {count} cached embeddings")
+        """
+        return self.clear_namespace(self.NAMESPACE_EMBEDDING)
+
     def close(self) -> None:
         """
         Close the Redis connection.
@@ -683,6 +786,26 @@ def invalidate_match_cache(resume_id: str, vacancy_id: Optional[str] = None) -> 
         invalidated += cache.delete_pattern(CacheService.NAMESPACE_MATCH, f"match:{resume_id}:*")
 
     return invalidated
+
+
+def invalidate_embedding_cache() -> int:
+    """
+    Invalidate all cached embeddings.
+
+    Useful when:
+    - Embedding model is updated
+    - Embedding dimensionality changes
+    - Fresh embeddings are required for all content
+
+    Returns:
+        Number of cache keys invalidated
+
+    Example:
+        >>> invalidate_embedding_cache()
+        1250
+    """
+    cache = get_cache_service()
+    return cache.invalidate_embeddings()
 
 
 def cached(

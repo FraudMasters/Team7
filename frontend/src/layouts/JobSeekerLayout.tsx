@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+// Импорт компонентов MUI Material
 import {
   AppBar,
   Toolbar,
@@ -20,6 +21,7 @@ import {
   IconButton,
   Collapse,
 } from '@mui/material';
+// Импорт иконок MUI
 import {
   Search as SearchIcon,
   Bookmark as BookmarkIcon,
@@ -38,6 +40,7 @@ import {
 } from '@mui/icons-material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
 
+// Интерфейс элемента навигации
 interface NavItem {
   label: string;
   path: string;
@@ -45,11 +48,13 @@ interface NavItem {
   children?: NavItem[];
 }
 
+// Интерфейс секции навигации
 interface NavSection {
   title?: string;
   items: NavItem[];
 }
 
+// Конфигурация секций навигации для соискателя
 const navSections: NavSection[] = [
   {
     items: [
@@ -85,6 +90,7 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Элементы нижней навигации для мобильных устройств
 const bottomNavItems: NavItem[] = [
   { label: 'Jobs', path: '/jobs', icon: <WorkIcon /> },
   { label: 'Saved', path: '/jobs/saved', icon: <BookmarkIcon /> },
@@ -92,8 +98,10 @@ const bottomNavItems: NavItem[] = [
   { label: 'Profile', path: '/profile', icon: <PersonIcon /> },
 ];
 
+// Ширина боковой панели навигации
 const DRAWER_WIDTH = 280;
 
+// Основной компонент макета для соискателя
 const JobSeekerLayout: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -107,7 +115,7 @@ const JobSeekerLayout: React.FC = () => {
     Account: false,
   });
 
-  // Update active tab based on current route (bottom nav)
+  // Обновление активной вкладки на основе текущего маршрута (нижняя навигация)
   useEffect(() => {
     const index = bottomNavItems.findIndex((item) =>
       location.pathname === item.path || location.pathname.startsWith(item.path + '/')
@@ -117,22 +125,26 @@ const JobSeekerLayout: React.FC = () => {
     }
   }, [location.pathname]);
 
+  // Обработчик изменения нижней навигации
   const handleBottomNavChange = (_event: React.SyntheticEvent, newValue: number) => {
     setBottomNavValue(newValue);
     navigate(bottomNavItems[newValue].path);
   };
 
+  // Обработчик открытия/закрытия мобильного меню
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  // Обработчик переключения секции навигации
   const handleSectionToggle = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
+  // Содержимое боковой панели навигации
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Logo */}
+      {/* Логотип */}
       <Box
         sx={{
           height: 64,
@@ -158,8 +170,8 @@ const JobSeekerLayout: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Navigation Sections */}
-      <nav aria-label="Main navigation">
+      {/* Секции навигации */}
+      <nav aria-label="Основная навигация">
         <List sx={{ px: 2, py: 2 }} role="menubar">
           {navSections.map((section, sectionIdx) => (
             <Box key={section.title || sectionIdx}>
@@ -257,7 +269,7 @@ const JobSeekerLayout: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* Skip Link for Keyboard Users */}
+      {/* Ссылка для пропуска к основному содержимому (для пользователей клавиатуры) */}
       <Box
         component="a"
         href="#main-content"
@@ -279,7 +291,7 @@ const JobSeekerLayout: React.FC = () => {
         Skip to main content
       </Box>
 
-      {/* Sticky Top AppBar */}
+      {/* Фиксированная верхняя панель */}
       <AppBar
         position="sticky"
         elevation={0}
@@ -330,7 +342,7 @@ const JobSeekerLayout: React.FC = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Desktop Sidebar */}
+      {/* Боковая панель для десктопа */}
       <Box
         component="nav"
         sx={{
@@ -356,7 +368,7 @@ const JobSeekerLayout: React.FC = () => {
         </Drawer>
       </Box>
 
-      {/* Mobile Drawer */}
+      {/* Мобильное выдвижное меню */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -373,7 +385,7 @@ const JobSeekerLayout: React.FC = () => {
         {drawerContent}
       </Drawer>
 
-      {/* Main Content */}
+      {/* Основной контент */}
       <Box
         component="main"
         id="main-content"
@@ -387,7 +399,7 @@ const JobSeekerLayout: React.FC = () => {
         <Outlet />
       </Box>
 
-      {/* Bottom Navigation (Mobile Only) */}
+      {/* Нижняя навигация (только для мобильных устройств) */}
       <Paper
         component="nav"
         aria-label="Mobile navigation"

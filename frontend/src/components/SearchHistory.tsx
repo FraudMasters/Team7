@@ -18,16 +18,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-} from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  Search as SearchIcon,
-  Delete as DeleteIcon,
-  History as HistoryIcon,
-  Close as CloseIcon,
-  Schedule as ScheduleIcon,
-  FilterList as FilterIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import { searchHistoryClient } from '@/api/searchHistory';
 import type {
@@ -282,7 +274,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <HistoryIcon fontSize="large" color="primary" />
+            <Icon name="history" size={32} color="primary" />
             <Box>
               <Typography variant="h5" fontWeight={600}>
                 {t('searchHistory.title') || 'Search History'}
@@ -295,7 +287,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
           <Stack direction="row" spacing={1}>
             <Button
               variant="outlined"
-              startIcon={<RefreshIcon />}
+              startIcon={<Icon name="refresh-cw" size={16} />}
               onClick={fetchHistory}
               size="small"
             >
@@ -304,7 +296,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
             <Button
               variant="outlined"
               color="error"
-              startIcon={<DeleteIcon />}
+              startIcon={<Icon name="trash-2" size={16} />}
               onClick={() => setClearDialogOpen(true)}
               size="small"
             >
@@ -358,7 +350,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
                             color: 'white',
                           }}
                         >
-                          <SearchIcon fontSize="small" />
+                          <Icon name="search" size="small" />
                         </Box>
                         <Typography variant="body1" fontWeight={500} sx={{ flex: 1 }}>
                           {searchSummary}
@@ -375,7 +367,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
                         )}
                         {filterCount > 0 && (
                           <Chip
-                            icon={<FilterIcon fontSize="small" />}
+                            icon={<Icon name="filter" size="small" />}
                             label={`${filterCount} filter${filterCount > 1 ? 's' : ''}`}
                             size="small"
                             variant="outlined"
@@ -387,7 +379,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
                     {/* Search Details */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ScheduleIcon fontSize="small" color="action" sx={{ fontSize: '1rem' }} />
+                        <Icon name="clock" size={14} color="muted" />
                         <Typography variant="caption" color="text.secondary">
                           {formatTimestamp(item.created_at)}
                         </Typography>
@@ -409,7 +401,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
                               handleRepeatSearch(item);
                             }}
                           >
-                            <RefreshIcon fontSize="small" />
+                            <Icon name="refresh-cw" size="small" />
                           </IconButton>
                         </Tooltip>
                       )}
@@ -434,7 +426,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DeleteIcon color="error" />
+            <Icon name="trash-2" size={24} color="error" />
             {t('searchHistory.clearDialogTitle') || 'Clear Search History'}
           </Box>
         </DialogTitle>
@@ -448,7 +440,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
           <Button
             onClick={() => setClearDialogOpen(false)}
             disabled={clearing}
-            startIcon={<CloseIcon />}
+            startIcon={<Icon name="x" size={16} />}
           >
             {t('searchHistory.cancel') || 'Cancel'}
           </Button>
@@ -457,7 +449,7 @@ const SearchHistory: React.FC<SearchHistoryProps> = ({
             disabled={clearing}
             color="error"
             variant="contained"
-            startIcon={<DeleteIcon />}
+            startIcon={<Icon name="trash-2" size={16} />}
           >
             {clearing
               ? (t('searchHistory.clearing') || 'Clearing...')

@@ -11,7 +11,7 @@ import {
   Stack,
   Paper,
   Chip,
-} from '@mui/material';
+} from '@/components/ui';
 import {
   Upload as UploadIcon,
   Work as WorkIcon,
@@ -23,7 +23,6 @@ import {
   CheckCircle as CheckIcon,
   Business as BusinessIcon,
   School as SchoolIcon,
-} from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -156,7 +155,7 @@ const HomePage: React.FC = () => {
           <Box sx={{ position: 'relative', zIndex: 1 }}>
             <Typography
               variant="h2"
-              component="h1"
+              as="h1"
               sx={{
                 fontWeight: 700,
                 mb: 2,
@@ -319,7 +318,7 @@ const HomePage: React.FC = () => {
                         {action.title}
                       </Typography>
                     </Box>
-                    <Typography variant="body2" color="text.secondary" paragraph>
+                    <Typography variant="body2" color="secondary" paragraph>
                       {action.description}
                     </Typography>
                     <Button
@@ -388,7 +387,7 @@ const HomePage: React.FC = () => {
                         {action.title}
                       </Typography>
                     </Box>
-                    <Typography variant="body2" color="text.secondary" paragraph>
+                    <Typography variant="body2" color="secondary" paragraph>
                       {action.description}
                     </Typography>
                     <Button
@@ -442,7 +441,7 @@ const HomePage: React.FC = () => {
                 <Typography variant="h6" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {t('landing.steps.step1.title')}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   {t('landing.steps.step1.description')}
                 </Typography>
               </Grid>
@@ -469,7 +468,7 @@ const HomePage: React.FC = () => {
                 <Typography variant="h6" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {t('landing.steps.step2.title')}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   {t('landing.steps.step2.description')}
                 </Typography>
               </Grid>
@@ -496,7 +495,7 @@ const HomePage: React.FC = () => {
                 <Typography variant="h6" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {t('landing.steps.step3.title')}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="secondary">
                   {t('landing.steps.step3.description')}
                 </Typography>
               </Grid>
