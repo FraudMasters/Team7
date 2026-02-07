@@ -26,6 +26,9 @@ PyPDF2==3.0.1
 python-docx==1.1.2
 pdfplumber==0.11.4
 
+# Excel File Handling
+openpyxl==3.1.5  # Excel file export with formatting support
+
 # Async Processing
 celery==5.4.0
 redis==5.2.0
