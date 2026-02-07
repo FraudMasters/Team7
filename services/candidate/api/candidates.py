@@ -13,7 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy import select, func, and_, or_
@@ -410,6 +410,207 @@ async def list_candidates(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list candidates: {str(e)}",
+        ) from e
+
+
+# Search endpoints - must come before /{candidate_id} to avoid route conflicts
+@router.post("/search", tags=["Search"])
+async def search_candidates_post(
+    request: Request,
+    query: Optional[str] = Body(None, description="Search query string"),
+    filters: Optional[Dict[str, Any]] = Body(None, description="Filter criteria"),
+    skip: int = Body(0, description="Pagination offset"),
+    limit: int = Body(100, description="Max results"),
+    sort_by: str = Body("created_at", description="Sort field"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Search candidates with POST method for complex queries."""
+    from services.search_service import get_search_service, SearchFilters
+
+    try:
+        search_service = get_search_service(db)
+
+        search_filters = None
+        if filters:
+            search_filters = SearchFilters(
+                query=query,
+                skills=filters.get("skills"),
+                min_experience_years=filters.get("min_experience_years"),
+                max_experience_years=filters.get("max_experience_years"),
+                location=filters.get("location"),
+                status=filters.get("status"),
+                source=filters.get("source"),
+                min_rating=filters.get("min_rating"),
+                date_from=filters.get("date_from"),
+                date_to=filters.get("date_to"),
+                tag_ids=filters.get("tag_ids"),
+            )
+
+        result = await search_service.search_candidates(
+            query=query,
+            filters=search_filters,
+            skip=skip,
+            limit=limit,
+            sort_by=sort_by,
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total": result.total,
+                "candidates": result.candidates,
+                "query": result.query,
+                "filters_applied": result.filters_applied,
+                "execution_time_seconds": result.execution_time_seconds,
+                "skip": skip,
+                "limit": limit,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Search error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}",
+        ) from e
+
+
+@router.get("/search", tags=["Search"])
+async def search_candidates_get(
+    request: Request,
+    query: Optional[str] = Query(None, description="Search query"),
+    location: Optional[str] = Query(None, description="Location filter"),
+    min_experience: Optional[int] = Query(None, description="Min experience years"),
+    max_experience: Optional[int] = Query(None, description="Max experience years"),
+    candidate_status: Optional[str] = Query(None, description="Candidate status filter"),
+    source: Optional[str] = Query(None, description="Source filter"),
+    min_rating: Optional[int] = Query(None, description="Min rating"),
+    skip: int = Query(0, description="Pagination offset"),
+    limit: int = Query(100, description="Max results"),
+    sort_by: str = Query("created_at", description="Sort field"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Search candidates with GET method for simple queries."""
+    from services.search_service import get_search_service, SearchFilters
+
+    try:
+        search_service = get_search_service(db)
+
+        filters_dict = {}
+        if location:
+            filters_dict["location"] = location
+        if min_experience is not None:
+            filters_dict["min_experience_years"] = min_experience
+        if max_experience is not None:
+            filters_dict["max_experience_years"] = max_experience
+        if candidate_status:
+            filters_dict["status"] = candidate_status
+        if source:
+            filters_dict["source"] = source
+        if min_rating is not None:
+            filters_dict["min_rating"] = min_rating
+
+        search_filters = SearchFilters(**filters_dict) if filters_dict else None
+
+        result = await search_service.search_candidates(
+            query=query,
+            filters=search_filters,
+            skip=skip,
+            limit=limit,
+            sort_by=sort_by,
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total": result.total,
+                "candidates": result.candidates,
+                "query": result.query,
+                "filters_applied": result.filters_applied,
+                "execution_time_seconds": result.execution_time_seconds,
+                "skip": skip,
+                "limit": limit,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Search error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}",
+        ) from e
+
+
+@router.post("/bulk-action", tags=["Candidates"])
+async def bulk_action(
+    request: Request,
+    action: str = Body(..., description="Action: export, status, tag"),
+    resume_ids: List[str] = Body(..., description="List of candidate IDs"),
+    new_status: Optional[str] = Body(None, description="New status"),
+    tag_name: Optional[str] = Body(None, description="Tag name"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Perform bulk action on candidates."""
+    try:
+        if action == "export":
+            result = await db.execute(
+                select(Candidate).where(Candidate.id.in_(resume_ids))
+            )
+            candidates = result.scalars().all()
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "total": len(candidates),
+                    "candidates": [
+                        {
+                            "id": str(c.id),
+                            "full_name": c.full_name,
+                            "email": c.email,
+                            "current_position": c.current_position,
+                            "location": c.location,
+                            "status": c.status.value if hasattr(c.status, 'value') else str(c.status),
+                        }
+                        for c in candidates
+                    ],
+                },
+            )
+
+        elif action == "status":
+            if not new_status:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="new_status is required for status action"
+                )
+            # TODO: Implement status change
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"message": f"Would update {len(resume_ids)} candidates to status '{new_status}'"}
+            )
+
+        elif action == "tag":
+            if not tag_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="tag_name is required for tag action"
+                )
+            # TODO: Implement tagging
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"message": f"Would tag {len(resume_ids)} candidates with '{tag_name}'"}
+            )
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown action: {action}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Bulk action error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk action failed: {str(e)}",
         ) from e
 
 
