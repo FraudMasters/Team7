@@ -41,14 +41,14 @@ export default defineConfig({
         '**/*.spec.ts',
         '**/*.spec.tsx',
       ],
-      // Coverage thresholds will be configured in subtask-1-2
+      // Coverage thresholds: enforce 85% minimum coverage across all metrics
       thresholds: {
         lines: 85,
         functions: 85,
         branches: 85,
         statements: 85,
       },
-      // Per-file coverage reporting
+      // Enable per-file coverage reporting for better insights
       all: true,
       include: [
         'src/**/*.{js,jsx,ts,tsx}',
