@@ -22,6 +22,7 @@ from models.resume import Resume, ResumeStatus
 from tasks.analysis_task import batch_analyze_resumes
 from celery_app import celery_app
 from utils.file_validation import validate_magic_number
+from utils.sanitization import get_safe_stored_filename, sanitize_filename
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -204,9 +205,13 @@ async def upload_batch(
 
                 # Generate resume ID and save file
                 resume_id = uuid4()
-                safe_filename = Path(file.filename or "resume").name
-                file_extension = Path(safe_filename).suffix
-                stored_filename = f"{resume_id}{file_extension}"
+                # Sanitize filename to prevent path traversal attacks
+                display_filename = sanitize_filename(file.filename or "unknown", preserve_extension=True)
+                stored_filename = get_safe_stored_filename(
+                    file.filename or "resume",
+                    str(resume_id),
+                    preserve_extension=True
+                )
                 file_path = UPLOAD_DIR / stored_filename
 
                 with open(file_path, "wb") as f:
@@ -215,7 +220,7 @@ async def upload_batch(
                 # Create resume record
                 resume = Resume(
                     id=resume_id,
-                    filename=file.filename or "unknown",
+                    filename=display_filename,
                     file_path=str(file_path),
                     content_type=file.content_type or "application/octet-stream",
                     status=ResumeStatus.PENDING,

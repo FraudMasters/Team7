@@ -21,6 +21,7 @@ from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
 from utils.audit_logger import log_audit_event, get_request_context
 from utils.file_validation import validate_magic_number
+from utils.sanitization import get_safe_stored_filename, sanitize_filename
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -188,9 +189,12 @@ async def upload_resume(
 
         # Generate UUID for the resume
         resume_id = uuid4()
-        safe_filename = Path(file.filename or "resume").name
-        file_extension = Path(safe_filename).suffix
-        stored_filename = f"{resume_id}{file_extension}"
+        # Sanitize filename to prevent path traversal attacks
+        stored_filename = get_safe_stored_filename(
+            file.filename or "resume",
+            str(resume_id),
+            preserve_extension=True
+        )
         file_path = UPLOAD_DIR / stored_filename
 
         # Save file to disk
@@ -198,10 +202,13 @@ async def upload_resume(
         with open(file_path, "wb") as f:
             f.write(file_content)
 
+        # Sanitize filename for display/storage to prevent path traversal
+        display_filename = sanitize_filename(file.filename or "unknown", preserve_extension=True)
+
         # Create database record
         new_resume = Resume(
             id=resume_id,
-            filename=file.filename or "unknown",
+            filename=display_filename,
             file_path=str(file_path),
             content_type=file.content_type or "application/octet-stream",
             status=ResumeStatus.PENDING,
@@ -221,7 +228,7 @@ async def upload_resume(
             ip_address=ip_address,
             user_agent=user_agent,
             action_data={
-                "filename": file.filename or "unknown",
+                "filename": display_filename,
                 "file_size": file_size,
                 "content_type": file.content_type or "application/octet-stream",
             },
@@ -232,7 +239,7 @@ async def upload_resume(
 
         response_data = {
             "id": str(resume_id),
-            "filename": file.filename or "unknown",
+            "filename": display_filename,
             "status": ResumeStatus.PENDING.value,
             "message": success_message,
         }
