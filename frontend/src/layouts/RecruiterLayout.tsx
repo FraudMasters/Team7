@@ -80,8 +80,7 @@ const navSections: NavSection[] = [
     title: 'Resumes',
     items: [
       { label: 'Database', path: '/recruiter/resumes', icon: <StorageIcon /> },
-      { label: 'Upload', path: '/recruiter/upload', icon: <UploadIcon /> },
-      { label: 'Batch Upload', path: '/recruiter/batch-upload', icon: <CloudUploadIcon /> },
+      { label: 'Upload', path: '/recruiter/unified-upload', icon: <CloudUploadIcon /> },
     ],
   },
   {
