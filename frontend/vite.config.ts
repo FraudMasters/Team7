@@ -108,20 +108,5 @@ export default defineConfig({
       'react-i18next',
     ],
   },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/tests/setup.ts',
-    coverage: {
-      provider: 'c8',
-      reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'src/tests/',
-        '**/*.d.ts',
-        '**/*.config.*',
-        '**/mockData',
-      ],
-    },
-  },
+  // Test configuration is in vitest.config.ts for better separation of concerns
 });

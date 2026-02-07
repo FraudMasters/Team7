@@ -1,0 +1,182 @@
+# Ruff configuration for AgentHR backend
+# https://docs.astral.sh/ruff/configuration/
+
+# Target Python version
+target-version = "py311"
+
+# Line length to match black configuration
+line-length = 100
+
+# Directories to exclude from linting
+exclude = [
+    ".git",
+    ".tox",
+    ".eggs",
+    "*.egg",
+    "venv",
+    "virtualenv",
+    "__pycache__",
+    ".pytest_cache",
+    "build",
+    "dist",
+    "vendor",
+    "third_party",
+    "*.pyc",
+]
+
+# Enable rule sets
+[lint]
+# Select specific rule categories
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "T10",    # flake8-debugger
+    "EM",     # flake8-errmsg
+    "ISC",    # flake8-implicit-str-concat
+    "ICN",    # flake8-import-conventions
+    "G",      # flake8-logging-format
+    "PIE",    # flake8-pie
+    "T20",    # flake8-print
+    "PT",     # flake8-pytest-style
+    "Q",      # flake8-quotes
+    "RSE",    # flake8-raise
+    "RET",    # flake8-return
+    "SIM",    # flake8-simplify
+    "TID",    # flake8-tidy-imports
+    "TCH",    # flake8-type-checking
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate
+    "PL",     # pylint
+    "TRY",    # tryceratops
+    "FLY",    # flynt
+    "PERF",   # perflint
+    "RUF",    # ruff-specific rules
+]
+
+# Ignore specific rules that may conflict with project patterns
+ignore = [
+    # Allow TODO comments
+    "TD003",  # Missing issue link on TODO
+    "TD002",  # Missing author in TODO
+
+    # Allow longer lines for docstrings and comments
+    "E501",   # Line too long (handled by formatter)
+
+    # Allow assert statements in tests
+    "S101",   # Use of assert detected
+
+    # Allow module level imports for ML libraries
+    "E402",   # Module level import not at top of file
+
+    # Ignore some naming conventions for ML/NLP code
+    "N806",   # Variable in function should be lowercase
+    "N803",   # Argument name should be lowercase
+    "N812",   # Lowercase imported as non lowercase
+
+    # Allow datetime.datetime.now() without tz for some legacy code
+    "DTZ005", # datetime.datetime.now() called without tz argument
+    "DTZ006", # datetime.datetime.utcnow() called without tz argument
+
+    # Allow some implicit str concat for readability
+    "ISC001", # Implicitly concatenated string literals
+
+    # Ignore print statements in some contexts (not tests)
+    # "T201",  # print found
+
+    # Allow certain try/except patterns
+    "TRY003", # Avoid specifying long messages outside exception class
+    "TRY300", # Consider moving statement into else clause
+
+    # Allow certain pylint rules for ML patterns
+    "PLR0913", # Too many arguments
+    "PLR2004", # Magic value used in comparison
+    "PLR0915", # Too many statements
+
+    # Ignore some complexity rules for ML algorithms
+    "C901",   # Too complex
+    "PLR0912", # Too many branches
+
+    # Ignore flake8-unused-arguments for common FastAPI patterns
+    "ARG001", # Unused function argument
+    "ARG002", # Unused method argument
+
+    # Allow certain pytest patterns
+    "PT011",  # pytest.raises() too broad
+    "PT012",  # pytest.raises() should specify exception
+
+    # Allow certain return patterns
+    "RET504", # Unnecessary variable assignment before return
+    "RET505", # Unnecessary else after return
+    "RET506", # Unnecessary else after raise
+    "RET507", # Unnecessary else after continue
+    "RET508", # Unnecessary else after break
+]
+
+# Allow autofix for all enabled rules when possible
+fixable = ["ALL"]
+unfixable = []
+
+# Configuration for specific rules
+[lint.per-file-ignores]
+# Allow print and asserts in tests
+"tests/**/*.py" = ["T201", "S101"]
+# Allow different patterns in migrations
+"**/alembic/versions/*.py" = ["N806", "E501", "DTZ"]
+# Allow different patterns in ML/NLP modules
+"backend/analyzers/**/*.py" = ["N806", "PLR0913", "C901"]
+
+# Pytest configuration
+[lint.pycodestyle]
+# Maximum docstring line length (can be longer than code)
+max-doc-length = 100
+
+# Pyflakes configuration
+[lint.pydocstyle]
+# Use Google style docstrings
+convention = "google"
+
+# Isort configuration
+[lint.isort]
+known-first-party = ["backend", "analyzers", "api"]
+known-third-party = [
+    "fastapi",
+    "pydantic",
+    "sqlalchemy",
+    "alembic",
+    "pytest",
+    "spacy",
+    "torch",
+    "transformers",
+    "sklearn",
+]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+# Pycodestyle configuration
+[lint.mccabe]
+# Maximum cyclomatic complexity
+max-complexity = 15
+
+# Format configuration (compatible with black)
+[format]
+# Use double quotes
+quote-style = "double"
+
+# Use spaces for indentation
+indent-style = "space"
+
+# Skip trailing whitespace in multiline strings
+skip-magic-trailing-comma = false
+
+# Line ending style
+line-ending = "auto"
+
+# Enable auto-formatting
+docstring-code-format = true

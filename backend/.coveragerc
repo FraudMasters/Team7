@@ -1,0 +1,18 @@
+[run]
+source = .
+omit =
+    */tests/*
+    */test_*.py
+    */venv/*
+    */virtualenv/*
+    */__pycache__/*
+    */site-packages/*
+    setup.py
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov

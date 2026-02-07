@@ -1,0 +1,228 @@
+# Bandit configuration for AgentHR security scanning
+# See https://bandit.readthedocs.io/ for configuration options
+
+# Directories and files to exclude from scanning
+exclude_dirs:
+  - /tests
+  - /test_*
+  - /.*test.*
+  - /alembic
+  - /__pycache__
+  - /.venv
+  - /venv
+  - /env
+  - /.eggs
+  - /build
+  - /dist
+  - /.tox
+  - /migrations
+
+# Specific tests to skip (with reasons)
+# See https://bandit.readthedocs.io/en/latest/plugins/index.html for plugin list
+skips:
+  # B101: Assert used - acceptable in test files and development
+  - 'B101'
+
+  # B105: Hardcoded password string - false positives for config examples
+  # This is acceptable if passwords are from env vars or config files
+  # - 'B105'
+
+  # B106: Hardcoded password function argument
+  # May have false positives for password hashing utilities
+  # - 'B106'
+
+  # B301: Pickle - acceptable for internal data processing
+  # Only disable if not used with untrusted data
+  # - 'B301'
+
+  # B303: Cipher - acceptable for internal encryption/decryption
+  # Only disable if used correctly with proper key management
+  # - 'B303'
+
+  # B304: Cipher algorithms and modes - may be acceptable
+  # - 'B304'
+
+  # B305: Cipher with insecure mode
+  # - 'B305'
+
+  # B306: Mktemp - deprecated, but may be used in legacy code
+  # - 'B306'
+
+  # B307: Eval - may be needed for dynamic code execution
+  # Only disable if input is properly sanitized
+  # - 'B307'
+
+  # B308: Mark safe - may be needed for templating
+  # - 'B308'
+
+  # B309: HTTPSConnection - may be acceptable for internal APIs
+  # - 'B309'
+
+  # B310: urllib_urlopen - may be acceptable with proper validation
+  # - 'B310'
+
+  # B311: Random - may be acceptable for non-cryptographic use
+  # - 'B311'
+
+  # B312: Telnetlib - not used in modern applications
+  # - 'B312'
+
+  # B313: XML bad dependencies - may be acceptable with proper config
+  # - 'B313'
+
+  # B314: XML bad ElementTree - may be acceptable with proper config
+  # - 'B314'
+
+  # B315: XML bad SAX - may be acceptable with proper config
+  # - 'B315'
+
+  # B316: XML bad ExpatReader - may be acceptable with proper config
+  # - 'B316'
+
+  # B317: XML bad minidom - may be acceptable with proper config
+  # - 'B317'
+
+  # B318: XML bad Pulldom - may be acceptable with proper config
+  # - 'B18'
+
+  # B319: XML bad etree - may be acceptable with proper config
+  # - 'B319'
+
+  # B320: XML bad lxml - may be acceptable with proper config
+  # - 'B320'
+
+  # B321: ftplib - may be acceptable for internal FTP operations
+  # - 'B321'
+
+  # B323: Unverified context - acceptable for internal development
+  # - 'B323'
+
+  # B324: hashlib new insecure signatures
+  # - 'B324'
+
+  # B325: Tempfile - may be acceptable with proper permissions
+  # - 'B325'
+
+  # B401: Import telnetlib
+  # - 'B401'
+
+  # B402: Import ftplib
+  # - 'B402'
+
+  # B403: Import pickle
+  # - 'B403'
+
+  # B404: Import subprocess
+  # - 'B404'
+
+  # B405: Import XML
+  # - 'B405'
+
+  # B406: Import xmlsax
+  # - 'B406'
+
+  # B407: Import xml etree
+  # - 'B407'
+
+  # B408: Import xml minidom
+  # - 'B408'
+
+  # B409: Import xml pulldom
+  # - 'B409'
+
+  # B410: Import lxml
+  # - 'B410'
+
+  # B411: Import xmlrpclib
+  # - 'B411'
+
+  # B412: Import httpoxy
+  # - 'B412'
+
+  # B413: Import pycrypto
+  # - 'B413'
+
+  # B501: Request with no timeout
+  # May be acceptable for long-running operations
+  # - 'B501'
+
+  # B502: SSL with bad version
+  # - 'B502'
+
+  # B503: SSL with bad defaults
+  # - 'B503'
+
+  # B504: SSL with no version
+  # - 'B504'
+
+  # B505: Weak cryptographic key
+  # - 'B505'
+
+  # B506: YAML load
+  # - 'B506'
+
+  # B507: SSH no host key verification
+  # - 'B507'
+
+  # B601: Paramiko calls
+  # - 'B601'
+
+  # B602: Subprocess shell
+  # May be acceptable with proper input sanitization
+  # - 'B602'
+
+  # B603: subprocess_without_shell_equals_true
+  # - 'B603'
+
+  # B604: Any_other_function_with_shell_equals_true
+  # - 'B604'
+
+  # B605: Start_process_with_a_shell
+  # - 'B605'
+
+  # B606: Start_process_with_no_shell
+  # - 'B606'
+
+  # B607: Start_process_with_partial_path
+  # - 'B607'
+
+  # B608: Hardcoded SQL expression
+  # May be acceptable with proper ORM usage
+  # - 'B608'
+
+  # B609: Linux commands wildcard injection
+  # - 'B609'
+
+  # B610: Django extra used
+  # - 'B610'
+
+  # B611: Django rawsql used
+  # - 'B611'
+
+  # B701: Jinja2 autoescape off
+  # - 'B701'
+
+  # B702: Use of mako templates
+  # - 'B702'
+
+  # B703: Django mark_safe
+  # - 'B703'
+
+# Only report issues with severity level: LOW, MEDIUM, HIGH
+# This can help focus on critical issues
+# Options: LOW, MEDIUM, HIGH
+# Uncomment to filter by severity:
+# level_set: 'MEDIUM'
+
+# Only report issues with confidence level: LOW, MEDIUM, HIGH
+# Options: LOW, MEDIUM, HIGH
+# Uncomment to filter by confidence:
+# confidence_set: 'MEDIUM'
+
+# Maximum number of code lines to audit per file
+# Helps prevent timeouts on very large files
+max_lines: 2000
+
+# Include lines in the output
+# Adds the code line to the report
+show_line_on_output: true
