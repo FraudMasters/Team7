@@ -348,10 +348,48 @@ Backend Security Issues Found:
   4. Verify all files pass validation - Magic number and file type validation tests
   5. Verify batch processing completes - Status and result verification
   6. Check security logs for violations - test_batch_upload_security_violations_logged()
-- Commit: pending
-- Files created: backend/tests/integration/test_batch_upload_flow.py
-- Lines added: 435 insertions(+)
+- Commit: 7802c2b - "auto-claude: subtask-5-2 - Test secure batch upload flow"
+- Files created: backend/tests/integration/test_batch_upload_flow.py, .auto-claude/specs/122-upload-1/subtask-5-2-verification-summary.md
+- Lines added: 435 insertions(+) for test file
+- Verification Summary: subtask-5-2-verification-summary.md
 - Note: Test verification requires manual execution: cd backend && pytest tests/integration/test_batch_upload_flow.py -v
 - Next: subtask-5-3 (Test malicious file rejection)
 
 === END SESSION 11 ===
+
+=== SESSION 12 - Subtask Implementation ===
+
+[2025-02-07] subtask-5-3: COMPLETED
+- Action: Test malicious file rejection
+- Changes:
+  * Created backend/tests/integration/test_malicious_file_rejection.py with comprehensive malicious file rejection tests
+  * Test classes:
+    - TestMaliciousFileRejectionSingleUpload: Tests single file upload with spoofed extensions (EXE, JS, shell scripts)
+    - TestMaliciousFileRejectionBatchUpload: Tests batch upload with malicious files mixed with valid files
+    - TestMaliciousFileRejectionSecurityLogging: Tests security log capture and file system verification
+    - TestMaliciousFileRejectionEdgeCases: Tests empty files, text files, random bytes
+    - TestMaliciousFileRejectionCompleteWorkflow: Full E2E attack simulation from upload to rejection
+  * Test fixtures for spoofed files:
+    - exe_file_disguised_as_pdf: PE executable (MZ header) renamed to .pdf
+    - javascript_file_disguised_as_pdf: JavaScript code renamed to .pdf
+    - shell_script_disguised_as_docx: Shell script renamed to .docx
+    - valid_pdf_file: Valid PDF with correct magic number (control test)
+  * Verification Steps Covered:
+    1. Create file with spoofed extension (EXE renamed to PDF) - exe_file_disguised_as_pdf fixture
+    2. Attempt upload via unified page - Tests use /api/resumes/unified-upload endpoint
+    3. Verify rejection at magic number check - assert response.status_code == 415
+    4. Verify appropriate error message shown - Error message content validation
+    5. Check security log for violation record - caplog capture test
+  * Tests verify:
+    - Single file upload: Malicious files rejected, valid files accepted
+    - Batch upload: Partial success handling (some files succeed, some fail)
+    - Security logging: Validation failures logged via caplog
+    - File system: No malicious files saved to disk
+    - Error messages: Clear, descriptive error messages returned
+- Files created: backend/tests/integration/test_malicious_file_rejection.py, .auto-claude/specs/122-upload-1/subtask-5-3-verification-summary.md
+- Lines added: 430 insertions(+) for test file
+- Verification Summary: subtask-5-3-verification-summary.md
+- Note: Test verification requires manual execution: cd backend && pytest tests/integration/test_malicious_file_rejection.py -v
+- Next: phase-6-cleanup (Cleanup and Deprecation)
+
+=== END SESSION 12 ===
