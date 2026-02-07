@@ -1,0 +1,83 @@
+[run]
+# Coverage configuration for resume analysis system
+
+# Source directories to measure coverage for
+source =
+    analyzers
+    api
+    .
+
+# Omit files from coverage measurement
+omit =
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */site-packages/*
+    */dist/*
+    */build/*
+    */.tox/*
+    */venv/*
+    */*.egg-info/*
+
+# Branch coverage
+branch = True
+
+# Parallel mode (useful with subprocesses)
+parallel = False
+
+# Data file location
+data_file = .coverage
+
+[report]
+# Coverage report configuration
+
+# Ignore errors during analysis
+ignore_errors = False
+
+# Exclude lines from coverage
+exclude_lines =
+    # Default exclusions
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+    # Additional exclusions
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+# Precision for coverage percentages
+precision = 2
+
+# Show missing lines
+show_missing = True
+
+# Skip empty files
+skip_empty = True
+
+# Sort report by
+sort = Cover
+
+[html]
+# HTML report configuration
+
+# Output directory
+directory = htmlcov
+
+[xml]
+# XML report configuration
+
+# Output file (useful for CI/CD)
+output = coverage.xml
+
+[json]
+# JSON report configuration
+
+# Output file
+output = coverage.json
+
+# Pretty print JSON
+pretty_print = True
