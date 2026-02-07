@@ -256,15 +256,20 @@ async def list_matching_weights_profiles(
     is_default: Optional[bool] = Query(None, description="Filter by default status"),
     is_preset: Optional[bool] = Query(None, description="Filter by preset status"),
     preset_type: Optional[PresetType] = Query(None, description="Filter by preset type"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     List matching weights profiles with optional filters.
+
+    This endpoint retrieves matching weights profiles with support for filtering
+    by organization, default status, preset status, and preset type.
 
     Args:
         organization_id: Optional organization ID filter
         is_default: Optional default status filter
         is_preset: Optional preset status filter
         preset_type: Optional preset type filter
+        db: Database session
 
     Returns:
         JSON response with list of weight profiles
@@ -276,19 +281,65 @@ async def list_matching_weights_profiles(
         >>> import requests
         >>> response = requests.get("/api/matching-weights/?organization_id=org123")
         >>> response.json()
+        {
+            "organization_id": "org123",
+            "profiles": [...],
+            "total_count": 5
+        }
     """
     try:
-        logger.info(f"Listing matching weights profiles with filters: organization_id={organization_id}")
+        logger.info(
+            f"Listing matching weights profiles with filters - "
+            f"organization_id: {organization_id}, is_default: {is_default}, "
+            f"is_preset: {is_preset}, preset_type: {preset_type}"
+        )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask
-        profiles = []
+        # Build query
+        query = select(MatchingWeightsProfile)
+
+        if organization_id is not None:
+            query = query.where(MatchingWeightsProfile.organization_id == organization_id)
+
+        if is_default is not None:
+            query = query.where(MatchingWeightsProfile.is_default == is_default)
+
+        if is_preset is not None:
+            query = query.where(MatchingWeightsProfile.is_preset == is_preset)
+
+        if preset_type is not None:
+            query = query.where(MatchingWeightsProfile.preset_type == preset_type)
+
+        query = query.order_by(MatchingWeightsProfile.name)
+
+        result = await db.execute(query)
+        profiles = result.scalars().all()
+
+        # Build response
+        profiles_data = []
+        for profile in profiles:
+            profiles_data.append({
+                "id": profile.id,
+                "organization_id": profile.organization_id,
+                "name": profile.name,
+                "description": profile.description,
+                "keyword_weight": profile.keyword_weight,
+                "tfidf_weight": profile.tfidf_weight,
+                "vector_weight": profile.vector_weight,
+                "is_default": profile.is_default,
+                "is_preset": profile.is_preset,
+                "preset_type": profile.preset_type,
+                "created_by": profile.created_by,
+                "created_at": profile.created_at.isoformat(),
+                "updated_at": profile.updated_at.isoformat(),
+            })
 
         response_data = {
             "organization_id": organization_id,
-            "profiles": profiles,
-            "total_count": len(profiles),
+            "profiles": profiles_data,
+            "total_count": len(profiles_data),
         }
+
+        logger.info(f"Retrieved {len(profiles_data)} matching weights profiles")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
