@@ -3,9 +3,12 @@ Batch resume upload and processing endpoints.
 
 This module provides endpoints for uploading multiple resume files at once,
 tracking batch processing status, and retrieving batch results.
+
+The core file upload logic is delegated to UnifiedUploadService for consistency,
+while this module maintains batch job tracking and Celery task integration.
+This is a compatibility layer that routes upload requests to the new unified service.
 """
 import logging
-from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -21,49 +24,12 @@ from models.batch_job import BatchJob, BatchJobStatus
 from models.resume import Resume, ResumeStatus
 from tasks.analysis_task import batch_analyze_resumes
 from celery_app import celery_app
-from utils.file_validation import validate_magic_number
-from utils.sanitization import get_safe_stored_filename, sanitize_filename
+from services.upload_service import get_upload_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 router = APIRouter()
-
-# Directory for storing uploaded resumes (from centralized config)
-UPLOAD_DIR = settings.upload_dir
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _extract_locale(request: Optional[Request]) -> str:
-    """Extract Accept-Language header from request."""
-    if request is None:
-        return "en"
-    accept_language = request.headers.get("Accept-Language", "en")
-    lang_code = accept_language.split("-")[0].split(",")[0].strip().lower()
-    return lang_code
-
-
-def validate_file_type(filename: str, content_type: str, locale: str = "en") -> None:
-    """Validate that the file type is allowed."""
-    file_ext = Path(filename).suffix.lower()
-    if file_ext not in settings.allowed_file_types:
-        allowed = ", ".join(settings.allowed_file_types)
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Invalid file type: {file_ext}. Allowed types: {allowed}",
-        )
-
-
-def validate_file_size(file_size: int, locale: str = "en") -> None:
-    """Validate that the file size is within allowed limits."""
-    max_size = settings.max_upload_size_bytes
-    if file_size > max_size:
-        max_mb = settings.max_upload_size_mb
-        size_mb = file_size / 1024 / 1024
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large: {size_mb:.1f}MB. Maximum allowed: {max_mb}MB",
-        )
 
 
 # Pydantic models for requests/responses
@@ -136,6 +102,9 @@ async def upload_batch(
     This endpoint accepts multiple resume files (PDF or DOCX), validates each file,
     stores them, creates database records, and initiates batch processing.
 
+    The core file upload logic is delegated to UnifiedUploadService for consistency,
+    while this endpoint maintains batch job tracking and Celery integration.
+
     Args:
         request: FastAPI request object
         files: List of uploaded resume files
@@ -151,7 +120,11 @@ async def upload_batch(
         HTTPException(413): If file size exceeds maximum
         HTTPException(500): If file storage or database operation fails
     """
-    locale = _extract_locale(request)
+    # Get the unified upload service
+    upload_service = get_upload_service()
+
+    # Extract locale from Accept-Language header
+    locale = upload_service.extract_locale(request)
 
     if not files:
         raise HTTPException(
@@ -159,16 +132,10 @@ async def upload_batch(
             detail="No files provided",
         )
 
-    if len(files) > 100:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Maximum 100 files allowed per batch",
-        )
-
     logger.info(f"Received batch upload request with {len(files)} files, analyze={analyze}, notification_email={notification_email}")
 
     try:
-        # Create batch job record
+        # Create batch job record first
         batch_id = uuid4()
         batch_job = BatchJob(
             id=batch_id,
@@ -179,82 +146,32 @@ async def upload_batch(
             notification_email=notification_email,
         )
         db.add(batch_job)
+        await db.flush()
 
-        # Store files and create resume records
-        resume_ids = []
-        failed_uploads = []
+        # Use unified upload service for core upload logic
+        upload_result = await upload_service.upload_batch(files, db, locale, request)
 
-        for file in files:
-            try:
-                # Read file content
-                file_content = await file.read()
-                file_size = len(file_content)
-
-                # Validate
-                validate_file_type(file.filename or "unknown", file.content_type or "application/octet-stream", locale)
-                validate_file_size(file_size, locale)
-
-                # Validate magic number (file signature) to prevent malicious file uploads
-                file_extension = Path(file.filename or "resume").suffix
-                is_valid, error_msg = validate_magic_number(file_content, file_extension, locale)
-                if not is_valid:
-                    raise HTTPException(
-                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                        detail=error_msg,
-                    )
-
-                # Generate resume ID and save file
-                resume_id = uuid4()
-                # Sanitize filename to prevent path traversal attacks
-                display_filename = sanitize_filename(file.filename or "unknown", preserve_extension=True)
-                stored_filename = get_safe_stored_filename(
-                    file.filename or "resume",
-                    str(resume_id),
-                    preserve_extension=True
-                )
-                file_path = UPLOAD_DIR / stored_filename
-
-                with open(file_path, "wb") as f:
-                    f.write(file_content)
-
-                # Create resume record
-                resume = Resume(
-                    id=resume_id,
-                    filename=display_filename,
-                    file_path=str(file_path),
-                    content_type=file.content_type or "application/octet-stream",
-                    status=ResumeStatus.PENDING,
-                )
-                db.add(resume)
-                resume_ids.append(str(resume_id))
-
-                logger.info(f"Stored file: {file.filename} -> {resume_id}")
-
-            except HTTPException:
-                failed_uploads.append(file.filename)
-                logger.warning(f"Failed to validate file: {file.filename}")
-            except Exception as e:
-                failed_uploads.append(file.filename)
-                logger.error(f"Failed to store file {file.filename}: {e}")
-
-        await db.commit()
+        # Extract successful and failed file information
+        resume_ids = [item["id"] for item in upload_result["successful"]]
+        failed_count = upload_result["failure_count"]
 
         # Update batch job with actual counts
-        batch_job.total_files = len(resume_ids)
-        batch_job.failed_files = len(failed_uploads)
+        batch_job.total_files = upload_result["success_count"]
+        batch_job.failed_files = failed_count
 
-        if failed_uploads:
+        if failed_count > 0:
             batch_job.status = BatchJobStatus.failed
-            batch_job.error_message = f"Failed to upload {len(failed_uploads)} files: {', '.join(failed_uploads[:5])}"
+            failed_filenames = [item["filename"] for item in upload_result["failed"]]
+            batch_job.error_message = f"Failed to upload {failed_count} files: {', '.join(failed_filenames[:5])}"
             await db.commit()
 
             return JSONResponse(
                 status_code=status.HTTP_201_CREATED,
                 content={
                     "batch_id": str(batch_id),
-                    "total_files": len(resume_ids),
+                    "total_files": upload_result["success_count"],
                     "status": BatchJobStatus.failed.value,
-                    "message": f"Batch created with errors. {len(failed_uploads)} files failed to upload.",
+                    "message": f"Batch created with errors. {failed_count} files failed to upload.",
                 }
             )
 
@@ -278,7 +195,7 @@ async def upload_batch(
                 logger.error(f"Error dispatching Celery task: {task_error}", exc_info=True)
                 raise
         else:
-            logger.info(f"Batch analysis not requested. analyze={analyze}, resume_ids count={len(resume_ids) if resume_ids else 0}")
+            logger.info(f"Batch analysis not requested. analyze={analyze}, resume_ids count={len(resume_ids)}")
             await db.commit()
 
         return JSONResponse(
