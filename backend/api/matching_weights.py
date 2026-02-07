@@ -575,14 +575,19 @@ async def update_matching_weights_profile(
 
 
 @router.delete("/{profile_id}", tags=["Matching Weights"])
-async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
+async def delete_matching_weights_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Delete a matching weights profile.
 
+    This endpoint permanently deletes a matching weights profile.
     Note: Default profiles and system presets cannot be deleted.
 
     Args:
         profile_id: UUID of the profile to delete
+        db: Database session
 
     Returns:
         JSON response confirming deletion
@@ -596,6 +601,10 @@ async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
         >>> import requests
         >>> response = requests.delete("/api/matching-weights/abc-123-def")
         >>> response.json()
+        {
+            "message": "Matching weights profile deleted successfully",
+            "id": "abc-123-def"
+        }
     """
     try:
         logger.info(f"Deleting matching weights profile: {profile_id}")
@@ -607,17 +616,53 @@ async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
                 detail="Profile ID cannot be empty",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Check if profile exists
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
+            )
+
+        # Check if profile is a preset - presets cannot be deleted
+        if profile.is_preset:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="System preset profiles cannot be deleted",
+            )
+
+        # Check if profile is the default - default profiles cannot be deleted
+        if profile.is_default:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Default profiles cannot be deleted",
+            )
+
+        # Delete the profile
+        await db.execute(
+            delete(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        await db.commit()
+
+        logger.info(f"Deleted matching weights profile: {profile_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"message": f"Matching weights profile {profile_id} deleted successfully"},
+            content={
+                "message": "Matching weights profile deleted successfully",
+                "id": profile_id,
+            },
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting matching weights profile: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete matching weights profile: {str(e)}",
