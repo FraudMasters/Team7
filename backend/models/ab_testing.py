@@ -24,6 +24,14 @@ class ABTestStatus(str, enum.Enum):
     PAUSED = "paused"
 
 
+class ABTestMetricType(str, enum.Enum):
+    """Type of metric being tracked in an A/B test"""
+
+    MATCH_ACCEPTANCE = "match_acceptance"  # Binary: whether user accepted a match
+    TIME_TO_HIRE = "time_to_hire"  # Continuous: days from match to hire
+    USER_SATISFACTION = "user_satisfaction"  # Ordinal: 1-5 satisfaction score
+
+
 class ABTest(Base, UUIDMixin, TimestampMixin):
     """
     ABTest model for managing A/B testing experiments
@@ -110,4 +118,53 @@ class ABTestAssignment(Base, UUIDMixin, TimestampMixin):
         return (
             f"<ABTestAssignment(id={self.id}, test_id={self.test_id}, "
             f"user_id={self.user_id}, profile_id={self.profile_id})>"
+        )
+
+
+class ABTestMetric(Base, UUIDMixin, TimestampMixin):
+    """
+    ABTestMetric model for tracking performance metrics in A/B tests
+
+    This model stores individual metric measurements collected during an A/B test.
+    Each metric is associated with a specific test and assignment, allowing for
+    granular tracking and statistical analysis of performance differences between
+    weight profile variants.
+
+    Attributes:
+        id: UUID primary key
+        test_id: Foreign key to the ABTest this metric belongs to
+        assignment_id: Foreign key to the ABTestAssignment for context
+        metric_type: Type of metric (match_acceptance, time_to_hire, user_satisfaction)
+        metric_value: Numeric value of the metric measurement
+        recorded_at: Timestamp when the metric was recorded
+        created_at: Timestamp when record was created (inherited)
+        updated_at: Timestamp when record was last updated (inherited)
+    """
+
+    __tablename__ = "ab_test_metrics"
+
+    test_id: Mapped[str] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("ab_tests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    assignment_id: Mapped[str] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("ab_test_assignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    metric_type: Mapped[ABTestMetricType] = mapped_column(
+        Enum(ABTestMetricType), nullable=False, index=True
+    )
+    metric_value: Mapped[float] = mapped_column(nullable=False)
+    recorded_at: Mapped[Optional[DateTime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<ABTestMetric(id={self.id}, test_id={self.test_id}, "
+            f"metric_type={self.metric_type}, metric_value={self.metric_value})>"
         )
