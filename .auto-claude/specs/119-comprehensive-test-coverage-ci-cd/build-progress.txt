@@ -342,3 +342,60 @@ Verification Note:
 Commit: 8556235
 
 === END SESSION 2 ===
+2026-02-07 12:46:19 - Subtask 4-2 COMPLETED: Created contract tests for API Gateway to services
+- Created backend/tests/contract/test_api_gateway_contracts.py (918 lines)
+- Created backend/tests/contract/__init__.py
+- Contract tests cover: Candidate API, Vacancy API, Matching API, Ranking API, Search API, Resume Upload, Error Responses, Service Integration
+- All tests use @pytest.mark.contract marker
+- Follow conftest.py patterns for fixtures and async handling
+- Committed with git commit 6cd472e
+
+=== SUBTASK 4-3 COMPLETED ===
+2026-02-07 - Subtask 4-3: Create contract tests for Matching to Candidate service
+Status: COMPLETED
+
+Files Created:
+- backend/tests/contract/test_matching_candidate_contracts.py
+  * 6 test classes covering Matching to Candidate service boundaries
+  * TestRankedCandidatesContract: Ranked candidates API schema validation
+    - test_ranked_candidates_request_schema: Validates request accepts vacancy_id and limit
+    - test_ranked_candidates_limit_validation: Tests limit parameter (1-200)
+    - test_ranked_candidate_item_schema: Validates individual candidate items
+    - test_ranked_candidates_invalid_vacancy_id: Tests error handling for invalid IDs
+  * TestMatchingStageIntegrationContract: Match result to stage transition integration
+    - test_match_result_to_stage_transition_schema: Validates match results for stage transitions
+    - test_stage_transition_with_match_context: Tests stage movement with match context
+  * TestBulkMatchingOperationsContract: Bulk operations with matching context
+    - test_bulk_move_with_vacancy_context_schema: Tests bulk move with vacancy association
+    - test_bulk_add_to_pipeline_from_matching_schema: Tests bulk add to pipeline
+  * TestMatchResultPersistenceContract: Match result persistence and retrieval
+    - test_get_match_result_schema: Validates match result retrieval schema
+    - test_match_result_id_format: Tests UUID format validation
+  * TestMatchFeedbackContract: Match feedback submission
+    - test_submit_feedback_request_schema: Validates feedback submission
+    - test_feedback_confidence_range_validation: Tests confidence score 0-1 range
+  * TestStageMetricsMatchingContract: Stage metrics with matching context
+    - test_stage_metrics_response_schema: Validates metrics API response
+    - test_stage_metrics_time_fields_schema: Validates time metrics (average, median, min, max)
+    - test_stage_metrics_dropoff_fields_schema: Validates dropoff metrics
+
+Test Helper Functions:
+- validate_response_schema: Validates required and optional fields with types
+- validate_error_response: Validates error response follows standard contract
+- validate_ranking_score: Validates scores are in valid range [0,1]
+
+Notes:
+- Follows patterns from test_api_gateway_contracts.py
+- All tests use @pytest.mark.contract marker
+- Tests verify interface compatibility (schema, types, required fields)
+- Uses fixtures from conftest.py (sample_resume, sample_vacancy)
+- Properly handles async/await patterns with AsyncClient
+- Validates score ranges for ranking (0-1) and match percentage (0-100)
+
+Verification Note:
+- pytest command blocked in current environment
+- File follows exact structure of test_api_gateway_contracts.py
+- All test classes have proper docstrings and type hints
+- Comprehensive coverage of Matching to Candidate integration points
+
+Commit: 455bea3
