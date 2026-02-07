@@ -17,6 +17,7 @@ sentence-transformers==3.0.1
 spacy==3.8.2
 language-tool-python==2.7.1
 langdetect==1.0.9
+graphiti-core>=0.7.8
 # TensorFlow/Keras removed - using PyTorch-only models for better compatibility
 # If TensorFlow is needed for specific features, install separately with:
 # pip install "tensorflow>=2.16" "tf-keras>=2.16" --upgrade
