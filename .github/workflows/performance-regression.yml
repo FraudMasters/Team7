@@ -1,0 +1,335 @@
+name: Performance Regression Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/performance-regression.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/performance-regression.yml'
+  schedule:
+    # Run performance regression tests daily at 3 AM UTC (after performance-tests)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  backend-load-tests:
+    name: Backend Load Tests (Locust)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-client \
+            redis-tools
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install locust
+
+      - name: Verify services are running
+        run: |
+          pg_isready -h localhost -p 5432
+          redis-cli -h localhost -p 6379 ping
+
+      - name: Set up environment
+        working-directory: ./backend
+        run: |
+          cp .env.example .env || true
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          echo "REDIS_CACHE_ENABLED=true" >> .env
+          echo "REDIS_CACHE_KEY_PREFIX=agenthr:test" >> .env
+          echo "REDIS_CACHE_DEFAULT_TTL=3600" >> .env
+          echo "REDIS_CACHE_MAX_CONNECTIONS=10" >> .env
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head
+
+      - name: Start backend server
+        working-directory: ./backend
+        run: |
+          python -m uvicorn api.main:app --host 0.0.0.0 --port 8888 &
+          echo $! > backend.pid
+          # Wait for server to be ready
+          timeout 60 sh -c 'until curl -s http://localhost:8888/health > /dev/null; do sleep 2; done'
+
+      - name: Run Locust load tests
+        working-directory: ./backend
+        run: |
+          locust -f tests/performance/locustfile.py \
+            --headless \
+            --users 50 \
+            --spawn-rate 10 \
+            --run-time 60s \
+            --host http://localhost:8888 \
+            --html ../locust-report.html \
+            --json \
+            --logfile ../locust.log \
+            --csv ../locust-stats
+
+      - name: Stop backend server
+        working-directory: ./backend
+        if: always()
+        run: |
+          if [ -f backend.pid ]; then
+            kill $(cat backend.pid) || true
+            rm backend.pid
+          fi
+
+      - name: Parse Locust results
+        run: |
+          python .github/scripts/parse_locust_results.py \
+            --stats-file=locust-stats_stats.json \
+            --output=locust-metrics.json
+
+      - name: Compare with baseline
+        run: |
+          python .github/scripts/compare_performance_baseline.py \
+            --current=locust-metrics.json \
+            --baseline=.github/baselines/performance-baseline.json \
+            --threshold=0.20 \
+            --output=regression-report.json
+
+      - name: Upload load test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-load-test-results
+          path: |
+            locust-report.html
+            locust-stats*
+            locust-metrics.json
+            regression-report.json
+            locust.log
+          retention-days: 30
+
+      - name: Generate performance summary
+        if: always()
+        run: |
+          python .github/scripts/generate_performance_summary.py \
+            --metrics=locust-metrics.json \
+            --regression=regression-report.json \
+            --output=performance-summary.md
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const regression = JSON.parse(fs.readFileSync('regression-report.json', 'utf8'));
+              const summary = fs.readFileSync('performance-summary.md', 'utf8');
+
+              let comment = '## ⚡ Performance Regression Test Results\n\n';
+              comment += summary + '\n';
+
+              if (regression.has_regression) {
+                comment += '### ⚠️ Performance Regressions Detected\n\n';
+                comment += 'The following metrics exceed the 20% degradation threshold:\n\n';
+                for (const r of regression.regressions) {
+                  comment += `- **${r.endpoint}**: ${(r.degradation * 100).toFixed(1)}% slower\n`;
+                  comment += `  - Current: ${r.current.toFixed(2)}ms\n`;
+                  comment += `  - Baseline: ${r.baseline.toFixed(2)}ms\n`;
+                  comment += `  - Threshold: ${(r.threshold * 100).toFixed(0)}%\n\n`;
+                }
+                comment += '❌ **Performance regression detected! Please investigate before merging.**\n';
+              } else {
+                comment += '### ✅ No Performance Regressions\n\n';
+                comment += 'All endpoints are within acceptable performance thresholds.\n';
+              }
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Could not post comment:', error.message);
+            }
+
+      - name: Fail on regression
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f regression-report.json ]; then
+            HAS_REGRESSION=$(python -c "import json; print(json.load(open('regression-report.json')).get('has_regression', False))")
+            if [ "$HAS_REGRESSION" = "True" ]; then
+              echo "::error::Performance regression detected. See report for details."
+              exit 1
+            fi
+          fi
+
+      - name: Update baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p .github/baselines
+          cp locust-metrics.json .github/baselines/performance-baseline.json
+
+      - name: Commit updated baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/baselines/performance-baseline.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update performance baseline [skip ci]"
+
+      - name: Push changes
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+  frontend-load-tests:
+    name: Frontend Load Tests (Lighthouse)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Start dev server
+        working-directory: ./frontend
+        run: |
+          npm run preview -- --host 0.0.0.0 --port 5173 &
+          echo $! > frontend.pid
+          # Wait for server to be ready
+          timeout 60 sh -c 'until curl -s http://localhost:5173 > /dev/null; do sleep 2; done'
+
+      - name: Run Lighthouse CI
+        working-directory: ./frontend
+        run: |
+          npx lhci autorun \
+            --collect.url=http://localhost:5173 \
+            --collect.url=http://localhost:5173/login \
+            --collect.url=http://localhost:5173/vacancies \
+            --collect.numRuns=3 \
+            --assert.presets=lighthouse:recommended
+
+      - name: Stop dev server
+        working-directory: ./frontend
+        if: always()
+        run: |
+          if [ -f frontend.pid ]; then
+            kill $(cat frontend.pid) || true
+            rm frontend.pid
+          fi
+
+      - name: Upload Lighthouse results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-lighthouse-results
+          path: |
+            frontend/.lighthouseci/
+          retention-days: 30
+
+  performance-summary:
+    name: Performance Test Summary
+    runs-on: ubuntu-latest
+    needs: [backend-load-tests, frontend-load-tests]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download backend results
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-load-test-results
+          path: backend-results/
+
+      - name: Download frontend results
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-lighthouse-results
+          path: frontend-results/
+
+      - name: Generate combined summary
+        run: |
+          python .github/scripts/generate_combined_performance_summary.py \
+            --backend-results=backend-results/ \
+            --frontend-results=frontend-results/ \
+            --output=combined-summary.md
+
+      - name: Publish GitHub Step Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const summary = fs.readFileSync('combined-summary.md', 'utf8');
+              core.summary.addRaw(summary);
+              await core.summary.write();
+            } catch (error) {
+              console.log('Could not add summary:', error.message);
+            }
