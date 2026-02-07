@@ -1,5 +1,5 @@
 // Импорт хуков React для управления состоянием
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // Импорт компонентов MUI для оформления интерфейса
 import {
   Container,      // Контейнер для ограничения ширины содержимого
@@ -33,6 +33,35 @@ export function JobsBrowsePage() {
     workFormat?: string; // Формат работы (удаленно/офис/гибрид)
     excludeSkills?: string[]; // Исключаемые навыки
   }>({});
+
+  // Ключ localStorage для сохранения исключаемых навыков
+  const EXCLUDED_SKILLS_STORAGE_KEY = 'excludedJobSkills';
+
+  // Загрузка исключаемых навыков из localStorage при монтировании компонента
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(EXCLUDED_SKILLS_STORAGE_KEY);
+      if (stored) {
+        const excludedSkills = JSON.parse(stored) as string[];
+        setFilters((prev) => ({ ...prev, excludeSkills: excludedSkills }));
+      }
+    } catch {
+      // Игнорируем ошибки при чтении из localStorage
+    }
+  }, []);
+
+  // Сохранение исключаемых навыков в localStorage при их изменении
+  useEffect(() => {
+    try {
+      if (filters.excludeSkills && filters.excludeSkills.length > 0) {
+        localStorage.setItem(EXCLUDED_SKILLS_STORAGE_KEY, JSON.stringify(filters.excludeSkills));
+      } else {
+        localStorage.removeItem(EXCLUDED_SKILLS_STORAGE_KEY);
+      }
+    } catch {
+      // Игнорируем ошибки при записи в localStorage
+    }
+  }, [filters.excludeSkills]);
 
   // Получение данных о вакансиях с использованием кастомного хука
   const { data, isLoading, error } = useJobs();
