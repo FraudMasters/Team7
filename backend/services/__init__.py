@@ -39,6 +39,12 @@ from .alerting import (
     send_health_alert,
 )
 
+from .upload_service import (
+    UnifiedUploadService,
+    UploadValidationError,
+    get_upload_service,
+)
+
 __all__ = [
     "BackupService",
     "get_backup_service",
@@ -66,4 +72,7 @@ __all__ = [
     "AlertingService",
     "get_alerting_service",
     "send_health_alert",
+    "UnifiedUploadService",
+    "UploadValidationError",
+    "get_upload_service",
 ]
