@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy
 
 on:
   push:
@@ -104,7 +104,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend to CDN
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'staging' }}
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
     needs: test
 
     steps:
@@ -143,8 +143,17 @@ jobs:
           echo "|------|------|" >> $GITHUB_STEP_SUMMARY
           du -h dist/assets/*.js | sort -h | awk '{print "| " $2 " | " $1 " |"}' >> $GITHUB_STEP_SUMMARY
 
+      - name: Deploy to Vercel (Staging)
+        if: github.ref == 'refs/heads/main'
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./frontend
+
       - name: Deploy to Vercel (Production)
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -154,6 +163,7 @@ jobs:
           working-directory: ./frontend
 
       - name: Deploy to Vercel (Preview)
+        id: vercel-preview
         if: github.event_name == 'pull_request'
         uses: amondnet/vercel-action@v25
         with:
@@ -167,7 +177,7 @@ jobs:
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
-            ${{ steps.vercel.outputs.preview-url }}
+            ${{ steps.vercel-preview.outputs.preview-url }}
           uploadArtifacts: true
           temporaryPublicStorage: true
 
@@ -176,7 +186,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const url = '${{ steps.vercel.outputs.preview-url }}';
+            const url = '${{ steps.vercel-preview.outputs.preview-url }}';
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -188,7 +198,7 @@ jobs:
   deploy-backend:
     name: Deploy Backend API
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'staging' }}
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
     needs: [test, deploy-frontend]
 
     steps:
@@ -212,22 +222,43 @@ jobs:
         run: |
           docker build -t agenthr-backend:${{ github.sha }} ./backend
 
-      - name: Push to registry
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      - name: Push to registry (Staging)
+        if: github.ref == 'refs/heads/main'
         run: |
-          echo "Pushing image to container registry..."
+          echo "Pushing image to container registry for staging..."
+          # Add actual registry push commands here
+          # docker tag agenthr-backend:${{ github.sha }} registry.example.com/agenthr-backend:staging
+          # docker push registry.example.com/agenthr-backend:staging
+
+      - name: Deploy to staging
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Deploying backend to staging environment..."
+          # Add deployment commands here (kubectl, helm, etc.)
+
+      - name: Push to registry (Production)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "Pushing image to container registry for production..."
           # Add actual registry push commands here
           # docker tag agenthr-backend:${{ github.sha }} registry.example.com/agenthr-backend:latest
           # docker push registry.example.com/agenthr-backend:latest
 
       - name: Deploy to production
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          echo "Deploying backend to production..."
+          echo "Deploying backend to production environment..."
           # Add deployment commands here (kubectl, helm, etc.)
 
-      - name: Run smoke tests
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      - name: Run smoke tests (Staging)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Smoke tests against staging deployment
+          curl -f https://api-staging.agenthr.com/health || exit 1
+          curl -f https://api-staging.agenthr.com/api/candidates/ || exit 1
+
+      - name: Run smoke tests (Production)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           # Smoke tests against production deployment
           curl -f https://api.agenthr.com/health || exit 1
@@ -241,7 +272,26 @@ jobs:
     needs: [test, deploy-frontend, deploy-backend]
 
     steps:
-      - name: Purge Cloudflare cache
+      - name: Purge Cloudflare cache (Staging)
+        if: github.ref == 'refs/heads/main'
+        uses: jakejarvis/cloudflare-purge-action@master
+        env:
+          CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_STAGING_ZONE_ID }}
+          CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        with:
+          path: |
+            https://staging.agenthr.com/assets/*
+            https://staging.agenthr.com/*.js
+            https://staging.agenthr.com/*.css
+
+      - name: Verify CDN cache cleared (Staging)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "CDN cache invalidated for staging static assets"
+          echo "New assets will be served from origin"
+
+      - name: Purge Cloudflare cache (Production)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: jakejarvis/cloudflare-purge-action@master
         env:
           CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE_ID }}
@@ -252,9 +302,10 @@ jobs:
             https://agenthr.com/*.js
             https://agenthr.com/*.css
 
-      - name: Verify CDN cache cleared
+      - name: Verify CDN cache cleared (Production)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          echo "CDN cache invalidated for static assets"
+          echo "CDN cache invalidated for production static assets"
           echo "New assets will be served from origin"
 
   # Deployment notification
@@ -272,7 +323,7 @@ jobs:
           status: ${{ job.status }}
           text: |
             Deployment ${{ job.status }}!
-            Environment: ${{ github.event.inputs.environment || 'staging' }}
+            Environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
             Commit: ${{ github.sha }}
             Author: ${{ github.actor }}
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -282,3 +333,4 @@ jobs:
       - name: Update deployment status
         run: |
           echo "Deployment completed with status: ${{ job.status }}"
+          echo "Environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}"
