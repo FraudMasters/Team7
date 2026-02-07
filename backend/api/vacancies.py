@@ -93,6 +93,13 @@ class VacancyResponse(BaseModel):
     updated_at: str = Field(..., description="Last update timestamp")
 
 
+<<<<<<< HEAD
+class VacancyListResponse(BaseModel):
+    """Response model for listing vacancies."""
+
+    total: int = Field(..., description="Total number of vacancies")
+    vacancies: list[VacancyResponse] = Field(..., description="List of vacancies")
+=======
 class VacancySearchRequest(BaseModel):
     """Request model for vacancy search."""
 
@@ -113,6 +120,7 @@ class VacancySearchResponse(BaseModel):
     execution_time_seconds: float = Field(..., description="Time taken to execute search")
     skip: int = Field(..., description="Number of results skipped")
     limit: int = Field(..., description="Maximum number of results returned")
+>>>>>>> origin/master
 
 
 def _vacancy_to_response(vacancy: JobVacancy) -> dict:
@@ -223,11 +231,11 @@ async def create_vacancy(
         ) from e
 
 
-@router.get("/", response_model=list[VacancyResponse], tags=["Vacancies"])
+@router.get("/", response_model=VacancyListResponse, tags=["Vacancies"])
 async def list_vacancies(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of records to return"),
     db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
     """
@@ -249,7 +257,14 @@ async def list_vacancies(
         >>> vacancies = response.json()
     """
     try:
-        # Query vacancies from database
+        logger.info(f"Listing vacancies - skip: {skip}, limit: {limit}")
+
+        # Get total count
+        count_query = select(func.count()).select_from(JobVacancy)
+        count_result = await db.execute(count_query)
+        total = count_result.scalar() or 0
+
+        # Query vacancies from database with pagination
         query = select(JobVacancy).order_by(JobVacancy.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
         vacancies = result.scalars().all()
@@ -257,9 +272,14 @@ async def list_vacancies(
         # Convert to response format
         vacancies_list = [_vacancy_to_response(v) for v in vacancies]
 
+        logger.info(f"Retrieved {len(vacancies_list)} vacancies (total: {total})")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=vacancies_list,
+            content={
+                "total": total,
+                "vacancies": vacancies_list,
+            },
         )
 
     except Exception as e:
