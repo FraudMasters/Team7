@@ -15,6 +15,7 @@ import {
   InputLabel,     // Метка поля ввода
   CircularProgress, // Индикатор загрузки
   Box,            // Универсальный контейнер для верстки
+  Autocomplete,   // Автозаполнение с выбором из списка
 } from '@mui/material';
 // Импорт иконок из MUI
 import { Search as SearchIcon, FilterList as FilterIcon } from '@mui/icons-material';
@@ -30,10 +31,18 @@ export function JobsBrowsePage() {
   // Состояние для фильтров вакансий
   const [filters, setFilters] = useState<{
     workFormat?: string; // Формат работы (удаленно/офис/гибрид)
+    excludeSkills?: string[]; // Исключаемые навыки
   }>({});
 
   // Получение данных о вакансиях с использованием кастомного хука
   const { data, isLoading, error } = useJobs();
+
+  // Доступные опции навыков (в будущем могут быть получены из API)
+  const skillOptions = [
+    'Python', 'Java', 'JavaScript', 'TypeScript', 'React', 'Angular', 'Vue.js',
+    'Node.js', 'Django', 'Flask', 'Spring', 'AWS', 'Azure', 'Docker', 'Kubernetes',
+    'SQL', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST', 'Git', 'CI/CD',
+  ];
 
   // Фильтрация вакансий по поисковому запросу и выбранным фильтрам
   const filteredJobs = data?.vacancies.filter((job) => {
@@ -46,8 +55,18 @@ export function JobsBrowsePage() {
     // Проверка совпадения формата работы
     const matchesFormat = !filters.workFormat || job.work_format === filters.workFormat;
 
-    // Возвращаем вакансию, если она соответствует обоим критериям
-    return matchesSearch && matchesFormat;
+    // Проверка исключаемых навыков - вакансии, требующие эти навыки, исключаются
+    const matchesExcludeSkills =
+      !filters.excludeSkills ||
+      filters.excludeSkills.length === 0 ||
+      !filters.excludeSkills.some((skill) =>
+        job.required_skills?.some((jobSkill: string) =>
+          jobSkill.toLowerCase().includes(skill.toLowerCase())
+        )
+      );
+
+    // Возвращаем вакансию, если она соответствует всем критериям
+    return matchesSearch && matchesFormat && matchesExcludeSkills;
   }) ?? [];
 
   return (
@@ -97,6 +116,31 @@ export function JobsBrowsePage() {
             <MenuItem value="hybrid">Hybrid</MenuItem>
           </Select>
         </FormControl>
+        {/* Автозаполнение для исключаемых навыков */}
+        <Autocomplete
+          multiple
+          options={skillOptions}
+          value={filters.excludeSkills || []}
+          onChange={(_, newValue) => setFilters({ ...filters, excludeSkills: newValue })}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                variant="outlined"
+                label={option}
+                {...getTagProps({ index })}
+                key={option}
+              />
+            ))
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Exclude Skills"
+              placeholder="Select skills to exclude"
+            />
+          )}
+          sx={{ minWidth: 250 }}
+        />
       </Paper>
 
       {/* Отображение состояния загрузки, ошибки или списка вакансий */}
