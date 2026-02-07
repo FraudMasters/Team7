@@ -106,3 +106,6 @@ verify_*.sh
 *.bak
 *.backup
 testdata/
+
+# Auto Claude generated files
+logs/security/
