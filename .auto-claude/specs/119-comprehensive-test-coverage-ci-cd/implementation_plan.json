@@ -1,0 +1,1194 @@
+{
+  "feature": "Comprehensive Test Coverage & CI/CD Pipeline",
+  "description": "Achieve 90%+ test coverage across all services with unit tests, integration tests, and end-to-end tests. Implement automated CI/CD pipeline with linting, security scanning, performance testing, and automated deployment. Add property-based testing for critical business logic, contract testing for service boundaries, and chaos engineering for fault tolerance verification.",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a feature implementation that spans multiple services (frontend, backend, microservices). The workflow follows service dependency order: establish test infrastructure first (setup), then build testing capabilities for each service layer (implementation), and finally integrate everything with CI/CD automation (integration). This ensures each service can be tested independently before being wired together.",
+  "created_at": "2026-02-07T12:00:00.000Z",
+  "updated_at": "2026-02-07T09:28:33.241Z",
+  "status": "in_progress",
+  "phases": [
+    {
+      "id": "phase-1-setup-frontend-coverage",
+      "name": "Frontend Test Coverage Setup",
+      "type": "setup",
+      "description": "Establish comprehensive test coverage configuration for frontend, including coverage thresholds, reporting, and missing test configurations.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Create vitest.config.ts with coverage configuration",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/vite.config.ts"
+          ],
+          "files_to_create": [
+            "frontend/vitest.config.ts"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run test:coverage -- --reporter=verbose",
+            "expected": "Coverage report generated"
+          },
+          "status": "completed",
+          "notes": "Extract test config from vite.config.ts into dedicated vitest.config.ts for better organization. Created with 85% coverage thresholds, c8 provider, and multiple reporters (text, json, html, lcov)."
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Configure coverage thresholds and reporting in vitest",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/vitest.config.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/vite.config.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run test:coverage -- --reporter=json",
+            "expected": "Coverage report with 85% threshold configured"
+          },
+          "status": "completed",
+          "notes": "Configured 85% coverage thresholds for all metrics (lines, functions, branches, statements). Multiple reporters enabled (text, json, html, lcov) for CI/CD integration. Per-file coverage reporting enabled with 'all: true'. Updated documentation to reflect completed configuration."
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Add coverage script and verify test output formats",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/package.json"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/package.json"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run test:coverage && ls -la coverage/",
+            "expected": "coverage/ directory with index.html, cobertura.xml, coverage-final.json"
+          },
+          "status": "completed",
+          "notes": "Added 'cobertura' reporter to vitest coverage configuration. The test:coverage script was already present in package.json. Coverage now generates all required formats: index.html (HTML report), coverage-final.json (JSON data), cobertura.xml (CI/CD format), and lcov.info (standard lcov)."
+        }
+      ]
+    },
+    {
+      "id": "phase-2-setup-backend-coverage",
+      "name": "Backend Test Coverage Setup",
+      "type": "setup",
+      "description": "Establish comprehensive test coverage configuration for backend and microservices, including .coveragerc and pytest configuration.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create .coveragerc for backend coverage configuration",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/.coveragerc"
+          ],
+          "patterns_from": [
+            "backend/pytest.ini"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest --cov=. --cov-report=term-missing --collect-only",
+            "expected": "Coverage configuration loaded from .coveragerc"
+          },
+          "status": "completed",
+          "notes": "Created .coveragerc with comprehensive coverage configuration. Configured source directories (analyzers, api, .), omit patterns for tests and build artifacts, branch coverage enabled, and report formats (HTML, XML, JSON) configured. Follows same style as pytest.ini with clear comments and structure."
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Update pytest.ini with coverage options",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/pytest.ini"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/pytest.ini"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest --help | grep -A5 'cov-options'",
+            "expected": "Coverage options properly configured"
+          },
+          "status": "completed",
+          "notes": "Added comprehensive coverage options to pytest.ini addopts: --cov=analyzers, --cov=api for coverage sources; --cov-report=term-missing for terminal output; --cov-report=html:htmlcov for HTML reports; --cov-report=xml:coverage.xml for CI/CD integration; --cov-fail-under=80 to enforce 80% minimum coverage. Also created .coveragerc with proper source paths, omit patterns, and report settings."
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Create shared conftest.py with test fixtures and markers",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/conftest.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_advanced_search.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest --markers",
+            "expected": "markers: unit, integration, slow, e2e, property, contract"
+          },
+          "status": "completed",
+          "notes": "Created comprehensive conftest.py with all required markers (unit, integration, slow, e2e, property, contract, performance) and shared fixtures. Fixtures include: test_db (async database session), client (async HTTP client), sample_user, sample_vacancy, sample_resume, sample_candidates, temp_dir, sample_resume_file, mock_settings, clear_redis, performance_thresholds, and track_performance. Follows patterns from test_advanced_search.py with proper async/await handling, SQLAlchemy setup, and FastAPI client configuration."
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "Create pytest.ini for each microservice",
+          "service": "microservices",
+          "files_to_modify": [
+            "services/*/pytest.ini"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/pytest.ini"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "for dir in services/*/pytest.ini; do service=$(dirname $dir); cd $service && pytest --collect-only 2>&1 | head -5; cd -; done",
+            "expected": "All services have pytest.ini and can discover tests"
+          },
+          "status": "completed",
+          "notes": "Created pytest.ini for all 9 microservices: resume_processing, matching, candidate, vacancy, taxonomy, analytics, ats_simulation, notifications, integration. Each config includes test discovery patterns, coverage with 80% threshold, multiple report formats (term-missing, html, xml), markers (slow, integration, unit), logging configuration, and proper ignore paths. Follows backend/pytest.ini pattern adapted for microservice structure."
+        }
+      ]
+    },
+    {
+      "id": "phase-3-property-based-tests",
+      "name": "Property-Based Testing for Matching Algorithms",
+      "type": "implementation",
+      "description": "Implement property-based tests (fuzz testing) for critical business logic in matching algorithms using Hypothesis.",
+      "depends_on": [
+        "phase-2-setup-backend-coverage"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Add Hypothesis to backend requirements",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/requirements.txt"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/requirements.txt"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c 'import hypothesis; print(hypothesis.__version__)'",
+            "expected": "Hypothesis version printed"
+          },
+          "status": "completed",
+          "notes": "Added hypothesis==6.122.1 to backend/requirements.txt in the Testing section. The package enables property-based testing for matching algorithms and critical business logic."
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Create property-based tests for skill matching",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/property/test_matching_properties.py"
+          ],
+          "patterns_from": [
+            "backend/tests/test_enhanced_matcher.py",
+            "backend/analyzers/enhanced_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/property/test_matching_properties.py -v --hypothesis-seed=0",
+            "expected": "Property tests pass with 100 examples"
+          },
+          "status": "completed",
+          "notes": "Created comprehensive property-based tests with 100 examples each. Test classes include: TestNormalizationProperties (idempotence, lowercase, whitespace, valid/invalid chars), TestSimilarityProperties (symmetry, range, reflexivity, normalized input), TestMatchResultProperties (structure, confidence range, match type, consistency), TestEmptyInputProperties (edge cases), TestMatchMultipleProperties (all keys, structure), TestMatchPercentageProperties (range, calculation), TestLowConfidenceFilterProperties (list type, threshold, unmatched handling), TestCompoundSkillProperties (split behavior), TestSynonymMatchProperties, TestFuzzyMatchProperties, and TestContextMatchProperties."
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Create property-based tests for TF-IDF matching",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/property/test_tfidf_properties.py"
+          ],
+          "patterns_from": [
+            "backend/tests/property/test_matching_properties.py",
+            "backend/analyzers/tfidf_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/property/test_tfidf_properties.py -v",
+            "expected": "Property tests for TF-IDF pass"
+          },
+          "status": "completed",
+          "notes": "Created comprehensive property-based tests with 10 test classes and 100 examples each. Test classes include: TestTfidfMatchResultProperties (structure, types), TestScoreProperties (range 0-1, threshold consistency), TestKeywordMatchingProperties (disjoint sets, non-negative weights), TestEmptyInputProperties (edge cases), TestThresholdProperties (monotonicity, zero threshold), TestMatcherInitializationProperties (config validation), TestKeywordExtractionProperties (required skills always included), TestMatchResumeToVacancyProperties (convenience method), TestGetMissingImportanceProperties (list of tuples), TestFindKeywordMatchesProperties (partition property), TestScoreMonotonicityProperties (determinism, case insensitivity)."
+        },
+        {
+          "id": "subtask-3-4",
+          "description": "Create property-based tests for ranking scores",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/property/test_ranking_properties.py"
+          ],
+          "patterns_from": [
+            "backend/tests/property/test_matching_properties.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/property/test_ranking_properties.py -v",
+            "expected": "Property tests for ranking pass"
+          },
+          "status": "pending",
+          "notes": "Test properties: monotonicity, bounds, normalization"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-contract-tests",
+      "name": "Contract Testing for Service Boundaries",
+      "type": "implementation",
+      "description": "Implement contract tests for gRPC/REST service boundaries to ensure API compatibility between microservices.",
+      "depends_on": [
+        "phase-2-setup-backend-coverage"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Add contract testing libraries to requirements",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/requirements.txt"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/requirements.txt"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && python -c 'import pact; import jsonschema; print(\"OK\")'",
+            "expected": "OK"
+          },
+          "status": "pending",
+          "notes": "Add pact-python, jsonschema for contract testing"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Create contract tests for API Gateway to services",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/contract/test_api_gateway_contracts.py"
+          ],
+          "patterns_from": [
+            "backend/tests/conftest.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/contract/test_api_gateway_contracts.py -v",
+            "expected": "Contract tests pass"
+          },
+          "status": "pending",
+          "notes": "Test API Gateway contracts with Resume Processing, Matching, Candidate services"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Create contract tests for Matching to Candidate service",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/contract/test_matching_candidate_contracts.py"
+          ],
+          "patterns_from": [
+            "backend/tests/contract/test_api_gateway_contracts.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/contract/test_matching_candidate_contracts.py -v",
+            "expected": "Contract tests pass"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-4",
+          "description": "Create schema validation tests for API responses",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/contract/test_api_schemas.py"
+          ],
+          "patterns_from": [
+            "backend/tests/contract/test_api_gateway_contracts.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/contract/test_api_schemas.py -v",
+            "expected": "Schema validation tests pass"
+          },
+          "status": "pending",
+          "notes": "Validate response schemas match OpenAPI spec for all endpoints"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-quality-tools",
+      "name": "Code Quality Tools Configuration",
+      "type": "implementation",
+      "description": "Configure and implement code quality tools including pre-commit hooks, linting, and formatting for both frontend and backend.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Create pre-commit configuration for Python",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".pre-commit-config.yaml"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "pre-commit install --install-hooks && pre-commit run --all-files",
+            "expected": "Pre-commit hooks installed and run"
+          },
+          "status": "pending",
+          "notes": "Configure: trailing-whitespace, end-of-file-fixer, check-yaml, check-toml, ruff, black"
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Create ruff.toml configuration",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "ruff.toml"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "ruff check backend/ --output-format=concise",
+            "expected": "Ruff runs with configuration from ruff.toml"
+          },
+          "status": "pending",
+          "notes": "Configure line length, target version, select error codes, ignore patterns"
+        },
+        {
+          "id": "subtask-5-3",
+          "description": "Create pyproject.toml for backend tooling",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/pyproject.toml"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && black --config pyproject.toml --check analyzers/",
+            "expected": "Black configuration loaded from pyproject.toml"
+          },
+          "status": "pending",
+          "notes": "Configure black, isort, mypy settings"
+        },
+        {
+          "id": "subtask-5-4",
+          "description": "Enhance ESLint config for stricter rules",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/.eslintrc.cjs"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/.eslintrc.cjs"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run lint -- --max-warnings=0 src/",
+            "expected": "No lint errors with stricter rules"
+          },
+          "status": "pending",
+          "notes": "Add more strict TypeScript rules, import ordering, no-console rule"
+        }
+      ]
+    },
+    {
+      "id": "phase-6-ci-workflow",
+      "name": "CI Workflow Implementation",
+      "type": "implementation",
+      "description": "Create comprehensive CI workflow that runs tests, linting, and coverage checks on every pull request.",
+      "depends_on": [
+        "phase-1-setup-frontend-coverage",
+        "phase-2-setup-backend-coverage",
+        "phase-5-quality-tools"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-6-1",
+          "description": "Create main CI workflow with test matrix",
+          "service": "ci_cd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".github/workflows/ci.yml"
+          ],
+          "patterns_from": [
+            ".github/workflows/deploy.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Push a test branch and verify CI workflow runs successfully"
+          },
+          "status": "pending",
+          "notes": "Run lint, tests, coverage for frontend and backend in parallel jobs"
+        },
+        {
+          "id": "subtask-6-2",
+          "description": "Create test coverage reporting workflow",
+          "service": "ci_cd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".github/workflows/test-coverage.yml"
+          ],
+          "patterns_from": [
+            ".github/workflows/ci.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify coverage report is generated and posted as PR comment"
+          },
+          "status": "pending",
+          "notes": "Generate coverage report, check thresholds, post diff as comment"
+        },
+        {
+          "id": "subtask-6-3",
+          "description": "Add coverage badge generation",
+          "service": "ci_cd",
+          "files_to_modify": [
+            ".github/workflows/test-coverage.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/test-coverage.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify coverage badges are generated/updated in README"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-7-security-scanning",
+      "name": "Security Scanning Implementation",
+      "type": "implementation",
+      "description": "Implement security scanning in CI pipeline including SAST, dependency scanning, and secret scanning.",
+      "depends_on": [
+        "phase-5-quality-tools"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-7-1",
+          "description": "Create security scanning workflow",
+          "service": "ci_cd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".github/workflows/security-scan.yml"
+          ],
+          "patterns_from": [
+            ".github/workflows/ci.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Push a test branch and verify security scans run"
+          },
+          "status": "pending",
+          "notes": "Run Bandit for Python SAST, npm audit for JS, CodeQL if available"
+        },
+        {
+          "id": "subtask-7-2",
+          "description": "Add Bandit configuration and baseline",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".github/bandit.yml"
+          ],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "bandit -r backend/ -c .github/bandit.yml -f json",
+            "expected": "Bandit runs with custom configuration"
+          },
+          "status": "pending",
+          "notes": "Configure skipped tests, baseline for existing issues"
+        },
+        {
+          "id": "subtask-7-3",
+          "description": "Add dependency scanning workflow",
+          "service": "ci_cd",
+          "files_to_modify": [
+            ".github/workflows/security-scan.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/security-scan.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify dependency vulnerabilities are detected"
+          },
+          "status": "pending",
+          "notes": "Use Dependabot or npm audit, pip-audit for Python deps"
+        },
+        {
+          "id": "subtask-7-4",
+          "description": "Add secret scanning to pre-commit",
+          "service": "backend",
+          "files_to_modify": [
+            ".pre-commit-config.yaml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".pre-commit-config.yaml"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "pre-commit run detect-secrets --all-files",
+            "expected": "Secret scanning runs in pre-commit"
+          },
+          "status": "pending",
+          "notes": "Add detect-secrets hook to prevent committing credentials"
+        }
+      ]
+    },
+    {
+      "id": "phase-8-performance-tests",
+      "name": "Performance Regression Tests",
+      "type": "implementation",
+      "description": "Implement performance regression tests to prevent degradations in CI pipeline.",
+      "depends_on": [
+        "phase-6-ci-workflow"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-8-1",
+          "description": "Create performance regression workflow",
+          "service": "ci_cd",
+          "files_to_modify": [],
+          "files_to_create": [
+            ".github/workflows/performance-regression.yml"
+          ],
+          "patterns_from": [
+            ".github/workflows/performance-tests.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Push a test branch and verify performance tests run"
+          },
+          "status": "pending",
+          "notes": "Run Locust load tests, compare with baseline, fail on regression"
+        },
+        {
+          "id": "subtask-8-2",
+          "description": "Create Locust test scripts for critical endpoints",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/performance/locustfile.py"
+          ],
+          "patterns_from": [
+            "backend/tests/performance/"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && locust -f tests/performance/locustfile.py --headless --users 10 --spawn-rate 1 -t 10s",
+            "expected": "Locust runs successfully"
+          },
+          "status": "pending",
+          "notes": "Test endpoints: /api/candidates, /api/vacancies, /api/matching"
+        },
+        {
+          "id": "subtask-8-3",
+          "description": "Add performance baseline storage and comparison",
+          "service": "ci_cd",
+          "files_to_modify": [
+            ".github/workflows/performance-regression.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/lighthouse.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify baseline is stored and compared on each run"
+          },
+          "status": "pending",
+          "notes": "Store response times, throughput, error rate in git, compare with baseline"
+        }
+      ]
+    },
+    {
+      "id": "phase-9-e2e-test-expansion",
+      "name": "E2E Test Coverage Expansion",
+      "type": "implementation",
+      "description": "Expand E2E test coverage to include all critical user journeys identified in the spec.",
+      "depends_on": [
+        "phase-1-setup-frontend-coverage"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-9-1",
+          "description": "Create E2E test for resume upload journey",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/e2e/resume-upload-journey.spec.ts"
+          ],
+          "patterns_from": [
+            "frontend/e2e/login-flow.spec.ts"
+          ],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Login as recruiter",
+              "Navigate to vacancies",
+              "Upload resume",
+              "Verify analysis completes",
+              "Verify candidate appears in list"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-9-2",
+          "description": "Create E2E test for candidate ranking journey",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/e2e/candidate-ranking-journey.spec.ts"
+          ],
+          "patterns_from": [
+            "frontend/e2e/resume-upload-journey.spec.ts"
+          ],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Login as recruiter",
+              "Open vacancy detail",
+              "View ranked candidates",
+              "Verify ranking scores display",
+              "Verify filtering works"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-9-3",
+          "description": "Create E2E test for vacancy creation journey",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/e2e/vacancy-creation-journey.spec.ts"
+          ],
+          "patterns_from": [
+            "frontend/e2e/candidate-ranking-journey.spec.ts"
+          ],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Login as recruiter",
+              "Navigate to vacancies",
+              "Create new vacancy",
+              "Fill required fields",
+              "Save and verify vacancy appears"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-10-microservice-tests",
+      "name": "Microservice Test Coverage",
+      "type": "implementation",
+      "description": "Ensure all 9 microservices have adequate test coverage with unit and integration tests.",
+      "depends_on": [
+        "phase-2-setup-backend-coverage"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-10-1",
+          "description": "Add unit tests for Resume Processing service",
+          "service": "microservices",
+          "files_to_modify": [],
+          "files_to_create": [
+            "services/resume_processing/tests/test_resume_processing.py"
+          ],
+          "patterns_from": [
+            "backend/tests/test_enhanced_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd services/resume_processing && pytest tests/ -v --cov=. --cov-report=term-missing",
+            "expected": "Tests pass with coverage report"
+          },
+          "status": "pending",
+          "notes": "Test resume upload, parsing, analysis, error handling"
+        },
+        {
+          "id": "subtask-10-2",
+          "description": "Add unit tests for Matching service",
+          "service": "microservices",
+          "files_to_modify": [],
+          "files_to_create": [
+            "services/matching/tests/test_matching.py"
+          ],
+          "patterns_from": [
+            "backend/tests/test_enhanced_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd services/matching && pytest tests/ -v --cov=. --cov-report=term-missing",
+            "expected": "Tests pass with coverage report"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-10-3",
+          "description": "Add unit tests for Candidate service",
+          "service": "microservices",
+          "files_to_modify": [],
+          "files_to_create": [
+            "services/candidate/tests/test_candidate.py"
+          ],
+          "patterns_from": [
+            "backend/tests/test_enhanced_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd services/candidate && pytest tests/ -v --cov=. --cov-report=term-missing",
+            "expected": "Tests pass with coverage report"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-10-4",
+          "description": "Add unit tests for Vacancy service",
+          "service": "microservices",
+          "files_to_modify": [],
+          "files_to_create": [
+            "services/vacancy/tests/test_vacancy.py"
+          ],
+          "patterns_from": [
+            "backend/tests/test_enhanced_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd services/vacancy && pytest tests/ -v --cov=. --cov-report=term-missing",
+            "expected": "Tests pass with coverage report"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-10-5",
+          "description": "Add unit tests for remaining services (Taxonomy, Analytics, ATS, Notifications, Integrations)",
+          "service": "microservices",
+          "files_to_modify": [],
+          "files_to_create": [
+            "services/taxonomy/tests/test_taxonomy.py",
+            "services/analytics/tests/test_analytics.py",
+            "services/ats_simulation/tests/test_ats.py",
+            "services/notifications/tests/test_notifications.py",
+            "services/integrations/tests/test_integrations.py"
+          ],
+          "patterns_from": [
+            "backend/tests/test_enhanced_matcher.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "for service in taxonomy analytics ats_simulation notifications integrations; do cd services/$service && pytest tests/ -v || echo \"Failed: $service\"; cd -; done",
+            "expected": "All services have passing tests"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-11-integration",
+      "name": "CI/CD Integration and Automation",
+      "type": "integration",
+      "description": "Integrate all testing workflows with automated deployment to staging on merge to main.",
+      "depends_on": [
+        "phase-6-ci-workflow",
+        "phase-7-security-scanning",
+        "phase-8-performance-tests",
+        "phase-9-e2e-test-expansion",
+        "phase-10-microservice-tests"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-11-1",
+          "description": "Update deploy.yml to require passing tests before deployment",
+          "service": "ci_cd",
+          "files_to_modify": [
+            ".github/workflows/deploy.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/deploy.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify that failing tests block deployment"
+          },
+          "status": "pending",
+          "notes": "Add 'needs: [ci, security-scan, performance-tests]' to deploy jobs"
+        },
+        {
+          "id": "subtask-11-2",
+          "description": "Add automated deployment to staging on merge to main",
+          "service": "ci_cd",
+          "files_to_modify": [
+            ".github/workflows/deploy.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/deploy.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Merge to main and verify staging deployment occurs"
+          },
+          "status": "pending",
+          "notes": "Configure environment, deployment steps, health checks"
+        },
+        {
+          "id": "subtask-11-3",
+          "description": "Add smoke tests after deployment",
+          "service": "ci_cd",
+          "files_to_modify": [
+            ".github/workflows/deploy.yml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".github/workflows/deploy.yml"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify smoke tests run after deployment"
+          },
+          "status": "pending",
+          "notes": "Test critical endpoints: health, login, basic API calls"
+        },
+        {
+          "id": "subtask-11-4",
+          "description": "Create comprehensive test summary dashboard",
+          "service": "ci_cd",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify test results appear in GitHub Actions summary"
+          },
+          "status": "pending",
+          "notes": "Aggregate test results, coverage, security scans into one summary"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 11,
+    "total_subtasks": 42,
+    "services_involved": [
+      "frontend",
+      "backend",
+      "api_gateway",
+      "resume_processing",
+      "matching",
+      "candidate",
+      "vacancy",
+      "taxonomy",
+      "analytics",
+      "ats_simulation",
+      "notifications",
+      "integrations",
+      "ci_cd"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 4,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-1-setup-frontend-coverage",
+            "phase-2-setup-backend-coverage",
+            "phase-5-quality-tools"
+          ],
+          "reason": "Setup phases are independent and can run in parallel"
+        },
+        {
+          "phases": [
+            "phase-3-property-based-tests",
+            "phase-4-contract-tests",
+            "phase-9-e2e-test-expansion"
+          ],
+          "reason": "All depend only on backend setup, different test types"
+        },
+        {
+          "phases": [
+            "phase-7-security-scanning",
+            "phase-8-performance-tests",
+            "phase-10-microservice-tests"
+          ],
+          "reason": "All can run after CI workflow is in place, different concerns"
+        }
+      ],
+      "recommended_workers": 3,
+      "speedup_estimate": "2.5x faster than sequential"
+    },
+    "startup_command": "cd .auto-claude && source .venv/bin/activate && python run.py --spec 119 --parallel 3"
+  },
+  "verification_strategy": {
+    "risk_level": "high",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration",
+      "e2e",
+      "property",
+      "contract",
+      "security",
+      "performance"
+    ],
+    "security_scanning_required": true,
+    "staging_deployment_required": true,
+    "acceptance_criteria": [
+      "Unit test coverage exceeds 90% for all Python services",
+      "Frontend unit test coverage exceeds 85% for React components",
+      "Integration tests cover all service-to-service communication patterns",
+      "E2E tests cover critical user journeys (upload resume, rank candidates, create vacancy)",
+      "Property-based testing for matching algorithms (fuzz testing)",
+      "Contract testing ensures service compatibility",
+      "CI/CD pipeline runs all tests on every pull request",
+      "Automated deployment to staging environment on merge to main",
+      "Security scanning (SAST, dependency scanning) in CI pipeline",
+      "Performance regression tests prevent degradations"
+    ],
+    "verification_steps": [
+      {
+        "name": "Frontend Unit Tests",
+        "command": "cd frontend && npm run test:coverage",
+        "expected_outcome": "All tests pass with 85%+ coverage",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Backend Unit Tests",
+        "command": "cd backend && pytest tests/unit -v --cov=. --cov-report=term-missing",
+        "expected_outcome": "All tests pass with 90%+ coverage",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Integration Tests",
+        "command": "cd backend && pytest tests/integration -v -m integration",
+        "expected_outcome": "All integration tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Property-Based Tests",
+        "command": "cd backend && pytest tests/property -v",
+        "expected_outcome": "All property-based tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "Contract Tests",
+        "command": "cd backend && pytest tests/contract -v",
+        "expected_outcome": "All contract tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "E2E Tests",
+        "command": "cd frontend && npm run test:e2e",
+        "expected_outcome": "All E2E tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Security Scan (SAST)",
+        "command": "bandit -r backend/ -f json",
+        "expected_outcome": "No high severity security issues",
+        "type": "security",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Dependency Scan",
+        "command": "npm audit --production && pip-audit",
+        "expected_outcome": "No critical vulnerabilities",
+        "type": "security",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Performance Tests",
+        "command": "locust -f backend/tests/performance/locustfile.py --headless --users 50 --spawn-rate 10 -t 30s",
+        "expected_outcome": "Response times within baseline",
+        "type": "performance",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "Linting",
+        "command": "cd frontend && npm run lint && cd ../backend && ruff check .",
+        "expected_outcome": "No lint errors",
+        "type": "lint",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "High risk change involving comprehensive test infrastructure and CI/CD pipeline. Requires unit, integration, and E2E tests, plus security scanning for production deployment. Property-based and contract tests ensure critical business logic reliability."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "cd frontend && npm run test:coverage",
+        "cd backend && pytest tests/unit -v --cov=. --cov-report=term-missing"
+      ],
+      "minimum_coverage": {
+        "frontend": 85,
+        "backend": 90
+      }
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/integration -v -m integration"
+      ],
+      "services_to_test": [
+        "backend",
+        "resume_processing",
+        "matching",
+        "candidate",
+        "vacancy",
+        "taxonomy",
+        "analytics",
+        "ats_simulation",
+        "notifications",
+        "integrations"
+      ]
+    },
+    "e2e_tests": {
+      "required": true,
+      "commands": [
+        "cd frontend && npm run test:e2e"
+      ],
+      "flows": [
+        "login-flow",
+        "resume-upload-journey",
+        "candidate-ranking-journey",
+        "vacancy-creation-journey",
+        "registration-flow",
+        "recruiter-journey",
+        "jobseeker-journey"
+      ]
+    },
+    "property_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/property -v"
+      ],
+      "modules": [
+        "enhanced_matcher",
+        "tfidf_matcher",
+        "vector_matcher",
+        "ranking_service"
+      ]
+    },
+    "contract_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/contract -v"
+      ],
+      "services": [
+        "api_gateway",
+        "matching",
+        "candidate",
+        "vacancy"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:5173/",
+          "checks": [
+            "renders",
+            "no-console-errors"
+          ]
+        },
+        {
+          "url": "http://localhost:5173/login",
+          "checks": [
+            "renders",
+            "login-form-works"
+          ]
+        },
+        {
+          "url": "http://localhost:8888/docs",
+          "checks": [
+            "swagger-loads",
+            "api-docs-display"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": true,
+      "checks": [
+        "migrations-exist",
+        "migrations-applied",
+        "schema-valid"
+      ]
+    },
+    "security_verification": {
+      "required": true,
+      "scans": [
+        "sast",
+        "dependency-scan",
+        "secret-scan"
+      ]
+    },
+    "performance_verification": {
+      "required": true,
+      "checks": [
+        "load-test-passes",
+        "no-regression-vs-baseline"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "planStatus": "in_progress"
+}
