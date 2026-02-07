@@ -4,16 +4,84 @@
  * Central exports for the API client and related types.
  */
 
+// Base client
 export { ApiClient, apiClient } from './client';
+
+// AI/ML services
+export { explainability, ExplainabilityClient } from './explainability';
+export { fairness, FairnessClient } from './fairness';
+export { industryClassifier, IndustryClassifierClient } from './industryClassifier';
+export { matchingClient, MatchingClient } from './matching';
+export { matchingWeightsClient, MatchingWeightsClient } from './matchingWeights';
+export { modelVersionsClient, ModelVersionsClient } from './modelVersions';
+export { salaryBenchmarking, SalaryBenchmarkingClient } from './salaryBenchmarking';
+export { semanticSearchClient, SemanticSearchClient } from './semanticSearch';
 export { skillGap } from './skillGap';
-export { workflowStagesClient, WorkflowStagesClient } from './workflowStages';
-export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
-export { candidateNotesClient, CandidateNotesClient } from './candidateNotes';
+export { skillSuggestions, SkillSuggestionsClient } from './skillSuggestions';
+export { skillTaxonomiesClient, SkillTaxonomiesClient } from './skillTaxonomies';
+
+// Analytics & reporting
+export { analyticsClient, AnalyticsClient } from './analyticsClient';
+
+// Authentication & security
+export * from './auth';
+export { gdprClient, GDPRClient } from './gdpr';
+export { securityConfigClient, SecurityConfigClient } from './securityConfig';
+export { sessionsClient, SessionsClient } from './sessions';
+export { ssoClient, SSOClient } from './sso';
+export { twoFactorClient, TwoFactorClient } from './twoFactor';
+
+// Candidate management
+export { candidatesClient, CandidatesClient } from './candidates';
 export { candidateActivitiesClient, CandidateActivitiesClient } from './candidateActivities';
+export { candidateNotesClient, CandidateNotesClient } from './candidateNotes';
+export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
+export { candidateSearchClient, CandidateSearchClient } from './search';
+
+// Communication
+export { communicationTemplatesClient, CommunicationTemplatesClient } from './communicationTemplates';
+export { communicationsClient, CommunicationsClient } from './communications';
+export { emailSyncClient, EmailSyncClient } from './emailSync';
+export { smsClient, SMSClient } from './sms';
+
+// Configuration & settings
+export { apiKeysClient, APIKeysClient } from './apiKeys';
+export { customSynonymsClient, CustomSynonymsClient } from './customSynonyms';
+export { pluginsClient, PluginsClient } from './plugins';
+export { preferencesClient, PreferencesClient } from './preferences';
+
+// Document processing
+export { atsEvaluationClient, AtsEvaluationClient } from './atsEvaluation';
+export { resumesClient, ResumesClient } from './resume';
+
+// Feedback & learning
+export { feedbackClient, FeedbackClient } from './feedback';
+export * from './recommendations';
+
+// Health & monitoring
+export * from './health';
+export * from './notifications';
+
+// Integrations
+export { integrationsClient, IntegrationsClient } from './integrations';
+export { jobIntegrationsClient, JobIntegrationsClient } from './jobIntegrations';
+export { webhooksClient, WebhooksClient } from './webhooks';
+
+// Organization management
+export { calendarClient, CalendarClient } from './calendar';
+export { interviewsClient, InterviewsClient } from './interviews';
+export { organizationsClient, OrganizationsClient } from './organizations';
+export { teamCommentsClient, TeamCommentsClient } from './teamComments';
+export { vacanciesClient, VacanciesClient } from './vacancies';
+export { workflowsClient, WorkflowsClient } from './workflows';
+
+// Workflow & search management
+export { workflowStagesClient, WorkflowStagesClient } from './workflowStages';
 export { savedSearchesClient, SavedSearchesClient } from './savedSearches';
 export { searchHistoryClient, SearchHistoryClient } from './searchHistory';
-export { candidateSearchClient, CandidateSearchClient } from './search';
-export * from './health';
+
+// Taxonomies & classification
+export { taxonomiesClient, TaxonomiesClient } from './taxonomies';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
