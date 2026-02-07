@@ -51,7 +51,9 @@ class SkillTaxonomy(Base, UUIDMixin, TimestampMixin):
     )
     is_latest: Mapped[bool] = mapped_column(nullable=False, default=True)
     is_public: Mapped[bool] = mapped_column(nullable=False, default=False)
-    organization_id: Mapped[Optional[str]] = mapped_column(nullable=True)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     source_organization: Mapped[Optional[str]] = mapped_column(nullable=True)
     view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

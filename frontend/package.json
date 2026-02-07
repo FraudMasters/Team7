@@ -15,6 +15,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:install": "playwright install --with-deps",
+    "verify:vacancy-saved-search": "npx tsx verify_vacancy_saved_search.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
@@ -33,12 +34,15 @@
     "date-fns": "^3.6.0",
     "i18next": "^24.2.2",
     "i18next-browser-languagedetector": "^8.0.2",
+    "idb": "^9.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "react-i18next": "^15.2.0",
     "react-router-dom": "^6.26.2",
+    "react-swipeable": "^7.0.1",
     "react-window": "^1.8.10",
+    "workbox-window": "^7.3.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -57,10 +61,12 @@
     "eslint": "^9.13.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
+    "fake-indexeddb": "^6.0.0",
     "jsdom": "^25.0.1",
     "prettier": "^3.3.3",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
+    "vite-plugin-pwa": "^0.21.1",
     "vitest": "^2.1.4"
   },
   "engines": {

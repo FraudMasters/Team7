@@ -1,7 +1,7 @@
 # Frontend Documentation Index
 
 > **AgentHR Frontend Documentation**
-> **Last updated:** 2026-02-01
+> **Last updated:** 2026-02-05
 
 ---
 
@@ -20,6 +20,8 @@
 
 | Document | Description |
 |----------|-------------|
+| [architecture.md](architecture.md) | Frontend architecture, routing, state management |
+| [api-integration.md](api-integration.md) | **NEW:** API Gateway integration guide with microservices |
 | [components.md](components.md) | Component catalog and patterns |
 | [migration-guide.md](migration-guide.md) | Old → New architecture migration |
 | [build-verification.md](build-verification.md) | Pre-deployment checklist |
@@ -30,7 +32,7 @@
 
 ### Current Coverage
 
-- **Backend API**: ~40% implemented
+- **Backend API**: 100% migrated to microservices architecture
 - **Test Coverage**: ~30% (needs improvement)
 - **Accessibility**: WCAG 2.1 AA compliant
 
@@ -42,7 +44,8 @@ React 18.3 + TypeScript
 ├── State: TanStack React Query v5
 ├── Routing: React Router v6
 ├── Build: Vite 5.4
-└── Testing: Vitest + Playwright
+├── Testing: Vitest + Playwright
+└── API: API Gateway (port 8888) → 10 Microservices
 ```
 
 ### File Locations
@@ -54,6 +57,7 @@ React 18.3 + TypeScript
 | Hooks | `src/hooks/` |
 | API Types | `src/types/api.ts` |
 | API Client | `src/api/client.ts` |
+| API Integration Guide | [docs/api-integration.md](api-integration.md) |
 | Routes | `src/App.tsx` |
 | Theme | `src/contexts/ThemeContext.tsx` |
 
@@ -64,9 +68,10 @@ React 18.3 + TypeScript
 ### For New Developers
 
 1. Read [README.md](../README.md) for setup
-2. Review [migration-guide.md](migration-guide.md) for architecture
-3. Browse [components.md](components.md) for patterns
-4. Check [TASKS.md](TASKS.md) for available work
+2. Review [architecture.md](architecture.md) for frontend architecture
+3. Read [api-integration.md](api-integration.md) for API Gateway and microservices
+4. Browse [components.md](components.md) for patterns
+5. Check [TASKS.md](TASKS.md) for available work
 
 ### For Project Managers
 
@@ -132,25 +137,41 @@ export function MyComponent({ prop }: MyComponentProps) {
 
 ### API Integration
 
+The frontend communicates with backend microservices via a unified API Gateway:
+
 ```tsx
-// hooks/useMyFeature.ts
+// All requests go through API Gateway (port 8888)
+// Environment: VITE_API_URL=http://localhost:8888
+
+// Using the typed API client
+import { apiClient } from '@/api/client';
+
+const result = await apiClient.uploadResume(file);
+const analysis = await apiClient.analyzeResume({ resume_id: id });
+const match = await apiClient.compareWithVacancy(resumeId, vacancy);
+
+// With React Query for caching
 import { useQuery } from '@tanstack/react-query';
 
-export function useMyFeature() {
+export function useCandidates(stageId?: string) {
   return useQuery({
-    queryKey: ['my-feature'],
-    queryFn: async () => {
-      const response = await apiClient.get('/api/my-feature');
-      return response.data;
-    },
+    queryKey: ['candidates', stageId],
+    queryFn: () => apiClient.listCandidates(stageId),
   });
 }
 ```
+
+**Key Points:**
+- All API calls go through the API Gateway (port 8888)
+- Individual microservice URLs are abstracted
+- See [api-integration.md](api-integration.md) for complete guide
 
 ---
 
 ## Support
 
+- **API Integration Issues**: Check [api-integration.md](api-integration.md) troubleshooting section
+- **Component Questions**: Check [components.md](components.md) first
+- **Architecture Questions**: Review [architecture.md](architecture.md)
+- **Build Errors**: See [build-verification.md](build-verification.md)
 - **Issues**: Create via TASKS.md breakdown
-- **Questions**: Check components.md first
-- **Build errors**: See build-verification.md

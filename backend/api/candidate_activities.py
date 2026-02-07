@@ -89,7 +89,7 @@ async def get_candidate_activities(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/candidate-activities/?resume_id=abc-123")
+        >>> response = requests.get("/api/candidate-activities/?resume_id=abc-123")
         >>> response.json()
         {
             "resume_id": "abc-123",
@@ -232,7 +232,7 @@ async def get_activity_types() -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/candidate-activities/types")
+        >>> response = requests.get("/api/candidate-activities/types")
         >>> response.json()
         {
             "activity_types": [

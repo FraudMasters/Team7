@@ -637,3 +637,360 @@ def send_performance_degradation_alert(
             "error": str(e),
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
+
+
+@shared_task(
+    name="tasks.notifications.send_follow_up_reminders",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def send_follow_up_reminders(
+    self,
+    look_ahead_hours: int = 24,
+) -> Dict[str, Any]:
+    """
+    Send follow-up reminder notifications to recruiters.
+
+    This Celery task queries for upcoming follow-ups scheduled within the
+    specified time window and sends reminder notifications to the assigned
+    recruiters. It helps ensure timely follow-up actions with candidates.
+
+    Task Workflow:
+    1. Query communications with upcoming follow-ups within look_ahead_hours
+    2. Group follow-ups by recruiter
+    3. Format reminder email for each recruiter with their follow-up list
+    4. Send reminder notifications via email
+    5. Return delivery status
+
+    Args:
+        self: Celery task instance (bind=True)
+        look_ahead_hours: Number of hours to look ahead for follow-ups (default: 24)
+
+    Returns:
+        Dictionary containing reminder results:
+        - notification_type: Type of notification (follow_up_reminders)
+        - status: Task status (sent/failed/partial)
+        - recruiters_notified: Number of recruiters notified
+        - total_followups: Total number of upcoming follow-ups found
+        - recipients_count: Total number of email recipients
+        - delivery_successful: Whether all deliveries were successful
+        - processing_time_ms: Total processing time
+        - error: Error message (if failed)
+
+    Raises:
+        SoftTimeLimitExceeded: If task exceeds time limit
+        Exception: For database or email sending errors
+
+    Example:
+        >>> from tasks.notifications import send_follow_up_reminders
+        >>> task = send_follow_up_reminders.delay(look_ahead_hours=24)
+        >>> result = task.get()
+        >>> print(result['total_followups'])
+        15
+    """
+    import asyncio
+    from datetime import timedelta
+
+    start_time = time.time()
+
+    try:
+        logger.info(
+            f"Sending follow-up reminders: looking ahead {look_ahead_hours} hours"
+        )
+
+        # Step 1: Query upcoming follow-ups
+        progress = {
+            "current": 1,
+            "total": 3,
+            "percentage": 33,
+            "status": "querying_followups",
+            "message": "Querying upcoming follow-ups...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Querying upcoming follow-ups")
+
+        # Note: This is a placeholder for database query
+        # In a real implementation, you would:
+        # 1. Query Communications table with status='pending' or status='sent'
+        # 2. Filter by metadata.followup_date within the look_ahead_hours window
+        # 3. Group by recruiter_id
+        # 4. Include candidate_name, vacancy_title, communication_type, followup_date
+
+        # Placeholder data - replace with actual database queries
+        upcoming_followups_by_recruiter = {
+            "recruiter1@example.com": [
+                {
+                    "communication_id": "uuid-1",
+                    "candidate_name": "John Doe",
+                    "candidate_id": "candidate-uuid-1",
+                    "vacancy_title": "Senior Software Engineer",
+                    "communication_type": "email",
+                    "subject": "Interview follow-up",
+                    "followup_date": (datetime.utcnow() + timedelta(hours=4)).isoformat(),
+                    "priority": "high",
+                },
+                {
+                    "communication_id": "uuid-2",
+                    "candidate_name": "Jane Smith",
+                    "candidate_id": "candidate-uuid-2",
+                    "vacancy_title": "Product Manager",
+                    "communication_type": "phone_call",
+                    "subject": "Technical discussion follow-up",
+                    "followup_date": (datetime.utcnow() + timedelta(hours=8)).isoformat(),
+                    "priority": "medium",
+                },
+            ],
+            "recruiter2@example.com": [
+                {
+                    "communication_id": "uuid-3",
+                    "candidate_name": "Bob Johnson",
+                    "candidate_id": "candidate-uuid-3",
+                    "vacancy_title": "Data Analyst",
+                    "communication_type": "email",
+                    "subject": "Salary negotiation follow-up",
+                    "followup_date": (datetime.utcnow() + timedelta(hours=12)).isoformat(),
+                    "priority": "high",
+                },
+            ],
+        }
+
+        total_followups = sum(
+            len(followups)
+            for followups in upcoming_followups_by_recruiter.values()
+        )
+        recruiters_to_notify = len(upcoming_followups_by_recruiter)
+
+        logger.info(
+            f"Found {total_followups} upcoming follow-ups for {recruiters_to_notify} recruiters"
+        )
+
+        # Step 2: Send reminders to each recruiter
+        progress = {
+            "current": 2,
+            "total": 3,
+            "percentage": 66,
+            "status": "sending_reminders",
+            "message": f"Sending reminders to {recruiters_to_notify} recruiters...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Sending reminder emails")
+
+        successful_deliveries = 0
+        failed_deliveries = 0
+
+        for recruiter_email, followups in upcoming_followups_by_recruiter.items():
+            try:
+                # Format reminder email for this recruiter
+                email_details = format_follow_up_reminder_email(recruiter_email, followups, look_ahead_hours)
+
+                # Send reminder email
+                delivery_result = send_notification_via_email([recruiter_email], email_details)
+                delivery_successful = delivery_result.get("success", False)
+
+                if delivery_successful:
+                    successful_deliveries += 1
+                    logger.info(
+                        f"Follow-up reminder sent successfully to {recruiter_email} "
+                        f"({len(followups)} follow-ups)"
+                    )
+                else:
+                    failed_deliveries += 1
+                    logger.warning(
+                        f"Failed to send follow-up reminder to {recruiter_email}: "
+                        f"{delivery_result.get('error')}"
+                    )
+
+            except Exception as e:
+                failed_deliveries += 1
+                logger.error(
+                    f"Error sending follow-up reminder to {recruiter_email}: {e}",
+                    exc_info=True
+                )
+
+        # Step 3: Return results
+        progress = {
+            "current": 3,
+            "total": 3,
+            "percentage": 100,
+            "status": "completed",
+            "message": "Follow-up reminders processed",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+
+        delivery_successful = failed_deliveries == 0
+        status = "sent" if delivery_successful else ("partial" if successful_deliveries > 0 else "failed")
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "notification_type": "follow_up_reminders",
+            "status": status,
+            "recruiters_notified": successful_deliveries,
+            "recruiters_failed": failed_deliveries,
+            "total_followups": total_followups,
+            "recipients_count": recruiters_to_notify,
+            "delivery_successful": delivery_successful,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        logger.info(
+            f"Follow-up reminder notifications completed: "
+            f"{successful_deliveries} sent, {failed_deliveries} failed, "
+            f"{total_followups} follow-ups, time: {processing_time_ms}ms"
+        )
+
+        return result
+
+    except SoftTimeLimitExceeded:
+        logger.error(f"Task {self.request.id} exceeded time limit")
+        return {
+            "notification_type": "follow_up_reminders",
+            "status": "failed",
+            "error": "Follow-up reminder sending exceeded maximum time limit",
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+    except Exception as e:
+        logger.error(f"Error in follow-up reminder notifications: {e}", exc_info=True)
+        return {
+            "notification_type": "follow_up_reminders",
+            "status": "failed",
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+
+def format_follow_up_reminder_email(
+    recruiter_email: str,
+    followups: List[Dict[str, Any]],
+    look_ahead_hours: int,
+) -> Dict[str, Any]:
+    """
+    Format follow-up reminder email for a recruiter.
+
+    This function formats an email notification for upcoming follow-ups,
+    including candidate details, communication type, and follow-up dates.
+
+    Args:
+        recruiter_email: Email address of the recruiter
+        followups: List of follow-up dictionaries containing:
+            - candidate_name: Name of the candidate
+            - vacancy_title: Position/title
+            - communication_type: Type of communication (email, phone_call, sms)
+            - subject: Communication subject
+            - followup_date: When the follow-up is scheduled (ISO format)
+            - priority: Priority level (high, medium, low)
+        look_ahead_hours: Number of hours ahead being checked
+
+    Returns:
+        Dictionary containing email details:
+        {
+            "subject": "Follow-up Reminders: 3 upcoming actions",
+            "body": "Email body with follow-up list...",
+            "priority": "high"
+        }
+
+    Example:
+        >>> followups = [{"candidate_name": "John Doe", "vacancy_title": "Engineer", ...}]
+        >>> email = format_follow_up_reminder_email("recruiter@example.com", followups, 24)
+        >>> print(email['subject'])
+        'Follow-up Reminders: 1 upcoming action'
+    """
+    try:
+        logger.info(
+            f"Formatting follow-up reminder email for {recruiter_email}: "
+            f"{len(followups)} follow-ups"
+        )
+
+        # Sort follow-ups by date and priority
+        sorted_followups = sorted(
+            followups,
+            key=lambda f: (
+                f.get("followup_date", ""),
+                {"high": 0, "medium": 1, "low": 2}.get(f.get("priority", "low"), 2)
+            )
+        )
+
+        # Determine email priority based on highest priority follow-up
+        priority_map = {"high": "high", "medium": "normal", "low": "normal"}
+        highest_priority = max(
+            [f.get("priority", "low") for f in followups],
+            key=lambda p: {"high": 2, "medium": 1, "low": 0}.get(p, 0)
+        )
+        email_priority = priority_map.get(highest_priority, "normal")
+
+        # Build email subject
+        subject = f"Follow-up Reminders: {len(followups)} upcoming action"
+        if len(followups) > 1:
+            subject += "s"
+        if highest_priority == "high":
+            subject += " 🔴"
+
+        # Build email body
+        body_lines = [
+            f"Upcoming Follow-up Reminders",
+            f"",
+            f"You have {len(followups)} follow-up action"
+            f"{'s' if len(followups) > 1 else ''} scheduled within the next {look_ahead_hours} hours.",
+            f"",
+            f"---",
+        ]
+
+        for idx, followup in enumerate(sorted_followups, start=1):
+            candidate_name = followup.get("candidate_name", "Unknown Candidate")
+            vacancy_title = followup.get("vacancy_title", "Unknown Position")
+            comm_type = followup.get("communication_type", "communication").replace("_", " ").title()
+            subject_line = followup.get("subject", "No subject")
+            followup_date = followup.get("followup_date", "")
+            priority = followup.get("priority", "low").upper()
+
+            # Parse and format date
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(followup_date.replace("Z", "+00:00"))
+                date_str = dt.strftime("%Y-%m-%d %H:%M UTC")
+            except Exception:
+                date_str = followup_date
+
+            # Priority indicator
+            priority_emoji = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(priority, "⚪")
+
+            body_lines.extend([
+                f"",
+                f"{idx}. {candidate_name} - {vacancy_title}",
+                f"   Type: {comm_type}",
+                f"   Subject: {subject_line}",
+                f"   Follow-up: {date_str}",
+                f"   Priority: {priority_emoji} {priority}",
+            ])
+
+        body_lines.extend([
+            f"",
+            f"---",
+            f"Please ensure to complete these follow-ups on time to maintain candidate engagement.",
+            f"",
+            f"View all follow-ups in the Communications page.",
+            f"",
+            f"This is an automated reminder from AgentHR Communication System.",
+        ])
+
+        body = "\n".join(body_lines)
+
+        email_details = {
+            "subject": subject,
+            "body": body,
+            "priority": email_priority,
+        }
+
+        logger.info(f"Follow-up reminder email formatted successfully for {recruiter_email}")
+        return email_details
+
+    except Exception as e:
+        logger.error(f"Failed to format follow-up reminder email: {e}", exc_info=True)
+        # Return a basic email format on error
+        return {
+            "subject": f"Follow-up Reminders: {len(followups)} upcoming",
+            "body": f"You have {len(followups)} follow-up(s) scheduled. Check the Communications page for details.",
+            "priority": "normal",
+        }

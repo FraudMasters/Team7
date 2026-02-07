@@ -1,5 +1,9 @@
+// React хуки для управления состоянием и эффектами
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -15,14 +19,16 @@ import {
   Chip,
   LinearProgress,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Refresh as RefreshIcon,
   AccessTime as ClockIcon,
   Business as SourceIcon,
+  TrendingUp as AttributionIcon,
 } from '@mui/icons-material';
 
 /**
- * Source tracking item interface from backend
+ * Интерфейс элемента отслеживания источника с бэкенда
  */
 interface SourceTrackingItem {
   source_name: string;
@@ -32,7 +38,7 @@ interface SourceTrackingItem {
 }
 
 /**
- * Source tracking response from backend
+ * Ответ об отслеживании источников с бэкенда
  */
 interface SourceTrackingResponse {
   sources: SourceTrackingItem[];
@@ -40,19 +46,19 @@ interface SourceTrackingResponse {
 }
 
 /**
- * SourceTracking Component Props
+ * Свойства компонента SourceTracking
  */
 interface SourceTrackingProps {
-  /** API endpoint URL for source tracking analytics */
+  /** URL API endpoint для аналитики отслеживания источников */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
 }
 
 /**
- * Get color for source based on index
+ * Получить цвет для источника на основе индекса
  */
 const getSourceColor = (index: number): string => {
   const colors: string[] = [
@@ -69,13 +75,13 @@ const getSourceColor = (index: number): string => {
 };
 
 /**
- * SourceTracking Component
+ * Компонент SourceTracking
  *
- * Displays source tracking analytics including:
- * - Vacancies by source (job board, referral, etc.) with pie chart
- * - Percentage distribution of sources
- * - Average time-to-fill by source
- * - Total vacancies analyzed
+ * Отображает аналитику отслеживания источников включая:
+ * - Вакансии по источникам (job board, referral и т.д.) с круговой диаграммой
+ * - Процентное распределение источников
+ * - Среднее время заполнения по источникам
+ * - Общее количество проанализированных вакансий
  *
  * @example
  * ```tsx
@@ -92,12 +98,13 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
   startDate,
   endDate,
 }) => {
+  // Состояния для загрузки, ошибки и данных источников
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sourceData, setSourceData] = useState<SourceTrackingResponse | null>(null);
 
   /**
-   * Fetch source tracking data from backend
+   * Загрузка данных отслеживания источников с бэкенда
    */
   const fetchSourceTracking = async () => {
     try {
@@ -207,9 +214,20 @@ const SourceTracking: React.FC<SourceTrackingProps> = ({
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSourceTracking} size="small">
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              component={Link}
+              to="/recruiter/analytics/candidate-source-attribution"
+              startIcon={<AttributionIcon />}
+              size="small"
+            >
+              View Candidate Attribution
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchSourceTracking} size="small">
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         {/* Summary Stats */}

@@ -33,6 +33,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { config } from '@/config';
 import type {
   CandidateSearchRequest,
   CandidateSearchResponse,
@@ -44,7 +45,7 @@ import type {
  * Default API configuration for candidate search client
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: config.api.url,
   timeout: 10000, // 10 seconds
   headers: {
     'Content-Type': 'application/json',
@@ -172,14 +173,15 @@ export class CandidateSearchClient {
    */
   async searchCandidates(request: CandidateSearchRequest = {}): Promise<CandidateSearchResponse> {
     try {
+      // Use microservice endpoint instead of monolith /api/search/candidates
       const response: AxiosResponse<CandidateSearchResponse> = await this.client.post(
-        '/api/search/candidates',
+        '/api/candidates/search',
         {
           query: request.query ?? null,
           filters: request.filters ?? null,
           skip: request.skip ?? 0,
           limit: request.limit ?? 100,
-          sort_by: request.sort_by ?? 'relevance',
+          sort_by: request.sort_by ?? 'created_at',
         }
       );
       return response.data;

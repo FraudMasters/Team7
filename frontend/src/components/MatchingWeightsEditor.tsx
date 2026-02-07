@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { config } from '@/config';
 import {
   Box,
   Paper,
@@ -157,7 +158,7 @@ const PRESET_PROFILES: PresetProfile[] = [
  */
 const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
   organizationId,
-  apiUrl = 'http://localhost:8000/api/matching-weights',
+  apiUrl = `${config.api.url}/api/matching-weights`,
   onProfileSave,
 }) => {
   const { t } = useTranslation();

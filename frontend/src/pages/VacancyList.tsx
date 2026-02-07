@@ -27,7 +27,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-} from '@mui/material';
+} from '@/components/ui';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -39,7 +39,6 @@ import {
   Clear as ClearIcon,
   Save as SaveIcon,
   Close as CloseIcon,
-} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
@@ -49,6 +48,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ErrorMessage, { ErrorType, ErrorAction } from '../components/ErrorMessage';
 import useKeyboardNavigation from '../hooks/useKeyboardNavigation';
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 
 interface Vacancy {
   id: string;
@@ -66,6 +66,15 @@ interface Vacancy {
   employment_type?: string;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Paginated response from vacancies list endpoint
+ * Matches backend VacancyListResponse model with total count
+ */
+interface VacancyListResponse {
+  total: number;
+  vacancies: Vacancy[];
 }
 
 // Zod validation schema for inline vacancy edit
@@ -117,6 +126,18 @@ const VacancyList: React.FC = () => {
   const [dateFromFilter, setDateFromFilter] = useState<string>('');
   const [dateToFilter, setDateToFilter] = useState<string>('');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  // Pagination state
+  const [skip, setSkip] = useState<number>(0);
+  const [limit] = useState<number>(20);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
+  // Infinite scroll hook - disabled when filters are active
+  const { ref: scrollRef, isNearBottom } = useInfiniteScroll({
+    threshold: 200,
+    enabled: !hasActiveFilters && hasMore && !loading && !loadingMore,
+  });
 
   // Filter vacancies based on search query and filters
   const filteredVacancies = vacancies.filter((vacancy) => {
@@ -319,29 +340,121 @@ const VacancyList: React.FC = () => {
     });
   }, [filteredVacancies.length]);
 
+  // Trigger load more when user scrolls near bottom
   useEffect(() => {
-    fetchVacancies();
+    if (isNearBottom && !hasActiveFilters && hasMore && !loading && !loadingMore) {
+      loadMore();
+    }
+  }, [isNearBottom, hasActiveFilters, hasMore, loading, loadingMore, loadMore]);
+
+  // Track individual filter value changes with a combined key
+  const filterKey = `${workFormatFilter}-${locationFilter}-${dateFromFilter}-${dateToFilter}`;
+  const previousFilterKeyRef = useRef(filterKey);
+  const isInitialMountRef = useRef(true);
+
+  // Initial data fetch on mount
+  useEffect(() => {
+    fetchVacancies(0, limit, false);
+    // Mark as initialized
+    isInitialMountRef.current = false;
+    // Sync the filter key
+    previousFilterKeyRef.current = filterKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchVacancies = async () => {
-    setLoading(true);
-    setError(null);
+  // Reset pagination and refetch when any filter value changes
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMountRef.current) {
+      return;
+    }
+
+    // Skip if filter key hasn't changed
+    if (previousFilterKeyRef.current === filterKey) {
+      return;
+    }
+
+    // Reset pagination state
+    resetPaginationState();
+    setVacancies([]);
+
+    // Fetch data based on filter state
+    if (hasActiveFilters) {
+      // When filters are applied, load all data for client-side filtering
+      fetchVacancies(0, 10000, false);
+    } else {
+      // When filters are cleared, reset to paginated loading
+      fetchVacancies(0, limit, false);
+    }
+
+    // Update previous filter key
+    previousFilterKeyRef.current = filterKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, hasActiveFilters]);
+
+  /**
+   * Reset pagination state to initial values
+   */
+  const resetPaginationState = useCallback(() => {
+    setSkip(0);
+    setHasMore(true);
+    setLoadingMore(false);
+  }, []);
+
+  /**
+   * Fetch vacancies with pagination support
+   * @param skip - Number of records to skip
+   * @param limit - Maximum number of records to return
+   * @param append - Whether to append results to existing vacancies (for load more)
+   */
+  const fetchVacancies = async (skip: number, limit: number, append: boolean = false) => {
+    // Set appropriate loading state
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
-      const response = await fetch('/api/vacancies/');
+      const response = await fetch(`/api/vacancies/?skip=${skip}&limit=${limit}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch vacancies');
       }
 
-      const data: Vacancy[] = await response.json();
-      setVacancies(data);
+      const data: VacancyListResponse = await response.json();
+
+      // Update vacancies list
+      if (append) {
+        setVacancies((prev) => [...prev, ...data.vacancies]);
+      } else {
+        setVacancies(data.vacancies);
+      }
+
+      // Update pagination state
+      setSkip(skip + limit);
+      setHasMore(skip + limit < data.total);
     } catch (err) {
       setError(err instanceof Error ? err : 'Failed to fetch vacancies');
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
+
+  /**
+   * Load more vacancies when scrolling near bottom
+   */
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || loading) {
+      return;
+    }
+    fetchVacancies(skip, limit, true);
+  }, [loadingMore, hasMore, loading, skip, limit]);
 
   const handleDeleteClick = (id: string) => {
     setVacancyToDelete(id);
@@ -555,7 +668,7 @@ const VacancyList: React.FC = () => {
     };
 
     return (
-      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box as="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {saveError && (
           <ErrorMessage
             error={saveError}
@@ -775,7 +888,7 @@ const VacancyList: React.FC = () => {
           }}
         >
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h4" component="h1" fontWeight={600} gutterBottom sx={{ color: 'text.primary' }}>
+            <Typography variant="h4" as="h1" fontWeight={600} gutterBottom sx={{ color: 'text.primary' }}>
               {t('vacancyList.title')}
             </Typography>
           </Box>
@@ -794,7 +907,7 @@ const VacancyList: React.FC = () => {
         </Box>
 
         {/* Loading Message */}
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+        <Typography variant="body2" color="secondary" sx={{ mb: 2, textAlign: 'center' }}>
           Loading vacancies...
         </Typography>
 
@@ -827,10 +940,10 @@ const VacancyList: React.FC = () => {
         }}
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="h4" component="h1" fontWeight={600} gutterBottom>
+          <Typography variant="h4" as="h1" fontWeight={600} gutterBottom>
             {t('vacancyList.title')}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             {t('vacancyList.subtitle')}
           </Typography>
         </Box>
@@ -861,13 +974,13 @@ const VacancyList: React.FC = () => {
             ),
           }}
           sx={{
-            '& .MuiOutlinedInput-root': {
+            '& .textfield-input': {
               borderRadius: 2,
             },
           }}
         />
         {searchQuery && (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          <Typography variant="caption" color="secondary" sx={{ mt: 1, display: 'block' }}>
             {t('vacancyList.results', { count: filteredVacancies.length })}
           </Typography>
         )}
@@ -899,7 +1012,7 @@ const VacancyList: React.FC = () => {
           <AccordionSummary
             expandIcon={<ExpandMoreIcon />}
             sx={{
-              '& .MuiAccordionSummary-content': {
+              '& .accordion-summary-content': {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1014,7 +1127,7 @@ const VacancyList: React.FC = () => {
 
               {/* Filter Actions */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="secondary">
                   {t('vacancyList.results', { count: filteredVacancies.length })}
                 </Typography>
                 {hasActiveFilters && (
@@ -1042,7 +1155,7 @@ const VacancyList: React.FC = () => {
               label: 'Retry',
               onClick: () => {
                 setError(null);
-                fetchVacancies();
+                fetchVacancies(0, limit);
               },
               primary: true,
             },
@@ -1059,10 +1172,10 @@ const VacancyList: React.FC = () => {
       {filteredVacancies.length === 0 && searchQuery ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <SearchIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Typography variant="h6" color="secondary" gutterBottom>
             {t('vacancyList.noResults')}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             {t('vacancyList.tryDifferentSearch')}
           </Typography>
           <Button variant="outlined" onClick={() => setSearchQuery('')}>
@@ -1072,10 +1185,10 @@ const VacancyList: React.FC = () => {
       ) : filteredVacancies.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <WorkIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Typography variant="h6" color="secondary" gutterBottom>
             {t('vacancyList.noActiveRequests')}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="secondary" sx={{ mb: 3 }}>
             {t('vacancyList.createFirstRequest')}
           </Typography>
           <Button
@@ -1087,12 +1200,35 @@ const VacancyList: React.FC = () => {
           </Button>
         </Paper>
       ) : (
-        <Grid2
-          container
-          spacing={{ xs: 2, sm: 3 }}
-          columns={{ xs: 1, sm: 2, md: 2, lg: 3 }}
+        <Box
+          ref={scrollRef}
+          sx={{
+            maxHeight: '70vh',
+            overflowY: 'auto',
+            pr: 1,
+            // Custom scrollbar styling for better UX
+            '&::-webkit-scrollbar': {
+              width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: 'background.paper',
+              borderRadius: 1,
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: 'action.hover',
+              borderRadius: 1,
+              '&:hover': {
+                backgroundColor: 'action.selected',
+              },
+            },
+          }}
         >
-          {filteredVacancies.map((vacancy, index) => (
+          <Grid2
+            container
+            spacing={{ xs: 2, sm: 3 }}
+            columns={{ xs: 1, sm: 2, md: 2, lg: 3 }}
+          >
+            {filteredVacancies.map((vacancy, index) => (
             <Grid2
               size={{ xs: 1, sm: 1, md: 1, lg: 1 }}
               key={vacancy.id}
@@ -1137,7 +1273,7 @@ const VacancyList: React.FC = () => {
 
                   {/* Experience */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="secondary">
                       {t('vacancyList.experience')}:
                     </Typography>
                     <Typography variant="body2" fontWeight={500}>
@@ -1147,7 +1283,7 @@ const VacancyList: React.FC = () => {
 
                   {/* Skills */}
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="secondary" display="block" sx={{ mb: 1 }}>
                       {t('vacancyList.requiredSkills', { count: vacancy.required_skills.length })}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -1211,6 +1347,26 @@ const VacancyList: React.FC = () => {
             </Grid2>
           ))}
         </Grid2>
+
+        {/* Loading more indicator */}
+        {loadingMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={24} />
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+              Loading more vacancies...
+            </Typography>
+          </Box>
+        )}
+
+        {/* No more items indicator */}
+        {!hasMore && vacancies.length > 0 && !hasActiveFilters && (
+          <Box sx={{ textAlign: 'center', py: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {t('vacancyList.allItemsLoaded') || 'All vacancies loaded'}
+            </Typography>
+          </Box>
+        )}
+        </Box>
       )}
 
       {/* Delete Confirmation Dialog */}

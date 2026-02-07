@@ -1,0 +1,416 @@
+// Протокольные определения для Сервиса Таксономий (Taxonomy Service)
+// Taxonomy Service gRPC Protocol Definitions
+//
+// Этот файл определяет интерфейсы gRPC для управления таксономиями навыков,
+// включая классификацию, синонимы, импорт/экспорт и версионирование.
+//
+// This file defines gRPC interfaces for skill taxonomy management,
+// including classification, synonyms, import/export, and versioning.
+
+syntax = "proto3";
+
+package taxonomy;
+
+// ============================================
+// Сообщения для таксономий навыков
+// Skill taxonomy messages
+// ============================================
+
+// Таксономия навыков / Skill taxonomy entry
+message SkillTaxonomy {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string industry = 2;              // Индустрия / Industry sector
+    string skill_name = 3;            // Каноническое название навыка / Canonical skill name
+    string context = 4;               // Категория контекста / Context category
+    repeated string variants = 5;     // Альтернативные названия / Alternative names
+
+    // Метаданные / Metadata
+    map<string, string> extra_metadata = 6; // Дополнительные метаданные / Additional metadata
+    bool is_active = 7;               // Активна ли запись / Is entry active
+    int32 version = 8;                // Версия записи / Entry version
+    string previous_version_id = 9;   // ID предыдущей версии / Previous version ID
+    bool is_latest = 10;              // Последняя версия / Is latest version
+
+    // Совместное использование / Sharing
+    bool is_public = 11;              // Публичная ли запись / Is entry public
+    string organization_id = 12;      // ID владельца организации / Owner organization ID
+    string source_organization = 13;  // Источник если скопировано / Source if copied
+
+    // Статистика использования / Usage statistics
+    int32 view_count = 14;            // Количество просмотров / View count
+    int32 use_count = 15;             // Количество использований / Use count
+    int64 last_used_at = 16;          // Последнее использование (timestamp) / Last used timestamp
+
+    int64 created_at = 17;            // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 18;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Запрос на создание таксономии / Request to create taxonomy
+message CreateTaxonomyRequest {
+    string industry = 1;              // Индустрия / Industry sector
+    string skill_name = 2;            // Название навыка / Skill name
+    string context = 3;               // Категория контекста / Context category
+    repeated string variants = 4;     // Альтернативные названия / Alternative names
+    map<string, string> extra_metadata = 5; // Дополнительные метаданные / Additional metadata
+    string organization_id = 6;       // ID организации / Organization ID
+    bool is_public = 7;               // Публичная ли запись / Is entry public
+}
+
+// Ответ на создание таксономии / Response to create taxonomy
+message CreateTaxonomyResponse {
+    SkillTaxonomy taxonomy = 1;       // Созданная таксономия / Created taxonomy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение таксономии по ID / Request to get taxonomy by ID
+message GetTaxonomyRequest {
+    string id = 1;                    // UUID таксономии / Taxonomy UUID
+}
+
+// Ответ с данными таксономии / Response with taxonomy data
+message GetTaxonomyResponse {
+    SkillTaxonomy taxonomy = 1;       // Данные таксономии / Taxonomy data
+    bool found = 2;                   // Найдена ли таксономия / Whether taxonomy was found
+}
+
+// Запрос на обновление таксономии / Request to update taxonomy
+message UpdateTaxonomyRequest {
+    string id = 1;                    // UUID таксономии / Taxonomy UUID
+    string skill_name = 2;            // Название навыка / Skill name
+    string context = 3;               // Категория контекста / Context category
+    repeated string variants = 4;     // Альтернативные названия / Alternative names
+    map<string, string> extra_metadata = 5; // Дополнительные метаданные / Additional metadata
+    bool is_active = 6;               // Активна ли запись / Is entry active
+    bool is_public = 7;               // Публичная ли запись / Is entry public
+    bool create_new_version = 8;      // Создать новую версию / Create new version
+}
+
+// Ответ на обновление таксономии / Response to update taxonomy
+message UpdateTaxonomyResponse {
+    SkillTaxonomy taxonomy = 1;       // Обновлённая таксономия / Updated taxonomy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+    bool new_version_created = 4;     // Создана ли новая версия / Whether new version was created
+}
+
+// Запрос на удаление таксономии / Request to delete taxonomy
+message DeleteTaxonomyRequest {
+    string id = 1;                    // UUID таксономии / Taxonomy UUID
+}
+
+// Ответ на удаление таксономии / Response to delete taxonomy
+message DeleteTaxonomyResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для поиска таксономий
+// Taxonomy search messages
+// ============================================
+
+// Запрос на список таксономий / Request for taxonomy list
+message ListTaxonomiesRequest {
+    int32 page = 1;                   // Номер страницы / Page number
+    int32 page_size = 2;              // Размер страницы / Page size
+
+    // Фильтры / Filters
+    string industry = 3;              // Фильтр по индустрии / Filter by industry
+    string context = 4;               // Фильтр по контексту / Filter by context
+    bool is_active = 5;               // Только активные / Only active
+    bool is_public = 6;               // Только публичные / Only public
+    bool is_latest = 7;               // Только последние версии / Only latest versions
+    string organization_id = 8;       // Фильтр по организации / Filter by organization
+    string search_query = 9;          // Поисковый запрос по названию / Search query by name
+}
+
+// Ответ со списком таксономий / Response with taxonomy list
+message ListTaxonomiesResponse {
+    repeated SkillTaxonomy taxonomies = 1; // Список таксономий / List of taxonomies
+    int32 total = 2;                  // Общее количество / Total count
+    int32 page = 3;                   // Текущая страница / Current page
+    int32 page_size = 4;              // Размер страницы / Page size
+}
+
+// Запрос на поиск навыков в таксономии / Request to search skills in taxonomy
+message SearchSkillsRequest {
+    string query = 1;                 // Поисковый запрос / Search query
+    string industry = 2;              // Опционально: индустрия / Optional: industry
+    string context = 3;               // Опционально: контекст / Optional: context
+    int32 limit = 4;                  // Лимит результатов / Result limit
+    bool include_variants = 5;        // Искать в вариантах / Search in variants
+}
+
+// Ответ с результатами поиска навыков / Response with skill search results
+message SearchSkillsResponse {
+    repeated SkillMatchResult results = 1; // Результаты поиска / Search results
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// Результат поиска навыка / Skill search result
+message SkillMatchResult {
+    SkillTaxonomy taxonomy = 1;       // Таксономия навыка / Skill taxonomy
+    float match_score = 2;            // Оценка совпадения / Match score
+    string matched_field = 3;         // Поле совпадения (name/variant) / Matched field
+}
+
+// ============================================
+// Сообщения для пользовательских синонимов
+// Custom synonyms messages
+// ============================================
+
+// Пользовательский синоним / Custom synonym
+message CustomSynonym {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string organization_id = 2;       // ID организации / Organization ID
+    string canonical_name = 3;        // Каноническое название навыка / Canonical skill name
+    string synonym = 4;               // Синоним / Synonym
+    string industry = 5;              // Индустрия / Industry sector
+    string context = 6;               // Контекст / Context
+    int32 use_count = 7;              // Количество использований / Use count
+    int64 created_at = 8;             // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 9;             // Время обновления (timestamp) / Update timestamp
+}
+
+// Запрос на создание синонима / Request to create synonym
+message CreateSynonymRequest {
+    string organization_id = 1;       // ID организации / Organization ID
+    string canonical_name = 2;        // Каноническое название / Canonical name
+    string synonym = 3;               // Синоним / Synonym
+    string industry = 4;              // Индустрия / Industry sector
+    string context = 5;               // Контекст / Context
+}
+
+// Ответ на создание синонима / Response to create synonym
+message CreateSynonymResponse {
+    CustomSynonym synonym = 1;        // Созданный синоним / Created synonym
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение синонимов организации / Request to get organization synonyms
+message GetSynonymsRequest {
+    string organization_id = 1;       // ID организации / Organization ID
+    string industry = 2;              // Фильтр по индустрии / Filter by industry
+    string canonical_name = 3;        // Фильтр по каноническому названию / Filter by canonical name
+}
+
+// Ответ со списком синонимов / Response with synonyms list
+message GetSynonymsResponse {
+    repeated CustomSynonym synonyms = 1; // Список синонимов / List of synonyms
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// Запрос на удаление синонима / Request to delete synonym
+message DeleteSynonymRequest {
+    string id = 1;                    // UUID синонима / Synonym UUID
+}
+
+// Ответ на удаление синонима / Response to delete synonym
+message DeleteSynonymResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для версионирования таксономий
+// Taxonomy versioning messages
+// ============================================
+
+// Запрос на получение истории версий таксономии / Request to get taxonomy version history
+message GetVersionHistoryRequest {
+    string skill_id = 1;              // ID текущей таксономии / Current taxonomy ID
+}
+
+// Ответ с историей версий / Response with version history
+message GetVersionHistoryResponse {
+    repeated SkillTaxonomy versions = 1; // Список версий / List of versions
+    int32 total = 2;                  // Общее количество версий / Total versions
+}
+
+// Запрос на откат к предыдущей версии / Request to revert to previous version
+message RevertToVersionRequest {
+    string current_id = 1;            // ID текущей версии / Current version ID
+    string target_version_id = 2;     // ID целевой версии / Target version ID
+}
+
+// Ответ на откат версии / Response to revert version
+message RevertToVersionResponse {
+    SkillTaxonomy taxonomy = 1;       // Восстановленная таксономия / Restored taxonomy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для импорта/экспорта таксономий
+// Taxonomy import/export messages
+// ============================================
+
+// Запрос на экспорт таксономий / Request to export taxonomies
+message ExportTaxonomiesRequest {
+    string organization_id = 1;       // ID организации / Organization ID
+    string industry = 2;              // Опционально: фильтр по индустрии / Optional: filter by industry
+    string format = 3;                // Формат экспорта (json/csv) / Export format
+    bool include_versions = 4;        // Включить историю версий / Include version history
+}
+
+// Ответ на экспорт таксономий / Response to export taxonomies
+message ExportTaxonomiesResponse {
+    bytes data = 1;                   // Экспортированные данные / Exported data
+    string format = 2;                // Формат данных / Data format
+    int32 entry_count = 3;            // Количество записей / Entry count
+    bool success = 4;                 // Успешность операции / Operation success
+    string message = 5;               // Сообщение о результате / Result message
+}
+
+// Запрос на импорт таксономий / Request to import taxonomies
+message ImportTaxonomiesRequest {
+    bytes data = 1;                   // Данные для импорта / Data to import
+    string format = 2;                // Формат данных (json/csv) / Data format
+    string organization_id = 3;       // ID организации / Organization ID
+    bool merge_strategy = 4;          // Стратегия слияния (true=merge, false=replace) / Merge strategy
+    bool skip_duplicates = 5;         // Пропускать дубликаты / Skip duplicates
+}
+
+// Ответ на импорт таксономий / Response to import taxonomies
+message ImportTaxonomiesResponse {
+    int32 imported_count = 1;         // Количество импортированных / Imported count
+    int32 updated_count = 2;          // Количество обновлённых / Updated count
+    int32 skipped_count = 3;          // Количество пропущенных / Skipped count
+    repeated string errors = 4;       // Список ошибок / List of errors
+    bool success = 5;                 // Успешность операции / Operation success
+    string message = 6;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для suggestions
+// Skill suggestion messages
+// ============================================
+
+// Запрос на предложения навыков / Request for skill suggestions
+message GetSkillSuggestionsRequest {
+    string partial_text = 1;          // Частичный текст навыка / Partial skill text
+    string industry = 2;              // Опционально: индустрия / Optional: industry
+    string context = 3;               // Опционально: контекст / Optional: context
+    int32 limit = 4;                  // Лимит предложений / Suggestion limit
+}
+
+// Ответ с предложениями навыков / Response with skill suggestions
+message GetSkillSuggestionsResponse {
+    repeated string suggestions = 1;  // Предложения навыков / Skill suggestions
+    repeated SkillTaxonomy taxonomies = 2; // Полные данные таксономий / Full taxonomy data
+    int32 total = 3;                  // Общее количество / Total count
+}
+
+// ============================================
+// Сообщения для совместного использования таксономий
+// Taxonomy sharing messages
+// ============================================
+
+// Запрос на публикацию таксономии / Request to publish taxonomy
+message PublishTaxonomyRequest {
+    string id = 1;                    // UUID таксономии / Taxonomy UUID
+}
+
+// Ответ на публикацию таксономии / Response to publish taxonomy
+message PublishTaxonomyResponse {
+    SkillTaxonomy taxonomy = 1;       // Опубликованная таксономия / Published taxonomy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на копирование таксономии / Request to copy taxonomy
+message CopyTaxonomyRequest {
+    string source_id = 1;             // ID исходной таксономии / Source taxonomy ID
+    string organization_id = 2;       // ID целевой организации / Target organization ID
+}
+
+// Ответ на копирование таксономии / Response to copy taxonomy
+message CopyTaxonomyResponse {
+    SkillTaxonomy taxonomy = 1;       // Скопированная таксономия / Copied taxonomy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сервис Taxonomy Service
+// Taxonomy Service definition
+// ============================================
+
+// Сервис управления таксономиями навыков / Skill taxonomy management service
+service TaxonomyService {
+    // ========== Таксономии / Taxonomies ==========
+    // Создать таксономию / Create taxonomy
+    rpc CreateTaxonomy (CreateTaxonomyRequest) returns (CreateTaxonomyResponse);
+
+    // Получить таксономию по ID / Get taxonomy by ID
+    rpc GetTaxonomy (GetTaxonomyRequest) returns (GetTaxonomyResponse);
+
+    // Получить список таксономий / Get taxonomy list
+    rpc ListTaxonomies (ListTaxonomiesRequest) returns (ListTaxonomiesResponse);
+
+    // Обновить таксономию / Update taxonomy
+    rpc UpdateTaxonomy (UpdateTaxonomyRequest) returns (UpdateTaxonomyResponse);
+
+    // Удалить таксономию / Delete taxonomy
+    rpc DeleteTaxonomy (DeleteTaxonomyRequest) returns (DeleteTaxonomyResponse);
+
+    // Поиск навыков / Search skills
+    rpc SearchSkills (SearchSkillsRequest) returns (SearchSkillsResponse);
+
+    // ========== Синонимы / Synonyms ==========
+    // Создать пользовательский синоним / Create custom synonym
+    rpc CreateSynonym (CreateSynonymRequest) returns (CreateSynonymResponse);
+
+    // Получить синонимы организации / Get organization synonyms
+    rpc GetSynonyms (GetSynonymsRequest) returns (GetSynonymsResponse);
+
+    // Удалить синоним / Delete synonym
+    rpc DeleteSynonym (DeleteSynonymRequest) returns (DeleteSynonymResponse);
+
+    // ========== Версионирование / Versioning ==========
+    // Получить историю версий / Get version history
+    rpc GetVersionHistory (GetVersionHistoryRequest) returns (GetVersionHistoryResponse);
+
+    // Откатиться к версии / Revert to version
+    rpc RevertToVersion (RevertToVersionRequest) returns (RevertToVersionResponse);
+
+    // ========== Импорт/Экспорт / Import/Export ==========
+    // Экспортировать таксономии / Export taxonomies
+    rpc ExportTaxonomies (ExportTaxonomiesRequest) returns (ExportTaxonomiesResponse);
+
+    // Импортировать таксономии / Import taxonomies
+    rpc ImportTaxonomies (ImportTaxonomiesRequest) returns (ImportTaxonomiesResponse);
+
+    // ========== Suggestions / Suggestions ==========
+    // Получить предложения навыков / Get skill suggestions
+    rpc GetSkillSuggestions (GetSkillSuggestionsRequest) returns (GetSkillSuggestionsResponse);
+
+    // ========== Совместное использование / Sharing ==========
+    // Опубликовать таксономию / Publish taxonomy
+    rpc PublishTaxonomy (PublishTaxonomyRequest) returns (PublishTaxonomyResponse);
+
+    // Скопировать таксономию / Copy taxonomy
+    rpc CopyTaxonomy (CopyTaxonomyRequest) returns (CopyTaxonomyResponse);
+
+    // ========== Дополнительные операции / Additional operations ==========
+    // Получить статистику таксономий / Get taxonomy statistics
+    rpc GetTaxonomyStats (GetTaxonomyStatsRequest) returns (GetTaxonomyStatsResponse);
+}
+
+// Запрос на статистику таксономий / Request for taxonomy statistics
+message GetTaxonomyStatsRequest {
+    string organization_id = 1;       // ID организации / Organization ID
+    string industry = 2;              // Опционально: индустрия / Optional: industry
+}
+
+// Ответ со статистикой таксономий / Response with taxonomy statistics
+message GetTaxonomyStatsResponse {
+    int32 total_taxonomies = 1;       // Общее количество таксономий / Total taxonomies
+    int32 total_synonyms = 2;         // Общее количество синонимов / Total synonyms
+    map<string, int32> taxonomies_by_industry = 3; // Таксономии по индустрии / Taxonomies by industry
+    map<string, int32> taxonomies_by_context = 4; // Таксономии по контексту / Taxonomies by context
+    repeated string top_skills = 5;   // Самые популярные навыки / Most popular skills
+    int32 public_taxonomies = 6;      // Публичные таксономии / Public taxonomies
+}

@@ -172,6 +172,88 @@ export interface HealthResponse {
 }
 
 /**
+ * Component health status
+ */
+export interface ComponentHealthStatus {
+  name: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  essential: boolean;
+  category: string;
+  response_time_ms?: number;
+  details?: Record<string, unknown>;
+  error?: string | null;
+  last_check: string;
+}
+
+/**
+ * Detailed health check response
+ */
+export interface DetailedHealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  service: string;
+  version: string;
+  checks: Record<string, ComponentHealthStatus>;
+  overall_health_percentage: number;
+  critical_issues: string[];
+  warnings: string[];
+}
+
+/**
+ * Ready check response
+ */
+export interface ReadyCheckResponse {
+  status: string;
+  checks: Record<string, string>;
+}
+
+/**
+ * Service dependency information
+ */
+export interface ServiceDependencyInfo {
+  name: string;
+  display_name: string;
+  description: string;
+  essential: boolean;
+  category: string;
+  dependencies: string[];
+  dependents: string[];
+}
+
+/**
+ * Dependency graph summary
+ */
+export interface DependencyGraphSummary {
+  total_services: number;
+  essential_services: number;
+  non_essential_services: number;
+  max_dependency_depth: number;
+  critical_path: string[];
+}
+
+/**
+ * Dependency graph response
+ */
+export interface DependencyGraphResponse {
+  services: Record<string, ServiceDependencyInfo>;
+  summary: DependencyGraphSummary;
+}
+
+/**
+ * Component health check response
+ */
+export interface ComponentHealthCheckResponse {
+  name: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  essential: boolean;
+  category: string;
+  response_time_ms: number;
+  details: Record<string, unknown>;
+  error: string | null;
+  last_check: string;
+}
+
+/**
  * Upload progress callback
  */
 export type UploadProgressCallback = (progress: number) => void;
@@ -1733,7 +1815,7 @@ export interface ActivityTypesResponse {
 export interface SavedSearchCreate {
   name: string;
   query: string;
-  filters?: Record<string, unknown>;
+  filters?: SearchFilters | VacancySearchFilters;
 }
 
 /**
@@ -1742,7 +1824,7 @@ export interface SavedSearchCreate {
 export interface SavedSearchUpdate {
   name?: string;
   query?: string;
-  filters?: Record<string, unknown>;
+  filters?: SearchFilters | VacancySearchFilters;
 }
 
 /**
@@ -1752,7 +1834,7 @@ export interface SavedSearchResponse {
   id: string;
   name: string;
   query: string;
-  filters: Record<string, unknown>;
+  filters: SearchFilters | VacancySearchFilters;
   created_at: string;
   updated_at: string;
 }
@@ -1783,6 +1865,17 @@ export interface SearchFilters {
   date_to?: string;
   vacancy_id?: string;
   stage_id?: string;
+}
+
+/**
+ * Search filter configuration for vacancy search
+ */
+export interface VacancySearchFilters {
+  work_format?: string;
+  location?: string;
+  salary_min?: number;
+  salary_max?: number;
+  employment_type?: string;
 }
 
 /**
@@ -1821,6 +1914,30 @@ export interface CandidateSearchResult {
 export interface CandidateSearchResponse {
   total: number;
   candidates: Array<Record<string, unknown>>;
+  query: string;
+  filters_applied: Record<string, unknown>;
+  execution_time_seconds: number;
+  skip: number;
+  limit: number;
+}
+
+/**
+ * Vacancy search request
+ */
+export interface VacancySearchRequest {
+  query?: string | null;
+  filters?: VacancySearchFilters | null;
+  skip?: number;
+  limit?: number;
+  sort_by?: string;
+}
+
+/**
+ * Vacancy search response
+ */
+export interface VacancySearchResponse {
+  total: number;
+  vacancies: Array<Record<string, unknown>>;
   query: string;
   filters_applied: Record<string, unknown>;
   execution_time_seconds: number;

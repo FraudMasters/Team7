@@ -30,15 +30,17 @@ from analyzers.interview_question_generator import (
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
+from config import get_settings
 from database import get_db
 from models.interview_prep import InterviewPrep
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 
 def _extract_locale(request: Optional[Request]) -> str:
@@ -293,7 +295,7 @@ async def generate_interview_prep(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/interview-prep/generate",
+        ...     "/api/interview-prep/generate",
         ...     json={
         ...         "resume_id": "abc123",
         ...         "vacancy_id": "vacancy-456"
@@ -517,7 +519,7 @@ async def get_interview_prep(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/interview-prep/prep-123")
+        >>> response = requests.get("/api/interview-prep/prep-123")
         >>> response.json()
         {
             "id": "prep-123",
@@ -620,7 +622,7 @@ async def update_interview_prep(
     Examples:
         >>> import requests
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/interview-prep/prep-123",
+        ...     "/api/interview-prep/prep-123",
         ...     json={"custom_questions": ["What is your greatest achievement?"]}
         ... )
         >>> response.json()
@@ -786,7 +788,7 @@ async def export_interview_prep_pdf(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/interview-prep/prep-123/export")
+        >>> response = requests.get("/api/interview-prep/prep-123/export")
         >>> with open("interview_prep.pdf", "wb") as f:
         ...     f.write(response.content)
     """

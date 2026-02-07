@@ -17,7 +17,7 @@ import {
   TextField,
   Chip,
   IconButton,
-  Grid2,
+  Grid,
   Paper,
   Alert,
   CircularProgress,
@@ -25,15 +25,8 @@ import {
   Switch,
   Menu,
   MenuItem,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Label as LabelIcon,
-  Close as CloseIcon,
-  MoreVert as MoreVertIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { candidateTagsClient } from '../api/candidateTags';
 
@@ -228,7 +221,7 @@ export function CandidateTagsManager({
         ))}
         {!readOnly && (
           <Chip
-            icon={<AddIcon />}
+            icon={<Icon name="plus" size={16} />}
             label="Add Tag"
             onClick={handleOpenCreateDialog}
             size="small"
@@ -245,7 +238,7 @@ export function CandidateTagsManager({
             <Typography variant="h6">All Tags</Typography>
             {!readOnly && (
               <Button
-                startIcon={<AddIcon />}
+                startIcon={<Icon name="plus" size={16} />}
                 onClick={handleOpenCreateDialog}
                 size="small"
               >
@@ -260,15 +253,15 @@ export function CandidateTagsManager({
             </Box>
           ) : allTags.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <LabelIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-              <Typography variant="body2" color="text.secondary">
+              <Icon name="tag" size={48} color="disabled" style={{ marginBottom: '8px' }} />
+              <Typography variant="body2" color="secondary">
                 No tags created yet
               </Typography>
             </Paper>
           ) : (
-            <Grid2 container spacing={2}>
+            <Grid container spacing={2}>
               {allTags.map((tag) => (
-                <Grid2 key={tag.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                <Grid item xs={12} sm={6} md={4} lg={3} key={tag.id}>
                   <Paper
                     sx={{
                       p: 2,
@@ -284,7 +277,7 @@ export function CandidateTagsManager({
                         {tag.name}
                       </Typography>
                       {tag.candidate_count !== undefined && (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="secondary">
                           {tag.candidate_count} {tag.candidate_count === 1 ? 'candidate' : 'candidates'}
                         </Typography>
                       )}
@@ -295,13 +288,13 @@ export function CandidateTagsManager({
                         onClick={(e) => handleMenuOpen(e, tag)}
                         aria-label="Tag options"
                       >
-                        <MoreVertIcon fontSize="small" />
+                        <Icon name="more-vertical" size={16} />
                       </IconButton>
                     )}
                   </Paper>
-                </Grid2>
+                </Grid>
               ))}
-            </Grid2>
+            </Grid>
           )}
         </Box>
       )}
@@ -319,19 +312,14 @@ export function CandidateTagsManager({
             sx={{ mt: 2 }}
             inputProps={{ maxLength: 30 }}
             helperText={`${tagName.length}/30 characters`}
-            slotProps={{
-              input: {
-                'aria-label': 'Tag name',
-              },
-            }}
           />
 
           <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
             Color
           </Typography>
-          <Grid2 container spacing={1}>
+          <Grid container spacing={1}>
             {TAG_COLORS.map((color) => (
-              <Grid2 key={color.value}>
+              <Grid key={color.value}>
                 <Paper
                   sx={{
                     width: 36,
@@ -339,7 +327,7 @@ export function CandidateTagsManager({
                     bgcolor: color.value,
                     cursor: 'pointer',
                     border: tagColor === color.value ? 3 : 0,
-                    borderColor: 'primary.main',
+                    borderColor: 'primary',
                     '&:hover': {
                       transform: 'scale(1.1)',
                     },
@@ -350,13 +338,13 @@ export function CandidateTagsManager({
                   role="button"
                   tabIndex={0}
                 />
-              </Grid2>
+              </Grid>
             ))}
-          </Grid2>
+          </Grid>
 
           {/* Preview */}
           <Box sx={{ mt: 3 }}>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="secondary">
               Preview
             </Typography>
             <Box sx={{ mt: 1 }}>
@@ -386,11 +374,11 @@ export function CandidateTagsManager({
       {/* Options Menu */}
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
         <MenuItem onClick={() => { handleMenuClose(); if (selectedTag) handleOpenEditDialog(selectedTag); }}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          <Icon name="edit" size={16} style={{ marginRight: '4px' }} />
           Edit
         </MenuItem>
-        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error' }}>
+          <Icon name="trash-2" size={16} style={{ marginRight: '4px' }} />
           Delete
         </MenuItem>
       </Menu>
@@ -407,7 +395,7 @@ export function CandidateTagsManager({
           <Typography variant="body1">
             Are you sure you want to delete "{selectedTag?.name}"?
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <Typography variant="body2" color="secondary" sx={{ mt: 1 }}>
             This action cannot be undone.
           </Typography>
         </DialogContent>

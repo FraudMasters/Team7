@@ -5,7 +5,7 @@ import {
   Typography,
   Stack,
   Box,
-} from '@mui/material';
+} from '@/components/ui';
 import SkillTextExplorer, {
   SkillMatchDetail,
 } from '@components/SkillTextExplorer';
@@ -260,7 +260,7 @@ CERTIFICATIONS
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Skill Text Explorer - Component Test
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Testing the SkillTextExplorer component with various skill matches and
             scenarios
           </Typography>
@@ -271,7 +271,7 @@ CERTIFICATIONS
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 1: Full Resume with Mixed Match Types
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Complete resume with various match types (direct, synonym, fuzzy, context,
             compound) and different confidence levels. Click on highlighted skills to see
             details.
@@ -289,7 +289,7 @@ CERTIFICATIONS
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 2: High Confidence Matches (90%+)
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Only showing skills with 90%+ confidence score
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -305,7 +305,7 @@ CERTIFICATIONS
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 3: No Skill Matches
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Resume text without any skill highlights
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -321,7 +321,7 @@ CERTIFICATIONS
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 4: Loading State
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Component in loading state
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -338,7 +338,7 @@ CERTIFICATIONS
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 5: Error State
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Component displaying an error message
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -355,7 +355,7 @@ CERTIFICATIONS
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Test Case 6: Empty Resume Text
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="secondary" gutterBottom>
             Component with no resume text available
           </Typography>
           <Box sx={{ mt: 2 }}>
@@ -368,7 +368,7 @@ CERTIFICATIONS
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
             Verification Checklist:
           </Typography>
-          <Typography variant="body2" component="div">
+          <Typography variant="body2" as="div">
             ✓ Displays resume text with highlighted skills<br />
             ✓ Skills are highlighted with different colors based on match type<br />
             ✓ Hovering over highlights displays tooltip with confidence score<br />

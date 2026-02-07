@@ -124,8 +124,8 @@ def get_celery_config() -> Dict[str, Any]:
     Example:
         >>> from celery_config import get_celery_config
         >>> config = get_celery_config()
-        >>> print(config['broker_url'])
-        'redis://localhost:6379/0'
+        >>> print(type(config['broker_url']))
+        <class 'str'>
     """
     return celery_config
 

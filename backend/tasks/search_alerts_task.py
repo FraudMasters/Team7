@@ -17,8 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import async_session_maker
-from models import SavedSearch, SearchAlert, Resume, ResumeAnalysis
+from models import SavedSearch, SearchAlert, Resume, ResumeAnalysis, Recruiter
 from analyzers.unified_matcher import UnifiedSkillMatcher, get_unified_matcher
+from tasks.email_tasks import send_search_alert_email_task
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -143,101 +144,72 @@ def check_resume_against_saved_searches(
 def send_search_alert_notification(
     self,
     alert_id: str,
-    saved_search_id: str,
-    resume_id: str,
-    recipient_email: str,
 ) -> Dict[str, Any]:
     """
-    Send notification for a specific search alert.
+    Send notification for a specific search alert with recruiter email lookup.
 
     This Celery task handles sending individual search alert notifications
-    to users who have saved searches matching new resumes.
+    to recruiters who have saved searches matching new resumes. It retrieves
+    all necessary data from the database and uses the email service to send
+    formatted notifications.
+
+    Task Workflow:
+    1. Retrieve SearchAlert, SavedSearch, Resume, and Recruiter from database
+    2. Retrieve ResumeAnalysis for candidate information
+    3. Extract candidate name and matched skills
+    4. Calculate match score
+    5. Send email via EmailService using search_alert template
+    6. Update SearchAlert.is_sent and SearchAlert.sent_at
 
     Args:
         self: Celery task instance (bind=True)
-        alert_id: UUID of the search alert
-        saved_search_id: UUID of the saved search that matched
-        resume_id: UUID of the matching resume
-        recipient_email: Email address to send notification to
+        alert_id: UUID of the search alert to send notification for
 
     Returns:
         Dictionary containing sending results:
         - alert_id: ID of the alert
         - status: Task status (sent/failed/pending)
         - recipient: Email address of recipient
-        - sent_at: Timestamp when sent (ISO format)
+        - sent_at: Timestamp when sent (Unix timestamp)
         - error: Error message (if failed)
         - processing_time_ms: Total processing time
 
     Example:
         >>> result = send_search_alert_notification.delay(
-        ...     alert_id="alert-123",
-        ...     saved_search_id="search-456",
-        ...     resume_id="resume-789",
-        ...     recipient_email="user@example.com"
+        ...     alert_id="alert-123"
         ... )
         >>> print(result.get())
         {'alert_id': 'alert-123', 'status': 'sent'}
     """
     import time
+    import asyncio
     start_time = time.time()
 
-    logger.info(
-        f"Sending search alert notification for alert_id={alert_id} "
-        f"to {recipient_email}"
-    )
+    logger.info(f"Sending search alert notification for alert_id={alert_id}")
 
     try:
-        # In a real implementation, you would:
-        # 1. Retrieve SearchAlert, SavedSearch, and Resume details from database
-        # 2. Compose notification email with resume details
-        # 3. Send email via configured SMTP/service
-        # 4. Update SearchAlert.is_sent and SearchAlert.sent_at
-
-        # Placeholder: Simulate sending notification
-        subject = f"New Resume Matches Your Saved Search"
-        body = f"""
-A new resume has been uploaded that matches your saved search.
-
-Alert ID: {alert_id}
-Resume ID: {resume_id}
-Saved Search ID: {saved_search_id}
-
-View the resume details in your dashboard.
-
----
-This is an automated email from AgentHR.
-        """.strip()
-
-        # Log email details (in production, actually send email)
-        logger.info(f"Alert notification composed: subject='{subject}', to={recipient_email}")
-        logger.info(f"Alert body length: {len(body)} characters")
-
-        # Simulate email sending (in production, use SMTP/service)
-        time.sleep(0.1)  # Simulate network delay
+        # Run async database operations in a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                _send_alert_notification(alert_id)
+            )
+        finally:
+            loop.close()
 
         processing_time = int((time.time() - start_time) * 1000)
+        result["processing_time_ms"] = processing_time
 
-        logger.info(
-            f"Search alert notification sent successfully to {recipient_email} "
-            f"in {processing_time}ms"
-        )
-
-        return {
-            "alert_id": alert_id,
-            "status": "sent",
-            "recipient": recipient_email,
-            "sent_at": time.time(),
-            "processing_time_ms": processing_time,
-        }
+        return result
 
     except SoftTimeLimitExceeded:
         logger.error(f"Search alert notification task timed out for alert_id={alert_id}")
         return {
             "alert_id": alert_id,
             "status": "failed",
-            "recipient": recipient_email,
             "error": "Task timed out",
+            "processing_time_ms": int((time.time() - start_time) * 1000),
         }
 
     except Exception as e:
@@ -253,8 +225,139 @@ This is an automated email from AgentHR.
         return {
             "alert_id": alert_id,
             "status": "failed",
-            "recipient": recipient_email,
             "error": str(e),
+            "processing_time_ms": int((time.time() - start_time) * 1000),
+        }
+
+
+async def _send_alert_notification(
+    alert_id: str,
+) -> Dict[str, Any]:
+    """
+    Send alert notification with database lookups (async helper).
+
+    This helper function retrieves all necessary data from the database
+    and sends the search alert notification email using the email service.
+
+    Args:
+        alert_id: UUID of the alert to send notification for
+
+    Returns:
+        Dictionary with sending results
+    """
+    import time
+    from sqlalchemy import select
+
+    async with async_session_maker() as db:
+        # Get alert with saved search
+        alert_stmt = select(SearchAlert, SavedSearch, Resume, ResumeAnalysis).join(
+            SavedSearch, SearchAlert.saved_search_id == SavedSearch.id
+        ).join(
+            Resume, SearchAlert.resume_id == Resume.id
+        ).outerjoin(
+            ResumeAnalysis, Resume.id == ResumeAnalysis.resume_id
+        ).where(
+            SearchAlert.id == UUID(alert_id)
+        )
+        alert_result = await db.execute(alert_stmt)
+        row = alert_result.first()
+
+        if not row:
+            error_msg = f"Alert {alert_id} not found"
+            logger.error(error_msg)
+            return {
+                "alert_id": alert_id,
+                "status": "failed",
+                "error": error_msg,
+            }
+
+        alert, saved_search, resume, resume_analysis = row
+
+        # Get recruiter
+        if not saved_search.recruiter_id:
+            error_msg = f"Saved search '{saved_search.name}' has no recruiter_id, cannot send alert {alert_id}"
+            logger.error(error_msg)
+            return {
+                "alert_id": alert_id,
+                "status": "failed",
+                "error": error_msg,
+            }
+
+        recruiter_stmt = select(Recruiter).where(Recruiter.id == saved_search.recruiter_id)
+        recruiter_result = await db.execute(recruiter_stmt)
+        recruiter = recruiter_result.scalar_one_or_none()
+
+        if not recruiter:
+            error_msg = f"Recruiter {saved_search.recruiter_id} not found for saved search '{saved_search.name}'"
+            logger.error(error_msg)
+            return {
+                "alert_id": alert_id,
+                "status": "failed",
+                "error": error_msg,
+            }
+
+        if not recruiter.is_active:
+            error_msg = f"Recruiter {recruiter.email} is not active"
+            logger.warning(error_msg)
+            return {
+                "alert_id": alert_id,
+                "status": "failed",
+                "error": error_msg,
+            }
+
+        # Extract candidate information
+        candidate_name = "Candidate"
+        matched_skills = []
+
+        if resume_analysis:
+            # Try to get name from entities
+            if resume_analysis.entities:
+                persons = resume_analysis.entities.get("persons", [])
+                if persons:
+                    candidate_name = persons[0] if isinstance(persons[0], str) else str(persons[0])
+
+            # Get matched skills from saved search filters
+            if saved_search.filters:
+                required_skills = saved_search.filters.get("skills", [])
+                resume_skills = resume_analysis.skills or []
+                matched_skills = [
+                    skill for skill in required_skills
+                    if skill.lower() in [s.lower() for s in resume_skills]
+                ]
+
+        # Calculate match score
+        match_score = min(len(matched_skills) * 20 + 50, 100) if matched_skills else 60
+
+        # Send email using email service task
+        email_result = send_search_alert_email_task.delay(
+            alert_id=alert_id,
+            saved_search_id=str(saved_search.id),
+            resume_id=str(resume.id),
+            recipient_email=recruiter.email,
+            candidate_name=candidate_name,
+            match_score=match_score,
+            matched_skills=matched_skills,
+            saved_search_name=saved_search.name,
+        )
+
+        # Update alert status
+        alert.is_sent = True
+        alert.sent_at = datetime.utcnow()
+        alert.error_message = None
+        await db.commit()
+
+        logger.info(
+            f"Alert {alert_id} notification sent to recruiter {recruiter.email} "
+            f"for saved search '{saved_search.name}'"
+        )
+
+        return {
+            "alert_id": alert_id,
+            "status": "sent",
+            "recipient": recruiter.email,
+            "sent_at": time.time(),
+            "candidate_name": candidate_name,
+            "match_score": match_score,
         }
 
 
@@ -455,12 +558,6 @@ async def _process_pending_alerts_batch(
         - remaining_pending: Number of alerts still pending
         - errors: List of error messages for failed sends
         - status: Overall status
-
-    Note:
-        This function requires that SavedSearch has a relationship to Recruiter
-        or User to determine notification recipients. Currently, the SavedSearch
-        model lacks this field, so the implementation includes a TODO for
-        future enhancement and graceful handling of missing recipient info.
     """
     from sqlalchemy import select, func, update as sql_update
 
@@ -486,7 +583,7 @@ async def _process_pending_alerts_batch(
 
         for alert in pending_alerts:
             try:
-                # Get saved search details
+                # Get saved search details with recruiter
                 saved_search_stmt = select(SavedSearch).where(
                     SavedSearch.id == alert.saved_search_id
                 )
@@ -497,43 +594,56 @@ async def _process_pending_alerts_batch(
                     error_msg = f"Saved search {alert.saved_search_id} not found for alert {alert.id}"
                     logger.error(error_msg)
                     errors.append(error_msg)
-
-                    # Update alert with error
                     alert.error_message = error_msg
                     failed_sends += 1
                     continue
 
-                # TODO: Get recipient email from saved_search.recruiter_id or user_id
-                # The SavedSearch model currently doesn't have a recruiter/user field.
-                # For now, we'll skip alerts without a clear recipient.
-                # This should be enhanced when SavedSearch.recruiter_id is added.
+                # Get recruiter email
+                if not saved_search.recruiter_id:
+                    error_msg = f"Saved search '{saved_search.name}' has no recruiter_id, cannot send alert {alert.id}"
+                    logger.warning(error_msg)
+                    errors.append(error_msg)
+                    alert.error_message = error_msg
+                    failed_sends += 1
+                    continue
 
-                # Placeholder: In a real implementation, you would:
-                # 1. Get recruiter_id from saved_search.recruiter_id
-                # 2. Query Recruiter model to get email
-                # 3. Trigger send_search_alert_notification.delay(...)
+                recruiter_stmt = select(Recruiter).where(
+                    Recruiter.id == saved_search.recruiter_id
+                )
+                recruiter_result = await db.execute(recruiter_stmt)
+                recruiter = recruiter_result.scalar_one_or_none()
 
-                # For now, simulate successful processing
-                # In production, uncomment the line below and pass actual email:
-                # send_search_alert_notification.delay(str(alert.id), str(saved_search.id), str(alert.resume_id), recipient_email)
+                if not recruiter:
+                    error_msg = f"Recruiter {saved_search.recruiter_id} not found for saved search '{saved_search.name}'"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    alert.error_message = error_msg
+                    failed_sends += 1
+                    continue
 
-                # Mark as sent (simulated - in production, this would be done by the notification task)
-                alert.is_sent = True
-                alert.sent_at = datetime.utcnow()
-                alert.error_message = None
+                if not recruiter.is_active:
+                    error_msg = f"Recruiter {recruiter.email} is not active, skipping alert {alert.id}"
+                    logger.warning(error_msg)
+                    errors.append(error_msg)
+                    alert.error_message = error_msg
+                    failed_sends += 1
+                    continue
 
+                # Trigger notification task
+                send_search_alert_notification.delay(str(alert.id))
+
+                # Note: We don't mark as sent here - the notification task
+                # will handle that after successfully sending the email
                 successful_sends += 1
                 logger.info(
-                    f"Processed alert {alert.id} for saved search '{saved_search.name}' "
-                    f"(recipient email lookup not yet implemented)"
+                    f"Queued notification for alert {alert.id} to recruiter "
+                    f"'{recruiter.name}' ({recruiter.email}) for saved search '{saved_search.name}'"
                 )
 
             except Exception as e:
                 error_msg = f"Failed to process alert {alert.id}: {str(e)}"
                 logger.error(error_msg, exc_info=True)
                 errors.append(error_msg)
-
-                # Update alert with error
                 alert.error_message = error_msg
                 failed_sends += 1
 

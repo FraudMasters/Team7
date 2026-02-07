@@ -113,7 +113,7 @@ async def create_taxonomy_version(
         ...     "variants": ["React", "ReactJS", "React.js", "React Framework"]
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/taxonomy-versions/123",
+        ...     "/api/taxonomy-versions/123",
         ...     json=data
         ... )
         >>> response.json()
@@ -205,7 +205,7 @@ async def list_taxonomy_versions(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/taxonomy-versions/123")
+        >>> response = requests.get("/api/taxonomy-versions/123")
         >>> response.json()
         {
             "taxonomy_id": "123",
@@ -325,7 +325,7 @@ async def rollback_taxonomy_version(
     Examples:
         >>> import requests
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/taxonomy-versions/123/rollback/456"
+        ...     "/api/taxonomy-versions/123/rollback/456"
         ... )
         >>> response.json()
     """

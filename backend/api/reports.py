@@ -10,12 +10,123 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles.colors import Color
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def format_excel_headers(worksheet, header_row: int = 1) -> None:
+    """
+    Apply formatting to Excel headers including bold font, background color, and alignment.
+
+    This function applies professional styling to header cells in an Excel worksheet,
+    making them stand out with bold text, a colored background, and centered alignment.
+
+    Args:
+        worksheet: The openpyxl worksheet object to format
+        header_row: The row number containing headers (default: 1)
+
+    Returns:
+        None
+
+    Examples:
+        >>> from openpyxl import Workbook
+        >>> wb = Workbook()
+        >>> ws = wb.active
+        >>> ws.append(["Name", "Date", "Value"])
+        >>> format_excel_headers(ws)
+    """
+    try:
+        # Define header style
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(
+            start_color="4472C4",
+            end_color="4472C4",
+            fill_type="solid"
+        )
+        header_alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            wrap_text=True
+        )
+
+        # Apply formatting to all cells in the header row
+        for cell in worksheet[header_row]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        logger.debug(f"Applied header formatting to row {header_row}")
+
+    except Exception as e:
+        logger.error(f"Error formatting Excel headers: {e}", exc_info=True)
+        raise
+
+
+def apply_data_bars(worksheet, column_letter: str, min_row: int = 2, max_row: Optional[int] = None, color: str = "63BE7B") -> None:
+    """
+    Apply conditional formatting data bars to a column of numeric values.
+
+    Data bars provide visual indicators of cell values relative to each other,
+    with longer bars representing higher values. This is useful for quickly
+    identifying trends and patterns in numeric data.
+
+    Args:
+        worksheet: The openpyxl worksheet object to format
+        column_letter: The column letter to apply data bars to (e.g., 'C', 'D')
+        min_row: The starting row number for data bars (default: 2, skipping header)
+        max_row: The ending row number (default: None, which uses all data rows)
+        color: Hex color code for the data bars (default: "63BE7B" - green)
+
+    Returns:
+        None
+
+    Examples:
+        >>> from openpyxl import Workbook
+        >>> wb = Workbook()
+        >>> ws = wb.active
+        >>> ws.append(["Item", "Value"])
+        >>> ws.append(["A", 100])
+        >>> ws.append(["B", 250])
+        >>> ws.append(["C", 150])
+        >>> apply_data_bars(ws, "B", 2, 4)
+    """
+    try:
+        from openpyxl.formatting.rule import DataBarRule
+
+        # Determine the actual max row if not provided
+        if max_row is None:
+            max_row = worksheet.max_row
+
+        # Validate that there are cells to format
+        if min_row > max_row:
+            logger.warning(f"Invalid row range: min_row {min_row} > max_row {max_row}")
+            return
+
+        # Create data bar rule
+        data_bar_rule = DataBarRule(
+            start_type="min",
+            end_type="max",
+            color=Color(color),
+            showValue=True,
+            minLength=None,
+            maxLength=None
+        )
+
+        # Apply data bar rule to the specified range
+        range_string = f"{column_letter}{min_row}:{column_letter}{max_row}"
+        worksheet.conditional_formatting.add(range_string, data_bar_rule)
+
+        logger.debug(f"Applied data bars to range {range_string}")
+
+    except Exception as e:
+        logger.error(f"Error applying data bars: {e}", exc_info=True)
+        raise
 
 
 class ReportCreate(BaseModel):
@@ -87,6 +198,25 @@ class CSVExportRequest(BaseModel):
     format: Optional[str] = Field("standard", description="CSV format variant (e.g., standard, detailed)")
 
 
+class ExcelExportRequest(BaseModel):
+    """Request model for exporting a report to Excel with formatting."""
+
+    report_id: str = Field(..., description="Report identifier to export")
+    data: Dict = Field(..., description="Report data to include in the Excel file")
+    format: Optional[str] = Field("standard", description="Excel format variant (e.g., standard, detailed)")
+    include_charts: Optional[bool] = Field(True, description="Whether to include charts in the Excel file")
+    include_summary: Optional[bool] = Field(True, description="Whether to include a summary sheet")
+
+
+class ExcelExportResponse(BaseModel):
+    """Response model for Excel export."""
+
+    report_id: str = Field(..., description="Report identifier")
+    download_url: str = Field(..., description="URL to download the generated Excel file")
+    expires_at: str = Field(..., description="Expiration timestamp for download link")
+    file_size: Optional[int] = Field(None, description="File size in bytes")
+
+
 class ScheduleReportRequest(BaseModel):
     """Request model for scheduling automated reports."""
 
@@ -144,7 +274,7 @@ async def create_report(request: ReportCreate) -> JSONResponse:
         ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
         ...     "is_public": True
         ... }
-        >>> response = requests.post("http://localhost:8000/api/reports/", json=data)
+        >>> response = requests.post("/api/reports/", json=data)
         >>> response.json()
         {
             "id": "report-123",
@@ -227,7 +357,7 @@ async def list_reports(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/reports/?organization_id=org123")
+        >>> response = requests.get("/api/reports/?organization_id=org123")
         >>> response.json()
     """
     try:
@@ -271,7 +401,7 @@ async def get_report(report_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/reports/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/reports/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
     """
     try:
@@ -326,7 +456,7 @@ async def update_report(
         >>> import requests
         >>> data = {"name": "Updated Report Name", "metrics": ["time_to_hire", "match_rates"]}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/reports/123",
+        ...     "/api/reports/123",
         ...     json=data
         ... )
         >>> response.json()
@@ -380,7 +510,7 @@ async def delete_report(report_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/reports/123")
+        >>> response = requests.delete("/api/reports/123")
         >>> response.json()
         {"message": "Report deleted successfully"}
     """
@@ -418,7 +548,7 @@ async def delete_reports_by_organization(organization_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/reports/organization/org123")
+        >>> response = requests.delete("/api/reports/organization/org123")
         >>> response.json()
         {"message": "Deleted 5 reports for organization: org123"}
     """
@@ -469,7 +599,7 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
         ...     }
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/reports/export/pdf",
+        ...     "/api/reports/export/pdf",
         ...     json=data
         ... )
         >>> response.json()
@@ -550,7 +680,7 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
         ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"}
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/reports/export/csv",
+        ...     "/api/reports/export/csv",
         ...     json=data
         ... )
         >>> with open("report.csv", "wb") as f:
@@ -622,6 +752,136 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
         ) from e
 
 
+@router.post("/export/excel", tags=["Reports"])
+async def export_report_excel(request: CSVExportRequest) -> StreamingResponse:
+    """
+    Export analytics data to Excel format with formatting.
+
+    This endpoint generates an Excel (.xlsx) file from analytics metrics and filters,
+    with professional formatting including styled headers and conditional data bars.
+    The file is returned directly for download.
+
+    Args:
+        request: Excel export request with metrics and filters
+
+    Returns:
+        StreamingResponse with Excel file content
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If Excel generation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "metrics": ["time_to_hire", "resumes_processed"],
+        ...     "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"}
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/reports/export/excel",
+        ...     json=data
+        ... )
+        >>> with open("report.xlsx", "wb") as f:
+        ...     f.write(response.content)
+    """
+    try:
+        logger.info(f"Generating Excel for metrics: {request.metrics}")
+
+        # Validate metrics list
+        if not request.metrics or len(request.metrics) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one metric must be provided",
+            )
+
+        # Import openpyxl for Excel generation
+        import io
+        from openpyxl import Workbook
+        from openpyxl.utils import get_column_letter
+
+        # Create a new workbook and worksheet
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Analytics Report"
+
+        # Write header row
+        headers = ["Metric", "Value", "Date", "Unit"]
+        ws.append(headers)
+
+        # Apply formatting to header row
+        format_excel_headers(ws, header_row=1)
+
+        # Sample data for metrics (similar to CSV export)
+        from datetime import datetime
+        sample_data = {
+            "time_to_hire": {"value": 15, "unit": "days"},
+            "resumes_processed": {"value": 150, "unit": "count"},
+            "match_rates": {"value": 85, "unit": "percentage"},
+            "interviews_scheduled": {"value": 25, "unit": "count"},
+            "offers_extended": {"value": 10, "unit": "count"},
+            "offers_accepted": {"value": 8, "unit": "count"},
+        }
+
+        # Write data rows
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        row_num = 2
+        numeric_values_col = "B"  # Column B will contain numeric values
+
+        for metric in request.metrics:
+            if metric in sample_data:
+                data = sample_data[metric]
+                ws.append([metric, data["value"], today, data["unit"]])
+            else:
+                ws.append([metric, 0, today, "N/A"])
+            row_num += 1
+
+        # Apply data bars to the Value column (Column B)
+        # Only apply if we have numeric data
+        if row_num > 2:
+            apply_data_bars(ws, numeric_values_col, min_row=2, max_row=row_num - 1)
+
+        # Auto-adjust column widths for better readability
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Save workbook to bytes buffer
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+        excel_content = excel_buffer.getvalue()
+        excel_buffer.close()
+
+        logger.info(f"Excel generated successfully for metrics: {request.metrics}")
+
+        # Return as downloadable Excel file
+        return StreamingResponse(
+            io.BytesIO(excel_content),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": "attachment; filename=analytics_export.xlsx",
+                "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating Excel: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate Excel: {str(e)}",
+        ) from e
+
+
 @router.post("/schedule", tags=["Reports"], response_model=ScheduleReportResponse)
 async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
     """
@@ -665,7 +925,7 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
         ...     "is_active": True
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/reports/schedule",
+        ...     "/api/reports/schedule",
         ...     json=data
         ... )
         >>> response.json()

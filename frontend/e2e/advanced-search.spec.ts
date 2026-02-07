@@ -847,3 +847,600 @@ test.describe('Content Validation', () => {
     }
   });
 });
+
+test.describe('Semantic Search', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/candidate-search');
+  });
+
+  test('should display semantic search toggle in advanced filters', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+
+    // Wait for filters panel to appear
+    await page.waitForTimeout(500);
+
+    // Check for semantic search checkbox
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+
+    // Semantic search toggle should be visible
+    await expect(semanticCheckbox).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should enable semantic search toggle', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Find semantic search checkbox
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+
+    // Verify it's unchecked by default
+    await expect(semanticCheckbox).not.toBeChecked();
+
+    // Click to enable
+    await semanticCheckbox.check();
+
+    // Verify it's now checked
+    await expect(semanticCheckbox).toBeChecked();
+  });
+
+  test('should perform search with semantic search enabled', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Enable semantic search
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+    await semanticCheckbox.check();
+
+    // Wait for data to load
+    await page.waitForTimeout(1000);
+
+    // Perform search if possible
+    const searchBtn = page.getByRole('button', { name: /Search/i }).first();
+
+    if (await searchBtn.isVisible({ timeout: 3000 })) {
+      await searchBtn.click();
+
+      // Wait for results
+      await page.waitForTimeout(3000);
+
+      // Verify we're still on search page
+      expect(page.url()).toContain('/candidate-search');
+    }
+  });
+
+  test('should display semantic similarity scores in results', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Enable semantic search
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+    await semanticCheckbox.check();
+
+    // Wait for data to load
+    await page.waitForTimeout(1000);
+
+    // Perform search
+    const searchBtn = page.getByRole('button', { name: /Search/i }).first();
+
+    if (await searchBtn.isVisible({ timeout: 3000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Check for semantic scores in results
+      const candidateCards = page.locator('.MuiCard-root');
+
+      if (await candidateCards.count() > 0) {
+        // Look for semantic score indicators (chips with psychology/brain icon)
+        const semanticScoreLabel = page.getByText(/Semantic/i).first();
+
+        if (await semanticScoreLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await expect(semanticScoreLabel).toBeVisible();
+        }
+      }
+    }
+  });
+
+  test('should show semantic scores as percentages', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Enable semantic search
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+    await semanticCheckbox.check();
+
+    // Wait for data and perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Search/i }).first();
+
+    if (await searchBtn.isVisible({ timeout: 3000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Look for percentage patterns (e.g., "75%", "Semantic: 80%")
+      const percentagePattern = /\d+%/;
+
+      // Check if any text matches percentage pattern
+      const pageText = await page.textContent('body');
+      const hasPercentage = percentagePattern.test(pageText || '');
+
+      // Percentages may or may not be present depending on results
+      if (hasPercentage) {
+        // Verify percentage format
+        expect(pageText).toMatch(/\d+%/);
+      }
+    }
+  });
+
+  test('should color-code semantic scores appropriately', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Enable semantic search
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+    await semanticCheckbox.check();
+
+    // Wait and perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Search/i }).first();
+
+    if (await searchBtn.isVisible({ timeout: 3000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Check for chips (which contain color-coded scores)
+      const chips = page.locator('.MuiChip-root');
+
+      if (await chips.count() > 0) {
+        // Verify chips are visible for score display
+        await expect(chips.first()).toBeVisible();
+      }
+    }
+  });
+
+  test('should rank results by semantic relevance when enabled', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Enable semantic search
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+    await semanticCheckbox.check();
+
+    // Wait and perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Search/i }).first();
+
+    if (await searchBtn.isVisible({ timeout: 3000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Get all candidate cards
+      const candidateCards = page.locator('.MuiCard-root');
+
+      if (await candidateCards.count() > 0) {
+        // Results are displayed - ordering is handled by backend
+        // This test verifies the search completes without errors
+        await expect(candidateCards.first()).toBeVisible();
+      }
+    }
+  });
+
+  test('should disable semantic search by default', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Check that semantic search checkbox is not checked by default
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+
+    await expect(semanticCheckbox).toBeVisible();
+    await expect(semanticCheckbox).not.toBeChecked();
+  });
+
+  test('should toggle semantic search on and off', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Find semantic search checkbox
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+
+    // Verify unchecked
+    await expect(semanticCheckbox).not.toBeChecked();
+
+    // Enable
+    await semanticCheckbox.check();
+    await expect(semanticCheckbox).toBeChecked();
+
+    // Disable
+    await semanticCheckbox.uncheck();
+    await expect(semanticCheckbox).not.toBeChecked();
+
+    // Enable again
+    await semanticCheckbox.check();
+    await expect(semanticCheckbox).toBeChecked();
+  });
+
+  test('should include semantic search description', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Check for semantic search label and description
+    const semanticLabel = page.getByText(/Semantic Search/i);
+
+    await expect(semanticLabel).toBeVisible({ timeout: 5000 });
+
+    // Check for description about AI-powered search
+    const description = page.getByText(/AI-powered|meaning and context|not just keywords/i);
+
+    if (await description.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await expect(description).toBeVisible();
+    }
+  });
+});
+
+test.describe('CSV Export', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/candidate-search');
+  });
+
+  test('should display CSV export button after search', async ({ page }) => {
+    // Wait for data to load
+    await page.waitForTimeout(1000);
+
+    // Perform search if possible
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      // Check for CSV export button
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+      await expect(exportBtn).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test('should trigger CSV download when export button clicked', async ({ page }) => {
+    // Setup download handler
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Wait for data and perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      // Click export button
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        // Wait for download to start
+        const download = await downloadPromise;
+
+        // Verify download started
+        expect(download).toBeTruthy();
+        expect(download.suggestedFilename()).toMatch(/\.csv$/i);
+      }
+    }
+  });
+
+  test('should download CSV file with proper filename format', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Wait and perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        const download = await downloadPromise;
+        const filename = download.suggestedFilename();
+
+        // Filename should contain date and end with .csv
+        expect(filename).toMatch(/\d{4}-\d{2}-\d{2}.*\.csv$/);
+        expect(filename).not.toContain(/[<>:"|?*]/); // No invalid characters
+      }
+    }
+  });
+
+  test('should show error message when exporting empty results', async ({ page }) => {
+    // Try to export without performing search
+    const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+    // Export button should not be visible without search results
+    // If it is visible, clicking it should show an error
+    if (await exportBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      // Setup to catch error dialog/snackbar
+      page.on('dialog', dialog => {
+        expect(dialog.message()).toMatch(/no results|empty/i);
+        dialog.accept().catch(() => {});
+      });
+
+      await exportBtn.click();
+      await page.waitForTimeout(1000);
+    }
+  });
+
+  test('should CSV contain correct headers', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        const download = await downloadPromise;
+
+        // Read the downloaded file
+        const stream = await download.createReadStream();
+        const csvContent = await streamToString(stream);
+
+        // Verify headers
+        const lines = csvContent.split('\n');
+        const headers = lines[0];
+
+        expect(headers).toContain('Rank');
+        expect(headers).toContain('Filename');
+        expect(headers).toContain('Vacancy');
+        expect(headers).toContain('Match Percentage');
+        expect(headers).toContain('Matched Skills');
+        expect(headers).toContain('Missing Skills');
+        expect(headers).toContain('AI Ranking Score');
+        expect(headers).toContain('Hire Probability');
+        expect(headers).toContain('Semantic Score');
+      }
+    }
+  });
+
+  test('should CSV contain candidate data rows', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        const download = await downloadPromise;
+
+        // Read the downloaded file
+        const stream = await download.createReadStream();
+        const csvContent = await streamToString(stream);
+
+        // Verify data rows exist (header + at least one data row)
+        const lines = csvContent.split('\n').filter(line => line.trim());
+
+        expect(lines.length).toBeGreaterThan(1); // Header + at least one row
+
+        // Verify each data row has correct number of columns
+        const headerColumns = lines[0].split(',').length;
+        for (let i = 1; i < lines.length; i++) {
+          const columns = lines[i].split(',');
+          expect(columns.length).toBe(headerColumns);
+        }
+      }
+    }
+  });
+
+  test('should CSV export work with semantic search results', async ({ page }) => {
+    // Enable advanced filters
+    const advancedFiltersBtn = page.getByRole('button', { name: /Enable Advanced Filters/i });
+    await advancedFiltersBtn.click();
+    await page.waitForTimeout(500);
+
+    // Enable semantic search
+    const semanticCheckbox = page.getByRole('checkbox', { name: /Semantic Search/i });
+    await semanticCheckbox.check();
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Search/i }).first();
+
+    if (await searchBtn.isVisible({ timeout: 3000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(3000);
+
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        const download = await downloadPromise;
+
+        // Verify file downloaded
+        expect(download.suggestedFilename()).toMatch(/\.csv$/i);
+
+        // Read and verify semantic scores are included
+        const stream = await download.createReadStream();
+        const csvContent = await streamToString(stream);
+
+        // Should contain Semantic Score column
+        expect(csvContent).toContain('Semantic Score');
+      }
+    }
+  });
+
+  test('should CSV handle special characters properly', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        const download = await downloadPromise;
+
+        // Read the file
+        const stream = await download.createReadStream();
+        const csvContent = await streamToString(stream);
+
+        // Verify proper CSV format (quotes are escaped, etc.)
+        // Check that quoted strings are properly formatted
+        const quotedStrings = csvContent.match(/"[^"]*"/g) || [];
+        expect(quotedStrings.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('complete CSV export workflow: search → export → verify', async ({ page }) => {
+    // Step 1: Navigate and load data
+    await page.goto('/candidate-search');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.waitForTimeout(1000);
+
+    // Step 2: Perform search
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+
+      // Step 3: Wait for results
+      await page.waitForTimeout(2000);
+
+      // Verify results loaded
+      const candidateCards = page.locator('.MuiCard-root');
+      const hasResults = await candidateCards.count() > 0;
+
+      // Step 4: Export to CSV
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+        await exportBtn.click();
+
+        // Step 5: Verify download
+        const download = await downloadPromise;
+        expect(download).toBeTruthy();
+        expect(download.suggestedFilename()).toMatch(/\.csv$/);
+
+        // Step 6: Verify CSV content
+        const stream = await download.createReadStream();
+        const csvContent = await streamToString(stream);
+
+        // Has headers
+        expect(csvContent).toContain('Rank');
+        expect(csvContent).toContain('Filename');
+        expect(csvContent).toContain('Match Percentage');
+
+        // Has data rows
+        const lines = csvContent.split('\n').filter(line => line.trim());
+        expect(lines.length).toBeGreaterThan(1);
+
+        console.log('✅ Complete CSV export workflow successful');
+      }
+    }
+  });
+
+  test('should CSV export preserve ranking order', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+
+    // Perform search
+    await page.waitForTimeout(1000);
+
+    const searchBtn = page.getByRole('button', { name: /Find Candidates/i });
+
+    if (await searchBtn.isEnabled({ timeout: 5000 })) {
+      await searchBtn.click();
+      await page.waitForTimeout(2000);
+
+      const exportBtn = page.getByRole('button', { name: /Export to CSV/i });
+
+      if (await exportBtn.isVisible({ timeout: 3000 })) {
+        await exportBtn.click();
+
+        const download = await downloadPromise;
+
+        // Read the file
+        const stream = await download.createReadStream();
+        const csvContent = await streamToString(stream);
+
+        const lines = csvContent.split('\n').filter(line => line.trim());
+
+        // Skip header, check data rows
+        if (lines.length > 1) {
+          // Verify Rank column is sequential
+          for (let i = 1; i < Math.min(lines.length, 5); i++) {
+            const columns = lines[i].split(',');
+            const rank = parseInt(columns[0], 10);
+            expect(rank).toBe(i);
+          }
+        }
+      }
+    }
+  });
+});
+
+/**
+ * Helper function to convert readable stream to string
+ */
+async function streamToString(stream: any): Promise<string> {
+  const chunks: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    stream.on('error', reject);
+  });
+}

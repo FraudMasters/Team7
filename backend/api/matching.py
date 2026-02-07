@@ -36,12 +36,15 @@ from analyzers import (
 )
 from i18n.backend_translations import get_error_message, get_success_message
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter()
 
-# Directory where uploaded resumes are stored
-UPLOAD_DIR = Path("data/uploads")
+# Directory where uploaded resumes are stored (from centralized config)
+UPLOAD_DIR = settings.upload_dir
 
 # Path to skill synonyms file
 SYNONYMS_FILE = Path(__file__).parent.parent / "models" / "skill_synonyms.json"
@@ -394,7 +397,7 @@ async def compare_resume_to_vacancy(http_request: Request, request: MatchRequest
         ...     "min_experience_months": 36
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/compare",
+        ...     "/api/matching/compare",
         ...     json={"resume_id": "abc123", "vacancy_data": vacancy}
         ... )
         >>> response.json()
@@ -723,7 +726,7 @@ async def submit_match_feedback(http_request: Request, request: MatchFeedbackReq
         ...     "recruiter_correction": None
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/feedback",
+        ...     "/api/matching/feedback",
         ...     json=data
         ... )
         >>> response.json()
@@ -845,7 +848,7 @@ async def compare_resume_to_vacancy_unified(
         ...     "required_skills": ["React", "TypeScript", "JavaScript"]
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/matching/compare-unified",
+        ...     "/api/matching/compare-unified",
         ...     json={"resume_id": "abc123", "vacancy_data": vacancy}
         ... )
         >>> response.json()

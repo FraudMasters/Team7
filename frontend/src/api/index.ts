@@ -23,6 +23,7 @@ export {
   getNotificationPreferences,
   updateNotificationPreferences,
 } from './notifications';
+export * from './health';
 export type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -39,6 +40,13 @@ export type {
   JobVacancy,
   ApiError,
   HealthResponse,
+  ComponentHealthStatus,
+  DetailedHealthResponse,
+  ReadyCheckResponse,
+  ServiceDependencyInfo,
+  DependencyGraphSummary,
+  DependencyGraphResponse,
+  ComponentHealthCheckResponse,
   UploadProgressCallback,
   ApiClientConfig,
   SkillGapAnalysisRequest,

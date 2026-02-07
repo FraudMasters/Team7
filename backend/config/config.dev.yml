@@ -1,0 +1,49 @@
+# Development Environment Configuration
+# This file contains environment-specific overrides for development
+
+environment: dev
+log_level: DEBUG
+
+# Development server configuration
+backend_host: 127.0.0.1
+backend_port: 8000
+frontend_url: http://localhost:5173
+
+# Development database (typically localhost)
+database_url: postgresql://postgres:postgres@localhost:5432/resume_analysis
+redis_url: redis://localhost:6379/0
+
+# Celery configuration
+celery_broker_url: redis://localhost:6379/0
+celery_result_backend: redis://localhost:6379/0
+
+# Development upload settings (more permissive)
+max_upload_size_mb: 20
+analysis_timeout_seconds: 600
+
+# Backup disabled in development
+backup_enabled: false
+backup_retention_days: 7
+backup_schedule: "0 2 * * *"
+
+# Audit log retention (shorter in dev)
+audit_log_retention_days: 7
+
+# LLM Configuration (may use test keys)
+llm_provider: zai
+llm_model: glm-4.7
+llm_temperature: 0.1
+llm_max_tokens: 4096
+
+# ATS Simulation Configuration
+ats_threshold: 0.6
+ats_visual_check_enabled: true
+ats_keyword_weight: 0.3
+ats_experience_weight: 0.3
+ats_education_weight: 0.2
+ats_fit_weight: 0.2
+
+# S3 Backup (disabled in dev)
+backup_s3_enabled: false
+backup_incremental_enabled: false
+backup_compression_enabled: false

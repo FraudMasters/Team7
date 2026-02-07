@@ -15,6 +15,7 @@ import {
   Stack,
   Button,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   CheckCircle as CheckIcon,
   Cancel as CrossIcon,
@@ -103,7 +104,7 @@ interface ComparisonTableProps {
 const ComparisonTable: React.FC<ComparisonTableProps> = ({
   resumeIds,
   vacancyId,
-  apiUrl = 'http://localhost:8000/api/comparisons',
+  apiUrl = `${config.api.url}/api/comparisons`,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

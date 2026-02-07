@@ -31,3 +31,13 @@ export {
   type UseWebSocketOptions,
   type UseWebSocketReturn,
 } from './useWebSocket';
+export {
+  useRoles,
+  isValidRole,
+  normalizeRole,
+  getRoleLevel,
+  compareRoles,
+  type UserRole,
+  type RolesResult,
+  type UserInfo,
+} from './useRoles';

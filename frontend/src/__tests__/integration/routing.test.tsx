@@ -16,7 +16,7 @@ import JobSeekerLayout from '../../layouts/JobSeekerLayout';
 import RecruiterLayout from '../../layouts/RecruiterLayout';
 
 // Context Providers
-import { ThemeProvider } from '../../contexts/ThemeContext';
+import { EmotionThemeProvider } from '../../contexts/EmotionThemeContext';
 import { LanguageProvider } from '../../contexts/LanguageContext';
 
 // Test Utilities
@@ -34,11 +34,11 @@ const renderWithProviders = (
   const Wrapper = ({ children }: { children: React.ReactNode }) => {
     return (
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
+        <EmotionThemeProvider>
           <LanguageProvider>
             {children}
           </LanguageProvider>
-        </ThemeProvider>
+        </EmotionThemeProvider>
       </QueryClientProvider>
     );
   };

@@ -37,6 +37,11 @@ from .notification_digest import (
     send_weekly_notification_digest,
     send_notification_digest,
 )
+from .health_monitoring import (
+    monitor_health_and_alert,
+    check_component_task,
+    check_essential_services_task,
+)
 
 __all__ = [
     "analyze_resume_async",
@@ -62,4 +67,7 @@ __all__ = [
     "send_daily_notification_digest",
     "send_weekly_notification_digest",
     "send_notification_digest",
+    "monitor_health_and_alert",
+    "check_component_task",
+    "check_essential_services_task",
 ]

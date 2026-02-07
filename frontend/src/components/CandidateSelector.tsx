@@ -14,12 +14,8 @@ import {
   Card,
   CardContent,
   Tooltip,
-} from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  RadioButtonUnchecked as RadioButtonUncheckedIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 
 /**
  * Individual candidate interface
@@ -183,7 +179,7 @@ const CandidateSelector: React.FC<CandidateSelectorProps> = ({
       <Paper elevation={1} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <CheckCircleIcon sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
+            <Icon name="check-circle" sx={{ mr: 1, fontSize: 24, color: 'primary.main' }} />
             <Typography variant="h6" fontWeight={600}>
               Select Candidates to Compare
             </Typography>
@@ -199,7 +195,7 @@ const CandidateSelector: React.FC<CandidateSelectorProps> = ({
 
         {/* Selection Count Info */}
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="secondary">
             Select <strong>{minCandidates}-{maxCandidates} candidates</strong> for side-by-side comparison
           </Typography>
           {!isValidRange && (
@@ -281,8 +277,8 @@ const CandidateSelector: React.FC<CandidateSelectorProps> = ({
                             disabled={disabled || cannotSelect}
                             size="small"
                             sx={{ p: 0.5, mt: 0.5 }}
-                            icon={<RadioButtonUncheckedIcon />}
-                            checkedIcon={<CheckCircleIcon />}
+                            icon={<Icon name="circle" />}
+                            checkedIcon={<Icon name="check-circle" />}
                           />
 
                           {/* Candidate Info */}
@@ -314,15 +310,15 @@ const CandidateSelector: React.FC<CandidateSelectorProps> = ({
                                         : 'default'
                                   }
                                   variant="outlined"
-                                  sx={{ height: 20, fontSize: '0.7rem', '& .MuiChip-label': { px: 1 } }}
+                                  sx={{ height: 20, fontSize: '0.7rem' }}
                                 />
                                 {candidate.overall_match !== undefined && (
                                   <Tooltip title={candidate.overall_match ? 'Meets requirements' : 'Partially meets requirements'}>
                                     <Box sx={{ ml: 0.5, display: 'flex' }}>
                                       {candidate.overall_match ? (
-                                        <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                                        <Icon name="check-circle" sx={{ fontSize: 16, color: 'success.main' }} />
                                       ) : (
-                                        <InfoIcon sx={{ fontSize: 16, color: 'warning.main' }} />
+                                        <Icon name="info" sx={{ fontSize: 16, color: 'warning.main' }} />
                                       )}
                                     </Box>
                                   </Tooltip>
@@ -334,7 +330,7 @@ const CandidateSelector: React.FC<CandidateSelectorProps> = ({
                             {showSkillsCount &&
                               candidate.matched_skills_count !== undefined &&
                               candidate.total_skills_count !== undefined && (
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                <Typography variant="caption" color="secondary" sx={{ mt: 0.5, display: 'block' }}>
                                   {candidate.matched_skills_count} / {candidate.total_skills_count} skills matched
                                 </Typography>
                               )}

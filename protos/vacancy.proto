@@ -1,0 +1,373 @@
+// Протокольные определения для Сервиса Вакансий (Vacancy Service)
+// Vacancy Service gRPC Protocol Definitions
+//
+// Этот файл определяет интерфейсы gRPC для управления вакансиями,
+// включая создание, обновление, поиск и массовые операции.
+//
+// This file defines gRPC interfaces for vacancy management,
+// including creation, updates, search, and bulk operations.
+
+syntax = "proto3";
+
+package vacancy;
+
+// ============================================
+// Сообщения для вакансий
+// Vacancy messages
+// ============================================
+
+// Вакансия / Job vacancy
+message JobVacancy {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string title = 2;                 // Должность / Job title
+    string description = 3;           // Описание вакансии / Job description
+    repeated string required_skills = 4; // Требуемые навыки / Required skills
+    int32 min_experience_months = 5;  // Минимальный опыт в месяцах / Minimum experience in months
+    repeated string additional_requirements = 6; // Дополнительные требования / Additional requirements
+
+    // Детали вакансии / Vacancy details
+    string industry = 7;              // Индустрия / Industry sector
+    string work_format = 8;           // Формат работы (remote/office/hybrid) / Work format
+    string location = 9;              // Местоположение / Location
+    int32 salary_min = 10;            // Минимальная зарплата / Minimum salary
+    int32 salary_max = 11;            // Максимальная зарплата / Maximum salary
+    string english_level = 12;        // Уровень английского / English level
+    string employment_type = 13;      // Тип занятости / Employment type
+
+    // Внешние данные / External data
+    string external_id = 14;          // Внешний ID (job board) / External ID
+    string source = 15;               // Источник вакансии / Vacancy source
+
+    int64 created_at = 16;            // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 17;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Запрос на создание вакансии / Request to create vacancy
+message CreateVacancyRequest {
+    string title = 1;                 // Должность / Job title
+    string description = 2;           // Описание вакансии / Job description
+    repeated string required_skills = 3; // Требуемые навыки / Required skills
+    int32 min_experience_months = 4;  // Минимальный опыт в месяцах / Minimum experience in months
+    repeated string additional_requirements = 5; // Дополнительные требования / Additional requirements
+
+    // Детали вакансии / Vacancy details
+    string industry = 6;              // Индустрия / Industry sector
+    string work_format = 7;           // Формат работы / Work format
+    string location = 8;              // Местоположение / Location
+    int32 salary_min = 9;             // Минимальная зарплата / Minimum salary
+    int32 salary_max = 10;            // Максимальная зарплата / Maximum salary
+    string english_level = 11;        // Уровень английского / English level
+    string employment_type = 12;      // Тип занятости / Employment type
+
+    // Внешние данные / External data
+    string external_id = 13;          // Внешний ID (job board) / External ID
+    string source = 14;               // Источник вакансии / Vacancy source
+}
+
+// Ответ на создание вакансии / Response to create vacancy
+message CreateVacancyResponse {
+    JobVacancy vacancy = 1;           // Созданная вакансия / Created vacancy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение вакансии по ID / Request to get vacancy by ID
+message GetVacancyRequest {
+    string id = 1;                    // UUID вакансии / Vacancy UUID
+}
+
+// Ответ с данными вакансии / Response with vacancy data
+message GetVacancyResponse {
+    JobVacancy vacancy = 1;           // Данные вакансии / Vacancy data
+    bool found = 2;                   // Найдена ли вакансия / Whether vacancy was found
+}
+
+// Запрос на обновление вакансии / Request to update vacancy
+message UpdateVacancyRequest {
+    string id = 1;                    // UUID вакансии / Vacancy UUID
+    string title = 2;                 // Должность / Job title
+    string description = 3;           // Описание вакансии / Job description
+    repeated string required_skills = 4; // Требуемые навыки / Required skills
+    int32 min_experience_months = 5;  // Минимальный опыт в месяцах / Minimum experience in months
+    repeated string additional_requirements = 6; // Дополнительные требования / Additional requirements
+
+    // Детали вакансии / Vacancy details
+    string industry = 7;              // Индустрия / Industry sector
+    string work_format = 8;           // Формат работы / Work format
+    string location = 9;              // Местоположение / Location
+    int32 salary_min = 10;            // Минимальная зарплата / Minimum salary
+    int32 salary_max = 11;            // Максимальная зарплата / Maximum salary
+    string english_level = 12;        // Уровень английского / English level
+    string employment_type = 13;      // Тип занятости / Employment type
+}
+
+// Ответ на обновление вакансии / Response to update vacancy
+message UpdateVacancyResponse {
+    JobVacancy vacancy = 1;           // Обновлённая вакансия / Updated vacancy
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на удаление вакансии / Request to delete vacancy
+message DeleteVacancyRequest {
+    string id = 1;                    // UUID вакансии / Vacancy UUID
+}
+
+// Ответ на удаление вакансии / Response to delete vacancy
+message DeleteVacancyResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для поиска вакансий
+// Vacancy search messages
+// ============================================
+
+// Запрос на список вакансий / Request for vacancy list
+message ListVacanciesRequest {
+    int32 page = 1;                   // Номер страницы / Page number
+    int32 page_size = 2;              // Размер страницы / Page size
+
+    // Фильтры / Filters
+    string industry = 3;              // Фильтр по индустрии / Filter by industry
+    string work_format = 4;           // Фильтр по формату работы / Filter by work format
+    string location = 5;              // Фильтр по местоположению / Filter by location
+    string english_level = 6;         // Фильтр по уровню английского / Filter by English level
+    int32 min_salary = 7;             // Минимальная зарплата (фильтр) / Minimum salary filter
+    int32 max_salary = 8;             // Максимальная зарплата (фильтр) / Maximum salary filter
+    string source = 9;                // Фильтр по источнику / Filter by source
+
+    // Поиск по навыкам / Search by skills
+    repeated string required_skills = 10; // Обязательные навыки / Required skills
+
+    // Полнотекстовый поиск / Full-text search
+    string search_query = 11;         // Поисковый запрос / Search query
+
+    // Сортировка / Sorting
+    string sort_field = 12;           // Поле сортировки / Sort field
+    string sort_order = 13;           // Порядок сортировки (asc/desc) / Sort order
+}
+
+// Ответ со списком вакансий / Response with vacancy list
+message ListVacanciesResponse {
+    repeated JobVacancy vacancies = 1; // Список вакансий / List of vacancies
+    int32 total = 2;                  // Общее количество / Total count
+    int32 page = 3;                   // Текущая страница / Current page
+    int32 page_size = 4;              // Размер страницы / Page size
+}
+
+// ============================================
+// Сообщения для массовых операций
+// Bulk operation messages
+// ============================================
+
+// Запрос на массовое создание вакансий / Request for bulk vacancy creation
+message BulkCreateVacanciesRequest {
+    repeated CreateVacancyRequest vacancies = 1; // Вакансии для создания / Vacancies to create
+}
+
+// Ответ на массовое создание / Response to bulk creation
+message BulkCreateVacanciesResponse {
+    repeated JobVacancy created_vacancies = 1; // Созданные вакансии / Created vacancies
+    repeated string errors = 2;       // Ошибки по индексу / Errors by index
+    int32 total_count = 3;            // Общее количество / Total count
+    int32 success_count = 4;          // Успешно создано / Successfully created
+    int32 failure_count = 5;          // Неудачных созданий / Failed creations
+}
+
+// Запрос на массовое обновление вакансий / Request for bulk vacancy update
+message BulkUpdateVacanciesRequest {
+    repeated UpdateVacancyRequest vacancies = 1; // Вакансии для обновления / Vacancies to update
+}
+
+// Ответ на массовое обновление / Response to bulk update
+message BulkUpdateVacanciesResponse {
+    repeated JobVacancy updated_vacancies = 1; // Обновлённые вакансии / Updated vacancies
+    repeated string errors = 2;       // Ошибки по индексу / Errors by index
+    int32 total_count = 3;            // Общее количество / Total count
+    int32 success_count = 4;          // Успешно обновлено / Successfully updated
+    int32 failure_count = 5;          // Неудачных обновлений / Failed updates
+}
+
+// Запрос на массовое удаление вакансий / Request for bulk vacancy deletion
+message BulkDeleteVacanciesRequest {
+    repeated string ids = 1;          // UUID вакансий для удаления / Vacancy UUIDs to delete
+}
+
+// Ответ на массовое удаление / Response to bulk deletion
+message BulkDeleteVacanciesResponse {
+    repeated string deleted_ids = 1;  // Удалённые ID / Deleted IDs
+    repeated string failed_ids = 2;   // Неудачные ID / Failed IDs
+    int32 total_count = 3;            // Общее количество / Total count
+    int32 success_count = 4;          // Успешно удалено / Successfully deleted
+    int32 failure_count = 5;          // Неудачных удалений / Failed deletions
+}
+
+// ============================================
+// Сообщения для сохранённых поисков
+// Saved search messages
+// ============================================
+
+// Сохранённый поиск вакансий / Saved vacancy search
+message SavedSearch {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string name = 2;                  // Название поиска / Search name
+    string user_id = 3;               // ID пользователя / User ID
+    ListVacanciesRequest filters = 4; // Фильтры поиска / Search filters
+    bool email_alerts = 5;            // Отправлять email уведомления / Send email alerts
+    int32 alert_frequency_hours = 6;  // Частота уведомлений (часы) / Alert frequency (hours)
+    int64 created_at = 7;             // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 8;             // Время обновления (timestamp) / Update timestamp
+    int64 last_alert_at = 9;          // Время последнего уведомления / Last alert timestamp
+}
+
+// Запрос на создание сохранённого поиска / Request to create saved search
+message CreateSavedSearchRequest {
+    string name = 1;                  // Название поиска / Search name
+    string user_id = 2;               // ID пользователя / User ID
+    ListVacanciesRequest filters = 3; // Фильтры поиска / Search filters
+    bool email_alerts = 4;            // Отправлять email уведомления / Send email alerts
+    int32 alert_frequency_hours = 5;  // Частота уведомлений (часы) / Alert frequency (hours)
+}
+
+// Ответ на создание сохранённого поиска / Response to create saved search
+message CreateSavedSearchResponse {
+    SavedSearch saved_search = 1;     // Созданный поиск / Created search
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение сохранённых поисков пользователя / Request to get user saved searches
+message GetSavedSearchesRequest {
+    string user_id = 1;               // ID пользователя / User ID
+}
+
+// Ответ со списком сохранённых поисков / Response with saved searches list
+message GetSavedSearchesResponse {
+    repeated SavedSearch saved_searches = 1; // Список поисков / List of searches
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// Запрос на обновление сохранённого поиска / Request to update saved search
+message UpdateSavedSearchRequest {
+    string id = 1;                    // UUID поиска / Search UUID
+    string name = 2;                  // Название поиска / Search name
+    ListVacanciesRequest filters = 3; // Фильтры поиска / Search filters
+    bool email_alerts = 4;            // Отправлять email уведомления / Send email alerts
+    int32 alert_frequency_hours = 5;  // Частота уведомлений (часы) / Alert frequency (hours)
+}
+
+// Ответ на обновление сохранённого поиска / Response to update saved search
+message UpdateSavedSearchResponse {
+    SavedSearch saved_search = 1;     // Обновлённый поиск / Updated search
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на удаление сохранённого поиска / Request to delete saved search
+message DeleteSavedSearchRequest {
+    string id = 1;                    // UUID поиска / Search UUID
+}
+
+// Ответ на удаление сохранённого поиска / Response to delete saved search
+message DeleteSavedSearchResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сервис Vacancy Service
+// Vacancy Service definition
+// ============================================
+
+// Сервис управления вакансиями / Vacancy management service
+service VacancyService {
+    // ========== Базовые операции / Basic operations ==========
+    // Создать вакансию / Create vacancy
+    rpc CreateVacancy (CreateVacancyRequest) returns (CreateVacancyResponse);
+
+    // Получить вакансию по ID / Get vacancy by ID
+    rpc GetVacancy (GetVacancyRequest) returns (GetVacancyResponse);
+
+    // Получить список вакансий / Get vacancy list
+    rpc ListVacancies (ListVacanciesRequest) returns (ListVacanciesResponse);
+
+    // Обновить вакансию / Update vacancy
+    rpc UpdateVacancy (UpdateVacancyRequest) returns (UpdateVacancyResponse);
+
+    // Удалить вакансию / Delete vacancy
+    rpc DeleteVacancy (DeleteVacancyRequest) returns (DeleteVacancyResponse);
+
+    // ========== Массовые операции / Bulk operations ==========
+    // Массовое создание вакансий / Bulk create vacancies
+    rpc BulkCreateVacancies (BulkCreateVacanciesRequest) returns (BulkCreateVacanciesResponse);
+
+    // Массовое обновление вакансий / Bulk update vacancies
+    rpc BulkUpdateVacancies (BulkUpdateVacanciesRequest) returns (BulkUpdateVacanciesResponse);
+
+    // Массовое удаление вакансий / Bulk delete vacancies
+    rpc BulkDeleteVacancies (BulkDeleteVacanciesRequest) returns (BulkDeleteVacanciesResponse);
+
+    // ========== Сохранённые поиски / Saved searches ==========
+    // Создать сохранённый поиск / Create saved search
+    rpc CreateSavedSearch (CreateSavedSearchRequest) returns (CreateSavedSearchResponse);
+
+    // Получить сохранённые поиски пользователя / Get user saved searches
+    rpc GetSavedSearches (GetSavedSearchesRequest) returns (GetSavedSearchesResponse);
+
+    // Обновить сохранённый поиск / Update saved search
+    rpc UpdateSavedSearch (UpdateSavedSearchRequest) returns (UpdateSavedSearchResponse);
+
+    // Удалить сохранённый поиск / Delete saved search
+    rpc DeleteSavedSearch (DeleteSavedSearchRequest) returns (DeleteSavedSearchResponse);
+
+    // ========== Дополнительные операции / Additional operations ==========
+    // Поиск вакансий по навыкам / Search vacancies by skills
+    rpc SearchBySkills (SearchBySkillsRequest) returns (SearchBySkillsResponse);
+
+    // Получить статистику по вакансиям / Get vacancy statistics
+    rpc GetVacancyStats (GetVacancyStatsRequest) returns (GetVacancyStatsResponse);
+}
+
+// Запрос на поиск вакансий по навыкам / Request to search vacancies by skills
+message SearchBySkillsRequest {
+    repeated string skills = 1;       // Список навыков для поиска / Skills to search
+    string industry = 2;              // Опционально: индустрия / Optional: industry
+    string work_format = 3;           // Опционально: формат работы / Optional: work format
+    int32 limit = 4;                  // Лимит результатов / Result limit
+}
+
+// Ответ на поиск по навыкам / Response to search by skills
+message SearchBySkillsResponse {
+    repeated VacancyMatchResult results = 1; // Результаты поиска / Search results
+    int32 total = 2;                  // Общее количество / Total count
+}
+
+// Результат поиска вакансии / Vacancy search result
+message VacancyMatchResult {
+    JobVacancy vacancy = 1;           // Вакансия / Vacancy
+    float match_score = 2;            // Оценка совпадения навыков / Skill match score
+    repeated string matched_skills = 3; // Совпавшие навыки / Matched skills
+    repeated string missing_skills = 4; // Отсутствующие навыки / Missing skills
+}
+
+// Запрос на статистику вакансий / Request for vacancy statistics
+message GetVacancyStatsRequest {
+    // Фильтры для статистики / Filters for statistics
+    string industry = 1;              // Фильтр по индустрии / Filter by industry
+    string work_format = 2;           // Фильтр по формату работы / Filter by work format
+    int64 from_date = 3;              // Начальная дата (timestamp) / Start date
+    int64 to_date = 4;                // Конечная дата (timestamp) / End date
+}
+
+// Ответ со статистикой вакансий / Response with vacancy statistics
+message GetVacancyStatsResponse {
+    int32 total_vacancies = 1;        // Общее количество вакансий / Total vacancies
+    int32 new_vacancies = 2;          // Новых вакансий / New vacancies
+    map<string, int32> vacancies_by_industry = 3; // Вакансии по индустрии / Vacancies by industry
+    map<string, int32> vacancies_by_work_format = 4; // Вакансии по формату работы / Vacancies by work format
+    map<string, int32> top_skills = 5; // Самые востребованные навыки / Top requested skills
+    int32 avg_salary_min = 6;         // Средняя минимальная зарплата / Average minimum salary
+    int32 avg_salary_max = 7;         // Средняя максимальная зарплата / Average maximum salary
+}

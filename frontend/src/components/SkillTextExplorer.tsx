@@ -13,17 +13,9 @@ import {
   Tooltip,
   Collapse,
   IconButton,
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  CheckCircle as CheckIcon,
-  Psychology as AIIcon,
-  Search as SearchIcon,
-  AutoFixHigh as MagicIcon,
-  Translate as SynonymIcon,
-} from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
+import styled from '@emotion/styled';
 
 export interface SkillMatchDetail {
   skill: string;
@@ -45,123 +37,129 @@ interface SkillTextExplorerProps {
   error?: string | null;
 }
 
-const StyledCard = styled(Card)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-}));
+const StyledCard = styled(Card)`
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
 
-const HighlightBox = styled(Box)(({ theme }) => ({
-  padding: theme.spacing(2),
-  backgroundColor: theme.palette.background.paper,
-  borderRadius: theme.spacing(1),
-  border: `1px solid ${theme.palette.divider}`,
-  maxHeight: 600,
-  overflowY: 'auto',
-  fontFamily: 'monospace',
-  fontSize: '0.875rem',
-  lineHeight: 1.6,
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word',
-}));
+const HighlightBox = styled(Box)`
+  padding: ${({ theme }) => theme.spacing.md};
+  background-color: ${({ theme }) => theme.colors.background.paper};
+  border-radius: ${({ theme }) => theme.spacing.md};
+  border: 1px solid ${({ theme }) => theme.colors.divider};
+  max-height: 600;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+`;
 
-const SkillHighlight = styled('span')<{ matchType: string; confidence: number }>(
-  ({ theme, matchType, confidence }) => {
-    const getBackgroundColor = () => {
+const SkillHighlight = styled('span')<{ matchType: string; confidence: number; theme: any }>`
+  background-color: ${({ matchType, confidence }) => {
+    switch (matchType) {
+      case 'direct':
+        return confidence >= 0.9 ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.15)';
+      case 'synonym':
+        return 'rgba(33, 150, 243, 0.2)';
+      case 'fuzzy':
+        return 'rgba(255, 152, 0, 0.2)';
+      case 'context':
+        return 'rgba(156, 39, 176, 0.2)';
+      case 'compound':
+        return 'rgba(63, 81, 181, 0.2)';
+      case 'language_hierarchy':
+        return 'rgba(0, 188, 212, 0.2)';
+      default:
+        return 'rgba(158, 158, 158, 0.2)';
+    }
+  }};
+  border-bottom: 2px solid
+    ${({ confidence, theme }) =>
+      confidence >= 0.9
+        ? theme.colors.success.main
+        : confidence >= 0.7
+        ? theme.colors.primary.main
+        : confidence >= 0.5
+        ? theme.colors.warning.main
+        : theme.colors.error.main};
+  padding: 2px 4px;
+  margin: 0 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+
+  &:hover {
+    background-color: ${({ matchType, confidence }) => {
+      let bg = '';
       switch (matchType) {
         case 'direct':
-          return confidence >= 0.9
-            ? 'rgba(76, 175, 80, 0.3)'
-            : 'rgba(76, 175, 80, 0.15)';
+          bg = confidence >= 0.9 ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.15)';
+          break;
         case 'synonym':
-          return 'rgba(33, 150, 243, 0.2)';
-        case 'fuzzy':
-          return 'rgba(255, 152, 0, 0.2)';
-        case 'context':
-          return 'rgba(156, 39, 176, 0.2)';
-        case 'compound':
-          return 'rgba(63, 81, 181, 0.2)';
-        case 'language_hierarchy':
-          return 'rgba(0, 188, 212, 0.2)';
+          bg = 'rgba(33, 150, 243, 0.2)';
+          break;
         default:
-          return 'rgba(158, 158, 158, 0.2)';
+          bg = 'rgba(158, 158, 158, 0.2)';
       }
-    };
-
-    return {
-      backgroundColor: getBackgroundColor(),
-      borderBottom: `2px solid ${
-        confidence >= 0.9
-          ? theme.palette.success.main
-          : confidence >= 0.7
-          ? theme.palette.primary.main
-          : confidence >= 0.5
-          ? theme.palette.warning.main
-          : theme.palette.error.main
-      }`,
-      padding: '2px 4px',
-      margin: '0 2px',
-      borderRadius: '3px',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      fontWeight: 500,
-      '&:hover': {
-        backgroundColor: getBackgroundColor().replace('0.2', '0.4').replace('0.3', '0.5').replace('0.15', '0.3'),
-        transform: 'scale(1.05)',
-      },
-    };
+      return bg.replace('0.2', '0.4').replace('0.3', '0.5').replace('0.15', '0.3');
+    }};
+    transform: scale(1.05);
   }
-);
+`;
 
 const getMatchTypeConfig = (matchType: string) => {
   switch (matchType) {
     case 'direct':
       return {
         label: 'Direct',
-        icon: <CheckIcon fontSize="small" />,
+        iconName: 'check-circle',
         color: 'success' as const,
         description: 'Exact match found in resume',
       };
     case 'synonym':
       return {
         label: 'Synonym',
-        icon: <SynonymIcon fontSize="small" />,
+        iconName: 'languages',
         color: 'info' as const,
         description: 'Matched through known synonyms',
       };
     case 'fuzzy':
       return {
         label: 'Fuzzy',
-        icon: <SearchIcon fontSize="small" />,
+        iconName: 'search',
         color: 'warning' as const,
         description: 'Partial match (typo or variation)',
       };
     case 'context':
       return {
         label: 'Context',
-        icon: <AIIcon fontSize="small" />,
+        iconName: 'brain',
         color: 'secondary' as const,
         description: 'Matched based on domain context',
       };
     case 'compound':
       return {
         label: 'Compound',
-        icon: <MagicIcon fontSize="small" />,
+        iconName: 'wand-sparkles',
         color: 'primary' as const,
         description: 'Compound skill match',
       };
     case 'language_hierarchy':
       return {
         label: 'Hierarchy',
-        icon: <AIIcon fontSize="small" />,
+        iconName: 'brain',
         color: 'info' as const,
         description: 'Matched through language hierarchy',
       };
     default:
       return {
         label: 'Unknown',
-        icon: <CheckIcon fontSize="small" />,
+        iconName: 'check-circle',
         color: 'default' as const,
         description: 'Unknown match type',
       };
@@ -228,13 +226,13 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
           key={`highlight-${index}`}
           title={
             <Box>
-              <Typography variant="caption" display="block" fontWeight={600}>
+              <Typography css={{ fontWeight: 600 }}>
                 {highlight.detail.skill}
               </Typography>
-              <Typography variant="caption" display="block">
+              <Typography>
                 {matchConfig.label} match • {confidencePercent}% confidence
               </Typography>
-              <Typography variant="caption" display="block" color="text.secondary">
+              <Typography color="text.secondary">
                 {matchConfig.description}
               </Typography>
             </Box>
@@ -267,9 +265,9 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+      <Box css={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />
-        <Typography variant="body1" sx={{ ml: 2 }}>
+        <Typography css={{ ml: 2 }}>
           Loading resume text explorer...
         </Typography>
       </Box>
@@ -278,7 +276,7 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mb: 2 }}>
+      <Alert severity="error" css={{ mb: 2 }}>
         {error}
       </Alert>
     );
@@ -286,11 +284,11 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
 
   if (!resumeText) {
     return (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Typography variant="h6" color="text.secondary">
+      <Box css={{ textAlign: 'center', py: 4 }}>
+        <Typography color="text.secondary">
           No resume text available
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography color="text.secondary">
           Upload a resume to explore skill matches
         </Typography>
       </Box>
@@ -301,14 +299,14 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
     <StyledCard>
       <CardContent>
         <Box
-          sx={{
+          css={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             mb: 2,
           }}
         >
-          <Typography variant="h6" fontWeight={600}>
+          <Typography fontWeight={600}>
             Resume Text Explorer
           </Typography>
           <Chip
@@ -319,9 +317,9 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
           />
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider css={{ mb: 2 }} />
 
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography color="text.secondary" css={{ mb: 2 }}>
           Click on highlighted skills to see detailed match information
         </Typography>
 
@@ -333,7 +331,7 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
           <Collapse in={detailsExpanded}>
             <Paper
               elevation={2}
-              sx={{
+              css={{
                 mt: 2,
                 p: 2,
                 borderLeft: 4,
@@ -348,30 +346,30 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
               }}
             >
               <Box
-                sx={{
+                css={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   mb: 1,
                 }}
               >
-                <Typography variant="subtitle1" fontWeight={600}>
+                <Typography fontWeight={600}>
                   {selectedSkill.skill}
                 </Typography>
                 <IconButton
                   size="small"
                   onClick={() => setDetailsExpanded(!detailsExpanded)}
                 >
-                  {detailsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  <Icon name={detailsExpanded ? 'chevron-up' : 'chevron-down'} />
                 </IconButton>
               </Box>
 
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+              <Stack css={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5 }}>
                 {(() => {
                   const matchConfig = getMatchTypeConfig(selectedSkill.match_type);
                   return (
                     <Chip
-                      icon={matchConfig.icon}
+                      iconName={matchConfig.iconName}
                       label={matchConfig.label}
                       size="small"
                       color={matchConfig.color}
@@ -383,7 +381,7 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
                 <Chip
                   label={`${Math.round(selectedSkill.confidence * 100)}% confidence`}
                   size="small"
-                  sx={{
+                  css={{
                     fontWeight: 600,
                     backgroundColor:
                       selectedSkill.confidence >= 0.9
@@ -399,7 +397,7 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
 
               {selectedSkill.matched_as &&
                 selectedSkill.matched_as !== selectedSkill.skill && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  <Typography color="text.secondary" css={{ mb: 1 }}>
                     Matched as: <strong>{selectedSkill.matched_as}</strong>
                   </Typography>
                 )}
@@ -407,16 +405,15 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
               {selectedSkill.locations && selectedSkill.locations.length > 0 && (
                 <Box>
                   <Typography
-                    variant="caption"
                     color="text.secondary"
-                    sx={{ display: 'block', mb: 1, fontWeight: 500 }}
+                    css={{ display: 'block', mb: 1, fontWeight: 500 }}
                   >
                     Found in {selectedSkill.locations.length} location{selectedSkill.locations.length > 1 ? 's' : ''}:
                   </Typography>
                   {selectedSkill.locations.map((location, idx) => (
                     <Box
                       key={idx}
-                      sx={{
+                      css={{
                         p: 1,
                         mt: idx > 0 ? 0.5 : 0,
                         backgroundColor: 'grey.50',
@@ -424,8 +421,7 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
                       }}
                     >
                       <Typography
-                        variant="caption"
-                        sx={{
+                        css={{
                           fontFamily: 'monospace',
                           fontSize: '0.75rem',
                           color: 'text.primary',
@@ -444,21 +440,21 @@ const SkillTextExplorer: React.FC<SkillTextExplorerProps> = ({
         )}
 
         {/* Legend */}
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontWeight: 500 }}>
+        <Box css={{ mt: 2 }}>
+          <Typography color="text.secondary" css={{ display: 'block', mb: 1, fontWeight: 500 }}>
             Highlight Legend:
           </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
+          <Stack css={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             {(['direct', 'synonym', 'fuzzy', 'context', 'compound'] as const).map((type) => {
               const config = getMatchTypeConfig(type);
               return (
                 <Chip
                   key={type}
-                  icon={config.icon}
+                  iconName={config.iconName}
                   label={config.label}
                   size="small"
                   variant="outlined"
-                  sx={{ fontSize: '0.7rem', height: 22 }}
+                  css={{ fontSize: '0.7rem', height: 22 }}
                 />
               );
             })}

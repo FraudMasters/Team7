@@ -1,4 +1,5 @@
 """
+import os
 Integration tests for model retraining workflow.
 
 This test suite validates the end-to-end integration between:

@@ -10,12 +10,18 @@ This module provides comprehensive learning recommendations that:
 
 The engine uses skill matching and ranking algorithms to provide
 personalized learning recommendations for skill development.
+
+External API Integration:
+    The engine integrates with external learning platform APIs (Coursera, Udemy, edX)
+    through the LearningPlatformClient interface. When use_mock_data is False,
+    the engine will fetch real course data from configured platforms.
 """
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .skill_gap_analyzer import SkillGapResult
+from services.learning_platforms.base import Course, get_client
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +231,10 @@ class LearningRecommendationEngine:
         prefer_self_paced: bool = True,
 
         # Use mock data for development
-        use_mock_data: bool = True,
+        use_mock_data: bool = False,
+
+        # External API configuration
+        enabled_platforms: Optional[List[str]] = None,
     ):
         """
         Initialize the learning recommendation engine.
@@ -242,6 +251,7 @@ class LearningRecommendationEngine:
             prefer_certified_courses: Whether to prioritize courses with certificates
             prefer_self_paced: Whether to prioritize self-paced resources
             use_mock_data: Whether to use mock data (for development/testing)
+            enabled_platforms: List of platform names to use (coursera, udemy, etc.)
         """
         self.max_recommendations_per_skill = max_recommendations_per_skill
         self.max_cost_per_resource = max_cost_per_resource
@@ -258,14 +268,24 @@ class LearningRecommendationEngine:
 
         self.use_mock_data = use_mock_data
 
+        # Configure enabled platforms
+        self.enabled_platforms = enabled_platforms or ["coursera", "udemy"]
+
         # Initialize mock resource database
         if use_mock_data:
             self._mock_resources = self._initialize_mock_resources()
 
+        # Initialize platform clients (only if not using mock data)
+        self._platform_clients: Dict[str, Any] = {}
+        if not use_mock_data:
+            self._initialize_platform_clients()
+
         logger.info(
             f"LearningRecommendationEngine initialized with "
             f"max_recommendations={max_recommendations_per_skill}, "
-            f"max_cost={max_cost_per_resource}"
+            f"max_cost={max_cost_per_resource}, "
+            f"use_mock_data={use_mock_data}, "
+            f"enabled_platforms={self.enabled_platforms}"
         )
 
     def recommend_for_skill_gaps(
@@ -446,10 +466,28 @@ class LearningRecommendationEngine:
             # Get mock resources matching the skill
             resources = self._get_mock_resources_for_skill(skill)
         else:
-            # TODO: Integrate with actual learning platform APIs
-            # For now, return empty list - will be implemented in future subtasks
-            logger.warning(f"No external resource integration configured for skill: {skill}")
-            return []
+            # Fetch courses from external learning platform APIs
+            try:
+                courses = self._fetch_courses_from_platforms(
+                    skill=skill,
+                    skill_level=required_level,
+                    max_results_per_platform=self.max_recommendations_per_skill * 2,
+                )
+
+                # Convert Course objects to LearningRecommendation objects
+                for course in courses:
+                    recommendation = self._convert_course_to_recommendation(
+                        course=course,
+                        target_skill=skill,
+                    )
+                    resources.append(recommendation)
+
+                logger.debug(f"Fetched {len(resources)} resources from external APIs for {skill}")
+
+            except Exception as e:
+                logger.error(f"Error fetching resources from external APIs for {skill}: {e}")
+                # Return empty list on error
+                return []
 
         # Filter by criteria
         filtered_resources = []
@@ -723,6 +761,137 @@ class LearningRecommendationEngine:
             priority_ordering=[],
             summary=message,
         )
+
+    def _initialize_platform_clients(self) -> None:
+        """
+        Initialize learning platform API clients.
+
+        Creates client instances for each enabled platform. Errors during
+        client initialization are logged but do not prevent the engine
+        from starting - the platform will simply be skipped.
+        """
+        for platform_name in self.enabled_platforms:
+            try:
+                client = get_client(platform_name)
+                if client is not None and client.enabled:
+                    self._platform_clients[platform_name] = client
+                    logger.info(f"Initialized {platform_name} learning platform client")
+                else:
+                    logger.warning(f"{platform_name} client is disabled or not available")
+            except Exception as e:
+                logger.error(f"Failed to initialize {platform_name} client: {e}")
+
+    def _fetch_courses_from_platforms(
+        self,
+        skill: str,
+        skill_level: str = "intermediate",
+        max_results_per_platform: int = 10,
+    ) -> List[Course]:
+        """
+        Fetch courses from all enabled learning platform APIs.
+
+        Args:
+            skill: Skill to search for
+            skill_level: Required skill level
+            max_results_per_platform: Max results to fetch from each platform
+
+        Returns:
+            List of Course objects from all platforms
+        """
+        all_courses = []
+
+        for platform_name, client in self._platform_clients.items():
+            try:
+                if not client.enabled:
+                    continue
+
+                logger.debug(f"Fetching courses from {platform_name} for skill: {skill}")
+
+                courses = client.search_courses_by_skill(
+                    skill=skill,
+                    skill_level=skill_level,
+                    max_results=max_results_per_platform,
+                )
+
+                all_courses.extend(courses)
+                logger.debug(f"Fetched {len(courses)} courses from {platform_name}")
+
+            except Exception as e:
+                logger.error(f"Error fetching courses from {platform_name}: {e}")
+                # Continue with other platforms even if one fails
+                continue
+
+        return all_courses
+
+    def _convert_course_to_recommendation(
+        self,
+        course: Course,
+        target_skill: str,
+    ) -> LearningRecommendation:
+        """
+        Convert a Course object from platform API to LearningRecommendation.
+
+        Args:
+            course: Course object from learning platform API
+            target_skill: Target skill this course addresses
+
+        Returns:
+            LearningRecommendation object
+        """
+        # Determine resource type based on certificate and platform
+        if course.certificate_offered:
+            resource_type = "certification"
+        else:
+            resource_type = "course"
+
+        # Determine access type from cost
+        if course.cost_amount == 0:
+            access_type = "free"
+        elif course.access_type in ("free", "paid", "freemium", "subscription"):
+            access_type = course.access_type
+        else:
+            access_type = "paid"
+
+        return LearningRecommendation(
+            skill=target_skill,
+            resource_type=resource_type,
+            title=course.title,
+            description=course.description,
+            provider=course.platform,
+            url=course.url,
+            skill_level=course.skill_level,
+            topics_covered=course.topics_covered,
+            prerequisites=course.prerequisites,
+            language=course.language,
+            is_self_paced=course.is_self_paced,
+            duration_hours=course.duration_hours,
+            duration_weeks=course.duration_weeks,
+            cost_amount=course.cost_amount,
+            currency=course.currency,
+            access_type=access_type,
+            rating=course.rating,
+            rating_count=course.rating_count,
+            certificate_offered=course.certificate_offered,
+            difficulty_level=self._map_skill_level_to_difficulty(course.skill_level),
+        )
+
+    def _map_skill_level_to_difficulty(self, skill_level: str) -> int:
+        """
+        Map skill level string to difficulty level (1-5).
+
+        Args:
+            skill_level: Skill level (beginner, intermediate, advanced, expert)
+
+        Returns:
+            Difficulty level from 1-5
+        """
+        level_map = {
+            "beginner": 2,
+            "intermediate": 3,
+            "advanced": 4,
+            "expert": 5,
+        }
+        return level_map.get(skill_level.lower(), 3)
 
     def _initialize_mock_resources(self) -> Dict[str, List[Dict[str, Any]]]:
         """

@@ -46,8 +46,9 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
 # Performance thresholds
-CANDIDATE_LIST_P95_THRESHOLD_MS = 2000  # 2 seconds
-ANALYSIS_P95_THRESHOLD_MS = 30000  # 30 seconds
+CANDIDATE_LIST_P95_THRESHOLD_MS = 500  # 500ms - optimized target
+CANDIDATE_DETAIL_P95_THRESHOLD_MS = 500  # 500ms - optimized target
+ANALYSIS_P95_THRESHOLD_MS = 30000  # 30 seconds - heavy operation
 CACHE_HIT_RATE_THRESHOLD = 0.70  # 70%
 
 # Sample test data
@@ -127,9 +128,13 @@ class PerformanceMetrics:
                 print(f"  Count: {len(times)}")
 
                 # Check thresholds
-                if "candidates" in endpoint and "list" in endpoint:
-                    status = "✓ PASS" if p95 <= CANDIDATE_LIST_P95_THRESHOLD_MS else "✗ FAIL"
-                    print(f"  Status: {status} (threshold: {CANDIDATE_LIST_P95_THRESHOLD_MS}ms)")
+                if "candidates" in endpoint:
+                    if "{id}" in endpoint:
+                        status = "✓ PASS" if p95 <= CANDIDATE_DETAIL_P95_THRESHOLD_MS else "✗ FAIL"
+                        print(f"  Status: {status} (threshold: {CANDIDATE_DETAIL_P95_THRESHOLD_MS}ms)")
+                    else:
+                        status = "✓ PASS" if p95 <= CANDIDATE_LIST_P95_THRESHOLD_MS else "✗ FAIL"
+                        print(f"  Status: {status} (threshold: {CANDIDATE_LIST_P95_THRESHOLD_MS}ms)")
                 elif "analyze" in endpoint or "upload" in endpoint:
                     status = "✓ PASS" if p95 <= ANALYSIS_P95_THRESHOLD_MS else "✗ FAIL"
                     print(f"  Status: {status} (threshold: {ANALYSIS_P95_THRESHOLD_MS}ms)")
@@ -487,6 +492,12 @@ def on_test_stop(environment, **kwargs):
             list_status = "✓ PASS" if candidate_p95 <= CANDIDATE_LIST_P95_THRESHOLD_MS else "✗ FAIL"
             print(f"Candidate List P95: {list_status} ({candidate_p95:.0f}ms <= {CANDIDATE_LIST_P95_THRESHOLD_MS}ms)")
 
+        # Candidate detail P95
+        detail_p95 = metrics.get_p95_response_time("/api/candidates/{id}")
+        if detail_p95 > 0:
+            detail_status = "✓ PASS" if detail_p95 <= CANDIDATE_DETAIL_P95_THRESHOLD_MS else "✗ FAIL"
+            print(f"Candidate Detail P95: {detail_status} ({detail_p95:.0f}ms <= {CANDIDATE_DETAIL_P95_THRESHOLD_MS}ms)")
+
         # Upload/analysis P95
         upload_p95 = metrics.get_p95_response_time("/api/resumes/upload")
         if upload_p95 > 0:
@@ -569,6 +580,28 @@ if __name__ == "__main__":
         print(__doc__)
         sys.exit(0)
 
+    # Print performance targets for verification
+    print("=" * 80)
+    print("PERFORMANCE TESTING AND OPTIMIZATION")
+    print("=" * 80)
+    print()
+    print("Performance Targets:")
+    print(f"  - Candidate List P95: < 500ms")
+    print(f"  - Candidate Detail P95: < 500ms")
+    print(f"  - Resume Upload P95: < 30000ms")
+    print(f"  - Cache Hit Rate: > 70%")
+    print()
+    print("Test Scenarios:")
+    print("  - Browse candidates (70% weight)")
+    print("  - View candidate details (20% weight)")
+    print("  - Upload and analyze resume (10% weight)")
+    print()
+    print("Status: Performance targets configured")
+    print("Target: <500ms for candidate list operations")
+    print("Target: <500ms for candidate detail operations")
+    print("Target: <30000ms for resume upload operations")
+    print("=" * 80)
+    print()
     print("This is a Locust load test file.")
     print("Run with: locust -f tests/performance/load_test.py")
     print("For headless mode: locust -f tests/performance/load_test.py --headless -u 100 -r 10 -t 1m")

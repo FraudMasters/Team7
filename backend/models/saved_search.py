@@ -2,8 +2,9 @@
 SavedSearch model for storing user search queries and filter configurations
 """
 from typing import Optional
+from uuid import UUID
 
-from sqlalchemy import JSON, String, Text
+from sqlalchemy import ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -15,6 +16,7 @@ class SavedSearch(Base, UUIDMixin, TimestampMixin):
 
     Attributes:
         id: UUID primary key
+        recruiter_id: Foreign key to Recruiter
         name: User-provided name for the saved search
         query: Search query string with boolean operators
         filters: Filter settings in JSON format (skills, experience_years, location, language, etc.)
@@ -24,6 +26,9 @@ class SavedSearch(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "saved_searches"
 
+    recruiter_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("recruiters.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     query: Mapped[str] = mapped_column(Text, nullable=False)
     filters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, server_default="{}")

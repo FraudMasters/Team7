@@ -1,0 +1,257 @@
+/**
+ * Design Tokens - CSS Variables
+ *
+ * CSS custom properties for the design system.
+ * These variables provide a single source of truth for colors, spacing, typography, and breakpoints.
+ *
+ * Theme Switching:
+ * These variables support both light and dark themes via the [data-theme] attribute.
+ * The ThemeContext sets this attribute on the document element.
+ *
+ * @example
+ * ```css
+ * .my-component {
+ *   color: var(--color-primary-main);
+ *   padding: var(--spacing-md);
+ *   font-size: var(--font-size-base);
+ * }
+ * ```
+ *
+ * @example
+ * ```tsx
+ * // In styled-components or other CSS-in-JS
+ * const StyledComponent = styled.div`
+ *   color: var(--color-primary-main);
+ *   padding: var(--spacing-md);
+ * `;
+ * ```
+ */
+
+/**
+ * ============================================
+ * COLOR VARIABLES
+ * ============================================
+ */
+
+:root {
+  /* Primary Colors */
+  --color-primary-main: #1976d2;
+  --color-primary-light: #42a5f5;
+  --color-primary-dark: #1565c0;
+  --color-primary-contrast-text: #ffffff;
+
+  /* Secondary Colors */
+  --color-secondary-main: #dc004e;
+  --color-secondary-light: #f50057;
+  --color-secondary-dark: #c51162;
+  --color-secondary-contrast-text: #ffffff;
+
+  /* Success Colors */
+  --color-success-main: #2e7d32;
+  --color-success-light: #4caf50;
+  --color-success-dark: #1b5e20;
+  --color-success-contrast-text: #ffffff;
+
+  /* Error Colors */
+  --color-error-main: #d32f2f;
+  --color-error-light: #f44336;
+  --color-error-dark: #c62828;
+  --color-error-contrast-text: #ffffff;
+
+  /* Warning Colors */
+  --color-warning-main: #ed6c02;
+  --color-warning-light: #ff9800;
+  --color-warning-dark: #e65100;
+  --color-warning-contrast-text: #ffffff;
+
+  /* Info Colors */
+  --color-info-main: #0288d1;
+  --color-info-light: #03a9f4;
+  --color-info-dark: #01579b;
+  --color-info-contrast-text: #ffffff;
+
+  /* Grey Scale */
+  --color-grey-50: #fafafa;
+  --color-grey-100: #f5f5f5;
+  --color-grey-200: #eeeeee;
+  --color-grey-300: #e0e0e0;
+  --color-grey-400: #bdbdbd;
+  --color-grey-500: #9e9e9e;
+  --color-grey-600: #757575;
+  --color-grey-700: #616161;
+  --color-grey-800: #424242;
+  --color-grey-900: #212121;
+
+  /* Text Colors (Light Theme) */
+  --color-text-primary: #000000;
+  --color-text-secondary: rgba(0, 0, 0, 0.6);
+  --color-text-disabled: rgba(0, 0, 0, 0.38);
+  --color-text-hint: rgba(0, 0, 0, 0.38);
+
+  /* Divider Color */
+  --color-divider: rgba(0, 0, 0, 0.12);
+}
+
+/**
+ * Light Theme Background Colors
+ */
+[data-theme='light'] {
+  --color-bg-default: #f5f5f5;
+  --color-bg-paper: #ffffff;
+}
+
+/**
+ * Dark Theme Background Colors
+ */
+[data-theme='dark'] {
+  --color-bg-default: #121212;
+  --color-bg-paper: #1e1e1e;
+
+  /* Dark theme text colors */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-text-disabled: rgba(255, 255, 255, 0.5);
+  --color-text-hint: rgba(255, 255, 255, 0.5);
+
+  /* Dark theme divider */
+  --color-divider: rgba(255, 255, 255, 0.12);
+}
+
+/**
+ * ============================================
+ * SPACING VARIABLES
+ * ============================================
+ */
+
+:root {
+  --spacing-none: 0;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 40px;
+  --spacing-xxxl: 48px;
+}
+
+/**
+ * ============================================
+ * TYPOGRAPHY VARIABLES
+ * ============================================
+ */
+
+:root {
+  /* Font Family */
+  --font-family-base: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+
+  /* Font Sizes */
+  --font-size-xs: 0.75rem;      /* 12px */
+  --font-size-sm: 0.875rem;     /* 14px */
+  --font-size-base: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.25rem;      /* 20px */
+  --font-size-2xl: 1.5rem;      /* 24px */
+  --font-size-3xl: 1.875rem;    /* 30px */
+  --font-size-4xl: 2.25rem;     /* 36px */
+  --font-size-5xl: 3rem;        /* 48px */
+  --font-size-6xl: 3.75rem;     /* 60px */
+
+  /* Font Weights */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line Heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Letter Spacing */
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+}
+
+/**
+ * ============================================
+ * BREAKPOINT VARIABLES
+ * ============================================
+ */
+
+:root {
+  --breakpoint-xs: 0px;
+  --breakpoint-sm: 600px;
+  --breakpoint-md: 960px;
+  --breakpoint-lg: 1280px;
+  --breakpoint-xl: 1920px;
+}
+
+/**
+ * ============================================
+ * BORDER RADIUS VARIABLES
+ * ============================================
+ */
+
+:root {
+  --border-radius-none: 0;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+}
+
+/**
+ * ============================================
+ * SHADOW VARIABLES
+ * ============================================
+ */
+
+:root {
+  --shadow-none: none;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/**
+ * ============================================
+ * Z-INDEX VARIABLES
+ * ============================================
+ */
+
+:root {
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+}
+
+/**
+ * ============================================
+ * TRANSITION VARIABLES
+ * ============================================
+ */
+
+:root {
+  /* Transition Durations (in ms) */
+  --transition-duration-shortest: 150ms;
+  --transition-duration-shorter: 200ms;
+  --transition-duration-short: 250ms;
+  --transition-duration-standard: 300ms;
+  --transition-duration-complex: 375ms;
+  --transition-duration-entering-screen: 225ms;
+  --transition-duration-leaving-screen: 195ms;
+
+  /* Transition Easing Functions */
+  --transition-easing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-easing-ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+  --transition-easing-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --transition-easing-sharp: cubic-bezier(0.4, 0, 0.6, 1);
+}

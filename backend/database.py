@@ -25,8 +25,10 @@ engine = create_async_engine(
     echo=settings.log_level == "DEBUG",
     future=True,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    pool_timeout=settings.db_pool_timeout,
+    pool_recycle=settings.db_pool_recycle,
 )
 
 # Create async session factory
@@ -86,6 +88,90 @@ def _extract_table_and_operation(query: str) -> tuple[str, str]:
 
 # Dictionary to store query start times for each connection
 _query_start_times: dict = {}
+
+# Dictionary to store connection checkout start times
+_checkout_start_times: dict = {}
+
+
+@event.listens_for(engine.sync_engine, "checkout")
+def _receive_checkout(dbapi_conn, connection_record, connection_proxy):
+    """
+    Event listener for connection checkout from pool.
+
+    Records the start time when a connection is checked out from the pool
+    to track checkout duration. Also updates pool metrics.
+
+    Args:
+        dbapi_conn: DBAPI connection
+        connection_record: Connection record
+        connection_proxy: Connection proxy
+    """
+    import time
+    _checkout_start_times[connection_record] = time.time()
+
+
+    # Update pool metrics
+    _update_pool_metrics()
+
+
+@event.listens_for(engine.sync_engine, "checkin")
+def _receive_checkin(dbapi_conn, connection_record):
+    """
+    Event listener for connection checkin to pool.
+
+    Records checkout duration metrics when a connection is returned to the pool.
+    Also updates pool metrics.
+
+    Args:
+        dbapi_conn: DBAPI connection
+        connection_record: Connection record
+    """
+    import time
+
+    try:
+        # Get checkout start time and record duration
+        start_time = _checkout_start_times.pop(connection_record, None)
+        if start_time is not None:
+            duration = time.time() - start_time
+            metrics_registry = get_metrics_registry()
+            metrics_registry.record_db_pool_checkout(duration, status="success")
+
+        # Update pool metrics
+        _update_pool_metrics()
+
+    except Exception as e:
+        logger.error(f"Error recording connection checkin metrics: {e}", exc_info=True)
+
+
+def _update_pool_metrics() -> None:
+    """
+    Update connection pool metrics.
+
+    Reads current pool status and updates Prometheus metrics.
+    This should be called on checkout/checkin events and periodically.
+    """
+    try:
+        pool = engine.pool
+        if pool is None:
+            return
+
+        metrics_registry = get_metrics_registry()
+
+        # Get pool status
+        size = pool.size()
+        overflow = pool.overflow() + getattr(pool, '_max_overflow', 0)
+        checked_out = size - pool.checkedin()
+        available = pool.checkedin()
+
+        metrics_registry.update_db_pool_metrics(
+            size=size,
+            overflow=overflow,
+            checked_out=checked_out,
+            available=available,
+        )
+
+    except Exception as e:
+        logger.debug(f"Error updating pool metrics: {e}")
 
 
 @event.listens_for(engine.sync_engine, "before_cursor_execute")
@@ -192,6 +278,10 @@ async def init_db() -> None:
         async with engine.begin() as conn:
             # Test connection
             await conn.execute("SELECT 1")
+
+        # Initialize pool metrics
+        _update_pool_metrics()
+
         logger.info("Database connection established successfully")
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")

@@ -1,0 +1,264 @@
+// Протокольные определения для Сервиса Обработки Резюме (Resume Processing Service)
+// Resume Processing Service gRPC Protocol Definitions
+//
+// Этот файл определяет интерфейсы gRPC для обработки резюме, включая
+// загрузку, парсинг, анализ и получение данных резюме.
+//
+// This file defines gRPC interfaces for resume processing, including
+// upload, parsing, analysis, and retrieval of resume data.
+
+syntax = "proto3";
+
+package resume;
+
+// ============================================
+// Сообщения для базовых операций с резюме
+// Resume basic operation messages
+// ============================================
+
+// Статус обработки резюме / Resume processing status
+enum ResumeStatus {
+    PENDING = 0;       // Ожидает обработки / Pending processing
+    PROCESSING = 1;    // В процессе обработки / Processing
+    COMPLETED = 2;     // Обработка завершена / Completed
+    FAILED = 3;        // Ошибка обработки / Failed
+    NEW = 4;           // Новое резюме / New resume
+    REVIEWED = 5;      // Просмотрено / Reviewed
+    INTERVIEW = 6;     // На интервью / Interview stage
+    OFFERED = 7;       // Предложение о работе / Offer stage
+    HIRED = 8;         // Нанят / Hired
+}
+
+// Базовая информация о резюме / Basic resume information
+message Resume {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string filename = 2;              // Имя файла / Filename
+    string file_path = 3;             // Путь к файлу / File path
+    string content_type = 4;          // MIME тип файла / MIME type
+    ResumeStatus status = 5;          // Статус обработки / Processing status
+    string raw_text = 6;              // Извлечённый текст / Extracted text
+    string language = 7;              // Обнаруженный язык / Detected language
+    string error_message = 8;         // Сообщение об ошибке / Error message
+    int64 created_at = 9;             // Время загрузки (timestamp) / Upload timestamp
+    int64 updated_at = 10;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Запрос на создание резюме / Request to create resume
+message CreateResumeRequest {
+    string filename = 1;              // Имя файла / Filename
+    string content_type = 2;          // MIME тип / MIME type
+    bytes file_data = 3;              // Двоичные данные файла / File binary data
+    string language = 4;              // Опционально: язык резюме / Optional: resume language
+}
+
+// Ответ на создание резюме / Response to create resume
+message CreateResumeResponse {
+    Resume resume = 1;                // Созданное резюме / Created resume
+    bool success = 2;                 // Успешность операции / Operation success
+    string message = 3;               // Сообщение о результате / Result message
+}
+
+// Запрос на получение резюме по ID / Request to get resume by ID
+message GetResumeRequest {
+    string id = 1;                    // UUID резюме / Resume UUID
+}
+
+// Ответ с данными резюме / Response with resume data
+message GetResumeResponse {
+    Resume resume = 1;                // Данные резюме / Resume data
+    bool found = 2;                   // Найдено ли резюме / Whether resume was found
+}
+
+// Запрос на список резюме / Request for resume list
+message ListResumesRequest {
+    int32 page = 1;                   // Номер страницы / Page number
+    int32 page_size = 2;              // Размер страницы / Page size
+    ResumeStatus status = 3;          // Фильтр по статусу / Status filter
+    string language = 4;              // Фильтр по языку / Language filter
+}
+
+// Ответ со списком резюме / Response with resume list
+message ListResumesResponse {
+    repeated Resume resumes = 1;      // Список резюме / List of resumes
+    int32 total = 2;                  // Общее количество / Total count
+    int32 page = 3;                   // Текущая страница / Current page
+    int32 page_size = 4;              // Размер страницы / Page size
+}
+
+// Запрос на удаление резюме / Request to delete resume
+message DeleteResumeRequest {
+    string id = 1;                    // UUID резюме / Resume UUID
+}
+
+// Ответ на удаление резюме / Response to delete resume
+message DeleteResumeResponse {
+    bool success = 1;                 // Успешность удаления / Deletion success
+    string message = 2;               // Сообщение о результате / Result message
+}
+
+// ============================================
+// Сообщения для анализа резюме
+// Resume analysis messages
+// ============================================
+
+// Результат анализа резюме / Resume analysis result
+message ResumeAnalysis {
+    string id = 1;                    // UUID идентификатор / UUID identifier
+    string resume_id = 2;             // ID резюме / Resume ID
+    string language = 3;              // Обнаруженный язык / Detected language
+    string raw_text = 4;              // Полный текст резюме / Full resume text
+
+    // Извлечённые данные / Extracted data
+    repeated string skills = 5;       // Список навыков / List of skills
+    repeated Keyword keywords = 6;    // Ключевые слова / Keywords
+    map<string, string> entities = 7; // Именованные сущности / Named entities
+
+    // Результаты анализа / Analysis results
+    int32 total_experience_months = 8; // Общий опыт в месяцах / Total experience in months
+    repeated Education education = 9;   // Образование / Education
+    ContactInfo contact_info = 10;     // Контактная информация / Contact info
+
+    // Метрики качества / Quality metrics
+    repeated GrammarIssue grammar_issues = 11; // Грамматические ошибки / Grammar issues
+    repeated string warnings = 12;              // Предупреждения / Warnings
+    int32 quality_score = 13;                   // Оценка качества (0-100) / Quality score
+
+    // Метаданные обработки / Processing metadata
+    float processing_time_seconds = 14;  // Время обработки / Processing time
+    string analyzer_version = 15;        // Версия анализатора / Analyzer version
+
+    int64 created_at = 16;            // Время создания (timestamp) / Creation timestamp
+    int64 updated_at = 17;            // Время обновления (timestamp) / Update timestamp
+}
+
+// Ключевое слово с оценкой релевантности / Keyword with relevance score
+message Keyword {
+    string text = 1;                 // Текст ключевого слова / Keyword text
+    float score = 2;                 // Оценка релевантности / Relevance score
+}
+
+// Информация об образовании / Education information
+message Education {
+    string institution = 1;          // Учебное заведение / Institution
+    string degree = 2;               // Степень / Degree
+    string field_of_study = 3;       // Специальность / Field of study
+    string start_date = 4;           // Дата начала / Start date
+    string end_date = 5;             // Дата окончания / End date
+    string description = 6;          // Описание / Description
+}
+
+// Контактная информация / Contact information
+message ContactInfo {
+    string email = 1;                // Email адрес / Email address
+    string phone = 2;                // Телефон / Phone number
+    repeated string links = 3;       // Ссылки (LinkedIn и др.) / Links (LinkedIn, etc.)
+    string location = 4;             // Местоположение / Location
+}
+
+// Грамматическая ошибка / Grammar issue
+message GrammarIssue {
+    string message = 1;              // Сообщение об ошибке / Error message
+    string context = 2;              // Контекст с ошибкой / Context with error
+    int32 offset = 3;                // Смещение в тексте / Offset in text
+    int32 length = 4;                // Длина ошибки / Error length
+    repeated string suggestions = 5; // Предложения исправления / Correction suggestions
+}
+
+// Запрос на анализ резюме / Request to analyze resume
+message AnalyzeResumeRequest {
+    string resume_id = 1;            // ID резюме для анализа / Resume ID to analyze
+    bool force_refresh = 2;          // Принудительный пересчёт / Force re-analysis
+}
+
+// Ответ с результатами анализа / Response with analysis results
+message AnalyzeResumeResponse {
+    ResumeAnalysis analysis = 1;     // Результаты анализа / Analysis results
+    bool success = 2;                // Успешность анализа / Analysis success
+    string message = 3;              // Сообщение о результате / Result message
+}
+
+// Запрос на получение анализа резюме / Request to get resume analysis
+message GetResumeAnalysisRequest {
+    string resume_id = 1;            // ID резюме / Resume ID
+}
+
+// Ответ с данными анализа / Response with analysis data
+message GetResumeAnalysisResponse {
+    ResumeAnalysis analysis = 1;     // Данные анализа / Analysis data
+    bool found = 2;                  // Найден ли анализ / Whether analysis was found
+}
+
+// ============================================
+// Сообщения для опыта работы
+// Work experience messages
+// ============================================
+
+// Запись об опыте работы / Work experience entry
+message WorkExperience {
+    string id = 1;                   // UUID идентификатор / UUID identifier
+    string resume_id = 2;            // ID резюме / Resume ID
+    string company = 3;              // Компания / Company
+    string title = 4;                // Должность / Job title
+    string start_date = 5;           // Дата начала / Start date
+    string end_date = 6;             // Дата окончания / End date
+    string description = 7;          // Описание / Description
+    float confidence_score = 8;      // Уверенность извлечения (0-1) / Extraction confidence
+    int64 created_at = 9;            // Время создания / Creation timestamp
+    int64 updated_at = 10;           // Время обновления / Update timestamp
+}
+
+// Запрос на получение опыта работы резюме / Request to get resume work experience
+message GetWorkExperienceRequest {
+    string resume_id = 1;            // ID резюме / Resume ID
+}
+
+// Ответ со списком опыта работы / Response with work experience list
+message GetWorkExperienceResponse {
+    repeated WorkExperience experiences = 1; // Список опыта работы / Work experience list
+    bool found = 2;                          // Найдены ли записи / Whether entries were found
+}
+
+// ============================================
+// Сервис Resume Service
+// Resume Service definition
+// ============================================
+
+// Сервис обработки резюме / Resume processing service
+service ResumeService {
+    // Создать новое резюме / Create new resume
+    rpc CreateResume (CreateResumeRequest) returns (CreateResumeResponse);
+
+    // Получить резюме по ID / Get resume by ID
+    rpc GetResume (GetResumeRequest) returns (GetResumeResponse);
+
+    // Получить список резюме / Get list of resumes
+    rpc ListResumes (ListResumesRequest) returns (ListResumesResponse);
+
+    // Удалить резюме / Delete resume
+    rpc DeleteResume (DeleteResumeRequest) returns (DeleteResumeResponse);
+
+    // Проанализировать резюме / Analyze resume
+    rpc AnalyzeResume (AnalyzeResumeRequest) returns (AnalyzeResumeResponse);
+
+    // Получить анализ резюме / Get resume analysis
+    rpc GetResumeAnalysis (GetResumeAnalysisRequest) returns (GetResumeAnalysisResponse);
+
+    // Получить опыт работы резюме / Get resume work experience
+    rpc GetWorkExperience (GetWorkExperienceRequest) returns (GetWorkExperienceResponse);
+
+    // Получить текст резюме для дополнительных сервисов / Get resume text for additional services
+    rpc GetResumeText (GetResumeRequest) returns (GetResumeTextResponse);
+}
+
+// ============================================
+// Дополнительные вспомогательные сообщения
+// Additional helper messages
+// ============================================
+
+// Ответ с текстом резюме / Response with resume text
+message GetResumeTextResponse {
+    string resume_id = 1;            // ID резюме / Resume ID
+    string raw_text = 2;             // Извлечённый текст / Extracted text
+    string language = 3;             // Язык резюме / Resume language
+    bool found = 4;                  // Найдено ли резюме / Whether resume was found
+}

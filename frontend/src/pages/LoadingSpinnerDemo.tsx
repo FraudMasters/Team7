@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Container, Typography, Box, Paper, Button, Stack, Divider } from '@mui/material';
+import { Container, Typography, Box, Paper, Button, Stack, Divider } from '@/components/ui';
 import LoadingSpinner from '@components/LoadingSpinner';
 
 /**
@@ -32,7 +32,7 @@ const LoadingSpinnerDemoPage: React.FC = () => {
         <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
           LoadingSpinner Component Demo
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="secondary">
           Visual verification of all skeleton variants
         </Typography>
       </Box>

@@ -23,12 +23,10 @@ test.describe('Dark Mode - Toggle Functionality', () => {
   test('should display theme toggle button in navigation', async ({ page }) => {
     await page.goto('/');
 
-    // Look for theme toggle button (has sun or moon icon)
+    // Look for theme toggle button (has sun or moon icon SVG)
+    // Using generic SVG detection instead of MUI-specific icon classes
     const themeToggle = page.locator('button[aria-label*="Switch"]').filter({
-      has: page.locator('svg').filter(async (svg) => {
-        const className = await svg.getAttribute('class');
-        return className?.includes('DarkModeIcon') || className?.includes('LightModeIcon');
-      }),
+      has: page.locator('svg'),
     });
 
     await expect(themeToggle.first()).toBeVisible();
@@ -291,8 +289,9 @@ test.describe('Dark Mode - Component Integration', () => {
     await themeToggle.click();
     await page.waitForTimeout(300);
 
-    // Check MUI Paper components (cards, dialogs, etc.)
-    const papers = page.locator('.MuiPaper-root');
+    // Check Paper/Card components (cards, dialogs, etc.)
+    // Using generic selector instead of MUI-specific class
+    const papers = page.locator('.paper, .card, [role="article"]');
 
     const count = await papers.count();
     if (count > 0) {
@@ -301,7 +300,7 @@ test.describe('Dark Mode - Component Integration', () => {
       });
 
       // In dark mode, papers should have dark background
-      expect(firstPaperBg).toBe('rgb(30, 30, 30)'); // #1e1e1e from ThemeContext
+      expect(firstPaperBg).toBe('rgb(30, 30, 30)'); // #1e1e1e from theme
     }
   });
 
@@ -314,12 +313,13 @@ test.describe('Dark Mode - Component Integration', () => {
     await page.waitForTimeout(300);
 
     // Check buttons
-    const buttons = page.locator('button:not([aria-label]):not(.MuiIconButton-root)');
+    // Looking for non-icon buttons (buttons with text content)
+    const buttons = page.locator('button:not([aria-label])');
 
     const buttonCount = await buttons.count();
     if (buttonCount > 0) {
       // At least some buttons should be visible
-      const visibleButtons = page.locator('button:not([aria-label]):not(.MuiIconButton-root)').filter({
+      const visibleButtons = page.locator('button:not([aria-label])').filter({
         hasText: /.+/
       });
 

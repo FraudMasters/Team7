@@ -5,6 +5,15 @@ import { Add as AddIcon, MoreVert as MoreVertIcon, Edit as EditIcon, Delete as D
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 
+/**
+ * Страница вакансий рекрутера
+ *
+ * Отображает список всех вакансий рекрутера с возможностью просмотра,
+ * редактирования и удаления. Использует MUI компоненты для отображения
+ * карточек вакансий в сетке.
+ */
+
+// Интерфейс вакансии
 interface Vacancy {
   id: string;
   title: string;
@@ -19,12 +28,16 @@ interface Vacancy {
 }
 
 export function VacanciesPage() {
+  // Хуки для навигации и управления кэшем
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Состояние для меню действий
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Загружаем список вакансий
   const { data: vacanciesData, isLoading, error } = useQuery({
     queryKey: ['vacancies'],
     queryFn: async () => {
@@ -33,6 +46,7 @@ export function VacanciesPage() {
     },
   });
 
+  // Мутация для удаления вакансии
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiClient.delete(`/vacancies/${id}`);
@@ -46,6 +60,7 @@ export function VacanciesPage() {
 
   const vacancies = vacanciesData?.vacancies || [];
 
+  // Обработчики действий
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, vacancy: Vacancy) => {
     setAnchorEl(event.currentTarget);
     setSelectedVacancy(vacancy);
@@ -74,6 +89,7 @@ export function VacanciesPage() {
     }
   };
 
+  // Состояние загрузки
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
@@ -84,6 +100,7 @@ export function VacanciesPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
+      {/* Заголовок страницы с кнопкой создания */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>
@@ -102,6 +119,7 @@ export function VacanciesPage() {
         </Button>
       </Stack>
 
+      {/* Пустое состояние - нет вакансий */}
       {vacancies.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Typography variant="h6" gutterBottom>
@@ -119,6 +137,7 @@ export function VacanciesPage() {
           </Button>
         </Paper>
       ) : (
+        /* Сетка карточек вакансий */
         <Grid container spacing={2}>
           {vacancies.map((vacancy, index) => {
             const visibleSkills = vacancy.required_skills?.slice(0, 3) || [];
@@ -145,6 +164,7 @@ export function VacanciesPage() {
                   }}
                 >
                 <Box sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                  {/* Заголовок карточки с кнопкой меню */}
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -159,6 +179,7 @@ export function VacanciesPage() {
                     </IconButton>
                   </Stack>
 
+                  {/* Метки с форматом работы и зарплатой */}
                   <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
                     {vacancy.work_format && (
                       <Chip label={vacancy.work_format} size="small" variant="outlined" />
@@ -168,6 +189,7 @@ export function VacanciesPage() {
                     )}
                   </Stack>
 
+                  {/* Навыки */}
                   <Stack direction="row" spacing={1} flexWrap="wrap" gap={0.5} sx={{ mt: 'auto' }}>
                     {visibleSkills.map((skill) => (
                       <Chip key={skill} label={skill} size="small" variant="outlined" />
@@ -184,6 +206,7 @@ export function VacanciesPage() {
         </Grid>
       )}
 
+      {/* Контекстное меню действий */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
@@ -199,6 +222,7 @@ export function VacanciesPage() {
         </MenuItem>
       </Menu>
 
+      {/* Диалог подтверждения удаления */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Delete this vacancy?</DialogTitle>
         <DialogContent>

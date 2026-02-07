@@ -18,17 +18,8 @@ import {
   TableContainer,
   TableRow,
   Divider,
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  TrendingUp as PositiveIcon,
-  TrendingDown as NegativeIcon,
-  Psychology as AIIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Info as InfoIcon,
-  BarChart as ImportanceIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { FeatureExplanation } from '../types/api';
 
 interface RankingExplanationProps {
@@ -105,9 +96,9 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {isPositive ? (
-              <PositiveIcon sx={{ fontSize: 16, color: 'success.main' }} />
+              <Icon name="trending-up" sx={{ fontSize: 16, color: 'success.main' }} />
             ) : (
-              <NegativeIcon sx={{ fontSize: 16, color: 'error.main' }} />
+              <Icon name="trending-down" sx={{ fontSize: 16, color: 'error.main' }} />
             )}
             <Typography variant="body2" fontWeight={600}>
               {label}
@@ -177,7 +168,7 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Box sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <AIIcon sx={{ fontSize: 28 }} />
+              <Icon name="brain" sx={{ fontSize: 28 }} />
               <Typography variant="h5" fontWeight={700}>
                 Объяснение AI-ранжирования
               </Typography>
@@ -230,7 +221,7 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <PositiveIcon color="success" sx={{ mr: 1 }} />
+              <Icon name="trending-up" color="success" sx={{ mr: 1 }} />
               <Typography variant="subtitle1" fontWeight={600} color="success.main">
                 Сильные стороны
               </Typography>
@@ -288,7 +279,7 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <NegativeIcon color="error" sx={{ mr: 1 }} />
+              <Icon name="trending-down" color="error" sx={{ mr: 1 }} />
               <Typography variant="subtitle1" fontWeight={600} color="error.main">
                 Области для улучшения
               </Typography>
@@ -347,16 +338,16 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ImportanceIcon color="primary" />
+            <Icon name="bar-chart" color="primary" />
             <Typography variant="subtitle1" fontWeight={600}>
               Детальный разбор факторов
             </Typography>
             <Tooltip title="Показывает вклад каждого фактора в итоговый рейтинг">
-              <InfoIcon fontSize="small" color="info" sx={{ ml: 0.5 }} />
+              <Icon name="info" fontSize="small" color="info" sx={{ ml: 0.5 }} />
             </Tooltip>
           </Box>
           <IconButton size="small">
-            {factorsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            {factorsOpen ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
           </IconButton>
         </Box>
 
@@ -419,13 +410,13 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
                   </Typography>
                   <Stack spacing={0.5}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <PositiveIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                      <Icon name="trending-up" sx={{ fontSize: 16, color: 'success.main' }} />
                       <Typography variant="caption" color="text.secondary">
                         Положительное влияние на рейтинг
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <NegativeIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                      <Icon name="trending-down" sx={{ fontSize: 16, color: 'error.main' }} />
                       <Typography variant="caption" color="text.secondary">
                         Отрицательное влияние на рейтинг
                       </Typography>

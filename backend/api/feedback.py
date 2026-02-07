@@ -116,7 +116,7 @@ async def create_feedback(request: FeedbackCreate) -> JSONResponse:
         ...         }
         ...     ]
         ... }
-        >>> response = requests.post("http://localhost:8000/api/feedback/", json=data)
+        >>> response = requests.post("/api/feedback/", json=data)
         >>> response.json()
         {
             "feedback": [...],
@@ -214,7 +214,7 @@ async def list_feedback(
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/feedback/?skill=React")
+        >>> response = requests.get("/api/feedback/?skill=React")
         >>> response.json()
     """
     try:
@@ -261,7 +261,7 @@ async def get_feedback(feedback_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/feedback/123e4567-e89b-12d3-a456-426614174000")
+        >>> response = requests.get("/api/feedback/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
     """
     try:
@@ -320,7 +320,7 @@ async def update_feedback(
         >>> import requests
         >>> data = {"processed": True, "was_correct": False}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/feedback/123",
+        ...     "/api/feedback/123",
         ...     json=data
         ... )
         >>> response.json()
@@ -384,7 +384,7 @@ async def delete_feedback(feedback_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("http://localhost:8000/api/feedback/123")
+        >>> response = requests.delete("/api/feedback/123")
         >>> response.json()
         {"message": "Feedback deleted successfully"}
     """

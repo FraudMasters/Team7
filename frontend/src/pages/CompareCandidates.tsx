@@ -16,8 +16,7 @@ import {
   TextField,
   CircularProgress,
   IconButton,
-} from '@mui/material';
-import { ContentCopy as CopyIcon, Check as CheckIcon } from '@mui/icons-material';
+} from '@/components/ui';
 import ResumeComparisonMatrix from '@components/ResumeComparisonMatrix';
 import ComparisonControls from '@components/ComparisonControls';
 import ComparisonNotes from '@components/ComparisonNotes';
@@ -269,15 +268,15 @@ const CompareCandidatesPage: React.FC = () => {
       <Stack spacing={3}>
         {/* Page Header */}
         <Box className="comparison-section">
-          <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+          <Typography variant="h4" as="h1" gutterBottom fontWeight={600}>
             Compare Candidates
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="secondary">
             Compare multiple candidates side-by-side to identify the best fit for this position. Select 2-5
             candidates to see a detailed skill matrix and rankings based on their qualifications against the
             vacancy requirements.
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          <Typography variant="caption" color="secondary" sx={{ display: 'block', mt: 1 }}>
             Vacancy ID: {vacancyId} | Generated: {new Date().toLocaleString()}
           </Typography>
         </Box>
@@ -313,7 +312,7 @@ const CompareCandidatesPage: React.FC = () => {
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Recruiter Notes
             </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph className="no-print">
+            <Typography variant="body2" color="secondary" paragraph className="no-print">
               Add notes for each candidate during your comparison. Notes are automatically saved as you type and
               will persist when you return to this comparison.
             </Typography>
@@ -355,7 +354,7 @@ const CompareCandidatesPage: React.FC = () => {
             </Typography>
             <Typography
               variant="body2"
-              component="div"
+              as="div"
               sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1, fontFamily: 'monospace' }}
             >
               /recruiter/vacancies/{vacancyId}?candidates=candidate-1,candidate-2,candidate-3
@@ -390,7 +389,7 @@ const CompareCandidatesPage: React.FC = () => {
               autoFocus
               disabled={isSaving}
             />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            <Typography variant="body2" color="secondary" sx={{ mt: 2 }}>
               This will save the current comparison with {candidateIds.length} candidate(s) for vacancy{' '}
               <strong>{vacancyId}</strong>.
             </Typography>
@@ -437,7 +436,7 @@ const CompareCandidatesPage: React.FC = () => {
               </IconButton>
             </Box>
             {copiedToClipboard && (
-              <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+              <Typography variant="body2" color="success" sx={{ mt: 1 }}>
                 URL copied to clipboard!
               </Typography>
             )}

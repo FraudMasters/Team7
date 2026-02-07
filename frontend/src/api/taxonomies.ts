@@ -25,6 +25,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { config } from '@/config';
 import type {
   CustomSynonymListResponse,
   ApiError,
@@ -45,7 +46,7 @@ import {
  * Default API configuration for taxonomies client
  */
 const DEFAULT_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: config.api.url,
   timeout: 10000, // 10 seconds
   headers: {
     'Content-Type': 'application/json',

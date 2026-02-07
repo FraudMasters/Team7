@@ -14,17 +14,8 @@ import {
   Tooltip,
   IconButton,
   Collapse,
-} from '@mui/material';
-import {
-  Star as StarIcon,
-  EmojiEvents as TrophyIcon,
-  Psychology as AIIcon,
-  TrendingUp as TrendingUpIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Info as InfoIcon,
-  Science as ScienceIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { RecommendationsResponse, RankedCandidate, FeatureExplanation } from '../types/api';
@@ -97,13 +88,13 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
-        return <TrophyIcon sx={{ fontSize: 32, color: 'warning.main' }} />;
+        return <Icon name="trophy" size={32} color="warning" />;
       case 2:
-        return <TrophyIcon sx={{ fontSize: 28, color: 'grey.400' }} />;
+        return <Icon name="trophy" size={28} color="gray" />;
       case 3:
-        return <TrophyIcon sx={{ fontSize: 24, color: 'error.main' }} />;
+        return <Icon name="trophy" size={24} color="error" />;
       default:
-        return <StarIcon sx={{ fontSize: 20, color: 'text.secondary' }} />;
+        return <Icon name="star" size={20} color="muted" />;
     }
   };
 
@@ -154,7 +145,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
   if (!recommendations || recommendations.top_candidates.length === 0) {
     return (
       <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <AIIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+        <Icon name="brain" size={48} color="disabled" style={{ marginBottom: '8px' }} />
         <Typography variant="h6" color="text.secondary">
           {t('recommendations.noRecommendations')}
         </Typography>
@@ -180,7 +171,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <StarIcon sx={{ fontSize: 28 }} />
+              <Icon name="star" size={28} />
               <Typography variant="h5" fontWeight={700}>
                 {t('recommendations.title')}
               </Typography>
@@ -263,7 +254,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
                       {candidate.is_experiment && (
                         <Tooltip title={`Experiment: ${candidate.experiment_group === 'treatment' ? 'New AI Model' : 'Standard Model'} (${candidate.model_version || 'v1.0'})`}>
                           <Chip
-                            icon={<ScienceIcon sx={{ fontSize: 14 }} />}
+                            icon={<Icon name="flask-conical" size={14} />}
                             label="A/B TEST"
                             size="small"
                             color={candidate.experiment_group === 'treatment' ? 'secondary' : 'default'}
@@ -310,7 +301,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
                   <Box sx={{ mb: 2, textAlign: 'center' }}>
                     <Tooltip title={t('recommendations.hireProbabilityTooltip')}>
                       <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                        <TrendingUpIcon fontSize="small" color="info" />
+                        <Icon name="trending-up" size="small" color="info" />
                         <Typography variant="caption" color="text.secondary">
                           {t('recommendations.hireProbability')}:{' '}
                           <strong>{(candidate.hire_probability * 100).toFixed(0)}%</strong>
@@ -322,7 +313,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
                   {/* Recommendation Badge */}
                   <Box sx={{ mb: 2, textAlign: 'center' }}>
                     <Chip
-                      icon={<AIIcon />}
+                      icon={<Icon name="brain" size="small" />}
                       label={t(`recommendations.levels.${candidate.recommendation}`)}
                       color={getRecommendationColor(candidate.recommendation) as any}
                       sx={{ fontWeight: 600 }}
@@ -336,7 +327,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
                       onClick={() => toggleCardExpansion(index)}
                       sx={{ bgcolor: 'action.hover' }}
                     >
-                      {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      {isExpanded ? <Icon name="chevron-up" size={20} /> : <Icon name="chevron-down" size={20} />}
                       <Typography variant="caption" sx={{ ml: 0.5 }}>
                         {isExpanded ? t('recommendations.hide') : t('recommendations.show')}
                       </Typography>
@@ -349,7 +340,7 @@ const TopRecommendations: React.FC<TopRecommendationsProps> = ({ vacancyId, vaca
                       {/* Summary */}
                       <Box sx={{ mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-                          <InfoIcon fontSize="small" color="primary" />
+                          <Icon name="info" size="small" color="primary" />
                           <Typography variant="subtitle2" fontWeight={600} color="primary">
                             {t('recommendations.whyRecommended')}
                           </Typography>

@@ -21,6 +21,29 @@ from .notification_service import (
     get_notification_service,
 )
 
+from .health_check import (
+    HealthCheckService,
+    HealthCheckResult,
+    BaseHealthChecker,
+    DatabaseHealthChecker,
+    RedisHealthChecker,
+    CeleryHealthChecker,
+    MLModelHealthChecker,
+    ExternalAPIHealthChecker,
+    get_health_check_service,
+)
+
+from .alerting import (
+    Alert,
+    BaseNotificationChannel,
+    EmailAlertChannel,
+    SlackAlertChannel,
+    PagerDutyAlertChannel,
+    AlertingService,
+    get_alerting_service,
+    send_health_alert,
+)
+
 __all__ = [
     "BackupService",
     "get_backup_service",
@@ -33,4 +56,21 @@ __all__ = [
     "cached",
     "NotificationService",
     "get_notification_service",
+    "HealthCheckService",
+    "HealthCheckResult",
+    "BaseHealthChecker",
+    "DatabaseHealthChecker",
+    "RedisHealthChecker",
+    "CeleryHealthChecker",
+    "MLModelHealthChecker",
+    "ExternalAPIHealthChecker",
+    "get_health_check_service",
+    "Alert",
+    "BaseNotificationChannel",
+    "EmailAlertChannel",
+    "SlackAlertChannel",
+    "PagerDutyAlertChannel",
+    "AlertingService",
+    "get_alerting_service",
+    "send_health_alert",
 ]

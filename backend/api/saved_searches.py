@@ -102,7 +102,7 @@ async def create_saved_search(
         ...     "filters": {"min_experience_years": 5}
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/saved-searches/",
+        ...     "/api/saved-searches/",
         ...     json=data
         ... )
     """
@@ -176,9 +176,9 @@ async def list_saved_searches(
     Examples:
         >>> import requests
         >>> # Get all saved searches
-        >>> response = requests.get("http://localhost:8000/api/saved-searches/")
+        >>> response = requests.get("/api/saved-searches/")
         >>> # Search by name
-        >>> response = requests.get("http://localhost:8000/api/saved-searches/?search=python")
+        >>> response = requests.get("/api/saved-searches/?search=python")
         >>> saved_searches = response.json()
     """
     try:
@@ -267,7 +267,7 @@ async def get_saved_search(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/saved-searches/abc-123-def"
+        ...     "/api/saved-searches/abc-123-def"
         ... )
         >>> saved_search = response.json()
     """
@@ -351,7 +351,7 @@ async def update_saved_search(
         >>> import requests
         >>> data = {"name": "Updated Search Name"}
         >>> response = requests.put(
-        ...     "http://localhost:8000/api/saved-searches/abc-123-def",
+        ...     "/api/saved-searches/abc-123-def",
         ...     json=data
         ... )
     """
@@ -445,7 +445,7 @@ async def delete_saved_search(
     Examples:
         >>> import requests
         >>> response = requests.delete(
-        ...     "http://localhost:8000/api/saved-searches/abc-123-def"
+        ...     "/api/saved-searches/abc-123-def"
         ... )
     """
     try:

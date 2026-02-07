@@ -1,26 +1,29 @@
+// Импорт хуков для управления состоянием
 import { useState } from 'react';
+// Импорт компонентов MUI для UI
 import {
-  Container,
-  Typography,
-  Box,
-  Paper,
-  Grid,
-  TextField,
-  Button,
-  Switch,
-  FormControlLabel,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Card,
-  CardContent,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
+  Container,          // Контейнер для ограничения ширины содержимого
+  Typography,         // Компонент для текста с различными стилями
+  Box,                // Универсальный контейнер для верстки
+  Paper,              // Контейнер с эффектом elevated (карточка)
+  Grid,               // Сетка для адаптивной верстки
+  TextField,          // Поле ввода текста
+  Button,             // Кнопки
+  Switch,             // Переключатель
+  FormControlLabel,   // Метка с контролом
+  Divider,            // Разделитель
+  List,               // Список
+  ListItem,           // Элемент списка
+  ListItemText,       // Текст элемента списка
+  ListItemSecondaryAction, // Вторичное действие элемента списка
+  Card,               // Карточка
+  CardContent,        // Содержимое карточки
+  Select,             // Выпадающий список
+  MenuItem,           // Пункт выпадающего списка
+  FormControl,        // Контейнер для элементов форм
+  InputLabel,         // Метка поля ввода
 } from '@mui/material';
+// Импорт иконок из MUI
 import {
   Settings as SettingsIcon,
   Language as LanguageIcon,
@@ -30,24 +33,47 @@ import {
   Visibility as VisibilityIcon,
   Email as EmailIcon,
 } from '@mui/icons-material';
-import { PageTransition } from '../../components/ui/PageTransition';
+// Импорт MUI компонентов
+import { PageTransition } from '@components/mui/PageTransition';
+// Импорт хуков для работы с данными
 import { useQuery } from '@tanstack/react-query';
+// Импорт API функций
 import { getLanguagePreference, updateLanguagePreference } from '../../api/preferences';
 import { NotificationPreferences } from '../../components/NotificationPreferences';
 
+/**
+ * Страница настроек
+ * Позволяет управлять предпочтениями аккаунта и конфиденциальностью
+ */
 export function SettingsPage() {
+  // Состояние выбранного языка
   const [language, setLanguage] = useState<'en' | 'ru'>('en');
+  // Состояние настроек уведомлений
+  const [notifications, setNotifications] = useState({
+    emailNewJobs: true,
+    emailApplicationUpdates: true,
+    emailMessages: false,
+    pushNewJobs: true,
+    pushApplicationUpdates: true,
+    pushMessages: true,
+  });
+  // Состояние настроек приватности
   const [privacy, setPrivacy] = useState({
     profileVisible: true,
     showSalary: false,
     allowRecruitersContact: true,
   });
 
+  // Получение текущего языка с сервера
   const { data: langPref } = useQuery({
     queryKey: ['language-preference'],
     queryFn: getLanguagePreference,
   });
 
+  /**
+   * Обработчик изменения языка
+   * @param newLang - Новый язык (en или ru)
+   */
   const handleLanguageChange = async (newLang: 'en' | 'ru') => {
     setLanguage(newLang);
     try {
@@ -60,7 +86,7 @@ export function SettingsPage() {
   return (
     <PageTransition>
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Header */}
+        {/* Заголовок страницы */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <SettingsIcon sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -76,7 +102,7 @@ export function SettingsPage() {
         </Box>
 
         <Grid container spacing={3}>
-          {/* Language & Region */}
+          {/* Язык и регион */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -125,7 +151,7 @@ export function SettingsPage() {
             </Paper>
           </Grid>
 
-          {/* Appearance */}
+          {/* Оформление */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -165,7 +191,7 @@ export function SettingsPage() {
             </Paper>
           </Grid>
 
-          {/* Notifications */}
+          {/* Уведомления */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -175,11 +201,100 @@ export function SettingsPage() {
                 </Typography>
               </Box>
 
-              <NotificationPreferences />
+              {/* Email-уведомления */}
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Email Notifications
+              </Typography>
+              <List dense>
+                <ListItem>
+                  <ListItemText primary="New job matches" secondary="Receive emails about new jobs" />
+                  <ListItemSecondaryAction>
+                    <Switch
+                      checked={notifications.emailNewJobs}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, emailNewJobs: e.target.checked })
+                      }
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+                <ListItem>
+                  <ListItemText
+                    primary="Application updates"
+                    secondary="Status changes on your applications"
+                  />
+                  <ListItemSecondaryAction>
+                    <Switch
+                      checked={notifications.emailApplicationUpdates}
+                      onChange={(e) =>
+                        setNotifications({
+                          ...notifications,
+                          emailApplicationUpdates: e.target.checked,
+                        })
+                      }
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Messages from recruiters" />
+                  <ListItemSecondaryAction>
+                    <Switch
+                      checked={notifications.emailMessages}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, emailMessages: e.target.checked })
+                      }
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+              </List>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Push-уведомления */}
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Push Notifications
+              </Typography>
+              <List dense>
+                <ListItem>
+                  <ListItemText primary="New job matches" />
+                  <ListItemSecondaryAction>
+                    <Switch
+                      checked={notifications.pushNewJobs}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, pushNewJobs: e.target.checked })
+                      }
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Application updates" />
+                  <ListItemSecondaryAction>
+                    <Switch
+                      checked={notifications.pushApplicationUpdates}
+                      onChange={(e) =>
+                        setNotifications({
+                          ...notifications,
+                          pushApplicationUpdates: e.target.checked,
+                        })
+                      }
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Messages" />
+                  <ListItemSecondaryAction>
+                    <Switch
+                      checked={notifications.pushMessages}
+                      onChange={(e) =>
+                        setNotifications({ ...notifications, pushMessages: e.target.checked })
+                      }
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+              </List>
             </Paper>
           </Grid>
 
-          {/* Privacy */}
+          {/* Приватность */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -250,7 +365,7 @@ export function SettingsPage() {
             </Paper>
           </Grid>
 
-          {/* Danger Zone */}
+          {/* Опасная зона */}
           <Grid item xs={12}>
             <Paper sx={{ p: 3, border: '1px solid', borderColor: 'error.main' }}>
               <Typography variant="h6" fontWeight={600} color="error" gutterBottom>

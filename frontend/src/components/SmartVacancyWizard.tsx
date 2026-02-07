@@ -27,17 +27,8 @@ import {
   Tooltip,
   InputAdornment,
   CircularProgress,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ArrowBack as ArrowBackIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Work as WorkIcon,
-  School as SchoolIcon,
-  BusinessCenter as BusinessCenterIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+} from '@/components/ui';
+import { Icon } from '@/components/ui/primitives';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
@@ -102,7 +93,7 @@ const SkillChip = React.memo<{
     label={skill}
     onDelete={onDelete}
     color={color}
-    deleteIcon={<DeleteIcon />}
+    deleteIcon={<Icon name="trash-2" size="small" />}
     size="small"
   />
 ));
@@ -428,10 +419,10 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
                 placeholder="Например: Java Developer, Python, DevOps"
                 helperText="Мы предложим готовые пресеты навыков для вашей позиции"
                 error={!!errors.title}
-                InputProps={{
+                inputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <WorkIcon />
+                      <Icon name="briefcase" size={20} />
                     </InputAdornment>
                   ),
                 }}
@@ -448,7 +439,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
           {suggestedPresets.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AutoAwesomeIcon color="primary" fontSize="small" />
+                <Icon name="sparkles" size="small" color="primary" />
                 Готовые пресеты для вашей позиции:
               </Typography>
               <Grid container spacing={2}>
@@ -675,7 +666,7 @@ const SmartVacancyWizard: React.FC<SmartVacancyWizardProps> = ({
 
         {/* Info Box */}
         <Box sx={{ bgcolor: 'info.50', p: 2, borderRadius: 1, display: 'flex', gap: 1 }}>
-          <InfoIcon color="info" fontSize="small" sx={{ mt: 0.25 }} />
+          <Icon name="info" size="small" color="info" style={{ marginTop: '2px' }} />
           <Typography variant="body2" color="text.secondary">
             Система автоматически распознает синонимы (например, js → JavaScript, react → React)
           </Typography>
@@ -863,7 +854,7 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton onClick={() => navigate('/recruiter/vacancies')} disabled={isSubmitting}>
-            <ArrowBackIcon />
+            <Icon name="arrow-left" size={20} />
           </IconButton>
           <Typography variant="h4" component="h1" fontWeight={600}>
             Создать запрос на сотрудника
@@ -947,7 +938,7 @@ ${skillsList ? `• ${skillsList} на уровне ${experienceText}` : ''}
               variant="contained"
               onClick={handleSubmit(onSubmit)}
               color="primary"
-              startIcon={isSubmitting ? <CircularProgress size={20} /> : <AutoAwesomeIcon />}
+              startIcon={isSubmitting ? <CircularProgress size={20} /> : <Icon name="sparkles" size={16} />}
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Создание...' : 'Создать вакансию'}

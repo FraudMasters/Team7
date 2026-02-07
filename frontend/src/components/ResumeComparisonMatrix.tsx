@@ -20,6 +20,7 @@ import {
   Grid,
   Divider,
 } from '@mui/material';
+import { config } from '@/config';
 import {
   CheckCircle as CheckIcon,
   Cancel as CrossIcon,
@@ -147,7 +148,7 @@ const getMatchConfig = (percentage: number) => {
 const ResumeComparisonMatrix: React.FC<ResumeComparisonMatrixProps> = ({
   resumeIds,
   vacancyId,
-  apiUrl = 'http://localhost:8000/api/comparisons',
+  apiUrl = `${config.api.url}/api/comparisons`,
   showDetails = true,
   showRanking = true,
 }) => {

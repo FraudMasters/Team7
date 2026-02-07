@@ -15,6 +15,7 @@ The AgentHR frontend application uses React with TypeScript, Material-UI (MUI) a
 - **HTTP Client**: Axios 1.7.7
 - **Internationalization**: i18next + react-i18next
 - **Testing**: Vitest + Playwright
+- **Backend Integration**: API Gateway (port 8888) → 10 Microservices
 
 ## Project Structure
 
@@ -376,16 +377,42 @@ The application uses React Context for global state:
 
 ## API Integration
 
+### Microservices Architecture
+
+The frontend communicates with the backend through a unified **API Gateway** that routes requests to 10 specialized microservices:
+
+| Service | Internal Port | Purpose |
+|---------|---------------|---------|
+| API Gateway | 8888 | Single entry point, routing, authentication |
+| Resume Processing | 8001 | Resume upload, parsing, analysis |
+| Matching | 8002 | Skill matching, candidate ranking |
+| Candidate | 8003 | Candidate CRUD, notes, tags, activities |
+| Vacancy | 8004 | Job vacancy management |
+| Taxonomy | 8005 | Skill taxonomies, synonyms |
+| Analytics | 8006 | Dashboards, reports, metrics |
+| ATS Simulation | 8007 | ATS scoring, screening |
+| Notification | 8008 | Email, SMS, webhook notifications |
+| Integration | 8009 | Third-party integrations |
+
+**Important:** The frontend only needs to know the API Gateway URL (`http://localhost:8888`). Individual service URLs are abstracted away.
+
 ### API Client Configuration
 
 **Base Configuration** (`vite.config.ts`):
 ```typescript
 proxy: {
   '/api': {
-    target: 'http://localhost:8000',
+    target: 'http://localhost:8888',  // API Gateway
     changeOrigin: true,
   }
 }
+```
+
+**Environment Variables:**
+```bash
+# .env
+VITE_API_URL=http://localhost:8888
+VITE_API_TIMEOUT=120000  # 2 minutes for long-running analysis
 ```
 
 ### API Structure
@@ -393,11 +420,22 @@ proxy: {
 **Directory**: `/Users/fraud/Projects/agenthr/frontend/src/api/`
 
 Key API modules:
-- `client.ts` - Axios client configuration
+- `client.ts` - Main Axios client with typed methods for all endpoints
+- `candidateActivities.ts` - Candidate activity tracking
+- `candidateNotes.ts` - Candidate notes management
+- `candidateTags.ts` - Candidate tagging
+- `fairness.ts` - Fairness metrics and bias detection
+- `industryClassifier.ts` - Industry classification
 - `preferences.ts` - User preferences
+- `savedSearches.ts` - Saved search management
+- `search.ts` - Advanced search functionality
+- `searchHistory.ts` - Search history tracking
 - `skillGap.ts` - Skill gap analysis
+- `skillSuggestions.ts` - AI-powered skill suggestions
 - `taxonomies.ts` - Industry taxonomies
 - `workflowStages.ts` - Workflow stage management
+
+**Note:** For complete API integration documentation including error handling, authentication, and usage examples, see [api-integration.md](api-integration.md).
 
 ## Internationalization
 

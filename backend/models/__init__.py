@@ -34,6 +34,8 @@ from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .notification import Notification, NotificationType
 from .notification_preference import NotificationPreference, DigestFrequency
+from .audit_log import AuditLog, AuditActionType
+from .config_change import ConfigChange, ConfigChangeAction
 
 __all__ = [
     "Base",
@@ -80,4 +82,8 @@ __all__ = [
     "NotificationType",
     "NotificationPreference",
     "DigestFrequency",
+    "AuditLog",
+    "AuditActionType",
+    "ConfigChange",
+    "ConfigChangeAction",
 ]

@@ -47,6 +47,7 @@ import {
   getPerformanceStats as getPerformanceStatsUtil,
   type PerformanceStats,
 } from '@/utils/performanceTracker';
+import { config } from '@/config';
 import type {
   ResumeUploadResponse,
   AnalysisRequest,
@@ -117,10 +118,12 @@ import type {
 
 /**
  * Default API configuration
+ *
+ * Uses centralized configuration service for all values.
  */
 const DEFAULT_CONFIG: ApiClientConfig = {
-  baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 120000, // 2 minutes for long-running analysis
+  baseURL: config.api.url,
+  timeout: config.api.timeout,
   headers: {
     'Content-Type': 'application/json',
   },

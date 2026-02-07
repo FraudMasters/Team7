@@ -159,7 +159,7 @@ async def search_candidates(
         ...     "limit": 10
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/search/candidates",
+        ...     "/api/search/candidates",
         ...     json=data
         ... )
         >>> # Filter by skills only
@@ -170,7 +170,7 @@ async def search_candidates(
         ...     }
         ... }
         >>> response = requests.post(
-        ...     "http://localhost:8000/api/search/candidates",
+        ...     "/api/search/candidates",
         ...     json=data
         ... )
     """
@@ -306,12 +306,12 @@ async def search_candidates_get(
         >>> import requests
         >>> # Simple search with query
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/search/candidates",
+        ...     "/api/search/candidates",
         ...     params={"query": "Python AND Django", "limit": 10}
         ... )
         >>> # Filter by experience and location
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/search/candidates",
+        ...     "/api/search/candidates",
         ...     params={
         ...         "min_experience_years": 5,
         ...         "location": "Remote",
@@ -320,7 +320,7 @@ async def search_candidates_get(
         ... )
         >>> # Filter by skills
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/search/candidates",
+        ...     "/api/search/candidates",
         ...     params={
         ...         "skills": "Python, FastAPI, PostgreSQL",
         ...         "min_experience_years": 3
@@ -444,12 +444,12 @@ async def get_search_history(
         >>> import requests
         >>> # Get recent search history
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/search/history",
+        ...     "/api/search/history",
         ...     params={"limit": 20}
         ... )
         >>> # Get history for a specific recruiter
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/search/history",
+        ...     "/api/search/history",
         ...     params={
         ...         "recruiter_id": "recruiter-uuid",
         ...         "limit": 50

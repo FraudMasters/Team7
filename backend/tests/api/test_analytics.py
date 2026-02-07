@@ -718,3 +718,203 @@ class TestEdgeCases:
         }
         response = client.post("/api/reports", json=payload)
         assert response.status_code == 201
+
+
+class TestCandidateSourceAttributionEndpoint:
+    """Tests for GET /api/analytics/candidate-source-attribution endpoint."""
+
+    def test_returns_200(self, client):
+        """Test endpoint returns 200 status code."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        assert response.status_code == 200
+
+    def test_response_structure(self, client):
+        """Test response has correct structure."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+
+        # Check required top-level fields
+        assert "sources" in data
+        assert "total_candidates" in data
+        assert "date_range" in data
+
+        # Check data types
+        assert isinstance(data["sources"], list)
+        assert isinstance(data["total_candidates"], int)
+        assert data["total_candidates"] >= 0
+
+    def test_sources_structure(self, client):
+        """Test each source has required fields."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+        sources = data["sources"]
+
+        if len(sources) > 0:
+            for source in sources:
+                # Check all required fields
+                assert "source" in source
+                assert "candidate_count" in source
+                assert "hired_count" in source
+                assert "conversion_rate" in source
+                assert "average_time_to_hire_days" in source
+                assert "stage_distribution" in source
+
+                # Check data types
+                assert isinstance(source["source"], str)
+                assert isinstance(source["candidate_count"], int)
+                assert isinstance(source["hired_count"], int)
+                assert isinstance(source["conversion_rate"], (int, float))
+                assert isinstance(source["average_time_to_hire_days"], (int, float))
+                assert isinstance(source["stage_distribution"], list)
+
+                # Check value constraints
+                assert source["candidate_count"] >= 0
+                assert source["hired_count"] >= 0
+                assert source["hired_count"] <= source["candidate_count"]
+                assert 0 <= source["conversion_rate"] <= 1
+                assert source["average_time_to_hire_days"] >= 0
+
+    def test_conversion_rate_calculation(self, client):
+        """Test conversion rates are calculated correctly."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+        sources = data["sources"]
+
+        for source in sources:
+            candidate_count = source["candidate_count"]
+            hired_count = source["hired_count"]
+            reported_rate = source["conversion_rate"]
+
+            # Calculate expected conversion rate
+            if candidate_count > 0:
+                expected_rate = round(hired_count / candidate_count, 3)
+            else:
+                expected_rate = 0.0
+
+            # Check if the reported rate matches (with small floating point tolerance)
+            assert abs(reported_rate - expected_rate) < 0.001, \
+                f"Conversion rate mismatch for source '{source['source']}': " \
+                f"expected {expected_rate}, got {reported_rate}"
+
+    def test_stage_distribution_percentages(self, client):
+        """Test stage distribution percentages sum to approximately 1.0."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+        sources = data["sources"]
+
+        for source in sources:
+            stage_dist = source["stage_distribution"]
+
+            if len(stage_dist) > 0:
+                # Sum all percentages
+                total_percentage = sum(stage["percentage"] for stage in stage_dist)
+
+                # Allow small floating point errors (within 1% tolerance)
+                assert abs(total_percentage - 1.0) < 0.01, \
+                    f"Stage distribution for source '{source['source']}' sums to " \
+                    f"{total_percentage:.3f}, expected ~1.0"
+
+                # Validate each percentage
+                for stage in stage_dist:
+                    assert 0 <= stage["percentage"] <= 1, \
+                        f"Stage '{stage['stage_name']}' in source '{source['source']}' " \
+                        f"has invalid percentage {stage['percentage']}"
+                    assert stage["count"] >= 0, \
+                        f"Stage '{stage['stage_name']}' in source '{source['source']}' " \
+                        f"has negative count {stage['count']}"
+
+    def test_source_sorting(self, client):
+        """Test sources are sorted by candidate_count descending."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+        sources = data["sources"]
+
+        if len(sources) > 1:
+            for i in range(len(sources) - 1):
+                current_count = sources[i]["candidate_count"]
+                next_count = sources[i + 1]["candidate_count"]
+                assert current_count >= next_count, \
+                    f"Sources not sorted: index {i} has {current_count}, " \
+                    f"index {i+1} has {next_count}"
+
+    def test_average_time_to_hire_values(self, client):
+        """Test average time-to-hire is reasonable."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+        sources = data["sources"]
+
+        for source in sources:
+            avg_time = source["average_time_to_hire_days"]
+            hired_count = source["hired_count"]
+
+            # Time-to-hire should be 0 if no one was hired
+            if hired_count == 0:
+                assert avg_time == 0.0, \
+                    f"Source '{source['source']}' has time-to-hire {avg_time} " \
+                    f"but hired_count is 0"
+            else:
+                # Time-to-hire should be non-negative
+                assert avg_time >= 0, \
+                    f"Source '{source['source']}' has negative time-to-hire {avg_time}"
+
+    def test_with_date_filter(self, client):
+        """Test endpoint with date range filter."""
+        response = client.get(
+            "/api/analytics/candidate-source-attribution?start_date=2024-01-01&end_date=2024-12-31"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "sources" in data
+
+        # Date range should be reflected in response
+        if data.get("date_range"):
+            assert "2024-01-01" in data["date_range"] or "2024-12-31" in data["date_range"]
+
+    def test_with_iso8601_date_format(self, client):
+        """Test endpoint with ISO 8601 datetime format."""
+        response = client.get(
+            "/api/analytics/candidate-source-attribution?"
+            "start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "sources" in data
+
+    def test_invalid_start_date_format(self, client):
+        """Test with invalid start_date format."""
+        response = client.get(
+            "/api/analytics/candidate-source-attribution?start_date=invalid-date"
+        )
+        assert response.status_code == 400
+
+    def test_invalid_end_date_format(self, client):
+        """Test with invalid end_date format."""
+        response = client.get(
+            "/api/analytics/candidate-source-attribution?end_date=not-a-date"
+        )
+        assert response.status_code == 400
+
+    def test_total_candidates_calculation(self, client):
+        """Test total_candidates is sum of all source candidate counts."""
+        response = client.get("/api/analytics/candidate-source-attribution")
+        data = response.json()
+
+        calculated_total = sum(source["candidate_count"] for source in data["sources"])
+        assert data["total_candidates"] == calculated_total, \
+            f"total_candidates mismatch: expected {calculated_total}, " \
+            f"got {data['total_candidates']}"
+
+    def test_empty_dataset(self, client):
+        """Test endpoint with date range that has no data."""
+        response = client.get(
+            "/api/analytics/candidate-source-attribution?"
+            "start_date=2020-01-01&end_date=2020-01-31"
+        )
+        # Should return 200 even with no data
+        assert response.status_code == 200
+        data = response.json()
+
+        # Structure should still be valid
+        assert "sources" in data
+        assert isinstance(data["sources"], list)
+        assert "total_candidates" in data

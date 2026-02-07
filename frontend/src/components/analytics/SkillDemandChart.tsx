@@ -1,5 +1,8 @@
+// React хуки для управления состоянием, эффектами и колбэками
 import React, { useState, useEffect, useCallback } from 'react';
+// HTTP клиент для запросов к API
 import axios from 'axios';
+// Компоненты Material UI для создания интерфейса
 import {
   Box,
   Paper,
@@ -15,6 +18,7 @@ import {
   Chip,
   LinearProgress,
 } from '@mui/material';
+// Иконки Material UI
 import {
   Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
@@ -24,7 +28,7 @@ import {
 } from '@mui/icons-material';
 
 /**
- * Skill demand item interface from backend
+ * Интерфейс элемента спроса на навыки с бэкенда
  */
 interface SkillDemandItem {
   skill_name: string;
@@ -34,7 +38,7 @@ interface SkillDemandItem {
 }
 
 /**
- * Skill demand response from backend
+ * Ответ о спросе на навыки с бэкенда
  */
 interface SkillDemandResponse {
   skills: SkillDemandItem[];
@@ -42,27 +46,27 @@ interface SkillDemandResponse {
 }
 
 /**
- * SkillDemandChart Component Props
+ * Свойства компонента SkillDemandChart
  */
 interface SkillDemandChartProps {
-  /** API endpoint URL for skill demand analytics */
+  /** URL API endpoint для аналитики спроса на навыки */
   apiUrl?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр начальной даты */
   startDate?: string;
-  /** Optional date range filter */
+  /** Опциональный фильтр конечной даты */
   endDate?: string;
-  /** Maximum number of skills to display */
+  /** Максимальное количество навыков для отображения */
   limit?: number;
 }
 
 /**
- * SkillDemandChart Component
+ * Компонент SkillDemandChart
  *
- * Displays trending skills with demand metrics including:
- * - Skill name with demand count
- * - Demand percentage as a horizontal bar chart
- * - Trend percentage with up/down indicators
- * - Total job postings analyzed
+ * Отображает trending навыки с метриками спроса включая:
+ * - Имя навыка с количеством спроса
+ * - Процент спроса в виде горизонтальной гистограммы
+ * - Процент тренда с индикаторами вверх/вниз
+ * - Общее количество проанализированных вакансий
  *
  * @example
  * ```tsx
@@ -80,12 +84,13 @@ const SkillDemandChart: React.FC<SkillDemandChartProps> = ({
   endDate,
   limit = 20,
 }) => {
+  // Состояния для загрузки, ошибки и данных навыков
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [skillData, setSkillData] = useState<SkillDemandResponse | null>(null);
 
   /**
-   * Fetch skill demand data from backend
+   * Загрузка данных о спросе на навыки с бэкенда
    */
   const fetchSkillDemand = async () => {
     try {

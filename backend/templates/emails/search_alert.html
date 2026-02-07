@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>New Resume Match Alert</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table {border-collapse: collapse;}
+        .mj-container {font-size: 0 !important;}
+    </style>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        body {{
+            margin: 0;
+            padding: 0;
+            word-spacing: normal;
+            background-color: #f4f4f7;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }}
+        .mj-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }}
+        .mj-header {{
+            background-color: #2563eb;
+            padding: 24px;
+            text-align: center;
+        }}
+        .mj-header h1 {{
+            color: #ffffff;
+            font-size: 24px;
+            margin: 0;
+            font-weight: 600;
+        }}
+        .mj-content {{
+            padding: 32px 24px;
+        }}
+        .mj-section {{
+            margin-bottom: 24px;
+        }}
+        .mj-section h2 {{
+            color: #1e293b;
+            font-size: 18px;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }}
+        .mj-section p {{
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 12px 0;
+        }}
+        .mj-matches {{
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+        .mj-match-item {{
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin: 4px;
+        }}
+        .mj-score {{
+            display: inline-block;
+            background-color: #10b981;
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+        }}
+        .mj-button {{
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+        }}
+        .mj-button:hover {{
+            background-color: #1d4ed8;
+        }}
+        .mj-footer {{
+            background-color: #f8fafc;
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .mj-footer p {{
+            color: #94a3b8;
+            font-size: 13px;
+            margin: 0;
+        }}
+        .mj-divider {{
+            border-bottom: 1px solid #e2e8f0;
+            margin: 24px 0;
+        }}
+        .mj-alert-title {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }}
+        .mj-alert-meta {{
+            color: #64748b;
+            font-size: 13px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="mj-container">
+        <!-- Header -->
+        <div class="mj-header">
+            <h1>AgentHR - New Resume Match</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="mj-content">
+            <!-- Greeting -->
+            <div class="mj-section">
+                <p>Hello{recipient_name,", {recipient_name}" if recipient_name else ""},</p>
+                <p>A new resume has been uploaded that matches your saved search criteria.</p>
+            </div>
+
+            <!-- Saved Search Info -->
+            <div class="mj-matches">
+                <div class="mj-alert-title">{saved_search_name}</div>
+                <div class="mj-alert-meta">Match Score: <span class="mj-score">{match_score}%</span></div>
+            </div>
+
+            <!-- Matched Criteria -->
+            <div class="mj-section">
+                <h2>Matched Criteria</h2>
+                <div>
+                    <!-- Matched skills -->
+                    {matched_criteria_start}
+                    <span class="mj-match-item">{criteria}</span>
+                    {matched_criteria_end}
+                </div>
+            </div>
+
+            <!-- Resume Details -->
+            <div class="mj-section">
+                <h2>Resume Details</h2>
+                <p><strong>Resume ID:</strong> {resume_id}</p>
+                {resume_details_start}
+                <p><strong>Candidate Name:</strong> {candidate_name}</p>
+                {resume_details_end}
+                {skills_section_start}
+                <p><strong>Key Skills:</strong></p>
+                <div>
+                    {skills_start}
+                    <span class="mj-match-item">{skill}</span>
+                    {skills_end}
+                </div>
+                {skills_section_end}
+            </div>
+
+            <!-- Divider -->
+            <div class="mj-divider"></div>
+
+            <!-- Call to Action -->
+            <div class="mj-section" style="text-align: center;">
+                <a href="{dashboard_url}" class="mj-button">View Resume Details</a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mj-footer">
+            <p>This is an automated notification from AgentHR.</p>
+            <p>You received this email because you have saved searches configured for matching alerts.</p>
+            <p>&copy; {current_year} AgentHR. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>

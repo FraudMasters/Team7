@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Box, Typography, Button, Paper, Container } from '@mui/material';
 import { ErrorOutline, Refresh as RefreshIcon, Home as HomeIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { isDevelopment } from '@/config';
 
 /**
  * Props for ErrorBoundary component
@@ -160,7 +161,7 @@ const ErrorFallback: React.FC<{
           </Box>
 
           {/* Error Details (development or when explicitly enabled) */}
-          {showDetails && (process.env.NODE_ENV === 'development' || import.meta.env.DEV) && (
+          {showDetails && (process.env.NODE_ENV === 'development' || isDevelopment()) && (
             <Box
               sx={{
                 mt: 4,

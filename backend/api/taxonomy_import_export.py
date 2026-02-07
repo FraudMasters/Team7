@@ -97,7 +97,7 @@ async def export_taxonomies(
     Examples:
         >>> import requests
         >>> response = requests.get(
-        ...     "http://localhost:8000/api/taxonomy-import-export/export?industry=healthcare&format=json"
+        ...     "/api/taxonomy-import-export/export?industry=healthcare&format=json"
         ... )
         >>> with open("healthcare_taxonomies.json", "wb") as f:
         ...     f.write(response.content)
@@ -222,7 +222,7 @@ async def import_taxonomies(
         >>> import requests
         >>> with open("healthcare_taxonomies.json", "rb") as f:
         ...     response = requests.post(
-        ...         "http://localhost:8000/api/taxonomy-import-export/import?industry=healthcare&format=json",
+        ...         "/api/taxonomy-import-export/import?industry=healthcare&format=json",
         ...         files={"file": f}
         ...     )
         >>> response.json()
