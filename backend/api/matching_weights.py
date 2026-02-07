@@ -12,15 +12,50 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.matching_weights_profile import MatchingWeightsProfile
+from models.matching_weights_history import MatchingWeightsHistory
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def normalize_weights(keyword_weight: float, tfidf_weight: float, vector_weight: float) -> tuple[float, float, float]:
+    """
+    Normalize weights so they sum to 1.0.
+
+    If the weights already sum to 1.0 (within a small tolerance), they are returned as-is.
+    Otherwise, they are scaled proportionally.
+
+    Args:
+        keyword_weight: Weight for keyword matching
+        tfidf_weight: Weight for TF-IDF matching
+        vector_weight: Weight for vector similarity matching
+
+    Returns:
+        Tuple of normalized (keyword_weight, tfidf_weight, vector_weight)
+    """
+    total = keyword_weight + tfidf_weight + vector_weight
+
+    # If weights sum to approximately 1.0, return as-is
+    if abs(total - 1.0) < 0.0001:
+        return keyword_weight, tfidf_weight, vector_weight
+
+    # Scale weights proportionally
+    if total > 0:
+        return (
+            keyword_weight / total,
+            tfidf_weight / total,
+            vector_weight / total,
+        )
+    else:
+        # If all weights are 0, return balanced defaults
+        return (0.33, 0.33, 0.34)
+
 
 # Preset type literal
 PresetType = Literal["technical", "creative", "executive", "balanced"]
@@ -193,6 +228,36 @@ async def create_matching_weights_profile(
                 detail="Profile name cannot be empty",
             )
 
+        # Check for duplicate profile name in the same organization
+        existing_profile = await db.execute(
+            select(MatchingWeightsProfile).where(
+                MatchingWeightsProfile.organization_id == request.organization_id,
+                MatchingWeightsProfile.name == request.name,
+            )
+        )
+        if existing_profile.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Profile with name '{request.name}' already exists for this organization",
+            )
+
+        # Normalize weights to sum to 1.0
+        normalized_keyword, normalized_tfidf, normalized_vector = normalize_weights(
+            request.keyword_weight,
+            request.tfidf_weight,
+            request.vector_weight,
+        )
+
+        if (normalized_keyword, normalized_tfidf, normalized_vector) != (
+            request.keyword_weight,
+            request.tfidf_weight,
+            request.vector_weight,
+        ):
+            logger.info(
+                f"Normalized weights from ({request.keyword_weight}, {request.tfidf_weight}, {request.vector_weight}) "
+                f"to ({normalized_keyword}, {normalized_tfidf}, {normalized_vector})"
+            )
+
         # Create new profile with UUID
         profile_id = str(uuid4())
         new_profile = MatchingWeightsProfile(
@@ -200,9 +265,9 @@ async def create_matching_weights_profile(
             organization_id=request.organization_id,
             name=request.name,
             description=request.description,
-            keyword_weight=request.keyword_weight,
-            tfidf_weight=request.tfidf_weight,
-            vector_weight=request.vector_weight,
+            keyword_weight=normalized_keyword,
+            tfidf_weight=normalized_tfidf,
+            vector_weight=normalized_vector,
             is_default=request.is_default,
             is_preset=request.is_preset,
             preset_type=request.preset_type,
@@ -210,6 +275,27 @@ async def create_matching_weights_profile(
         )
         db.add(new_profile)
         await db.flush()
+
+        # Create history entry for the creation
+        history_entry = MatchingWeightsHistory(
+            profile_id=new_profile.id,
+            organization_id=new_profile.organization_id,
+            change_type="create",
+            changed_by=request.created_by,
+            old_name=None,
+            new_name=new_profile.name,
+            old_description=None,
+            new_description=new_profile.description,
+            old_keyword_weight=None,
+            new_keyword_weight=new_profile.keyword_weight,
+            old_tfidf_weight=None,
+            new_tfidf_weight=new_profile.tfidf_weight,
+            old_vector_weight=None,
+            new_vector_weight=new_profile.vector_weight,
+            old_is_default=None,
+            new_is_default=new_profile.is_default,
+        )
+        db.add(history_entry)
 
         response_data = {
             "id": new_profile.id,
@@ -507,38 +593,122 @@ async def update_matching_weights_profile(
                 detail=f"Matching weights profile not found: {profile_id}",
             )
 
+        # Store old values for history tracking
+        old_name = profile.name
+        old_description = profile.description
+        old_keyword_weight = profile.keyword_weight
+        old_tfidf_weight = profile.tfidf_weight
+        old_vector_weight = profile.vector_weight
+        old_is_default = profile.is_default
+
+        # Track what changed
+        changes_made = False
+
+        # Check for duplicate name if name is being changed
+        if request.name is not None and request.name != profile.name:
+            existing_profile = await db.execute(
+                select(MatchingWeightsProfile).where(
+                    MatchingWeightsProfile.organization_id == profile.organization_id,
+                    MatchingWeightsProfile.name == request.name,
+                    MatchingWeightsProfile.id != profile_id,
+                )
+            )
+            if existing_profile.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Profile with name '{request.name}' already exists for this organization",
+                )
+
         # Update fields if provided
         if request.name is not None:
             profile.name = request.name
+            changes_made = True
 
         if request.description is not None:
             profile.description = request.description
+            changes_made = True
 
-        if request.keyword_weight is not None:
-            profile.keyword_weight = request.keyword_weight
+        # Track if weights are being updated for normalization
+        weights_updated = False
+        if request.keyword_weight is not None or request.tfidf_weight is not None or request.vector_weight is not None:
+            # Get current weights if not provided
+            current_keyword = profile.keyword_weight if request.keyword_weight is None else request.keyword_weight
+            current_tfidf = profile.tfidf_weight if request.tfidf_weight is None else request.tfidf_weight
+            current_vector = profile.vector_weight if request.vector_weight is None else request.vector_weight
 
-        if request.tfidf_weight is not None:
-            profile.tfidf_weight = request.tfidf_weight
+            # Normalize weights
+            normalized_keyword, normalized_tfidf, normalized_vector = normalize_weights(
+                current_keyword,
+                current_tfidf,
+                current_vector,
+            )
 
-        if request.vector_weight is not None:
-            profile.vector_weight = request.vector_weight
+            # Apply normalized weights
+            if request.keyword_weight is not None:
+                profile.keyword_weight = normalized_keyword
+            if request.tfidf_weight is not None:
+                profile.tfidf_weight = normalized_tfidf
+            if request.vector_weight is not None:
+                profile.vector_weight = normalized_vector
+
+            if (normalized_keyword, normalized_tfidf, normalized_vector) != (
+                current_keyword,
+                current_tfidf,
+                current_vector,
+            ):
+                logger.info(
+                    f"Normalized weights from ({current_keyword}, {current_tfidf}, {current_vector}) "
+                    f"to ({normalized_keyword}, {normalized_tfidf}, {normalized_vector})"
+                )
+
+            weights_updated = True
+            changes_made = True
 
         if request.is_default is not None:
             # If setting as default, unset other default profiles for the same organization
             if request.is_default:
                 await db.execute(
-                    select(MatchingWeightsProfile).where(
+                    update(MatchingWeightsProfile)
+                    .where(
                         MatchingWeightsProfile.organization_id == profile.organization_id,
                         MatchingWeightsProfile.id != profile_id,
                         MatchingWeightsProfile.is_default == True,
                     )
+                    .values(is_default=False)
                 )
-                # Note: In a full implementation, we'd update all other profiles to is_default=False
-                # For now, we just set the current profile as default
+                logger.info(
+                    f"Unset {len([p for p in [profile] if p.is_default])} other default profile(s) "
+                    f"for organization: {profile.organization_id}"
+                )
             profile.is_default = request.is_default
+            changes_made = True
 
         await db.commit()
         await db.refresh(profile)
+
+        # Create history entry for the update
+        if changes_made:
+            history_entry = MatchingWeightsHistory(
+                profile_id=profile.id,
+                organization_id=profile.organization_id,
+                change_type="update",
+                changed_by=profile.created_by,  # Using the profile's created_by as changed_by
+                old_name=old_name if old_name != profile.name else None,
+                new_name=profile.name if old_name != profile.name else None,
+                old_description=old_description if old_description != profile.description else None,
+                new_description=profile.description if old_description != profile.description else None,
+                old_keyword_weight=old_keyword_weight if old_keyword_weight != profile.keyword_weight else None,
+                new_keyword_weight=profile.keyword_weight if old_keyword_weight != profile.keyword_weight else None,
+                old_tfidf_weight=old_tfidf_weight if old_tfidf_weight != profile.tfidf_weight else None,
+                new_tfidf_weight=profile.tfidf_weight if old_tfidf_weight != profile.tfidf_weight else None,
+                old_vector_weight=old_vector_weight if old_vector_weight != profile.vector_weight else None,
+                new_vector_weight=profile.vector_weight if old_vector_weight != profile.vector_weight else None,
+                old_is_default=old_is_default if old_is_default != profile.is_default else None,
+                new_is_default=profile.is_default if old_is_default != profile.is_default else None,
+            )
+            db.add(history_entry)
+            # Separate commit for history entry (already committed main changes)
+            await db.commit()
 
         response_data = {
             "id": profile.id,
@@ -641,6 +811,30 @@ async def delete_matching_weights_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Default profiles cannot be deleted",
             )
+
+        # Store profile data for history before deletion
+        profile_for_history = profile
+
+        # Create history entry before deleting
+        history_entry = MatchingWeightsHistory(
+            profile_id=profile_for_history.id,
+            organization_id=profile_for_history.organization_id,
+            change_type="delete",
+            changed_by=profile_for_history.created_by,
+            old_name=profile_for_history.name,
+            new_name=None,
+            old_description=profile_for_history.description,
+            new_description=None,
+            old_keyword_weight=profile_for_history.keyword_weight,
+            new_keyword_weight=None,
+            old_tfidf_weight=profile_for_history.tfidf_weight,
+            new_tfidf_weight=None,
+            old_vector_weight=profile_for_history.vector_weight,
+            new_vector_weight=None,
+            old_is_default=profile_for_history.is_default,
+            new_is_default=None,
+        )
+        db.add(history_entry)
 
         # Delete the profile
         await db.execute(
