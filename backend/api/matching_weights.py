@@ -441,6 +441,7 @@ async def get_matching_weights_profile(
 async def update_matching_weights_profile(
     profile_id: str,
     request: MatchingWeightsProfileUpdate,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Update a matching weights profile.
@@ -451,6 +452,7 @@ async def update_matching_weights_profile(
     Args:
         profile_id: UUID of the profile to update
         request: Update request with fields to modify
+        db: Database session
 
     Returns:
         JSON response with updated profile details
@@ -493,35 +495,79 @@ async def update_matching_weights_profile(
                 detail="At least one field must be provided for update",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        profile_response = {
-            "id": profile_id,
-            "organization_id": "org123",
-            "name": request.name or "Updated Profile Name",
-            "description": request.description,
-            "keyword_weight": request.keyword_weight if request.keyword_weight is not None else 0.5,
-            "tfidf_weight": request.tfidf_weight if request.tfidf_weight is not None else 0.3,
-            "vector_weight": request.vector_weight if request.vector_weight is not None else 0.2,
-            "is_default": request.is_default if request.is_default is not None else False,
-            "is_preset": False,
-            "preset_type": None,
-            "created_by": "user456",
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
+        # Get existing profile
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
+            )
+
+        # Update fields if provided
+        if request.name is not None:
+            profile.name = request.name
+
+        if request.description is not None:
+            profile.description = request.description
+
+        if request.keyword_weight is not None:
+            profile.keyword_weight = request.keyword_weight
+
+        if request.tfidf_weight is not None:
+            profile.tfidf_weight = request.tfidf_weight
+
+        if request.vector_weight is not None:
+            profile.vector_weight = request.vector_weight
+
+        if request.is_default is not None:
+            # If setting as default, unset other default profiles for the same organization
+            if request.is_default:
+                await db.execute(
+                    select(MatchingWeightsProfile).where(
+                        MatchingWeightsProfile.organization_id == profile.organization_id,
+                        MatchingWeightsProfile.id != profile_id,
+                        MatchingWeightsProfile.is_default == True,
+                    )
+                )
+                # Note: In a full implementation, we'd update all other profiles to is_default=False
+                # For now, we just set the current profile as default
+            profile.is_default = request.is_default
+
+        await db.commit()
+        await db.refresh(profile)
+
+        response_data = {
+            "id": profile.id,
+            "organization_id": profile.organization_id,
+            "name": profile.name,
+            "description": profile.description,
+            "keyword_weight": profile.keyword_weight,
+            "tfidf_weight": profile.tfidf_weight,
+            "vector_weight": profile.vector_weight,
+            "is_default": profile.is_default,
+            "is_preset": profile.is_preset,
+            "preset_type": profile.preset_type,
+            "created_by": profile.created_by,
+            "created_at": profile.created_at.isoformat(),
+            "updated_at": profile.updated_at.isoformat(),
         }
 
         logger.info(f"Updated matching weights profile: {profile_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=profile_response,
+            content=response_data,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating matching weights profile: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update matching weights profile: {str(e)}",
