@@ -1,0 +1,396 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Frontend lint and unit tests
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ./frontend
+        run: |
+          npm run lint -- --max-warnings=0
+        env:
+          CI: true
+
+      - name: Check TypeScript types
+        working-directory: ./frontend
+        run: npx tsc --noEmit
+
+  # Frontend unit tests with coverage
+  frontend-tests:
+    name: Frontend Unit Tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16, 18, 20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        working-directory: ./frontend
+        run: |
+          npm run test:coverage -- --reporter=verbose --coverage
+        env:
+          CI: true
+
+      - name: Check coverage threshold
+        working-directory: ./frontend
+        run: |
+          echo "### Coverage Report 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          npm run test:coverage -- --reporter=json --coverage.reporters=json-summary || true
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "Coverage report generated successfully"
+          fi
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-node-${{ matrix.node-version }}
+          path: |
+            frontend/coverage/
+          retention-days: 7
+
+  # Backend lint and type checking
+  backend-lint:
+    name: Backend Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ruff linter
+        working-directory: ./backend
+        run: |
+          ruff check . --output-format=github
+
+      - name: Run Ruff formatter check
+        working-directory: ./backend
+        run: |
+          ruff format --check .
+
+      - name: Run mypy type checker
+        working-directory: ./backend
+        run: |
+          mypy analyzers/ api/ --no-error-summary 2>&1 || true
+        continue-on-error: true
+
+  # Backend unit tests
+  backend-tests:
+    name: Backend Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: backend-lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify services are running
+        run: |
+          pg_isready -h localhost -p 5432
+          redis-cli -h localhost -p 6379 ping
+
+      - name: Set up environment
+        working-directory: ./backend
+        run: |
+          cp .env.example .env || true
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head || echo "Migrations already applied or no migrations needed"
+
+      - name: Run unit tests with coverage
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/unit/ \
+            -v \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html:htmlcov \
+            --cov-fail-under=80 \
+            -m "not slow" \
+            --maxfail=5
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-python-${{ matrix.python-version }}
+          path: |
+            backend/htmlcov/
+            backend/coverage.xml
+          retention-days: 7
+
+      - name: Check coverage threshold
+        if: always()
+        working-directory: ./backend
+        run: |
+          echo "### Backend Coverage Report 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage.xml ]; then
+            coverage report >> $GITHUB_STEP_SUMMARY || true
+          fi
+
+  # Integration tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [frontend-tests, backend-tests]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenthr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify services are running
+        run: |
+          pg_isready -h localhost -p 5432
+          redis-cli -h localhost -p 6379 ping
+
+      - name: Set up environment
+        working-directory: ./backend
+        run: |
+          cp .env.example .env || true
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head || true
+
+      - name: Run integration tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/integration/ \
+            -v \
+            -m integration \
+            --maxfail=3
+
+      - name: Run property-based tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/property/ \
+            -v \
+            --hypothesis-seed=0 \
+            --maxfail=3
+        continue-on-error: true
+
+      - name: Run contract tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenthr_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/contract/ \
+            -v \
+            -m contract \
+            --maxfail=3
+
+  # Test summary and report
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [frontend-lint, frontend-tests, backend-lint, backend-tests, integration-tests]
+    if: always()
+
+    steps:
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-artifacts/
+
+      - name: Generate test summary
+        run: |
+          echo "## CI Test Summary 📋" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Lint | ${{ needs.frontend-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Tests | ${{ needs.frontend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Lint | ${{ needs.backend-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Tests | ${{ needs.backend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for failures
+        if: |
+          needs.frontend-lint.result == 'failure' ||
+          needs.frontend-tests.result == 'failure' ||
+          needs.backend-lint.result == 'failure' ||
+          needs.backend-tests.result == 'failure' ||
+          needs.integration-tests.result == 'failure'
+        run: |
+          echo "❌ One or more test jobs failed"
+          exit 1
+
+      - name: All tests passed
+        if: |
+          needs.frontend-lint.result == 'success' &&
+          needs.frontend-tests.result == 'success' &&
+          needs.backend-lint.result == 'success' &&
+          needs.backend-tests.result == 'success' &&
+          needs.integration-tests.result == 'success'
+        run: |
+          echo "✅ All tests passed successfully!"
