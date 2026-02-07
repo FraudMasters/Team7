@@ -134,6 +134,13 @@ jobs:
             --stats-file=locust-stats_stats.json \
             --output=locust-metrics.json
 
+      - name: Fetch baseline from main branch
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin main
+          mkdir -p .github/baselines
+          git show origin/main:.github/baselines/performance-baseline.json > .github/baselines/performance-baseline.json 2>/dev/null || echo "No baseline found on main branch"
+
       - name: Compare with baseline
         run: |
           python .github/scripts/compare_performance_baseline.py \
@@ -283,6 +290,41 @@ jobs:
             rm frontend.pid
           fi
 
+      - name: Parse Lighthouse results
+        if: always()
+        id: parse-lighthouse-results
+        working-directory: ./frontend
+        run: |
+          # Find the most recent results JSON
+          RESULTS_FILE=$(ls -t .lighthouseci/*.json 2>/dev/null | head -1 || echo "")
+          if [ -z "$RESULTS_FILE" ]; then
+            echo "No Lighthouse results found"
+            exit 1
+          fi
+
+          # Extract scores using jq
+          PERFORMANCE=$(jq -r '.[0].categories.performance.score * 100' "$RESULTS_FILE" || echo "0")
+          BEST_PRACTICES=$(jq -r '.[0].categories["best-practices"].score * 100' "$RESULTS_FILE" || echo "0")
+          ACCESSIBILITY=$(jq -r '.[0].categories.accessibility.score * 100' "$RESULTS_FILE" || echo "0")
+          SEO=$(jq -r '.[0].categories.seo.score * 100' "$RESULTS_FILE" || echo "0")
+          PWA=$(jq -r '.[0].categories.pwa.score * 100' "$RESULTS_FILE" || echo "0")
+
+          echo "performance=$PERFORMANCE" >> $GITHUB_OUTPUT
+          echo "best_practices=$BEST_PRACTICES" >> $GITHUB_OUTPUT
+          echo "accessibility=$ACCESSIBILITY" >> $GITHUB_OUTPUT
+          echo "seo=$SEO" >> $GITHUB_OUTPUT
+          echo "pwa=$PWA" >> $GITHUB_OUTPUT
+
+          echo "### Lighthouse Scores 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Category | Score | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | $PERFORMANCE | $(if [ "$PERFORMANCE" -ge 90 ]; then echo "✅"; elif [ "$PERFORMANCE" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Best Practices | $BEST_PRACTICES | $(if [ "$BEST_PRACTICES" -ge 90 ]; then echo "✅"; elif [ "$BEST_PRACTICES" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility | $ACCESSIBILITY | $(if [ "$ACCESSIBILITY" -ge 90 ]; then echo "✅"; elif [ "$ACCESSIBILITY" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SEO | $SEO | $(if [ "$SEO" -ge 90 ]; then echo "✅"; elif [ "$SEO" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+          echo "| PWA | $PWA | $(if [ "$PWA" -ge 90 ]; then echo "✅"; elif [ "$PWA" -ge 50 ]; then echo "⚠️"; else echo "❌"; fi) |" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload Lighthouse results
         if: always()
         uses: actions/upload-artifact@v4
@@ -291,6 +333,27 @@ jobs:
           path: |
             frontend/.lighthouseci/
           retention-days: 30
+
+      - name: Save frontend baseline results
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p .github/baselines
+          cp frontend/.lighthouseci/*.json .github/baselines/lighthouse-baseline.json || true
+
+      - name: Commit updated frontend baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/baselines/lighthouse-baseline.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update Lighthouse baseline [skip ci]"
+
+      - name: Push frontend baseline changes
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
 
   performance-summary:
     name: Performance Test Summary
