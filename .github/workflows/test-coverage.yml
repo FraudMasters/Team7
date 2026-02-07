@@ -328,3 +328,133 @@ with open('coverage.json') as f:
         if: success()
         run: |
           echo "✅ All coverage thresholds met!"
+
+  # Generate coverage badges
+  coverage-badges:
+    name: Generate Coverage Badges
+    runs-on: ubuntu-latest
+    needs: [coverage-report]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download frontend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage-frontend/
+
+      - name: Download backend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage-backend/
+
+      - name: Create badges directory
+        run: |
+          mkdir -p .badges
+
+      - name: Generate coverage badges
+        run: |
+          # Frontend badge
+          if [ -f coverage-frontend/coverage-summary.json ]; then
+            FRONTEND_PCT=$(jq -r '.total?.statements?.pct // 0' coverage-frontend/coverage-summary.json)
+            FRONTEND_COLOR=$(awk "BEGIN {print ($FRONTEND_PCT >= 85) ? \"4CAF50\" : ($FRONTEND_PCT >= 70) ? \"FFC107\" : \"F44336\"}")
+            cat > .badges/frontend-coverage.svg << EOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="160" height="20">
+            <linearGradient id="b" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <mask id="a">
+              <rect width="160" height="20" rx="3" fill="#fff"/>
+            </mask>
+            <g mask="url(#a)">
+              <path fill="#555" d="M0 0h85v20H0z"/>
+              <path fill="#$FRONTEND_COLOR" d="M85 0h75v20H85z"/>
+              <path fill="url(#b)" d="M0 0h160v20H0z"/>
+            </g>
+            <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+              <text x="42.5" y="15" fill="#010101" fill-opacity=".3">frontend</text>
+              <text x="42.5" y="14">frontend</text>
+              <text x="122.5" y="15" fill="#010101" fill-opacity=".3">${FRONTEND_PCT}%</text>
+              <text x="122.5" y="14">${FRONTEND_PCT}%</text>
+            </g>
+          </svg>
+          EOF
+          fi
+
+          # Backend badge
+          if [ -f coverage-backend/coverage.json ]; then
+            BACKEND_PCT=$(jq -r '.totals.percent_covered // 0' coverage-backend/coverage.json | awk '{printf "%.0f", $1}')
+            BACKEND_COLOR=$(awk "BEGIN {print ($BACKEND_PCT >= 80) ? \"4CAF50\" : ($BACKEND_PCT >= 70) ? \"FFC107\" : \"F44336\"}")
+            cat > .badges/backend-coverage.svg << EOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="160" height="20">
+            <linearGradient id="b" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <mask id="a">
+              <rect width="160" height="20" rx="3" fill="#fff"/>
+            </mask>
+            <g mask="url(#a)">
+              <path fill="#555" d="M0 0h75v20H0z"/>
+              <path fill="#$BACKEND_COLOR" d="M75 0h85v20H75z"/>
+              <path fill="url(#b)" d="M0 0h160v20H0z"/>
+            </g>
+            <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+              <text x="37.5" y="15" fill="#010101" fill-opacity=".3">backend</text>
+              <text x="37.5" y="14">backend</text>
+              <text x="117.5" y="15" fill="#010101" fill-opacity=".3">${BACKEND_PCT}%</text>
+              <text x="117.5" y="14">${BACKEND_PCT}%</text>
+            </g>
+          </svg>
+          EOF
+          fi
+
+          # Overall badge (average of frontend and backend)
+          if [ -f coverage-frontend/coverage-summary.json ] && [ -f coverage-backend/coverage.json ]; then
+            FRONTEND_PCT=$(jq -r '.total?.statements?.pct // 0' coverage-frontend/coverage-summary.json)
+            BACKEND_PCT=$(jq -r '.totals.percent_covered // 0' coverage-backend/coverage.json)
+            OVERALL_PCT=$(awk "BEGIN {printf \"%.0f\", ($FRONTEND_PCT + $BACKEND_PCT) / 2}")
+            OVERALL_COLOR=$(awk "BEGIN {print ($OVERALL_PCT >= 80) ? \"4CAF50\" : ($OVERALL_PCT >= 70) ? \"FFC107\" : \"F44336\"}")
+            cat > .badges/coverage.svg << EOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="130" height="20">
+            <linearGradient id="b" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <mask id="a">
+              <rect width="130" height="20" rx="3" fill="#fff"/>
+            </mask>
+            <g mask="url(#a)">
+              <path fill="#555" d="M0 0h65v20H0z"/>
+              <path fill="#$OVERALL_COLOR" d="M65 0h65v20H65z"/>
+              <path fill="url(#b)" d="M0 0h130v20H0z"/>
+            </g>
+            <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+              <text x="32.5" y="15" fill="#010101" fill-opacity=".3">coverage</text>
+              <text x="32.5" y="14">coverage</text>
+              <text x="97.5" y="15" fill="#010101" fill-opacity=".3">${OVERALL_PCT}%</text>
+              <text x="97.5" y="14">${OVERALL_PCT}%</text>
+            </g>
+          </svg>
+          EOF
+          fi
+
+          echo "Generated badges:"
+          ls -la .badges/
+
+      - name: Commit badges
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .badges/
+          git diff --staged --quiet || git commit -m "chore: update coverage badges [skip ci]"
+          git push

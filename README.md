@@ -2,6 +2,10 @@
 
 AI-powered resume analysis system built on a **microservices architecture** with intelligent job matching, ML-based candidate ranking, and comprehensive monitoring.
 
+![Coverage](.badges/coverage.svg)
+![Frontend Coverage](.badges/frontend-coverage.svg)
+![Backend Coverage](.badges/backend-coverage.svg)
+
 ## Features
 
 - **Resume Upload & Analysis**: Support for PDF and DOCX formats with NLP-based parsing
