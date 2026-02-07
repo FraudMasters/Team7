@@ -1,6 +1,8 @@
-# TEAM7 Resume Analysis Platform
+# AgentHR - Resume Analysis Platform
 
 AI-powered resume analysis system with intelligent job matching.
+
+© Soinex Inc
 
 ## Quick Start
 
@@ -214,4 +216,4 @@ bash setup.sh                   # Mac/Linux
 
 ## Support
 
-For issues or questions, contact the TEAM7 team.
+For issues or questions, contact the Soinex Inc team.

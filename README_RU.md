@@ -1,4 +1,4 @@
-# TEAM7 Платформа Анализа Резюме
+# AgentHR - Платформа Анализа Резюме
 
 Система анализа резюме на базе ИИ с интеллектуальным подбором вакансий, многоязычной поддержкой и аналитической панелью.
 
@@ -18,16 +18,16 @@
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/FraudMasters/Team7.git
-cd Team7
+git clone https://github.com/Soinex-Inc/agenthr.git
+cd agenthr
 bash setup.sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/FraudMasters/Team7.git
-cd Team7
+git clone https://github.com/Soinex-Inc/agenthr.git
+cd agenthr
 .\setup.ps1
 ```
 
@@ -276,4 +276,4 @@ MIT
 
 ---
 
-Создано для TEAM7
+Создано для Soinex Inc

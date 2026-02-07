@@ -29,8 +29,8 @@ AI-powered resume analysis system with intelligent job matching, ML-based candid
 ### Start Services
 
 ```bash
-git clone https://github.com/FraudMasters/Team7.git
-cd Team7  # or agenthr
+git clone https://github.com/Soinex-Inc/agenthr.git
+cd agenthr
 
 # Start all services
 docker-compose up -d
@@ -333,4 +333,4 @@ MIT
 
 ---
 
-Built by TEAM7
+Built by Soinex Inc
