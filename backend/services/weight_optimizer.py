@@ -725,8 +725,149 @@ class WeightOptimizerService:
         Raises:
             ValueError: If test is not found or insufficient data
         """
-        # TODO: Implementation in subtask-4-5
-        raise NotImplementedError("optimize_weights will be implemented in subtask-4-5")
+        from uuid import UUID
+
+        # Step 1: Validate test_id and fetch test
+        try:
+            test_uuid = UUID(test_id)
+        except ValueError as e:
+            raise ValueError(f"Invalid test_id format: {test_id}") from e
+
+        test_query = select(ABTest).where(ABTest.id == test_uuid)
+        test_result = await self.db.execute(test_query)
+        test = test_result.scalar_one_or_none()
+
+        if not test:
+            raise ValueError(f"A/B test not found: {test_id}")
+
+        # Step 2: Analyze each metric type
+        metrics_summary: Dict[str, Any] = {}
+        significant_improvements: List[Dict[str, Any]] = []
+
+        for metric_type in ABTestMetricType:
+            try:
+                analysis = await self.analyze_metrics(test_id, metric_type)
+                metrics_summary[metric_type.value] = analysis
+
+                # Check if result is statistically significant
+                stat_test = analysis.get("statistical_test", {})
+                if stat_test.get("is_significant", False):
+                    comparison = analysis.get("comparison", {})
+                    significant_improvements.append({
+                        "metric_type": metric_type.value,
+                        "better_profile": comparison.get("better_profile"),
+                        "improvement_pct": comparison.get("improvement_pct", 0.0),
+                        "p_value": stat_test.get("p_value"),
+                        "effect_size": stat_test.get("effect_size"),
+                    })
+                    logger.info(
+                        f"Significant improvement found for {metric_type.value}: "
+                        f"p={stat_test.get('p_value'):.4f}, "
+                        f"better_profile={comparison.get('better_profile')}"
+                    )
+            except ValueError as e:
+                # Insufficient data for this metric type
+                logger.warning(f"Could not analyze {metric_type.value}: {e}")
+                metrics_summary[metric_type.value] = {"error": str(e)}
+
+        # Step 3: Determine if optimization should occur
+        # Optimization is recommended if at least one metric shows significant improvement
+        should_optimize = len(significant_improvements) > 0
+
+        if not should_optimize:
+            # No significant improvements found
+            return OptimizationResult(
+                should_optimize=False,
+                recommended_weights={},
+                reason=(
+                    "No statistically significant improvements found (p < 0.05). "
+                    f"Continue collecting data until minimum sample size ({self.MIN_SAMPLE_SIZE}) "
+                    "is reached for all variants."
+                ),
+                statistical_significance=None,
+                metrics_summary=metrics_summary,
+            )
+
+        # Step 4: Identify the best profile to recommend
+        # Use a voting approach: the profile with the most significant wins is recommended
+        profile_win_count: Dict[str, int] = {}
+        for improvement in significant_improvements:
+            profile_id = improvement["better_profile"]
+            profile_win_count[profile_id] = profile_win_count.get(profile_id, 0) + 1
+
+        # Get the profile with the most wins
+        best_profile_id = max(profile_win_count, key=profile_win_count.get)
+
+        # Step 5: Get the weights for the best profile
+        profile_query = select(MatchingWeightProfile).where(
+            MatchingWeightProfile.id == UUID(best_profile_id)
+        )
+        profile_result = await self.db.execute(profile_query)
+        best_profile = profile_result.scalar_one_or_none()
+
+        if not best_profile:
+            raise ValueError(f"Best profile not found: {best_profile_id}")
+
+        recommended_weights = {
+            "keyword_weight": best_profile.keyword_weight,
+            "tfidf_weight": best_profile.tfidf_weight,
+            "vector_weight": best_profile.vector_weight,
+        }
+
+        # Step 6: Build the reason string
+        win_reasons = []
+        for improvement in significant_improvements:
+            if improvement["better_profile"] == best_profile_id:
+                win_reasons.append(
+                    f"{improvement['metric_type']}: "
+                    f"+{improvement['improvement_pct']:.1f}% "
+                    f"(p={improvement['p_value']:.4f})"
+                )
+
+        reason = (
+            f"Profile '{best_profile.name}' shows statistically significant improvement "
+            f"in {len([i for i in significant_improvements if i['better_profile'] == best_profile_id])} "
+            f"of {len(significant_improvements)} significant metrics. "
+            f"Improvements: {', '.join(win_reasons)}. "
+            f"Weights: keyword={recommended_weights['keyword_weight']:.2f}, "
+            f"tfidf={recommended_weights['tfidf_weight']:.2f}, "
+            f"vector={recommended_weights['vector_weight']:.2f}"
+        )
+
+        # Step 7: Create a representative StatisticalTestResult for the primary metric
+        # Use match_acceptance as the primary metric if significant, otherwise first significant
+        primary_result = None
+        for improvement in significant_improvements:
+            if improvement["better_profile"] == best_profile_id:
+                metric_data = metrics_summary.get(improvement["metric_type"], {})
+                stat_data = metric_data.get("statistical_test", {})
+                if stat_data:
+                    primary_result = StatisticalTestResult(
+                        test_type=stat_data.get("test_type", ""),
+                        p_value=stat_data.get("p_value", 0.0),
+                        is_significant=stat_data.get("is_significant", False),
+                        effect_size=stat_data.get("effect_size", 0.0),
+                        confidence_interval=stat_data.get("confidence_interval"),
+                        variant_a_mean=stat_data.get("variant_a_mean", 0.0),
+                        variant_b_mean=stat_data.get("variant_b_mean", 0.0),
+                        sample_size_a=stat_data.get("sample_size_a", 0),
+                        sample_size_b=stat_data.get("sample_size_b", 0),
+                    )
+                break
+
+        logger.info(
+            f"Optimization recommendation for test {test_id}: "
+            f"optimize={should_optimize}, profile={best_profile.name}"
+        )
+
+        # Step 8: Return OptimizationResult
+        return OptimizationResult(
+            should_optimize=should_optimize,
+            recommended_weights=recommended_weights,
+            reason=reason,
+            statistical_significance=primary_result,
+            metrics_summary=metrics_summary,
+        )
 
 
 # Singleton instance getter for dependency injection
