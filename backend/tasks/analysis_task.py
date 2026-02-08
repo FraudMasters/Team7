@@ -57,6 +57,7 @@ from analyzers import (
     extract_work_experience,
 )
 from config import get_settings
+from services.resume_cache_service import get_resume_cache
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -142,6 +143,7 @@ def analyze_resume_core(
     Core resume analysis logic without Celery dependencies.
 
     This function can be called directly or wrapped in a Celery task.
+    Uses content-based caching to avoid reprocessing identical resumes.
 
     Args:
         resume_id: Unique identifier of the resume to analyze
@@ -157,6 +159,9 @@ def analyze_resume_core(
     try:
         logger.info(f"Starting core resume analysis for resume_id: {resume_id}")
 
+        # Get resume cache service
+        resume_cache = get_resume_cache()
+
         # Step 1: Find and extract text
         try:
             file_path = find_resume_file(resume_id)
@@ -167,6 +172,28 @@ def analyze_resume_core(
                 "error": str(e),
                 "processing_time_ms": round((time.time() - start_time) * 1000, 2),
             }
+
+        # Read file content for cache hashing
+        content_hash = None
+        try:
+            with open(file_path, "rb") as f:
+                file_content = f.read()
+            content_hash = resume_cache.hash_content(file_content)
+            logger.debug(f"Generated content hash for resume: {content_hash[:16]}...")
+
+            # Check cache for existing analysis result
+            cached_analysis = resume_cache.get_analysis_result(content_hash)
+            if cached_analysis is not None:
+                logger.info(f"Cache hit for resume analysis: {content_hash[:16]}...")
+                cached_analysis["resume_id"] = resume_id
+                cached_analysis["processing_time_ms"] = round((time.time() - start_time) * 1000, 2)
+                cached_analysis["from_cache"] = True
+                return cached_analysis
+            else:
+                logger.debug(f"Cache miss for resume analysis: {content_hash[:16]}...")
+        except Exception as e:
+            logger.warning(f"Failed to generate/read content hash for caching: {e}")
+            # Continue without caching if hashing fails
 
         # Extract text
         try:
@@ -275,10 +302,20 @@ def analyze_resume_core(
             "experience": experience_result,
             "errors": errors_result,
             "processing_time_ms": processing_time_ms,
+            "from_cache": False,
         }
 
         # Convert numpy types to Python native types for JSON serialization
         result = convert_numpy_types(result)
+
+        # Cache the analysis result if we have a content hash
+        if content_hash and resume_cache.enabled:
+            try:
+                cache_success = resume_cache.set_analysis_result(content_hash, result)
+                if cache_success:
+                    logger.debug(f"Cached analysis result for: {content_hash[:16]}...")
+            except Exception as e:
+                logger.warning(f"Failed to cache analysis result: {e}")
 
         logger.info(f"Resume core analysis completed in {processing_time_ms}ms")
         return result
@@ -365,8 +402,26 @@ def analyze_resume_async(
 
         return result
 
+    except SoftTimeLimitExceeded:
+        logger.error(f"Resume analysis for {resume_id} exceeded time limit")
+        return {
+            "resume_id": resume_id,
+            "status": "failed",
+            "error": "Analysis exceeded maximum time limit",
+            "processing_time_ms": 0,
+        }
+
     except Exception as e:
         logger.error(f"Unexpected error in resume analysis: {e}", exc_info=True)
+
+        # Retry with exponential backoff for transient failures
+        if self.request.retries < self.max_retries:
+            logger.info(
+                f"Retrying resume analysis for {resume_id}, "
+                f"attempt {self.request.retries + 1}/{self.max_retries}"
+            )
+            raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+
         return {
             "resume_id": resume_id,
             "status": "failed",

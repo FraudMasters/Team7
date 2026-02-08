@@ -61,6 +61,8 @@ interface ResumeUploaderProps {
   onUploadError?: (error: string) => void;
   /** Callback when uploading state changes */
   onUploadingChange?: (isUploading: boolean) => void;
+  /** Callback when upload starts and processing begins */
+  onUploadStart?: () => void;
 }
 
 /**
@@ -94,6 +96,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
   onUploadComplete,
   onUploadError,
   onUploadingChange,
+  onUploadStart,
 }, ref) => {
   const { t } = useTranslation();
 
@@ -206,6 +209,9 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
     async (file: File) => {
       setUploadState((prev) => ({ ...prev, uploading: true, progress: 0 }));
 
+      // Notify parent that upload has started
+      onUploadStart?.();
+
       const formData = new FormData();
       formData.append('file', file);
 
@@ -280,7 +286,7 @@ const ResumeUploader = forwardRef<ResumeUploaderHandle, ResumeUploaderProps>(({
         onUploadError?.(errorMessage);
       }
     },
-    [uploadUrl, onUploadComplete, onUploadError, t]
+    [uploadUrl, onUploadComplete, onUploadError, onUploadStart, t]
   );
 
   /**

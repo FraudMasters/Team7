@@ -47,6 +47,7 @@ import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
+import TestProgressPage from './pages/TestProgressPage';
 
 /**
  * Main App Component
@@ -83,6 +84,9 @@ function App() {
         <Route path="/profile" element={<JobSeekerLayout />}>
           <Route index element={<CandidateProfilePage />} />
         </Route>
+
+        {/* Test Routes (for development) */}
+        <Route path="/test-progress" element={<TestProgressPage />} />
 
         {/* Recruiter Flow */}
         <Route path="/recruiter" element={<RecruiterLayout />}>

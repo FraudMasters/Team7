@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Typography, Box, Paper, Stepper, Step, StepLabel } from '@mui/material';
 import { config } from '@/config';
 import ResumeUploader from '@components/ResumeUploader';
+import ProcessingProgressIndicator, {
+  ProcessingProgressIndicatorHandle,
+} from '@components/ProcessingProgressIndicator';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import type {
+  ResumeProgressStage,
+  ResumeProcessingState,
+} from '@/types/resume-progress';
 
 /**
  * Upload workflow step
@@ -26,16 +34,92 @@ const ResumeUploadPage: React.FC = () => {
   const { t } = useTranslation();
 
   const [currentStep, setCurrentStep] = useState<UploadStep>('upload');
+  const [currentResumeId, setCurrentResumeId] = useState<string | null>(null);
+
+  // Processing progress state
+  const [processingStage, setProcessingStage] = useState<ResumeProgressStage>('parsing');
+  const [processingProgress, setProcessingProgress] = useState<number>(0);
+  const [processingMessage, setProcessingMessage] = useState<string>('');
+  const [isProcessingComplete, setIsProcessingComplete] = useState<boolean>(false);
+  const [hasProcessingError, setHasProcessingError] = useState<boolean>(false);
+  const [processingError, setProcessingError] = useState<string>('');
+
+  // Progress indicator ref for programmatic control
+  const progressIndicatorRef = useRef<ProcessingProgressIndicatorHandle>(null);
+
+  /**
+   * Get current user ID from localStorage or use a default
+   * In a real app, this would come from the auth context
+   */
+  const getCurrentUserId = useCallback((): string => {
+    return 'guest-user'; // Default user ID for resume upload
+  }, []);
+
+  /**
+   * WebSocket connection for real-time progress updates
+   */
+  const { isConnected } = useWebSocket({
+    userId: getCurrentUserId(),
+    onMessage: useCallback((message) => {
+      // Handle resume progress messages from WebSocket
+      if (message.type === 'resume_progress' || message.type === 'batch_progress') {
+        const progressMessage = message as any;
+        if (progressMessage.stage) {
+          setProcessingStage(progressMessage.stage);
+          setProcessingProgress(progressMessage.progress || 0);
+          setProcessingMessage(progressMessage.message || '');
+
+          // Update progress indicator via ref if available
+          if (progressIndicatorRef.current) {
+            if (progressMessage.stage === 'complete') {
+              progressIndicatorRef.current.setComplete(progressMessage.message);
+            } else if (progressMessage.stage === 'failed') {
+              progressIndicatorRef.current.setError(
+                progressMessage.error_message || 'Processing failed'
+              );
+            } else {
+              progressIndicatorRef.current.updateProgress({
+                stage: progressMessage.stage,
+                progress: progressMessage.progress,
+                message: progressMessage.message,
+              });
+            }
+          }
+        }
+
+        // Handle completion
+        if (progressMessage.stage === 'complete') {
+          setIsProcessingComplete(true);
+          setHasProcessingError(false);
+        }
+
+        // Handle errors
+        if (progressMessage.stage === 'failed') {
+          setIsProcessingComplete(false);
+          setHasProcessingError(true);
+          setProcessingError(progressMessage.error_message || 'Processing failed');
+        }
+      }
+    }, []),
+    onError: useCallback((error) => {
+      // Handle WebSocket errors without stopping the upload
+      // The upload will still complete, we just won't get real-time updates
+    }, []),
+  });
 
   /**
    * Handle successful upload by navigating to results page
    */
   const handleUploadComplete = (resumeId: string) => {
-    setCurrentStep('complete');
-    // Navigate after a brief delay to show the complete step
+    setCurrentResumeId(resumeId);
+    // Stay on processing step to show progress
+    // Will navigate after processing completes or timeout
     setTimeout(() => {
-      navigate(`/jobs/resume-results/${resumeId}`);
-    }, 1000);
+      if (!isProcessingComplete) {
+        // If processing not complete after timeout, still navigate
+        navigate(`/jobs/resume-results/${resumeId}`);
+      }
+    }, 5000); // 5 second timeout
   };
 
   /**
@@ -47,11 +131,33 @@ const ResumeUploadPage: React.FC = () => {
   };
 
   /**
-   * Handle upload start to update step indicator
+   * Handle upload start to update step indicator and reset progress state
    */
   const handleUploadStart = () => {
     setCurrentStep('processing');
+    // Reset progress state for new upload
+    setProcessingStage('parsing');
+    setProcessingProgress(0);
+    setProcessingMessage('');
+    setIsProcessingComplete(false);
+    setHasProcessingError(false);
+    setProcessingError('');
+    // Reset progress indicator
+    progressIndicatorRef.current?.reset();
   };
+
+  /**
+   * Navigate to results when processing is complete
+   */
+  useEffect(() => {
+    if (isProcessingComplete && currentResumeId) {
+      const timeoutId = setTimeout(() => {
+        navigate(`/jobs/resume-results/${currentResumeId}`);
+      }, 1500); // Brief delay to show completion state
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isProcessingComplete, currentResumeId, navigate]);
 
   // Define workflow steps
   const steps = [
@@ -86,12 +192,31 @@ const ResumeUploadPage: React.FC = () => {
 
       {/* Upload Component */}
       <Paper elevation={1} sx={{ p: 4 }}>
-        <ResumeUploader
-          uploadUrl={`${config.api.url}/api/resumes/upload`}
-          onUploadComplete={handleUploadComplete}
-          onUploadError={handleUploadError}
-          onUploadStart={handleUploadStart}
-        />
+        {currentStep === 'upload' && (
+          <ResumeUploader
+            uploadUrl={`${config.api.url}/api/resumes/upload`}
+            onUploadComplete={handleUploadComplete}
+            onUploadError={handleUploadError}
+            onUploadStart={handleUploadStart}
+          />
+        )}
+
+        {/* Processing Progress Indicator */}
+        {currentStep === 'processing' && (
+          <ProcessingProgressIndicator
+            ref={progressIndicatorRef}
+            stage={processingStage}
+            progress={processingProgress}
+            message={processingMessage}
+            isComplete={isProcessingComplete}
+            hasError={hasProcessingError}
+            error={processingError}
+            resumeId={currentResumeId || undefined}
+            showStepper={true}
+            title={t('upload.processingTitle')}
+            size="large"
+          />
+        )}
       </Paper>
 
       {/* Quick Info - Streamlined from full instructions */}
