@@ -7,15 +7,55 @@ are combined for resume-job matching.
 """
 import logging
 from typing import List, Literal, Optional
+from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select, delete, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.matching_weights_profile import MatchingWeightsProfile
+from models.matching_weights_history import MatchingWeightsHistory
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def normalize_weights(keyword_weight: float, tfidf_weight: float, vector_weight: float) -> tuple[float, float, float]:
+    """
+    Normalize weights so they sum to 1.0.
+
+    If the weights already sum to 1.0 (within a small tolerance), they are returned as-is.
+    Otherwise, they are scaled proportionally.
+
+    Args:
+        keyword_weight: Weight for keyword matching
+        tfidf_weight: Weight for TF-IDF matching
+        vector_weight: Weight for vector similarity matching
+
+    Returns:
+        Tuple of normalized (keyword_weight, tfidf_weight, vector_weight)
+    """
+    total = keyword_weight + tfidf_weight + vector_weight
+
+    # If weights sum to approximately 1.0, return as-is
+    if abs(total - 1.0) < 0.0001:
+        return keyword_weight, tfidf_weight, vector_weight
+
+    # Scale weights proportionally
+    if total > 0:
+        return (
+            keyword_weight / total,
+            tfidf_weight / total,
+            vector_weight / total,
+        )
+    else:
+        # If all weights are 0, return balanced defaults
+        return (0.33, 0.33, 0.34)
+
 
 # Preset type literal
 PresetType = Literal["technical", "creative", "executive", "balanced"]
@@ -130,7 +170,10 @@ class CompareWeightsResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["Matching Weights"],
 )
-async def create_matching_weights_profile(request: MatchingWeightsProfileCreate) -> JSONResponse:
+async def create_matching_weights_profile(
+    request: MatchingWeightsProfileCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Create a custom matching weights profile for an organization.
 
@@ -141,6 +184,7 @@ async def create_matching_weights_profile(request: MatchingWeightsProfileCreate)
 
     Args:
         request: Create request with profile configuration
+        db: Database session
 
     Returns:
         JSON response with created profile details
@@ -184,38 +228,108 @@ async def create_matching_weights_profile(request: MatchingWeightsProfileCreate)
                 detail="Profile name cannot be empty",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        profile_response = {
-            "id": "placeholder-id",
-            "organization_id": request.organization_id,
-            "name": request.name,
-            "description": request.description,
-            "keyword_weight": request.keyword_weight,
-            "tfidf_weight": request.tfidf_weight,
-            "vector_weight": request.vector_weight,
-            "is_default": request.is_default,
-            "is_preset": request.is_preset,
-            "preset_type": request.preset_type,
-            "created_by": request.created_by,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
+        # Check for duplicate profile name in the same organization
+        existing_profile = await db.execute(
+            select(MatchingWeightsProfile).where(
+                MatchingWeightsProfile.organization_id == request.organization_id,
+                MatchingWeightsProfile.name == request.name,
+            )
+        )
+        if existing_profile.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Profile with name '{request.name}' already exists for this organization",
+            )
+
+        # Normalize weights to sum to 1.0
+        normalized_keyword, normalized_tfidf, normalized_vector = normalize_weights(
+            request.keyword_weight,
+            request.tfidf_weight,
+            request.vector_weight,
+        )
+
+        if (normalized_keyword, normalized_tfidf, normalized_vector) != (
+            request.keyword_weight,
+            request.tfidf_weight,
+            request.vector_weight,
+        ):
+            logger.info(
+                f"Normalized weights from ({request.keyword_weight}, {request.tfidf_weight}, {request.vector_weight}) "
+                f"to ({normalized_keyword}, {normalized_tfidf}, {normalized_vector})"
+            )
+
+        # Create new profile with UUID
+        profile_id = str(uuid4())
+        new_profile = MatchingWeightsProfile(
+            id=profile_id,
+            organization_id=request.organization_id,
+            name=request.name,
+            description=request.description,
+            keyword_weight=normalized_keyword,
+            tfidf_weight=normalized_tfidf,
+            vector_weight=normalized_vector,
+            is_default=request.is_default,
+            is_preset=request.is_preset,
+            preset_type=request.preset_type,
+            created_by=request.created_by,
+        )
+        db.add(new_profile)
+        await db.flush()
+
+        # Create history entry for the creation
+        history_entry = MatchingWeightsHistory(
+            profile_id=new_profile.id,
+            organization_id=new_profile.organization_id,
+            change_type="create",
+            changed_by=request.created_by,
+            old_name=None,
+            new_name=new_profile.name,
+            old_description=None,
+            new_description=new_profile.description,
+            old_keyword_weight=None,
+            new_keyword_weight=new_profile.keyword_weight,
+            old_tfidf_weight=None,
+            new_tfidf_weight=new_profile.tfidf_weight,
+            old_vector_weight=None,
+            new_vector_weight=new_profile.vector_weight,
+            old_is_default=None,
+            new_is_default=new_profile.is_default,
+        )
+        db.add(history_entry)
+
+        response_data = {
+            "id": new_profile.id,
+            "organization_id": new_profile.organization_id,
+            "name": new_profile.name,
+            "description": new_profile.description,
+            "keyword_weight": new_profile.keyword_weight,
+            "tfidf_weight": new_profile.tfidf_weight,
+            "vector_weight": new_profile.vector_weight,
+            "is_default": new_profile.is_default,
+            "is_preset": new_profile.is_preset,
+            "preset_type": new_profile.preset_type,
+            "created_by": new_profile.created_by,
+            "created_at": new_profile.created_at.isoformat(),
+            "updated_at": new_profile.updated_at.isoformat(),
         }
+
+        await db.commit()
 
         logger.info(
             f"Created matching weights profile '{request.name}' "
-            f"for organization: {request.organization_id}"
+            f"for organization: {request.organization_id} with ID: {new_profile.id}"
         )
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
-            content=profile_response,
+            content=response_data,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating matching weights profile: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create matching weights profile: {str(e)}",
@@ -228,15 +342,20 @@ async def list_matching_weights_profiles(
     is_default: Optional[bool] = Query(None, description="Filter by default status"),
     is_preset: Optional[bool] = Query(None, description="Filter by preset status"),
     preset_type: Optional[PresetType] = Query(None, description="Filter by preset type"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     List matching weights profiles with optional filters.
+
+    This endpoint retrieves matching weights profiles with support for filtering
+    by organization, default status, preset status, and preset type.
 
     Args:
         organization_id: Optional organization ID filter
         is_default: Optional default status filter
         is_preset: Optional preset status filter
         preset_type: Optional preset type filter
+        db: Database session
 
     Returns:
         JSON response with list of weight profiles
@@ -248,19 +367,65 @@ async def list_matching_weights_profiles(
         >>> import requests
         >>> response = requests.get("/api/matching-weights/?organization_id=org123")
         >>> response.json()
+        {
+            "organization_id": "org123",
+            "profiles": [...],
+            "total_count": 5
+        }
     """
     try:
-        logger.info(f"Listing matching weights profiles with filters: organization_id={organization_id}")
+        logger.info(
+            f"Listing matching weights profiles with filters - "
+            f"organization_id: {organization_id}, is_default: {is_default}, "
+            f"is_preset: {is_preset}, preset_type: {preset_type}"
+        )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask
-        profiles = []
+        # Build query
+        query = select(MatchingWeightsProfile)
+
+        if organization_id is not None:
+            query = query.where(MatchingWeightsProfile.organization_id == organization_id)
+
+        if is_default is not None:
+            query = query.where(MatchingWeightsProfile.is_default == is_default)
+
+        if is_preset is not None:
+            query = query.where(MatchingWeightsProfile.is_preset == is_preset)
+
+        if preset_type is not None:
+            query = query.where(MatchingWeightsProfile.preset_type == preset_type)
+
+        query = query.order_by(MatchingWeightsProfile.name)
+
+        result = await db.execute(query)
+        profiles = result.scalars().all()
+
+        # Build response
+        profiles_data = []
+        for profile in profiles:
+            profiles_data.append({
+                "id": profile.id,
+                "organization_id": profile.organization_id,
+                "name": profile.name,
+                "description": profile.description,
+                "keyword_weight": profile.keyword_weight,
+                "tfidf_weight": profile.tfidf_weight,
+                "vector_weight": profile.vector_weight,
+                "is_default": profile.is_default,
+                "is_preset": profile.is_preset,
+                "preset_type": profile.preset_type,
+                "created_by": profile.created_by,
+                "created_at": profile.created_at.isoformat(),
+                "updated_at": profile.updated_at.isoformat(),
+            })
 
         response_data = {
             "organization_id": organization_id,
-            "profiles": profiles,
-            "total_count": len(profiles),
+            "profiles": profiles_data,
+            "total_count": len(profiles_data),
         }
+
+        logger.info(f"Retrieved {len(profiles_data)} matching weights profiles")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -276,12 +441,19 @@ async def list_matching_weights_profiles(
 
 
 @router.get("/{profile_id}", tags=["Matching Weights"])
-async def get_matching_weights_profile(profile_id: str) -> JSONResponse:
+async def get_matching_weights_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Retrieve a specific matching weights profile by ID.
 
+    This endpoint retrieves detailed information about a single matching weights profile,
+    including the weight configuration for keyword, TF-IDF, and vector similarity matching.
+
     Args:
         profile_id: UUID of the profile to retrieve
+        db: Database session
 
     Returns:
         JSON response with profile details
@@ -294,22 +466,51 @@ async def get_matching_weights_profile(profile_id: str) -> JSONResponse:
         >>> import requests
         >>> response = requests.get("/api/matching-weights/abc-123-def")
         >>> response.json()
+        {
+            "id": "abc-123-def",
+            "organization_id": "org123",
+            "name": "Technical Role Focus",
+            "keyword_weight": 0.6,
+            "tfidf_weight": 0.3,
+            "vector_weight": 0.1,
+            ...
+        }
     """
     try:
         logger.info(f"Retrieving matching weights profile: {profile_id}")
 
-        # Validate profile_id
-        if not profile_id or len(profile_id.strip()) == 0:
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Profile ID cannot be empty",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Matching weights profile not found: {profile_id}",
+        response_data = {
+            "id": profile.id,
+            "organization_id": profile.organization_id,
+            "name": profile.name,
+            "description": profile.description,
+            "keyword_weight": profile.keyword_weight,
+            "tfidf_weight": profile.tfidf_weight,
+            "vector_weight": profile.vector_weight,
+            "is_default": profile.is_default,
+            "is_preset": profile.is_preset,
+            "preset_type": profile.preset_type,
+            "created_by": profile.created_by,
+            "created_at": profile.created_at.isoformat(),
+            "updated_at": profile.updated_at.isoformat(),
+        }
+
+        logger.info(f"Retrieved matching weights profile: {profile_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
         )
 
     except HTTPException:
@@ -326,6 +527,7 @@ async def get_matching_weights_profile(profile_id: str) -> JSONResponse:
 async def update_matching_weights_profile(
     profile_id: str,
     request: MatchingWeightsProfileUpdate,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Update a matching weights profile.
@@ -336,6 +538,7 @@ async def update_matching_weights_profile(
     Args:
         profile_id: UUID of the profile to update
         request: Update request with fields to modify
+        db: Database session
 
     Returns:
         JSON response with updated profile details
@@ -378,35 +581,163 @@ async def update_matching_weights_profile(
                 detail="At least one field must be provided for update",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        profile_response = {
-            "id": profile_id,
-            "organization_id": "org123",
-            "name": request.name or "Updated Profile Name",
-            "description": request.description,
-            "keyword_weight": request.keyword_weight if request.keyword_weight is not None else 0.5,
-            "tfidf_weight": request.tfidf_weight if request.tfidf_weight is not None else 0.3,
-            "vector_weight": request.vector_weight if request.vector_weight is not None else 0.2,
-            "is_default": request.is_default if request.is_default is not None else False,
-            "is_preset": False,
-            "preset_type": None,
-            "created_by": "user456",
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
+        # Get existing profile
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
+            )
+
+        # Store old values for history tracking
+        old_name = profile.name
+        old_description = profile.description
+        old_keyword_weight = profile.keyword_weight
+        old_tfidf_weight = profile.tfidf_weight
+        old_vector_weight = profile.vector_weight
+        old_is_default = profile.is_default
+
+        # Track what changed
+        changes_made = False
+
+        # Check for duplicate name if name is being changed
+        if request.name is not None and request.name != profile.name:
+            existing_profile = await db.execute(
+                select(MatchingWeightsProfile).where(
+                    MatchingWeightsProfile.organization_id == profile.organization_id,
+                    MatchingWeightsProfile.name == request.name,
+                    MatchingWeightsProfile.id != profile_id,
+                )
+            )
+            if existing_profile.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Profile with name '{request.name}' already exists for this organization",
+                )
+
+        # Update fields if provided
+        if request.name is not None:
+            profile.name = request.name
+            changes_made = True
+
+        if request.description is not None:
+            profile.description = request.description
+            changes_made = True
+
+        # Track if weights are being updated for normalization
+        weights_updated = False
+        if request.keyword_weight is not None or request.tfidf_weight is not None or request.vector_weight is not None:
+            # Get current weights if not provided
+            current_keyword = profile.keyword_weight if request.keyword_weight is None else request.keyword_weight
+            current_tfidf = profile.tfidf_weight if request.tfidf_weight is None else request.tfidf_weight
+            current_vector = profile.vector_weight if request.vector_weight is None else request.vector_weight
+
+            # Normalize weights
+            normalized_keyword, normalized_tfidf, normalized_vector = normalize_weights(
+                current_keyword,
+                current_tfidf,
+                current_vector,
+            )
+
+            # Apply normalized weights
+            if request.keyword_weight is not None:
+                profile.keyword_weight = normalized_keyword
+            if request.tfidf_weight is not None:
+                profile.tfidf_weight = normalized_tfidf
+            if request.vector_weight is not None:
+                profile.vector_weight = normalized_vector
+
+            if (normalized_keyword, normalized_tfidf, normalized_vector) != (
+                current_keyword,
+                current_tfidf,
+                current_vector,
+            ):
+                logger.info(
+                    f"Normalized weights from ({current_keyword}, {current_tfidf}, {current_vector}) "
+                    f"to ({normalized_keyword}, {normalized_tfidf}, {normalized_vector})"
+                )
+
+            weights_updated = True
+            changes_made = True
+
+        if request.is_default is not None:
+            # If setting as default, unset other default profiles for the same organization
+            if request.is_default:
+                await db.execute(
+                    update(MatchingWeightsProfile)
+                    .where(
+                        MatchingWeightsProfile.organization_id == profile.organization_id,
+                        MatchingWeightsProfile.id != profile_id,
+                        MatchingWeightsProfile.is_default == True,
+                    )
+                    .values(is_default=False)
+                )
+                logger.info(
+                    f"Unset {len([p for p in [profile] if p.is_default])} other default profile(s) "
+                    f"for organization: {profile.organization_id}"
+                )
+            profile.is_default = request.is_default
+            changes_made = True
+
+        await db.commit()
+        await db.refresh(profile)
+
+        # Create history entry for the update
+        if changes_made:
+            history_entry = MatchingWeightsHistory(
+                profile_id=profile.id,
+                organization_id=profile.organization_id,
+                change_type="update",
+                changed_by=profile.created_by,  # Using the profile's created_by as changed_by
+                old_name=old_name if old_name != profile.name else None,
+                new_name=profile.name if old_name != profile.name else None,
+                old_description=old_description if old_description != profile.description else None,
+                new_description=profile.description if old_description != profile.description else None,
+                old_keyword_weight=old_keyword_weight if old_keyword_weight != profile.keyword_weight else None,
+                new_keyword_weight=profile.keyword_weight if old_keyword_weight != profile.keyword_weight else None,
+                old_tfidf_weight=old_tfidf_weight if old_tfidf_weight != profile.tfidf_weight else None,
+                new_tfidf_weight=profile.tfidf_weight if old_tfidf_weight != profile.tfidf_weight else None,
+                old_vector_weight=old_vector_weight if old_vector_weight != profile.vector_weight else None,
+                new_vector_weight=profile.vector_weight if old_vector_weight != profile.vector_weight else None,
+                old_is_default=old_is_default if old_is_default != profile.is_default else None,
+                new_is_default=profile.is_default if old_is_default != profile.is_default else None,
+            )
+            db.add(history_entry)
+            # Separate commit for history entry (already committed main changes)
+            await db.commit()
+
+        response_data = {
+            "id": profile.id,
+            "organization_id": profile.organization_id,
+            "name": profile.name,
+            "description": profile.description,
+            "keyword_weight": profile.keyword_weight,
+            "tfidf_weight": profile.tfidf_weight,
+            "vector_weight": profile.vector_weight,
+            "is_default": profile.is_default,
+            "is_preset": profile.is_preset,
+            "preset_type": profile.preset_type,
+            "created_by": profile.created_by,
+            "created_at": profile.created_at.isoformat(),
+            "updated_at": profile.updated_at.isoformat(),
         }
 
         logger.info(f"Updated matching weights profile: {profile_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=profile_response,
+            content=response_data,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating matching weights profile: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update matching weights profile: {str(e)}",
@@ -414,14 +745,19 @@ async def update_matching_weights_profile(
 
 
 @router.delete("/{profile_id}", tags=["Matching Weights"])
-async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
+async def delete_matching_weights_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Delete a matching weights profile.
 
+    This endpoint permanently deletes a matching weights profile.
     Note: Default profiles and system presets cannot be deleted.
 
     Args:
         profile_id: UUID of the profile to delete
+        db: Database session
 
     Returns:
         JSON response confirming deletion
@@ -435,6 +771,10 @@ async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
         >>> import requests
         >>> response = requests.delete("/api/matching-weights/abc-123-def")
         >>> response.json()
+        {
+            "message": "Matching weights profile deleted successfully",
+            "id": "abc-123-def"
+        }
     """
     try:
         logger.info(f"Deleting matching weights profile: {profile_id}")
@@ -446,20 +786,190 @@ async def delete_matching_weights_profile(profile_id: str) -> JSONResponse:
                 detail="Profile ID cannot be empty",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Check if profile exists
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
+            )
+
+        # Check if profile is a preset - presets cannot be deleted
+        if profile.is_preset:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="System preset profiles cannot be deleted",
+            )
+
+        # Check if profile is the default - default profiles cannot be deleted
+        if profile.is_default:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Default profiles cannot be deleted",
+            )
+
+        # Store profile data for history before deletion
+        profile_for_history = profile
+
+        # Create history entry before deleting
+        history_entry = MatchingWeightsHistory(
+            profile_id=profile_for_history.id,
+            organization_id=profile_for_history.organization_id,
+            change_type="delete",
+            changed_by=profile_for_history.created_by,
+            old_name=profile_for_history.name,
+            new_name=None,
+            old_description=profile_for_history.description,
+            new_description=None,
+            old_keyword_weight=profile_for_history.keyword_weight,
+            new_keyword_weight=None,
+            old_tfidf_weight=profile_for_history.tfidf_weight,
+            new_tfidf_weight=None,
+            old_vector_weight=profile_for_history.vector_weight,
+            new_vector_weight=None,
+            old_is_default=profile_for_history.is_default,
+            new_is_default=None,
+        )
+        db.add(history_entry)
+
+        # Delete the profile
+        await db.execute(
+            delete(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        await db.commit()
+
+        logger.info(f"Deleted matching weights profile: {profile_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"message": f"Matching weights profile {profile_id} deleted successfully"},
+            content={
+                "message": "Matching weights profile deleted successfully",
+                "id": profile_id,
+            },
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting matching weights profile: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete matching weights profile: {str(e)}",
+        ) from e
+
+
+@router.post("/{profile_id}/set-active", tags=["Matching Weights"])
+async def set_active_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Set a matching weights profile as the active/default profile for its organization.
+
+    This endpoint sets the specified profile as the default profile for its organization,
+    automatically unsetting any existing default profile for the same organization.
+
+    Args:
+        profile_id: UUID of the profile to set as active
+        db: Database session
+
+    Returns:
+        JSON response with updated profile details
+
+    Raises:
+        HTTPException(404): If profile not found
+        HTTPException(422): If profile_id is invalid
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post("/api/matching-weights/abc-123-def/set-active")
+        >>> response.json()
+        {
+            "id": "abc-123-def",
+            "organization_id": "org123",
+            "name": "Technical Role Focus",
+            "is_default": true,
+            ...
+        }
+    """
+    try:
+        logger.info(f"Setting profile as active: {profile_id}")
+
+        # Validate profile_id
+        if not profile_id or len(profile_id.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Profile ID cannot be empty",
+            )
+
+        # Get the profile to set as active
+        result = await db.execute(
+            select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Matching weights profile not found: {profile_id}",
+            )
+
+        # Update all other profiles in the organization to is_default=False
+        from models.matching_weights_profile import MatchingWeightsProfile as MWP
+        other_profiles_result = await db.execute(
+            select(MWP).where(
+                MWP.organization_id == profile.organization_id,
+                MWP.id != profile_id,
+                MWP.is_default == True,
+            )
+        )
+        other_profiles = other_profiles_result.scalars().all()
+        for other_profile in other_profiles:
+            other_profile.is_default = False
+
+        # Set the selected profile as active
+        profile.is_default = True
+
+        await db.commit()
+        await db.refresh(profile)
+
+        response_data = {
+            "id": profile.id,
+            "organization_id": profile.organization_id,
+            "name": profile.name,
+            "description": profile.description,
+            "keyword_weight": profile.keyword_weight,
+            "tfidf_weight": profile.tfidf_weight,
+            "vector_weight": profile.vector_weight,
+            "is_default": profile.is_default,
+            "is_preset": profile.is_preset,
+            "preset_type": profile.preset_type,
+            "created_by": profile.created_by,
+            "created_at": profile.created_at.isoformat(),
+            "updated_at": profile.updated_at.isoformat(),
+        }
+
+        logger.info(f"Set profile as active: {profile_id} for organization: {profile.organization_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting profile as active: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set profile as active: {str(e)}",
         ) from e
 
 

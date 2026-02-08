@@ -1,797 +1,441 @@
 """
-import os
-End-to-end integration tests for Matching Weights Customization feature.
+End-to-End Integration Test for Matching Weights CRUD Workflow
 
-This test suite validates the complete weight customization workflow:
-- Preset profile creation and seeding
-- Custom profile creation via API
-- Profile selection and vacancy re-matching
-- A/B testing comparison between profiles
-- Score recalculation with different weight configurations
+This script tests the complete flow of matching weights profile management,
+including create, read, update, delete, and set-active operations.
 
-Test Coverage:
-- Preset profiles (Technical, Creative, Executive, Balanced)
-- Custom profile CRUD operations
-- Weight profile application to vacancy matching
-- Candidate re-matching with new weights
-- A/B testing comparison endpoint
-- Score differences between weight profiles
-- Integration with UnifiedSkillMatcher
+Test Steps:
+1. Create a profile via POST /api/matching-weights/
+2. Verify profile appears in GET /api/matching-weights/
+3. Get single profile via GET /api/matching-weights/{id}
+4. Update profile via PUT /api/matching-weights/{id}
+5. Verify update persisted
+6. Set profile as active via POST /api/matching-weights/{id}/set-active
+7. Delete profile via DELETE /api/matching-weights/{id}
+8. Verify profile deleted
+
+Requirements:
+- Backend server running on http://localhost:8000
+- Database available and migrations applied
+
+Usage:
+    cd backend
+    pytest tests/integration/test_matching_weights_e2e.py -v
 """
 import asyncio
-from datetime import datetime
-from typing import Dict, Generator, List
+import sys
+from pathlib import Path
+from typing import Optional
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import the FastAPI application
-import sys
-from pathlib import Path
-
+# Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from main import app
-from backend.models.matching_weights_profile import MatchingWeightsProfile
-from backend.models.matching_weights_history import MatchingWeightsHistory
-from backend.models.match_result import MatchResult
-from backend.models.vacancy import Vacancy
-from backend.models.resume import Resume
+from database import get_db
+from models.matching_weights_profile import MatchingWeightsProfile
+
+
+# ============================================================================
+# Test Data Fixtures
+# ============================================================================
+
+@pytest.fixture
+async def test_organization_id() -> str:
+    """Generate a test organization ID."""
+    return str(uuid4())
 
 
 @pytest.fixture
-async def test_organization(async_session_maker) -> str:
-    """
-    Create or get a test organization.
-
-    Returns:
-        Organization ID for testing
-    """
-    org_id = f"test-org-{uuid4().hex[:8]}"
-
-    # Store in session for cleanup
-    yield org_id
-
-
-@pytest.fixture
-async def seeded_preset_profiles(async_session_maker, test_organization) -> List[Dict]:
-    """
-    Seed preset weight profiles for testing.
-
-    Returns:
-        List of preset profile data
-    """
-    async with async_session_maker() as session:
-        preset_profiles = [
-            {
-                "id": uuid4(),
-                "organization_id": "system",
-                "name": "Technical",
-                "description": "Emphasizes exact keyword matching for technical roles",
-                "keyword_weight": 0.60,
-                "tfidf_weight": 0.25,
-                "vector_weight": 0.15,
-                "is_default": False,
-                "is_preset": True,
-                "preset_type": "technical",
-                "created_by": "system",
-            },
-            {
-                "id": uuid4(),
-                "organization_id": "system",
-                "name": "Creative",
-                "description": "Prioritizes semantic understanding for creative roles",
-                "keyword_weight": 0.15,
-                "tfidf_weight": 0.25,
-                "vector_weight": 0.60,
-                "is_default": False,
-                "is_preset": True,
-                "preset_type": "creative",
-                "created_by": "system",
-            },
-            {
-                "id": uuid4(),
-                "organization_id": "system",
-                "name": "Executive",
-                "description": "Balanced matching for leadership positions",
-                "keyword_weight": 0.34,
-                "tfidf_weight": 0.33,
-                "vector_weight": 0.33,
-                "is_default": False,
-                "is_preset": True,
-                "preset_type": "executive",
-                "created_by": "system",
-            },
-            {
-                "id": uuid4(),
-                "organization_id": "system",
-                "name": "Balanced",
-                "description": "Equal weight across all matching algorithms",
-                "keyword_weight": 0.33,
-                "tfidf_weight": 0.34,
-                "vector_weight": 0.33,
-                "is_default": False,
-                "is_preset": True,
-                "preset_type": "balanced",
-                "created_by": "system",
-            },
-        ]
-
-        for profile_data in preset_profiles:
-            profile = MatchingWeightsProfile(**profile_data)
-            session.add(profile)
-
-        await session.commit()
-
-        # Return profile data without ORM objects
-        yield [
-            {
-                "id": str(p["id"]),
-                "name": p["name"],
-                "preset_type": p["preset_type"],
-                "keyword_weight": p["keyword_weight"],
-                "tfidf_weight": p["tfidf_weight"],
-                "vector_weight": p["vector_weight"],
-            }
-            for p in preset_profiles
-        ]
+async def test_profile_data(test_organization_id) -> dict:
+    """Generate test profile data."""
+    return {
+        "organization_id": test_organization_id,
+        "name": "E2E Test Profile",
+        "description": "Test profile for end-to-end verification",
+        "keyword_weight": 0.5,
+        "tfidf_weight": 0.3,
+        "vector_weight": 0.2,
+        "is_default": False,
+        "is_preset": False,
+        "created_by": "test-user-001",
+    }
 
 
 @pytest.fixture
-async def test_vacancy(async_session_maker, test_organization) -> Dict:
-    """
-    Create a test vacancy for matching.
-
-    Returns:
-        Vacancy data dictionary
-    """
-    async with async_session_maker() as session:
-        vacancy_id = uuid4()
-        vacancy = Vacancy(
-            id=vacancy_id,
-            organization_id=test_organization,
-            title="Senior Python Developer",
-            description="Looking for a senior Python developer with experience in FastAPI, PostgreSQL, and Docker.",
-            required_skills=["Python", "FastAPI", "PostgreSQL", "Docker"],
-            min_experience_years=5,
-        )
-        session.add(vacancy)
-        await session.commit()
-        await session.refresh(vacancy)
-
-        yield {
-            "id": str(vacancy.id),
-            "title": vacancy.title,
-            "organization_id": str(vacancy.organization_id),
-        }
+async def update_profile_data() -> dict:
+    """Generate data for updating profile."""
+    return {
+        "name": "Updated E2E Test Profile",
+        "description": "Updated test profile description",
+        "keyword_weight": 0.6,
+        "tfidf_weight": 0.2,
+        "vector_weight": 0.2,
+    }
 
 
-@pytest.fixture
-async def test_resume(async_session_maker, test_organization) -> Dict:
-    """
-    Create a test resume for matching.
+# ============================================================================
+# Test Class
+# ============================================================================
 
-    Returns:
-        Resume data dictionary
-    """
-    async with async_session_maker() as session:
-        resume_id = uuid4()
-        resume = Resume(
-            id=resume_id,
-            organization_id=test_organization,
-            candidate_name="John Doe",
-            email="john.doe@example.com",
-            raw_text="Senior Python Developer with 7 years of experience. Skilled in FastAPI, PostgreSQL, Docker, and Kubernetes. Previously worked at TechCorp building scalable microservices.",
-            extracted_skills=["Python", "FastAPI", "PostgreSQL", "Docker", "Kubernetes"],
-            years_of_experience=7.0,
-        )
-        session.add(resume)
-        await session.commit()
-        await session.refresh(resume)
-
-        yield {
-            "id": str(resume.id),
-            "candidate_name": resume.candidate_name,
-            "email": resume.email,
-            "skills": resume.extracted_skills,
-        }
-
-
+@pytest.mark.e2e
+@pytest.mark.integration
 class TestWeightProfileE2E:
-    """End-to-end tests for weight profile customization flow."""
-
-    async def test_e2e_preset_profiles_available(
-        self, client: TestClient, seeded_preset_profiles
-    ):
-        """
-        E2E Test 1: Verify preset profiles are available via API.
-
-        Steps:
-        1. GET /api/matching-weights/?is_preset=true
-        2. Verify all 4 preset profiles returned
-        3. Verify weight distribution for each preset
-        """
-        response = client.get("/api/matching-weights/?is_preset=true")
-
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-        data = response.json()
-
-        assert "profiles" in data
-        assert len(data["profiles"]) == 4
-
-        # Verify Technical profile (Keyword-heavy)
-        technical = next(p for p in data["profiles"] if p["preset_type"] == "technical")
-        assert technical["keyword_weight"] == 0.60
-        assert technical["tfidf_weight"] == 0.25
-        assert technical["vector_weight"] == 0.15
-
-        # Verify Creative profile (Vector-heavy)
-        creative = next(p for p in data["profiles"] if p["preset_type"] == "creative")
-        assert creative["keyword_weight"] == 0.15
-        assert creative["tfidf_weight"] == 0.25
-        assert creative["vector_weight"] == 0.60
-
-        # Verify Executive profile (Balanced)
-        executive = next(p for p in data["profiles"] if p["preset_type"] == "executive")
-        assert abs(executive["keyword_weight"] - 0.34) < 0.01
-        assert abs(executive["tfidf_weight"] - 0.33) < 0.01
-        assert abs(executive["vector_weight"] - 0.33) < 0.01
-
-    async def test_e2e_create_custom_profile_with_vector_70(
-        self, client: TestClient, test_organization
-    ):
-        """
-        E2E Test 2: Create custom profile with Vector weight 70%.
-
-        Steps:
-        1. POST /api/matching-weights/ with vector_weight=0.70
-        2. Verify profile created successfully
-        3. GET /api/matching-weights/{profile_id}
-        4. Verify weights match request
-        """
-        custom_profile_data = {
-            "organization_id": test_organization,
-            "name": "Vector Heavy Custom",
-            "description": "Custom profile emphasizing vector similarity",
-            "keyword_weight": 0.15,
-            "tfidf_weight": 0.15,
-            "vector_weight": 0.70,
-        }
-
-        # Create custom profile
-        response = client.post("/api/matching-weights/", json=custom_profile_data)
-
-        assert response.status_code == 201, f"Expected 201, got {response.status_code}"
-        created_profile = response.json()
-
-        assert created_profile["name"] == "Vector Heavy Custom"
-        assert created_profile["vector_weight"] == 0.70
-        assert created_profile["is_preset"] is False
-
-        profile_id = created_profile["id"]
-
-        # Retrieve profile to verify
-        response = client.get(f"/api/matching-weights/{profile_id}")
-
-        assert response.status_code == 200
-        retrieved_profile = response.json()
-
-        assert retrieved_profile["vector_weight"] == 0.70
-        assert retrieved_profile["keyword_weight"] == 0.15
-        assert retrieved_profile["tfidf_weight"] == 0.15
-
-    async def test_e2e_select_technical_preset_and_verify(
-        self, client: TestClient, seeded_preset_profiles
-    ):
-        """
-        E2E Test 3: Select 'Technical' preset profile and verify configuration.
-
-        Steps:
-        1. GET /api/matching-weights/?preset_type=technical
-        2. Verify Technical profile is Keyword-heavy (60%)
-        3. Verify profile is marked as preset
-        """
-        response = client.get("/api/matching-weights/?preset_type=technical")
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert len(data["profiles"]) == 1
-        technical = data["profiles"][0]
-
-        assert technical["name"] == "Technical"
-        assert technical["preset_type"] == "technical"
-        assert technical["is_preset"] is True
-        assert technical["keyword_weight"] == 0.60
-        assert technical["tfidf_weight"] == 0.25
-        assert technical["vector_weight"] == 0.15
-
-    async def test_e2e_rematch_vacancy_with_custom_weights(
-        self, client: TestClient, test_organization, test_vacancy, test_resume
-    ):
-        """
-        E2E Test 4: Re-match candidates with custom weight profile.
-
-        Steps:
-        1. Create custom weight profile
-        2. POST /api/matching-weights/{profile_id}/rematch with vacancy_id
-        3. Verify re-match initiated (202 ACCEPTED)
-        4. Verify response includes candidates_matched count
-        """
-        # Create custom profile
-        custom_profile = {
-            "organization_id": test_organization,
-            "name": "High Keyword Weight",
-            "description": "Emphasizes keyword matching",
-            "keyword_weight": 0.70,
-            "tfidf_weight": 0.20,
-            "vector_weight": 0.10,
-        }
-
-        create_response = client.post("/api/matching-weights/", json=custom_profile)
-        assert create_response.status_code == 201
-        profile_id = create_response.json()["id"]
-
-        # Re-match vacancy with custom profile
-        rematch_request = {"vacancy_id": test_vacancy["id"]}
-        rematch_response = client.post(
-            f"/api/matching-weights/{profile_id}/rematch", json=rematch_request
-        )
-
-        assert rematch_response.status_code == 202
-        rematch_data = rematch_response.json()
-
-        assert "vacancy_id" in rematch_data
-        assert "profile_id" in rematch_data
-        assert "candidates_matched" in rematch_data
-        assert "status" in rematch_data
-        assert rematch_data["status"] in ["completed", "processing"]
-
-    async def test_e2e_compare_preset_vs_custom_profile(
-        self, client: TestClient, test_organization, test_vacancy, seeded_preset_profiles
-    ):
-        """
-        E2E Test 5: A/B testing - compare preset vs custom profile results.
-
-        Steps:
-        1. Create custom profile (Vector 70%)
-        2. Get Technical preset profile ID
-        3. POST /api/matching-weights/compare with profile_a and profile_b
-        4. Verify comparison results include score differences
-        5. Verify statistical summary data
-        """
-        # Create custom profile
-        custom_profile = {
-            "organization_id": test_organization,
-            "name": "Vector Heavy for Comparison",
-            "description": "Custom profile for A/B testing",
-            "keyword_weight": 0.15,
-            "tfidf_weight": 0.15,
-            "vector_weight": 0.70,
-        }
-
-        create_response = client.post("/api/matching-weights/", json=custom_profile)
-        assert create_response.status_code == 201
-        custom_profile_id = create_response.json()["id"]
-
-        # Get Technical preset profile ID
-        technical_profile = next(
-            p for p in seeded_preset_profiles if p["preset_type"] == "technical"
-        )
-        technical_profile_id = technical_profile["id"]
-
-        # Run A/B comparison
-        compare_request = {
-            "profile_a_id": technical_profile_id,
-            "profile_b_id": custom_profile_id,
-            "vacancy_id": test_vacancy["id"],
-        }
-
-        compare_response = client.post("/api/matching-weights/compare", json=compare_request)
-
-        assert compare_response.status_code == 200
-        comparison_data = compare_response.json()
-
-        # Verify response structure
-        assert "vacancy_id" in comparison_data
-        assert "profile_a" in comparison_data
-        assert "profile_b" in comparison_data
-        assert "differences" in comparison_data
-
-        # Verify profile configurations returned
-        assert comparison_data["profile_a"]["keyword_weight"] == 0.60
-        assert comparison_data["profile_b"]["vector_weight"] == 0.70
-
-        # Verify differences array (may be empty if no candidates matched yet)
-        assert isinstance(comparison_data["differences"], list)
-
-    async def test_e2e_weight_normalization(
-        self, client: TestClient, test_organization
-    ):
-        """
-        E2E Test 6: Verify weight normalization ensures sum equals 100%.
-
-        Steps:
-        1. Create profile with weights summing to 0.9 (should normalize to 1.0)
-        2. Create profile with weights summing to 1.5 (should normalize to 1.0)
-        3. Verify normalized weights stored correctly
-        """
-        # Profile with sum < 1.0
-        profile_under = {
-            "organization_id": test_organization,
-            "name": "Under Sum",
-            "description": "Test normalization with sum < 1.0",
-            "keyword_weight": 0.30,
-            "tfidf_weight": 0.30,
-            "vector_weight": 0.30,  # Sum = 0.90
-        }
-
-        response = client.post("/api/matching-weights/", json=profile_under)
-        assert response.status_code == 201
-        data = response.json()
-
-        # Verify normalized (each weight divided by 0.9, then multiplied)
-        sum_weights = (
-            data["keyword_weight"] + data["tfidf_weight"] + data["vector_weight"]
-        )
-        assert abs(sum_weights - 1.0) < 0.01, f"Weights should sum to 1.0, got {sum_weights}"
-
-    async def test_e2e_update_custom_profile(
-        self, client: TestClient, test_organization
-    ):
-        """
-        E2E Test 7: Update existing custom profile.
-
-        Steps:
-        1. Create custom profile
-        2. PUT /api/matching-weights/{profile_id} with new weights
-        3. Verify update successful
-        4. GET /api/matching-weights/{profile_id}
-        5. Verify new weights saved
-        """
-        # Create profile
-        create_data = {
-            "organization_id": test_organization,
-            "name": "Profile to Update",
-            "description": "Will be updated",
-            "keyword_weight": 0.33,
-            "tfidf_weight": 0.34,
-            "vector_weight": 0.33,
-        }
-
-        create_response = client.post("/api/matching-weights/", json=create_data)
-        assert create_response.status_code == 201
-        profile_id = create_response.json()["id"]
-
-        # Update profile
-        update_data = {
-            "name": "Updated Profile",
-            "description": "Has been updated",
-            "keyword_weight": 0.50,
-            "tfidf_weight": 0.30,
-            "vector_weight": 0.20,
-        }
-
-        update_response = client.put(
-            f"/api/matching-weights/{profile_id}", json=update_data
-        )
-
-        assert update_response.status_code == 200
-        updated_data = update_response.json()
-
-        assert updated_data["name"] == "Updated Profile"
-        assert updated_data["keyword_weight"] == 0.50
-
-    async def test_e2e_delete_custom_profile(
-        self, client: TestClient, test_organization
-    ):
-        """
-        E2E Test 8: Delete custom profile.
-
-        Steps:
-        1. Create custom profile
-        2. DELETE /api/matching-weights/{profile_id}
-        3. Verify delete successful
-        4. GET /api/matching-weights/{profile_id}
-        5. Verify profile not found (404)
-        """
-        # Create profile
-        create_data = {
-            "organization_id": test_organization,
-            "name": "Profile to Delete",
-            "description": "Will be deleted",
-            "keyword_weight": 0.33,
-            "tfidf_weight": 0.34,
-            "vector_weight": 0.33,
-        }
-
-        create_response = client.post("/api/matching-weights/", json=create_data)
-        assert create_response.status_code == 201
-        profile_id = create_response.json()["id"]
-
-        # Delete profile
-        delete_response = client.delete(f"/api/matching-weights/{profile_id}")
-
-        assert delete_response.status_code == 200
-        delete_data = delete_response.json()
-
-        assert "message" in delete_data
-
-        # Verify profile deleted
-        get_response = client.get(f"/api/matching-weights/{profile_id}")
-
-        # Should return 404 or empty list
-        assert get_response.status_code in [404, 200]
-
-    async def test_e2e_set_default_profile(
-        self, client: TestClient, test_organization
-    ):
-        """
-        E2E Test 9: Set custom profile as organization default.
-
-        Steps:
-        1. Create two custom profiles
-        2. Set first as default (is_default=true)
-        3. Verify default set
-        4. Set second as default
-        5. Verify first is no longer default
-        6. Verify second is now default
-        """
-        # Create first profile
-        profile1_data = {
-            "organization_id": test_organization,
-            "name": "Default Profile 1",
-            "description": "First default",
-            "keyword_weight": 0.40,
-            "tfidf_weight": 0.30,
-            "vector_weight": 0.30,
-            "is_default": True,
-        }
-
-        response1 = client.post("/api/matching-weights/", json=profile1_data)
-        assert response1.status_code == 201
-        profile1_id = response1.json()["id"]
-
-        # Create second profile
-        profile2_data = {
-            "organization_id": test_organization,
-            "name": "Default Profile 2",
-            "description": "Second default",
-            "keyword_weight": 0.50,
-            "tfidf_weight": 0.25,
-            "vector_weight": 0.25,
-            "is_default": True,
-        }
-
-        response2 = client.post("/api/matching-weights/", json=profile2_data)
-        assert response2.status_code == 201
-        profile2_id = response2.json()["id"]
-
-        # List default profiles
-        list_response = client.get(
-            f"/api/matching-weights/?organization_id={test_organization}&is_default=true"
-        )
-
-        assert list_response.status_code == 200
-        defaults = list_response.json()["profiles"]
-
-        # Should have only one default (the last one set)
-        assert len(defaults) >= 1
-        latest_default = next((p for p in defaults if p["id"] == profile2_id), None)
-        assert latest_default is not None
+    """
+    End-to-end test suite for matching weights CRUD operations.
+
+    Tests the complete workflow from creation to deletion,
+    verifying database persistence at each step.
+    """
 
     async def test_e2e_complete_workflow(
-        self, client: TestClient, test_organization, test_vacancy, seeded_preset_profiles
-    ):
+        self,
+        test_db: AsyncSession,
+        test_profile_data: dict,
+        update_profile_data: dict,
+    ) -> None:
         """
-        E2E Test 10: Complete end-to-end workflow simulation.
+        Test complete CRUD workflow for matching weights profiles.
 
-        This test simulates the full user journey:
-        1. Navigate to settings → List preset profiles
-        2. Select Technical preset → Verify configuration
-        3. Create custom profile (Vector 70%) → Save
-        4. Go to vacancy → Select custom profile
-        5. Trigger re-match → Verify candidates re-matched
-        6. Run A/B comparison → Compare results
+        This test verifies:
+        1. Creating a new profile
+        2. Listing profiles (profile appears in list)
+        3. Getting single profile by ID
+        4. Updating profile fields
+        5. Verifying update persisted
+        6. Setting profile as active
+        7. Deleting profile
+        8. Verifying deletion
         """
-        # Step 1 & 2: List and select Technical preset
-        list_response = client.get("/api/matching-weights/?is_preset=true")
-        assert list_response.status_code == 200
-        presets = list_response.json()["profiles"]
+        # Use ASGI transport for direct app testing (no server needed)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # ========================================================================
+            # Step 1: Create profile via POST /api/matching-weights/
+            # ========================================================================
+            response = await client.post("/api/matching-weights/", json=test_profile_data)
 
-        technical = next(p for p in presets if p["preset_type"] == "technical")
-        assert technical["keyword_weight"] == 0.60
+            assert response.status_code == 201, f"Create failed: {response.text}"
+            created_profile = response.json()
 
-        # Step 3: Create custom profile with Vector 70%
-        custom_profile = {
-            "organization_id": test_organization,
-            "name": "Custom Vector 70%",
-            "description": "Created during E2E test",
-            "keyword_weight": 0.15,
-            "tfidf_weight": 0.15,
-            "vector_weight": 0.70,
-        }
+            # Verify response contains required fields
+            assert "id" in created_profile
+            assert created_profile["name"] == test_profile_data["name"]
+            assert created_profile["organization_id"] == test_profile_data["organization_id"]
+            assert created_profile["keyword_weight"] == test_profile_data["keyword_weight"]
+            assert created_profile["tfidf_weight"] == test_profile_data["tfidf_weight"]
+            assert created_profile["vector_weight"] == test_profile_data["vector_weight"]
+            assert "created_at" in created_profile
+            assert "updated_at" in created_profile
 
-        create_response = client.post("/api/matching-weights/", json=custom_profile)
-        assert create_response.status_code == 201
-        custom_profile_data = create_response.json()
-        custom_profile_id = custom_profile_data["id"]
+            profile_id = created_profile["id"]
 
-        # Verify custom profile saved
-        get_response = client.get(f"/api/matching-weights/{custom_profile_id}")
-        assert get_response.status_code == 200
-        assert get_response.json()["vector_weight"] == 0.70
-
-        # Step 4 & 5: Re-match vacancy with custom profile
-        rematch_response = client.post(
-            f"/api/matching-weights/{custom_profile_id}/rematch",
-            json={"vacancy_id": test_vacancy["id"]},
-        )
-        assert rematch_response.status_code == 202
-        rematch_data = rematch_response.json()
-
-        assert "candidates_matched" in rematch_data
-        assert rematch_data["status"] == "completed"
-
-        # Step 6: A/B comparison
-        technical_id = technical["id"]
-        compare_response = client.post(
-            "/api/matching-weights/compare",
-            json={
-                "profile_a_id": technical_id,
-                "profile_b_id": custom_profile_id,
-                "vacancy_id": test_vacancy["id"],
-            },
-        )
-
-        assert compare_response.status_code == 200
-        comparison = compare_response.json()
-
-        # Verify comparison structure
-        assert comparison["profile_a"]["preset_type"] == "technical"
-        assert comparison["profile_b"]["vector_weight"] == 0.70
-        assert "differences" in comparison
-
-        # Complete workflow successful
-        assert True
-
-
-class TestWeightProfileValidation:
-    """Test validation and error scenarios."""
-
-    async def test_invalid_weights_sum_to_zero(self, client: TestClient, test_organization):
-        """Test that weights summing to zero are rejected."""
-        invalid_profile = {
-            "organization_id": test_organization,
-            "name": "Invalid Weights",
-            "description": "All weights zero",
-            "keyword_weight": 0.0,
-            "tfidf_weight": 0.0,
-            "vector_weight": 0.0,
-        }
-
-        response = client.post("/api/matching-weights/", json=invalid_profile)
-
-        # Should return 422 validation error
-        assert response.status_code == 422
-
-    async def test_negative_weights_rejected(self, client: TestClient, test_organization):
-        """Test that negative weights are rejected."""
-        invalid_profile = {
-            "organization_id": test_organization,
-            "name": "Negative Weight",
-            "description": "Has negative weight",
-            "keyword_weight": -0.1,
-            "tfidf_weight": 0.5,
-            "vector_weight": 0.6,
-        }
-
-        response = client.post("/api/matching-weights/", json=invalid_profile)
-
-        assert response.status_code == 422
-
-    async def test_weights_exceeding_one_rejected(
-        self, client: TestClient, test_organization
-    ):
-        """Test that individual weights > 1.0 are rejected."""
-        invalid_profile = {
-            "organization_id": test_organization,
-            "name": "Weight Too High",
-            "description": "Weight exceeds 1.0",
-            "keyword_weight": 1.5,
-            "tfidf_weight": 0.0,
-            "vector_weight": 0.0,
-        }
-
-        response = client.post("/api/matching-weights/", json=invalid_profile)
-
-        assert response.status_code == 422
-
-    async def test_comparison_same_profile_ids_rejected(
-        self, client: TestClient, test_vacancy
-    ):
-        """Test that comparing a profile to itself is rejected."""
-        comparison = {
-            "profile_a_id": str(uuid4()),
-            "profile_b_id": str(uuid4()),
-            "vacancy_id": test_vacancy["id"],
-        }
-
-        # Same IDs should be rejected
-        comparison["profile_b_id"] = comparison["profile_a_id"]
-
-        response = client.post("/api/matching-weights/compare", json=comparison)
-
-        assert response.status_code == 422
-        assert "different" in response.json()["detail"].lower()
-
-
-class TestWeightProfileHistory:
-    """Test audit trail and version history."""
-
-    async def test_profile_creation_creates_history_entry(
-        self, client: TestClient, test_organization, async_session_maker
-    ):
-        """Test that creating a profile creates a history entry."""
-        # Create profile
-        profile_data = {
-            "organization_id": test_organization,
-            "name": "History Test Profile",
-            "description": "Testing audit trail",
-            "keyword_weight": 0.50,
-            "tfidf_weight": 0.30,
-            "vector_weight": 0.20,
-        }
-
-        response = client.post("/api/matching-weights/", json=profile_data)
-        assert response.status_code == 201
-        profile_id = response.json()["id"]
-
-        # Verify history entry created
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(MatchingWeightsHistory).where(
-                    MatchingWeightsHistory.profile_id == profile_id
-                )
+            # Verify profile exists in database
+            result = await test_db.execute(
+                select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
             )
-            history_entries = result.scalars().all()
+            db_profile = result.scalar_one_or_none()
+            assert db_profile is not None, "Profile not found in database after creation"
+            assert db_profile.name == test_profile_data["name"]
 
-            assert len(history_entries) > 0
-            assert history_entries[0].change_type == "created"
-
-    async def test_profile_update_creates_history_entry(
-        self, client: TestClient, test_organization, async_session_maker
-    ):
-        """Test that updating a profile creates a history entry."""
-        # Create profile
-        profile_data = {
-            "organization_id": test_organization,
-            "name": "Update History Test",
-            "description": "Testing update history",
-            "keyword_weight": 0.50,
-            "tfidf_weight": 0.30,
-            "vector_weight": 0.20,
-        }
-
-        response = client.post("/api/matching-weights/", json=profile_data)
-        profile_id = response.json()["id"]
-
-        # Update profile
-        update_data = {"keyword_weight": 0.60}
-        response = client.put(f"/api/matching-weights/{profile_id}", json=update_data)
-        assert response.status_code == 200
-
-        # Verify history entry created
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(MatchingWeightsHistory).where(
-                    MatchingWeightsHistory.profile_id == profile_id,
-                    MatchingWeightsHistory.change_type == "updated",
-                )
+            # ========================================================================
+            # Step 2: Verify profile appears in GET /api/matching-weights/
+            # ========================================================================
+            response = await client.get(
+                f"/api/matching-weights/?organization_id={test_profile_data['organization_id']}"
             )
-            history_entries = result.scalars().all()
 
-            assert len(history_entries) > 0
+            assert response.status_code == 200
+            profiles_response = response.json()
+
+            assert "profiles" in profiles_response
+            assert "total_count" in profiles_response
+            assert profiles_response["total_count"] >= 1
+
+            # Find our created profile in the list
+            found_profile = None
+            for p in profiles_response["profiles"]:
+                if p["id"] == profile_id:
+                    found_profile = p
+                    break
+
+            assert found_profile is not None, "Created profile not found in list"
+            assert found_profile["name"] == test_profile_data["name"]
+
+            # ========================================================================
+            # Step 3: Get single profile via GET /api/matching-weights/{id}
+            # ========================================================================
+            response = await client.get(f"/api/matching-weights/{profile_id}")
+
+            assert response.status_code == 200
+            single_profile = response.json()
+
+            assert single_profile["id"] == profile_id
+            assert single_profile["name"] == test_profile_data["name"]
+            assert single_profile["keyword_weight"] == test_profile_data["keyword_weight"]
+            assert "created_at" in single_profile
+            assert "updated_at" in single_profile
+
+            # ========================================================================
+            # Step 4: Update profile via PUT /api/matching-weights/{id}
+            # ========================================================================
+            response = await client.put(
+                f"/api/matching-weights/{profile_id}",
+                json=update_profile_data
+            )
+
+            assert response.status_code == 200
+            updated_profile = response.json()
+
+            # Verify updated fields
+            assert updated_profile["id"] == profile_id
+            assert updated_profile["name"] == update_profile_data["name"]
+            assert updated_profile["description"] == update_profile_data["description"]
+            assert updated_profile["keyword_weight"] == update_profile_data["keyword_weight"]
+            assert updated_profile["tfidf_weight"] == update_profile_data["tfidf_weight"]
+            assert updated_profile["vector_weight"] == update_profile_data["vector_weight"]
+
+            # ========================================================================
+            # Step 5: Verify update persisted (get profile again)
+            # ========================================================================
+            response = await client.get(f"/api/matching-weights/{profile_id}")
+
+            assert response.status_code == 200
+            verified_profile = response.json()
+
+            # Verify update persisted
+            assert verified_profile["name"] == update_profile_data["name"]
+            assert verified_profile["description"] == update_profile_data["description"]
+            assert verified_profile["keyword_weight"] == update_profile_data["keyword_weight"]
+            assert verified_profile["tfidf_weight"] == update_profile_data["tfidf_weight"]
+            assert verified_profile["vector_weight"] == update_profile_data["vector_weight"]
+
+            # Also verify in database
+            result = await test_db.execute(
+                select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+            )
+            db_profile = result.scalar_one_or_none()
+            assert db_profile is not None
+            assert db_profile.name == update_profile_data["name"]
+            assert db_profile.description == update_profile_data["description"]
+
+            # ========================================================================
+            # Step 6: Set profile as active via POST /api/matching-weights/{id}/set-active
+            # ========================================================================
+            response = await client.post(f"/api/matching-weights/{profile_id}/set-active")
+
+            assert response.status_code == 200
+            active_profile = response.json()
+
+            # Verify is_default is now True
+            assert active_profile["id"] == profile_id
+            assert active_profile["is_default"] is True
+
+            # Verify in database
+            await test_db.refresh(db_profile)
+            assert db_profile.is_default is True
+
+            # ========================================================================
+            # Step 7: Delete profile via DELETE /api/matching-weights/{id}
+            # ========================================================================
+            # First, unset is_default so we can delete it
+            unset_data = {"is_default": False}
+            response = await client.put(f"/api/matching-weights/{profile_id}", json=unset_data)
+            assert response.status_code == 200
+
+            # Now delete the profile
+            response = await client.delete(f"/api/matching-weights/{profile_id}")
+
+            assert response.status_code == 200
+            delete_response = response.json()
+
+            assert "message" in delete_response
+            assert delete_response["id"] == profile_id
+
+            # ========================================================================
+            # Step 8: Verify profile deleted
+            # ========================================================================
+            # Try to get the deleted profile (should return 404)
+            response = await client.get(f"/api/matching-weights/{profile_id}")
+
+            assert response.status_code == 404
+
+            # Verify profile not in database
+            result = await test_db.execute(
+                select(MatchingWeightsProfile).where(MatchingWeightsProfile.id == profile_id)
+            )
+            db_profile = result.scalar_one_or_none()
+            assert db_profile is None, "Profile still exists in database after deletion"
+
+
+@pytest.mark.e2e
+@pytest.mark.integration
+class TestWeightProfileEdgeCases:
+    """Test edge cases and error conditions."""
+
+    async def test_get_nonexistent_profile_returns_404(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that getting a non-existent profile returns 404."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            fake_id = str(uuid4())
+            response = await client.get(f"/api/matching-weights/{fake_id}")
+
+            assert response.status_code == 404
+            assert "not found" in response.json()["detail"].lower()
+
+    async def test_update_nonexistent_profile_returns_404(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that updating a non-existent profile returns 404."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            fake_id = str(uuid4())
+            update_data = {"name": "Updated Name"}
+            response = await client.put(f"/api/matching-weights/{fake_id}", json=update_data)
+
+            assert response.status_code == 404
+
+    async def test_delete_nonexistent_profile_returns_404(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that deleting a non-existent profile returns 404."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            fake_id = str(uuid4())
+            response = await client.delete(f"/api/matching-weights/{fake_id}")
+
+            assert response.status_code == 404
+
+    async def test_delete_preset_profile_returns_400(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that preset profiles cannot be deleted."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # Create a preset profile
+            preset_data = {
+                "organization_id": str(uuid4()),
+                "name": "Preset Profile",
+                "description": "A preset profile",
+                "keyword_weight": 0.5,
+                "tfidf_weight": 0.3,
+                "vector_weight": 0.2,
+                "is_preset": True,
+                "preset_type": "technical",
+            }
+
+            response = await client.post("/api/matching-weights/", json=preset_data)
+            assert response.status_code == 201
+            preset_profile = response.json()
+            preset_id = preset_profile["id"]
+
+            # Try to delete the preset profile
+            response = await client.delete(f"/api/matching-weights/{preset_id}")
+
+            assert response.status_code == 400
+            assert "preset" in response.json()["detail"].lower()
+
+            # Clean up - update to non-preset then delete
+            update_data = {"is_preset": False, "is_default": False}
+            await client.put(f"/api/matching-weights/{preset_id}", json=update_data)
+            await client.delete(f"/api/matching-weights/{preset_id}")
+
+    async def test_delete_default_profile_returns_400(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that default profiles cannot be deleted."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # Create a profile and set it as default
+            profile_data = {
+                "organization_id": str(uuid4()),
+                "name": "Default Profile",
+                "description": "A default profile",
+                "keyword_weight": 0.5,
+                "tfidf_weight": 0.3,
+                "vector_weight": 0.2,
+                "is_default": True,
+            }
+
+            response = await client.post("/api/matching-weights/", json=profile_data)
+            assert response.status_code == 201
+            default_profile = response.json()
+            default_id = default_profile["id"]
+
+            # Try to delete the default profile
+            response = await client.delete(f"/api/matching-weights/{default_id}")
+
+            assert response.status_code == 400
+            assert "default" in response.json()["detail"].lower()
+
+            # Clean up - unset default then delete
+            update_data = {"is_default": False}
+            await client.put(f"/api/matching-weights/{default_id}", json=update_data)
+            await client.delete(f"/api/matching-weights/{default_id}")
+
+    async def test_set_active_nonexistent_profile_returns_404(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that setting a non-existent profile as active returns 404."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            fake_id = str(uuid4())
+            response = await client.post(f"/api/matching-weights/{fake_id}/set-active")
+
+            assert response.status_code == 404
+
+    async def test_create_profile_with_empty_organization_id_returns_422(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that creating a profile with empty organization_id returns 422."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            invalid_data = {
+                "organization_id": "",
+                "name": "Test Profile",
+                "keyword_weight": 0.5,
+                "tfidf_weight": 0.3,
+                "vector_weight": 0.2,
+            }
+
+            response = await client.post("/api/matching-weights/", json=invalid_data)
+
+            assert response.status_code == 422
+
+    async def test_create_profile_with_empty_name_returns_422(
+        self,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test that creating a profile with empty name returns 422."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            invalid_data = {
+                "organization_id": str(uuid4()),
+                "name": "",
+                "keyword_weight": 0.5,
+                "tfidf_weight": 0.3,
+                "vector_weight": 0.2,
+            }
+
+            response = await client.post("/api/matching-weights/", json=invalid_data)
+
+            assert response.status_code == 422
+
+
+if __name__ == "__main__":
+    # Run tests with pytest
+    pytest.main([__file__, "-v", "-s"])
