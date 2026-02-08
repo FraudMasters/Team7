@@ -16,9 +16,14 @@ import {
   CircularProgress, // Индикатор загрузки
   Box,            // Универсальный контейнер для верстки
   Autocomplete,   // Автозаполнение с выбором из списка
+  Button,         // Кнопка
 } from '@mui/material';
 // Импорт иконок из MUI
-import { Search as SearchIcon, FilterList as FilterIcon } from '@mui/icons-material';
+import {
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  Clear as ClearIcon,
+} from '@mui/icons-material';
 // Импорт кастомного хука для получения данных о вакансиях
 import { useJobs } from '../../hooks/useJobs';
 // Импорт компонента карточки вакансии
@@ -145,31 +150,43 @@ export function JobsBrowsePage() {
             <MenuItem value="hybrid">Hybrid</MenuItem>
           </Select>
         </FormControl>
-        {/* Автозаполнение для исключаемых навыков */}
-        <Autocomplete
-          multiple
-          options={skillOptions}
-          value={filters.excludeSkills || []}
-          onChange={(_, newValue) => setFilters({ ...filters, excludeSkills: newValue })}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => (
-              <Chip
-                variant="outlined"
-                label={option}
-                {...getTagProps({ index })}
-                key={option}
+        {/* Автозаполнение для исключаемых навыков с кнопкой очистки */}
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Autocomplete
+            multiple
+            options={skillOptions}
+            value={filters.excludeSkills || []}
+            onChange={(_, newValue) => setFilters({ ...filters, excludeSkills: newValue })}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={option}
+                  {...getTagProps({ index })}
+                  key={option}
+                />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Exclude Skills"
+                placeholder="Select skills to exclude"
               />
-            ))
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Exclude Skills"
-              placeholder="Select skills to exclude"
-            />
+            )}
+            sx={{ minWidth: 250 }}
+          />
+          {filters.excludeSkills && filters.excludeSkills.length > 0 && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setFilters({ ...filters, excludeSkills: [] })}
+              startIcon={<ClearIcon />}
+            >
+              Clear
+            </Button>
           )}
-          sx={{ minWidth: 250 }}
-        />
+        </Stack>
       </Paper>
 
       {/* Отображение состояния загрузки, ошибки или списка вакансий */}
