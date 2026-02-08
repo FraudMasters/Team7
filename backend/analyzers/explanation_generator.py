@@ -370,6 +370,73 @@ Important guidelines:
                 f"- {description}: {contribution:.3f} ({impact} impact)"
             )
 
+        # Extract detailed candidate context
+        skills_details = ranking_factors.get('skills_match', {})
+        experience_details = ranking_factors.get('experience_analysis', {})
+        education_details = ranking_factors.get('education_analysis', {})
+
+        # Build skills list
+        skills_context = []
+        if isinstance(skills_details, dict):
+            matched_skills = skills_details.get('matched_skills', [])
+            if matched_skills:
+                skills_context.append(f"Matched Skills: {', '.join(matched_skills[:10])}")
+            missing_skills = skills_details.get('missing_skills', [])
+            if missing_skills:
+                skills_context.append(f"Missing Skills: {', '.join(missing_skills[:5])}")
+            skills_score = skills_details.get('score', 'N/A')
+            if skills_score != 'N/A':
+                skills_context.append(f"Skills Match Score: {skills_score:.2f}")
+
+        # Build experience context
+        experience_context = []
+        if isinstance(experience_details, dict):
+            total_months = experience_details.get('total_months', 0)
+            if total_months:
+                years = total_months // 12
+                months = total_months % 12
+                if years > 0 and months > 0:
+                    duration_str = f"{years} years, {months} months"
+                elif years > 0:
+                    duration_str = f"{years} years"
+                else:
+                    duration_str = f"{months} months"
+                experience_context.append(f"Total Experience: {duration_str}")
+
+            relevant_months = experience_details.get('relevant_months', 0)
+            if relevant_months:
+                years = relevant_months // 12
+                months = relevant_months % 12
+                if years > 0 and months > 0:
+                    duration_str = f"{years} years, {months} months"
+                elif years > 0:
+                    duration_str = f"{years} years"
+                else:
+                    duration_str = f"{months} months"
+                experience_context.append(f"Relevant Experience: {duration_str}")
+
+            experience_score = experience_details.get('score', ranking_factors.get('experience_score', 'N/A'))
+            if experience_score != 'N/A':
+                experience_context.append(f"Experience Score: {experience_score:.2f}")
+
+        # Build education context
+        education_context = []
+        if isinstance(education_details, dict):
+            degree = education_details.get('degree', '')
+            field_of_study = education_details.get('field_of_study', '')
+            institution = education_details.get('institution', '')
+
+            if degree:
+                education_context.append(f"Degree: {degree}")
+            if field_of_study:
+                education_context.append(f"Field of Study: {field_of_study}")
+            if institution:
+                education_context.append(f"Institution: {institution}")
+
+            education_score = education_details.get('score', ranking_factors.get('education_score', 'N/A'))
+            if education_score != 'N/A':
+                education_context.append(f"Education Score: {education_score:.2f}")
+
         prompt_parts = [
             f"Generate an explanation for the following candidate ranking:\n\n",
             f"=== CANDIDATE ===\n",
@@ -382,15 +449,80 @@ Important guidelines:
             f"=== TOP FACTORS INFLUENCING RANKING ===\n",
         ]
         prompt_parts.extend([f"{fd}\n" for fd in feature_details])
-        prompt_parts.extend([
-            f"\n=== ADDITIONAL CONTEXT ===\n",
-            f"Skills Match: {ranking_factors.get('skills_match', {}).get('score', 'N/A')}\n",
-            f"Experience Score: {ranking_factors.get('experience_score', 'N/A')}\n",
-            f"Education Score: {ranking_factors.get('education_score', 'N/A')}\n\n",
-            f"Please generate a clear explanation following the JSON format.",
-        ])
+
+        # Add detailed candidate context section
+        prompt_parts.append(f"\n=== CANDIDATE DETAILS ===\n")
+        if skills_context:
+            prompt_parts.extend([f"  {item}\n" for item in skills_context])
+            prompt_parts.append("\n")
+        if experience_context:
+            prompt_parts.extend([f"  {item}\n" for item in experience_context])
+            prompt_parts.append("\n")
+        if education_context:
+            prompt_parts.extend([f"  {item}\n" for item in education_context])
+            prompt_parts.append("\n")
+
+        prompt_parts.append("Please generate a clear explanation following the JSON format.\n")
+        prompt_parts.append("Use the specific candidate details (skills, experience duration, education) to provide personalized, concrete explanations.")
 
         return "".join(prompt_parts)
+
+    def _format_candidate_context(
+        self,
+        candidate_name: str,
+        score: float,
+        factors: Dict[str, Any],
+    ) -> str:
+        """Format candidate details for prompts."""
+        lines = [
+            f"Name: {candidate_name}\n",
+            f"Score: {score:.2f}\n",
+        ]
+
+        # Skills context
+        skills_details = factors.get('skills_match', {})
+        if isinstance(skills_details, dict):
+            matched_skills = skills_details.get('matched_skills', [])
+            if matched_skills:
+                lines.append(f"Matched Skills: {', '.join(matched_skills[:10])}\n")
+            skills_score = skills_details.get('score', factors.get('experience_score', 'N/A'))
+            if skills_score != 'N/A':
+                lines.append(f"Skills Match Score: {skills_score:.2f}\n")
+
+        # Experience context
+        experience_details = factors.get('experience_analysis', {})
+        if isinstance(experience_details, dict):
+            total_months = experience_details.get('total_months', 0)
+            if total_months:
+                years = total_months // 12
+                months = total_months % 12
+                if years > 0 and months > 0:
+                    duration_str = f"{years} years, {months} months"
+                elif years > 0:
+                    duration_str = f"{years} years"
+                else:
+                    duration_str = f"{months} months"
+                lines.append(f"Total Experience: {duration_str}\n")
+
+            experience_score = experience_details.get('score', factors.get('experience_score', 'N/A'))
+            if experience_score != 'N/A':
+                lines.append(f"Experience Score: {experience_score:.2f}\n")
+
+        # Education context
+        education_details = factors.get('education_analysis', {})
+        if isinstance(education_details, dict):
+            degree = education_details.get('degree', '')
+            field_of_study = education_details.get('field_of_study', '')
+            if degree:
+                lines.append(f"Degree: {degree}\n")
+            if field_of_study:
+                lines.append(f"Field of Study: {field_of_study}\n")
+
+            education_score = education_details.get('score', factors.get('education_score', 'N/A'))
+            if education_score != 'N/A':
+                lines.append(f"Education Score: {education_score:.2f}\n")
+
+        return "".join(lines)
 
     def _create_comparison_prompt(
         self,
@@ -408,19 +540,12 @@ Important guidelines:
             f"=== JOB POSITION ===\n",
             f"Title: {job_title}\n\n",
             f"=== CANDIDATE A (Higher Score) ===\n",
-            f"Name: {candidate_a_name}\n",
-            f"Score: {candidate_a_score:.2f}\n",
-            f"Skills Match: {candidate_a_factors.get('skills_match', {}).get('score', 'N/A')}\n",
-            f"Experience Score: {candidate_a_factors.get('experience_score', 'N/A')}\n",
-            f"Education Score: {candidate_a_factors.get('education_score', 'N/A')}\n\n",
-            f"=== CANDIDATE B (Lower Score) ===\n",
-            f"Name: {candidate_b_name}\n",
-            f"Score: {candidate_b_score:.2f}\n",
-            f"Skills Match: {candidate_b_factors.get('skills_match', {}).get('score', 'N/A')}\n",
-            f"Experience Score: {candidate_b_factors.get('experience_score', 'N/A')}\n",
-            f"Education Score: {candidate_b_factors.get('education_score', 'N/A')}\n\n",
-            f"Return your analysis in JSON format:\n",
-            f'{{"narrative": "...", "key_differences": [...], "winning_factors": [...], "losing_factors": [...], "recommendation": "..."}}',
+            self._format_candidate_context(candidate_a_name, candidate_a_score, candidate_a_factors),
+            f"\n=== CANDIDATE B (Lower Score) ===\n",
+            self._format_candidate_context(candidate_b_name, candidate_b_score, candidate_b_factors),
+            f"\nReturn your analysis in JSON format:\n",
+            f'{{"narrative": "...", "key_differences": [...], "winning_factors": [...], "losing_factors": [...], "recommendation": "..."}}\n',
+            f"Use the specific candidate details (skills, experience duration, education) to provide personalized, concrete comparisons.",
         ]
         return "".join(prompt_parts)
 
