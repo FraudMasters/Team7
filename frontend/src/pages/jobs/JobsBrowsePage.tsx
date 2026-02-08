@@ -17,6 +17,7 @@ import {
   Box,            // Универсальный контейнер для верстки
   Autocomplete,   // Автозаполнение с выбором из списка
   Button,         // Кнопка
+  createFilterOptions, // Функция для создания кастомного фильтра опций
 } from '@mui/material';
 // Импорт иконок из MUI
 import {
@@ -77,6 +78,13 @@ export function JobsBrowsePage() {
     'Node.js', 'Django', 'Flask', 'Spring', 'AWS', 'Azure', 'Docker', 'Kubernetes',
     'SQL', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST', 'Git', 'CI/CD',
   ];
+
+  // Кастомный фильтр для case-insensitive поиска навыков в Autocomplete
+  const skillFilterOptions = createFilterOptions({
+    matchFrom: 'any',
+    limit: 100,
+    stringify: (option: string) => option.toLowerCase(),
+  });
 
   // Фильтрация вакансий по поисковому запросу и выбранным фильтрам
   const filteredJobs = data?.vacancies.filter((job) => {
@@ -155,6 +163,7 @@ export function JobsBrowsePage() {
           <Autocomplete
             multiple
             options={skillOptions}
+            filterOptions={skillFilterOptions}
             value={filters.excludeSkills || []}
             onChange={(_, newValue) => setFilters({ ...filters, excludeSkills: newValue })}
             renderTags={(value, getTagProps) =>
