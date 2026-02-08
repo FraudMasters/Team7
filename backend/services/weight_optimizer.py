@@ -316,8 +316,86 @@ class WeightOptimizerService:
         Raises:
             ValueError: If no assignment exists for the user in this test
         """
-        # TODO: Implementation in subtask-4-3
-        raise NotImplementedError("record_metric will be implemented in subtask-4-3")
+        from uuid import UUID
+
+        # Step 1: Validate test_id format
+        try:
+            test_uuid = UUID(test_id)
+        except ValueError as e:
+            raise ValueError(f"Invalid test_id format: {test_id}") from e
+
+        # Step 2: Find the user's existing assignment in this test
+        assignment_query = select(ABTestAssignment).where(
+            and_(
+                ABTestAssignment.test_id == test_uuid,
+                ABTestAssignment.user_id == user_id,
+            )
+        )
+        assignment_result = await self.db.execute(assignment_query)
+        assignment = assignment_result.scalar_one_or_none()
+
+        if not assignment:
+            raise ValueError(
+                f"No assignment found for user {user_id} in test {test_id}. "
+                f"User must be assigned to a variant before recording metrics."
+            )
+
+        # Step 3: Validate metric value based on type
+        if metric_type == ABTestMetricType.MATCH_ACCEPTANCE:
+            # Binary: should be 0.0 or 1.0
+            if metric_value not in (0.0, 1.0):
+                logger.warning(
+                    f"Match acceptance metric should be 0.0 or 1.0, got {metric_value}. "
+                    f"Clamping to valid range."
+                )
+                metric_value = 1.0 if metric_value > 0.5 else 0.0
+        elif metric_type == ABTestMetricType.USER_SATISFACTION:
+            # Ordinal 1-5 scale
+            if not (1.0 <= metric_value <= 5.0):
+                logger.warning(
+                    f"User satisfaction metric should be 1.0-5.0, got {metric_value}. "
+                    f"Clamping to valid range."
+                )
+                metric_value = max(1.0, min(5.0, metric_value))
+        elif metric_type == ABTestMetricType.TIME_TO_HIRE:
+            # Continuous: days to hire, should be non-negative
+            if metric_value < 0:
+                logger.warning(
+                    f"Time-to-hire metric should be non-negative, got {metric_value}. "
+                    f"Setting to 0."
+                )
+                metric_value = 0.0
+
+        # Step 4: Set recorded_at timestamp if not provided
+        if recorded_at is None:
+            recorded_at = datetime.now().astimezone()
+
+        # Step 5: Create and save the metric record
+        new_metric = ABTestMetric(
+            test_id=test_uuid,
+            assignment_id=assignment.id,
+            metric_type=metric_type,
+            metric_value=metric_value,
+            recorded_at=recorded_at,
+        )
+
+        self.db.add(new_metric)
+        await self.db.commit()
+        await self.db.refresh(new_metric)
+
+        logger.info(
+            f"Recorded metric {metric_type.value}={metric_value} for user {user_id} "
+            f"in test {test_id} (assignment: {assignment.id}, profile: {assignment.profile_id})"
+        )
+
+        # Step 6: Return MetricRecord
+        return MetricRecord(
+            metric_id=str(new_metric.id),
+            assignment_id=str(assignment.id),
+            metric_type=metric_type,
+            metric_value=metric_value,
+            recorded_at=recorded_at,
+        )
 
     async def analyze_metrics(
         self,
