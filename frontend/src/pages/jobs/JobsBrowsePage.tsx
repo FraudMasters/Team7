@@ -165,7 +165,11 @@ export function JobsBrowsePage() {
             options={skillOptions}
             filterOptions={skillFilterOptions}
             value={filters.excludeSkills || []}
-            onChange={(_, newValue) => setFilters({ ...filters, excludeSkills: newValue })}
+            onChange={(_, newValue) => {
+              // Удаляем дубликаты перед сохранением
+              const uniqueSkills = Array.from(new Set(newValue));
+              setFilters({ ...filters, excludeSkills: uniqueSkills });
+            }}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (
                 <Chip
