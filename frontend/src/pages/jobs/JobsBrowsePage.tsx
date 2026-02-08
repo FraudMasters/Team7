@@ -210,9 +210,9 @@ export function JobsBrowsePage() {
           <Typography color="error">Failed to load jobs</Typography>
         </Box>
       ) : filteredJobs.length === 0 ? (
-        // Состояние отсутствия вакансий
+        // Состояние отсутствия вакансий после применения фильтров
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography color="text.secondary">No jobs found</Typography>
+          <Typography color="text.secondary">No jobs match your criteria</Typography>
         </Box>
       ) : (
         // Сетка с карточками вакансий
