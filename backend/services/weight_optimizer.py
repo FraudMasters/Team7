@@ -184,8 +184,109 @@ class WeightOptimizerService:
         Raises:
             ValueError: If test is not found or not in running state
         """
-        # TODO: Implementation in subtask-4-2
-        raise NotImplementedError("assign_user_to_variant will be implemented in subtask-4-2")
+        from uuid import UUID
+
+        # Step 1: Verify the test exists and is running
+        try:
+            test_uuid = UUID(test_id)
+        except ValueError as e:
+            raise ValueError(f"Invalid test_id format: {test_id}") from e
+
+        test_query = select(ABTest).where(
+            and_(
+                ABTest.id == test_uuid,
+                ABTest.organization_id == organization_id,
+            )
+        )
+        test_result = await self.db.execute(test_query)
+        test = test_result.scalar_one_or_none()
+
+        if not test:
+            raise ValueError(f"A/B test not found: {test_id}")
+
+        if test.status != ABTestStatus.RUNNING:
+            raise ValueError(
+                f"A/B test is not in running state. Current status: {test.status.value}"
+            )
+
+        # Step 2: Check if user already has an assignment for this test
+        existing_query = select(ABTestAssignment).where(
+            and_(
+                ABTestAssignment.test_id == test_uuid,
+                ABTestAssignment.user_id == user_id,
+            )
+        )
+        existing_result = await self.db.execute(existing_query)
+        existing_assignment = existing_result.scalar_one_or_none()
+
+        if existing_assignment:
+            # Return existing assignment
+            profile_query = select(MatchingWeightProfile).where(
+                MatchingWeightProfile.id == existing_assignment.profile_id
+            )
+            profile_result = await self.db.execute(profile_query)
+            profile = profile_result.scalar_one_or_none()
+
+            if profile:
+                return UserAssignment(
+                    user_id=user_id,
+                    test_id=test_id,
+                    profile_id=str(profile.id),
+                    profile_name=profile.name,
+                    assignment_id=str(existing_assignment.id),
+                    was_new_assignment=False,
+                )
+
+        # Step 3: Get available preset profiles for assignment
+        profiles_query = select(MatchingWeightProfile).where(
+            and_(
+                MatchingWeightProfile.is_preset == True,
+                MatchingWeightProfile.is_active == True,
+            )
+        )
+        profiles_result = await self.db.execute(profiles_query)
+        profiles = list(profiles_result.scalars().all())
+
+        if not profiles:
+            raise ValueError("No active preset profiles found for assignment")
+
+        # Step 4: Deterministically assign user to a profile
+        # Use hash(user_id) % n_profiles for deterministic assignment
+        # The same user will always get the same profile index
+        profile_index = hash(user_id) % len(profiles)
+        selected_profile = profiles[profile_index]
+
+        logger.info(
+            f"Assigning user {user_id} to profile '{selected_profile.name}' "
+            f"for test {test_id} (deterministic index: {profile_index})"
+        )
+
+        # Step 5: Create and save the assignment
+        new_assignment = ABTestAssignment(
+            test_id=test_uuid,
+            user_id=user_id,
+            profile_id=selected_profile.id,
+            assigned_at=datetime.now().astimezone(),
+        )
+
+        self.db.add(new_assignment)
+        await self.db.commit()
+        await self.db.refresh(new_assignment)
+
+        logger.info(
+            f"Created assignment {new_assignment.id} for user {user_id} "
+            f"to profile {selected_profile.name}"
+        )
+
+        # Step 6: Return UserAssignment
+        return UserAssignment(
+            user_id=user_id,
+            test_id=test_id,
+            profile_id=str(selected_profile.id),
+            profile_name=selected_profile.name,
+            assignment_id=str(new_assignment.id),
+            was_new_assignment=True,
+        )
 
     async def record_metric(
         self,
