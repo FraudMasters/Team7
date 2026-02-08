@@ -19,6 +19,8 @@ import {
   Button,         // Кнопка
   createFilterOptions, // Функция для создания кастомного фильтра опций
 } from '@mui/material';
+// Импорт хука для интернационализации
+import { useTranslation } from 'react-i18next';
 // Импорт иконок из MUI
 import {
   Search as SearchIcon,
@@ -32,6 +34,8 @@ import { JobCard } from '../../components/jobs/JobCard';
 
 // Основной компонент страницы просмотра вакансий
 export function JobsBrowsePage() {
+  // Хук для интернационализации
+  const { t } = useTranslation();
   // Состояние для текста поиска
   const [searchTerm, setSearchTerm] = useState('');
   // Состояние для фильтров вакансий
@@ -183,8 +187,8 @@ export function JobsBrowsePage() {
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Exclude Skills"
-                placeholder="Select skills to exclude"
+                label={t('jobsBrowse.excludeStacks.title')}
+                placeholder={t('jobsBrowse.excludeStacks.placeholder')}
               />
             )}
             sx={{ minWidth: 250 }}
@@ -196,7 +200,7 @@ export function JobsBrowsePage() {
               onClick={() => setFilters({ ...filters, excludeSkills: [] })}
               startIcon={<ClearIcon />}
             >
-              Clear
+              {t('jobsBrowse.excludeStacks.clear')}
             </Button>
           )}
         </Stack>
@@ -216,7 +220,7 @@ export function JobsBrowsePage() {
       ) : filteredJobs.length === 0 ? (
         // Состояние отсутствия вакансий после применения фильтров
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography color="text.secondary">No jobs match your criteria</Typography>
+          <Typography color="text.secondary">{t('jobsBrowse.excludeStacks.noFilteredJobs')}</Typography>
         </Box>
       ) : (
         // Сетка с карточками вакансий
