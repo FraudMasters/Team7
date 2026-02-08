@@ -402,8 +402,26 @@ def analyze_resume_async(
 
         return result
 
+    except SoftTimeLimitExceeded:
+        logger.error(f"Resume analysis for {resume_id} exceeded time limit")
+        return {
+            "resume_id": resume_id,
+            "status": "failed",
+            "error": "Analysis exceeded maximum time limit",
+            "processing_time_ms": 0,
+        }
+
     except Exception as e:
         logger.error(f"Unexpected error in resume analysis: {e}", exc_info=True)
+
+        # Retry with exponential backoff for transient failures
+        if self.request.retries < self.max_retries:
+            logger.info(
+                f"Retrying resume analysis for {resume_id}, "
+                f"attempt {self.request.retries + 1}/{self.max_retries}"
+            )
+            raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+
         return {
             "resume_id": resume_id,
             "status": "failed",

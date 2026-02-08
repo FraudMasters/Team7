@@ -3,12 +3,13 @@ Retry decorator with exponential backoff for transient failures.
 
 This module provides a flexible retry decorator that handles transient failures
 with configurable exponential backoff, jitter, and exception filtering.
+It also includes a circuit breaker pattern for preventing cascading failures.
 """
 import functools
 import logging
 import random
 import time
-from typing import Callable, Type, Tuple, Union, Optional, Any
+from typing import Callable, Type, Tuple, Union, Optional, Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -211,3 +212,228 @@ def async_retry_with_backoff(
 
         return wrapper
     return decorator
+
+
+class CircuitBreaker:
+    """
+    Circuit breaker pattern for preventing cascading failures.
+
+    The circuit breaker monitors failures and "opens" the circuit (blocks requests)
+    when failures exceed a threshold within a time window. After a timeout, it enters
+    a "half-open" state allowing a test request to determine if the service has recovered.
+
+    States:
+        - CLOSED: Normal operation, requests pass through
+        - OPEN: Circuit is tripped, requests fail fast without executing
+        - HALF_OPEN: Test mode, allows one request to check if service recovered
+
+    Args:
+        failure_threshold: Number of failures to trigger opening (default: 5)
+        timeout_seconds: Seconds to wait before transitioning from OPEN to HALF_OPEN (default: 60)
+        success_threshold: Successful calls needed to close circuit from HALF_OPEN (default: 1)
+
+    Example:
+        >>> breaker = CircuitBreaker(failure_threshold=3, timeout_seconds=30)
+        >>>
+        >>> @breaker
+        >>> def external_api_call():
+        ...     return requests.get("https://api.example.com/data")
+        >>>
+        >>> # Or use as context manager
+        >>> with breaker:
+        ...     result = external_api_call()
+    """
+
+    # Circuit states
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        timeout_seconds: float = 60.0,
+        success_threshold: int = 1,
+    ):
+        """
+        Initialize the circuit breaker.
+
+        Args:
+            failure_threshold: Number of failures to trigger opening
+            timeout_seconds: Seconds to wait before transitioning from OPEN to HALF_OPEN
+            success_threshold: Successful calls needed to close circuit from HALF_OPEN
+        """
+        self.failure_threshold = failure_threshold
+        self.timeout_seconds = timeout_seconds
+        self.success_threshold = success_threshold
+
+        # State tracking
+        self._state = self.CLOSED
+        self._failure_count = 0
+        self._success_count = 0
+        self._last_failure_time = 0
+        self._opened_at = 0
+
+    @property
+    def state(self) -> str:
+        """Get current circuit state."""
+        return self._state
+
+    @property
+    def failure_count(self) -> int:
+        """Get current failure count."""
+        return self._failure_count
+
+    @property
+    def is_open(self) -> bool:
+        """Check if circuit is currently open (blocking requests)."""
+        if self._state == self.OPEN:
+            # Check if timeout has elapsed
+            if time.time() - self._opened_at >= self.timeout_seconds:
+                logger.info("Circuit breaker timeout elapsed, transitioning to HALF_OPEN")
+                self._state = self.HALF_OPEN
+                self._success_count = 0
+                return False
+            return True
+        return False
+
+    def record_success(self):
+        """
+        Record a successful operation.
+
+        Transitions state:
+        - HALF_OPEN -> CLOSED if success threshold reached
+        - Resets failure count in CLOSED state
+        """
+        if self._state == self.HALF_OPEN:
+            self._success_count += 1
+            if self._success_count >= self.success_threshold:
+                logger.info("Circuit breaker: success threshold reached, closing circuit")
+                self._state = self.CLOSED
+                self._failure_count = 0
+                self._success_count = 0
+        elif self._state == self.CLOSED:
+            self._failure_count = max(0, self._failure_count - 1)
+
+    def record_failure(self):
+        """
+        Record a failed operation.
+
+        Transitions state:
+        - CLOSED -> OPEN if failure threshold reached
+        - HALF_OPEN -> OPEN on any failure
+        """
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+
+        if self._state == self.HALF_OPEN:
+            logger.warning("Circuit breaker: failure in HALF_OPEN state, opening circuit")
+            self._state = self.OPEN
+            self._opened_at = time.time()
+        elif self._state == self.CLOSED:
+            if self._failure_count >= self.failure_threshold:
+                logger.warning(
+                    f"Circuit breaker: failure threshold ({self.failure_threshold}) reached, opening circuit"
+                )
+                self._state = self.OPEN
+                self._opened_at = time.time()
+
+    def __call__(self, func: Callable) -> Callable:
+        """
+        Decorator to use circuit breaker with a function.
+
+        Args:
+            func: Function to protect with circuit breaker
+
+        Returns:
+            Wrapped function that honors circuit state
+        """
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            return self.execute(func, *args, **kwargs)
+
+        return wrapper
+
+    def execute(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """
+        Execute a function with circuit breaker protection.
+
+        Args:
+            func: Function to execute
+            *args: Positional arguments for function
+            **kwargs: Keyword arguments for function
+
+        Returns:
+            Result of function execution
+
+        Raises:
+            CircuitBreakerOpenError: If circuit is OPEN
+            Exception: Any exception from the decorated function
+        """
+        if self.is_open:
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker is OPEN for '{func.__name__}'. "
+                f"Last failure: {time.time() - self._last_failure_time:.1f}s ago. "
+                f"Timeout: {self.timeout_seconds}s"
+            )
+
+        try:
+            result = func(*args, **kwargs)
+            self.record_success()
+            return result
+        except Exception as e:
+            self.record_failure()
+            raise
+
+    def __enter__(self):
+        """Context manager entry - raises if circuit is open."""
+        if self.is_open:
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker is OPEN. "
+                f"Timeout: {self.timeout_seconds}s"
+            )
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - records success/failure."""
+        if exc_type is None:
+            self.record_success()
+        else:
+            self.record_failure()
+        return False  # Don't suppress exceptions
+
+    def reset(self):
+        """Reset circuit breaker to CLOSED state (for testing/recovery)."""
+        logger.info("Circuit breaker: manual reset to CLOSED state")
+        self._state = self.CLOSED
+        self._failure_count = 0
+        self._success_count = 0
+        self._last_failure_time = 0
+        self._opened_at = 0
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get circuit breaker statistics.
+
+        Returns:
+            Dictionary with current stats
+        """
+        return {
+            "state": self._state,
+            "failure_count": self._failure_count,
+            "success_count": self._success_count,
+            "failure_threshold": self.failure_threshold,
+            "success_threshold": self.success_threshold,
+            "timeout_seconds": self.timeout_seconds,
+            "last_failure_time": self._last_failure_time,
+            "opened_at": self._opened_at,
+            "time_since_open": time.time() - self._opened_at if self._opened_at else 0,
+        }
+
+
+class CircuitBreakerOpenError(Exception):
+    """Exception raised when attempting to call a function with an open circuit."""
+
+    def __init__(self, message: str = "Circuit breaker is OPEN"):
+        self.message = message
+        super().__init__(self.message)
