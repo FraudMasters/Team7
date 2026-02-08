@@ -1,5 +1,5 @@
 // Импорт хуков React для управления состоянием
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // Импорт компонентов MUI для оформления интерфейса
 import {
   Container,      // Контейнер для ограничения ширины содержимого
@@ -15,9 +15,18 @@ import {
   InputLabel,     // Метка поля ввода
   CircularProgress, // Индикатор загрузки
   Box,            // Универсальный контейнер для верстки
+  Autocomplete,   // Автозаполнение с выбором из списка
+  Button,         // Кнопка
+  createFilterOptions, // Функция для создания кастомного фильтра опций
 } from '@mui/material';
+// Импорт хука для интернационализации
+import { useTranslation } from 'react-i18next';
 // Импорт иконок из MUI
-import { Search as SearchIcon, FilterList as FilterIcon } from '@mui/icons-material';
+import {
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  Clear as ClearIcon,
+} from '@mui/icons-material';
 // Импорт кастомного хука для получения данных о вакансиях
 import { useJobs } from '../../hooks/useJobs';
 // Импорт компонента карточки вакансии
@@ -25,15 +34,61 @@ import { JobCard } from '../../components/jobs/JobCard';
 
 // Основной компонент страницы просмотра вакансий
 export function JobsBrowsePage() {
+  // Хук для интернационализации
+  const { t } = useTranslation();
   // Состояние для текста поиска
   const [searchTerm, setSearchTerm] = useState('');
   // Состояние для фильтров вакансий
   const [filters, setFilters] = useState<{
     workFormat?: string; // Формат работы (удаленно/офис/гибрид)
+    excludeSkills?: string[]; // Исключаемые навыки
   }>({});
+
+  // Ключ localStorage для сохранения исключаемых навыков
+  const EXCLUDED_SKILLS_STORAGE_KEY = 'excludedJobSkills';
+
+  // Загрузка исключаемых навыков из localStorage при монтировании компонента
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(EXCLUDED_SKILLS_STORAGE_KEY);
+      if (stored) {
+        const excludedSkills = JSON.parse(stored) as string[];
+        setFilters((prev) => ({ ...prev, excludeSkills: excludedSkills }));
+      }
+    } catch {
+      // Игнорируем ошибки при чтении из localStorage
+    }
+  }, []);
+
+  // Сохранение исключаемых навыков в localStorage при их изменении
+  useEffect(() => {
+    try {
+      if (filters.excludeSkills && filters.excludeSkills.length > 0) {
+        localStorage.setItem(EXCLUDED_SKILLS_STORAGE_KEY, JSON.stringify(filters.excludeSkills));
+      } else {
+        localStorage.removeItem(EXCLUDED_SKILLS_STORAGE_KEY);
+      }
+    } catch {
+      // Игнорируем ошибки при записи в localStorage
+    }
+  }, [filters.excludeSkills]);
 
   // Получение данных о вакансиях с использованием кастомного хука
   const { data, isLoading, error } = useJobs();
+
+  // Доступные опции навыков (в будущем могут быть получены из API)
+  const skillOptions = [
+    'Python', 'Java', 'JavaScript', 'TypeScript', 'React', 'Angular', 'Vue.js',
+    'Node.js', 'Django', 'Flask', 'Spring', 'AWS', 'Azure', 'Docker', 'Kubernetes',
+    'SQL', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST', 'Git', 'CI/CD',
+  ];
+
+  // Кастомный фильтр для case-insensitive поиска навыков в Autocomplete
+  const skillFilterOptions = createFilterOptions({
+    matchFrom: 'any',
+    limit: 100,
+    stringify: (option: string) => option.toLowerCase(),
+  });
 
   // Фильтрация вакансий по поисковому запросу и выбранным фильтрам
   const filteredJobs = data?.vacancies.filter((job) => {
@@ -46,8 +101,18 @@ export function JobsBrowsePage() {
     // Проверка совпадения формата работы
     const matchesFormat = !filters.workFormat || job.work_format === filters.workFormat;
 
-    // Возвращаем вакансию, если она соответствует обоим критериям
-    return matchesSearch && matchesFormat;
+    // Проверка исключаемых навыков - вакансии, требующие эти навыки, исключаются
+    const matchesExcludeSkills =
+      !filters.excludeSkills ||
+      filters.excludeSkills.length === 0 ||
+      !filters.excludeSkills.some((skill) =>
+        job.required_skills?.some((jobSkill: string) =>
+          jobSkill.toLowerCase().includes(skill.toLowerCase())
+        )
+      );
+
+    // Возвращаем вакансию, если она соответствует всем критериям
+    return matchesSearch && matchesFormat && matchesExcludeSkills;
   }) ?? [];
 
   return (
@@ -97,6 +162,48 @@ export function JobsBrowsePage() {
             <MenuItem value="hybrid">Hybrid</MenuItem>
           </Select>
         </FormControl>
+        {/* Автозаполнение для исключаемых навыков с кнопкой очистки */}
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Autocomplete
+            multiple
+            options={skillOptions}
+            filterOptions={skillFilterOptions}
+            value={filters.excludeSkills || []}
+            onChange={(_, newValue) => {
+              // Удаляем дубликаты перед сохранением
+              const uniqueSkills = Array.from(new Set(newValue));
+              setFilters({ ...filters, excludeSkills: uniqueSkills });
+            }}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={option}
+                  {...getTagProps({ index })}
+                  key={option}
+                />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t('jobsBrowse.excludeStacks.title')}
+                placeholder={t('jobsBrowse.excludeStacks.placeholder')}
+              />
+            )}
+            sx={{ minWidth: 250 }}
+          />
+          {filters.excludeSkills && filters.excludeSkills.length > 0 && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setFilters({ ...filters, excludeSkills: [] })}
+              startIcon={<ClearIcon />}
+            >
+              {t('jobsBrowse.excludeStacks.clear')}
+            </Button>
+          )}
+        </Stack>
       </Paper>
 
       {/* Отображение состояния загрузки, ошибки или списка вакансий */}
@@ -111,9 +218,9 @@ export function JobsBrowsePage() {
           <Typography color="error">Failed to load jobs</Typography>
         </Box>
       ) : filteredJobs.length === 0 ? (
-        // Состояние отсутствия вакансий
+        // Состояние отсутствия вакансий после применения фильтров
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography color="text.secondary">No jobs found</Typography>
+          <Typography color="text.secondary">{t('jobsBrowse.excludeStacks.noFilteredJobs')}</Typography>
         </Box>
       ) : (
         // Сетка с карточками вакансий

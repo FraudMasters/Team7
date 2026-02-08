@@ -1014,5 +1014,13 @@
     "reportContents": "Report Contents: AI narrative explanation, feature contributions, confidence intervals, candidate strengths and weaknesses, and resume section highlights",
     "formatPdf": "Format: PDF (professional document)",
     "formatHtml": "Format: HTML (viewable in any browser, can be printed to PDF)"
+  },
+  "jobsBrowse": {
+    "excludeStacks": {
+      "title": "Don't show jobs with these skills",
+      "placeholder": "Enter technologies to exclude...",
+      "clear": "Clear filters",
+      "noFilteredJobs": "All jobs are hidden by your filters"
+    }
   }
 }
