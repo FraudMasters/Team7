@@ -220,6 +220,73 @@ export interface EmotionTheme {
       sharp: string;
     };
   };
+  /** Gradient definitions for 2026 design system */
+  gradients: {
+    /** Primary brand gradients */
+    primary: string;
+    primaryReverse: string;
+    primarySubtle: string;
+    primaryLight: string;
+    primaryLightSubtle: string;
+    /** Secondary accent gradients */
+    secondary: string;
+    secondaryReverse: string;
+    secondarySubtle: string;
+    secondaryLight: string;
+    secondaryLightSubtle: string;
+    /** Success state gradients */
+    success: string;
+    successReverse: string;
+    successSubtle: string;
+    /** Error state gradients */
+    error: string;
+    errorReverse: string;
+    errorSubtle: string;
+    /** Warning state gradients */
+    warning: string;
+    warningReverse: string;
+    warningSubtle: string;
+    /** Info state gradients */
+    info: string;
+    infoReverse: string;
+    infoSubtle: string;
+    /** Neutral gradients */
+    grey: string;
+    greyLight: string;
+    greySubtle: string;
+    neutral: string;
+    neutralSubtle: string;
+    /** Rainbow gradients */
+    rainbow: string;
+    rainbowSubtle: string;
+    rainbowHorizontal: string;
+    /** Special effect gradients */
+    glossy: string;
+    glass: string;
+    shine: string;
+    /** Radial gradients */
+    radialPrimary: string;
+    radialSecondary: string;
+    glow: string;
+    glowSuccess: string;
+    glowError: string;
+    glowWarning: string;
+    /** Overlay gradients */
+    overlayTop: string;
+    overlayBottom: string;
+    overlayFull: string;
+    overlaySubtle: string;
+    /** Mesh gradients */
+    meshPrimary: string;
+    meshSecondary: string;
+    meshColorful: string;
+    /** Utility gradients */
+    fadeRight: string;
+    fadeLeft: string;
+    fadeUp: string;
+    fadeDown: string;
+    fadeIn: string;
+  };
 }
 
 /**
@@ -433,6 +500,96 @@ const createEmotionTheme = (mode: ThemeMode): EmotionTheme => {
         easeIn: 'cubic-bezier(0.4, 0, 1, 1)',
         sharp: 'cubic-bezier(0.4, 0, 0.6, 1)',
       },
+    },
+    gradients: {
+      // Primary gradients
+      primary: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+      primaryReverse: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+      primarySubtle: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(21, 101, 192, 0.08) 100%)',
+      primaryLight: 'linear-gradient(135deg, #42a5f5 0%, #1976d2 100%)',
+      primaryLightSubtle: 'linear-gradient(135deg, rgba(66, 165, 245, 0.08) 0%, rgba(25, 118, 210, 0.08) 100%)',
+
+      // Secondary gradients
+      secondary: 'linear-gradient(135deg, #dc004e 0%, #c51162 100%)',
+      secondaryReverse: 'linear-gradient(135deg, #c51162 0%, #dc004e 100%)',
+      secondarySubtle: 'linear-gradient(135deg, rgba(220, 0, 78, 0.08) 0%, rgba(197, 17, 98, 0.08) 100%)',
+      secondaryLight: 'linear-gradient(135deg, #f50057 0%, #dc004e 100%)',
+      secondaryLightSubtle: 'linear-gradient(135deg, rgba(245, 0, 87, 0.08) 0%, rgba(220, 0, 78, 0.08) 100%)',
+
+      // Success gradients
+      success: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+      successReverse: 'linear-gradient(135deg, #2e7d32 0%, #4caf50 100%)',
+      successSubtle: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(46, 125, 50, 0.08) 100%)',
+
+      // Error gradients
+      error: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+      errorReverse: 'linear-gradient(135deg, #d32f2f 0%, #f44336 100%)',
+      errorSubtle: 'linear-gradient(135deg, rgba(244, 67, 54, 0.08) 0%, rgba(211, 47, 47, 0.08) 100%)',
+
+      // Warning gradients
+      warning: 'linear-gradient(135deg, #ff9800 0%, #ed6c02 100%)',
+      warningReverse: 'linear-gradient(135deg, #ed6c02 0%, #ff9800 100%)',
+      warningSubtle: 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(237, 108, 2, 0.08) 100%)',
+
+      // Info gradients
+      info: 'linear-gradient(135deg, #03a9f4 0%, #0288d1 100%)',
+      infoReverse: 'linear-gradient(135deg, #0288d1 0%, #03a9f4 100%)',
+      infoSubtle: 'linear-gradient(135deg, rgba(3, 169, 244, 0.08) 0%, rgba(2, 136, 209, 0.08) 100%)',
+
+      // Neutral gradients
+      grey: 'linear-gradient(135deg, #9e9e9e 0%, #616161 100%)',
+      greyLight: 'linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%)',
+      greySubtle: 'linear-gradient(135deg, rgba(158, 158, 158, 0.08) 0%, rgba(97, 97, 97, 0.08) 100%)',
+      neutral: isDark
+        ? 'linear-gradient(135deg, #1e1e1e 0%, #121212 100%)'
+        : 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
+      neutralSubtle: isDark
+        ? 'linear-gradient(135deg, rgba(30, 30, 30, 0.5) 0%, rgba(18, 18, 18, 0.5) 100%)'
+        : 'linear-gradient(135deg, rgba(245, 245, 245, 0.5) 0%, rgba(224, 224, 224, 0.5) 100%)',
+
+      // Rainbow gradients
+      rainbow: 'linear-gradient(90deg, #f44336 0%, #ff9800 16.66%, #4caf50 33.33%, #2196f3 50%, #9c27b0 66.66%, #e91e63 83.33%, #f44336 100%)',
+      rainbowSubtle: 'linear-gradient(90deg, rgba(244, 67, 54, 0.3) 0%, rgba(255, 152, 0, 0.3) 16.66%, rgba(76, 175, 80, 0.3) 33.33%, rgba(33, 150, 243, 0.3) 50%, rgba(156, 39, 176, 0.3) 66.66%, rgba(233, 30, 99, 0.3) 83.33%, rgba(244, 67, 54, 0.3) 100%)',
+      rainbowHorizontal: 'linear-gradient(90deg, #1976d2 0%, #dc004e 50%, #2e7d32 100%)',
+
+      // Special effect gradients
+      glossy: 'linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.05) 100%)',
+      glass: isDark
+        ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)'
+        : 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+      shine: isDark
+        ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%)'
+        : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%)',
+
+      // Radial gradients
+      radialPrimary: 'radial-gradient(circle, #42a5f5 0%, #1976d2 100%)',
+      radialSecondary: 'radial-gradient(circle, #f50057 0%, #dc004e 100%)',
+      glow: 'radial-gradient(circle, rgba(25, 118, 210, 0.3) 0%, transparent 70%)',
+      glowSuccess: 'radial-gradient(circle, rgba(76, 175, 80, 0.3) 0%, transparent 70%)',
+      glowError: 'radial-gradient(circle, rgba(244, 67, 54, 0.3) 0%, transparent 70%)',
+      glowWarning: 'radial-gradient(circle, rgba(255, 152, 0, 0.3) 0%, transparent 70%)',
+
+      // Overlay gradients
+      overlayTop: 'linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%)',
+      overlayBottom: 'linear-gradient(0deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%)',
+      overlayFull: 'linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 30%, transparent 70%, rgba(0, 0, 0, 0.6) 100%)',
+      overlaySubtle: isDark
+        ? 'linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, transparent 100%)'
+        : 'linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, transparent 100%)',
+
+      // Mesh gradients
+      meshPrimary: 'radial-gradient(at 40% 20%, #42a5f5 0px, transparent 50%), radial-gradient(at 80% 0%, #1976d2 0px, transparent 50%), radial-gradient(at 0% 50%, #1565c0 0px, transparent 50%), radial-gradient(at 80% 50%, #42a5f5 0px, transparent 50%), radial-gradient(at 0% 100%, #1976d2 0px, transparent 50%), radial-gradient(at 80% 100%, #1565c0 0px, transparent 50%)',
+      meshSecondary: 'radial-gradient(at 40% 20%, #f50057 0px, transparent 50%), radial-gradient(at 80% 0%, #dc004e 0px, transparent 50%), radial-gradient(at 0% 50%, #c51162 0px, transparent 50%), radial-gradient(at 80% 50%, #f50057 0px, transparent 50%), radial-gradient(at 0% 100%, #dc004e 0px, transparent 50%), radial-gradient(at 80% 100%, #c51162 0px, transparent 50%)',
+      meshColorful: 'radial-gradient(at 40% 20%, #f44336 0px, transparent 50%), radial-gradient(at 80% 0%, #ff9800 0px, transparent 50%), radial-gradient(at 0% 50%, #4caf50 0px, transparent 50%), radial-gradient(at 80% 50%, #2196f3 0px, transparent 50%), radial-gradient(at 0% 100%, #9c27b0 0px, transparent 50%), radial-gradient(at 80% 100%, #e91e63 0px, transparent 50%)',
+
+      // Utility gradients
+      fadeRight: 'linear-gradient(90deg, transparent 0%, currentColor 100%)',
+      fadeLeft: 'linear-gradient(270deg, transparent 0%, currentColor 100%)',
+      fadeUp: 'linear-gradient(0deg, transparent 0%, currentColor 100%)',
+      fadeDown: 'linear-gradient(180deg, transparent 0%, currentColor 100%)',
+      fadeIn: isDark
+        ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.03) 50%, rgba(255, 255, 255, 0.06) 100%)'
+        : 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.03) 50%, rgba(0, 0, 0, 0.06) 100%)',
     },
   };
 };
