@@ -34,6 +34,7 @@ from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .audit_log import AuditLog, AuditActionType
 from .config_change import ConfigChange, ConfigChangeAction
+from .organization_explanation_preferences import OrganizationExplanationPreferences
 
 __all__ = [
     "Base",
@@ -80,4 +81,5 @@ __all__ = [
     "AuditActionType",
     "ConfigChange",
     "ConfigChangeAction",
+    "OrganizationExplanationPreferences",
 ]
