@@ -7,7 +7,7 @@ validating file format and size, storing files, and creating database records.
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -69,6 +69,25 @@ class ResumeListItem(BaseModel):
     status: str = Field(..., description="Processing status")
     created_at: str = Field(..., description="Creation timestamp")
     language: Optional[str] = Field(None, description="Detected language")
+
+
+class BatchUploadRequest(BaseModel):
+    """Request model for batch upload endpoint."""
+
+    resume_ids: List[str] = Field(..., description="List of resume IDs to process in parallel")
+    check_grammar: bool = Field(True, description="Whether to perform grammar checking")
+    extract_experience: bool = Field(True, description="Whether to calculate experience")
+    detect_errors: bool = Field(True, description="Whether to detect resume errors")
+    batch_size: Optional[int] = Field(None, description="Maximum number of resumes to process in parallel")
+
+
+class BatchUploadResponse(BaseModel):
+    """Response model for batch upload endpoint."""
+
+    task_id: str = Field(..., description="Celery task ID for tracking progress")
+    status: str = Field(..., description="Task status")
+    message: str = Field(..., description="Success message")
+    total_resumes: int = Field(..., description="Number of resumes being processed")
 
 
 def validate_file_type(filename: str, content_type: str, locale: str = "en") -> None:
@@ -253,6 +272,159 @@ async def upload_resume(
     except Exception as e:
         logger.error(f"Error uploading resume: {e}", exc_info=True)
         await db.rollback()
+        error_msg = get_error_message("file_upload_failed", locale)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_msg,
+        ) from e
+
+
+@router.post(
+    "/batch-upload",
+    response_model=BatchUploadResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Resumes"],
+)
+async def batch_upload_resumes(
+    request: Request,
+    batch_request: BatchUploadRequest,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Trigger parallel processing for multiple uploaded resumes.
+
+    This endpoint accepts a list of resume IDs and triggers parallel batch
+    processing using Celery groups. Resumes are analyzed concurrently instead
+    of sequentially, significantly reducing total processing time.
+
+    Args:
+        request: FastAPI request object (for Accept-Language header)
+        batch_request: Request body containing resume_ids and processing options
+        db: Database session
+
+    Returns:
+        JSON response with Celery task ID for progress tracking
+
+    Raises:
+        HTTPException(400): If resume_ids list is empty
+        HTTPException(404): If any resume IDs are not found
+        HTTPException(500): If task triggering fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/resumes/batch-upload",
+        ...     json={
+        ...         "resume_ids": ["abc123", "def456", "ghi789"],
+        ...         "batch_size": 5
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "task_id": "123e4567-e89b-12d3-a456-426614174000",
+            "status": "processing",
+            "message": "Batch processing started for 3 resumes",
+            "total_resumes": 3
+        }
+    """
+    # Extract locale from Accept-Language header
+    locale = _extract_locale(request)
+
+    # Validate resume_ids is not empty
+    if not batch_request.resume_ids:
+        error_msg = get_error_message("invalid_request", locale, error="resume_ids cannot be empty")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg,
+        )
+
+    try:
+        # Verify all resumes exist in database
+        from models.resume import Resume as ResumeModel
+
+        resume_uuids = []
+        invalid_ids = []
+
+        for resume_id in batch_request.resume_ids:
+            try:
+                resume_uuid = UUID(resume_id)
+                resume_uuids.append(resume_uuid)
+            except ValueError:
+                invalid_ids.append(resume_id)
+
+        if invalid_ids:
+            error_msg = get_error_message("invalid_request", locale, error=f"Invalid resume ID format: {', '.join(invalid_ids)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg,
+            )
+
+        # Query to verify all resumes exist
+        query = select(ResumeModel).where(ResumeModel.id.in_(resume_uuids))
+        result = await db.execute(query)
+        found_resumes = result.scalars().all()
+
+        found_ids = {str(resume.id) for resume in found_resumes}
+        missing_ids = set(batch_request.resume_ids) - found_ids
+
+        if missing_ids:
+            error_msg = get_error_message("resume_not_found", locale, resume_id=', '.join(missing_ids))
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error_msg,
+            )
+
+        # Trigger parallel batch analysis task
+        from tasks.parallel_resume_tasks import parallel_batch_analyze_resumes
+
+        task = parallel_batch_analyze_resumes.delay(
+            resume_ids=batch_request.resume_ids,
+            check_grammar=batch_request.check_grammar,
+            extract_experience=batch_request.extract_experience,
+            detect_errors=batch_request.detect_errors,
+            batch_size=batch_request.batch_size,
+        )
+
+        logger.info(
+            f"Triggered parallel batch analysis for {len(batch_request.resume_ids)} resumes, "
+            f"task_id: {task.id}"
+        )
+
+        # Log audit event
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.RESUME_UPLOADED,
+            entity_type="resume_batch",
+            entity_id=task.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "resume_ids": batch_request.resume_ids,
+                "batch_size": batch_request.batch_size,
+                "check_grammar": batch_request.check_grammar,
+            },
+        )
+
+        # Get translated success message
+        success_message = get_success_message("file_uploaded", locale)
+
+        response_data = {
+            "task_id": task.id,
+            "status": "processing",
+            "message": f"Batch processing started for {len(batch_request.resume_ids)} resumes",
+            "total_resumes": len(batch_request.resume_ids),
+        }
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error triggering batch processing: {e}", exc_info=True)
         error_msg = get_error_message("file_upload_failed", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
