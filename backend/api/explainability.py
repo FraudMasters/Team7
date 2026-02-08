@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models import CandidateRank, JobVacancy, MatchResult, Resume
+from models.organization_explanation_preferences import OrganizationExplanationPreferences
 from analyzers.explanation_generator import (
     ExplanationGenerator,
     RankingExplanation,
@@ -1124,6 +1125,72 @@ class PDFExportResponse(BaseModel):
     expires_at: str = Field(..., description="Expiration timestamp for download link")
 
 
+# Organization Explanation Preferences Models
+class ExplanationPreferencesUpdate(BaseModel):
+    """Request model for updating organization explanation preferences."""
+
+    tone: Optional[str] = Field(
+        None,
+        description="Preferred explanation tone: professional, casual, friendly, formal"
+    )
+    style: Optional[str] = Field(
+        None,
+        description="Preferred explanation style: detailed, concise, balanced"
+    )
+    detail_level: Optional[str] = Field(
+        None,
+        description="Level of detail: high, medium, low"
+    )
+    include_percentiles: Optional[bool] = Field(
+        None,
+        description="Whether to include percentile-based comparisons"
+    )
+    include_skill_names: Optional[bool] = Field(
+        None,
+        description="Whether to include specific skill names in explanations"
+    )
+    include_experience_details: Optional[bool] = Field(
+        None,
+        description="Whether to include experience duration details"
+    )
+    include_education_details: Optional[bool] = Field(
+        None,
+        description="Whether to include education details"
+    )
+    language: Optional[str] = Field(
+        None,
+        description="Preferred language for explanations (e.g., en, es, fr)"
+    )
+    custom_prompt_template: Optional[str] = Field(
+        None,
+        description="Optional custom prompt template for LLM explanations"
+    )
+    is_active: Optional[bool] = Field(
+        None,
+        description="Whether these preferences are currently active"
+    )
+
+
+class ExplanationPreferencesResponse(BaseModel):
+    """Response model for organization explanation preferences."""
+
+    id: str = Field(..., description="Unique identifier for the preferences")
+    organization_id: str = Field(..., description="Organization identifier")
+    tone: str = Field(..., description="Preferred explanation tone")
+    style: str = Field(..., description="Preferred explanation style")
+    detail_level: str = Field(..., description="Level of detail")
+    include_percentiles: bool = Field(..., description="Whether to include percentiles")
+    include_skill_names: bool = Field(..., description="Whether to include skill names")
+    include_experience_details: bool = Field(..., description="Whether to include experience details")
+    include_education_details: bool = Field(..., description="Whether to include education details")
+    language: Optional[str] = Field(None, description="Preferred language")
+    custom_prompt_template: Optional[str] = Field(None, description="Custom prompt template")
+    is_active: bool = Field(..., description="Whether preferences are active")
+    created_by: Optional[str] = Field(None, description="User who created preferences")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
 @router.post(
     "/export/pdf",
     response_model=PDFExportResponse,
@@ -1350,4 +1417,250 @@ async def export_explainability_pdf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"PDF export failed: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/preferences/{organization_id}",
+    response_model=ExplanationPreferencesResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Explainability"],
+)
+async def get_organization_preferences(
+    organization_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get explanation preferences for an organization.
+
+    This endpoint retrieves the explanation preferences for a specific
+    organization, including tone, style, detail level, and content inclusion flags.
+
+    Args:
+        organization_id: Organization identifier (slug or UUID)
+        db: Database session
+
+    Returns:
+        Organization explanation preferences
+
+    Raises:
+        HTTPException(404): If no preferences found for organization
+        HTTPException(500): If retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/explainability/preferences/test-org"
+        ... )
+        >>> response.status_code
+        200
+        >>> response.json()
+        {
+            "id": "pref-id",
+            "organization_id": "test-org",
+            "tone": "professional",
+            "style": "balanced",
+            ...
+        }
+    """
+    try:
+        logger.info(f"Retrieving explanation preferences for organization: {organization_id}")
+
+        # Query for preferences
+        query = select(OrganizationExplanationPreferences).where(
+            OrganizationExplanationPreferences.organization_id == organization_id
+        )
+        result = await db.execute(query)
+        preferences = result.scalar_one_or_none()
+
+        if not preferences:
+            # Return default preferences if none exist
+            logger.info(f"No preferences found for {organization_id}, returning defaults")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "id": "",
+                    "organization_id": organization_id,
+                    "tone": "professional",
+                    "style": "balanced",
+                    "detail_level": "medium",
+                    "include_percentiles": True,
+                    "include_skill_names": True,
+                    "include_experience_details": True,
+                    "include_education_details": True,
+                    "language": None,
+                    "custom_prompt_template": None,
+                    "is_active": False,
+                    "created_by": None,
+                    "created_at": "",
+                    "updated_at": "",
+                },
+            )
+
+        response_data = {
+            "id": preferences.id,
+            "organization_id": preferences.organization_id,
+            "tone": preferences.tone,
+            "style": preferences.style,
+            "detail_level": preferences.detail_level,
+            "include_percentiles": preferences.include_percentiles,
+            "include_skill_names": preferences.include_skill_names,
+            "include_experience_details": preferences.include_experience_details,
+            "include_education_details": preferences.include_education_details,
+            "language": preferences.language,
+            "custom_prompt_template": preferences.custom_prompt_template,
+            "is_active": preferences.is_active,
+            "created_by": preferences.created_by,
+            "created_at": preferences.created_at.isoformat() if preferences.created_at else "",
+            "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else "",
+        }
+
+        logger.info(f"Retrieved preferences for organization: {organization_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving organization preferences: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve preferences: {str(e)}",
+        ) from e
+
+
+@router.put(
+    "/preferences/{organization_id}",
+    response_model=ExplanationPreferencesResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Explainability"],
+)
+async def update_organization_preferences(
+    organization_id: str,
+    request: ExplanationPreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update explanation preferences for an organization.
+
+    This endpoint updates the explanation preferences for a specific organization.
+    Only the fields specified in the request body will be updated.
+
+    Args:
+        organization_id: Organization identifier (slug or UUID)
+        request: Request body containing fields to update
+        db: Database session
+
+    Returns:
+        Updated organization explanation preferences
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If update fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.put(
+        ...     "http://localhost:8000/api/explainability/preferences/test-org",
+        ...     json={
+        ...         "tone": "casual",
+        ...         "style": "concise",
+        ...         "is_active": True
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "id": "pref-id",
+            "organization_id": "test-org",
+            "tone": "casual",
+            "style": "concise",
+            ...
+        }
+    """
+    try:
+        logger.info(f"Updating explanation preferences for organization: {organization_id}")
+
+        # Get existing preferences
+        query = select(OrganizationExplanationPreferences).where(
+            OrganizationExplanationPreferences.organization_id == organization_id
+        )
+        result = await db.execute(query)
+        preferences = result.scalar_one_or_none()
+
+        if not preferences:
+            # Create new preferences
+            from uuid import uuid4
+            preferences = OrganizationExplanationPreferences(
+                id=str(uuid4()),
+                organization_id=organization_id,
+                tone=request.tone or "professional",
+                style=request.style or "balanced",
+                detail_level=request.detail_level or "medium",
+                include_percentiles=request.include_percentiles if request.include_percentiles is not None else True,
+                include_skill_names=request.include_skill_names if request.include_skill_names is not None else True,
+                include_experience_details=request.include_experience_details if request.include_experience_details is not None else True,
+                include_education_details=request.include_education_details if request.include_education_details is not None else True,
+                language=request.language,
+                custom_prompt_template=request.custom_prompt_template,
+                is_active=request.is_active if request.is_active is not None else False,
+            )
+            db.add(preferences)
+        else:
+            # Update existing preferences
+            if request.tone is not None:
+                preferences.tone = request.tone
+            if request.style is not None:
+                preferences.style = request.style
+            if request.detail_level is not None:
+                preferences.detail_level = request.detail_level
+            if request.include_percentiles is not None:
+                preferences.include_percentiles = request.include_percentiles
+            if request.include_skill_names is not None:
+                preferences.include_skill_names = request.include_skill_names
+            if request.include_experience_details is not None:
+                preferences.include_experience_details = request.include_experience_details
+            if request.include_education_details is not None:
+                preferences.include_education_details = request.include_education_details
+            if request.language is not None:
+                preferences.language = request.language
+            if request.custom_prompt_template is not None:
+                preferences.custom_prompt_template = request.custom_prompt_template
+            if request.is_active is not None:
+                preferences.is_active = request.is_active
+
+        await db.commit()
+        await db.refresh(preferences)
+
+        response_data = {
+            "id": preferences.id,
+            "organization_id": preferences.organization_id,
+            "tone": preferences.tone,
+            "style": preferences.style,
+            "detail_level": preferences.detail_level,
+            "include_percentiles": preferences.include_percentiles,
+            "include_skill_names": preferences.include_skill_names,
+            "include_experience_details": preferences.include_experience_details,
+            "include_education_details": preferences.include_education_details,
+            "language": preferences.language,
+            "custom_prompt_template": preferences.custom_prompt_template,
+            "is_active": preferences.is_active,
+            "created_by": preferences.created_by,
+            "created_at": preferences.created_at.isoformat() if preferences.created_at else "",
+            "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else "",
+        }
+
+        logger.info(f"Updated preferences for organization: {organization_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error updating organization preferences: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update preferences: {str(e)}",
         ) from e
