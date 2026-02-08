@@ -4,7 +4,11 @@ Parallel resume processing tasks using Celery primitives.
 This module provides Celery tasks for parallel batch resume analysis
 using Celery groups and chords. Multiple resumes are processed concurrently
 instead of sequentially, significantly reducing batch processing time.
+
+Progress updates are sent via WebSocket to connected clients for real-time
+monitoring of batch processing operations.
 """
+import asyncio
 import logging
 import time
 from typing import Dict, Any, List, Optional
@@ -27,6 +31,105 @@ def _get_analysis_core():
     return analyze_resume_core
 
 
+# Import WebSocket progress functions
+def _send_progress_safe(
+    task_id: str,
+    resume_id: str,
+    stage: str,
+    progress: int,
+    message: str,
+) -> bool:
+    """
+    Safely send progress update via WebSocket.
+
+    This helper function runs the async WebSocket function in an event loop
+    for use within Celery tasks. It handles errors gracefully to avoid
+    disrupting the main task execution.
+
+    Args:
+        task_id: Celery task ID
+        resume_id: Resume identifier
+        stage: Processing stage (e.g., "parsing", "analyzing", "complete")
+        progress: Progress percentage (0-100)
+        message: Human-readable progress message
+
+    Returns:
+        True if message sent successfully, False otherwise
+    """
+    try:
+        from websocket.resume_progress import send_resume_progress, ResumeProgressStage
+
+        # Map string stage to enum
+        stage_map = {
+            "parsing": ResumeProgressStage.PARSING,
+            "analyzing": ResumeProgressStage.ANALYZING,
+            "complete": ResumeProgressStage.COMPLETE,
+            "failed": ResumeProgressStage.FAILED,
+        }
+        stage_enum = stage_map.get(stage, ResumeProgressStage.ANALYZING)
+
+        # Run async function in event loop
+        return asyncio.run(
+            send_resume_progress(
+                task_id=task_id,
+                resume_id=resume_id,
+                stage=stage_enum,
+                progress=progress,
+                message=message,
+            )
+        )
+    except Exception as e:
+        # Don't fail the task if WebSocket fails
+        logger.debug(f"Failed to send progress update: {e}")
+        return False
+
+
+def _broadcast_batch_progress_safe(
+    task_id: str,
+    current: int,
+    total: int,
+    message: str,
+    completed_resumes: Optional[List[str]] = None,
+    failed_resumes: Optional[List[str]] = None,
+) -> int:
+    """
+    Safely broadcast batch progress update via WebSocket.
+
+    This helper function runs the async WebSocket function in an event loop
+    for use within Celery tasks. It handles errors gracefully to avoid
+    disrupting the main task execution.
+
+    Args:
+        task_id: Celery task ID
+        current: Current number of processed resumes
+        total: Total number of resumes to process
+        message: Human-readable progress message
+        completed_resumes: Optional list of completed resume IDs
+        failed_resumes: Optional list of failed resume IDs
+
+    Returns:
+        Number of clients the message was sent to
+    """
+    try:
+        from websocket.resume_progress import broadcast_resume_progress
+
+        # Run async function in event loop
+        return asyncio.run(
+            broadcast_resume_progress(
+                task_id=task_id,
+                current=current,
+                total=total,
+                message=message,
+                completed_resumes=completed_resumes,
+                failed_resumes=failed_resumes,
+            )
+        )
+    except Exception as e:
+        # Don't fail the task if WebSocket fails
+        logger.debug(f"Failed to broadcast batch progress: {e}")
+        return 0
+
+
 @shared_task(
     name="tasks.parallel_resume_tasks._analyze_single_resume",
     bind=True,
@@ -39,12 +142,14 @@ def _analyze_single_resume(
     check_grammar: bool = True,
     extract_experience: bool = True,
     detect_errors: bool = True,
+    ws_manager: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Analyze a single resume as part of a parallel batch.
 
     This is a private Celery task that wraps the core analysis function
-    for use in parallel groups. It includes retry logic and proper error handling.
+    for use in parallel groups. It includes retry logic, proper error handling,
+    and real-time WebSocket progress updates.
 
     Args:
         self: Celery task instance (bind=True)
@@ -52,6 +157,7 @@ def _analyze_single_resume(
         check_grammar: Whether to perform grammar checking
         extract_experience: Whether to calculate experience
         detect_errors: Whether to detect resume errors
+        ws_manager: Optional WebSocket manager for progress updates (reserved for future use)
 
     Returns:
         Dictionary containing analysis results
@@ -61,12 +167,31 @@ def _analyze_single_resume(
         Exception: For analysis errors (with retry)
     """
     start_time = time.time()
+    task_id = self.request.id
 
     try:
         logger.info(f"[Parallel Task] Analyzing resume: {resume_id}")
 
+        # Send parsing progress
+        _send_progress_safe(
+            task_id=task_id,
+            resume_id=resume_id,
+            stage="parsing",
+            progress=25,
+            message="Reading and parsing resume file...",
+        )
+
         # Get core analysis function
         analyze_resume_core = _get_analysis_core()
+
+        # Send analyzing progress
+        _send_progress_safe(
+            task_id=task_id,
+            resume_id=resume_id,
+            stage="analyzing",
+            progress=50,
+            message="Extracting keywords and entities...",
+        )
 
         # Call core analysis function
         result = analyze_resume_core(
@@ -80,28 +205,63 @@ def _analyze_single_resume(
 
         # Add metadata about this parallel execution
         result["parallel_processing_time_ms"] = processing_time_ms
-        result["task_id"] = self.request.id
+        result["task_id"] = task_id
 
         logger.info(
             f"[Parallel Task] Completed resume {resume_id} in {processing_time_ms}ms"
         )
 
+        # Send completion progress
+        if result.get("status") == "completed":
+            _send_progress_safe(
+                task_id=task_id,
+                resume_id=resume_id,
+                stage="complete",
+                progress=100,
+                message="Resume analysis complete",
+            )
+        else:
+            _send_progress_safe(
+                task_id=task_id,
+                resume_id=resume_id,
+                stage="failed",
+                progress=0,
+                message=f"Analysis failed: {result.get('error', 'Unknown error')}",
+            )
+
         return result
 
     except SoftTimeLimitExceeded:
         logger.error(f"[Parallel Task] Resume {resume_id} exceeded time limit")
-        return {
+        error_result = {
             "resume_id": resume_id,
             "status": "failed",
             "error": "Analysis exceeded maximum time limit",
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
-            "task_id": self.request.id,
+            "task_id": task_id,
         }
+        _send_progress_safe(
+            task_id=task_id,
+            resume_id=resume_id,
+            stage="failed",
+            progress=0,
+            message="Analysis exceeded time limit",
+        )
+        return error_result
 
     except Exception as e:
         logger.error(
             f"[Parallel Task] Failed to analyze resume {resume_id}: {e}",
             exc_info=True
+        )
+
+        # Send error progress
+        _send_progress_safe(
+            task_id=task_id,
+            resume_id=resume_id,
+            stage="failed",
+            progress=0,
+            message=f"Analysis error: {str(e)}",
         )
 
         # Retry with exponential backoff
@@ -117,7 +277,7 @@ def _analyze_single_resume(
             "status": "failed",
             "error": str(e),
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
-            "task_id": self.request.id,
+            "task_id": task_id,
         }
 
 
@@ -134,6 +294,7 @@ def parallel_batch_analyze_resumes(
     extract_experience: bool = True,
     detect_errors: bool = True,
     batch_size: Optional[int] = None,
+    ws_manager: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Analyze multiple resumes in parallel using Celery groups.
@@ -142,11 +303,14 @@ def parallel_batch_analyze_resumes(
     group primitive. Instead of processing resumes sequentially, all resumes
     are analyzed in parallel, significantly reducing total processing time.
 
+    Real-time progress updates are sent via WebSocket to connected clients.
+
     Key Features:
     - Uses Celery group for parallel execution
     - Supports configurable batch size to control concurrency
     - Aggregates results from all parallel tasks
     - Provides progress tracking at batch level
+    - Sends real-time WebSocket progress updates
     - Handles individual failures without stopping entire batch
     - Returns sorted results matching input order
 
@@ -159,6 +323,7 @@ def parallel_batch_analyze_resumes(
         batch_size: Maximum number of resumes to process in parallel.
                     If None, processes all resumes in one batch.
                     If set, divides resumes into chunks of this size.
+        ws_manager: Optional WebSocket manager for progress updates (reserved for future use)
 
     Returns:
         Dictionary containing batch analysis results:
@@ -188,6 +353,7 @@ def parallel_batch_analyze_resumes(
         1234.56
     """
     batch_start_time = time.time()
+    task_id = self.request.id
 
     try:
         logger.info(
@@ -219,7 +385,15 @@ def parallel_batch_analyze_resumes(
             "message": f"Preparing parallel analysis for {len(resume_ids)} resumes...",
         }
         self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Preparing parallel tasks")
+        logger.info(f"Task {task_id}: Preparing parallel tasks")
+
+        # Broadcast initial progress
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=0,
+            total=len(resume_ids),
+            message=f"Preparing to analyze {len(resume_ids)} resumes...",
+        )
 
         # Determine batch size
         if batch_size is None:
@@ -248,11 +422,12 @@ def parallel_batch_analyze_resumes(
             "message": f"Processing {num_batches} parallel batch(es)...",
         }
         self.update_state(state="PROGRESS", meta=progress)
-        logger.info(f"Task {self.request.id}: Executing parallel tasks")
+        logger.info(f"Task {task_id}: Executing parallel tasks")
 
         all_results = []
         total_successful = 0
         total_failed = 0
+        completed_count = 0
 
         # Process each batch in parallel
         for batch_idx, batch in enumerate(resume_batches):
@@ -263,14 +438,24 @@ def parallel_batch_analyze_resumes(
                 f"({len(batch)} resumes)"
             )
 
+            # Broadcast batch start progress
+            _broadcast_batch_progress_safe(
+                task_id=task_id,
+                current=completed_count,
+                total=len(resume_ids),
+                message=f"Processing batch {batch_idx + 1}/{num_batches} ({len(batch)} resumes)...",
+            )
+
             # Create a Celery group for parallel execution
             # Each resume in the batch gets its own task
+            # Note: ws_manager is passed through to subtasks
             parallel_tasks = group(
                 _analyze_single_resume.s(
                     resume_id=resume_id,
                     check_grammar=check_grammar,
                     extract_experience=extract_experience,
                     detect_errors=detect_errors,
+                    ws_manager=ws_manager,
                 )
                 for resume_id in batch
             )
@@ -285,18 +470,35 @@ def parallel_batch_analyze_resumes(
                 batch_results = group_result.get()
 
             # Aggregate results
+            batch_completed = []
+            batch_failed = []
+
             for result in batch_results:
                 all_results.append(result)
 
                 if result.get("status") == "completed":
                     total_successful += 1
+                    batch_completed.append(result.get("resume_id"))
                 else:
                     total_failed += 1
+                    batch_failed.append(result.get("resume_id"))
+
+                completed_count += 1
 
             batch_time = round((time.time() - batch_start) * 1000, 2)
             logger.info(
                 f"Batch {batch_idx + 1}/{num_batches} completed in {batch_time}ms: "
                 f"{sum(1 for r in batch_results if r.get('status') == 'completed')}/{len(batch)} successful"
+            )
+
+            # Broadcast progress after each batch
+            _broadcast_batch_progress_safe(
+                task_id=task_id,
+                current=completed_count,
+                total=len(resume_ids),
+                message=f"Completed {completed_count}/{len(resume_ids)} resumes...",
+                completed_resumes=batch_completed,
+                failed_resumes=batch_failed if batch_failed else None,
             )
 
         # Step 3: Complete and return results
@@ -308,6 +510,14 @@ def parallel_batch_analyze_resumes(
             "message": "Parallel batch analysis complete",
         }
         self.update_state(state="PROGRESS", meta=progress)
+
+        # Broadcast final completion
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=len(resume_ids),
+            total=len(resume_ids),
+            message=f"Batch analysis complete: {total_successful} successful, {total_failed} failed",
+        )
 
         processing_time_ms = round((time.time() - batch_start_time) * 1000, 2)
 
@@ -331,7 +541,13 @@ def parallel_batch_analyze_resumes(
         return result
 
     except SoftTimeLimitExceeded:
-        logger.error(f"Task {self.request.id} exceeded time limit")
+        logger.error(f"Task {task_id} exceeded time limit")
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=completed_count if 'completed_count' in locals() else 0,
+            total=len(resume_ids),
+            message="Batch analysis exceeded time limit",
+        )
         return {
             "total_resumes": len(resume_ids),
             "successful": total_successful,
@@ -348,6 +564,12 @@ def parallel_batch_analyze_resumes(
         logger.error(
             f"Error in parallel batch analysis: {e}",
             exc_info=True
+        )
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=completed_count if 'completed_count' in locals() else 0,
+            total=len(resume_ids),
+            message=f"Batch analysis error: {str(e)}",
         )
         return {
             "total_resumes": len(resume_ids),
@@ -375,6 +597,7 @@ def batch_analyze_with_screening(
     check_grammar: bool = True,
     extract_experience: bool = True,
     batch_size: Optional[int] = None,
+    ws_manager: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Analyze resumes in parallel and optionally screen against vacancies.
@@ -382,6 +605,8 @@ def batch_analyze_with_screening(
     This is a convenience task that combines parallel batch analysis with
     automatic candidate screening. It first analyzes all resumes in parallel,
     then triggers screening for each successfully analyzed resume.
+
+    Real-time progress updates are sent via WebSocket to connected clients.
 
     Task Workflow:
     1. Analyze all resumes in parallel using parallel_batch_analyze_resumes
@@ -397,6 +622,7 @@ def batch_analyze_with_screening(
         check_grammar: Whether to perform grammar checking (default: True)
         extract_experience: Whether to calculate experience (default: True)
         batch_size: Maximum number of resumes to process in parallel.
+        ws_manager: Optional WebSocket manager for progress updates (reserved for future use)
 
     Returns:
         Dictionary containing combined results:
@@ -417,6 +643,7 @@ def batch_analyze_with_screening(
         2
     """
     start_time = time.time()
+    task_id = self.request.id
 
     try:
         logger.info(
@@ -434,6 +661,14 @@ def batch_analyze_with_screening(
         }
         self.update_state(state="PROGRESS", meta=progress)
 
+        # Broadcast analysis start
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=0,
+            total=len(resume_ids),
+            message=f"Starting analysis of {len(resume_ids)} resumes...",
+        )
+
         # Import task to avoid circular dependency
         from tasks.screening_tasks import auto_screen_candidate
 
@@ -444,6 +679,7 @@ def batch_analyze_with_screening(
             extract_experience=extract_experience,
             detect_errors=True,
             batch_size=batch_size,
+            ws_manager=ws_manager,
         )
 
         # Step 2: Screen successful resumes
@@ -455,6 +691,15 @@ def batch_analyze_with_screening(
             "message": "Screening analyzed resumes...",
         }
         self.update_state(state="PROGRESS", meta=progress)
+
+        # Broadcast screening start
+        successful_count = analysis_result.get("successful", 0)
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=len(resume_ids),
+            total=len(resume_ids),
+            message=f"Analysis complete. Screening {successful_count} resumes...",
+        )
 
         screening_results = []
         successfully_analyzed = []
@@ -500,6 +745,14 @@ def batch_analyze_with_screening(
         }
         self.update_state(state="PROGRESS", meta=progress)
 
+        # Broadcast completion
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=len(resume_ids),
+            total=len(resume_ids),
+            message=f"Complete: {len(successfully_analyzed)} screenings triggered",
+        )
+
         processing_time_ms = round((time.time() - start_time) * 1000, 2)
 
         result = {
@@ -521,6 +774,12 @@ def batch_analyze_with_screening(
 
     except Exception as e:
         logger.error(f"Error in batch analyze with screening: {e}", exc_info=True)
+        _broadcast_batch_progress_safe(
+            task_id=task_id,
+            current=0,
+            total=len(resume_ids),
+            message=f"Error: {str(e)}",
+        )
         return {
             "total_resumes": len(resume_ids),
             "analysis_results": analysis_result if 'analysis_result' in locals() else {},
