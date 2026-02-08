@@ -12,6 +12,7 @@ import {
   FormControl,
   Select,
   MenuItem,
+  InputLabel,
   CircularProgress,
   Collapse,
   Grid,
@@ -22,13 +23,22 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
 import type { SelectChangeEvent } from '@/components/ui/Select';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
+import { candidateTagsClient } from '@/api/candidateTags';
 import type { WorkflowStageResponse } from '@/types/api';
+import {
+  CheckCircle as CheckCircleIcon,
+  Download as DownloadIcon,
+  Label as LabelIcon,
+  ArrowForward as ArrowForwardIcon,
+  Warning as WarningIcon,
+  RadioButtonUnchecked as RadioButtonUncheckedIcon,
+} from '@mui/icons-material';
 
 /**
  * Individual candidate interface for bulk actions
@@ -144,9 +154,18 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
 
   const [isTagging, setIsTagging] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [tagName, setTagName] = useState('');
-  const [tagColor, setTagColor] = useState('#1976d2');
+  const [selectedTagId, setSelectedTagId] = useState('');
   const [tagResults, setTagResults] = useState<BulkActionResult[] | null>(null);
+
+  // Fetch available tags
+  const { data: tagsData, isLoading: tagsLoading } = useQuery({
+    queryKey: ['candidate-tags'],
+    queryFn: async () => {
+      return await candidateTagsClient.listTags();
+    },
+  });
+
+  const availableTags = tagsData?.tags || [];
 
   /**
    * Handle selection change
@@ -333,7 +352,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
    * Execute bulk tag operation
    */
   const handleBulkTag = useCallback(async () => {
-    if (selectedIds.length === 0 || !tagName.trim() || isTagging) {
+    if (selectedIds.length === 0 || !selectedTagId || isTagging) {
       return;
     }
 
@@ -345,8 +364,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
       const response = await apiClient.post<BulkActionResponse>('/api/candidates/bulk-action', {
         action: 'tag',
         resume_ids: selectedIds,
-        tag_name: tagName.trim(),
-        tag_color: tagColor,
+        tag_id: selectedTagId,
       });
 
       const data = response.data;
@@ -369,15 +387,14 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
 
       // Clear dialog
       setTagDialogOpen(false);
-      setTagName('');
-      setTagColor('#1976d2');
+      setSelectedTagId('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('bulkActions.tagError');
       setError(errorMessage);
     } finally {
       setIsTagging(false);
     }
-  }, [selectedIds, tagName, tagColor, isTagging, handleSelectionChange, t]);
+  }, [selectedIds, selectedTagId, isTagging, handleSelectionChange, t]);
 
   const hasSelection = selectedIds.length > 0;
   const canMove = hasSelection && selectedStageId && !isMoving && !isExporting && !isTagging;
@@ -749,42 +766,39 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
             {t('bulkActions.tagDialog.description', { count: selectedIds.length })}
           </Typography>
 
-          <Stack spacing={2}>
-            <TextField
-              autoFocus
-              label={t('bulkActions.tagDialog.tagName')}
-              value={tagName}
-              onChange={(e) => setTagName(e.target.value)}
-              fullWidth
-              size="small"
-              disabled={isTagging}
-              placeholder={t('bulkActions.tagDialog.tagNamePlaceholder')}
-            />
-
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                {t('bulkActions.tagDialog.tagColor')}
+          {availableTags.length === 0 ? (
+            <Alert severity="info">
+              <Typography variant="body2">
+                No tags available. Please create tags first in the Tags Management page.
               </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <input
-                  type="color"
-                  value={tagColor}
-                  onChange={(e) => setTagColor(e.target.value)}
-                  disabled={isTagging}
-                  style={{
-                    width: 50,
-                    height: 36,
-                    border: '1px solid #ccc',
-                    borderRadius: 4,
-                    cursor: isTagging ? 'not-allowed' : 'pointer',
-                  }}
-                />
-                <Typography variant="body2" color="text.secondary">
-                  {tagColor}
-                </Typography>
-              </Stack>
-            </Box>
-          </Stack>
+            </Alert>
+          ) : (
+            <FormControl fullWidth size="small" disabled={isTagging || tagsLoading}>
+              <InputLabel id="bulk-tag-select-label">Select Tag</InputLabel>
+              <Select
+                labelId="bulk-tag-select-label"
+                value={selectedTagId}
+                onChange={(e) => setSelectedTagId(e.target.value as string)}
+                label="Select Tag"
+              >
+                {availableTags.map((tag) => (
+                  <MenuItem key={tag.id} value={tag.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          bgcolor: tag.color || '#1976d2',
+                        }}
+                      />
+                      {tag.name}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTagDialogOpen(false)} disabled={isTagging}>
@@ -793,7 +807,7 @@ const BulkCandidateActions: React.FC<BulkCandidateActionsProps> = ({
           <Button
             onClick={handleBulkTag}
             variant="contained"
-            disabled={!tagName.trim() || isTagging}
+            disabled={!selectedTagId || isTagging || availableTags.length === 0}
             startIcon={isTagging ? <CircularProgress size={16} /> : <LabelIcon />}
           >
             {isTagging ? t('bulkActions.tagDialog.tagging') : t('bulkActions.tagDialog.tag')}

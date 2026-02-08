@@ -185,8 +185,7 @@ class BulkActionRequest(BaseModel):
     action: str = Field(..., description="Action type: 'export', 'tag', or 'add_to_pipeline'")
     resume_ids: List[str] = Field(..., description="List of resume IDs to perform action on", min_length=1)
     # For 'tag' action
-    tag_name: Optional[str] = Field(None, description="Tag name (required for 'tag' action)")
-    tag_color: Optional[str] = Field(None, description="Tag color hex code (optional for 'tag' action)")
+    tag_id: Optional[str] = Field(None, description="Tag ID (required for 'tag' action)")
     # For 'add_to_pipeline' action
     stage_id: Optional[str] = Field(None, description="Target stage ID (required for 'add_to_pipeline' action)")
     vacancy_id: Optional[str] = Field(None, description="Optional vacancy ID for 'add_to_pipeline' action")
@@ -224,6 +223,7 @@ async def list_candidates(
     request: Request,
     stage_id: Optional[str] = None,
     vacancy_id: Optional[str] = None,
+    tag_id: Optional[str] = None,
     search: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
@@ -233,12 +233,13 @@ async def list_candidates(
     List all candidates (resumes) with their current workflow stages.
 
     Returns a paginated list of candidates with their current hiring stage.
-    Can be filtered by stage, vacancy, and search term for kanban board views.
+    Can be filtered by stage, vacancy, tag, and search term for kanban board views.
 
     Args:
         request: FastAPI request object
         stage_id: Optional filter by workflow stage ID or name
         vacancy_id: Optional filter by vacancy ID
+        tag_id: Optional filter by tag ID to show only candidates with this tag
         search: Optional search term to filter candidates by filename (case-insensitive)
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
@@ -256,6 +257,8 @@ async def list_candidates(
         >>> response = requests.get("/api/candidates/")
         >>> # Filter by stage
         >>> response = requests.get("/api/candidates/?stage_id=interview")
+        >>> # Filter by tag
+        >>> response = requests.get("/api/candidates/?tag_id=abc-123-def")
         >>> # Search by name
         >>> response = requests.get("/api/candidates/?search=john")
         >>> # Combine filters
@@ -265,8 +268,60 @@ async def list_candidates(
     try:
         logger.info(
             f"Fetching candidates - stage_id: {stage_id}, vacancy_id: {vacancy_id}, "
-            f"search: {search}, skip: {skip}, limit: {limit}"
+            f"tag_id: {tag_id}, search: {search}, skip: {skip}, limit: {limit}"
         )
+
+        # Validate tag_id and fetch resume IDs with this tag if provided
+        tag_resume_ids = None
+        if tag_id:
+            try:
+                tag_uuid = UUID(tag_id)
+            except ValueError:
+                logger.warning(f"Invalid tag_id format: {tag_id}")
+                # Return empty result for invalid tag_id
+                return JSONResponse(
+                    status_code=status.HTTP_200_OK,
+                    content=[],
+                )
+
+            # Get resume_ids that currently have this tag
+            # A resume has a tag if the latest TAG_ADDED/TAG_REMOVED activity for that tag is TAG_ADDED
+            tag_resumes_subq = (
+                select(
+                    CandidateActivity.candidate_id,
+                    func.max(CandidateActivity.created_at).label("max_created_at")
+                )
+                .where(
+                    CandidateActivity.tag_id == tag_uuid,
+                    CandidateActivity.activity_type.in_([
+                        CandidateActivityType.TAG_ADDED,
+                        CandidateActivityType.TAG_REMOVED
+                    ])
+                )
+                .group_by(CandidateActivity.candidate_id)
+                .subquery()
+            )
+
+            # Get resumes where latest activity for this tag is TAG_ADDED
+            tag_resumes_result = await db.execute(
+                select(CandidateActivity.candidate_id)
+                .join(
+                    tag_resumes_subq,
+                    and_(
+                        CandidateActivity.candidate_id == tag_resumes_subq.c.candidate_id,
+                        CandidateActivity.created_at == tag_resumes_subq.c.max_created_at,
+                        CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED
+                    )
+                )
+            )
+            tag_resume_ids = [row[0] for row in tag_resumes_result.all()]
+
+            # If no resumes have this tag, return empty result early
+            if not tag_resume_ids:
+                return JSONResponse(
+                    status_code=status.HTTP_200_OK,
+                    content=[],
+                )
 
         # Build base query joining resumes with their latest hiring stage
         # Subquery to get the latest hiring stage for each resume
@@ -320,6 +375,10 @@ async def list_candidates(
         if search:
             # Case-insensitive search on filename
             query = query.where(Resume.filename.ilike(f"%{search}%"))
+
+        if tag_resume_ids is not None:
+            # Filter by resumes that have the specified tag
+            query = query.where(Resume.id.in_(tag_resume_ids))
 
         # Order by most recently updated
         query = query.order_by(HiringStage.updated_at.desc()).offset(skip).limit(limit)
@@ -1500,7 +1559,7 @@ async def bulk_action(
         >>> data = {
         ...     "action": "tag",
         ...     "resume_ids": ["id1", "id2"],
-        ...     "tag_name": "High Priority"
+        ...     "tag_id": "tag-uuid-123"
         ... }
         >>> response = requests.post(
         ...     "/api/candidates/bulk-action",
@@ -1548,10 +1607,30 @@ async def bulk_action(
         # Handle different action types
         if bulk_data.action == "tag":
             # Validate required parameters for tag action
-            if not bulk_data.tag_name:
+            if not bulk_data.tag_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="tag_name is required for 'tag' action",
+                    detail="tag_id is required for 'tag' action",
+                )
+
+            # Parse and validate tag_id
+            try:
+                tag_uuid = UUID(bulk_data.tag_id)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid tag_id format: {bulk_data.tag_id}",
+                )
+
+            # Fetch the tag to verify it exists
+            tag_query = select(CandidateTag).where(CandidateTag.id == tag_uuid)
+            tag_result = await db.execute(tag_query)
+            tag = tag_result.scalar_one_or_none()
+
+            if not tag:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Tag not found: {bulk_data.tag_id}",
                 )
 
             # Process tagging for each resume
@@ -1585,34 +1664,13 @@ async def bulk_action(
                         failed_count += 1
                         continue
 
-                    # Find or create tag
-                    tag_query = select(CandidateTag).where(
-                        and_(
-                            CandidateTag.organization_id == resume.organization_id,
-                            CandidateTag.tag_name == bulk_data.tag_name
-                        )
-                    )
-                    tag_result = await db.execute(tag_query)
-                    tag = tag_result.scalar_one_or_none()
-
-                    if not tag:
-                        # Create new tag
-                        tag = CandidateTag(
-                            organization_id=resume.organization_id,
-                            tag_name=bulk_data.tag_name,
-                            color=bulk_data.tag_color,
-                        )
-                        db.add(tag)
-                        await db.commit()
-                        await db.refresh(tag)
-
                     # Create activity record for tag addition
                     activity = CandidateActivity(
                         candidate_id=candidate_uuid,
                         activity_type=CandidateActivityType.TAG_ADDED,
                         tag_id=tag.id,
                         metadata={
-                            "tag_name": bulk_data.tag_name,
+                            "tag_name": tag.tag_name,
                             "bulk_operation": True,
                         },
                     )
@@ -1622,8 +1680,8 @@ async def bulk_action(
                     results.append({
                         "resume_id": resume_id,
                         "success": True,
-                        "message": f"Tag '{bulk_data.tag_name}' added to candidate",
-                        "data": {"tag_id": str(tag.id), "tag_name": bulk_data.tag_name},
+                        "message": f"Tag '{tag.tag_name}' added to candidate",
+                        "data": {"tag_id": str(tag.id), "tag_name": tag.tag_name},
                     })
                     successful_count += 1
 

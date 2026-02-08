@@ -55,6 +55,7 @@ class FilterRequest(BaseModel):
     date_to: Optional[str] = Field(None, description="End date filter (ISO 8601 format)")
     vacancy_id: Optional[str] = Field(None, description="Filter by vacancy ID")
     stage_id: Optional[str] = Field(None, description="Filter by workflow stage ID or name")
+    tag_ids: Optional[List[str]] = Field(None, description="List of tag IDs to filter candidates")
 
 
 # Response Models
@@ -200,6 +201,7 @@ async def search_candidates(
                 date_to=search_data.filters.get("date_to"),
                 vacancy_id=search_data.filters.get("vacancy_id"),
                 stage_id=search_data.filters.get("stage_id"),
+                tag_ids=search_data.filters.get("tag_ids"),
             )
 
         # Execute search
@@ -264,6 +266,7 @@ async def search_candidates_get(
     date_to: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
     vacancy_id: Optional[str] = Query(None, description="Filter by vacancy ID"),
     stage_id: Optional[str] = Query(None, description="Filter by workflow stage"),
+    tag_ids: Optional[str] = Query(None, description="Comma-separated list of tag IDs"),
     skip: int = Query(0, ge=0, description="Number of results to skip"),
     limit: int = Query(100, ge=1, le=200, description="Maximum number of results"),
     sort_by: str = Query("relevance", description="Sort field: relevance, date, or experience"),
@@ -290,6 +293,7 @@ async def search_candidates_get(
         date_to: End date filter (ISO 8601 format)
         vacancy_id: Filter by vacancy ID
         stage_id: Filter by workflow stage
+        tag_ids: Comma-separated list of tag IDs
         skip: Number of results to skip (pagination)
         limit: Maximum number of results to return
         sort_by: Sort field (relevance, date, experience)
@@ -324,6 +328,14 @@ async def search_candidates_get(
         ...     params={
         ...         "skills": "Python, FastAPI, PostgreSQL",
         ...         "min_experience_years": 3
+        ...     }
+        ... )
+        >>> # Filter by tags
+        >>> response = requests.get(
+        ...     "/api/search/candidates",
+        ...     params={
+        ...         "tag_ids": "tag-uuid-1,tag-uuid-2",
+        ...         "limit": 20
         ...     }
         ... )
     """
@@ -363,6 +375,8 @@ async def search_candidates_get(
             filters_dict["vacancy_id"] = vacancy_id
         if stage_id:
             filters_dict["stage_id"] = stage_id
+        if tag_ids:
+            filters_dict["tag_ids"] = [t.strip() for t in tag_ids.split(",")]
 
         filters = SearchFilters(**filters_dict) if filters_dict else None
 

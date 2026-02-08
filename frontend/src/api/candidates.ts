@@ -135,6 +135,7 @@ export class CandidatesClient {
    * @param limit - Максимальное количество записей для возврата
    * @param stageId - Опциональный фильтр по ID этапа workflow
    * @param vacancyId - Опциональный фильтр по ID вакансии
+   * @param tagId - Опциональный фильтр по ID тега (показать кандидатов с этим тегом)
    * @returns Список кандидатов
    * @throws ApiError если получение списка не удалось
    *
@@ -149,6 +150,9 @@ export class CandidatesClient {
    * // Фильтрация по вакансии
    * const vacancyCandidates = await candidatesClient.listCandidates(0, 50, undefined, 'vacancy-123');
    *
+   * // Фильтрация по тегу
+   * const taggedCandidates = await candidatesClient.listCandidates(0, 50, undefined, undefined, 'tag-uuid');
+   *
    * // Пагинация
    * const page2 = await candidatesClient.listCandidates(50, 50);
    * ```
@@ -157,12 +161,14 @@ export class CandidatesClient {
     skip: number = 0,
     limit: number = 100,
     stageId?: string,
-    vacancyId?: string
+    vacancyId?: string,
+    tagId?: string
   ): Promise<CandidateListItem[]> {
     try {
       const params: Record<string, number | string> = { skip, limit };
       if (stageId) params.stage_id = stageId;
       if (vacancyId) params.vacancy_id = vacancyId;
+      if (tagId) params.tag_id = tagId;
 
       const response: AxiosResponse<CandidateListItem[]> = await this.client.get(
         '/api/candidates',

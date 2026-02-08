@@ -25,6 +25,8 @@ import {
   Switch,
   Menu,
   MenuItem,
+  Divider,
+  Select,
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -66,8 +68,10 @@ export function CandidateTagsManager({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
+  const [targetTagId, setTargetTagId] = useState('');
   const [tagName, setTagName] = useState('');
   const [tagColor, setTagColor] = useState(TAG_COLORS[0].value);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -81,6 +85,12 @@ export function CandidateTagsManager({
   });
 
   const allTags = tagsData?.tags || [];
+
+  // Compute popular tags (tags with candidate_count, sorted by usage)
+  const popularTags = allTags
+    .filter((tag) => tag.candidate_count !== undefined && tag.candidate_count > 0)
+    .sort((a, b) => (b.candidate_count || 0) - (a.candidate_count || 0))
+    .slice(0, 5);
 
   // Create tag mutation
   const createMutation = useMutation({
@@ -144,6 +154,19 @@ export function CandidateTagsManager({
     },
   });
 
+  // Merge tags mutation
+  const mergeMutation = useMutation({
+    mutationFn: async ({ sourceTagId, targetTagId }: { sourceTagId: string; targetTagId: string }) => {
+      return await candidateTagsClient.mergeTags(sourceTagId, targetTagId);
+    },
+    onSuccess: () => {
+      setMergeDialogOpen(false);
+      setSelectedTag(null);
+      setTargetTagId('');
+      queryClient.invalidateQueries({ queryKey: ['candidate-tags'] });
+    },
+  });
+
   const handleOpenCreateDialog = () => {
     setEditMode(false);
     setSelectedTag(null);
@@ -191,12 +214,50 @@ export function CandidateTagsManager({
     }
   };
 
+  const handleMergeClick = () => {
+    setMergeDialogOpen(true);
+    setTargetTagId('');
+    handleMenuClose();
+  };
+
+  const handleMergeConfirm = () => {
+    if (selectedTag && targetTagId && selectedTag.id !== targetTagId) {
+      mergeMutation.mutate({ sourceTagId: selectedTag.id, targetTagId });
+    }
+  };
+
+  const handleMergeDialogClose = () => {
+    setMergeDialogOpen(false);
+    setTargetTagId('');
+  };
+
+  const getAvailableTargetTags = () => {
+    if (!selectedTag) return [];
+    return allTags.filter((tag) => tag.id !== selectedTag.id);
+  };
+
   const handleToggleTag = (tag: Tag) => {
     const isAssigned = assignedTags.some((t) => t.id === tag.id);
     if (isAssigned) {
       removeMutation.mutate(tag.id);
     } else {
       assignMutation.mutate(tag.id);
+    }
+  };
+
+  const handleSuggestionClick = (tag: Tag) => {
+    // Check if already assigned
+    const isAssigned = assignedTags.some((t) => t.id === tag.id);
+    if (isAssigned) {
+      // Already assigned, just close dialog
+      setDialogOpen(false);
+    } else {
+      // Assign the tag and close dialog
+      assignMutation.mutate(tag.id, {
+        onSuccess: () => {
+          setDialogOpen(false);
+        },
+      });
     }
   };
 
@@ -342,6 +403,59 @@ export function CandidateTagsManager({
             ))}
           </Grid>
 
+          {/* Popular Tags Suggestions */}
+          {!editMode && popularTags.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                Popular Tags
+                <Typography component="span" variant="caption" color="secondary" sx={{ ml: 1 }}>
+                  (Quick add)
+                </Typography>
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {popularTags.map((tag) => {
+                  const isAssigned = assignedTags.some((t) => t.id === tag.id);
+                  return (
+                    <Chip
+                      key={tag.id}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <span>{tag.name}</span>
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{
+                              opacity: 0.8,
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            ({tag.candidate_count})
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{
+                        bgcolor: tag.color,
+                        color: 'white',
+                        fontWeight: 500,
+                        opacity: isAssigned ? 0.6 : 1,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                          boxShadow: 2,
+                        },
+                        transition: 'transform 0.2s',
+                      }}
+                      onClick={() => handleSuggestionClick(tag)}
+                      size="small"
+                      disabled={assignMutation.isPending}
+                    />
+                  );
+                })}
+              </Box>
+            </>
+          )}
+
           {/* Preview */}
           <Box sx={{ mt: 3 }}>
             <Typography variant="caption" color="secondary">
@@ -377,6 +491,10 @@ export function CandidateTagsManager({
           <Icon name="edit" size={16} style={{ marginRight: '4px' }} />
           Edit
         </MenuItem>
+        <MenuItem onClick={handleMergeClick}>
+          <Icon name="merge" size={16} style={{ marginRight: '4px' }} />
+          Merge
+        </MenuItem>
         <MenuItem onClick={handleDeleteClick} sx={{ color: 'error' }}>
           <Icon name="trash-2" size={16} style={{ marginRight: '4px' }} />
           Delete
@@ -408,6 +526,64 @@ export function CandidateTagsManager({
             disabled={deleteMutation.isPending}
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Merge Dialog */}
+      <Dialog open={mergeDialogOpen} onClose={handleMergeDialogClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Merge Tags</DialogTitle>
+        <DialogContent>
+          {selectedTag && selectedTag.candidate_count && selectedTag.candidate_count > 0 ? (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Merging "{selectedTag.name}" will transfer all {selectedTag.candidate_count} {selectedTag.candidate_count === 1 ? 'candidate' : 'candidates'} to the target tag. The source tag will be deleted.
+            </Alert>
+          ) : null}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Source Tag (will be deleted)
+            </Typography>
+            {selectedTag && (
+              <Chip
+                label={selectedTag.name}
+                sx={{
+                  bgcolor: selectedTag.color,
+                  color: 'white',
+                  fontWeight: 500,
+                }}
+                size="small"
+              />
+            )}
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Target Tag (will be kept)
+            </Typography>
+            <Select
+              label="Select target tag"
+              value={targetTagId}
+              onChange={(e) => setTargetTagId(e.target.value)}
+              options={getAvailableTargetTags().map((tag) => ({
+                value: tag.id,
+                label: tag.name,
+              }))}
+              fullWidth
+              displayEmpty
+              placeholder="Select a tag to merge into"
+            />
+          </Box>
+          <Typography variant="body2" color="secondary">
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleMergeDialogClose}>Cancel</Button>
+          <Button
+            onClick={handleMergeConfirm}
+            variant="contained"
+            disabled={!targetTagId || mergeMutation.isPending || selectedTag?.id === targetTagId}
+          >
+            Merge Tags
           </Button>
         </DialogActions>
       </Dialog>

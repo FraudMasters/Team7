@@ -1622,6 +1622,43 @@ export interface CandidateTagsResponse {
   total_count: number;
 }
 
+/**
+ * Tag suggestion item
+ */
+export interface TagSuggestionItem {
+  id: string;
+  tag_name: string;
+  color: string | null;
+  usage_count: number;
+}
+
+/**
+ * Tag suggestions response
+ */
+export interface TagSuggestionsResponse {
+  organization_id: string;
+  suggestions: TagSuggestionItem[];
+  total_count: number;
+}
+
+/**
+ * Merge tags request
+ */
+export interface MergeTagsRequest {
+  source_tag_id: string;
+  target_tag_id: string;
+}
+
+/**
+ * Merge tags response
+ */
+export interface MergeTagsResponse {
+  message: string;
+  source_tag_id: string;
+  target_tag_id: string;
+  candidates_transferred: number;
+}
+
 // ==================== Candidates Types ====================
 
 /**

@@ -29,6 +29,12 @@
  *   recruiter_id: 'recruiter-id'
  * });
  *
+ * // Get tag suggestions based on usage
+ * const suggestions = await candidateTagsClient.getSuggestions('org-123', 5);
+ *
+ * // Merge two tags
+ * const result = await candidateTagsClient.mergeTags('old-tag-id', 'new-tag-id');
+ *
  * // Update a tag
  * const updated = await candidateTagsClient.updateTag('tag-id', {
  *   tag_name: 'Updated Tag Name',
@@ -46,6 +52,9 @@ import type {
   CandidateTagListResponse,
   CandidateTagsResponse,
   AssignTagRequest,
+  TagSuggestionsResponse,
+  MergeTagsRequest,
+  MergeTagsResponse,
   ApiError,
 } from '@/types/api';
 
@@ -365,6 +374,81 @@ export class CandidateTagsClient {
       const response = await this.client.delete(
         `/api/candidate-tags/resume/${resumeId}/tags/${tagId}`,
         { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get tag suggestions based on usage popularity
+   *
+   * @param organizationId - Organization ID
+   * @param limit - Optional limit on number of suggestions (default: 10, max: 100)
+   * @returns Tag suggestions ordered by usage count
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * // Get top 10 suggested tags
+   * const suggestions = await candidateTagsClient.getSuggestions('org-123');
+   *
+   * // Get top 5 suggested tags
+   * const top5 = await candidateTagsClient.getSuggestions('org-123', 5);
+   * ```
+   */
+  async getSuggestions(
+    organizationId: string,
+    limit: number = 10
+  ): Promise<TagSuggestionsResponse> {
+    try {
+      const params: Record<string, number | string> = {
+        organization_id: organizationId,
+      };
+      if (limit !== undefined) params.limit = limit;
+
+      const response = await this.client.get<TagSuggestionsResponse>(
+        '/api/candidate-tags/suggestions',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Merge two tags together
+   *
+   * Transfers all candidates from the source tag to the target tag,
+   * then deletes the source tag. If a candidate already has the target
+   * tag, only the source tag is removed.
+   *
+   * @param sourceTagId - ID of the tag to merge from (will be deleted)
+   * @param targetTagId - ID of the tag to merge into (will be kept)
+   * @returns Merge result with count of transferred candidates
+   * @throws ApiError if merge fails
+   *
+   * @example
+   * ```ts
+   * const result = await candidateTagsClient.mergeTags('old-tag-id', 'new-tag-id');
+   * console.log(`Transferred ${result.candidates_transferred} candidates`);
+   * ```
+   */
+  async mergeTags(
+    sourceTagId: string,
+    targetTagId: string
+  ): Promise<MergeTagsResponse> {
+    try {
+      const request: MergeTagsRequest = {
+        source_tag_id: sourceTagId,
+        target_tag_id: targetTagId,
+      };
+
+      const response = await this.client.post<MergeTagsResponse>(
+        '/api/candidate-tags/merge',
+        request
       );
       return response.data;
     } catch (error) {

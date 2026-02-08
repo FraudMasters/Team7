@@ -31,7 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Resume, ResumeAnalysis, HiringStage, HiringStageName
+from models import Resume, ResumeAnalysis, HiringStage, HiringStageName, CandidateActivity
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ class SearchFilters:
         date_to: End date filter (ISO date, optional)
         vacancy_id: Filter by vacancy ID (optional)
         stage_id: Filter by workflow stage (optional)
+        tag_ids: List of tag IDs to filter candidates (optional)
         use_semantic_search: Enable semantic similarity search (optional)
     """
 
@@ -77,6 +78,7 @@ class SearchFilters:
     date_to: Optional[str] = None
     vacancy_id: Optional[str] = None
     stage_id: Optional[str] = None
+    tag_ids: Optional[List[str]] = None
     use_semantic_search: Optional[bool] = None
 
 
@@ -442,6 +444,18 @@ class SearchService:
                 except ValueError:
                     logger.warning(f"Invalid stage_id: {filters.stage_id}")
 
+        # Tag IDs filter - via candidate_activities
+        if filters.tag_ids:
+            try:
+                tag_uuids = [UUID(tag_id) for tag_id in filters.tag_ids]
+                # Get resume IDs that have ANY of the specified tags (OR logic)
+                tag_resume_ids = select(CandidateActivity.candidate_id).where(
+                    CandidateActivity.tag_id.in_(tag_uuids)
+                )
+                stmt = stmt.where(Resume.id.in_(tag_resume_ids))
+            except ValueError:
+                logger.warning(f"Invalid tag_ids format: {filters.tag_ids}")
+
         return stmt
 
     def _apply_sorting(
@@ -685,6 +699,7 @@ class SearchService:
             "date_to": filters.date_to,
             "vacancy_id": filters.vacancy_id,
             "stage_id": filters.stage_id,
+            "tag_ids": filters.tag_ids,
             "use_semantic_search": filters.use_semantic_search,
         }
 

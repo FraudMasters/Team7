@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
-from sqlalchemy import select, delete, and_, or_
+from sqlalchemy import select, delete, and_, or_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -85,6 +85,44 @@ class CandidateTagsResponse(BaseModel):
     resume_id: str = Field(..., description="Resume ID")
     tags: List[CandidateTagResponse] = Field(..., description="List of tags assigned to this candidate")
     total_count: int = Field(..., description="Total number of tags assigned")
+
+
+class TagSuggestion(BaseModel):
+    """Response model for a single tag suggestion."""
+
+    id: str = Field(..., description="Unique identifier for the tag")
+    organization_id: str = Field(..., description="Organization ID that owns this tag")
+    tag_name: str = Field(..., description="Name of the tag")
+    tag_order: int = Field(..., description="Order of this tag in the UI")
+    is_default: bool = Field(..., description="Whether this is a default tag")
+    is_active: bool = Field(..., description="Whether this tag is currently active")
+    color: Optional[str] = Field(None, description="Hex color code for UI display")
+    description: Optional[str] = Field(None, description="Description of when to use this tag")
+    usage_count: int = Field(..., description="Number of times this tag has been used")
+
+
+class TagSuggestionsResponse(BaseModel):
+    """Response model for tag suggestions."""
+
+    organization_id: str = Field(..., description="Organization ID")
+    suggestions: List[TagSuggestion] = Field(..., description="List of tag suggestions")
+    total_count: int = Field(..., description="Total number of suggestions")
+
+
+class MergeTagsRequest(BaseModel):
+    """Request model for merging two tags."""
+
+    source_tag_id: str = Field(..., description="ID of the tag to merge from (will be deleted)")
+    target_tag_id: str = Field(..., description="ID of the tag to merge into (will be kept)")
+
+
+class MergeTagsResponse(BaseModel):
+    """Response model for tag merge operation."""
+
+    message: str = Field(..., description="Success message")
+    source_tag_id: str = Field(..., description="ID of the source tag that was deleted")
+    target_tag_id: str = Field(..., description="ID of the target tag")
+    candidates_transferred: int = Field(..., description="Number of candidates transferred from source to target tag")
 
 
 @router.post(
@@ -283,6 +321,154 @@ async def list_candidate_tags(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list candidate tags: {str(e)}",
+        ) from e
+
+
+@router.get("/suggestions", tags=["Candidate Tags"])
+async def get_tag_suggestions(
+    organization_id: str = Query(..., description="Organization ID to get suggestions for"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of suggestions to return"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get tag suggestions based on usage for an organization.
+
+    This endpoint returns the most frequently used tags for an organization,
+    sorted by usage count (number of times tags have been added to candidates).
+    Useful for displaying popular tags in autocomplete and suggestion UIs.
+
+    Args:
+        organization_id: Organization ID to get suggestions for
+        limit: Maximum number of suggestions to return (default: 10, max: 100)
+        db: Database session
+
+    Returns:
+        JSON response with list of tag suggestions
+
+    Raises:
+        HTTPException(500): If an internal error occurs
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/candidate-tags/suggestions?organization_id=org-123&limit=5")
+        >>> response.json()
+        {
+            "organization_id": "org-123",
+            "suggestions": [
+                {
+                    "id": "tag-1",
+                    "organization_id": "org-123",
+                    "tag_name": "High Priority",
+                    "usage_count": 25,
+                    ...
+                }
+            ],
+            "total_count": 5
+        }
+    """
+    try:
+        logger.info(f"Getting tag suggestions for organization: {organization_id}, limit: {limit}")
+
+        # Query for tags with their usage counts
+        # We need to find TAG_ADDED activities that haven't been removed
+        # This is complex because we need to account for TAG_REMOVED activities
+
+        # First, get all tags for the organization that are active
+        tags_result = await db.execute(
+            select(CandidateTag).where(
+                CandidateTag.organization_id == organization_id,
+                CandidateTag.is_active == True,
+            ).order_by(CandidateTag.tag_order, CandidateTag.tag_name)
+        )
+        tags = tags_result.scalars().all()
+
+        if not tags:
+            # No tags found for this organization
+            response_data = {
+                "organization_id": organization_id,
+                "suggestions": [],
+                "total_count": 0,
+            }
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=response_data,
+            )
+
+        # For each tag, calculate its current usage (number of resumes currently tagged)
+        tag_usage = {}
+        for tag in tags:
+            # Find the latest TAG_ADDED activity for each candidate
+            # A tag is currently assigned if the latest activity for a tag on a candidate is TAG_ADDED
+            tag_added_subquery = (
+                select(
+                    CandidateActivity.candidate_id,
+                    func.max(CandidateActivity.created_at).label('latest_added')
+                )
+                .where(
+                    CandidateActivity.tag_id == tag.id,
+                    CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED,
+                )
+                .group_by(CandidateActivity.candidate_id)
+                .subquery()
+            )
+
+            # Count candidates where the latest activity for this tag is TAG_ADDED (not TAG_REMOVED)
+            usage_result = await db.execute(
+                select(func.count(func.distinct(tag_added_subquery.c.candidate_id)))
+                .select_from(tag_added_subquery)
+                .where(
+                    ~select(CandidateActivity)
+                    .where(
+                        CandidateActivity.candidate_id == tag_added_subquery.c.candidate_id,
+                        CandidateActivity.tag_id == tag.id,
+                        CandidateActivity.activity_type == CandidateActivityType.TAG_REMOVED,
+                        CandidateActivity.created_at > tag_added_subquery.c.latest_added,
+                    )
+                    .exists()
+                )
+            )
+            usage_count = usage_result.scalar() or 0
+            tag_usage[str(tag.id)] = usage_count
+
+        # Build suggestions list, sorted by usage count (descending), then by tag_order
+        suggestions_data = []
+        for tag in tags:
+            suggestions_data.append({
+                "id": str(tag.id),
+                "organization_id": tag.organization_id,
+                "tag_name": tag.tag_name,
+                "tag_order": tag.tag_order,
+                "is_default": tag.is_default,
+                "is_active": tag.is_active,
+                "color": tag.color,
+                "description": tag.description,
+                "usage_count": tag_usage.get(str(tag.id), 0),
+            })
+
+        # Sort by usage count (descending), then by tag_order
+        suggestions_data.sort(key=lambda x: (-x["usage_count"], x["tag_order"]))
+
+        # Apply limit
+        suggestions_data = suggestions_data[:limit]
+
+        response_data = {
+            "organization_id": organization_id,
+            "suggestions": suggestions_data,
+            "total_count": len(suggestions_data),
+        }
+
+        logger.info(f"Retrieved {len(suggestions_data)} tag suggestions for organization: {organization_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting tag suggestions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get tag suggestions: {str(e)}",
         ) from e
 
 
@@ -893,4 +1079,191 @@ async def remove_tag_from_resume(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove tag from resume: {str(e)}",
+        ) from e
+
+
+@router.post("/merge", tags=["Candidate Tags"])
+async def merge_tags(
+    request: MergeTagsRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Merge two tags together.
+
+    This endpoint merges a source tag into a target tag. All candidates currently
+    assigned the source tag will be assigned the target tag (if not already assigned),
+    and then the source tag will be deleted.
+
+    Args:
+        request: Request body containing source_tag_id and target_tag_id
+        db: Database session
+
+    Returns:
+        JSON response confirming the merge and the number of candidates transferred
+
+    Raises:
+        HTTPException(400): If source and target tags are the same
+        HTTPException(404): If either tag is not found
+        HTTPException(500): If an internal error occurs
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/candidate-tags/merge",
+        ...     json={
+        ...         "source_tag_id": "old-tag-uuid",
+        ...         "target_tag_id": "keep-tag-uuid"
+        ...     }
+        ... )
+        >>> response.status_code
+        200
+    """
+    try:
+        logger.info(f"Merging tags - source: {request.source_tag_id}, target: {request.target_tag_id}")
+
+        # Validate source and target are different
+        if request.source_tag_id == request.target_tag_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source and target tags cannot be the same",
+            )
+
+        # Get source tag
+        source_result = await db.execute(
+            select(CandidateTag).where(CandidateTag.id == UUID(request.source_tag_id))
+        )
+        source_tag = source_result.scalar_one_or_none()
+
+        if not source_tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source tag not found: {request.source_tag_id}",
+            )
+
+        # Get target tag
+        target_result = await db.execute(
+            select(CandidateTag).where(CandidateTag.id == UUID(request.target_tag_id))
+        )
+        target_tag = target_result.scalar_one_or_none()
+
+        if not target_tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Target tag not found: {request.target_tag_id}",
+            )
+
+        # Find all candidates currently assigned the source tag
+        # We need to find candidates where the latest activity for the source tag is TAG_ADDED
+        source_tag_added_subquery = (
+            select(
+                CandidateActivity.candidate_id,
+                func.max(CandidateActivity.created_at).label('latest_added')
+            )
+            .where(
+                CandidateActivity.tag_id == UUID(request.source_tag_id),
+                CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED,
+            )
+            .group_by(CandidateActivity.candidate_id)
+            .subquery()
+        )
+
+        # Get candidates where latest source tag activity is TAG_ADDED (not TAG_REMOVED)
+        candidates_with_source_tag_result = await db.execute(
+            select(source_tag_added_subquery.c.candidate_id)
+            .select_from(source_tag_added_subquery)
+            .where(
+                ~select(CandidateActivity)
+                .where(
+                    CandidateActivity.candidate_id == source_tag_added_subquery.c.candidate_id,
+                    CandidateActivity.tag_id == UUID(request.source_tag_id),
+                    CandidateActivity.activity_type == CandidateActivityType.TAG_REMOVED,
+                    CandidateActivity.created_at > source_tag_added_subquery.c.latest_added,
+                )
+                .exists()
+            )
+        )
+        candidates_with_source_tag = candidates_with_source_tag_result.scalars().all()
+
+        logger.info(f"Found {len(candidates_with_source_tag)} candidates with source tag")
+
+        # Transfer candidates to target tag
+        candidates_transferred = 0
+
+        for candidate_id in candidates_with_source_tag:
+            # Check if candidate already has target tag
+            target_tag_added_result = await db.execute(
+                select(CandidateActivity).where(
+                    CandidateActivity.candidate_id == candidate_id,
+                    CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED,
+                    CandidateActivity.tag_id == UUID(request.target_tag_id),
+                ).order_by(CandidateActivity.created_at.desc()).limit(1)
+            )
+            last_target_activity = target_tag_added_result.scalar_one_or_none()
+
+            target_already_assigned = False
+            if last_target_activity:
+                # Check if there's been a removal after this addition
+                target_removal_result = await db.execute(
+                    select(CandidateActivity).where(
+                        CandidateActivity.candidate_id == candidate_id,
+                        CandidateActivity.activity_type == CandidateActivityType.TAG_REMOVED,
+                        CandidateActivity.tag_id == UUID(request.target_tag_id),
+                        CandidateActivity.created_at > last_target_activity.created_at,
+                    ).limit(1)
+                )
+                target_removal = target_removal_result.scalar_one_or_none()
+                target_already_assigned = (target_removal is None)
+
+            # Only assign target tag if not already assigned
+            if not target_already_assigned:
+                activity = CandidateActivity(
+                    activity_type=CandidateActivityType.TAG_ADDED,
+                    candidate_id=candidate_id,
+                    tag_id=UUID(request.target_tag_id),
+                    activity_data={
+                        "tag_name": target_tag.tag_name,
+                        "color": target_tag.color,
+                        "merged_from": source_tag.tag_name,
+                    },
+                )
+                db.add(activity)
+                candidates_transferred += 1
+
+        await db.flush()
+
+        # Delete the source tag
+        await db.execute(
+            delete(CandidateTag).where(CandidateTag.id == UUID(request.source_tag_id))
+        )
+
+        await db.commit()
+
+        logger.info(
+            f"Merged tag '{source_tag.tag_name}' into '{target_tag.tag_name}' - "
+            f"transferred {candidates_transferred} candidates"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": f"Merged '{source_tag.tag_name}' into '{target_tag.tag_name}' successfully",
+                "source_tag_id": request.source_tag_id,
+                "target_tag_id": request.target_tag_id,
+                "candidates_transferred": candidates_transferred,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid UUID format",
+        )
+    except Exception as e:
+        logger.error(f"Error merging tags: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to merge tags: {str(e)}",
         ) from e
