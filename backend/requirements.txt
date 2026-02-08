@@ -68,6 +68,7 @@ mypy==1.11.2
 
 # Additional ML Dependencies
 numpy==1.26.4
+scipy>=1.14.0
 scikit-learn==1.5.2
 torch==2.4.0
 transformers==4.46.0
