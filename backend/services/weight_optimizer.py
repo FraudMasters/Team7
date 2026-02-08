@@ -14,10 +14,11 @@ and scipy.stats for statistical analysis of metric differences between variants.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import numpy as np
+from scipy.stats import chi2_contingency, mannwhitneyu, ttest_ind
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -418,8 +419,289 @@ class WeightOptimizerService:
         Raises:
             ValueError: If insufficient sample size or test not found
         """
-        # TODO: Implementation in subtask-4-4
-        raise NotImplementedError("analyze_metrics will be implemented in subtask-4-4")
+        from uuid import UUID
+
+        # Step 1: Validate test_id and fetch test
+        try:
+            test_uuid = UUID(test_id)
+        except ValueError as e:
+            raise ValueError(f"Invalid test_id format: {test_id}") from e
+
+        # Step 2: Query metrics grouped by profile
+        # Join ABTestMetric -> ABTestAssignment -> MatchingWeightProfile
+        metrics_query = (
+            select(
+                MatchingWeightProfile.id.label("profile_id"),
+                MatchingWeightProfile.name.label("profile_name"),
+                MatchingWeightProfile.keyword_weight,
+                MatchingWeightProfile.tfidf_weight,
+                MatchingWeightProfile.vector_weight,
+                ABTestMetric.metric_value,
+            )
+            .join(ABTestAssignment, ABTestAssignment.profile_id == MatchingWeightProfile.id)
+            .join(ABTestMetric, ABTestMetric.assignment_id == ABTestAssignment.id)
+            .where(
+                and_(
+                    ABTestMetric.test_id == test_uuid,
+                    ABTestMetric.metric_type == metric_type,
+                )
+            )
+        )
+
+        metrics_result = await self.db.execute(metrics_query)
+        metrics_rows = metrics_result.all()
+
+        if not metrics_rows:
+            raise ValueError(
+                f"No metrics found for test {test_id} and metric type {metric_type.value}"
+            )
+
+        # Step 3: Group metrics by profile
+        profile_metrics: Dict[str, List[float]] = {}
+        profile_info: Dict[str, Dict[str, Any]] = {}
+
+        for row in metrics_rows:
+            profile_id_str = str(row.profile_id)
+            if profile_id_str not in profile_metrics:
+                profile_metrics[profile_id_str] = []
+                profile_info[profile_id_str] = {
+                    "profile_id": profile_id_str,
+                    "profile_name": row.profile_name,
+                    "keyword_weight": row.keyword_weight,
+                    "tfidf_weight": row.tfidf_weight,
+                    "vector_weight": row.vector_weight,
+                    "sample_size": 0,
+                    "mean": 0.0,
+                    "std": 0.0,
+                }
+            profile_metrics[profile_id_str].append(row.metric_value)
+
+        # Step 4: Check minimum sample size
+        for profile_id, values in profile_metrics.items():
+            if len(values) < self.MIN_SAMPLE_SIZE:
+                raise ValueError(
+                    f"Insufficient sample size for profile {profile_id}: "
+                    f"{len(values)} < {self.MIN_SAMPLE_SIZE} (minimum required)"
+                )
+
+        # Step 5: Calculate summary statistics for each profile
+        for profile_id, values in profile_metrics.items():
+            arr = np.array(values)
+            profile_info[profile_id]["sample_size"] = len(values)
+            profile_info[profile_id]["mean"] = float(np.mean(arr))
+            profile_info[profile_id]["std"] = float(np.std(arr, ddof=1)) if len(values) > 1 else 0.0
+
+        # Step 6: Run appropriate statistical test based on metric type
+        profile_ids = list(profile_metrics.keys())
+
+        if len(profile_ids) < 2:
+            raise ValueError(
+                f"At least 2 profiles required for analysis, found {len(profile_ids)}"
+            )
+
+        # Compare first two profiles (can be extended for multi-variant comparison)
+        profile_a_id = profile_ids[0]
+        profile_b_id = profile_ids[1]
+        values_a = profile_metrics[profile_a_id]
+        values_b = profile_metrics[profile_b_id]
+
+        # Choose test based on metric type
+        if metric_type == ABTestMetricType.TIME_TO_HIRE:
+            test_result = self._analyze_continuous_metric(values_a, values_b)
+        elif metric_type == ABTestMetricType.MATCH_ACCEPTANCE:
+            test_result = self._analyze_binary_metric(values_a, values_b)
+        elif metric_type == ABTestMetricType.USER_SATISFACTION:
+            test_result = self._analyze_ordinal_metric(values_a, values_b)
+        else:
+            raise ValueError(f"Unknown metric type: {metric_type}")
+
+        # Step 7: Return results
+        return {
+            "metric_type": metric_type.value,
+            "profiles": list(profile_info.values()),
+            "statistical_test": {
+                "test_type": test_result.test_type,
+                "p_value": test_result.p_value,
+                "is_significant": test_result.is_significant,
+                "effect_size": test_result.effect_size,
+                "confidence_interval": test_result.confidence_interval,
+                "variant_a_mean": test_result.variant_a_mean,
+                "variant_b_mean": test_result.variant_b_mean,
+                "sample_size_a": test_result.sample_size_a,
+                "sample_size_b": test_result.sample_size_b,
+            },
+            "comparison": {
+                "profile_a": profile_a_id,
+                "profile_b": profile_b_id,
+                "better_profile": profile_a_id if test_result.variant_a_mean > test_result.variant_b_mean else profile_b_id,
+                "improvement_pct": (
+                    (test_result.variant_a_mean - test_result.variant_b_mean) / test_result.variant_b_mean * 100
+                    if test_result.variant_b_mean != 0
+                    else 0.0
+                ),
+            },
+        }
+
+    def _analyze_continuous_metric(
+        self,
+        values_a: List[float],
+        values_b: List[float],
+    ) -> StatisticalTestResult:
+        """
+        Analyze continuous metrics using independent t-test.
+
+        Uses scipy.stats.ttest_ind to compare means between two groups.
+        Calculates Cohen's d as effect size.
+
+        Args:
+            values_a: Metric values for variant A
+            values_b: Metric values for variant B
+
+        Returns:
+            StatisticalTestResult with t-test results
+        """
+        arr_a = np.array(values_a)
+        arr_b = np.array(values_b)
+
+        # Run independent t-test (assumes unequal variance)
+        statistic, p_value = ttest_ind(arr_a, arr_b, equal_var=False)
+
+        # Calculate Cohen's d (effect size)
+        pooled_std = np.sqrt(
+            ((len(arr_a) - 1) * np.var(arr_a, ddof=1) +
+             (len(arr_b) - 1) * np.var(arr_b, ddof=1)) /
+            (len(arr_a) + len(arr_b) - 2)
+        )
+        effect_size = (np.mean(arr_a) - np.mean(arr_b)) / pooled_std if pooled_std > 0 else 0.0
+
+        # Calculate 95% confidence interval for difference
+        se_diff = np.sqrt(np.var(arr_a, ddof=1) / len(arr_a) + np.var(arr_b, ddof=1) / len(arr_b))
+        margin = 1.96 * se_diff
+        diff_mean = float(np.mean(arr_a) - np.mean(arr_b))
+        ci = (diff_mean - margin, diff_mean + margin)
+
+        return StatisticalTestResult(
+            test_type="ttest",
+            p_value=float(p_value),
+            is_significant=p_value < self.SIGNIFICANCE_LEVEL,
+            effect_size=float(effect_size),
+            confidence_interval=ci,
+            variant_a_mean=float(np.mean(arr_a)),
+            variant_b_mean=float(np.mean(arr_b)),
+            sample_size_a=len(arr_a),
+            sample_size_b=len(arr_b),
+        )
+
+    def _analyze_binary_metric(
+        self,
+        values_a: List[float],
+        values_b: List[float],
+    ) -> StatisticalTestResult:
+        """
+        Analyze binary metrics using chi-square test of independence.
+
+        Uses scipy.stats.chi2_contingency to compare proportions between groups.
+        Calculates difference in proportions as effect size.
+
+        Args:
+            values_a: Binary metric values (0.0 or 1.0) for variant A
+            values_b: Binary metric values (0.0 or 1.0) for variant B
+
+        Returns:
+            StatisticalTestResult with chi-square test results
+        """
+        arr_a = np.array(values_a)
+        arr_b = np.array(values_b)
+
+        # Count successes (1.0) and failures (0.0) for each group
+        success_a = np.sum(arr_a == 1.0)
+        failure_a = np.sum(arr_a == 0.0)
+        success_b = np.sum(arr_b == 1.0)
+        failure_b = np.sum(arr_b == 0.0)
+
+        # Build contingency table
+        observed = np.array([[success_a, failure_a], [success_b, failure_b]])
+
+        # Run chi-square test
+        statistic, p_value, dof, expected = chi2_contingency(observed)
+
+        # Effect size: difference in proportions
+        prop_a = success_a / len(arr_a) if len(arr_a) > 0 else 0.0
+        prop_b = success_b / len(arr_b) if len(arr_b) > 0 else 0.0
+        effect_size = float(prop_a - prop_b)
+
+        # Confidence interval for difference in proportions
+        se_diff = np.sqrt(
+            (prop_a * (1 - prop_a) / len(arr_a)) +
+            (prop_b * (1 - prop_b) / len(arr_b))
+        )
+        margin = 1.96 * se_diff
+        ci = (effect_size - margin, effect_size + margin)
+
+        return StatisticalTestResult(
+            test_type="chi2",
+            p_value=float(p_value),
+            is_significant=p_value < self.SIGNIFICANCE_LEVEL,
+            effect_size=effect_size,
+            confidence_interval=ci,
+            variant_a_mean=prop_a,
+            variant_b_mean=prop_b,
+            sample_size_a=len(arr_a),
+            sample_size_b=len(arr_b),
+        )
+
+    def _analyze_ordinal_metric(
+        self,
+        values_a: List[float],
+        values_b: List[float],
+    ) -> StatisticalTestResult:
+        """
+        Analyze ordinal metrics using Mann-Whitney U test.
+
+        Uses scipy.stats.mannwhitneyu to compare distributions between groups.
+        Calculates rank-biserial correlation as effect size.
+
+        Args:
+            values_a: Ordinal metric values (e.g., 1-5 scale) for variant A
+            values_b: Ordinal metric values (e.g., 1-5 scale) for variant B
+
+        Returns:
+            StatisticalTestResult with Mann-Whitney U test results
+        """
+        arr_a = np.array(values_a)
+        arr_b = np.array(values_b)
+
+        # Run Mann-Whitney U test
+        statistic, p_value = mannwhitneyu(arr_a, arr_b, alternative="two-sided")
+
+        # Calculate effect size: rank-biserial correlation
+        # r = 1 - (2U / (n1 * n2))
+        n1 = len(arr_a)
+        n2 = len(arr_b)
+        u_stat = min(
+            statistic,  # statistic could be U for first group
+            n1 * n2 - statistic  # or U for second group
+        )
+        effect_size = 1 - (2 * u_stat / (n1 * n2))
+
+        # Calculate confidence interval using bootstrap approximation
+        # For simplicity, use standard error of the mean difference
+        se_diff = np.sqrt(np.var(arr_a, ddof=1) / n1 + np.var(arr_b, ddof=1) / n2)
+        margin = 1.96 * se_diff
+        diff_mean = float(np.mean(arr_a) - np.mean(arr_b))
+        ci = (diff_mean - margin, diff_mean + margin)
+
+        return StatisticalTestResult(
+            test_type="mann_whitney",
+            p_value=float(p_value),
+            is_significant=p_value < self.SIGNIFICANCE_LEVEL,
+            effect_size=float(effect_size),
+            confidence_interval=ci,
+            variant_a_mean=float(np.mean(arr_a)),
+            variant_b_mean=float(np.mean(arr_b)),
+            sample_size_a=n1,
+            sample_size_b=n2,
+        )
 
     async def optimize_weights(
         self,
