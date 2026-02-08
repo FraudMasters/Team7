@@ -23,6 +23,7 @@ from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
 from utils.audit_logger import log_audit_event, get_request_context
+from services.resume_cache_service import get_resume_cache
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -685,6 +686,20 @@ async def update_resume_status(
         await db.commit()
         await db.refresh(resume_record)
 
+        # Invalidate cache for this resume to ensure fresh analysis on next access
+        try:
+            from pathlib import Path
+            resume_file_path = Path(resume_record.file_path)
+            if resume_file_path.exists():
+                with open(resume_file_path, "rb") as f:
+                    file_content = f.read()
+                resume_cache = get_resume_cache()
+                content_hash = resume_cache.hash_content(file_content)
+                resume_cache.invalidate(content_hash)
+                logger.info(f"Invalidated cache for resume {resume_id} on status update (hash: {content_hash[:16]}...)")
+        except Exception as cache_err:
+            logger.warning(f"Failed to invalidate cache for resume {resume_id}: {cache_err}")
+
         # Log audit event (if audit_logs table exists)
         try:
             ip_address, user_agent = get_request_context(request)
@@ -790,8 +805,20 @@ async def delete_resume(
             await db.delete(resume_record)
             await db.commit()
 
-        # Delete file from disk if exists
+        # Invalidate cache for this resume before deleting file
         if file_path and file_path.exists():
+            try:
+                # Read file content to compute hash for cache invalidation
+                with open(file_path, "rb") as f:
+                    file_content = f.read()
+                resume_cache = get_resume_cache()
+                content_hash = resume_cache.hash_content(file_content)
+                resume_cache.invalidate(content_hash)
+                logger.info(f"Invalidated cache for resume {resume_id} (hash: {content_hash[:16]}...)")
+            except Exception as cache_err:
+                logger.warning(f"Failed to invalidate cache for resume {resume_id}: {cache_err}")
+
+            # Delete file from disk
             file_path.unlink()
 
         logger.info(f"Deleted resume: {resume_id}")
