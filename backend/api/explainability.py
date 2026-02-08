@@ -77,6 +77,12 @@ class ExplainResponse(BaseModel):
     highlight_sections: Dict[str, str] = Field(
         ..., description="Resume sections to highlight with explanations"
     )
+    percentile_rank: Optional[float] = Field(
+        None, description="Percentile ranking among all candidates (0-100)"
+    )
+    percentile_explanation: str = Field(
+        "", description="Natural language percentile comparison explanation"
+    )
     provider: str = Field(..., description="LLM provider used")
     model: str = Field(..., description="Model name used")
     generated_at: str = Field(..., description="Timestamp of generation")
@@ -290,6 +296,13 @@ async def explain_ranking(
         else:
             use_llm = request.use_llm
 
+        # Fetch all candidate scores for this vacancy to enable percentile calculation
+        all_scores_query = select(CandidateRank.rank_score).where(
+            CandidateRank.vacancy_id == vacancy_uuid
+        )
+        all_scores_result = await db.execute(all_scores_query)
+        all_candidate_scores = [float(row[0]) for row in all_scores_result.fetchall()]
+
         # Generate explanation
         explanation = await generator.generate_ranking_explanation(
             candidate_name=resume.filename or None,
@@ -301,6 +314,7 @@ async def explain_ranking(
             job_description=vacancy.description or "",
             recommendation=ranking.recommendation or "good",
             prediction_confidence=float(ranking.confidence) if ranking.confidence else None,
+            all_candidate_scores=all_candidate_scores,
             use_llm=use_llm,
         )
 
@@ -322,6 +336,8 @@ async def explain_ranking(
             "weaknesses": explanation.weaknesses,
             "recommendation": explanation.recommendation,
             "highlight_sections": explanation.highlight_sections,
+            "percentile_rank": explanation.percentile_rank,
+            "percentile_explanation": explanation.percentile_explanation,
             "provider": explanation.provider,
             "model": explanation.model,
             "generated_at": explanation.generated_at,
@@ -925,6 +941,13 @@ async def get_narrative_explanation(
             generator = ExplanationGenerator()
             use_llm = False
 
+        # Fetch all candidate scores for this vacancy to enable percentile calculation
+        all_scores_query = select(CandidateRank.rank_score).where(
+            CandidateRank.vacancy_id == ranking.vacancy_id
+        )
+        all_scores_result = await db.execute(all_scores_query)
+        all_candidate_scores = [float(row[0]) for row in all_scores_result.fetchall()]
+
         # Generate narrative explanation
         explanation = await generator.generate_ranking_explanation(
             candidate_name=candidate_name,
@@ -936,6 +959,7 @@ async def get_narrative_explanation(
             job_description=job_description,
             recommendation=ranking.recommendation or "good",
             prediction_confidence=float(ranking.confidence) if ranking.confidence else None,
+            all_candidate_scores=all_candidate_scores,
             use_llm=use_llm,
         )
 
@@ -949,6 +973,8 @@ async def get_narrative_explanation(
                 "recommendation": explanation.recommendation,
                 "strengths": explanation.strengths,
                 "weaknesses": explanation.weaknesses,
+                "percentile_rank": explanation.percentile_rank,
+                "percentile_explanation": explanation.percentile_explanation,
                 "provider": explanation.provider,
                 "model": explanation.model,
                 "generated_at": explanation.generated_at,
@@ -1230,6 +1256,13 @@ async def export_explainability_pdf(
         if not generator:
             generator = ExplanationGenerator()
 
+        # Fetch all candidate scores for this vacancy to enable percentile calculation
+        all_scores_query = select(CandidateRank.rank_score).where(
+            CandidateRank.vacancy_id == vacancy_uuid
+        )
+        all_scores_result = await db.execute(all_scores_query)
+        all_candidate_scores = [float(row[0]) for row in all_scores_result.fetchall()]
+
         # Generate explanation
         explanation = await generator.generate_ranking_explanation(
             candidate_name=resume.filename or None,
@@ -1241,6 +1274,7 @@ async def export_explainability_pdf(
             job_description=vacancy.description or "",
             recommendation=ranking.recommendation or "good",
             prediction_confidence=float(ranking.confidence) if ranking.confidence else None,
+            all_candidate_scores=all_candidate_scores,
             use_llm=False,  # Don't use LLM for PDF generation
         )
 
