@@ -96,6 +96,8 @@ export interface ExplainRankingResponse {
   weaknesses: string[];
   recommendation: string;
   highlight_sections: Record<string, string>;
+  percentile_rank: number | null;
+  percentile_explanation: string;
   provider: string;
   model: string;
   generated_at: string;

@@ -29,6 +29,8 @@ interface RankingExplanationProps {
   featureContributions: Record<string, number>;
   rankingScore: number;
   hireProbability: number;
+  percentileRank?: number | null;
+  percentileExplanation?: string;
 }
 
 const RankingExplanation: React.FC<RankingExplanationProps> = ({
@@ -38,6 +40,8 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
   featureContributions = {},
   rankingScore,
   hireProbability,
+  percentileRank = null,
+  percentileExplanation = '',
 }) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [factorsOpen, setFactorsOpen] = useState(false);
@@ -176,9 +180,31 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
             <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
               {scoreConfig.label}
             </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.95, whiteSpace: 'pre-line' }}>
+            <Typography variant="body1" sx={{ opacity: 0.95, whiteSpace: 'pre-line', mb: percentileExplanation ? 1 : 0 }}>
               {summary}
             </Typography>
+            {percentileExplanation && (
+              <Box
+                sx={{
+                  mt: 1.5,
+                  p: 1.5,
+                  borderRadius: 1.5,
+                  bgcolor: 'rgba(255,255,255,0.15)',
+                  border: 1,
+                  borderColor: 'rgba(255,255,255,0.3)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                  <Icon name="bar-chart" sx={{ fontSize: 16 }} />
+                  <Typography variant="caption" fontWeight={600} sx={{ opacity: 0.9 }}>
+                    Сравнение с другими кандидатами
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ opacity: 0.95, whiteSpace: 'pre-line' }}>
+                  {percentileExplanation}
+                </Typography>
+              </Box>
+            )}
           </Box>
           <Box
             sx={{
@@ -203,6 +229,17 @@ const RankingExplanation: React.FC<RankingExplanationProps> = ({
             <Typography variant="h6" fontWeight={600}>
               {Math.round(hireProbability * 100)}%
             </Typography>
+            {percentileRank !== null && percentileRank !== undefined && (
+              <>
+                <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.3)' }} />
+                <Typography variant="caption" display="block" sx={{ opacity: 0.9 }}>
+                  Процентиль
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {Math.round(percentileRank)}%
+                </Typography>
+              </>
+            )}
           </Box>
         </Box>
       </Paper>
