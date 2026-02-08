@@ -3,7 +3,8 @@
  *
  * This module provides a convenient interface for AI decision transparency,
  * including natural language explanations, feature contributions, what-if
- * analysis, confidence intervals, and candidate comparisons.
+ * analysis, confidence intervals, candidate comparisons, and organization
+ * preference management.
  *
  * @example
  * ```ts
@@ -40,6 +41,16 @@
  *
  * // Get confidence interval
  * const confidence = await explainability.getConfidenceInterval('rank-id-123');
+ *
+ * // Get organization preferences
+ * const preferences = await explainability.getOrganizationPreferences('test-org');
+ *
+ * // Update organization preferences
+ * const updated = await explainability.updateOrganizationPreferences('test-org', {
+ *   tone: 'casual',
+ *   style: 'concise',
+ *   is_active: true,
+ * });
  * ```
  */
 
@@ -96,6 +107,8 @@ export interface ExplainRankingResponse {
   weaknesses: string[];
   recommendation: string;
   highlight_sections: Record<string, string>;
+  percentile_rank: number | null;
+  percentile_explanation: string;
   provider: string;
   model: string;
   generated_at: string;
@@ -206,6 +219,43 @@ export interface CompareCandidatesResponse {
 export interface ConfidenceIntervalResponse {
   rank_id: string;
   confidence_interval: ConfidenceInterval;
+}
+
+/**
+ * Explanation preferences update request
+ */
+export interface ExplanationPreferencesUpdate {
+  tone?: 'professional' | 'casual' | 'friendly' | 'formal';
+  style?: 'detailed' | 'concise' | 'balanced';
+  detail_level?: 'high' | 'medium' | 'low';
+  include_percentiles?: boolean;
+  include_skill_names?: boolean;
+  include_experience_details?: boolean;
+  include_education_details?: boolean;
+  language?: string;
+  custom_prompt_template?: string;
+  is_active?: boolean;
+}
+
+/**
+ * Explanation preferences response
+ */
+export interface ExplanationPreferencesResponse {
+  id: string;
+  organization_id: string;
+  tone: 'professional' | 'casual' | 'friendly' | 'formal';
+  style: 'detailed' | 'concise' | 'balanced';
+  detail_level: 'high' | 'medium' | 'low';
+  include_percentiles: boolean;
+  include_skill_names: boolean;
+  include_experience_details: boolean;
+  include_education_details: boolean;
+  language: string | null;
+  custom_prompt_template: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ==================== Client ====================
@@ -453,6 +503,74 @@ export class ExplainabilityClient {
     try {
       const response = await this.client.get<ConfidenceIntervalResponse>(
         `/api/explainability/confidence/${rankId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
+  }
+
+  /**
+   * Get explanation preferences for an organization
+   *
+   * Retrieves the explanation preferences for a specific organization,
+   * including tone, style, detail level, and content inclusion flags.
+   * Returns default preferences if none exist for the organization.
+   *
+   * @param organizationId - Organization identifier (slug or UUID)
+   * @returns Organization explanation preferences
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const preferences = await explainability.getOrganizationPreferences('test-org');
+   * console.log(`Tone: ${preferences.tone}`);
+   * console.log(`Style: ${preferences.style}`);
+   * ```
+   */
+  async getOrganizationPreferences(
+    organizationId: string
+  ): Promise<ExplanationPreferencesResponse> {
+    try {
+      const response = await this.client.get<ExplanationPreferencesResponse>(
+        `/api/explainability/preferences/${organizationId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
+  }
+
+  /**
+   * Update explanation preferences for an organization
+   *
+   * Updates the explanation preferences for a specific organization.
+   * Only the fields specified in the request body will be updated.
+   * Creates new preferences if none exist for the organization.
+   *
+   * @param organizationId - Organization identifier (slug or UUID)
+   * @param request - Request body containing fields to update
+   * @returns Updated organization explanation preferences
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const updated = await explainability.updateOrganizationPreferences('test-org', {
+   *   tone: 'casual',
+   *   style: 'concise',
+   *   is_active: true,
+   * });
+   * console.log(`Updated tone: ${updated.tone}`);
+   * ```
+   */
+  async updateOrganizationPreferences(
+    organizationId: string,
+    request: ExplanationPreferencesUpdate
+  ): Promise<ExplanationPreferencesResponse> {
+    try {
+      const response = await this.client.put<ExplanationPreferencesResponse>(
+        `/api/explainability/preferences/${organizationId}`,
+        request
       );
       return response.data;
     } catch (error) {

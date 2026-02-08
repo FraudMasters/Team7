@@ -28,6 +28,22 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "LLMProvider",
+    "ExplanationType",
+    "ExplanationTone",
+    "ExplanationStyle",
+    "DetailLevel",
+    "OrganizationExplanationPreferences",
+    "FeatureExplanation",
+    "ConfidenceInterval",
+    "RankingExplanation",
+    "ComparisonExplanation",
+    "ExplanationGenerator",
+    "get_explanation_generator",
+    "generate_ranking_explanation",
+]
+
 
 class LLMProvider(str, Enum):
     """Supported LLM providers."""
@@ -37,6 +53,70 @@ class LLMProvider(str, Enum):
     ZAI = "zai"
 
 
+class ExplanationTone(str, Enum):
+    """Explanation tone options."""
+    PROFESSIONAL = "professional"
+    CASUAL = "casual"
+    FRIENDLY = "friendly"
+    FORMAL = "formal"
+
+
+class ExplanationStyle(str, Enum):
+    """Explanation style options."""
+    DETAILED = "detailed"
+    CONCISE = "concise"
+    BALANCED = "balanced"
+
+
+class DetailLevel(str, Enum):
+    """Detail level options."""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+@dataclass
+class OrganizationExplanationPreferences:
+    """
+    Organization explanation preferences dataclass.
+
+    Attributes:
+        tone: Preferred explanation tone
+        style: Preferred explanation style
+        detail_level: Level of detail
+        include_percentiles: Whether to include percentile-based comparisons
+        include_skill_names: Whether to include specific skill names
+        include_experience_details: Whether to include experience duration details
+        include_education_details: Whether to include education details
+        language: Preferred language for explanations
+        custom_prompt_template: Optional custom prompt template
+    """
+    tone: str = "professional"
+    style: str = "balanced"
+    detail_level: str = "medium"
+    include_percentiles: bool = True
+    include_skill_names: bool = True
+    include_experience_details: bool = True
+    include_education_details: bool = True
+    language: Optional[str] = None
+    custom_prompt_template: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OrganizationExplanationPreferences":
+        """Create preferences from dictionary."""
+        return cls(
+            tone=data.get("tone", "professional"),
+            style=data.get("style", "balanced"),
+            detail_level=data.get("detail_level", "medium"),
+            include_percentiles=data.get("include_percentiles", True),
+            include_skill_names=data.get("include_skill_names", True),
+            include_experience_details=data.get("include_experience_details", True),
+            include_education_details=data.get("include_education_details", True),
+            language=data.get("language"),
+            custom_prompt_template=data.get("custom_prompt_template"),
+        )
+
+
 class ExplanationType(str, Enum):
     """Types of explanations that can be generated."""
     RANKING = "ranking"
@@ -44,6 +124,7 @@ class ExplanationType(str, Enum):
     COMPARISON = "comparison"
     WHAT_IF = "what_if"
     CONFIDENCE = "confidence"
+    PERCENTILE = "percentile"
 
 
 @dataclass
@@ -126,6 +207,8 @@ class RankingExplanation:
         weaknesses: List of areas for improvement
         recommendation: Hiring recommendation
         highlight_sections: Resume sections to highlight
+        percentile_rank: Percentile ranking among all candidates (0-100)
+        percentile_explanation: Natural language percentile comparison
         provider: LLM provider used
         model: Model name used
         generated_at: Timestamp of generation
@@ -140,6 +223,8 @@ class RankingExplanation:
     weaknesses: List[str]
     recommendation: str
     highlight_sections: Dict[str, str]
+    percentile_rank: Optional[float] = None
+    percentile_explanation: str = ""
     provider: str = ""
     model: str = ""
     generated_at: str = ""
@@ -157,6 +242,8 @@ class RankingExplanation:
             "weaknesses": self.weaknesses,
             "recommendation": self.recommendation,
             "highlight_sections": self.highlight_sections,
+            "percentile_rank": self.percentile_rank,
+            "percentile_explanation": self.percentile_explanation,
             "provider": self.provider,
             "model": self.model,
             "generated_at": self.generated_at,
@@ -273,6 +360,7 @@ class ExplanationGenerator:
         self,
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
+        org_preferences: Optional[OrganizationExplanationPreferences] = None,
     ):
         """
         Initialize the Explanation Generator.
@@ -280,11 +368,15 @@ class ExplanationGenerator:
         Args:
             provider: LLM provider to use (default from config)
             model: Model name to use (default from config)
+            org_preferences: Organization explanation preferences for tone customization
         """
         settings = get_settings()
 
         self.provider = provider or LLMProvider(settings.llm_provider)
         self.model = model or settings.llm_model
+
+        # Organization preferences
+        self.org_preferences = org_preferences or OrganizationExplanationPreferences()
 
         # LLM parameters
         self.temperature = settings.llm_temperature
@@ -299,23 +391,59 @@ class ExplanationGenerator:
 
         logger.info(
             f"ExplanationGenerator initialized: provider={self.provider}, "
-            f"model={self.model}"
+            f"model={self.model}, tone={self.org_preferences.tone}, "
+            f"style={self.org_preferences.style}"
+        )
+
+    def set_organization_preferences(
+        self,
+        preferences: OrganizationExplanationPreferences,
+    ) -> None:
+        """
+        Update organization preferences for this generator instance.
+
+        Args:
+            preferences: New organization explanation preferences
+
+        Example:
+            >>> generator = ExplanationGenerator()
+            >>> new_prefs = OrganizationExplanationPreferences(tone="casual")
+            >>> generator.set_organization_preferences(new_prefs)
+        """
+        self.org_preferences = preferences
+        logger.info(
+            f"Organization preferences updated: tone={preferences.tone}, "
+            f"style={preferences.style}, detail_level={preferences.detail_level}"
         )
 
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for explanation generation."""
-        return """You are an expert AI explainer specializing in making AI hiring decisions transparent and understandable. Your task is to generate clear, concise explanations that help recruiters understand why candidates are ranked certain ways.
+        """Get the system prompt for explanation generation customized to organization preferences."""
+        # Build tone-specific instruction
+        tone_instructions = self._get_tone_instruction()
+
+        # Build style-specific instruction
+        style_instructions = self._get_style_instruction()
+
+        # Build detail-level instruction
+        detail_instructions = self._get_detail_instruction()
+
+        base_prompt = f"""You are an expert AI explainer specializing in making AI hiring decisions transparent and understandable. Your task is to generate clear explanations that help recruiters understand why candidates are ranked certain ways.
+
+{tone_instructions}
+
+{style_instructions}
+
+{detail_instructions}
 
 Your explanations should:
-1. Be concise (1-3 sentences for main narrative)
-2. Be accessible to non-technical users (no ML jargon)
-3. Focus on the most impactful factors
-4. Be honest about uncertainty
-5. Avoid bias and discrimination
+1. Be accessible to non-technical users (no ML jargon)
+2. Focus on the most impactful factors
+3. Be honest about uncertainty
+4. Avoid bias and discrimination
 
 Generate explanations in the following JSON format:
 ```json
-{
+{{
     "narrative": "Brief 1-3 sentence explanation of why the candidate received this ranking",
     "strengths": [
         "Specific strength 1",
@@ -325,21 +453,73 @@ Generate explanations in the following JSON format:
         "Specific area for improvement 1",
         "Specific area for improvement 2"
     ],
-    "highlight_suggestions": {
+    "highlight_suggestions": {{
         "skills": "Explanation of what to highlight in the skills section",
         "experience": "Explanation of what to highlight in the experience section"
-    }
-}
+    }}
+}}
 ```
 
 Important guidelines:
 - Narrative should directly answer "Why this ranking?"
 - Prioritize factors that have the biggest impact
-- For strengths/weaknesses, focus on the top 3-5 most important items
 - Be specific about what aspects of the resume are relevant
-- Maintain a professional, objective tone
 - Avoid assumptions about gender, age, race, or other protected characteristics
 """
+
+        # Use custom prompt template if provided
+        if self.org_preferences.custom_prompt_template:
+            return self.org_preferences.custom_prompt_template
+
+        return base_prompt
+
+    def _get_tone_instruction(self) -> str:
+        """Get tone-specific instruction based on organization preferences."""
+        tone = self.org_preferences.tone
+
+        tone_guides = {
+            "professional": """Maintain a professional, business-like tone. Use clear, objective language that would be appropriate in a corporate hiring environment.""",
+            "casual": """Use a casual, relaxed tone. Write as if you're speaking with a colleague in an informal setting while maintaining professionalism.""",
+            "friendly": """Use a warm, friendly tone. Write in an approachable, welcoming manner that puts the reader at ease.""",
+            "formal": """Use a formal, structured tone. Write in a more traditional business style with precise, elevated language appropriate for executive communications.""",
+        }
+
+        return tone_guides.get(tone, tone_guides["professional"])
+
+    def _get_style_instruction(self) -> str:
+        """Get style-specific instruction based on organization preferences."""
+        style = self.org_preferences.style
+
+        style_guides = {
+            "detailed": """Provide comprehensive explanations with thorough analysis. Include specific examples and detailed reasoning for each point. The narrative can be longer (3-5 sentences) to fully capture nuances.""",
+            "concise": """Provide brief, to-the-point explanations. Focus only on the most critical information. Keep the narrative short (1-2 sentences) and limit strengths/weaknesses to the top 2-3 items.""",
+            "balanced": """Provide well-rounded explanations that are thorough but not overly detailed. Balance comprehensiveness with readability. The narrative should be 2-3 sentences with 3-5 strengths/weaknesses.""",
+        }
+
+        return style_guides.get(style, style_guides["balanced"])
+
+    def _get_detail_instruction(self) -> str:
+        """Get detail-level instruction based on organization preferences."""
+        detail_level = self.org_preferences.detail_level
+        instructions = []
+
+        if not self.org_preferences.include_skill_names:
+            instructions.append("- Do not include specific skill names in explanations")
+        if not self.org_preferences.include_experience_details:
+            instructions.append("- Do not include specific experience duration details")
+        if not self.org_preferences.include_education_details:
+            instructions.append("- Do not include education details")
+
+        if detail_level == "high":
+            instructions.append("- Provide comprehensive analysis with extensive detail")
+        elif detail_level == "low":
+            instructions.append("- Provide high-level summary with minimal detail")
+        else:  # medium
+            instructions.append("- Provide moderate detail covering key points")
+
+        if instructions:
+            return "Detail level guidelines:\n" + "\n".join(instructions)
+        return ""
 
     def _create_ranking_prompt(
         self,
@@ -370,6 +550,73 @@ Important guidelines:
                 f"- {description}: {contribution:.3f} ({impact} impact)"
             )
 
+        # Extract detailed candidate context
+        skills_details = ranking_factors.get('skills_match', {})
+        experience_details = ranking_factors.get('experience_analysis', {})
+        education_details = ranking_factors.get('education_analysis', {})
+
+        # Build skills list
+        skills_context = []
+        if isinstance(skills_details, dict) and self.org_preferences.include_skill_names:
+            matched_skills = skills_details.get('matched_skills', [])
+            if matched_skills:
+                skills_context.append(f"Matched Skills: {', '.join(matched_skills[:10])}")
+            missing_skills = skills_details.get('missing_skills', [])
+            if missing_skills:
+                skills_context.append(f"Missing Skills: {', '.join(missing_skills[:5])}")
+            skills_score = skills_details.get('score', 'N/A')
+            if skills_score != 'N/A':
+                skills_context.append(f"Skills Match Score: {skills_score:.2f}")
+
+        # Build experience context
+        experience_context = []
+        if isinstance(experience_details, dict) and self.org_preferences.include_experience_details:
+            total_months = experience_details.get('total_months', 0)
+            if total_months:
+                years = total_months // 12
+                months = total_months % 12
+                if years > 0 and months > 0:
+                    duration_str = f"{years} years, {months} months"
+                elif years > 0:
+                    duration_str = f"{years} years"
+                else:
+                    duration_str = f"{months} months"
+                experience_context.append(f"Total Experience: {duration_str}")
+
+            relevant_months = experience_details.get('relevant_months', 0)
+            if relevant_months:
+                years = relevant_months // 12
+                months = relevant_months % 12
+                if years > 0 and months > 0:
+                    duration_str = f"{years} years, {months} months"
+                elif years > 0:
+                    duration_str = f"{years} years"
+                else:
+                    duration_str = f"{months} months"
+                experience_context.append(f"Relevant Experience: {duration_str}")
+
+            experience_score = experience_details.get('score', ranking_factors.get('experience_score', 'N/A'))
+            if experience_score != 'N/A':
+                experience_context.append(f"Experience Score: {experience_score:.2f}")
+
+        # Build education context
+        education_context = []
+        if isinstance(education_details, dict) and self.org_preferences.include_education_details:
+            degree = education_details.get('degree', '')
+            field_of_study = education_details.get('field_of_study', '')
+            institution = education_details.get('institution', '')
+
+            if degree:
+                education_context.append(f"Degree: {degree}")
+            if field_of_study:
+                education_context.append(f"Field of Study: {field_of_study}")
+            if institution:
+                education_context.append(f"Institution: {institution}")
+
+            education_score = education_details.get('score', ranking_factors.get('education_score', 'N/A'))
+            if education_score != 'N/A':
+                education_context.append(f"Education Score: {education_score:.2f}")
+
         prompt_parts = [
             f"Generate an explanation for the following candidate ranking:\n\n",
             f"=== CANDIDATE ===\n",
@@ -382,15 +629,83 @@ Important guidelines:
             f"=== TOP FACTORS INFLUENCING RANKING ===\n",
         ]
         prompt_parts.extend([f"{fd}\n" for fd in feature_details])
-        prompt_parts.extend([
-            f"\n=== ADDITIONAL CONTEXT ===\n",
-            f"Skills Match: {ranking_factors.get('skills_match', {}).get('score', 'N/A')}\n",
-            f"Experience Score: {ranking_factors.get('experience_score', 'N/A')}\n",
-            f"Education Score: {ranking_factors.get('education_score', 'N/A')}\n\n",
-            f"Please generate a clear explanation following the JSON format.",
-        ])
+
+        # Add detailed candidate context section
+        prompt_parts.append(f"\n=== CANDIDATE DETAILS ===\n")
+        if skills_context:
+            prompt_parts.extend([f"  {item}\n" for item in skills_context])
+            prompt_parts.append("\n")
+        if experience_context:
+            prompt_parts.extend([f"  {item}\n" for item in experience_context])
+            prompt_parts.append("\n")
+        if education_context:
+            prompt_parts.extend([f"  {item}\n" for item in education_context])
+            prompt_parts.append("\n")
+
+        prompt_parts.append("Please generate a clear explanation following the JSON format.\n")
+        prompt_parts.append("Use the specific candidate details (skills, experience duration, education) to provide personalized, concrete explanations.")
 
         return "".join(prompt_parts)
+
+    def _format_candidate_context(
+        self,
+        candidate_name: str,
+        score: float,
+        factors: Dict[str, Any],
+    ) -> str:
+        """Format candidate details for prompts based on organization preferences."""
+        lines = [
+            f"Name: {candidate_name}\n",
+            f"Score: {score:.2f}\n",
+        ]
+
+        # Skills context
+        if self.org_preferences.include_skill_names:
+            skills_details = factors.get('skills_match', {})
+            if isinstance(skills_details, dict):
+                matched_skills = skills_details.get('matched_skills', [])
+                if matched_skills:
+                    lines.append(f"Matched Skills: {', '.join(matched_skills[:10])}\n")
+                skills_score = skills_details.get('score', factors.get('experience_score', 'N/A'))
+                if skills_score != 'N/A':
+                    lines.append(f"Skills Match Score: {skills_score:.2f}\n")
+
+        # Experience context
+        if self.org_preferences.include_experience_details:
+            experience_details = factors.get('experience_analysis', {})
+            if isinstance(experience_details, dict):
+                total_months = experience_details.get('total_months', 0)
+                if total_months:
+                    years = total_months // 12
+                    months = total_months % 12
+                    if years > 0 and months > 0:
+                        duration_str = f"{years} years, {months} months"
+                    elif years > 0:
+                        duration_str = f"{years} years"
+                    else:
+                        duration_str = f"{months} months"
+                    lines.append(f"Total Experience: {duration_str}\n")
+
+                experience_score = experience_details.get('score', factors.get('experience_score', 'N/A'))
+                if experience_score != 'N/A':
+                    lines.append(f"Experience Score: {experience_score:.2f}\n")
+
+        # Education context
+        if self.org_preferences.include_education_details:
+            education_details = factors.get('education_analysis', {})
+            if isinstance(education_details, dict):
+                degree = education_details.get('degree', '')
+                field_of_study = education_details.get('field_of_study', '')
+                if degree:
+                    lines.append(f"Degree: {degree}\n")
+                if field_of_study:
+                    lines.append(f"Field of Study: {field_of_study}\n")
+
+                education_score = education_details.get('score', factors.get('education_score', 'N/A'))
+                if education_score != 'N/A':
+                    lines.append(f"Education Score: {education_score:.2f}\n")
+
+        return "".join(lines)
 
     def _create_comparison_prompt(
         self,
@@ -408,19 +723,12 @@ Important guidelines:
             f"=== JOB POSITION ===\n",
             f"Title: {job_title}\n\n",
             f"=== CANDIDATE A (Higher Score) ===\n",
-            f"Name: {candidate_a_name}\n",
-            f"Score: {candidate_a_score:.2f}\n",
-            f"Skills Match: {candidate_a_factors.get('skills_match', {}).get('score', 'N/A')}\n",
-            f"Experience Score: {candidate_a_factors.get('experience_score', 'N/A')}\n",
-            f"Education Score: {candidate_a_factors.get('education_score', 'N/A')}\n\n",
-            f"=== CANDIDATE B (Lower Score) ===\n",
-            f"Name: {candidate_b_name}\n",
-            f"Score: {candidate_b_score:.2f}\n",
-            f"Skills Match: {candidate_b_factors.get('skills_match', {}).get('score', 'N/A')}\n",
-            f"Experience Score: {candidate_b_factors.get('experience_score', 'N/A')}\n",
-            f"Education Score: {candidate_b_factors.get('education_score', 'N/A')}\n\n",
-            f"Return your analysis in JSON format:\n",
-            f'{{"narrative": "...", "key_differences": [...], "winning_factors": [...], "losing_factors": [...], "recommendation": "..."}}',
+            self._format_candidate_context(candidate_a_name, candidate_a_score, candidate_a_factors),
+            f"\n=== CANDIDATE B (Lower Score) ===\n",
+            self._format_candidate_context(candidate_b_name, candidate_b_score, candidate_b_factors),
+            f"\nReturn your analysis in JSON format:\n",
+            f'{{"narrative": "...", "key_differences": [...], "winning_factors": [...], "losing_factors": [...], "recommendation": "..."}}\n',
+            f"Use the specific candidate details (skills, experience duration, education) to provide personalized, concrete comparisons.",
         ]
         return "".join(prompt_parts)
 
@@ -696,6 +1004,87 @@ Important guidelines:
 
         return explanations
 
+    def _calculate_percentile(
+        self,
+        candidate_score: float,
+        all_scores: List[float],
+    ) -> float:
+        """
+        Calculate percentile rank for a candidate score.
+
+        Args:
+            candidate_score: The candidate's ranking score
+            all_scores: List of all candidate scores in the ranking pool
+
+        Returns:
+            Percentile rank (0-100), where 100 means the candidate is ranked
+            higher than all other candidates
+        """
+        if not all_scores:
+            return 50.0  # Default to middle if no comparison data
+
+        # Count how many candidates have lower scores
+        num_lower = sum(1 for score in all_scores if score < candidate_score)
+        num_equal = sum(1 for score in all_scores if score == candidate_score)
+
+        # Calculate percentile using the "percentile rank" formula
+        # Percentile = (number of values below + 0.5 * number of equal values) / total * 100
+        total = len(all_scores)
+        percentile = ((num_lower + 0.5 * num_equal) / total) * 100
+
+        return round(percentile, 1)
+
+    def _generate_percentile_explanation(
+        self,
+        percentile_rank: float,
+        candidate_name: Optional[str],
+        total_candidates: int,
+    ) -> str:
+        """
+        Generate natural language explanation of percentile ranking.
+
+        Args:
+            percentile_rank: The candidate's percentile rank (0-100)
+            candidate_name: The candidate's name
+            total_candidates: Total number of candidates in the pool
+
+        Returns:
+            Natural language explanation
+        """
+        name = candidate_name or "This candidate"
+
+        if percentile_rank >= 95:
+            return (
+                f"{name} is ranked in the top 5% of all candidates, "
+                f"placing them higher than {percentile_rank:.0f}% of applicants "
+                f"out of {total_candidates} total candidates."
+            )
+        elif percentile_rank >= 90:
+            return (
+                f"{name} ranks higher than {percentile_rank:.0f}% of candidates, "
+                f"placing them in the top 10% of {total_candidates} applicants."
+            )
+        elif percentile_rank >= 75:
+            return (
+                f"{name} ranks in the top quartile, higher than "
+                f"{percentile_rank:.0f}% of {total_candidates} candidates."
+            )
+        elif percentile_rank >= 50:
+            return (
+                f"{name} ranks in the top half, higher than "
+                f"{percentile_rank:.0f}% of {total_candidates} candidates."
+            )
+        elif percentile_rank >= 25:
+            return (
+                f"{name} ranks higher than {percentile_rank:.0f}% of "
+                f"{total_candidates} candidates, placing them in the third quartile."
+            )
+        else:
+            return (
+                f"{name} ranks higher than {percentile_rank:.0f}% of "
+                f"{total_candidates} candidates."
+            )
+
     async def generate_ranking_explanation(
         self,
         candidate_name: Optional[str],
@@ -707,6 +1096,7 @@ Important guidelines:
         job_description: str = "",
         recommendation: str = "good",
         prediction_confidence: Optional[float] = None,
+        all_candidate_scores: Optional[List[float]] = None,
         use_llm: bool = True,
     ) -> RankingExplanation:
         """
@@ -722,6 +1112,7 @@ Important guidelines:
             job_description: Job posting description
             recommendation: Hiring recommendation
             prediction_confidence: Model's prediction confidence
+            all_candidate_scores: List of all candidate scores for percentile calculation
             use_llm: Whether to use LLM for narrative generation
 
         Returns:
@@ -744,6 +1135,17 @@ Important guidelines:
             prediction_confidence,
             len(feature_contributions),
         )
+
+        # Calculate percentile rank if all scores provided and organization prefers it
+        percentile_rank = None
+        percentile_explanation = ""
+        if all_candidate_scores and self.org_preferences.include_percentiles:
+            percentile_rank = self._calculate_percentile(rank_score, all_candidate_scores)
+            percentile_explanation = self._generate_percentile_explanation(
+                percentile_rank,
+                candidate_name,
+                len(all_candidate_scores)
+            )
 
         # Generate LLM-based narrative if enabled
         narrative = ""
@@ -802,6 +1204,8 @@ Important guidelines:
             weaknesses=weaknesses,
             recommendation=recommendation,
             highlight_sections=highlight_sections,
+            percentile_rank=percentile_rank,
+            percentile_explanation=percentile_explanation,
             provider=self.provider.value,
             model=self.model,
             generated_at=generated_at,
@@ -942,6 +1346,7 @@ Important guidelines:
         job_description: str = "",
         recommendation: str = "good",
         prediction_confidence: Optional[float] = None,
+        all_candidate_scores: Optional[List[float]] = None,
         use_llm: bool = True,
     ) -> RankingExplanation:
         """
@@ -966,6 +1371,7 @@ Important guidelines:
                 job_description=job_description,
                 recommendation=recommendation,
                 prediction_confidence=prediction_confidence,
+                all_candidate_scores=all_candidate_scores,
                 use_llm=use_llm,
             )
         )
@@ -975,11 +1381,24 @@ Important guidelines:
 _default_generator: Optional[ExplanationGenerator] = None
 
 
-def get_explanation_generator() -> Optional[ExplanationGenerator]:
+def get_explanation_generator(
+    org_preferences: Optional[OrganizationExplanationPreferences] = None,
+) -> Optional[ExplanationGenerator]:
     """
     Get or create the default explanation generator instance.
 
+    Args:
+        org_preferences: Optional organization explanation preferences
+
     Returns None if LLM API is not configured.
+
+    Example:
+        >>> # Get generator with default preferences
+        >>> generator = get_explanation_generator()
+        >>>
+        >>> # Get generator with custom organization preferences
+        >>> prefs = OrganizationExplanationPreferences(tone="casual", style="concise")
+        >>> generator = get_explanation_generator(org_preferences=prefs)
     """
     global _default_generator
     settings = get_settings()
@@ -997,7 +1416,10 @@ def get_explanation_generator() -> Optional[ExplanationGenerator]:
         return None
 
     if _default_generator is None:
-        _default_generator = ExplanationGenerator()
+        _default_generator = ExplanationGenerator(org_preferences=org_preferences)
+    elif org_preferences is not None:
+        # Update preferences if provided
+        _default_generator.set_organization_preferences(org_preferences)
 
     return _default_generator
 
@@ -1012,7 +1434,9 @@ async def generate_ranking_explanation(
     job_description: str = "",
     recommendation: str = "good",
     prediction_confidence: Optional[float] = None,
+    all_candidate_scores: Optional[List[float]] = None,
     use_llm: bool = True,
+    org_preferences: Optional[OrganizationExplanationPreferences] = None,
 ) -> Optional[RankingExplanation]:
     """
     Convenience function to generate ranking explanation.
@@ -1029,12 +1453,22 @@ async def generate_ranking_explanation(
         job_description: Job posting description
         recommendation: Hiring recommendation
         prediction_confidence: Model's prediction confidence
+        all_candidate_scores: List of all candidate scores for percentile calculation
         use_llm: Whether to use LLM for narrative generation
+        org_preferences: Optional organization explanation preferences
 
     Returns:
         RankingExplanation with comprehensive explanation, or None if unavailable
+
+    Example:
+        >>> # Default preferences
+        >>> explanation = await generate_ranking_explanation(...)
+        >>>
+        >>> # Custom organization preferences
+        >>> prefs = OrganizationExplanationPreferences(tone="casual", style="detailed")
+        >>> explanation = await generate_ranking_explanation(..., org_preferences=prefs)
     """
-    generator = get_explanation_generator()
+    generator = get_explanation_generator(org_preferences=org_preferences)
     if generator:
         return await generator.generate_ranking_explanation(
             candidate_name=candidate_name,
@@ -1046,6 +1480,7 @@ async def generate_ranking_explanation(
             job_description=job_description,
             recommendation=recommendation,
             prediction_confidence=prediction_confidence,
+            all_candidate_scores=all_candidate_scores,
             use_llm=use_llm,
         )
 

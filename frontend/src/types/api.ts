@@ -799,6 +799,8 @@ export interface RankedCandidate {
     top_positive_factors: FeatureExplanation[];
     top_negative_factors: FeatureExplanation[];
     feature_contributions: Record<string, number>;
+    percentile_rank?: number | null;
+    percentile_explanation?: string;
   };
   is_top_recommendation: boolean;
   is_experiment?: boolean;
