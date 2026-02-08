@@ -44,6 +44,7 @@ class ExplanationType(str, Enum):
     COMPARISON = "comparison"
     WHAT_IF = "what_if"
     CONFIDENCE = "confidence"
+    PERCENTILE = "percentile"
 
 
 @dataclass
@@ -126,6 +127,8 @@ class RankingExplanation:
         weaknesses: List of areas for improvement
         recommendation: Hiring recommendation
         highlight_sections: Resume sections to highlight
+        percentile_rank: Percentile ranking among all candidates (0-100)
+        percentile_explanation: Natural language percentile comparison
         provider: LLM provider used
         model: Model name used
         generated_at: Timestamp of generation
@@ -140,6 +143,8 @@ class RankingExplanation:
     weaknesses: List[str]
     recommendation: str
     highlight_sections: Dict[str, str]
+    percentile_rank: Optional[float] = None
+    percentile_explanation: str = ""
     provider: str = ""
     model: str = ""
     generated_at: str = ""
@@ -157,6 +162,8 @@ class RankingExplanation:
             "weaknesses": self.weaknesses,
             "recommendation": self.recommendation,
             "highlight_sections": self.highlight_sections,
+            "percentile_rank": self.percentile_rank,
+            "percentile_explanation": self.percentile_explanation,
             "provider": self.provider,
             "model": self.model,
             "generated_at": self.generated_at,
@@ -821,6 +828,87 @@ Important guidelines:
 
         return explanations
 
+    def _calculate_percentile(
+        self,
+        candidate_score: float,
+        all_scores: List[float],
+    ) -> float:
+        """
+        Calculate percentile rank for a candidate score.
+
+        Args:
+            candidate_score: The candidate's ranking score
+            all_scores: List of all candidate scores in the ranking pool
+
+        Returns:
+            Percentile rank (0-100), where 100 means the candidate is ranked
+            higher than all other candidates
+        """
+        if not all_scores:
+            return 50.0  # Default to middle if no comparison data
+
+        # Count how many candidates have lower scores
+        num_lower = sum(1 for score in all_scores if score < candidate_score)
+        num_equal = sum(1 for score in all_scores if score == candidate_score)
+
+        # Calculate percentile using the "percentile rank" formula
+        # Percentile = (number of values below + 0.5 * number of equal values) / total * 100
+        total = len(all_scores)
+        percentile = ((num_lower + 0.5 * num_equal) / total) * 100
+
+        return round(percentile, 1)
+
+    def _generate_percentile_explanation(
+        self,
+        percentile_rank: float,
+        candidate_name: Optional[str],
+        total_candidates: int,
+    ) -> str:
+        """
+        Generate natural language explanation of percentile ranking.
+
+        Args:
+            percentile_rank: The candidate's percentile rank (0-100)
+            candidate_name: The candidate's name
+            total_candidates: Total number of candidates in the pool
+
+        Returns:
+            Natural language explanation
+        """
+        name = candidate_name or "This candidate"
+
+        if percentile_rank >= 95:
+            return (
+                f"{name} is ranked in the top 5% of all candidates, "
+                f"placing them higher than {percentile_rank:.0f}% of applicants "
+                f"out of {total_candidates} total candidates."
+            )
+        elif percentile_rank >= 90:
+            return (
+                f"{name} ranks higher than {percentile_rank:.0f}% of candidates, "
+                f"placing them in the top 10% of {total_candidates} applicants."
+            )
+        elif percentile_rank >= 75:
+            return (
+                f"{name} ranks in the top quartile, higher than "
+                f"{percentile_rank:.0f}% of {total_candidates} candidates."
+            )
+        elif percentile_rank >= 50:
+            return (
+                f"{name} ranks in the top half, higher than "
+                f"{percentile_rank:.0f}% of {total_candidates} candidates."
+            )
+        elif percentile_rank >= 25:
+            return (
+                f"{name} ranks higher than {percentile_rank:.0f}% of "
+                f"{total_candidates} candidates, placing them in the third quartile."
+            )
+        else:
+            return (
+                f"{name} ranks higher than {percentile_rank:.0f}% of "
+                f"{total_candidates} candidates."
+            )
+
     async def generate_ranking_explanation(
         self,
         candidate_name: Optional[str],
@@ -832,6 +920,7 @@ Important guidelines:
         job_description: str = "",
         recommendation: str = "good",
         prediction_confidence: Optional[float] = None,
+        all_candidate_scores: Optional[List[float]] = None,
         use_llm: bool = True,
     ) -> RankingExplanation:
         """
@@ -847,6 +936,7 @@ Important guidelines:
             job_description: Job posting description
             recommendation: Hiring recommendation
             prediction_confidence: Model's prediction confidence
+            all_candidate_scores: List of all candidate scores for percentile calculation
             use_llm: Whether to use LLM for narrative generation
 
         Returns:
@@ -869,6 +959,17 @@ Important guidelines:
             prediction_confidence,
             len(feature_contributions),
         )
+
+        # Calculate percentile rank if all scores provided
+        percentile_rank = None
+        percentile_explanation = ""
+        if all_candidate_scores:
+            percentile_rank = self._calculate_percentile(rank_score, all_candidate_scores)
+            percentile_explanation = self._generate_percentile_explanation(
+                percentile_rank,
+                candidate_name,
+                len(all_candidate_scores)
+            )
 
         # Generate LLM-based narrative if enabled
         narrative = ""
@@ -927,6 +1028,8 @@ Important guidelines:
             weaknesses=weaknesses,
             recommendation=recommendation,
             highlight_sections=highlight_sections,
+            percentile_rank=percentile_rank,
+            percentile_explanation=percentile_explanation,
             provider=self.provider.value,
             model=self.model,
             generated_at=generated_at,
@@ -1067,6 +1170,7 @@ Important guidelines:
         job_description: str = "",
         recommendation: str = "good",
         prediction_confidence: Optional[float] = None,
+        all_candidate_scores: Optional[List[float]] = None,
         use_llm: bool = True,
     ) -> RankingExplanation:
         """
@@ -1091,6 +1195,7 @@ Important guidelines:
                 job_description=job_description,
                 recommendation=recommendation,
                 prediction_confidence=prediction_confidence,
+                all_candidate_scores=all_candidate_scores,
                 use_llm=use_llm,
             )
         )
@@ -1137,6 +1242,7 @@ async def generate_ranking_explanation(
     job_description: str = "",
     recommendation: str = "good",
     prediction_confidence: Optional[float] = None,
+    all_candidate_scores: Optional[List[float]] = None,
     use_llm: bool = True,
 ) -> Optional[RankingExplanation]:
     """
@@ -1154,6 +1260,7 @@ async def generate_ranking_explanation(
         job_description: Job posting description
         recommendation: Hiring recommendation
         prediction_confidence: Model's prediction confidence
+        all_candidate_scores: List of all candidate scores for percentile calculation
         use_llm: Whether to use LLM for narrative generation
 
     Returns:
@@ -1171,6 +1278,7 @@ async def generate_ranking_explanation(
             job_description=job_description,
             recommendation=recommendation,
             prediction_confidence=prediction_confidence,
+            all_candidate_scores=all_candidate_scores,
             use_llm=use_llm,
         )
 
