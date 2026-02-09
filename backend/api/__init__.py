@@ -23,6 +23,8 @@ from . import (
     matching,
     matching_weights,
     model_versions,
+    performance_monitoring,
+    profiles,
     ranking,
     reports,
     resumes,
@@ -38,7 +40,6 @@ from . import (
     work_experience,
     workflow_stages,
     backups,
-    performance_monitoring,
 )
 
 __all__ = [
@@ -60,6 +61,8 @@ __all__ = [
     "matching",
     "matching_weights",
     "model_versions",
+    "performance_monitoring",
+    "profiles",
     "ranking",
     "reports",
     "resumes",
@@ -75,5 +78,4 @@ __all__ = [
     "work_experience",
     "workflow_stages",
     "backups",
-    "performance_monitoring",
 ]
