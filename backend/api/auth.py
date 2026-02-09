@@ -33,6 +33,7 @@ from utils.jwt_handler import (
     TokenData,
 )
 from config import get_settings
+from services.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -50,6 +51,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="User's email address")
     password: str = Field(..., description="User's password (min 8 chars, uppercase, lowercase, digit, special)", min_length=8)
     full_name: Optional[str] = Field(None, description="User's full name")
+    role: Optional[str] = Field(None, description="User's role (admin, hiring_manager, job_seeker, recruiter, viewer)")
 
     @validator('password')
     def validate_password(cls, v):
@@ -166,6 +168,30 @@ class ErrorResponse(BaseModel):
     type: str = Field(..., description="Error category")
 
 
+class RequestEmailVerificationRequest(BaseModel):
+    """Request model for email verification token."""
+
+    email: EmailStr = Field(..., description="User's email address")
+
+
+class RequestEmailVerificationResponse(BaseModel):
+    """Response model for email verification token request."""
+
+    message: str = Field(..., description="Success message")
+
+
+class VerifyEmailRequest(BaseModel):
+    """Request model for email verification confirmation."""
+
+    token: str = Field(..., description="Email verification token")
+
+
+class VerifyEmailResponse(BaseModel):
+    """Response model for successful email verification."""
+
+    message: str = Field(..., description="Success message")
+
+
 # ============================================================
 # Endpoints
 # ============================================================
@@ -184,18 +210,19 @@ async def register(
     Register a new user account.
 
     Creates a new user account with the provided email and password.
-    The password will be hashed using bcrypt before storage. A default
-    'viewer' role will be assigned to the new user.
+    The password will be hashed using bcrypt before storage. A role
+    will be assigned based on the request parameter, defaulting to
+    'job_seeker' if not specified.
 
     Args:
-        request_data: Registration data including email, password, and optional full_name
+        request_data: Registration data including email, password, optional full_name, and optional role
         db: Database session
 
     Returns:
         JSON response with created user information
 
     Raises:
-        HTTPException(400): If email is already registered
+        HTTPException(400): If email is already registered or role is invalid
         HTTPException(500): If database operation fails
 
     Examples:
@@ -203,7 +230,8 @@ async def register(
         >>> data = {
         ...     "email": "user@example.com",
         ...     "password": "SecurePass123!",
-        ...     "full_name": "John Doe"
+        ...     "full_name": "John Doe",
+        ...     "role": "job_seeker"
         ... }
         >>> response = requests.post("http://localhost:8000/api/auth/register", json=data)
         >>> response.json()
@@ -235,6 +263,28 @@ async def register(
         # Hash the password
         password_hash = get_password_hash(request_data.password)
 
+        # Validate and determine role
+        requested_role = request_data.role
+        if requested_role is None:
+            # Default to job_seeker if no role specified
+            user_role_enum = UserRole.JOB_SEEKER
+        else:
+            # Map string role to UserRole enum
+            role_mapping = {
+                "admin": UserRole.ADMIN,
+                "hiring_manager": UserRole.HIRING_MANAGER,
+                "job_seeker": UserRole.JOB_SEEKER,
+                "recruiter": UserRole.RECRUITER,
+                "viewer": UserRole.VIEWER,
+            }
+            if requested_role not in role_mapping:
+                logger.warning(f"Registration failed: invalid role - {requested_role}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid role. Must be one of: {', '.join(role_mapping.keys())}",
+                )
+            user_role_enum = role_mapping[requested_role]
+
         # Create new user
         new_user = User(
             email=request_data.email,
@@ -247,17 +297,61 @@ async def register(
         db.add(new_user)
         await db.flush()  # Flush to get the user ID
 
-        # Assign default viewer role
+        # Assign the specified role
         user_role = Role(
             user_id=new_user.id,
-            role=UserRole.VIEWER,
+            role=user_role_enum,
         )
         db.add(user_role)
 
         await db.commit()
         await db.refresh(new_user)
 
-        logger.info(f"User registered successfully: {new_user.email} (ID: {new_user.id})")
+        logger.info(f"User registered successfully: {new_user.email} (ID: {new_user.id}, role: {user_role_enum.value})")
+
+        # Send welcome email
+        try:
+            email_service = get_email_service()
+
+            # Prepare context for email template
+            email_context = {
+                "email": new_user.email,
+                "full_name": new_user.full_name or new_user.email.split("@")[0],
+            }
+
+            # Try to send template email first, fall back to plain text
+            if not email_service.send_template_email(
+                to=new_user.email,
+                subject="Welcome to AgentHR",
+                template_name=email_service.TEMPLATE_WELCOME,
+                context=email_context,
+            ):
+                # Fall back to plain text email if template fails
+                plain_body = f"""Welcome to AgentHR!
+
+Hello {email_context['full_name']},
+
+Thank you for registering with AgentHR. Your account has been created successfully.
+
+Email: {new_user.email}
+
+To get started, please verify your email address by visiting:
+{settings.frontend_url}/verify-email
+
+If you have any questions, feel free to contact our support team.
+
+Best regards,
+The AgentHR Team
+"""
+                email_service.send_email(
+                    to=new_user.email,
+                    subject="Welcome to AgentHR",
+                    body=plain_body,
+                    html=False,
+                )
+        except Exception as email_error:
+            # Don't fail registration if email sending fails
+            logger.warning(f"Failed to send welcome email to {new_user.email}: {email_error}")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
@@ -820,4 +914,201 @@ async def password_reset_confirm(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Password reset failed: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/request-email-verification",
+    response_model=RequestEmailVerificationResponse,
+    tags=["Authentication"],
+)
+async def request_email_verification(
+    request_data: RequestEmailVerificationRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Request email verification token.
+
+    Initiates the email verification flow for a user. If the email exists
+    in the system, an email verification token will be generated and should
+    be sent to the user's email (email sending not implemented yet).
+
+    Args:
+        request_data: Email address for verification
+        db: Database session
+
+    Returns:
+        JSON response confirming request was processed
+
+    Raises:
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {"email": "user@example.com"}
+        >>> response = requests.post("http://localhost:8000/api/auth/request-email-verification", json=data)
+        >>> response.json()
+        {"message": "If the email exists, a verification link has been sent"}
+    """
+    try:
+        logger.info(f"Email verification request for email: {request_data.email}")
+
+        # Find user by email
+        result = await db.execute(
+            select(User).where(User.email == request_data.email)
+        )
+        user = result.scalar_one_or_none()
+
+        if user:
+            # Generate verification token
+            verification_token = create_refresh_token(
+                user_id=str(user.id),
+                email=user.email,
+                expires_delta=timedelta(hours=24),  # 24 hour expiration
+            )
+
+            # Store verification token
+            verification_record = RefreshToken(
+                user_id=user.id,
+                token=verification_token,
+                expires_at=datetime.utcnow() + timedelta(hours=24),
+                is_revoked=False,
+            )
+            db.add(verification_record)
+            await db.commit()
+
+            # TODO: Send email with verification token
+            # For now, just log it (INSECURE - for development only)
+            logger.info(f"Email verification token generated for {user.email}: {verification_token}")
+
+        # Always return success to avoid email enumeration
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "If the email exists, a verification link has been sent"
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error during email verification request: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email verification request failed: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/verify-email",
+    response_model=VerifyEmailResponse,
+    tags=["Authentication"],
+)
+async def verify_email(
+    request_data: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Confirm email verification with token.
+
+    Validates the email verification token and marks the user's email as verified.
+    The token must be valid, not expired, and not revoked.
+
+    Args:
+        request_data: Verification token
+        db: Database session
+
+    Returns:
+        JSON response confirming email was verified
+
+    Raises:
+        HTTPException(400): If token is invalid or expired
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        ... }
+        >>> response = requests.post("http://localhost:8000/api/auth/verify-email", json=data)
+        >>> response.json()
+        {"message": "Email verified successfully"}
+    """
+    try:
+        logger.info("Email verification confirmation received")
+
+        # Decode and verify verification token (using refresh token verification)
+        try:
+            token_data = decode_token(request_data.token)
+        except Exception as e:
+            logger.warning(f"Email verification failed: invalid token - {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification token",
+            )
+
+        # Check if verification token exists in database and is not revoked
+        result = await db.execute(
+            select(RefreshToken).where(
+                RefreshToken.token == request_data.token,
+                RefreshToken.is_revoked == False,
+            )
+        )
+        verification_token_record = result.scalar_one_or_none()
+
+        if not verification_token_record:
+            logger.warning("Email verification failed: verification token not found or revoked")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification token",
+            )
+
+        # Check if token is expired
+        if verification_token_record.expires_at < datetime.utcnow():
+            logger.warning("Email verification failed: verification token expired")
+            # Mark as revoked
+            verification_token_record.is_revoked = True
+            verification_token_record.revoked_at = datetime.utcnow()
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification token has expired",
+            )
+
+        # Find user
+        user_result = await db.execute(
+            select(User).where(User.id == token_data.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            logger.warning(f"Email verification failed: user not found - {token_data.user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification token",
+            )
+
+        # Update user's verified status
+        user.is_verified = True
+
+        # Revoke the verification token
+        verification_token_record.is_revoked = True
+        verification_token_record.revoked_at = datetime.utcnow()
+
+        await db.commit()
+
+        logger.info(f"Email verified successfully for user: {user.email}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": "Email verified successfully"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during email verification: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email verification failed: {str(e)}",
         ) from e

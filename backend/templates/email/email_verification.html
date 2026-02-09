@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Verify Your Email Address</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table {border-collapse: collapse;}
+        .mj-container {font-size: 0 !important;}
+    </style>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        body {{
+            margin: 0;
+            padding: 0;
+            word-spacing: normal;
+            background-color: #f4f4f7;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }}
+        .mj-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }}
+        .mj-header {{
+            background-color: #2563eb;
+            padding: 32px 24px;
+            text-align: center;
+        }}
+        .mj-header h1 {{
+            color: #ffffff;
+            font-size: 26px;
+            margin: 0;
+            font-weight: 600;
+        }}
+        .mj-content {{
+            padding: 32px 24px;
+        }}
+        .mj-section {{
+            margin-bottom: 24px;
+        }}
+        .mj-section h2 {{
+            color: #1e293b;
+            font-size: 18px;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }}
+        .mj-section p {{
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 12px 0;
+        }}
+        .mj-button {{
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+        }}
+        .mj-button:hover {{
+            background-color: #1d4ed8;
+        }}
+        .mj-alert-box {{
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+        .mj-alert-box-title {{
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }}
+        .mj-alert-box-text {{
+            color: #475569;
+            font-size: 14px;
+            line-height: 1.5;
+        }}
+        .mj-divider {{
+            border-bottom: 1px solid #e2e8f0;
+            margin: 24px 0;
+        }}
+        .mj-footer {{
+            background-color: #f8fafc;
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .mj-footer p {{
+            color: #94a3b8;
+            font-size: 13px;
+            margin: 0 0 8px 0;
+        }}
+        .mj-footer a {{
+            color: #2563eb;
+            text-decoration: none;
+        }}
+        .mj-footer a:hover {{
+            text-decoration: underline;
+        }}
+        .mj-code {{
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #1e293b;
+            word-break: break-all;
+        }}
+    </style>
+</head>
+<body>
+    <div class="mj-container">
+        <!-- Header -->
+        <div class="mj-header">
+            <h1>Verify Your Email Address</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="mj-content">
+            <!-- Greeting -->
+            <div class="mj-section">
+                <p>Hello{user_name,", " + user_name if user_name else ""},</p>
+                <p>Thank you for signing up for {organization_name}! We're excited to have you on board.</p>
+            </div>
+
+            <!-- Verification Message -->
+            <div class="mj-section">
+                <p>To complete your registration and ensure the security of your account, please verify your email address by clicking the button below:</p>
+            </div>
+
+            <!-- Verification Button -->
+            <div class="mj-section" style="text-align: center; margin: 32px 0;">
+                <a href="{verification_url}" class="mj-button">Verify Email Address</a>
+            </div>
+
+            <!-- Alternative Link -->
+            <div class="mj-section">
+                <p>If the button above doesn't work, you can copy and paste the following link into your browser:</p>
+                <div class="mj-code">{verification_url}</div>
+            </div>
+
+            <!-- Expiration Warning -->
+            <div class="mj-alert-box">
+                <div class="mj-alert-box-title">⏰ Link Expires in {expiration_hours} Hours</div>
+                <div class="mj-alert-box-text">
+                    Please verify your email address within {expiration_hours} hours. After this time, the link will expire
+                    and you'll need to request a new verification email.
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="mj-divider"></div>
+
+            <!-- Security Notice -->
+            <div class="mj-section">
+                <h2>Security Notice</h2>
+                <p>If you did not create an account with {organization_name}, please disregard this email or contact our support team if you have concerns.</p>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="mj-section">
+                <h2>What Happens Next?</h2>
+                <p>Once you verify your email address, you'll have full access to your {organization_name} account, including:</p>
+                <ul style="color: #475569; font-size: 15px; line-height: 1.8; margin: 12px 0; padding-left: 24px;">
+                    <li>Complete access to your job seeker dashboard</li>
+                    <li>Ability to create and manage your profile</li>
+                    <li>Apply to jobs and track your applications</li>
+                    <li>Receive job alerts and recommendations</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mj-footer">
+            <p>This is an automated email from {organization_name}.</p>
+            <p>Please do not reply to this email. If you have questions, contact our support team.</p>
+            <p>&copy; {current_year} {organization_name}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

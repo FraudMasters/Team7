@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Welcome to {organization_name}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table {border-collapse: collapse;}
+        .mj-container {font-size: 0 !important;}
+    </style>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o>
+PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        body {{
+            margin: 0;
+            padding: 0;
+            word-spacing: normal;
+            background-color: #f4f4f7;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }}
+        .mj-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }}
+        .mj-header {{
+            background-color: #2563eb;
+            padding: 32px 24px;
+            text-align: center;
+        }}
+        .mj-header h1 {{
+            color: #ffffff;
+            font-size: 26px;
+            margin: 0;
+            font-weight: 600;
+        }}
+        .mj-content {{
+            padding: 32px 24px;
+        }}
+        .mj-section {{
+            margin-bottom: 24px;
+        }}
+        .mj-section h2 {{
+            color: #1e293b;
+            font-size: 18px;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }}
+        .mj-section p {{
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 12px 0;
+        }}
+        .mj-button {{
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+        }}
+        .mj-button:hover {{
+            background-color: #1d4ed8;
+        }}
+        .mj-feature-list {{
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        }}
+        .mj-feature-item {{
+            display: flex;
+            align-items: flex-start;
+            margin: 12px 0;
+        }}
+        .mj-feature-icon {{
+            color: #2563eb;
+            font-size: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }}
+        .mj-feature-text {{
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.6;
+        }}
+        .mj-feature-text strong {{
+            color: #1e293b;
+            font-weight: 600;
+        }}
+        .mj-divider {{
+            border-bottom: 1px solid #e2e8f0;
+            margin: 24px 0;
+        }}
+        .mj-footer {{
+            background-color: #f8fafc;
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .mj-footer p {{
+            color: #94a3b8;
+            font-size: 13px;
+            margin: 0 0 8px 0;
+        }}
+        .mj-footer a {{
+            color: #2563eb;
+            text-decoration: none;
+        }}
+        .mj-footer a:hover {{
+            text-decoration: underline;
+        }}
+    </style>
+</head>
+<body>
+    <div class="mj-container">
+        <!-- Header -->
+        <div class="mj-header">
+            <h1>Welcome to {organization_name}!</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="mj-content">
+            <!-- Greeting -->
+            <div class="mj-section">
+                <p>Hello{user_name,", " + user_name if user_name else ""},</p>
+                <p>Welcome to {organization_name}! We're thrilled to have you join our community of job seekers. Your account has been successfully verified and is ready to use.</p>
+            </div>
+
+            <!-- Getting Started -->
+            <div class="mj-section">
+                <h2>Get Started on Your Job Search Journey</h2>
+                <p>Here's what you can do to maximize your chances of finding your dream job:</p>
+            </div>
+
+            <!-- Feature List -->
+            <div class="mj-feature-list">
+                <div class="mj-feature-item">
+                    <span class="mj-feature-icon">👤</span>
+                    <span class="mj-feature-text"><strong>Complete Your Profile</strong> - Add your resume, skills, and experience to help recruiters find you.</span>
+                </div>
+                <div class="mj-feature-item">
+                    <span class="mj-feature-icon">🔍</span>
+                    <span class="mj-feature-text"><strong>Search for Jobs</strong> - Browse through thousands of job opportunities tailored to your preferences.</span>
+                </div>
+                <div class="mj-feature-item">
+                    <span class="mj-feature-icon">📢</span>
+                    <span class="mj-feature-text"><strong>Set Up Job Alerts</strong> - Receive notifications when new jobs match your criteria.</span>
+                </div>
+                <div class="mj-feature-item">
+                    <span class="mj-feature-icon">📊</span>
+                    <span class="mj-feature-text"><strong>Track Applications</strong> - Monitor the status of all your job applications in one place.</span>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="mj-divider"></div>
+
+            <!-- Call to Action -->
+            <div class="mj-section" style="text-align: center; margin: 32px 0;">
+                <p style="margin-bottom: 16px;">Ready to start? Access your dashboard now:</p>
+                <a href="{dashboard_url}" class="mj-button">Go to Dashboard</a>
+            </div>
+
+            <!-- Divider -->
+            <div class="mj-divider"></div>
+
+            <!-- Tips Section -->
+            <div class="mj-section">
+                <h2>Tips for Success</h2>
+                <ul style="color: #475569; font-size: 15px; line-height: 1.8; margin: 12px 0; padding-left: 24px;">
+                    <li>Keep your profile updated with your latest skills and experience</li>
+                    <li>Upload a polished resume that highlights your achievements</li>
+                    <li>Set up job alerts for your preferred roles and locations</li>
+                    <li>Apply promptly to jobs that match your interests</li>
+                    <li>Follow up with recruiters after submitting applications</li>
+                </ul>
+            </div>
+
+            <!-- Support Section -->
+            <div class="mj-section">
+                <h2>Need Help?</h2>
+                <p>Our support team is here to assist you every step of the way. If you have any questions or need guidance, don't hesitate to reach out.</p>
+                <p>Email us at <a href="mailto:{support_email}" style="color: #2563eb;">{support_email}</a></p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mj-footer">
+            <p>Thank you for choosing {organization_name} for your job search.</p>
+            <p>We wish you the best of luck in finding your perfect role!</p>
+            <p>&copy; {current_year} {organization_name}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

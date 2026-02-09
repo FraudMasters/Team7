@@ -2,11 +2,11 @@
  * Authentication API
  *
  * This module provides API functions for user authentication including
- * registration, login, token refresh, logout, and password reset.
+ * registration, login, token refresh, logout, password reset, and email verification.
  *
  * @example
  * ```ts
- * import { register, login, logout, refreshToken } from '@/api/auth';
+ * import { register, login, logout, refreshToken, requestEmailVerification, verifyEmail } from '@/api/auth';
  *
  * // Register a new user
  * const user = await register({
@@ -24,6 +24,12 @@
  *
  * // Logout
  * await logout(session.refresh_token);
+ *
+ * // Request email verification
+ * await requestEmailVerification('user@example.com');
+ *
+ * // Verify email with token
+ * await verifyEmail('verification_token');
  * ```
  */
 
@@ -41,6 +47,10 @@ import type {
   PasswordResetRequestResponse,
   PasswordResetConfirmRequest,
   PasswordResetConfirmResponse,
+  RequestEmailVerificationRequest,
+  RequestEmailVerificationResponse,
+  VerifyEmailRequest,
+  VerifyEmailResponse,
   ApiError,
 } from '@/types/api';
 
@@ -269,6 +279,80 @@ export async function passwordResetConfirm(
     const apiError = error as ApiError;
     throw new Error(
       apiError.detail || 'Failed to confirm password reset'
+    );
+  }
+}
+
+/**
+ * Request email verification
+ *
+ * Initiates the email verification flow by sending a verification
+ * token to the user's email. The verification token will be valid
+ * for 24 hours.
+ *
+ * @param email - User's email address
+ * @returns Promise resolving to email verification request response
+ * @throws ApiError if request fails
+ *
+ * @example
+ * ```ts
+ * const result = await requestEmailVerification('user@example.com');
+ * console.log(result.message); // "Verification email sent"
+ * ```
+ */
+export async function requestEmailVerification(
+  email: string
+): Promise<RequestEmailVerificationResponse> {
+  try {
+    const request: RequestEmailVerificationRequest = { email };
+    const response = await apiClient
+      .getAxiosInstance()
+      .post<RequestEmailVerificationResponse>(
+        '/api/auth/request-email-verification',
+        request
+      );
+    return response.data;
+  } catch (error) {
+    const apiError = error as ApiError;
+    throw new Error(
+      apiError.detail || 'Failed to request email verification'
+    );
+  }
+}
+
+/**
+ * Verify email with token
+ *
+ * Completes the email verification flow by validating the verification
+ * token from the email. This marks the user's email as verified and
+ * activates their account.
+ *
+ * @param token - Email verification token from email
+ * @returns Promise resolving to email verification response
+ * @throws ApiError if verification fails (invalid token, expired token, etc.)
+ *
+ * @example
+ * ```ts
+ * const result = await verifyEmail('verification_token_here');
+ * console.log(result.message); // "Email verified successfully"
+ * ```
+ */
+export async function verifyEmail(
+  token: string
+): Promise<VerifyEmailResponse> {
+  try {
+    const request: VerifyEmailRequest = { token };
+    const response = await apiClient
+      .getAxiosInstance()
+      .post<VerifyEmailResponse>(
+        '/api/auth/verify-email',
+        request
+      );
+    return response.data;
+  } catch (error) {
+    const apiError = error as ApiError;
+    throw new Error(
+      apiError.detail || 'Failed to verify email'
     );
   }
 }

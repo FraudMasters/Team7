@@ -1974,3 +1974,159 @@ export interface SearchHistoryResponse {
   limit: number;
 }
 
+// ==================== Auth Types ====================
+
+/**
+ * User role enum for registration
+ */
+export type UserRole = 'admin' | 'hiring_manager' | 'job_seeker' | 'recruiter' | 'viewer';
+
+/**
+ * Registration request with optional role for job seeker support
+ */
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  full_name?: string;
+  role?: UserRole;
+}
+
+/**
+ * Registration response
+ */
+export interface RegisterResponse {
+  id: string;
+  email: string;
+  full_name?: string;
+  is_active: boolean;
+  is_verified: boolean;
+  message: string;
+}
+
+/**
+ * Login request
+ */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/**
+ * Basic user information
+ */
+export interface UserInfo {
+  id: string;
+  email: string;
+  full_name?: string;
+  is_active: boolean;
+  is_verified: boolean;
+  is_superuser: boolean;
+}
+
+/**
+ * Login response
+ */
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  user: UserInfo;
+}
+
+/**
+ * Token refresh request
+ */
+export interface RefreshTokenRequest {
+  refresh_token: string;
+}
+
+/**
+ * Token refresh response
+ */
+export interface RefreshTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+/**
+ * Logout request
+ */
+export interface LogoutRequest {
+  refresh_token: string;
+}
+
+/**
+ * Logout response
+ */
+export interface LogoutResponse {
+  message: string;
+}
+
+/**
+ * Password reset request
+ */
+export interface PasswordResetRequest {
+  email: string;
+}
+
+/**
+ * Password reset request response
+ */
+export interface PasswordResetRequestResponse {
+  message: string;
+}
+
+/**
+ * Password reset confirmation request
+ */
+export interface PasswordResetConfirmRequest {
+  token: string;
+  new_password: string;
+}
+
+/**
+ * Password reset confirmation response
+ */
+export interface PasswordResetConfirmResponse {
+  message: string;
+}
+
+/**
+ * Request email verification request
+ */
+export interface RequestEmailVerificationRequest {
+  email: string;
+}
+
+/**
+ * Request email verification response
+ */
+export interface RequestEmailVerificationResponse {
+  message: string;
+}
+
+/**
+ * Verify email request
+ */
+export interface VerifyEmailRequest {
+  token: string;
+}
+
+/**
+ * Verify email response
+ */
+export interface VerifyEmailResponse {
+  message: string;
+}
+
+/**
+ * Auth error response
+ */
+export interface AuthErrorResponse {
+  error: string;
+  detail: string;
+  type: string;
+}
+
