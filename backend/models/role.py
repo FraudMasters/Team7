@@ -14,8 +14,9 @@ class UserRole(str, enum.Enum):
     """User role definitions for access control"""
 
     ADMIN = "admin"
-    RECRUITER = "recruiter"
     HIRING_MANAGER = "hiring_manager"
+    JOB_SEEKER = "job_seeker"
+    RECRUITER = "recruiter"
     VIEWER = "viewer"
 
 
@@ -30,7 +31,7 @@ class Role(Base, UUIDMixin, TimestampMixin):
     Attributes:
         id: UUID primary key
         user_id: Foreign key to User
-        role: User role (admin, recruiter, hiring_manager, viewer)
+        role: User role (admin, hiring_manager, job_seeker, recruiter, viewer)
         vacancy_id: Optional foreign key to JobVacancy for scoped permissions
         notes: Optional notes about this role assignment
         created_at: Timestamp when role was assigned (inherited)
