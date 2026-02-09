@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Typography, Box, Tabs, Tab, Paper } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import ProfileEditor from '@components/ProfileEditor';
+import ProfileEditor from '@components/UserSettingsEditor';
 import ApiKeysManager from '@components/ApiKeysManager';
 
 /**
