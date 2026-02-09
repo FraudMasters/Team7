@@ -290,6 +290,7 @@ from api import (
     websocket,
     auth,
     profiles,
+    skills,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -310,6 +311,7 @@ app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidate
 app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
 app.include_router(work_history.router, prefix="/api/profiles/me/work-history", tags=["Work History"])
 app.include_router(education.router, prefix="/api/profiles/me/education", tags=["Education"])
+app.include_router(skills.router, prefix="/api/profiles/me/skills", tags=["Skills"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
 app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
 app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
