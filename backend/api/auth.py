@@ -50,6 +50,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="User's email address")
     password: str = Field(..., description="User's password (min 8 chars, uppercase, lowercase, digit, special)", min_length=8)
     full_name: Optional[str] = Field(None, description="User's full name")
+    role: Optional[str] = Field(None, description="User's role (admin, hiring_manager, job_seeker, recruiter, viewer)")
 
     @validator('password')
     def validate_password(cls, v):
