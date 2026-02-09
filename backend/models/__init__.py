@@ -19,6 +19,7 @@ from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
 from .hiring_stage import HiringStage, HiringStageName
+from .job_seeker_profile import JobSeekerProfile
 from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
@@ -62,6 +63,7 @@ __all__ = [
     "UserPreferences",
     "HiringStage",
     "HiringStageName",
+    "JobSeekerProfile",
     "AnalyticsEvent",
     "Recruiter",
     "Report",
