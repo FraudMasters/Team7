@@ -38,6 +38,7 @@ from . import (
     taxonomy_versions,
     vacancies,
     work_experience,
+    work_history,
     workflow_stages,
     backups,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "taxonomy_versions",
     "vacancies",
     "work_experience",
+    "work_history",
     "workflow_stages",
     "backups",
 ]

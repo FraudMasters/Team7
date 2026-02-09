@@ -275,6 +275,7 @@ from api import (
     taxonomy_versions,
     batch,
     work_experience,
+    work_history,
     skill_gap_analysis,
     backups,
     ats_simulation,
@@ -306,6 +307,7 @@ app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"]
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
 app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
 app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
+app.include_router(work_history.router, prefix="/api/profiles/me/work-history", tags=["Work History"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
 app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
 app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
