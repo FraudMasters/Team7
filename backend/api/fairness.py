@@ -4,12 +4,14 @@ Fairness monitoring endpoints for AI bias detection and mitigation.
 This module provides endpoints for monitoring and tracking AI model fairness,
 including retrieving fairness metrics, bias reports, and discrimination alerts.
 """
+import io
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 
@@ -1398,4 +1400,288 @@ async def get_fairness_scorecard(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate fairness scorecard: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/reports/{report_id}",
+    response_model=BiasReport,
+    tags=["Fairness"],
+)
+async def get_bias_report(
+    report_id: str,
+) -> JSONResponse:
+    """
+    Get a specific bias analysis report by ID.
+
+    This endpoint retrieves detailed information about a specific bias analysis
+    report including all findings, metrics, and recommendations.
+
+    The report_id format is typically "{analysis_date}_{model_version}".
+
+    Args:
+        report_id: Unique identifier for the report
+
+    Returns:
+        JSON response with detailed bias report information
+
+    Raises:
+        HTTPException(404): If report not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/fairness/reports/2024-01-25_v1.0")
+        >>> response.json()
+        {
+            "report_id": "2024-01-25_v1.0",
+            "model_name": "ranking",
+            "findings": [...],
+            ...
+        }
+    """
+    try:
+        logger.info(f"Fetching bias report {report_id}")
+
+        from database import get_db
+        from models.fairness_metrics import FairnessMetrics as FairnessMetricsModel
+
+        async for db in get_db():
+            # Parse report_id to extract analysis_date and model_version
+            # Format: "{analysis_date}_{model_version}"
+            parts = report_id.rsplit("_", 1)
+            if len(parts) != 2:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Invalid report_id format: {report_id}. Expected format: YYYY-MM-DD_version",
+                )
+
+            analysis_date, model_version = parts
+
+            # Get all metrics for this analysis_date and model_version
+            metrics_query = select(FairnessMetricsModel).where(
+                FairnessMetricsModel.analysis_date == analysis_date,
+                FairnessMetricsModel.model_version_id == model_version
+            )
+
+            metrics_result = await db.execute(metrics_query)
+            metrics_records = metrics_result.scalars().all()
+
+            if not metrics_records:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Report not found: {report_id}",
+                )
+
+            # Build the report (similar to get_bias_reports logic but for single report)
+            actual_model_name = "ranking"
+
+            protected_attributes = list(set([
+                m.demographic_group for m in metrics_records
+            ]))
+
+            disparate_impact_values = [
+                m.disparate_impact_ratio for m in metrics_records
+                if m.disparate_impact_ratio is not None
+            ]
+            overall_fairness_score = (
+                sum(disparate_impact_values) / len(disparate_impact_values)
+                if disparate_impact_values
+                else 0.85
+            )
+
+            bias_detected_value = any(
+                m.alert_triggered for m in metrics_records
+            )
+
+            severity_ranks = {"low": 1, "medium": 2, "high": 3, "critical": 4, "none": 0}
+            max_severity = "none"
+            for m in metrics_records:
+                if m.alert_severity and severity_ranks.get(m.alert_severity, 0) > severity_ranks.get(max_severity, 0):
+                    max_severity = m.alert_severity
+
+            findings = []
+            for m in metrics_records:
+                if m.alert_triggered:
+                    findings.append({
+                        "demographic_attribute": m.demographic_group,
+                        "disparate_impact_ratio": float(m.disparate_impact_ratio) if m.disparate_impact_ratio else 1.0,
+                        "statistical_parity_difference": float(m.statistical_parity_difference) if m.statistical_parity_difference else 0.0,
+                        "severity": m.alert_severity or "low",
+                        "sample_size": m.total_sample_size or 0,
+                        "vacancy_id": str(m.vacancy_id) if m.vacancy_id else None,
+                    })
+
+            recommendations_set = set()
+            for m in metrics_records:
+                if m.mitigation_suggested:
+                    recommendations_set.add(m.mitigation_suggested)
+
+            recommendations = sorted(list(recommendations_set)) if recommendations_set else ["No issues detected"]
+
+            # Get generated_at timestamp
+            created_at = max((m.created_at for m in metrics_records if m.created_at), default=None)
+            generated_at = created_at.isoformat() if created_at else analysis_date
+
+            report_data = {
+                "report_id": report_id,
+                "model_name": actual_model_name,
+                "model_version": model_version,
+                "report_type": "system-wide",
+                "protected_attributes": protected_attributes,
+                "overall_fairness_score": round(overall_fairness_score, 2),
+                "bias_detected": bias_detected_value,
+                "severity_level": max_severity if max_severity != "none" else "none",
+                "findings": findings,
+                "recommendations": recommendations,
+                "generated_at": generated_at,
+            }
+
+            logger.info(f"Retrieved bias report {report_id}")
+            break
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=report_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching bias report {report_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch bias report: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/reports/{report_id}/export",
+    tags=["Fairness"],
+)
+async def export_bias_report(
+    report_id: str,
+    format: str = Query("pdf", description="Export format: pdf or csv"),
+) -> StreamingResponse:
+    """
+    Export a bias analysis report in PDF or CSV format.
+
+    This endpoint generates a downloadable file containing the bias analysis
+    report in the specified format. PDF reports include visualizations and
+    professional formatting, while CSV exports provide raw metrics data.
+
+    The report_id format is "{analysis_date}_{model_version}".
+
+    Args:
+        report_id: Unique identifier for the report
+        format: Export format - "pdf" for formatted report, "csv" for raw metrics data
+
+    Returns:
+        StreamingResponse with file download
+
+    Raises:
+        HTTPException(404): If report not found
+        HTTPException(422): If format is invalid
+        HTTPException(500): If export generation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post("/api/fairness/reports/2024-01-25_v1.0/export?format=pdf")
+        >>> # Returns PDF file for download
+    """
+    try:
+        logger.info(f"Exporting bias report {report_id} as {format}")
+
+        # Validate format
+        valid_formats = ["pdf", "csv"]
+        if format not in valid_formats:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid format '{format}'. Must be one of: {', '.join(valid_formats)}",
+            )
+
+        from database import get_db
+        from services.bias_report_generator import get_bias_report_generator
+
+        # Get report generator service
+        report_generator = get_bias_report_generator()
+        if not report_generator:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="PDF report generation service is not available. Please install reportlab.",
+            )
+
+        # Parse report_id to extract analysis_date and model_version
+        parts = report_id.rsplit("_", 1)
+        if len(parts) != 2:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Invalid report_id format: {report_id}. Expected format: YYYY-MM-DD_version",
+            )
+
+        analysis_date, model_version = parts
+
+        async for db in get_db():
+            if format == "pdf":
+                # Generate PDF report
+                result = await report_generator.generate_bias_report(
+                    db=db,
+                    vacancy_id=None,  # System-wide report
+                    model_version=model_version,
+                    analysis_date=analysis_date,
+                    report_type="detailed_analysis",
+                )
+
+                if not result.success:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=result.error_message or "Failed to generate PDF report",
+                    )
+
+                # Return PDF as streaming response
+                logger.info(f"Generated PDF export for report {report_id} ({result.file_size} bytes)")
+
+                return StreamingResponse(
+                    io.BytesIO(result.report_bytes),
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": f"attachment; filename={result.filename}",
+                        "Content-Length": str(result.file_size),
+                    },
+                )
+
+            else:  # format == "csv"
+                # Generate CSV export
+                result = await report_generator.generate_csv_export(
+                    db=db,
+                    vacancy_id=None,
+                    model_version=model_version,
+                    analysis_date=analysis_date,
+                )
+
+                if not result.success:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=result.error_message or "Failed to generate CSV export",
+                    )
+
+                # Return CSV as streaming response
+                logger.info(f"Generated CSV export for report {report_id} ({result.file_size} bytes)")
+
+                return StreamingResponse(
+                    io.BytesIO(result.report_bytes),
+                    media_type="text/csv",
+                    headers={
+                        "Content-Disposition": f"attachment; filename={result.filename}",
+                        "Content-Length": str(result.file_size),
+                    },
+                )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting bias report {report_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export bias report: {str(e)}",
         ) from e
