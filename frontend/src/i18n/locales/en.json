@@ -479,6 +479,10 @@
       "mediumMatches": "Medium Matches (50%+)"
     }
   },
+  "biasDetectionDashboard": {
+    "title": "AI Bias Detection",
+    "subtitle": "Monitor fairness metrics and detect algorithmic bias"
+  },
   "vacancyList": {
     "title": "Job Requests",
     "subtitle": "Manage vacancies and candidate requirements",
