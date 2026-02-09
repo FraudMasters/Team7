@@ -4,6 +4,7 @@ SQLAlchemy database models for Resume Analysis System
 from .base import Base
 from .resume import Resume
 from .work_history import WorkHistory, EmploymentType
+from .education import Education, DegreeType
 from .resume_analysis import ResumeAnalysis
 from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
@@ -42,6 +43,8 @@ __all__ = [
     "Resume",
     "WorkHistory",
     "EmploymentType",
+    "Education",
+    "DegreeType",
     "ResumeAnalysis",
     "AnalysisResult",
     "ResumeComparison",
