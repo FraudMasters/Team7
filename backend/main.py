@@ -286,6 +286,7 @@ from api import (
     search,
     config,
     websocket,
+    auth,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -320,6 +321,7 @@ app.include_router(candidate_activities.router, prefix="/api/candidate-activitie
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 app.include_router(websocket.router, tags=["WebSocket"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 
 
 if __name__ == "__main__":
