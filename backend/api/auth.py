@@ -167,6 +167,18 @@ class ErrorResponse(BaseModel):
     type: str = Field(..., description="Error category")
 
 
+class RequestEmailVerificationRequest(BaseModel):
+    """Request model for email verification token."""
+
+    email: EmailStr = Field(..., description="User's email address")
+
+
+class RequestEmailVerificationResponse(BaseModel):
+    """Response model for email verification token request."""
+
+    message: str = Field(..., description="Success message")
+
+
 # ============================================================
 # Endpoints
 # ============================================================
@@ -845,4 +857,85 @@ async def password_reset_confirm(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Password reset failed: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/request-email-verification",
+    response_model=RequestEmailVerificationResponse,
+    tags=["Authentication"],
+)
+async def request_email_verification(
+    request_data: RequestEmailVerificationRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Request email verification token.
+
+    Initiates the email verification flow for a user. If the email exists
+    in the system, an email verification token will be generated and should
+    be sent to the user's email (email sending not implemented yet).
+
+    Args:
+        request_data: Email address for verification
+        db: Database session
+
+    Returns:
+        JSON response confirming request was processed
+
+    Raises:
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {"email": "user@example.com"}
+        >>> response = requests.post("http://localhost:8000/api/auth/request-email-verification", json=data)
+        >>> response.json()
+        {"message": "If the email exists, a verification link has been sent"}
+    """
+    try:
+        logger.info(f"Email verification request for email: {request_data.email}")
+
+        # Find user by email
+        result = await db.execute(
+            select(User).where(User.email == request_data.email)
+        )
+        user = result.scalar_one_or_none()
+
+        if user:
+            # Generate verification token
+            verification_token = create_refresh_token(
+                user_id=str(user.id),
+                email=user.email,
+                expires_delta=timedelta(hours=24),  # 24 hour expiration
+            )
+
+            # Store verification token
+            verification_record = RefreshToken(
+                user_id=user.id,
+                token=verification_token,
+                expires_at=datetime.utcnow() + timedelta(hours=24),
+                is_revoked=False,
+            )
+            db.add(verification_record)
+            await db.commit()
+
+            # TODO: Send email with verification token
+            # For now, just log it (INSECURE - for development only)
+            logger.info(f"Email verification token generated for {user.email}: {verification_token}")
+
+        # Always return success to avoid email enumeration
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "If the email exists, a verification link has been sent"
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error during email verification request: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email verification request failed: {str(e)}",
         ) from e
