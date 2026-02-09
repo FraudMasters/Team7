@@ -1093,21 +1093,42 @@ async def acknowledge_alert(
     try:
         logger.info(f"Acknowledging alert {alert_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        response_data = {
-            "alert_id": alert_id,
-            "acknowledged": True,
-            "acknowledged_at": datetime.utcnow().isoformat() + "Z",
-        }
+        from database import get_db
+        from models.fairness_metrics import FairnessAlert as FairnessAlertModel
 
-        logger.info(f"Acknowledged alert {alert_id}")
+        async for db in get_db():
+            # Query for the alert
+            query = select(FairnessAlertModel).where(FairnessAlertModel.id == alert_id)
+            result = await db.execute(query)
+            alert = result.scalar_one_or_none()
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data,
-        )
+            if not alert:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Alert with ID {alert_id} not found",
+                )
 
+            # Update alert status to acknowledged
+            alert.status = "acknowledged"
+            alert.acknowledged_at = datetime.utcnow().isoformat() + "Z"
+
+            # Commit the changes
+            await db.commit()
+            await db.refresh(alert)
+
+            logger.info(f"Acknowledged alert {alert_id}")
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "alert_id": str(alert.id),
+                    "acknowledged": True,
+                    "acknowledged_at": alert.acknowledged_at,
+                },
+            )
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error acknowledging alert: {e}", exc_info=True)
         raise HTTPException(
