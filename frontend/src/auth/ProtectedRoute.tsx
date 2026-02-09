@@ -83,13 +83,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectTo = '/login',
   unauthorizedTo = '/unauthorized',
 }) => {
-  const { isAuthenticated, isLoading, hasRole, hasAnyRole, user } = useAuthContext();
+  const { isAuthenticated, isLoading, isInitialized, hasRole, hasAnyRole, user } = useAuthContext();
   const location = useLocation();
 
   /**
    * Show loading state while checking authentication
+   * This shows during initial auth check and during auth operations
    */
-  if (isLoading) {
+  if (isLoading || !isInitialized) {
     return (
       <Box
         sx={{
@@ -102,7 +103,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       >
         <CircularProgress size={60} thickness={4} />
         <Typography variant="h6" sx={{ mt: 3, color: 'text.secondary' }}>
-          Checking authentication...
+          {!isInitialized ? 'Loading...' : 'Checking authentication...'}
         </Typography>
       </Box>
     );

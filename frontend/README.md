@@ -216,6 +216,107 @@ See [BACKLOG.md](BACKLOG.md) for full list:
 /Landing            /jobs/*    /recruiter/*        /admin/*
 ```
 
+### Role-Based Routing
+
+The AgentHR frontend implements a **dual-flow architecture** with role-based routing that provides optimized experiences for different user types:
+
+#### User Roles
+
+```typescript
+type UserRole = 'JobSeeker' | 'Recruiter' | 'Admin';
+```
+
+- **JobSeeker**: Can browse and apply for jobs without authentication
+- **Recruiter**: Can manage vacancies and candidates (requires authentication + role)
+- **Admin**: Has full access to all recruiter and admin features
+
+#### Route Protection
+
+**Job Seeker Routes** (`/jobs/*`):
+- No authentication required
+- Mobile-first design with bottom navigation
+- Focus on job discovery and application flow
+
+**Recruiter Routes** (`/recruiter/*`):
+- Require `Recruiter` or `Admin` role
+- Protected by `ProtectedRoute` component
+- Desktop-focused dashboard with sidebar navigation
+- Role-based access control using `AuthContext`
+
+**Authentication Routes** (`/auth/*`):
+- Shared between both flows
+- Login, registration, and OAuth callback
+
+#### ProtectedRoute Component
+
+Recruiter routes are wrapped with `ProtectedRoute` for role-based access control:
+
+```tsx
+// Example: Protecting recruiter routes
+function ProtectedRecruiterLayout() {
+  return (
+    <ProtectedRoute requiredRoles={[UserRole.Recruiter, UserRole.Admin]} redirectTo="/auth/login">
+      <RecruiterLayout />
+    </ProtectedRoute>
+  );
+}
+
+// Usage in App.tsx
+<Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
+  {/* Recruiter routes */}
+</Route>
+```
+
+#### Role-Based Redirects
+
+The landing page automatically redirects authenticated users based on their role:
+
+```typescript
+// Recruiter or Admin → /recruiter/dashboard
+if (hasAnyRole([UserRole.Recruiter, UserRole.Admin])) {
+  navigate('/recruiter/dashboard');
+}
+// Everyone else → /jobs
+else if (isAuthenticated) {
+  navigate('/jobs');
+}
+```
+
+#### Checking User Roles in Components
+
+```tsx
+import { useAuthContext, UserRole } from '@/contexts/AuthContext';
+
+const MyComponent = () => {
+  const { user, hasRole, hasAnyRole, isAuthenticated } = useAuthContext();
+
+  // Check if user has specific role
+  if (hasRole(UserRole.Admin)) {
+    return <AdminPanel />;
+  }
+
+  // Check if user has any of the specified roles
+  if (hasAnyRole([UserRole.Recruiter, UserRole.Admin])) {
+    return <RecruiterFeatures />;
+  }
+
+  return <JobSeekerView />;
+};
+```
+
+#### Layout Differences
+
+| Feature | JobSeekerLayout | RecruiterLayout |
+|---------|----------------|-----------------|
+| **Primary Navigation** | Bottom nav (mobile) + Sidebar (desktop) | Sidebar only |
+| **Design Focus** | Mobile-first, discovery | Desktop-first, dashboard |
+| **Target Device** | Responsive, mobile-optimized | Desktop-optimized |
+| **Sections** | Jobs, Career, Account | Hiring, Resumes, Search, Analytics, Settings |
+| **Authentication** | Optional | Required |
+| **Protected** | No | Yes (Recruiter/Admin roles) |
+
+For detailed architecture documentation, see [DUAL_FLOW_ARCHITECTURE.md](DUAL_FLOW_ARCHITECTURE.md).
+
 ### Data Fetching Pattern
 
 All components use TanStack React Query for server state:

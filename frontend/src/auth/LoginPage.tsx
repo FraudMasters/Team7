@@ -67,7 +67,7 @@ const LoginPage: React.FC = () => {
    * Navigates to registration page
    */
   const handleRegister = () => {
-    navigate('/register', { state: { from: location.state } });
+    navigate('/auth/register', { state: { from: location.state } });
   };
 
   /**

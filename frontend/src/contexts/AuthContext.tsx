@@ -1,6 +1,58 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { login as apiLogin, register as apiRegister, logout as apiLogout, refreshToken as apiRefreshToken } from '@/api/auth';
-import type { UserInfo, LoginResponse, RegisterResponse } from '@/types/api';
+import type { UserRole } from '@/hooks/useRoles';
+
+/**
+ * User role type for role-based access control
+ *
+ * Standardized role names following PascalCase convention.
+ * - JobSeeker: Can browse and apply for jobs
+ * - Recruiter: Can manage vacancies and candidates
+ * - Admin: Has superuser privileges and can access all routes
+ */
+export type { UserRole };
+
+/**
+ * User information interface
+ *
+ * Represents the authenticated user with their associated data.
+ */
+export interface UserInfo {
+  /** User's unique identifier */
+  id: string;
+  /** User's email address */
+  email: string;
+  /** User's full name (optional) */
+  full_name?: string;
+  /** Roles assigned to the user */
+  roles?: UserRole[];
+  /** User's profile information from OIDC */
+  profile?: {
+    preferred_username?: string;
+    name?: string;
+    email?: string;
+    sub?: string;
+  };
+}
+
+/**
+ * Login response from API
+ */
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  user: UserInfo;
+}
+
+/**
+ * Register response from API
+ */
+export interface RegisterResponse {
+  message: string;
+  user: UserInfo;
+}
 
 /**
  * Local storage keys for authentication persistence
@@ -23,6 +75,8 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Whether authentication state is loading */
   isLoading: boolean;
+  /** Whether authentication state has been initialized */
+  isInitialized: boolean;
   /** Authentication error message */
   error: string | null;
 }
@@ -41,6 +95,12 @@ interface AuthActions {
   refreshAccessToken: () => Promise<void>;
   /** Clear authentication error */
   clearError: () => void;
+  /** Check if user has a specific role */
+  hasRole: (role: UserRole) => boolean;
+  /** Check if user has at least one of the specified roles */
+  hasAnyRole: (roles: UserRole[]) => boolean;
+  /** Whether authentication state has been initialized */
+  isInitialized: boolean;
 }
 
 /**
@@ -141,7 +201,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const [accessToken, setAccessToken] = useState<string | null>(initialState.accessToken || null);
   const [refreshTokenValue, setRefreshTokenValue] = useState<string | null>(initialState.refreshToken || null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Initialize authentication state
+   * Sets isInitialized to true after checking localStorage
+   */
+  useEffect(() => {
+    // Small delay to ensure smooth loading state
+    const timer = setTimeout(() => {
+      setIsInitialized(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   /**
    * Update localStorage with auth state
@@ -335,18 +409,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     setError(null);
   }, []);
 
+  /**
+   * Check if user has a specific role
+   *
+   * @param role - Role to check
+   * @returns true if user has the role
+   */
+  const hasRole = useCallback((role: UserRole): boolean => {
+    if (!user?.roles) return false;
+    return user.roles.includes(role);
+  }, [user]);
+
+  /**
+   * Check if user has at least one of the specified roles
+   *
+   * @param roles - Array of roles to check
+   * @returns true if user has at least one of the roles
+   */
+  const hasAnyRole = useCallback((roles: UserRole[]): boolean => {
+    if (!user?.roles) return false;
+    return roles.some(role => user.roles?.includes(role));
+  }, [user]);
+
   const contextValue: AuthContextValue = {
     user,
     accessToken,
     refreshToken: refreshTokenValue,
     isAuthenticated: !!accessToken && !!user,
     isLoading,
+    isInitialized,
     error,
     register,
     login,
     logout,
     refreshAccessToken,
     clearError,
+    hasRole,
+    hasAnyRole,
   };
 
   return (
@@ -367,7 +466,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
  *
  * @example
  * ```tsx
- * const { user, login, logout, isAuthenticated, isLoading } = useAuthContext();
+ * const { user, login, logout, isAuthenticated, isLoading, hasRole, hasAnyRole } = useAuthContext();
  *
  * // Display user info
  * {user && <p>Welcome, {user.email}</p>}
@@ -384,6 +483,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
  *
  * // Show loading state
  * {isLoading && <p>Loading...</p>}
+ *
+ * // Check user role
+ * {hasRole('Admin') && <AdminPanel />}
+ *
+ * // Check if user has any of the specified roles
+ * {hasAnyRole(['Recruiter', 'Admin']) && <RecruiterFeatures />}
  * ```
  */
 export const useAuthContext = (): AuthContextValue => {

@@ -88,7 +88,7 @@ const CallbackPage: React.FC = () => {
         if (auth.error) {
           // Authentication failed - redirect to login with error
           console.error('Authentication error:', auth.error);
-          navigate('/login', { replace: true });
+          navigate('/auth/login', { replace: true });
           return;
         }
 
@@ -119,12 +119,12 @@ const CallbackPage: React.FC = () => {
           // No user yet - might still be loading
           // If not loading and no user, something went wrong
           if (!auth.isLoading) {
-            navigate('/login', { replace: true });
+            navigate('/auth/login', { replace: true });
           }
         }
       } catch (error) {
         console.error('Callback processing error:', error);
-        navigate('/login', { replace: true });
+        navigate('/auth/login', { replace: true });
       }
     };
 

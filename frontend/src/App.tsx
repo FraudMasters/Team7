@@ -4,8 +4,17 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import JobSeekerLayout from './layouts/JobSeekerLayout';
 import RecruiterLayout from './layouts/RecruiterLayout';
 
+// Authentication
+import ProtectedRoute from './auth/ProtectedRoute';
+import { UserRole } from './contexts/AuthContext';
+
 // Pages - Landing
 import LandingPage from './pages/LandingPage';
+
+// Authentication Pages
+import { LoginPage } from './auth/LoginPage';
+import { RegisterPage } from './auth/RegisterPage';
+import { CallbackPage } from './auth/CallbackPage';
 
 // Job Seeker Pages
 import { JobsBrowsePage } from './pages/jobs/JobsBrowsePage';
@@ -47,7 +56,20 @@ import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
-import TestProgressPage from './pages/TestProgressPage';
+
+/**
+ * Protected Recruiter Layout Wrapper
+ *
+ * Wraps the RecruiterLayout with role-based access control.
+ * Only users with Recruiter or Admin roles can access recruiter routes.
+ */
+function ProtectedRecruiterLayout() {
+  return (
+    <ProtectedRoute requiredRoles={[UserRole.Recruiter, UserRole.Admin]} redirectTo="/auth/login">
+      <RecruiterLayout />
+    </ProtectedRoute>
+  );
+}
 
 /**
  * Main App Component
@@ -61,6 +83,11 @@ function App() {
       <Routes>
         {/* Root route - Landing Page */}
         <Route path="/" element={<LandingPage />} />
+
+        {/* Authentication Routes */}
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/auth/callback" element={<CallbackPage />} />
 
         {/* Job Seeker Flow */}
         <Route path="/jobs" element={<JobSeekerLayout />}>
@@ -85,11 +112,8 @@ function App() {
           <Route index element={<CandidateProfilePage />} />
         </Route>
 
-        {/* Test Routes (for development) */}
-        <Route path="/test-progress" element={<TestProgressPage />} />
-
-        {/* Recruiter Flow */}
-        <Route path="/recruiter" element={<RecruiterLayout />}>
+        {/* Recruiter Flow - Protected with role-based access control */}
+        <Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="candidates" element={<CandidatesKanbanPage />} />
           <Route path="candidates/:id" element={<CandidateDetailPage />} />

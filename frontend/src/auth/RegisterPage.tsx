@@ -149,7 +149,7 @@ const RegisterPage: React.FC = () => {
    * Navigates back to login page
    */
   const handleLogin = () => {
-    navigate('/login', { state: { from: location.state } });
+    navigate('/auth/login', { state: { from: location.state } });
   };
 
   /**

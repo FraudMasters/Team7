@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -17,6 +17,9 @@ import {
   useTheme,
   Divider,
   Tooltip,
+  CircularProgress,
+  Backdrop,
+  Fade,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -42,6 +45,7 @@ import {
   ViewColumn as KanbanIcon,
   Upload as UploadIcon,
 } from '@mui/icons-material';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 // Ширина боковой панели навигации
 const DRAWER_WIDTH = 280;
@@ -114,6 +118,7 @@ const RecruiterLayout: React.FC = () => {
   const theme = useTheme();
   // Проверка, является ли устройство мобильным
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { isInitialized } = useAuthContext();
   // Состояние открытости мобильного меню
   const [mobileOpen, setMobileOpen] = useState(false);
   // Состояние раскрытых секций навигации
@@ -124,6 +129,8 @@ const RecruiterLayout: React.FC = () => {
     Analytics: false,
     Settings: false,
   });
+  // State for transition animation
+  const [transitionKey, setTransitionKey] = useState(location.pathname);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -137,6 +144,11 @@ const RecruiterLayout: React.FC = () => {
   const handleSectionToggle = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
+
+  // Trigger transition animation on route change
+  useEffect(() => {
+    setTransitionKey(location.pathname);
+  }, [location.pathname]);
 
   // Контент боковой панели ( drawer)
   const drawerContent = (
@@ -278,6 +290,36 @@ const RecruiterLayout: React.FC = () => {
     </Box>
   );
 
+  /**
+   * Show loading state during initial auth check
+   */
+  if (!isInitialized) {
+    return (
+      <Backdrop
+        sx={{
+          color: 'primary.main',
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          bgcolor: 'background.default',
+        }}
+        open
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={48} thickness={4} />
+          <Typography variant="body1" color="text.secondary">
+            Loading...
+          </Typography>
+        </Box>
+      </Backdrop>
+    );
+  }
+
   return (
     <Box sx={{ display: 'flex' }}>
       {/* Ссылка для быстрого перехода к основному контенту (для пользователей клавиатуры) */}
@@ -394,7 +436,6 @@ const RecruiterLayout: React.FC = () => {
         id="main-content"
         sx={{
           flexGrow: 1,
-          p: 3,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           bgcolor: 'background.default',
           minHeight: '100vh',
@@ -402,7 +443,13 @@ const RecruiterLayout: React.FC = () => {
         tabIndex={-1}
       >
         <Toolbar />
-        <Outlet />
+        <Box sx={{ p: 3 }}>
+          <Fade in timeout={{ enter: 300, exit: 200 }} key={transitionKey}>
+            <Box>
+              <Outlet />
+            </Box>
+          </Fade>
+        </Box>
       </Box>
     </Box>
   );

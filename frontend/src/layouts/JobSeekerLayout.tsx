@@ -20,6 +20,9 @@ import {
   useTheme,
   IconButton,
   Collapse,
+  CircularProgress,
+  Backdrop,
+  Fade,
 } from '@mui/material';
 // Импорт иконок MUI
 import {
@@ -35,10 +38,10 @@ import {
   School as LearningIcon,
   Assessment as AssessmentIcon,
   Menu as MenuIcon,
-  TrendingUp as TrendingUpIcon,
   AttachMoney as SalaryIcon,
 } from '@mui/icons-material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 // Интерфейс элемента навигации
 interface NavItem {
@@ -107,6 +110,7 @@ const JobSeekerLayout: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
+  const { isInitialized } = useAuthContext();
   const [bottomNavValue, setBottomNavValue] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -114,6 +118,8 @@ const JobSeekerLayout: React.FC = () => {
     Career: false,
     Account: false,
   });
+  // State for transition animation
+  const [transitionKey, setTransitionKey] = useState(location.pathname);
 
   // Обновление активной вкладки на основе текущего маршрута (нижняя навигация)
   useEffect(() => {
@@ -123,6 +129,11 @@ const JobSeekerLayout: React.FC = () => {
     if (index >= 0) {
       setBottomNavValue(index);
     }
+  }, [location.pathname]);
+
+  // Trigger transition animation on route change
+  useEffect(() => {
+    setTransitionKey(location.pathname);
   }, [location.pathname]);
 
   // Обработчик изменения нижней навигации
@@ -267,6 +278,36 @@ const JobSeekerLayout: React.FC = () => {
     </Box>
   );
 
+  /**
+   * Show loading state during initial auth check
+   */
+  if (!isInitialized) {
+    return (
+      <Backdrop
+        sx={{
+          color: 'primary.main',
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          bgcolor: 'background.default',
+        }}
+        open
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={48} thickness={4} />
+          <Typography variant="body1" color="text.secondary">
+            Loading...
+          </Typography>
+        </Box>
+      </Backdrop>
+    );
+  }
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Ссылка для пропуска к основному содержимому (для пользователей клавиатуры) */}
@@ -393,10 +434,15 @@ const JobSeekerLayout: React.FC = () => {
           flexGrow: 1,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           bgcolor: 'background.default',
+          pb: { xs: 7, md: 0 }, // Padding for bottom navigation on mobile
         }}
         tabIndex={-1}
       >
-        <Outlet />
+        <Fade in timeout={{ enter: 300, exit: 200 }} key={transitionKey}>
+          <Box>
+            <Outlet />
+          </Box>
+        </Fade>
       </Box>
 
       {/* Нижняя навигация (только для мобильных устройств) */}

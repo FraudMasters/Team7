@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider as MuiThemeProvider, CssBaseline, createTheme } from '@mui/material';
-import { AuthProvider } from 'react-oidc-context';
+import { AuthProvider as OidcAuthProvider } from 'react-oidc-context';
+import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { EmotionThemeProvider, useEmotionTheme } from './contexts/EmotionThemeContext';
 import QueryProvider from './providers/QueryProvider';
@@ -303,16 +304,18 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     }}
   >
     <React.StrictMode>
-      <AuthProvider {...oidcConfig}>
-        <ServiceWorkerRegistration />
-        <LanguageProvider>
-          <EmotionThemeProvider>
-            <QueryProvider>
-              <AppWithTheme />
-            </QueryProvider>
-          </EmotionThemeProvider>
-        </LanguageProvider>
-      </AuthProvider>
+      <OidcAuthProvider {...oidcConfig}>
+        <AuthProvider>
+          <ServiceWorkerRegistration />
+          <LanguageProvider>
+            <EmotionThemeProvider>
+              <QueryProvider>
+                <AppWithTheme />
+              </QueryProvider>
+            </EmotionThemeProvider>
+          </LanguageProvider>
+        </AuthProvider>
+      </OidcAuthProvider>
     </React.StrictMode>
   </ErrorBoundary>
 );
