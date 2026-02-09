@@ -451,30 +451,139 @@ async def get_fairness_alerts(
             f"acknowledged: {acknowledged}, days: {days}"
         )
 
-        # Validate days parameter
-        if days < 1 or days > 365:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Days parameter must be between 1 and 365",
+        from database import get_db
+        from models.fairness_metrics import FairnessAlert as FairnessAlertModel, FairnessMetrics as FairnessMetricsModel
+        from sqlalchemy import func
+
+        alerts_list = []
+        total_count = 0
+        unacknowledged_count = 0
+
+        async for db in get_db():
+            # Calculate date threshold
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+            # Build query for fairness alerts with join to fairness_metrics
+            query = (
+                select(FairnessAlertModel, FairnessMetricsModel)
+                .join(
+                    FairnessMetricsModel,
+                    FairnessAlertModel.fairness_metric_id == FairnessMetricsModel.id
+                )
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        response_data = {
-            "alerts": [],
-            "total_count": 0,
-            "unacknowledged_count": 0,
-        }
+            # Apply date filter - alerts created since cutoff date
+            query = query.where(FairnessAlertModel.created_at >= cutoff_date)
 
-        logger.info(f"Retrieved {response_data['total_count']} fairness alerts")
+            # Apply filters
+            if alert_type:
+                query = query.where(FairnessAlertModel.alert_type == alert_type)
+
+            if severity:
+                query = query.where(FairnessAlertModel.severity == severity)
+
+            # Filter by acknowledgment status
+            # acknowledged=True means status is 'acknowledged' or 'resolved'
+            # acknowledged=False means status is 'active'
+            if acknowledged is not None:
+                if acknowledged:
+                    query = query.where(FairnessAlertModel.status.in_(["acknowledged", "resolved"]))
+                else:
+                    query = query.where(FairnessAlertModel.status == "active")
+
+            # Order by created_at descending (most recent first)
+            query = query.order_by(desc(FairnessAlertModel.created_at))
+
+            # Get total count before limit
+            count_query = select(func.count()).select_from(query.subquery())
+            count_result = await db.execute(count_query)
+            total_count = count_result.scalar() or 0
+
+            # Get unacknowledged count (active alerts)
+            unack_query = (
+                select(func.count())
+                .select_from(FairnessAlertModel)
+                .where(FairnessAlertModel.created_at >= cutoff_date)
+                .where(FairnessAlertModel.status == "active")
+            )
+            if alert_type:
+                unack_query = unack_query.where(FairnessAlertModel.alert_type == alert_type)
+            if severity:
+                unack_query = unack_query.where(FairnessAlertModel.severity == severity)
+
+            unack_result = await db.execute(unack_query)
+            unacknowledged_count = unack_result.scalar() or 0
+
+            # Apply limit
+            query = query.limit(limit)
+
+            # Execute query
+            result = await db.execute(query)
+            alert_records = result.all()
+
+            # Transform database records to API response format
+            for alert_record, metrics_record in alert_records:
+                # Determine if acknowledged
+                is_acknowledged = alert_record.status in ["acknowledged", "resolved"]
+
+                # Get protected attribute from metrics record
+                protected_attribute = metrics_record.demographic_group if metrics_record else "unknown"
+
+                # Determine model name (default to "ranking" for now)
+                actual_model_name = model_name or "ranking"
+
+                # Get triggered_at timestamp
+                triggered_at = alert_record.created_at.isoformat() if alert_record.created_at else datetime.utcnow().isoformat()
+
+                # Map alert type to metric name
+                metric_name_map = {
+                    "disparate_impact": "Disparate Impact Ratio",
+                    "statistical_parity": "Statistical Parity Difference",
+                    "sample_size": "Sample Size",
+                    "threshold_exceeded": "Fairness Threshold",
+                    "bias_detected": "Bias Detection",
+                }
+                metric_name = metric_name_map.get(alert_record.alert_type, alert_record.alert_type)
+
+                # Build recommendation based on alert type
+                recommendation_map = {
+                    "disparate_impact": "Review selection criteria for potential bias. Consider retraining with fairness-aware algorithms.",
+                    "statistical_parity": "Investigate group-specific selection rates. Ensure equal opportunity across demographics.",
+                    "sample_size": "Increase sample size for more reliable fairness metrics.",
+                    "threshold_exceeded": "Review and adjust fairness thresholds or investigate underlying bias in training data.",
+                    "bias_detected": "Conduct detailed bias audit. Consider implementing fairness constraints in the model.",
+                }
+                recommendation = recommendation_map.get(alert_record.alert_type, "Investigate and address potential bias.")
+
+                alerts_list.append({
+                    "alert_id": str(alert_record.id),
+                    "model_name": actual_model_name,
+                    "model_version": metrics_record.model_version_id if metrics_record else "unknown",
+                    "alert_type": alert_record.alert_type,
+                    "severity": alert_record.severity,
+                    "protected_attribute": protected_attribute,
+                    "metric_name": metric_name,
+                    "current_value": float(alert_record.actual_value) if alert_record.actual_value is not None else 0.0,
+                    "threshold_value": float(alert_record.threshold_value) if alert_record.threshold_value is not None else 0.8,
+                    "description": alert_record.message,
+                    "recommendation": recommendation,
+                    "triggered_at": triggered_at,
+                    "acknowledged": is_acknowledged,
+                })
+
+            break
+
+        logger.info(f"Retrieved {total_count} fairness alerts ({unacknowledged_count} unacknowledged)")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content={
+                "alerts": alerts_list,
+                "total_count": total_count,
+                "unacknowledged_count": unacknowledged_count,
+            },
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error fetching fairness alerts: {e}", exc_info=True)
         raise HTTPException(
