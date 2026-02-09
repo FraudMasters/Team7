@@ -11,6 +11,7 @@ export { default as CompareVacancyPage } from './CompareVacancy';
 export { default as AdminSynonymsPage } from './AdminSynonyms';
 export { default as AdminAnalyticsPage } from './AdminAnalytics';
 export { default as AnalyticsDashboardPage } from './AnalyticsDashboard';
+export { default as BiasDetectionDashboardPage } from './BiasDetectionDashboard';
 export { default as VacancyListPage } from './VacancyList';
 export { default as CreateVacancyPage } from './CreateVacancy';
 export { default as VacancyDetailsPage } from './VacancyDetails';

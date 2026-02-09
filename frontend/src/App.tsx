@@ -56,6 +56,7 @@ import BatchUploadPage from './pages/BatchUpload';
 import ApplicationsPage from './pages/Applications';
 import ResumeDatabasePage from './pages/ResumeDatabase';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
+import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 
@@ -143,6 +144,7 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
         </Route>
 

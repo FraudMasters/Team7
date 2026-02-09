@@ -8,6 +8,7 @@
 export { ApiClient, apiClient } from './client';
 
 // AI/ML services
+export { biasReports, BiasReportsClient } from './biasReports';
 export { explainability, ExplainabilityClient } from './explainability';
 export { fairness, FairnessClient } from './fairness';
 export { industryClassifier, IndustryClassifierClient } from './industryClassifier';
