@@ -542,6 +542,10 @@ class FairnessScorecard:
                 "Recommendation: Apply fairness-aware ranking algorithms."
             )
 
+        # Generate actionable insights based on metrics
+        actionable_insights = self._generate_actionable_insights(metrics, fairness_score)
+        recommendations.extend(actionable_insights)
+
         # Metric-specific recommendations
         for metric in metrics:
             if metric.alert_triggered and metric.mitigation_suggested:
@@ -555,6 +559,178 @@ class FairnessScorecard:
                     )
 
         return recommendations
+
+    def _generate_actionable_insights(
+        self,
+        metrics: List[FairnessMetrics],
+        fairness_score: float,
+    ) -> List[str]:
+        """
+        Generate detailed actionable insights based on bias metrics.
+
+        Provides specific recommendations including:
+        - Model retraining suggestions
+        - Threshold adjustment recommendations
+        - Feature review guidance
+        - Sample size improvement suggestions
+
+        Args:
+            metrics: List of fairness metrics
+            fairness_score: Overall fairness score
+
+        Returns:
+            List of actionable insight strings
+        """
+        insights = []
+
+        if not metrics:
+            return insights
+
+        # Analyze disparate impact patterns
+        low_di_metrics = [
+            m for m in metrics
+            if m.disparate_impact_ratio is not None
+            and m.disparate_impact_ratio < 0.8
+        ]
+
+        if low_di_metrics:
+            # Sort by severity
+            low_di_metrics.sort(key=lambda m: float(m.disparate_impact_ratio or 0))
+
+            most_severe = low_di_metrics[0]
+            di_ratio = float(most_severe.disparate_impact_ratio or 0)
+
+            if di_ratio < 0.5:
+                insights.append(
+                    "CRITICAL: Retrain ranking model with balanced training data "
+                    f"to address severe disparate impact in {most_severe.demographic_group}. "
+                    "Current ratio indicates significant adverse impact."
+                )
+            elif di_ratio < 0.65:
+                insights.append(
+                    "Retrain ranking model using fairness-aware techniques "
+                    f"(e.g., adversarial debiasing, reweighting) for {most_severe.demographic_group}. "
+                    "Consider applying fairness constraints during model training."
+                )
+
+        # Analyze statistical parity patterns
+        high_sp_metrics = [
+            m for m in metrics
+            if m.statistical_parity_difference is not None
+            and abs(m.statistical_parity_difference) > 0.1
+        ]
+
+        if high_sp_metrics:
+            # Sort by absolute difference
+            high_sp_metrics.sort(
+                key=lambda m: abs(float(m.statistical_parity_difference or 0)),
+                reverse=True
+            )
+
+            worst_sp = high_sp_metrics[0]
+            sp_diff = abs(float(worst_sp.statistical_parity_difference or 0))
+
+            if sp_diff > 0.2:
+                insights.append(
+                    "Adjust ranking thresholds to reduce selection rate disparity. "
+                    f"Consider group-specific threshold calibration for {worst_sp.demographic_group} "
+                    "or implement post-processing equalization techniques."
+                )
+            elif sp_diff > 0.15:
+                insights.append(
+                    "Review ranking score distribution across demographic groups. "
+                    "Threshold adjustment or score calibration may improve fairness."
+                )
+
+        # Sample size analysis
+        for metric in metrics:
+            if metric.group_sample_size and metric.group_sample_size < 10:
+                insights.append(
+                    f"Increase sample size for {metric.demographic_group} "
+                    f"(current: {metric.group_sample_size}). "
+                    "Small sample sizes may lead to unreliable fairness metrics. "
+                    "Collect more data to improve analysis confidence."
+                )
+
+        # Feature-based recommendations (if group metrics available)
+        features_to_review = self._identify_features_for_review(metrics)
+        if features_to_review:
+            for feature, demographic in features_to_review:
+                insights.append(
+                    f"Review feature '{feature}' for potential bias against {demographic}. "
+                    "This feature may be acting as a proxy for protected attributes. "
+                    "Consider feature removal or transformation."
+                )
+
+        # Model-specific recommendations based on fairness-aware status
+        fairness_aware_count = sum(1 for m in metrics if m.is_fairness_aware)
+        total_count = len(metrics)
+
+        if total_count > 0 and fairness_aware_count == 0:
+            insights.append(
+                "Enable fairness-aware ranking mode to reduce algorithmic bias. "
+                "The current model does not use fairness constraints during ranking."
+            )
+        elif fairness_aware_count < total_count:
+            insights.append(
+                f"Only {fairness_aware_count}/{total_count} analyses use fairness-aware ranking. "
+                "Consider enabling fairness-aware mode across all rankings for consistency."
+            )
+
+        # Threshold-specific guidance
+        if fairness_score >= self.SCORE_GOOD and fairness_score < self.SCORE_EXCELLENT:
+            insights.append(
+                "Fine-tune ranking model by adjusting feature weights or "
+                "applying light regularization to improve fairness without significant accuracy loss."
+            )
+
+        return insights
+
+    def _identify_features_for_review(
+        self,
+        metrics: List[FairnessMetrics],
+    ) -> List[tuple[str, str]]:
+        """
+        Identify features that may be contributing to bias for review.
+
+        Analyzes group metrics to identify features that correlate with
+        demographic disparities.
+
+        Args:
+            metrics: List of fairness metrics
+
+        Returns:
+            List of (feature_name, demographic_group) tuples to review
+        """
+        features_to_review = []
+
+        # Features that commonly act as proxies for protected attributes
+        proxy_features = {
+            "gender": ["name", "pronouns", "gendered_words", "titles"],
+            "age_group": ["graduation_year", "experience_duration", "career_start"],
+            "ethnicity": ["names", "language_patterns", "location", "schools"],
+        }
+
+        for metric in metrics:
+            if metric.alert_triggered and metric.group_metrics:
+                # Check if any groups have significantly lower selection rates
+                group_data = metric.group_metrics or {}
+                selection_rates = {
+                    group: data.get("selection_rate", 0)
+                    for group, data in group_data.items()
+                }
+
+                if selection_rates:
+                    max_rate = max(selection_rates.values())
+                    for group, rate in selection_rates.items():
+                        if rate < max_rate * 0.7:  # 30% lower than max
+                            demographic = metric.demographic_group
+                            if demographic in proxy_features:
+                                # Add proxy features for review
+                                for feature in proxy_features[demographic][:2]:  # Top 2
+                                    features_to_review.append((feature, demographic))
+
+        return features_to_review[:5]  # Limit to 5 recommendations
 
     def _empty_scorecard(
         self,
