@@ -5,6 +5,7 @@ from .base import Base
 from .resume import Resume
 from .work_history import WorkHistory, EmploymentType
 from .education import Education, DegreeType
+from .skill import Skill, ProficiencyLevel
 from .resume_analysis import ResumeAnalysis
 from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
@@ -45,6 +46,8 @@ __all__ = [
     "EmploymentType",
     "Education",
     "DegreeType",
+    "Skill",
+    "ProficiencyLevel",
     "ResumeAnalysis",
     "AnalysisResult",
     "ResumeComparison",
