@@ -34,6 +34,7 @@ from sqlalchemy import select, func as sql_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import FairnessAlert, FairnessMetrics, JobVacancy
+from analyzers.ranking_service import RankingModel
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,83 @@ SEVERITY_PENALTIES = {
     "critical": 50,
 }
 
+# Features that commonly act as proxies for protected attributes
+PROXY_FEATURES = {
+    "gender": {
+        "name": "Candidate Name",
+        "pronouns": "Pronouns",
+        "gendered_words": "Gendered Language Patterns",
+        "titles": "Honorific Titles (Mr/Ms)",
+    },
+    "age_group": {
+        "graduation_year": "Graduation Year",
+        "experience_duration": "Career Duration",
+        "career_start": "Career Start Year",
+        "age_mentions": "Age-Related Mentions",
+    },
+    "ethnicity": {
+        "names": "Name Analysis",
+        "language_patterns": "Language Patterns",
+        "location": "Geographic Location",
+        "schools": "Educational Institutions",
+    },
+}
+
+# Human-readable feature labels (aligned with RankingFeatures)
+FEATURE_LABELS = {
+    "overall_match_score": "Overall Match Score",
+    "keyword_score": "Keyword Score",
+    "tfidf_score": "TF-IDF Score",
+    "vector_score": "Vector Similarity Score",
+    "skills_match_ratio": "Skills Match Ratio",
+    "experience_months": "Experience (months)",
+    "experience_relevance": "Experience Relevance",
+    "education_level": "Education Level",
+    "recent_experience": "Recent Experience",
+    "skill_rarity_score": "Skill Rarity Score",
+    "title_similarity": "Title Similarity",
+    "freshness_score": "Freshness Score",
+    "completeness_score": "Resume Completeness",
+}
+
+
+@dataclass
+class FeatureBiasSource:
+    """
+    Identification of a feature that may be contributing to bias.
+
+    Attributes:
+        feature_name: Name of the potentially biased feature
+        feature_label: Human-readable feature name
+        demographic_group: Demographic group affected by this bias
+        bias_indicator: How bias was detected (proxy/correlation/importance)
+        importance_score: Feature importance from model (0-1)
+        correlation_strength: Strength of correlation with demographic (0-1)
+        recommendation: Suggested action to address this bias source
+        severity: Severity level of the bias source
+    """
+    feature_name: str
+    feature_label: str
+    demographic_group: str
+    bias_indicator: str
+    importance_score: float
+    correlation_strength: float
+    recommendation: str
+    severity: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "feature_name": self.feature_name,
+            "feature_label": self.feature_label,
+            "demographic_group": self.demographic_group,
+            "bias_indicator": self.bias_indicator,
+            "importance_score": round(self.importance_score, 3),
+            "correlation_strength": round(self.correlation_strength, 3),
+            "recommendation": self.recommendation,
+            "severity": self.severity,
+        }
+
 
 @dataclass
 class FairnessScorecardData:
@@ -66,6 +144,7 @@ class FairnessScorecardData:
         score_breakdown: Component scores that make up the overall score
         metrics_by_demographic: Detailed metrics grouped by demographic attribute
         alerts_summary: Summary of active alerts by severity
+        feature_bias_sources: List of identified feature-level bias sources
         recommendations: List of actionable recommendations
         analyzed_at: Timestamp of scorecard generation
         total_sample_size: Total candidates analyzed
@@ -78,6 +157,7 @@ class FairnessScorecardData:
     score_breakdown: Dict[str, float] = field(default_factory=dict)
     metrics_by_demographic: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     alerts_summary: Dict[str, int] = field(default_factory=dict)
+    feature_bias_sources: List[Dict[str, Any]] = field(default_factory=list)
     recommendations: List[str] = field(default_factory=list)
     analyzed_at: str = ""
     total_sample_size: int = 0
@@ -93,6 +173,7 @@ class FairnessScorecardData:
             "score_breakdown": self.score_breakdown,
             "metrics_by_demographic": self.metrics_by_demographic,
             "alerts_summary": self.alerts_summary,
+            "feature_bias_sources": self.feature_bias_sources,
             "recommendations": self.recommendations,
             "analyzed_at": self.analyzed_at,
             "total_sample_size": self.total_sample_size,
@@ -220,6 +301,11 @@ class FairnessScorecard:
                 metrics, alerts, fairness_score
             )
 
+            # Identify feature importance bias sources
+            feature_bias_sources = self._identify_feature_bias_sources(
+                metrics, vacancy_id
+            )
+
             # Calculate total sample size
             total_sample_size = max(
                 (m.total_sample_size or 0) for m in metrics
@@ -240,6 +326,7 @@ class FairnessScorecard:
                 score_breakdown=score_breakdown,
                 metrics_by_demographic=metrics_by_demographic,
                 alerts_summary=alerts_summary,
+                feature_bias_sources=[f.to_dict() for f in feature_bias_sources],
                 recommendations=recommendations,
                 analyzed_at=datetime.utcnow().isoformat(),
                 total_sample_size=total_sample_size,
@@ -732,6 +819,217 @@ class FairnessScorecard:
 
         return features_to_review[:5]  # Limit to 5 recommendations
 
+    def _identify_feature_bias_sources(
+        self,
+        metrics: List[FairnessMetrics],
+        vacancy_id: Optional[UUID],
+    ) -> List[FeatureBiasSource]:
+        """
+        Identify feature importance bias sources using model feature importance.
+
+        Analyzes which features may be contributing to bias by combining:
+        - Model feature importance scores
+        - Demographic disparity patterns
+        - Proxy feature detection
+
+        Args:
+            metrics: List of fairness metrics
+            vacancy_id: Optional vacancy ID for context
+
+        Returns:
+            List of FeatureBiasSource objects identifying potentially biased features
+        """
+        bias_sources = []
+
+        if not metrics:
+            return bias_sources
+
+        try:
+            # Get feature importances from ranking model
+            ranking_model = RankingModel(model_type="random_forest")
+            feature_importances = ranking_model.get_feature_importance()
+
+            # Sort features by importance
+            sorted_features = sorted(
+                feature_importances.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+
+            # Analyze each metric for feature-level bias
+            for metric in metrics:
+                if not metric.alert_triggered:
+                    continue
+
+                demographic_group = metric.demographic_group
+                di_ratio = float(metric.disparate_impact_ratio or 1.0)
+
+                # High bias indicators
+                high_bias = di_ratio < 0.7
+
+                # Check top features for potential bias
+                for feature_name, importance in sorted_features[:8]:
+                    # Skip if importance is negligible
+                    if importance < 0.05:
+                        continue
+
+                    # Check if feature is a known proxy
+                    is_proxy = False
+                    proxy_name = None
+                    if demographic_group in PROXY_FEATURES:
+                        for proxy_key, proxy_label in PROXY_FEATURES[demographic_group].items():
+                            if proxy_key.lower() in feature_name.lower():
+                                is_proxy = True
+                                proxy_name = proxy_label
+                                break
+
+                    # Determine correlation strength based on disparate impact
+                    # Lower disparate impact = higher correlation with bias
+                    if di_ratio < 0.5:
+                        correlation_strength = 0.9
+                    elif di_ratio < 0.65:
+                        correlation_strength = 0.7
+                    elif di_ratio < 0.8:
+                        correlation_strength = 0.5
+                    else:
+                        correlation_strength = 0.2
+
+                    # Only include features with significant correlation
+                    if correlation_strength < 0.3:
+                        continue
+
+                    # Determine bias indicator type
+                    if is_proxy:
+                        bias_indicator = f"proxy_for_{demographic_group}"
+                    elif importance > 0.15:
+                        bias_indicator = "high_importance_correlation"
+                    else:
+                        bias_indicator = "correlation_detected"
+
+                    # Determine severity
+                    if is_proxy and di_ratio < 0.6:
+                        severity = "critical"
+                    elif di_ratio < 0.5:
+                        severity = "high"
+                    elif di_ratio < 0.7:
+                        severity = "medium"
+                    else:
+                        severity = "low"
+
+                    # Generate recommendation
+                    recommendation = self._generate_feature_recommendation(
+                        feature_name,
+                        demographic_group,
+                        is_proxy,
+                        proxy_name,
+                        importance,
+                        severity
+                    )
+
+                    feature_label = FEATURE_LABELS.get(feature_name, feature_name)
+
+                    bias_source = FeatureBiasSource(
+                        feature_name=feature_name,
+                        feature_label=feature_label,
+                        demographic_group=demographic_group,
+                        bias_indicator=bias_indicator,
+                        importance_score=importance,
+                        correlation_strength=correlation_strength,
+                        recommendation=recommendation,
+                        severity=severity
+                    )
+
+                    bias_sources.append(bias_source)
+
+            # Remove duplicates and sort by severity and importance
+            unique_sources = []
+            seen = set()
+
+            for source in bias_sources:
+                key = (source.feature_name, source.demographic_group)
+                if key not in seen:
+                    seen.add(key)
+                    unique_sources.append(source)
+
+            # Sort by severity (critical first) then importance
+            severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+            unique_sources.sort(
+                key=lambda x: (severity_order.get(x.severity, 4), -x.importance_score)
+            )
+
+            return unique_sources[:10]  # Limit to top 10
+
+        except Exception as e:
+            logger.error(f"Error identifying feature bias sources: {e}", exc_info=True)
+            return []
+
+    def _generate_feature_recommendation(
+        self,
+        feature_name: str,
+        demographic_group: str,
+        is_proxy: bool,
+        proxy_name: Optional[str],
+        importance: float,
+        severity: str,
+    ) -> str:
+        """
+        Generate a recommendation for addressing feature-level bias.
+
+        Args:
+            feature_name: Name of the feature
+            demographic_group: Affected demographic group
+            is_proxy: Whether the feature is a known proxy
+            proxy_name: Human-readable proxy name
+            importance: Feature importance score
+            severity: Severity level
+
+        Returns:
+            Recommendation string
+        """
+        feature_label = FEATURE_LABELS.get(feature_name, feature_name)
+
+        if is_proxy and proxy_name:
+            if severity == "critical":
+                return (
+                    f"URGENT: Remove or transform '{proxy_name}' feature. "
+                    f"This feature directly correlates with {demographic_group} "
+                    f"and may violate anti-discrimination laws."
+                )
+            else:
+                return (
+                    f"Review '{proxy_name}' feature. This appears to be a proxy "
+                    f"for {demographic_group}. Consider removing or anonymizing "
+                    f"this feature from the ranking model."
+                )
+
+        if severity == "critical":
+            return (
+                f"Critical bias detected in {feature_label}. "
+                f"This high-importance feature (score: {importance:.2f}) "
+                f"shows strong correlation with {demographic_group}. "
+                f"Immediate retraining with fairness constraints recommended."
+            )
+
+        if severity == "high":
+            return (
+                f"Review {feature_label} for bias mitigation. "
+                f"This feature (importance: {importance:.2f}) may be "
+                f"disadvantaging {demographic_group}. "
+                f"Consider applying fairness-aware regularization."
+            )
+
+        if severity == "medium":
+            return (
+                f"Monitor {feature_label} for fairness. "
+                f"Feature shows moderate correlation with demographic outcomes. "
+                f"Consider bias auditing during next model retraining."
+            )
+
+        return (
+            f"Track {feature_label} performance across demographic groups. "
+            f"Low-severity indicator, but worth monitoring for trends."
+        )
+
     def _empty_scorecard(
         self,
         vacancy_id: Optional[UUID],
@@ -743,6 +1041,7 @@ class FairnessScorecard:
             score_breakdown={},
             metrics_by_demographic={},
             alerts_summary={},
+            feature_bias_sources=[],
             recommendations=["No fairness metrics available for analysis."],
             analyzed_at=datetime.utcnow().isoformat(),
             total_sample_size=0,

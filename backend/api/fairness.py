@@ -1284,3 +1284,118 @@ async def acknowledge_alert(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to acknowledge alert: {str(e)}",
         ) from e
+
+
+@router.post(
+    "/scorecard",
+    status_code=status.HTTP_200_OK,
+    tags=["Fairness"],
+)
+async def get_fairness_scorecard(
+    vacancy_id: Optional[str] = Query(None, description="Optional vacancy ID for specific vacancy scorecard"),
+    model_version: Optional[str] = Query(None, description="Optional model version filter"),
+) -> JSONResponse:
+    """
+    Get fairness scorecard with feature importance bias source identification.
+
+    This endpoint generates a comprehensive fairness scorecard that aggregates
+    fairness metrics into an overall score (0-100) and identifies feature-level
+    bias sources using model feature importance analysis.
+
+    The scorecard includes:
+    - Overall fairness score (0-100)
+    - Feature bias sources with severity levels
+    - Metrics breakdown by demographic
+    - Actionable recommendations
+
+    Args:
+        vacancy_id: Optional JobVacancy UUID for specific vacancy analysis
+        model_version: Optional model version filter
+
+    Returns:
+        JSON response with fairness scorecard data
+
+    Raises:
+        HTTPException(500): If scorecard generation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/fairness/scorecard?vacancy_id=abc-123"
+        ... )
+        >>> response.json()
+        {
+            "vacancy_id": "abc-123",
+            "fairness_score": 82.5,
+            "bias_sources": [...],
+            "recommendations": [...]
+        }
+    """
+    try:
+        logger.info(
+            f"Generating fairness scorecard - vacancy_id: {vacancy_id}, "
+            f"model_version: {model_version}"
+        )
+
+        from database import get_db
+        from services.fairness_scorecard import get_fairness_scorecard
+
+        async for db in get_db():
+            scorecard_service = get_fairness_scorecard()
+
+            # Convert vacancy_id string to UUID if provided
+            vacancy_uuid = None
+            if vacancy_id:
+                from uuid import UUID
+                try:
+                    vacancy_uuid = UUID(vacancy_id)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Invalid vacancy_id format: {vacancy_id}",
+                    )
+
+            # Generate scorecard
+            scorecard = await scorecard_service.generate_scorecard(
+                db=db,
+                vacancy_id=vacancy_uuid,
+                model_version=model_version,
+            )
+
+            # Build response - map feature_bias_sources to bias_sources
+            response_data = {
+                "vacancy_id": scorecard.vacancy_id,
+                "vacancy_title": scorecard.vacancy_title,
+                "fairness_score": scorecard.fairness_score,
+                "bias_sources": scorecard.feature_bias_sources,
+                "score_breakdown": scorecard.score_breakdown,
+                "metrics_by_demographic": scorecard.metrics_by_demographic,
+                "alerts_summary": scorecard.alerts_summary,
+                "recommendations": scorecard.recommendations,
+                "analyzed_at": scorecard.analyzed_at,
+                "total_sample_size": scorecard.total_sample_size,
+                "demographics_analyzed": scorecard.demographics_analyzed,
+                "model_version": scorecard.model_version,
+            }
+
+            logger.info(
+                f"Generated fairness scorecard - fairness_score: {scorecard.fairness_score}, "
+                f"bias_sources: {len(scorecard.feature_bias_sources)}, "
+                f"recommendations: {len(scorecard.recommendations)}"
+            )
+
+            break
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating fairness scorecard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate fairness scorecard: {str(e)}",
+        ) from e
