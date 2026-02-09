@@ -179,6 +179,18 @@ class RequestEmailVerificationResponse(BaseModel):
     message: str = Field(..., description="Success message")
 
 
+class VerifyEmailRequest(BaseModel):
+    """Request model for email verification confirmation."""
+
+    token: str = Field(..., description="Email verification token")
+
+
+class VerifyEmailResponse(BaseModel):
+    """Response model for successful email verification."""
+
+    message: str = Field(..., description="Success message")
+
+
 # ============================================================
 # Endpoints
 # ============================================================
@@ -938,4 +950,120 @@ async def request_email_verification(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Email verification request failed: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/verify-email",
+    response_model=VerifyEmailResponse,
+    tags=["Authentication"],
+)
+async def verify_email(
+    request_data: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Confirm email verification with token.
+
+    Validates the email verification token and marks the user's email as verified.
+    The token must be valid, not expired, and not revoked.
+
+    Args:
+        request_data: Verification token
+        db: Database session
+
+    Returns:
+        JSON response confirming email was verified
+
+    Raises:
+        HTTPException(400): If token is invalid or expired
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        ... }
+        >>> response = requests.post("http://localhost:8000/api/auth/verify-email", json=data)
+        >>> response.json()
+        {"message": "Email verified successfully"}
+    """
+    try:
+        logger.info("Email verification confirmation received")
+
+        # Decode and verify verification token (using refresh token verification)
+        try:
+            token_data = decode_token(request_data.token)
+        except Exception as e:
+            logger.warning(f"Email verification failed: invalid token - {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification token",
+            )
+
+        # Check if verification token exists in database and is not revoked
+        result = await db.execute(
+            select(RefreshToken).where(
+                RefreshToken.token == request_data.token,
+                RefreshToken.is_revoked == False,
+            )
+        )
+        verification_token_record = result.scalar_one_or_none()
+
+        if not verification_token_record:
+            logger.warning("Email verification failed: verification token not found or revoked")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification token",
+            )
+
+        # Check if token is expired
+        if verification_token_record.expires_at < datetime.utcnow():
+            logger.warning("Email verification failed: verification token expired")
+            # Mark as revoked
+            verification_token_record.is_revoked = True
+            verification_token_record.revoked_at = datetime.utcnow()
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification token has expired",
+            )
+
+        # Find user
+        user_result = await db.execute(
+            select(User).where(User.id == token_data.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            logger.warning(f"Email verification failed: user not found - {token_data.user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification token",
+            )
+
+        # Update user's verified status
+        user.is_verified = True
+
+        # Revoke the verification token
+        verification_token_record.is_revoked = True
+        verification_token_record.revoked_at = datetime.utcnow()
+
+        await db.commit()
+
+        logger.info(f"Email verified successfully for user: {user.email}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": "Email verified successfully"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during email verification: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email verification failed: {str(e)}",
         ) from e
