@@ -453,6 +453,40 @@ export class FairnessClient {
       throw transformError(error);
     }
   }
+
+  /**
+   * Export a bias report in PDF or CSV format
+   *
+   * @param reportId - Report ID to export
+   * @param format - Export format ('pdf' or 'csv')
+   * @returns Blob containing the exported file data
+   * @throws ApiError if export fails
+   *
+   * @example
+   * ```ts
+   * const blob = await fairness.exportReport('2024-01-25_v1.0', 'pdf');
+   * // Create download link
+   * const url = URL.createObjectURL(blob);
+   * const link = document.createElement('a');
+   * link.href = url;
+   * link.download = 'bias_report.pdf';
+   * link.click();
+   * ```
+   */
+  async exportReport(reportId: string, format: 'pdf' | 'csv' = 'pdf'): Promise<Blob> {
+    try {
+      const response = await this.client.post(
+        `/api/fairness/reports/${reportId}/export?format=${format}`,
+        undefined,
+        {
+          responseType: 'blob',
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
+  }
 }
 
 /**

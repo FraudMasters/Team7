@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   IconButton,
   CircularProgress,
   Alert,
@@ -15,6 +16,9 @@ import {
 import { useTranslation } from 'react-i18next';
 import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
 import FairnessDashboard from '@components/analytics/FairnessDashboard';
+import { BiasReportExport } from '@/components/BiasReportExport';
+import { fairness } from '@/api/fairness';
+import type { BiasReport } from '@/types/api';
 
 /**
  * Bias Detection Dashboard Page (Recruiter Module)
@@ -35,8 +39,11 @@ const BiasDetectionDashboardPage: React.FC = () => {
     preset: 'last_30_days',
   });
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [latestReport, setLatestReport] = useState<BiasReport | null>(null);
 
   /**
    * Handle date range change from DateRangeFilter component
@@ -91,6 +98,52 @@ const BiasDetectionDashboardPage: React.FC = () => {
     }
   };
 
+  /**
+   * Open export dialog for bias report
+   */
+  const handleOpenExportDialog = async () => {
+    try {
+      // Try to get the latest report for the current date
+      const today = new Date().toISOString().split('T')[0];
+      const reportsResponse = await fairness.getReports({ limit: 1 });
+
+      if (reportsResponse.reports.length > 0) {
+        const report = reportsResponse.reports[0];
+        setLatestReport(report);
+        // Format report ID as {date}_{version}
+        const reportId = `${today}_${report.model_version}`;
+        setSelectedReportId(reportId);
+      } else {
+        // If no reports exist, use a default format
+        const reportId = `${today}_latest`;
+        setSelectedReportId(reportId);
+      }
+
+      setExportDialogOpen(true);
+    } catch (err) {
+      // If fetching reports fails, still open the dialog with a default ID
+      const today = new Date().toISOString().split('T')[0];
+      setSelectedReportId(`${today}_latest`);
+      setExportDialogOpen(true);
+    }
+  };
+
+  /**
+   * Close export dialog
+   */
+  const handleCloseExportDialog = () => {
+    setExportDialogOpen(false);
+    setSelectedReportId(null);
+  };
+
+  /**
+   * Handle export completion
+   */
+  const handleExportComplete = (format: 'pdf' | 'csv') => {
+    // Optionally show a notification or log
+    console.log(`Export completed in ${format} format`);
+  };
+
   return (
     <>
       <Container maxWidth="xl" sx={{ py: 4 }} className="bias-detection-dashboard">
@@ -104,14 +157,24 @@ const BiasDetectionDashboardPage: React.FC = () => {
               {t('biasDetectionDashboard.subtitle') || 'Monitor fairness metrics and detect algorithmic bias'}
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Icon name="file" size={20} />}
-            onClick={handleOpenReportBuilder}
-            color="primary"
-          >
-            Generate Report
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<Icon name="download" size={20} />}
+              onClick={handleOpenExportDialog}
+              color="primary"
+            >
+              Export Report
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Icon name="file" size={20} />}
+              onClick={handleOpenReportBuilder}
+              color="primary"
+            >
+              Generate Report
+            </Button>
+          </Box>
         </Box>
 
         {/* Info Alert */}
@@ -200,6 +263,16 @@ const BiasDetectionDashboardPage: React.FC = () => {
           </Box>
         </DialogContent>
       </Dialog>
+
+      {/* Bias Report Export Dialog */}
+      {selectedReportId && (
+        <BiasReportExport
+          open={exportDialogOpen}
+          onClose={handleCloseExportDialog}
+          reportId={selectedReportId}
+          onExportComplete={handleExportComplete}
+        />
+      )}
 
       {/* Print-specific styles - only applied when printing */}
       <style>{`

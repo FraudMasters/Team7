@@ -45,3 +45,7 @@ export { default as SourceTracking } from './analytics/SourceTracking';
 export { default as ModelQualityMetrics } from './ModelQualityMetrics';
 export { default as UnifiedMatchMetrics } from './UnifiedMatchMetrics';
 export { default as ExplainabilityDashboard } from './explainability/ExplainabilityDashboard';
+export { default as BiasReportExport } from './BiasReportExport';
+export { default as FairnessScorecard } from './FairnessScorecard';
+export { default as BiasMetricsChart } from './BiasMetricsChart';
+export { default as FeatureImportanceChart } from './FeatureImportanceChart';
