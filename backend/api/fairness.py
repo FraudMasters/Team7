@@ -322,6 +322,9 @@ async def get_bias_reports(
     fairness evaluations of AI models. Reports include detailed findings,
     recommendations for mitigation, and severity assessments.
 
+    Reports are generated from historical fairness metrics, grouped by analysis date.
+    Each report aggregates metrics across all demographic groups analyzed on that date.
+
     Report types:
     - individual: Analysis of individual predictions for bias
     - group: Analysis of group-level disparities
@@ -364,18 +367,164 @@ async def get_bias_reports(
             f"severity_level: {severity_level}, bias_detected: {bias_detected}"
         )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        response_data = {
-            "reports": [],
-            "total_count": 0,
-        }
+        from database import get_db
+        from models.fairness_metrics import FairnessMetrics as FairnessMetricsModel
+        from sqlalchemy import func
 
-        logger.info(f"Retrieved {response_data['total_count']} bias reports")
+        reports_list = []
+        total_count = 0
+
+        async for db in get_db():
+            # Build query to get reports grouped by analysis_date and model_version
+            # We'll create one report per unique analysis_date per model_version
+            query = select(
+                FairnessMetricsModel.analysis_date,
+                FairnessMetricsModel.model_version_id,
+                func.max(FairnessMetricsModel.created_at).label('created_at')
+            ).group_by(
+                FairnessMetricsModel.analysis_date,
+                FairnessMetricsModel.model_version_id
+            )
+
+            # Apply model_version filter
+            if model_version:
+                query = query.where(FairnessMetricsModel.model_version_id == model_version)
+
+            # Order by created_at descending (most recent first)
+            query = query.order_by(desc(func.max(FairnessMetricsModel.created_at)))
+
+            # Get total count before limit
+            # Count unique (analysis_date, model_version) combinations
+            count_query = select(
+                func.count(func.distinct(
+                    func.concat(FairnessMetricsModel.analysis_date, '|', FairnessMetricsModel.model_version_id)
+                ))
+            )
+
+            if model_version:
+                count_query = count_query.where(FairnessMetricsModel.model_version_id == model_version)
+
+            count_result = await db.execute(count_query)
+            total_count = count_result.scalar() or 0
+
+            # Apply limit
+            query = query.limit(limit)
+
+            # Execute query to get report identifiers
+            result = await db.execute(query)
+            report_dates = result.all()
+
+            # Build each report by aggregating metrics for that date
+            for analysis_date, mv_id, created_at in report_dates:
+                # Get all metrics for this analysis_date and model_version
+                metrics_query = select(FairnessMetricsModel).where(
+                    FairnessMetricsModel.analysis_date == analysis_date,
+                    FairnessMetricsModel.model_version_id == mv_id
+                )
+
+                metrics_result = await db.execute(metrics_query)
+                metrics_records = metrics_result.scalars().all()
+
+                if not metrics_records:
+                    continue
+
+                # Aggregate metrics to build report
+                actual_model_name = model_name or "ranking"
+                actual_model_version = mv_id or "unknown"
+
+                # Collect protected attributes analyzed
+                protected_attributes = list(set([
+                    m.demographic_group for m in metrics_records
+                ]))
+
+                # Calculate overall fairness score (average of disparate impact ratios)
+                disparate_impact_values = [
+                    m.disparate_impact_ratio for m in metrics_records
+                    if m.disparate_impact_ratio is not None
+                ]
+                overall_fairness_score = (
+                    sum(disparate_impact_values) / len(disparate_impact_values)
+                    if disparate_impact_values
+                    else 0.85
+                )
+
+                # Determine if bias was detected
+                bias_detected_value = any(
+                    m.alert_triggered for m in metrics_records
+                )
+
+                # Determine max severity level
+                severity_ranks = {"low": 1, "medium": 2, "high": 3, "critical": 4, "none": 0}
+                max_severity = "none"
+                for m in metrics_records:
+                    if m.alert_severity and severity_ranks.get(m.alert_severity, 0) > severity_ranks.get(max_severity, 0):
+                        max_severity = m.alert_severity
+
+                # Apply filters
+                if severity_level and max_severity != severity_level:
+                    continue
+                if bias_detected is not None and bias_detected_value != bias_detected:
+                    continue
+
+                # Build findings list
+                findings = []
+                for m in metrics_records:
+                    if m.alert_triggered:
+                        findings.append({
+                            "demographic_attribute": m.demographic_group,
+                            "disparate_impact_ratio": float(m.disparate_impact_ratio) if m.disparate_impact_ratio else 1.0,
+                            "statistical_parity_difference": float(m.statistical_parity_difference) if m.statistical_parity_difference else 0.0,
+                            "severity": m.alert_severity or "low",
+                            "sample_size": m.total_sample_size or 0,
+                            "vacancy_id": str(m.vacancy_id) if m.vacancy_id else None,
+                        })
+
+                # Build recommendations list
+                recommendations_set = set()
+                for m in metrics_records:
+                    if m.mitigation_suggested:
+                        recommendations_set.add(m.mitigation_suggested)
+
+                recommendations = sorted(list(recommendations_set)) if recommendations_set else ["No issues detected"]
+
+                # Determine report_type
+                # Use passed report_type or default to "system-wide"
+                actual_report_type = report_type or "system-wide"
+
+                # Generate report_id from analysis_date and model_version
+                report_id = f"{analysis_date}_{actual_model_version}"
+
+                # Get generated_at timestamp
+                generated_at = created_at.isoformat() if created_at else analysis_date
+
+                reports_list.append({
+                    "report_id": report_id,
+                    "model_name": actual_model_name,
+                    "model_version": actual_model_version,
+                    "report_type": actual_report_type,
+                    "protected_attributes": protected_attributes,
+                    "overall_fairness_score": round(overall_fairness_score, 2),
+                    "bias_detected": bias_detected_value,
+                    "severity_level": max_severity if max_severity != "none" else "none",
+                    "findings": findings,
+                    "recommendations": recommendations,
+                    "generated_at": generated_at,
+                })
+
+                # Apply limit to reports list
+                if len(reports_list) >= limit:
+                    break
+
+            break
+
+        logger.info(f"Retrieved {len(reports_list)} bias reports")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content={
+                "reports": reports_list,
+                "total_count": total_count,
+            },
         )
 
     except Exception as e:
