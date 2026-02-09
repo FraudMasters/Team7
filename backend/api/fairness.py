@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import desc, select
 
 logger = logging.getLogger(__name__)
 
@@ -157,18 +158,140 @@ async def get_fairness_metrics(
             f"metric_type: {metric_type}, is_acceptable: {is_acceptable}"
         )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        response_data = {
-            "metrics": [],
-            "total_count": 0,
-        }
+        from database import get_db
+        from models.fairness_metrics import FairnessMetrics as FairnessMetricsModel
 
-        logger.info(f"Retrieved {response_data['total_count']} fairness metrics")
+        metrics_list = []
+        total_count = 0
+
+        async for db in get_db():
+            # Build query for fairness metrics
+            query = select(FairnessMetricsModel)
+
+            # Apply filters
+            if model_version:
+                query = query.where(FairnessMetricsModel.model_version_id == model_version)
+
+            if protected_attribute:
+                query = query.where(FairnessMetricsModel.demographic_group == protected_attribute)
+
+            # Order by created_at descending (most recent first)
+            query = query.order_by(desc(FairnessMetricsModel.created_at))
+
+            # Get total count
+            from sqlalchemy import func
+            count_query = select(func.count()).select_from(query)
+            count_result = await db.execute(count_query)
+            total_count = count_result.scalar() or 0
+
+            # Apply limit
+            query = query.limit(limit)
+
+            # Execute query
+            result = await db.execute(query)
+            fairness_records = result.scalars().all()
+
+            # Transform database records to API response format
+            for record in fairness_records:
+                # Determine model name (default to "ranking" for now)
+                actual_model_name = model_name or "ranking"
+
+                # Get calculated_at timestamp
+                calculated_at = record.created_at.isoformat() if record.created_at else record.analysis_date
+
+                # Create separate metric entries for each metric type
+                metric_entries = []
+
+                # Disparate Impact Ratio metric
+                if record.disparate_impact_ratio is not None:
+                    if metric_type is None or metric_type == "disparate_impact":
+                        metric_is_acceptable = record.disparate_impact_ratio >= (record.alert_threshold or 0.8)
+                        metric_entries.append({
+                            "metric_id": str(record.id),
+                            "model_name": actual_model_name,
+                            "model_version": record.model_version_id or "unknown",
+                            "protected_attribute": record.demographic_group,
+                            "metric_type": "disparate_impact",
+                            "metric_value": float(record.disparate_impact_ratio),
+                            "threshold": float(record.alert_threshold or 0.8),
+                            "is_acceptable": metric_is_acceptable,
+                            "sample_size": record.total_sample_size or 0,
+                            "calculated_at": calculated_at,
+                        })
+
+                # Statistical Parity Difference metric
+                if record.statistical_parity_difference is not None:
+                    if metric_type is None or metric_type == "statistical_parity":
+                        # For statistical parity, lower absolute values are better (closer to 0)
+                        metric_is_acceptable = abs(record.statistical_parity_difference) <= (1 - (record.alert_threshold or 0.8))
+                        metric_entries.append({
+                            "metric_id": str(record.id),
+                            "model_name": actual_model_name,
+                            "model_version": record.model_version_id or "unknown",
+                            "protected_attribute": record.demographic_group,
+                            "metric_type": "statistical_parity",
+                            "metric_value": float(record.statistical_parity_difference),
+                            "threshold": 1 - float(record.alert_threshold or 0.8),
+                            "is_acceptable": metric_is_acceptable,
+                            "sample_size": record.total_sample_size or 0,
+                            "calculated_at": calculated_at,
+                        })
+
+                # Group Selection Rate metric
+                if record.group_selection_rate is not None:
+                    if metric_type is None or metric_type == "group_selection_rate":
+                        metric_entries.append({
+                            "metric_id": str(record.id),
+                            "model_name": actual_model_name,
+                            "model_version": record.model_version_id or "unknown",
+                            "protected_attribute": record.demographic_group,
+                            "metric_type": "group_selection_rate",
+                            "metric_value": float(record.group_selection_rate),
+                            "threshold": 0.0,  # No threshold for raw selection rate
+                            "is_acceptable": True,
+                            "sample_size": record.group_sample_size or 0,
+                            "calculated_at": calculated_at,
+                        })
+
+                # Overall Selection Rate metric
+                if record.overall_selection_rate is not None:
+                    if metric_type is None or metric_type == "overall_selection_rate":
+                        metric_entries.append({
+                            "metric_id": str(record.id),
+                            "model_name": actual_model_name,
+                            "model_version": record.model_version_id or "unknown",
+                            "protected_attribute": record.demographic_group,
+                            "metric_type": "overall_selection_rate",
+                            "metric_value": float(record.overall_selection_rate),
+                            "threshold": 0.0,  # No threshold for raw selection rate
+                            "is_acceptable": True,
+                            "sample_size": record.total_sample_size or 0,
+                            "calculated_at": calculated_at,
+                        })
+
+                # Filter by is_acceptable if specified
+                for entry in metric_entries:
+                    if is_acceptable is None or entry["is_acceptable"] == is_acceptable:
+                        metrics_list.append(entry)
+
+                # Apply limit to metrics list (since we may have multiple entries per record)
+                if len(metrics_list) >= limit:
+                    break
+
+            break
+
+        # Final limit application
+        metrics_list = metrics_list[:limit]
+        total_count = len(metrics_list)
+
+        logger.info(f"Retrieved {total_count} fairness metrics")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content={
+                "metrics": metrics_list,
+                "total_count": total_count,
+            },
         )
 
     except Exception as e:

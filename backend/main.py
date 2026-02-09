@@ -299,6 +299,7 @@ app.include_router(model_versions.router, prefix="/api/model-versions", tags=["M
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
 app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
