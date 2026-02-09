@@ -627,18 +627,83 @@ async def get_fairness_summary() -> JSONResponse:
     try:
         logger.info("Fetching fairness summary")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        from database import get_db
+        from models.fairness_metrics import FairnessMetrics as FairnessMetricsModel, FairnessAlert as FairnessAlertModel
+        from sqlalchemy import func, distinct
+
+        total_models = 0
+        models_with_issues = 0
+        overall_fairness_score = 0.0
+        protected_attributes = set()
+        recent_alerts_count = 0
+
+        async for db in get_db():
+            # Get unique model versions (total models monitored)
+            model_count_result = await db.execute(
+                select(func.count(distinct(FairnessMetricsModel.model_version_id)))
+            )
+            total_models = model_count_result.scalar() or 0
+
+            # Get unique protected attributes analyzed
+            attr_result = await db.execute(
+                select(distinct(FairnessMetricsModel.demographic_group))
+            )
+            protected_attributes = {row[0] for row in attr_result if row[0]}
+
+            # Calculate models with issues (where disparate_impact_ratio < threshold)
+            # Count unique model versions with at least one metric below threshold
+            if total_models > 0:
+                # Get all metrics to calculate overall fairness and count issues
+                all_metrics_result = await db.execute(
+                    select(FairnessMetricsModel)
+                )
+                all_metrics = all_metrics_result.scalars().all()
+
+                if all_metrics:
+                    # Calculate overall fairness score (average of disparate impact ratios)
+                    disparate_impact_values = [
+                        m.disparate_impact_ratio for m in all_metrics
+                        if m.disparate_impact_ratio is not None
+                    ]
+                    if disparate_impact_values:
+                        overall_fairness_score = sum(disparate_impact_values) / len(disparate_impact_values)
+                    else:
+                        overall_fairness_score = 0.85  # Default if no metrics available
+
+                    # Count models with issues (at least one metric below threshold)
+                    models_with_issues_result = await db.execute(
+                        select(func.count(distinct(FairnessMetricsModel.model_version_id)))
+                        .where(FairnessMetricsModel.disparate_impact_ratio < (FairnessMetricsModel.alert_threshold | 0.8))
+                    )
+                    models_with_issues = models_with_issues_result.scalar() or 0
+                else:
+                    overall_fairness_score = 0.85  # Default placeholder
+
+            # Count recent alerts in last 24 hours
+            cutoff_date = datetime.utcnow() - timedelta(days=1)
+            recent_alerts_result = await db.execute(
+                select(func.count(FairnessAlertModel.id))
+                .where(FairnessAlertModel.created_at >= cutoff_date)
+            )
+            recent_alerts_count = recent_alerts_result.scalar() or 0
+
+            break
+
+        # Build response data
         response_data = {
-            "total_models": 0,
-            "models_with_issues": 0,
-            "overall_fairness_score": 0.0,
-            "protected_attributes_analyzed": [],
-            "recent_alerts": 0,
+            "total_models": total_models,
+            "models_with_issues": models_with_issues,
+            "overall_fairness_score": round(overall_fairness_score, 2),
+            "protected_attributes_analyzed": sorted(list(protected_attributes)),
+            "recent_alerts": recent_alerts_count,
             "last_updated": datetime.utcnow().isoformat() + "Z",
         }
 
-        logger.info("Retrieved fairness summary")
+        logger.info(
+            f"Retrieved fairness summary - {total_models} models, "
+            f"{models_with_issues} with issues, "
+            f"fairness score: {response_data['overall_fairness_score']}"
+        )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
