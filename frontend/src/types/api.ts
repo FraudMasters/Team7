@@ -1974,3 +1974,192 @@ export interface SearchHistoryResponse {
   limit: number;
 }
 
+// ==================== Fairness Types ====================
+
+/**
+ * Fairness metric entry from backend
+ */
+export interface FairnessMetric {
+  metric_id: string;
+  vacancy_id: string;
+  model_name: string;
+  model_version: string;
+  model_version_id: string;
+  demographic_group: string;
+  protected_attribute: string;
+  metric_type: string;
+  metric_value: number;
+  threshold: number;
+  is_acceptable: boolean;
+  alert_triggered: boolean;
+  alert_severity: 'low' | 'medium' | 'high' | 'critical' | null;
+  mitigation_suggested: string | null;
+  group_sample_size: number;
+  total_sample_size: number;
+  analysis_date: string;
+  is_fairness_aware: boolean;
+}
+
+/**
+ * Fairness metrics list response from backend
+ */
+export interface FairnessMetricsListResponse {
+  metrics: FairnessMetric[];
+  total_count: number;
+}
+
+/**
+ * Fairness alert entry from backend
+ */
+export interface FairnessAlert {
+  alert_id: string;
+  model_name: string;
+  model_version: string;
+  alert_type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  protected_attribute: string;
+  metric_name: string;
+  current_value: number;
+  threshold_value: number;
+  description: string;
+  recommendation: string;
+  triggered_at: string;
+  acknowledged: boolean;
+}
+
+/**
+ * Fairness alerts list response from backend
+ */
+export interface FairnessAlertListResponse {
+  alerts: FairnessAlert[];
+  total_count: number;
+  unacknowledged_count: number;
+}
+
+/**
+ * Fairness summary from backend
+ */
+export interface FairnessSummary {
+  total_models: number;
+  models_with_issues: number;
+  overall_fairness_score: number;
+  protected_attributes_analyzed: string[];
+  recent_alerts: number;
+  last_updated: string;
+}
+
+/**
+ * Bias report entry from backend
+ */
+export interface BiasReport {
+  report_id: string;
+  model_name: string;
+  model_version: string;
+  report_type: string;
+  protected_attributes: string[];
+  overall_fairness_score: number;
+  bias_detected: boolean;
+  severity_level: 'low' | 'medium' | 'high' | 'critical' | null;
+  findings: Array<{
+    demographic_group: string;
+    disparate_impact_ratio: number;
+    statistical_parity_difference: number;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+  }>;
+  recommendations: string[];
+  generated_at: string;
+}
+
+/**
+ * Bias reports list response from backend
+ */
+export interface BiasReportListResponse {
+  reports: BiasReport[];
+  total_count: number;
+}
+
+/**
+ * Generate bias report request
+ */
+export interface GenerateBiasReportRequest {
+  model_name: string;
+  model_version?: string;
+  report_type?: string;
+}
+
+/**
+ * Acknowledge alert response
+ */
+export interface AcknowledgeAlertResponse {
+  alert_id: string;
+  acknowledged: boolean;
+  acknowledged_at: string;
+}
+
+/**
+ * Score breakdown for fairness scorecard
+ */
+export interface ScoreBreakdown {
+  disparate_impact_score: number;
+  statistical_parity_score: number;
+  alert_penalty: number;
+  final_score: number;
+}
+
+/**
+ * Metrics grouped by demographic for scorecard
+ */
+export interface DemographicMetric {
+  demographic_group: string;
+  protected_attribute: string;
+  disparate_impact_ratio: number;
+  statistical_parity_difference: number;
+  group_selection_rate: number;
+  overall_selection_rate: number;
+  sample_size: number;
+  is_acceptable: boolean;
+}
+
+/**
+ * Feature bias source for scorecard
+ */
+export interface FeatureBiasSource {
+  feature_name: string;
+  feature_label: string;
+  demographic_group: string;
+  bias_indicator: 'proxy' | 'high_importance' | 'correlation_detected';
+  importance_score: number;
+  correlation_strength: number;
+  recommendation: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+}
+
+/**
+ * Alerts summary for scorecard
+ */
+export interface AlertsSummary {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  total: number;
+}
+
+/**
+ * Fairness scorecard data from backend
+ */
+export interface FairnessScorecard {
+  vacancy_id?: string;
+  vacancy_title?: string;
+  fairness_score: number;
+  score_breakdown: ScoreBreakdown;
+  metrics_by_demographic: DemographicMetric[];
+  bias_sources: FeatureBiasSource[];
+  alerts_summary: AlertsSummary;
+  recommendations: string[];
+  analyzed_at: string;
+  total_sample_size: number;
+  demographics_analyzed: string[];
+  model_version: string;
+}
+
