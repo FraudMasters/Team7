@@ -185,18 +185,19 @@ async def register(
     Register a new user account.
 
     Creates a new user account with the provided email and password.
-    The password will be hashed using bcrypt before storage. A default
-    'viewer' role will be assigned to the new user.
+    The password will be hashed using bcrypt before storage. A role
+    will be assigned based on the request parameter, defaulting to
+    'job_seeker' if not specified.
 
     Args:
-        request_data: Registration data including email, password, and optional full_name
+        request_data: Registration data including email, password, optional full_name, and optional role
         db: Database session
 
     Returns:
         JSON response with created user information
 
     Raises:
-        HTTPException(400): If email is already registered
+        HTTPException(400): If email is already registered or role is invalid
         HTTPException(500): If database operation fails
 
     Examples:
@@ -204,7 +205,8 @@ async def register(
         >>> data = {
         ...     "email": "user@example.com",
         ...     "password": "SecurePass123!",
-        ...     "full_name": "John Doe"
+        ...     "full_name": "John Doe",
+        ...     "role": "job_seeker"
         ... }
         >>> response = requests.post("http://localhost:8000/api/auth/register", json=data)
         >>> response.json()
@@ -236,6 +238,28 @@ async def register(
         # Hash the password
         password_hash = get_password_hash(request_data.password)
 
+        # Validate and determine role
+        requested_role = request_data.role
+        if requested_role is None:
+            # Default to job_seeker if no role specified
+            user_role_enum = UserRole.JOB_SEEKER
+        else:
+            # Map string role to UserRole enum
+            role_mapping = {
+                "admin": UserRole.ADMIN,
+                "hiring_manager": UserRole.HIRING_MANAGER,
+                "job_seeker": UserRole.JOB_SEEKER,
+                "recruiter": UserRole.RECRUITER,
+                "viewer": UserRole.VIEWER,
+            }
+            if requested_role not in role_mapping:
+                logger.warning(f"Registration failed: invalid role - {requested_role}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid role. Must be one of: {', '.join(role_mapping.keys())}",
+                )
+            user_role_enum = role_mapping[requested_role]
+
         # Create new user
         new_user = User(
             email=request_data.email,
@@ -248,17 +272,17 @@ async def register(
         db.add(new_user)
         await db.flush()  # Flush to get the user ID
 
-        # Assign default viewer role
+        # Assign the specified role
         user_role = Role(
             user_id=new_user.id,
-            role=UserRole.VIEWER,
+            role=user_role_enum,
         )
         db.add(user_role)
 
         await db.commit()
         await db.refresh(new_user)
 
-        logger.info(f"User registered successfully: {new_user.email} (ID: {new_user.id})")
+        logger.info(f"User registered successfully: {new_user.email} (ID: {new_user.id}, role: {user_role_enum.value})")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
