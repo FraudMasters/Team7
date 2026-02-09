@@ -141,10 +141,12 @@
  */
 
 :root {
-  /* Font Family */
-  --font-family-base: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  /* Font Family - 2026 Design System Variable Fonts */
+  --font-family-base: var(--font-family-variable, 'Inter Variable', 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif);
+  --font-family-display: var(--font-family-display, 'Space Grotesk Variable', 'Space Grotesk', 'Roboto', 'Helvetica', 'Arial', sans-serif);
+  --font-family-mono: var(--font-family-mono, 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace);
 
-  /* Font Sizes */
+  /* Font Sizes - Variable Font Optimized */
   --font-size-xs: 0.75rem;      /* 12px */
   --font-size-sm: 0.875rem;     /* 14px */
   --font-size-base: 1rem;       /* 16px */

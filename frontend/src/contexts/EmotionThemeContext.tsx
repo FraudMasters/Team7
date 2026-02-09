@@ -414,7 +414,8 @@ const createEmotionTheme = (mode: ThemeMode): EmotionTheme => {
       xxxl: '48px',
     },
     typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: 'var(--font-family-base, "Inter Variable", "Inter", "Roboto", "Helvetica", "Arial", sans-serif)',
+      fontFamilyDisplay: 'var(--font-family-display, "Space Grotesk Variable", "Space Grotesk", "Roboto", "Helvetica", "Arial", sans-serif)',
       fontSize: {
         xs: '0.75rem',
         sm: '0.875rem',

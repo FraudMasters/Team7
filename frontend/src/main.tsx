@@ -10,6 +10,7 @@ import App from './App';
 import oidcConfig from './auth/oidcConfig';
 import './index.css';
 // Import 2026 Design System style sheets
+import './styles/variable-fonts.css';
 import './styles/gradients.css';
 import './styles/animations.css';
 import './i18n'; // Initialize i18n

@@ -160,15 +160,20 @@ export const spacing = {
 /**
  * Typography tokens
  * Font sizes, weights, and line heights
+ * Includes variable font support for 2026 Design System
  */
 export const typography = {
   /**
-   * Font family
+   * Variable font families - 2026 Design System
+   * Inter Variable: Supports weight 100-900, width 25-151%, slant -10-0
+   * Space Grotesk Variable: Supports weight 300-700, optical sizing 9-144
    */
-  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+  fontFamily: 'var(--font-family-base, "Inter Variable", "Inter", "Roboto", "Helvetica", "Arial", sans-serif)',
+  fontFamilyDisplay: 'var(--font-family-display, "Space Grotesk Variable", "Space Grotesk", "Roboto", "Helvetica", "Arial", sans-serif)',
+  fontFamilyMono: 'var(--font-family-mono, "SF Mono", "Monaco", "Inconsolata", "Fira Mono", monospace)',
 
   /**
-   * Font sizes
+   * Font sizes - optimized for variable fonts
    */
   fontSize: {
     xs: '0.75rem',    // 12px
@@ -184,14 +189,55 @@ export const typography = {
   },
 
   /**
-   * Font weights
+   * Font weights - Variable font axes (wght)
+   * Inter Variable supports 100-900
+   * Space Grotesk Variable supports 300-700
    */
   fontWeight: {
+    thin: 100,
+    extralight: 200,
     light: 300,
     normal: 400,
     medium: 500,
     semibold: 600,
     bold: 700,
+    extrabold: 800,
+    black: 900,
+  },
+
+  /**
+   * Variable font axes - for font-variation-settings
+   * Use these for fine-grained control over variable fonts
+   */
+  fontVariation: {
+    // Weight axis (wght)
+    wght: {
+      thin: 100,
+      extralight: 200,
+      light: 300,
+      normal: 400,
+      medium: 500,
+      semibold: 600,
+      bold: 700,
+      extrabold: 800,
+      black: 900,
+    },
+    // Width axis (wdth) - Inter Variable only (25-151)
+    wdth: {
+      compressed: 50,
+      condensed: 75,
+      normal: 100,
+      expanded: 125,
+      extraExpanded: 150,
+    },
+    // Optical size axis (opsz) - Space Grotesk only (9-144)
+    opsz: {
+      text: 12,
+      subheading: 18,
+      heading: 24,
+      display: 36,
+      poster: 72,
+    },
   },
 
   /**
