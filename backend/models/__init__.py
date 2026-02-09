@@ -3,6 +3,9 @@ SQLAlchemy database models for Resume Analysis System
 """
 from .base import Base
 from .resume import Resume
+from .work_history import WorkHistory, EmploymentType
+from .education import Education, DegreeType
+from .skill import Skill, ProficiencyLevel
 from .resume_analysis import ResumeAnalysis
 from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
@@ -16,6 +19,7 @@ from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
 from .hiring_stage import HiringStage, HiringStageName
+from .job_seeker_profile import JobSeekerProfile
 from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
@@ -39,6 +43,12 @@ from .organization_explanation_preferences import OrganizationExplanationPrefere
 __all__ = [
     "Base",
     "Resume",
+    "WorkHistory",
+    "EmploymentType",
+    "Education",
+    "DegreeType",
+    "Skill",
+    "ProficiencyLevel",
     "ResumeAnalysis",
     "AnalysisResult",
     "ResumeComparison",
@@ -53,6 +63,7 @@ __all__ = [
     "UserPreferences",
     "HiringStage",
     "HiringStageName",
+    "JobSeekerProfile",
     "AnalyticsEvent",
     "Recruiter",
     "Report",

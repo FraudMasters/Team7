@@ -25,6 +25,7 @@ import { ApplicationFlowPage } from './pages/jobs/ApplicationFlowPage';
 import { SavedJobsPage } from './pages/jobs/SavedJobsPage';
 import { MyApplicationsPage } from './pages/jobs/MyApplicationsPage';
 import { CandidateProfilePage } from './pages/jobs/CandidateProfilePage';
+import { JobSeekerProfilePage } from './pages/JobSeekerProfilePage';
 import { ResumeUploadPage } from './pages/jobs/ResumeUploadPage';
 import { ResumeResultsPage } from './pages/jobs/ResumeResultsPage';
 import { RecommendedJobsPage } from './pages/jobs/RecommendedJobsPage';
@@ -117,7 +118,7 @@ function App() {
 
         {/* Candidate Profile */}
         <Route path="/profile" element={<JobSeekerLayout />}>
-          <Route index element={<CandidateProfilePage />} />
+          <Route index element={<JobSeekerProfilePage />} />
         </Route>
 
         {/* Recruiter Flow - Protected with role-based access control */}

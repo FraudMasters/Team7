@@ -2130,3 +2130,242 @@ export interface AuthErrorResponse {
   type: string;
 }
 
+// ==================== Job Seeker Profile Types ====================
+
+/**
+ * Employment type enum for work history
+ */
+export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'internship' | 'freelance' | 'self_employed';
+
+/**
+ * Degree type enum for education
+ */
+export type DegreeType = 'high_school' | 'associate' | 'bachelor' | 'master' | 'doctorate' | 'certificate' | 'other';
+
+/**
+ * Proficiency level enum for skills
+ */
+export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+
+/**
+ * Job seeker status enum
+ */
+export type JobSeekerStatus = 'actively_looking' | 'open' | 'not_looking';
+
+/**
+ * Job seeker profile response
+ */
+export interface JobSeekerProfile {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  phone: string | null;
+  location: string | null;
+  bio: string | null;
+  linkedin_url: string | null;
+  portfolio_url: string | null;
+  years_of_experience: number | null;
+  current_title: string | null;
+  current_company: string | null;
+  industry: string | null;
+  job_seeker_status: JobSeekerStatus | null;
+  preferred_locations: string | null;
+  preferred_job_types: string | null;
+  expected_salary: string | null;
+  resume_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Job seeker profile create request
+ */
+export interface JobSeekerProfileCreate {
+  phone?: string;
+  location?: string;
+  bio?: string;
+  linkedin_url?: string;
+  portfolio_url?: string;
+  years_of_experience?: number;
+  current_title?: string;
+  current_company?: string;
+  industry?: string;
+  job_seeker_status?: JobSeekerStatus;
+  preferred_locations?: string;
+  preferred_job_types?: string;
+  expected_salary?: string;
+  resume_id?: string;
+}
+
+/**
+ * Job seeker profile update request
+ */
+export interface JobSeekerProfileUpdate {
+  phone?: string;
+  location?: string;
+  bio?: string;
+  linkedin_url?: string;
+  portfolio_url?: string;
+  years_of_experience?: number;
+  current_title?: string;
+  current_company?: string;
+  industry?: string;
+  job_seeker_status?: JobSeekerStatus;
+  preferred_locations?: string;
+  preferred_job_types?: string;
+  expected_salary?: string;
+  resume_id?: string;
+}
+
+/**
+ * Work history item response
+ */
+export interface WorkHistoryItem {
+  id: string;
+  resume_id: string;
+  company_name: string;
+  position_title: string;
+  start_date: string;
+  end_date: string | null;
+  description: string | null;
+  location: string | null;
+  employment_type: EmploymentType;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Work history create request
+ */
+export interface WorkHistoryCreate {
+  company_name: string;
+  position_title: string;
+  start_date: string;
+  end_date?: string;
+  description?: string;
+  location?: string;
+  employment_type?: EmploymentType;
+}
+
+/**
+ * Work history update request
+ */
+export interface WorkHistoryUpdate {
+  company_name?: string;
+  position_title?: string;
+  start_date?: string;
+  end_date?: string;
+  description?: string;
+  location?: string;
+  employment_type?: EmploymentType;
+}
+
+/**
+ * Work history list response
+ */
+export interface WorkHistoryListResponse {
+  work_history: WorkHistoryItem[];
+  count: number;
+}
+
+/**
+ * Education item response
+ */
+export interface EducationItem {
+  id: string;
+  resume_id: string;
+  institution_name: string;
+  degree: string;
+  field_of_study: string | null;
+  start_date: string;
+  end_date: string | null;
+  description: string | null;
+  location: string | null;
+  degree_type: DegreeType;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Education create request
+ */
+export interface EducationCreate {
+  resume_id?: string;
+  institution_name: string;
+  degree: string;
+  field_of_study?: string;
+  start_date: string;
+  end_date?: string;
+  description?: string;
+  location?: string;
+  degree_type?: DegreeType;
+}
+
+/**
+ * Education update request
+ */
+export interface EducationUpdate {
+  institution_name?: string;
+  degree?: string;
+  field_of_study?: string;
+  start_date?: string;
+  end_date?: string;
+  description?: string;
+  location?: string;
+  degree_type?: DegreeType;
+}
+
+/**
+ * Education list response
+ */
+export interface EducationListResponse {
+  education: EducationItem[];
+  count: number;
+}
+
+/**
+ * Skill item response
+ */
+export interface SkillItem {
+  id: string;
+  resume_id: string;
+  name: string;
+  category: string | null;
+  proficiency_level: ProficiencyLevel;
+  years_of_experience: number | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Skill create request
+ */
+export interface SkillCreate {
+  resume_id?: string;
+  name: string;
+  category?: string;
+  proficiency_level?: ProficiencyLevel;
+  years_of_experience?: number;
+  description?: string;
+}
+
+/**
+ * Skill update request
+ */
+export interface SkillUpdate {
+  name?: string;
+  category?: string;
+  proficiency_level?: ProficiencyLevel;
+  years_of_experience?: number;
+  description?: string;
+}
+
+/**
+ * Skill list response
+ */
+export interface SkillListResponse {
+  skills: SkillItem[];
+  count: number;
+}
+

@@ -1,106 +1,126 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   Box,
   Paper,
   Typography,
-  Alert,
-  AlertTitle,
-  Stack,
-  Grid,
-  Card,
-  CardContent,
-  Button,
   TextField,
+  Button,
+  Stack,
   CircularProgress,
-  Avatar,
-  IconButton,
-} from '@mui/material';
-import {
-  Save as SaveIcon,
-  Refresh as RefreshIcon,
-  Person as PersonIcon,
-  Edit as EditIcon,
-} from '@mui/icons-material';
-import { getUserProfile, updateUserProfile } from '@/api/preferences';
-import type { UserProfileResponse, UserProfileUpdate } from '@/types/api';
+  Alert,
+  Grid,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Divider,
+} from '@/components/ui';
+import { useTranslation } from 'react-i18next';
+import { profilesClient } from '@/api/profiles';
+import type {
+  JobSeekerProfile,
+  JobSeekerProfileUpdate,
+  JobSeekerStatus,
+  ApiError,
+} from '@/types/api';
 
 /**
- * Form data for editing user profile
- */
-interface ProfileFormData {
-  name: string;
-  email: string;
-  role: string;
-  avatar_url: string;
-}
-
-/**
- * Profile editor component props
+ * ProfileEditor Component Props
  */
 interface ProfileEditorProps {
-  /** Optional callback when profile is updated */
-  onProfileUpdate?: (profile: UserProfileResponse) => void;
+  /** Callback when profile is updated */
+  onProfileUpdate?: (profile: JobSeekerProfile) => void;
+  /** Whether to show the header section */
+  showHeader?: boolean;
+  /** Maximum length for bio field */
+  bioMaxLength?: number;
 }
 
 /**
  * ProfileEditor Component
  *
- * Provides a comprehensive interface for editing user profile information. Features include:
- * - Edit name, email, role, and avatar URL
- * - Real-time validation
- * - Loading and error states
- * - Optimistic UI updates
- * - Avatar preview
+ * Edit basic job seeker profile information:
+ * - Contact information (phone, location)
+ * - Professional summary (bio, current title/company)
+ * - Online presence (LinkedIn, portfolio URLs)
+ * - Career details (years of experience, industry)
+ * - Job preferences (status, preferred locations, job types, expected salary)
+ * - Supports both creating new profiles and updating existing ones
+ * - Handles loading and error states gracefully
  *
  * @example
  * ```tsx
  * <ProfileEditor
  *   onProfileUpdate={(profile) => console.log('Profile updated:', profile)}
  * />
+ *
+ * <ProfileEditor
+ *   showHeader={false}
+ *   bioMaxLength={500}
+ * />
  * ```
  */
 const ProfileEditor: React.FC<ProfileEditorProps> = ({
   onProfileUpdate,
+  showHeader = true,
+  bioMaxLength = 2000,
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  // Profile state
-  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [profile, setProfile] = useState<JobSeekerProfile | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState<ProfileFormData>({
-    name: '',
-    email: '',
-    role: '',
-    avatar_url: '',
-  });
+  const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState('');
+  const [bio, setBio] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [portfolioUrl, setPortfolioUrl] = useState('');
+  const [yearsOfExperience, setYearsOfExperience] = useState('');
+  const [currentTitle, setCurrentTitle] = useState('');
+  const [currentCompany, setCurrentCompany] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [jobSeekerStatus, setJobSeekerStatus] = useState<JobSeekerStatus | ''>('');
+  const [preferredLocations, setPreferredLocations] = useState('');
+  const [preferredJobTypes, setPreferredJobTypes] = useState('');
+  const [expectedSalary, setExpectedSalary] = useState('');
 
   /**
-   * Fetch user profile from backend
+   * Fetch the current user's profile
    */
   const fetchProfile = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
     try {
-      const result = await getUserProfile();
-      setProfile(result);
-      setFormData({
-        name: result.name || '',
-        email: result.email || '',
-        role: result.role || '',
-        avatar_url: result.avatar_url || '',
-      });
+      setLoading(true);
+      setError(null);
+
+      const data = await profilesClient.getMyProfile();
+      setProfile(data);
+
+      // Populate form fields with existing data
+      setPhone(data.phone || '');
+      setLocation(data.location || '');
+      setBio(data.bio || '');
+      setLinkedinUrl(data.linkedin_url || '');
+      setPortfolioUrl(data.portfolio_url || '');
+      setYearsOfExperience(data.years_of_experience?.toString() || '');
+      setCurrentTitle(data.current_title || '');
+      setCurrentCompany(data.current_company || '');
+      setIndustry(data.industry || '');
+      setJobSeekerStatus(data.job_seeker_status || '');
+      setPreferredLocations(data.preferred_locations || '');
+      setPreferredJobTypes(data.preferred_job_types || '');
+      setExpectedSalary(data.expected_salary || '');
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load user profile';
-      setError(errorMessage);
+      const apiError = err as ApiError;
+      // Profile might not exist yet - that's okay, user will create it
+      if (apiError.status === 404) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      setError(apiError.detail || 'Failed to load profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -111,87 +131,106 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
   }, [fetchProfile]);
 
   /**
-   * Handle form input change
+   * Handle form submission - create or update profile
    */
-  const handleInputChange = (field: keyof ProfileFormData) => (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setFormData({
-      ...formData,
-      [field]: event.target.value,
-    });
-    setSuccess(false);
-  };
-
-  /**
-   * Validate form data
-   */
-  const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      setError('Name is required');
-      return false;
-    }
-    if (!formData.email.trim()) {
-      setError('Email is required');
-      return false;
-    }
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address');
-      return false;
-    }
-    if (!formData.role.trim()) {
-      setError('Role is required');
-      return false;
-    }
-    return true;
-  };
-
-  /**
-   * Submit profile update
-   */
-  const handleSubmit = async () => {
-    if (!validateForm()) {
+  const handleSubmit = useCallback(async () => {
+    // Basic validation
+    if (!phone.trim() && !location.trim() && !bio.trim() && !currentTitle.trim()) {
+      setError('Please fill in at least one field.');
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
-    setSuccess(false);
+    // Validate LinkedIn URL format if provided
+    if (linkedinUrl.trim() && !isValidUrl(linkedinUrl)) {
+      setError('Please enter a valid LinkedIn URL.');
+      return;
+    }
+
+    // Validate portfolio URL format if provided
+    if (portfolioUrl.trim() && !isValidUrl(portfolioUrl)) {
+      setError('Please enter a valid portfolio URL.');
+      return;
+    }
+
+    // Validate years of experience if provided
+    const yearsExp = yearsOfExperience.trim() ? parseFloat(yearsOfExperience) : undefined;
+    if (yearsExp !== undefined && (isNaN(yearsExp) || yearsExp < 0 || yearsExp > 100)) {
+      setError('Years of experience must be between 0 and 100.');
+      return;
+    }
 
     try {
-      const updateData: UserProfileUpdate = {
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        role: formData.role.trim(),
-        avatar_url: formData.avatar_url.trim() || undefined,
+      setSubmitting(true);
+      setError(null);
+
+      const updateData: JobSeekerProfileUpdate = {
+        phone: phone.trim() || undefined,
+        location: location.trim() || undefined,
+        bio: bio.trim() || undefined,
+        linkedin_url: linkedinUrl.trim() || undefined,
+        portfolio_url: portfolioUrl.trim() || undefined,
+        years_of_experience: yearsExp,
+        current_title: currentTitle.trim() || undefined,
+        current_company: currentCompany.trim() || undefined,
+        industry: industry.trim() || undefined,
+        job_seeker_status: jobSeekerStatus || undefined,
+        preferred_locations: preferredLocations.trim() || undefined,
+        preferred_job_types: preferredJobTypes.trim() || undefined,
+        expected_salary: expectedSalary.trim() || undefined,
       };
 
-      const updated = await updateUserProfile(updateData);
+      let updatedProfile: JobSeekerProfile;
 
-      // Optimistic update
-      setProfile(updated);
-      setSuccess(true);
-
-      if (onProfileUpdate) {
-        onProfileUpdate(updated);
+      if (!profile) {
+        // Create new profile
+        updatedProfile = await profilesClient.createMyProfile(updateData);
+        setProfile(updatedProfile);
+      } else {
+        // Update existing profile
+        updatedProfile = await profilesClient.updateMyProfile(updateData);
+        setProfile(updatedProfile);
       }
 
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(false), 3000);
+      setSuccessMessage(profile ? 'Profile updated successfully.' : 'Profile created successfully.');
+      setTimeout(() => setSuccessMessage(null), 3000);
+
+      onProfileUpdate?.(updatedProfile);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to update profile';
-      setError(errorMessage);
+      const apiError = err as ApiError;
+      setError(apiError.detail || 'Failed to save profile. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [
+    phone,
+    location,
+    bio,
+    linkedinUrl,
+    portfolioUrl,
+    yearsOfExperience,
+    currentTitle,
+    currentCompany,
+    industry,
+    jobSeekerStatus,
+    preferredLocations,
+    preferredJobTypes,
+    expectedSalary,
+    profile,
+    onProfileUpdate,
+  ]);
 
   /**
-   * Render loading state
+   * Validate URL format
    */
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url.startsWith('http') ? url : `https://${url}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   if (loading) {
     return (
       <Box
@@ -200,11 +239,11 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          py: 8,
+          py: 4,
         }}
       >
-        <CircularProgress size={60} sx={{ mb: 3 }} />
-        <Typography variant="h6" color="text.secondary">
+        <CircularProgress size={40} sx={{ mb: 2 }} />
+        <Typography variant="body2" color="secondary">
           Loading profile...
         </Typography>
       </Box>
@@ -212,211 +251,258 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
   }
 
   return (
-    <Stack spacing={3}>
-      {/* Header Section */}
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5" fontWeight={600}>
-            Profile Settings
+    <Stack spacing={2}>
+      {/* Header */}
+      {showHeader && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" fontWeight={600}>
+            Profile Information
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchProfile}
-            size="small"
-          >
-            Refresh
-          </Button>
+          {!profile && (
+            <Typography variant="caption" color="secondary">
+              Create your profile to get started
+            </Typography>
+          )}
         </Box>
+      )}
 
-        <Typography variant="body2" color="text.secondary" paragraph>
-          Manage your personal information, including your name, email, role, and avatar. These details help personalize your experience.
-        </Typography>
+      {/* Error Message */}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-        {/* Success Message */}
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            <AlertTitle>Success</AlertTitle>
-            Profile updated successfully
-          </Alert>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <Alert
-            severity="error"
-            sx={{ mb: 3 }}
-            onClose={() => setError(null)}
-          >
-            <AlertTitle>Error</AlertTitle>
-            {error}
-          </Alert>
-        )}
-      </Paper>
+      {/* Success Message */}
+      {successMessage && (
+        <Alert
+          severity="success"
+          onClose={() => setSuccessMessage(null)}
+        >
+          {successMessage}
+        </Alert>
+      )}
 
       {/* Profile Form */}
-      <Grid container spacing={3}>
-        {/* Avatar Section */}
-        <Grid item xs={12} md={4}>
-          <Card variant="outlined" sx={{ height: '100%' }}>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                Avatar
-              </Typography>
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 2,
-                }}
-              >
-                <Avatar
-                  src={formData.avatar_url || undefined}
-                  sx={{
-                    width: 120,
-                    height: 120,
-                    bgcolor: 'primary.main',
-                    fontSize: '3rem',
-                  }}
-                >
-                  {!formData.avatar_url && <PersonIcon />}
-                </Avatar>
-                <Typography variant="caption" color="text.secondary">
-                  {formData.avatar_url
-                    ? 'Custom avatar'
-                    : 'Default avatar'}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Form Fields */}
-        <Grid item xs={12} md={8}>
-          <Paper elevation={1} sx={{ p: 3 }}>
-            <Stack spacing={3}>
-              {/* Name Field */}
-              <TextField
-                label="Full Name"
-                fullWidth
-                required
-                value={formData.name}
-                onChange={handleInputChange('name')}
-                placeholder="e.g., John Doe"
-                disabled={submitting}
-                helperText="Your full name as it appears in the system"
-                InputProps={{
-                  startAdornment: <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-              />
-
-              {/* Email Field */}
-              <TextField
-                label="Email Address"
-                fullWidth
-                required
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange('email')}
-                placeholder="e.g., john.doe@company.com"
-                disabled={submitting}
-                helperText="Your work email address for notifications"
-              />
-
-              {/* Role Field */}
-              <TextField
-                label="Role"
-                fullWidth
-                required
-                value={formData.role}
-                onChange={handleInputChange('role')}
-                placeholder="e.g., Recruiter, Hiring Manager"
-                disabled={submitting}
-                helperText="Your role in the organization"
-                select
-                SelectProps={{
-                  native: true,
-                }}
-              >
-                <option value="">Select a role</option>
-                <option value="recruiter">Recruiter</option>
-                <option value="hiring_manager">Hiring Manager</option>
-                <option value="hr_manager">HR Manager</option>
-                <option value="admin">Administrator</option>
-                <option value="other">Other</option>
-              </TextField>
-
-              {/* Avatar URL Field */}
-              <TextField
-                label="Avatar URL"
-                fullWidth
-                value={formData.avatar_url}
-                onChange={handleInputChange('avatar_url')}
-                placeholder="https://example.com/avatar.jpg"
-                disabled={submitting}
-                helperText="Optional: URL to your profile picture"
-              />
-
-              {/* Submit Button */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                <Button
-                  variant="contained"
-                  onClick={handleSubmit}
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack spacing={3}>
+          {/* Contact Information */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Contact Information
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Phone Number"
+                  placeholder="+1 (555) 123-4567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   disabled={submitting}
-                  startIcon={submitting ? <CircularProgress size={16} /> : <SaveIcon />}
-                  size="large"
-                >
-                  {submitting ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </Box>
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+                  size="small"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Location"
+                  placeholder="San Francisco, CA"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
+            </Grid>
+          </Box>
 
-      {/* Current Profile Info */}
-      {profile && (
-        <Paper elevation={1} sx={{ p: 3 }}>
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            Current Profile Information
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Name
-              </Typography>
-              <Typography variant="body1">
-                {profile.name || 'Not set'}
-              </Typography>
+          <Divider />
+
+          {/* Professional Summary */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Professional Summary
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Current Title"
+                  placeholder="Senior Software Engineer"
+                  value={currentTitle}
+                  onChange={(e) => setCurrentTitle(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Current Company"
+                  placeholder="Tech Corp"
+                  value={currentCompany}
+                  onChange={(e) => setCurrentCompany(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Industry"
+                  placeholder="Technology / Software"
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Years of Experience"
+                  type="number"
+                  placeholder="5"
+                  value={yearsOfExperience}
+                  onChange={(e) => setYearsOfExperience(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                  inputProps={{ min: 0, max: 100, step: 0.5 }}
+                />
+              </Grid>
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Bio"
+                  placeholder="Tell us about yourself, your background, and your career goals..."
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  disabled={submitting}
+                  inputProps={{ maxLength: bioMaxLength }}
+                  helperText={`${bio.length}/${bioMaxLength} characters`}
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Email
-              </Typography>
-              <Typography variant="body1">
-                {profile.email || 'Not set'}
-              </Typography>
+          </Box>
+
+          <Divider />
+
+          {/* Online Presence */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Online Presence
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="LinkedIn URL"
+                  placeholder="https://linkedin.com/in/yourprofile"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Portfolio URL"
+                  placeholder="https://yourportfolio.com"
+                  value={portfolioUrl}
+                  onChange={(e) => setPortfolioUrl(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Role
-              </Typography>
-              <Typography variant="body1">
-                {profile.role || 'Not set'}
-              </Typography>
+          </Box>
+
+          <Divider />
+
+          {/* Job Preferences */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Job Preferences
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Job Seeker Status</InputLabel>
+                  <Select
+                    value={jobSeekerStatus}
+                    onChange={(e) => setJobSeekerStatus(e.target.value as JobSeekerStatus | '')}
+                    label="Job Seeker Status"
+                    disabled={submitting}
+                  >
+                    <MenuItem value="">Not specified</MenuItem>
+                    <MenuItem value="actively_looking">Actively Looking</MenuItem>
+                    <MenuItem value="open">Open to Opportunities</MenuItem>
+                    <MenuItem value="not_looking">Not Looking</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Preferred Locations"
+                  placeholder="San Francisco, Remote, New York"
+                  value={preferredLocations}
+                  onChange={(e) => setPreferredLocations(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                  helperText="Separate multiple locations with commas"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Preferred Job Types"
+                  placeholder="Full-time, Contract, Remote"
+                  value={preferredJobTypes}
+                  onChange={(e) => setPreferredJobTypes(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                  helperText="Separate multiple types with commas"
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Expected Salary"
+                  placeholder="$120,000 - $150,000"
+                  value={expectedSalary}
+                  onChange={(e) => setExpectedSalary(e.target.value)}
+                  disabled={submitting}
+                  size="small"
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Avatar URL
-              </Typography>
-              <Typography variant="body1" sx={{ wordBreak: 'break-all' }}>
-                {profile.avatar_url || 'Not set'}
-              </Typography>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
+          </Box>
+
+          {/* Actions */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={fetchProfile}
+              disabled={submitting}
+            >
+              Reset
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={submitting}
+              startIcon={submitting ? <CircularProgress size={16} /> : null}
+            >
+              {profile ? 'Update Profile' : 'Create Profile'}
+            </Button>
+          </Box>
+        </Stack>
+      </Paper>
     </Stack>
   );
 };

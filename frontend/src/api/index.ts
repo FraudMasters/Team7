@@ -39,6 +39,9 @@ export { candidateNotesClient, CandidateNotesClient } from './candidateNotes';
 export { candidateTagsClient, CandidateTagsClient } from './candidateTags';
 export { candidateSearchClient, CandidateSearchClient } from './search';
 
+// Job seeker profile management
+export { profilesClient, ProfilesClient } from './profiles';
+
 // Communication
 export { communicationTemplatesClient, CommunicationTemplatesClient } from './communicationTemplates';
 export { communicationsClient, CommunicationsClient } from './communications';
@@ -152,4 +155,23 @@ export type {
   CandidateSearchRequest,
   CandidateSearchResult,
   CandidateSearchResponse,
+  JobSeekerProfile,
+  JobSeekerProfileCreate,
+  JobSeekerProfileUpdate,
+  WorkHistoryItem,
+  WorkHistoryCreate,
+  WorkHistoryUpdate,
+  WorkHistoryListResponse,
+  EducationItem,
+  EducationCreate,
+  EducationUpdate,
+  EducationListResponse,
+  SkillItem,
+  SkillCreate,
+  SkillUpdate,
+  SkillListResponse,
+  EmploymentType,
+  DegreeType,
+  ProficiencyLevel,
+  JobSeekerStatus,
 } from '@/types/api';
