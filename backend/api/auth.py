@@ -33,6 +33,7 @@ from utils.jwt_handler import (
     TokenData,
 )
 from config import get_settings
+from services.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -307,6 +308,50 @@ async def register(
         await db.refresh(new_user)
 
         logger.info(f"User registered successfully: {new_user.email} (ID: {new_user.id}, role: {user_role_enum.value})")
+
+        # Send welcome email
+        try:
+            email_service = get_email_service()
+
+            # Prepare context for email template
+            email_context = {
+                "email": new_user.email,
+                "full_name": new_user.full_name or new_user.email.split("@")[0],
+            }
+
+            # Try to send template email first, fall back to plain text
+            if not email_service.send_template_email(
+                to=new_user.email,
+                subject="Welcome to AgentHR",
+                template_name=email_service.TEMPLATE_WELCOME,
+                context=email_context,
+            ):
+                # Fall back to plain text email if template fails
+                plain_body = f"""Welcome to AgentHR!
+
+Hello {email_context['full_name']},
+
+Thank you for registering with AgentHR. Your account has been created successfully.
+
+Email: {new_user.email}
+
+To get started, please verify your email address by visiting:
+{settings.frontend_url}/verify-email
+
+If you have any questions, feel free to contact our support team.
+
+Best regards,
+The AgentHR Team
+"""
+                email_service.send_email(
+                    to=new_user.email,
+                    subject="Welcome to AgentHR",
+                    body=plain_body,
+                    html=False,
+                )
+        except Exception as email_error:
+            # Don't fail registration if email sending fails
+            logger.warning(f"Failed to send welcome email to {new_user.email}: {email_error}")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
