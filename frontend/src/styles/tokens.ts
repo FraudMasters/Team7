@@ -160,15 +160,20 @@ export const spacing = {
 /**
  * Typography tokens
  * Font sizes, weights, and line heights
+ * Includes variable font support for 2026 Design System
  */
 export const typography = {
   /**
-   * Font family
+   * Variable font families - 2026 Design System
+   * Inter Variable: Supports weight 100-900, width 25-151%, slant -10-0
+   * Space Grotesk Variable: Supports weight 300-700, optical sizing 9-144
    */
-  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+  fontFamily: 'var(--font-family-base, "Inter Variable", "Inter", "Roboto", "Helvetica", "Arial", sans-serif)',
+  fontFamilyDisplay: 'var(--font-family-display, "Space Grotesk Variable", "Space Grotesk", "Roboto", "Helvetica", "Arial", sans-serif)',
+  fontFamilyMono: 'var(--font-family-mono, "SF Mono", "Monaco", "Inconsolata", "Fira Mono", monospace)',
 
   /**
-   * Font sizes
+   * Font sizes - optimized for variable fonts
    */
   fontSize: {
     xs: '0.75rem',    // 12px
@@ -184,14 +189,55 @@ export const typography = {
   },
 
   /**
-   * Font weights
+   * Font weights - Variable font axes (wght)
+   * Inter Variable supports 100-900
+   * Space Grotesk Variable supports 300-700
    */
   fontWeight: {
+    thin: 100,
+    extralight: 200,
     light: 300,
     normal: 400,
     medium: 500,
     semibold: 600,
     bold: 700,
+    extrabold: 800,
+    black: 900,
+  },
+
+  /**
+   * Variable font axes - for font-variation-settings
+   * Use these for fine-grained control over variable fonts
+   */
+  fontVariation: {
+    // Weight axis (wght)
+    wght: {
+      thin: 100,
+      extralight: 200,
+      light: 300,
+      normal: 400,
+      medium: 500,
+      semibold: 600,
+      bold: 700,
+      extrabold: 800,
+      black: 900,
+    },
+    // Width axis (wdth) - Inter Variable only (25-151)
+    wdth: {
+      compressed: 50,
+      condensed: 75,
+      normal: 100,
+      expanded: 125,
+      extraExpanded: 150,
+    },
+    // Optical size axis (opsz) - Space Grotesk only (9-144)
+    opsz: {
+      text: 12,
+      subheading: 18,
+      heading: 24,
+      display: 36,
+      poster: 72,
+    },
   },
 
   /**
@@ -291,6 +337,271 @@ export const transitions = {
 } as const;
 
 /**
+ * Gradient tokens
+ * CSS gradient definitions for backgrounds and effects
+ */
+export const gradients = {
+  /**
+   * Primary gradients
+   */
+  primary: {
+    main: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+    reverse: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+    subtle: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(21, 101, 192, 0.08) 100%)',
+    light: 'linear-gradient(135deg, #42a5f5 0%, #1976d2 100%)',
+    lightSubtle: 'linear-gradient(135deg, rgba(66, 165, 245, 0.08) 0%, rgba(25, 118, 210, 0.08) 100%)',
+  },
+
+  /**
+   * Secondary gradients
+   */
+  secondary: {
+    main: 'linear-gradient(135deg, #dc004e 0%, #c51162 100%)',
+    reverse: 'linear-gradient(135deg, #c51162 0%, #dc004e 100%)',
+    subtle: 'linear-gradient(135deg, rgba(220, 0, 78, 0.08) 0%, rgba(197, 17, 98, 0.08) 100%)',
+    light: 'linear-gradient(135deg, #f50057 0%, #dc004e 100%)',
+    lightSubtle: 'linear-gradient(135deg, rgba(245, 0, 87, 0.08) 0%, rgba(220, 0, 78, 0.08) 100%)',
+  },
+
+  /**
+   * Success gradients
+   */
+  success: {
+    main: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+    reverse: 'linear-gradient(135deg, #2e7d32 0%, #4caf50 100%)',
+    subtle: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(46, 125, 50, 0.08) 100%)',
+  },
+
+  /**
+   * Error gradients
+   */
+  error: {
+    main: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+    reverse: 'linear-gradient(135deg, #d32f2f 0%, #f44336 100%)',
+    subtle: 'linear-gradient(135deg, rgba(244, 67, 54, 0.08) 0%, rgba(211, 47, 47, 0.08) 100%)',
+  },
+
+  /**
+   * Warning gradients
+   */
+  warning: {
+    main: 'linear-gradient(135deg, #ff9800 0%, #ed6c02 100%)',
+    reverse: 'linear-gradient(135deg, #ed6c02 0%, #ff9800 100%)',
+    subtle: 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(237, 108, 2, 0.08) 100%)',
+  },
+
+  /**
+   * Info gradients
+   */
+  info: {
+    main: 'linear-gradient(135deg, #03a9f4 0%, #0288d1 100%)',
+    reverse: 'linear-gradient(135deg, #0288d1 0%, #03a9f4 100%)',
+    subtle: 'linear-gradient(135deg, rgba(3, 169, 244, 0.08) 0%, rgba(2, 136, 209, 0.08) 100%)',
+  },
+
+  /**
+   * Neutral gradients
+   */
+  neutral: {
+    grey: 'linear-gradient(135deg, #9e9e9e 0%, #616161 100%)',
+    greyLight: 'linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%)',
+    greySubtle: 'linear-gradient(135deg, rgba(158, 158, 158, 0.08) 0%, rgba(97, 97, 97, 0.08) 100%)',
+    light: 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
+    dark: 'linear-gradient(135deg, #1e1e1e 0%, #121212 100%)',
+  },
+
+  /**
+   * Rainbow gradients
+   */
+  rainbow: {
+    main: 'linear-gradient(90deg, #f44336 0%, #ff9800 16.66%, #4caf50 33.33%, #2196f3 50%, #9c27b0 66.66%, #e91e63 83.33%, #f44336 100%)',
+    subtle: 'linear-gradient(90deg, rgba(244, 67, 54, 0.3) 0%, rgba(255, 152, 0, 0.3) 16.66%, rgba(76, 175, 80, 0.3) 33.33%, rgba(33, 150, 243, 0.3) 50%, rgba(156, 39, 176, 0.3) 66.66%, rgba(233, 30, 99, 0.3) 83.33%, rgba(244, 67, 54, 0.3) 100%)',
+    horizontal: 'linear-gradient(90deg, #1976d2 0%, #dc004e 50%, #2e7d32 100%)',
+  },
+
+  /**
+   * Special effect gradients
+   */
+  effects: {
+    glossy: 'linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.05) 100%)',
+    glass: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+    glassDark: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)',
+    shine: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%)',
+    shineDark: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%)',
+  },
+
+  /**
+   * Radial gradients
+   */
+  radial: {
+    primary: 'radial-gradient(circle, #42a5f5 0%, #1976d2 100%)',
+    secondary: 'radial-gradient(circle, #f50057 0%, #dc004e 100%)',
+    glow: 'radial-gradient(circle, rgba(25, 118, 210, 0.3) 0%, transparent 70%)',
+    glowSuccess: 'radial-gradient(circle, rgba(76, 175, 80, 0.3) 0%, transparent 70%)',
+    glowError: 'radial-gradient(circle, rgba(244, 67, 54, 0.3) 0%, transparent 70%)',
+    glowWarning: 'radial-gradient(circle, rgba(255, 152, 0, 0.3) 0%, transparent 70%)',
+  },
+
+  /**
+   * Overlay gradients
+   */
+  overlay: {
+    top: 'linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%)',
+    bottom: 'linear-gradient(0deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%)',
+    full: 'linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 30%, transparent 70%, rgba(0, 0, 0, 0.6) 100%)',
+    subtle: 'linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, transparent 100%)',
+    subtleDark: 'linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, transparent 100%)',
+  },
+
+  /**
+   * Mesh gradients
+   */
+  mesh: {
+    primary: 'radial-gradient(at 40% 20%, #42a5f5 0px, transparent 50%), radial-gradient(at 80% 0%, #1976d2 0px, transparent 50%), radial-gradient(at 0% 50%, #1565c0 0px, transparent 50%), radial-gradient(at 80% 50%, #42a5f5 0px, transparent 50%), radial-gradient(at 0% 100%, #1976d2 0px, transparent 50%), radial-gradient(at 80% 100%, #1565c0 0px, transparent 50%)',
+    secondary: 'radial-gradient(at 40% 20%, #f50057 0px, transparent 50%), radial-gradient(at 80% 0%, #dc004e 0px, transparent 50%), radial-gradient(at 0% 50%, #c51162 0px, transparent 50%), radial-gradient(at 80% 50%, #f50057 0px, transparent 50%), radial-gradient(at 0% 100%, #dc004e 0px, transparent 50%), radial-gradient(at 80% 100%, #c51162 0px, transparent 50%)',
+    colorful: 'radial-gradient(at 40% 20%, #f44336 0px, transparent 50%), radial-gradient(at 80% 0%, #ff9800 0px, transparent 50%), radial-gradient(at 0% 50%, #4caf50 0px, transparent 50%), radial-gradient(at 80% 50%, #2196f3 0px, transparent 50%), radial-gradient(at 0% 100%, #9c27b0 0px, transparent 50%), radial-gradient(at 80% 100%, #e91e63 0px, transparent 50%)',
+  },
+
+  /**
+   * Utility gradients
+   */
+  utility: {
+    fadeRight: 'linear-gradient(90deg, transparent 0%, currentColor 100%)',
+    fadeLeft: 'linear-gradient(270deg, transparent 0%, currentColor 100%)',
+    fadeUp: 'linear-gradient(0deg, transparent 0%, currentColor 100%)',
+    fadeDown: 'linear-gradient(180deg, transparent 0%, currentColor 100%)',
+    fadeIn: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.05) 50%, rgba(0, 0, 0, 0.1) 100%)',
+    fadeInLight: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.03) 50%, rgba(0, 0, 0, 0.06) 100%)',
+    fadeInDark: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.03) 50%, rgba(255, 255, 255, 0.06) 100%)',
+  },
+} as const;
+
+/**
+ * Animation tokens
+ * Animation name definitions for use with CSS animation property
+ */
+export const animations = {
+  /**
+   * Fade animations
+   */
+  fade: {
+    in: 'fadeIn',
+    out: 'fadeOut',
+    inUp: 'fadeInUp',
+    inDown: 'fadeInDown',
+    inLeft: 'fadeInLeft',
+    inRight: 'fadeInRight',
+  },
+
+  /**
+   * Slide animations
+   */
+  slide: {
+    inUp: 'slideInUp',
+    inDown: 'slideInDown',
+    inLeft: 'slideInLeft',
+    inRight: 'slideInRight',
+    outUp: 'slideOutUp',
+    outDown: 'slideOutDown',
+    outLeft: 'slideOutLeft',
+    outRight: 'slideOutRight',
+  },
+
+  /**
+   * Zoom animations
+   */
+  zoom: {
+    in: 'zoomIn',
+    out: 'zoomOut',
+    inUp: 'zoomInUp',
+    inDown: 'zoomInDown',
+  },
+
+  /**
+   * Bounce animations
+   */
+  bounce: {
+    infinite: 'bounce',
+    in: 'bounceIn',
+    out: 'bounceOut',
+  },
+
+  /**
+   * Pulse animations
+   */
+  pulse: {
+    scale: 'pulse',
+    glow: 'pulseGlow',
+  },
+
+  /**
+   * Spin animations
+   */
+  spin: {
+    normal: 'spin',
+    reverse: 'spinReverse',
+  },
+
+  /**
+   * Shake and wobble animations
+   */
+  shake: 'shake',
+  wobble: 'wobble',
+
+  /**
+   * Special effect animations
+   */
+  effects: {
+    heartbeat: 'heartbeat',
+    float: 'float',
+    drip: 'drip',
+    jell: 'jell',
+    flash: 'flash',
+  },
+
+  /**
+   * Animation durations
+   */
+  duration: {
+    fastest: '150ms',
+    faster: '200ms',
+    fast: '250ms',
+    standard: '300ms',
+    slow: '375ms',
+  },
+
+  /**
+   * Animation delays
+   */
+  delay: {
+    none: '0ms',
+    short: '100ms',
+    medium: '200ms',
+    long: '300ms',
+  },
+
+  /**
+   * Animation easing functions
+   */
+  easing: {
+    easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    easeOut: 'cubic-bezier(0.0, 0, 0.2, 1)',
+    easeIn: 'cubic-bezier(0.4, 0, 1, 1)',
+    sharp: 'cubic-bezier(0.4, 0, 0.6, 1)',
+  },
+
+  /**
+   * Animation fill modes
+   */
+  fillMode: {
+    none: 'none',
+    forwards: 'forwards',
+    backwards: 'backwards',
+    both: 'both',
+  },
+} as const;
+
+/**
  * All design tokens combined
  */
 export const tokens = {
@@ -302,6 +613,8 @@ export const tokens = {
   shadows,
   zIndex,
   transitions,
+  gradients,
+  animations,
 } as const;
 
 export default tokens;
