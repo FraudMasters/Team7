@@ -20,6 +20,7 @@ from database import get_db
 from models.candidate_tag import CandidateTag
 from models.candidate_activity import CandidateActivity, CandidateActivityType
 from models.resume import Resume
+from analyzers.tag_suggester import TagSuggester
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,30 @@ class MergeTagsResponse(BaseModel):
     source_tag_id: str = Field(..., description="ID of the source tag that was deleted")
     target_tag_id: str = Field(..., description="ID of the target tag")
     candidates_transferred: int = Field(..., description="Number of candidates transferred from source to target tag")
+
+
+class IntelligentTagSuggestion(BaseModel):
+    """Individual intelligent tag suggestion with relevance score."""
+
+    id: str = Field(..., description="Unique identifier for the tag")
+    organization_id: str = Field(..., description="Organization ID that owns this tag")
+    tag_name: str = Field(..., description="Name of the tag")
+    tag_order: int = Field(..., description="Order of this tag in the UI")
+    is_default: bool = Field(..., description="Whether this is a default tag")
+    is_active: bool = Field(..., description="Whether this tag is currently active")
+    color: Optional[str] = Field(None, description="Hex color code for UI display")
+    description: Optional[str] = Field(None, description="Description of when to use this tag")
+    relevance_score: float = Field(..., description="Relevance score (0-1)")
+
+
+class IntelligentTagSuggestionResponse(BaseModel):
+    """Response model for intelligent tag suggestions."""
+
+    organization_id: str = Field(..., description="Organization ID")
+    resume_id: str = Field(..., description="Resume ID that was analyzed")
+    suggestions: List[IntelligentTagSuggestion] = Field(..., description="List of intelligent tag suggestions")
+    keywords_extracted: List[str] = Field(..., description="Keywords extracted from resume for reference")
+    total_count: int = Field(..., description="Total number of suggestions returned")
 
 
 @router.post(
@@ -469,6 +494,220 @@ async def get_tag_suggestions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get tag suggestions: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/intelligent-suggestions",
+    response_model=IntelligentTagSuggestionResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Candidate Tags"],
+)
+async def get_intelligent_tag_suggestions(
+    organization_id: str = Query(..., description="Organization ID to get suggestions for"),
+    resume_id: str = Query(..., description="Resume ID to analyze for tag suggestions"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of suggestions to return"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get intelligent tag suggestions based on resume content analysis.
+
+    This endpoint analyzes a candidate's resume to extract keywords and intelligently
+    match them against the organization's tags. Suggestions are scored based on
+    keyword matching accuracy and returned in order of relevance.
+
+    Args:
+        organization_id: Organization ID to get suggestions for
+        resume_id: Resume ID to analyze for tag suggestions
+        limit: Maximum number of suggestions to return (default: 10, max: 100)
+        db: Database session
+
+    Returns:
+        JSON response with intelligent tag suggestions and relevance scores
+
+    Raises:
+        HTTPException(404): If organization or resume is not found
+        HTTPException(422): If validation fails
+        HTTPException(500): If analysis or database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "/api/candidate-tags/intelligent-suggestions"
+        ...     "?organization_id=org-123&resume_id=resume-456&limit=5"
+        ... )
+        >>> response.json()
+        {
+            "organization_id": "org-123",
+            "resume_id": "resume-456",
+            "suggestions": [
+                {
+                    "id": "tag-1",
+                    "organization_id": "org-123",
+                    "tag_name": "Senior Developer",
+                    "relevance_score": 0.85,
+                    ...
+                },
+                ...
+            ],
+            "keywords_extracted": ["python", "django", "postgresql"],
+            "total_count": 5
+        }
+    """
+    try:
+        logger.info(
+            f"Generating intelligent tag suggestions for organization={organization_id}, "
+            f"resume={resume_id}, limit={limit}"
+        )
+
+        # Validate organization_id
+        if not organization_id or len(organization_id.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Organization ID cannot be empty",
+            )
+
+        # Validate resume_id
+        if not resume_id or len(resume_id.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Resume ID cannot be empty",
+            )
+
+        # Fetch resume to get raw text
+        resume_result = await db.execute(
+            select(Resume).where(Resume.id == UUID(resume_id))
+        )
+        resume = resume_result.scalar_one_or_none()
+
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume not found: {resume_id}",
+            )
+
+        # Get resume text for analysis
+        resume_text = resume.raw_text or ""
+        if not resume_text:
+            logger.warning(f"Resume {resume_id} has no text content")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "organization_id": organization_id,
+                    "resume_id": resume_id,
+                    "suggestions": [],
+                    "keywords_extracted": [],
+                    "total_count": 0,
+                },
+            )
+
+        # Detect language for keyword extraction (default to english)
+        language = "english" if not resume.language or resume.language.startswith("en") else resume.language
+
+        # Fetch all active organization tags
+        tags_result = await db.execute(
+            select(CandidateTag).where(
+                CandidateTag.organization_id == organization_id,
+                CandidateTag.is_active == True,
+            ).order_by(CandidateTag.tag_order, CandidateTag.tag_name)
+        )
+        tags = tags_result.scalars().all()
+
+        if not tags:
+            logger.info(f"No active tags found for organization: {organization_id}")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "organization_id": organization_id,
+                    "resume_id": resume_id,
+                    "suggestions": [],
+                    "keywords_extracted": [],
+                    "total_count": 0,
+                },
+            )
+
+        # Convert tags to format expected by TagSuggester
+        organization_tags = []
+        for tag in tags:
+            organization_tags.append({
+                "id": str(tag.id),
+                "organization_id": tag.organization_id,
+                "tag_name": tag.tag_name,
+                "tag_order": tag.tag_order,
+                "is_default": tag.is_default,
+                "is_active": tag.is_active,
+                "color": tag.color,
+                "description": tag.description,
+            })
+
+        # Use TagSuggester to generate intelligent suggestions
+        suggester = TagSuggester(min_score=0.3, fuzzy_threshold=0.6)
+        suggestion_result = suggester.suggest_tags(
+            resume_text=resume_text,
+            organization_tags=organization_tags,
+            limit=limit,
+            language=language
+        )
+
+        if suggestion_result.get("error"):
+            logger.warning(f"Tag suggestion returned error: {suggestion_result['error']}")
+            # Return empty suggestions rather than failing
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "organization_id": organization_id,
+                    "resume_id": resume_id,
+                    "suggestions": [],
+                    "keywords_extracted": [],
+                    "total_count": 0,
+                },
+            )
+
+        # Build response with suggestions
+        suggestions_data = []
+        for suggestion in suggestion_result.get("suggestions", []):
+            suggestions_data.append({
+                "id": suggestion.get("id"),
+                "organization_id": suggestion.get("organization_id"),
+                "tag_name": suggestion.get("tag_name"),
+                "tag_order": suggestion.get("tag_order"),
+                "is_default": suggestion.get("is_default"),
+                "is_active": suggestion.get("is_active"),
+                "color": suggestion.get("color"),
+                "description": suggestion.get("description"),
+                "relevance_score": suggestion.get("score", 0.0),
+            })
+
+        response_data = {
+            "organization_id": organization_id,
+            "resume_id": resume_id,
+            "suggestions": suggestions_data,
+            "keywords_extracted": suggestion_result.get("keywords_extracted", []),
+            "total_count": len(suggestions_data),
+        }
+
+        logger.info(
+            f"Generated {len(suggestions_data)} intelligent tag suggestions "
+            f"for resume {resume_id}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid UUID format: {resume_id}",
+        )
+    except Exception as e:
+        logger.error(f"Error generating intelligent tag suggestions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate intelligent tag suggestions: {str(e)}",
         ) from e
 
 
