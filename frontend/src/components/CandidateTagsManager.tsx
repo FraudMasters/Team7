@@ -109,7 +109,12 @@ export function CandidateTagsManager({
   // Create tag mutation
   const createMutation = useMutation({
     mutationFn: async ({ name, color }: { name: string; color: string }) => {
-      return await candidateTagsClient.createTag({ name, color });
+      return await candidateTagsClient.createTag({
+        organization_id: 'default-org',
+        tag_name: name,
+        color,
+        is_active: true,
+      });
     },
     onSuccess: () => {
       setDialogOpen(false);
@@ -121,7 +126,10 @@ export function CandidateTagsManager({
   // Update tag mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, name, color }: { id: string; name?: string; color?: string }) => {
-      return await candidateTagsClient.updateTag(id, { name, color });
+      const updateData: { tag_name?: string; color?: string } = {};
+      if (name !== undefined) updateData.tag_name = name;
+      if (color !== undefined) updateData.color = color;
+      return await candidateTagsClient.updateTag(id, updateData);
     },
     onSuccess: () => {
       setDialogOpen(false);
@@ -146,7 +154,7 @@ export function CandidateTagsManager({
   const assignMutation = useMutation({
     mutationFn: async (tagId: string) => {
       if (candidateId) {
-        await candidateTagsClient.assignTag(candidateId, tagId);
+        await candidateTagsClient.assignTagToResume(candidateId, { tag_id: tagId, recruiter_id: '' });
       }
     },
     onSuccess: () => {
@@ -160,7 +168,7 @@ export function CandidateTagsManager({
   const removeMutation = useMutation({
     mutationFn: async (tagId: string) => {
       if (candidateId) {
-        await candidateTagsClient.removeTag(candidateId, tagId);
+        await candidateTagsClient.removeTagFromResume(candidateId, tagId);
       }
     },
     onSuccess: () => {
