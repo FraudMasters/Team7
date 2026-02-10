@@ -301,6 +301,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setPhone(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Contact number for recruiters"
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -312,6 +313,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setLocation(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Your city and country or region"
                 />
               </Grid>
             </Grid>
@@ -334,6 +336,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setCurrentTitle(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Your current job title"
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -345,6 +348,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setCurrentCompany(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Your current employer"
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -356,6 +360,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setIndustry(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Your field of work"
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -369,6 +374,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   disabled={submitting}
                   size="small"
                   inputProps={{ min: 0, max: 100, step: 0.5 }}
+                  helperText="Optional: Total years of work experience (0-100)"
                 />
               </Grid>
               <Grid size={12}>
@@ -405,6 +411,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setLinkedinUrl(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Link to your LinkedIn profile"
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -416,6 +423,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setPortfolioUrl(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Link to your portfolio or website"
                 />
               </Grid>
             </Grid>
@@ -478,6 +486,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({
                   onChange={(e) => setExpectedSalary(e.target.value)}
                   disabled={submitting}
                   size="small"
+                  helperText="Optional: Your salary expectations or range"
                 />
               </Grid>
             </Grid>
