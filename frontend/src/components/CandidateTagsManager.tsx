@@ -4,7 +4,7 @@
  * Manage tags for candidates with color coding and assignment capabilities.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -31,6 +31,7 @@ import {
 import { Icon } from '@/components/ui/primitives';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { candidateTagsClient } from '../api/candidateTags';
+import type { IntelligentTagSuggestion } from '@/types/api';
 
 // Predefined colors for tags
 const TAG_COLORS = [
@@ -92,6 +93,19 @@ export function CandidateTagsManager({
     .sort((a, b) => (b.candidate_count || 0) - (a.candidate_count || 0))
     .slice(0, 5);
 
+  // Fetch intelligent tag suggestions when candidateId is provided
+  const { data: intelligentSuggestionsData, isLoading: intelligentLoading } = useQuery({
+    queryKey: ['intelligent-tag-suggestions', candidateId],
+    queryFn: async () => {
+      if (!candidateId) return null;
+      // Use default organization ID - in production this would come from user context
+      return await candidateTagsClient.getIntelligentSuggestions('default-org', candidateId, 5);
+    },
+    enabled: !!candidateId && dialogOpen, // Only fetch when dialog is open and candidateId exists
+  });
+
+  const intelligentSuggestions = intelligentSuggestionsData?.suggestions || [];
+
   // Create tag mutation
   const createMutation = useMutation({
     mutationFn: async ({ name, color }: { name: string; color: string }) => {
@@ -138,6 +152,7 @@ export function CandidateTagsManager({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidate-tags'] });
       queryClient.invalidateQueries({ queryKey: ['candidate', candidateId, 'tags'] });
+      queryClient.invalidateQueries({ queryKey: ['intelligent-tag-suggestions', candidateId] });
     },
   });
 
@@ -453,6 +468,70 @@ export function CandidateTagsManager({
                   );
                 })}
               </Box>
+            </>
+          )}
+
+          {/* Intelligent Tag Suggestions (when candidateId is provided) */}
+          {!editMode && candidateId && intelligentSuggestions.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                Suggested Tags
+                <Typography component="span" variant="caption" color="secondary" sx={{ ml: 1 }}>
+                  (Based on resume content)
+                </Typography>
+              </Typography>
+              {intelligentLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {intelligentSuggestions.map((suggestion: IntelligentTagSuggestion) => {
+                    const isAssigned = assignedTags.some((t) => t.id === suggestion.id);
+                    return (
+                      <Chip
+                        key={suggestion.id}
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span>{suggestion.tag_name}</span>
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              sx={{
+                                opacity: 0.9,
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                              }}
+                            >
+                              ({Math.round(suggestion.relevance_score * 100)}%)
+                            </Typography>
+                          </Box>
+                        }
+                        sx={{
+                          bgcolor: suggestion.color || '#757575',
+                          color: 'white',
+                          fontWeight: 500,
+                          opacity: isAssigned ? 0.6 : 1,
+                          cursor: 'pointer',
+                          '&:hover': {
+                            transform: 'scale(1.05)',
+                            boxShadow: 2,
+                          },
+                          transition: 'transform 0.2s',
+                        }}
+                        onClick={() => handleSuggestionClick({
+                          id: suggestion.id,
+                          name: suggestion.tag_name,
+                          color: suggestion.color || '#757575',
+                        } as Tag)}
+                        size="small"
+                        disabled={assignMutation.isPending}
+                      />
+                    );
+                  })}
+                </Box>
+              )}
             </>
           )}
 
