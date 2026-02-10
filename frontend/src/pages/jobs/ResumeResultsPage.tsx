@@ -7,9 +7,10 @@ import {
   Tabs,        // Вкладки для переключения между секциями
   Tab,         // Отдельная вкладка
   Alert,       // Предупреждающее сообщение
+  Button,      // Кнопка для действий
 } from '@mui/material';
-// Импорт хука для получения параметров из URL
-import { useParams } from 'react-router-dom';
+// Импорт хуков для навигации
+import { useParams, useNavigate } from 'react-router-dom';
 // Импорт хука для локализации
 import { useTranslation } from 'react-i18next';
 // Импорт компонентов для отображения результатов анализа резюме
@@ -30,6 +31,8 @@ import { PageTransition } from '@components/mui/PageTransition';
 const ResumeResultsPage: React.FC = () => {
   // Получение ID резюме из URL параметров
   const { id } = useParams<{ id: string }>();
+  // Хук для навигации между страницами
+  const navigate = useNavigate();
   // Хук для локализации интерфейса
   const { t } = useTranslation();
   // Состояние активной вкладки (0 - анализ, 1 - соответствие вакансиям)
@@ -60,13 +63,22 @@ const ResumeResultsPage: React.FC = () => {
     <PageTransition>
       <Box sx={{ p: 3 }}>
         {/* Заголовок страницы с ID резюме */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
-            {t('results.title', 'Resume Analysis Results')}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Resume ID: {id}
-          </Typography>
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom fontWeight={600}>
+              {t('results.title', 'Resume Analysis Results')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Resume ID: {id}
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate(`/jobs/resume-optimization/${id}`)}
+          >
+            {t('results.viewOptimization', 'View Optimization')}
+          </Button>
         </Box>
 
         {/* Панель вкладок для переключения между видами результатов */}

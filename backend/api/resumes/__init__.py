@@ -31,6 +31,11 @@ specialized modules to improve maintainability, testability, and code organizati
   - Resume deletion with file cleanup
   - Audit logging for all changes
 
+* **optimization** - Resume optimization and enhancement endpoint
+  - Generate optimized resume versions
+  - AI-powered improvement suggestions
+  - Job description matching
+
 ## Usage
 
 Include this router in the main FastAPI application:
@@ -54,6 +59,7 @@ from . import (
     analysis,
     listing,
     management,
+    optimization,
     upload,
 )
 
@@ -65,10 +71,12 @@ router = APIRouter()
 # 1. upload - Entry point for new resumes
 # 2. listing - Browse existing resumes
 # 3. analysis - View detailed analysis
-# 4. management - Update status and delete resumes
+# 4. optimization - Generate optimized versions
+# 5. management - Update status and delete resumes
 router.include_router(upload.router)
 router.include_router(listing.router)
 router.include_router(analysis.router)
+router.include_router(optimization.router)
 router.include_router(management.router)
 
 # Export public API
@@ -77,6 +85,7 @@ __all__ = [
     "analysis",
     "listing",
     "management",
+    "optimization",
     "upload",
     "router",
 ]

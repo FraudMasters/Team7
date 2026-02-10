@@ -25,3 +25,4 @@ export { default as AuditLogsPage } from './AuditLogs';
 export { default as LoginPage } from './auth/LoginPage';
 export { default as RegisterPage } from './auth/RegisterPage';
 export { default as PasswordResetPage } from './auth/PasswordResetPage';
+export { default as ResumeOptimizationPage } from './jobs/ResumeOptimizationPage';

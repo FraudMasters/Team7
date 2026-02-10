@@ -108,6 +108,10 @@ from .llm_matcher import (
     LLMMatchResult,
     get_llm_matcher,
 )
+from .resume_optimizer import (
+    generate_resume_optimization,
+    format_suggestions_for_display,
+)
 
 __all__ = [
     "extract_keywords",
@@ -171,6 +175,8 @@ __all__ = [
     "LLMSemanticMatcher",
     "LLMMatchResult",
     "get_llm_matcher",
+    "generate_resume_optimization",
+    "format_suggestions_for_display",
     "save_resume_analysis",
     "get_resume_analysis",
     "delete_resume_analysis",
