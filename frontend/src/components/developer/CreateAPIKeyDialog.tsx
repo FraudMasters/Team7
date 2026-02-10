@@ -280,6 +280,7 @@ const CreateAPIKeyDialog: React.FC<CreateAPIKeyDialogProps> = ({
                 disabled={loading}
                 placeholder="60"
                 sx={{ flex: 1 }}
+                helperText="Maximum API calls per minute"
               />
               <TextField
                 label="Requests per Hour"
@@ -289,6 +290,7 @@ const CreateAPIKeyDialog: React.FC<CreateAPIKeyDialogProps> = ({
                 disabled={loading}
                 placeholder="1000"
                 sx={{ flex: 1 }}
+                helperText="Maximum API calls per hour"
               />
               <TextField
                 label="Requests per Day"
@@ -298,6 +300,7 @@ const CreateAPIKeyDialog: React.FC<CreateAPIKeyDialogProps> = ({
                 disabled={loading}
                 placeholder="10000"
                 sx={{ flex: 1 }}
+                helperText="Maximum API calls per day"
               />
             </Stack>
           </Box>
