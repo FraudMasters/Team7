@@ -2363,3 +2363,92 @@ export interface CheckJobSavedResponse {
   saved_job_id: string | null;
 }
 
+// ==================== Resume Optimization Types ====================
+
+/**
+ * Optimization suggestion priority levels
+ */
+export type OptimizationPriority = 'high' | 'medium' | 'low';
+
+/**
+ * Optimization suggestion types
+ */
+export type OptimizationSuggestionType = 'keyword' | 'formatting' | 'content';
+
+/**
+ * Optimization suggestion categories
+ */
+export type OptimizationCategory =
+  | 'keywords'
+  | 'structure'
+  | 'readability'
+  | 'impact'
+  | 'action_verbs'
+  | 'summary'
+  | 'active_language'
+  | 'achievements';
+
+/**
+ * Individual optimization suggestion
+ */
+export interface OptimizationSuggestion {
+  /** Type of suggestion */
+  type: OptimizationSuggestionType;
+  /** Priority level */
+  priority: OptimizationPriority;
+  /** Category within the type */
+  category: OptimizationCategory;
+  /** Short suggestion title */
+  title: string;
+  /** Detailed suggestion description */
+  description: string;
+  /** Current state description */
+  current_state: string;
+  /** What to change */
+  recommendation: string;
+  /** Example improvements */
+  examples: string[];
+}
+
+/**
+ * Resume optimization request
+ */
+export interface OptimizationRequest {
+  /** Optional job description to target */
+  target_job_description?: string;
+  /** Whether to check keywords */
+  check_keywords?: boolean;
+  /** Whether to check formatting */
+  check_formatting?: boolean;
+  /** Whether to check content */
+  check_content?: boolean;
+}
+
+/**
+ * Resume optimization feedback response
+ */
+export interface OptimizationFeedback {
+  /** Resume ID being optimized */
+  resume_id: string;
+  /** List of optimization suggestions */
+  suggestions: OptimizationSuggestion[];
+  /** Total number of suggestions */
+  total_suggestions: number;
+  /** Number of high-priority suggestions */
+  high_priority_count: number;
+  /** Number of medium-priority suggestions */
+  medium_priority_count: number;
+  /** Number of low-priority suggestions */
+  low_priority_count: number;
+  /** Keywords found in resume */
+  keywords_found: string[] | null;
+  /** Missing recommended keywords */
+  missing_keywords: string[] | null;
+  /** Overall optimization score (0-100) */
+  score: number;
+  /** Error message if analysis failed */
+  error: string | null;
+  /** Processing time in milliseconds */
+  processing_time_ms?: number;
+}
+
