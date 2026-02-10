@@ -55,6 +55,13 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "vacancy_not_found": "Job vacancy not found",
         "invalid_vacancy_id": "Invalid vacancy ID format",
 
+        # Optimization errors
+        "optimization_failed": "Resume optimization analysis failed",
+        "keyword_analysis_failed": "Keyword analysis failed",
+        "formatting_analysis_failed": "Formatting analysis failed",
+        "content_analysis_failed": "Content analysis failed",
+        "optimization_generation_failed": "Failed to generate optimization suggestions",
+
         # Processing errors
         "processing_timeout": "Processing timed out. Please try again",
         "service_unavailable": "Service temporarily unavailable. Please try again later",
@@ -117,6 +124,13 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "vacancy_not_found": "Вакансия не найдена",
         "invalid_vacancy_id": "Неверный формат ID вакансии",
 
+        # Optimization errors
+        "optimization_failed": "Не удалось выполнить анализ оптимизации резюме",
+        "keyword_analysis_failed": "Не удалось выполнить анализ ключевых слов",
+        "formatting_analysis_failed": "Не удалось выполнить анализ форматирования",
+        "content_analysis_failed": "Не удалось выполнить анализ содержимого",
+        "optimization_generation_failed": "Не удалось сгенерировать предложения по оптимизации",
+
         # Processing errors
         "processing_timeout": "Превышено время обработки. Попробуйте снова",
         "service_unavailable": "Сервис временно недоступен. Попробуйте позже",
@@ -155,6 +169,9 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "record_updated": "Record updated successfully",
         "record_deleted": "Record deleted successfully",
         "deletion_request_created": "Data deletion request created successfully. We will process your request shortly.",
+        # Optimization success messages
+        "optimization_completed": "Resume optimization completed successfully",
+        "optimization_saved": "Optimization feedback saved successfully",
     },
     "ru": {
         "file_uploaded": "Резюме успешно загружено",
@@ -164,6 +181,9 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "record_updated": "Запись успешно обновлена",
         "record_deleted": "Запись успешно удалена",
         "deletion_request_created": "Запрос на удаление данных успешно создан. Мы обработаем ваш запрос в ближайшее время.",
+        # Optimization success messages
+        "optimization_completed": "Оптимизация резюме успешно завершена",
+        "optimization_saved": "Результаты оптимизации успешно сохранены",
     },
 }
 
@@ -178,6 +198,10 @@ VALIDATION_MESSAGES: Dict[str, Dict[str, str]] = {
         "invalid_date_format": "Invalid date format. Expected format: {expected_format}",
         "invalid_email_format": "Invalid email format",
         "invalid_url_format": "Invalid URL format",
+        # Optimization validation messages
+        "resume_text_required": "Resume text is required for optimization",
+        "invalid_keyword_density": "Keyword density must be between {min} and {max}",
+        "invalid_min_action_verbs": "Minimum action verbs must be a positive integer",
     },
     "ru": {
         "resume_id_required": "Требуется ID резюме",
@@ -187,6 +211,129 @@ VALIDATION_MESSAGES: Dict[str, Dict[str, str]] = {
         "invalid_date_format": "Неверный формат даты. Ожидаемый формат: {expected_format}",
         "invalid_email_format": "Неверный формат email",
         "invalid_url_format": "Неверный формат URL",
+        # Optimization validation messages
+        "resume_text_required": "Требуется текст резюме для оптимизации",
+        "invalid_keyword_density": "Плотность ключевых слов должна быть между {min} и {max}",
+        "invalid_min_action_verbs": "Минимальное количество глаголов должно быть положительным целым числом",
+    },
+}
+
+
+# Translation dictionaries for optimization feedback messages
+OPTIMIZATION_MESSAGES: Dict[str, Dict[str, str]] = {
+    "en": {
+        # Suggestion categories
+        "category_keywords": "Keywords",
+        "category_structure": "Structure",
+        "category_readability": "Readability",
+        "category_impact": "Impact",
+        "category_action_verbs": "Action Verbs",
+        "category_summary": "Summary",
+        "category_active_language": "Active Language",
+        "category_achievements": "Achievements",
+
+        # Priority levels
+        "priority_high": "High",
+        "priority_medium": "Medium",
+        "priority_low": "Low",
+
+        # Keyword analysis messages
+        "keywords_missing_title": "Add missing job-relevant keywords",
+        "keywords_missing_desc": "Your resume is missing {count} keyword(s) that appear in the job description. Including these can improve ATS matching.",
+        "keywords_low_density_title": "Increase keyword density",
+        "keywords_low_density_desc": "Your resume has low keyword density ({density:.1%}). Include more industry-relevant keywords to improve ATS visibility.",
+        "keywords_no_section_title": "Add or expand skills section",
+        "keywords_no_section_desc": "A clear skills section helps recruiters and ATS systems quickly identify your qualifications.",
+
+        # Formatting messages
+        "format_too_many_sections_title": "Reduce number of sections",
+        "format_too_many_sections_desc": "Your resume has {count} sections, which may be too many. Too many sections can make your resume harder to read and scan.",
+        "format_too_few_sections_title": "Add more resume sections",
+        "format_too_few_sections_desc": "Your resume has only {count} section(s). Adding more sections can provide a more complete picture of your qualifications.",
+        "format_no_bullets_title": "Use bullet points for better readability",
+        "format_no_bullets_desc": "Bullet points make your resume easier to scan and read. Recruiters typically spend only 6-7 seconds on each resume.",
+        "format_no_metrics_title": "Add quantifiable achievements",
+        "format_no_metrics_desc": "Quantifiable achievements (numbers, percentages, metrics) make your accomplishments more concrete and impressive.",
+        "format_long_lines_title": "Consider shortening long lines",
+        "format_long_lines_desc": "Average line length is {avg:.0f} characters. Lines longer than 80 characters can be harder to read.",
+
+        # Content messages
+        "content_few_action_verbs_title": "Use more action verbs",
+        "content_few_action_verbs_desc": "Your resume uses {count} action verb(s). Action verbs make your experience more dynamic and showcase your achievements effectively.",
+        "content_no_summary_title": "Add a professional summary",
+        "content_no_summary_desc": "A professional summary at the top of your resume provides a quick overview of your qualifications and career goals.",
+        "content_passive_language_title": "Replace passive language with active language",
+        "content_passive_language_desc": "Found {count} instance(s) of passive language. Active language is more impactful and demonstrates your contributions more effectively.",
+        "content_no_results_title": "Add measurable results to experience",
+        "content_no_results_desc": "Your experience descriptions lack specific metrics. Quantifiable achievements help recruiters understand the impact of your work.",
+
+        # Labels and UI text
+        "current_state": "Current State",
+        "recommendation": "Recommendation",
+        "examples": "Examples",
+        "no_suggestions": "Your resume looks great! No optimization suggestions.",
+        "optimization_report": "RESUME OPTIMIZATION REPORT",
+        "total_suggestions": "Total",
+        "high_priority": "High Priority",
+        "medium_priority": "Medium Priority",
+        "low_priority": "Low Priority",
+    },
+    "ru": {
+        # Suggestion categories
+        "category_keywords": "Ключевые слова",
+        "category_structure": "Структура",
+        "category_readability": "Читаемость",
+        "category_impact": "Результативность",
+        "category_action_verbs": "Глаголы действия",
+        "category_summary": "Резюме",
+        "category_active_language": "Активный язык",
+        "category_achievements": "Достижения",
+
+        # Priority levels
+        "priority_high": "Высокий",
+        "priority_medium": "Средний",
+        "priority_low": "Низкий",
+
+        # Keyword analysis messages
+        "keywords_missing_title": "Добавьте отсутствующие ключевые слова",
+        "keywords_missing_desc": "В вашем резюме отсутствует {count} ключевое(-ых) слово(-а), которое(-ые) встречается(-ются) в описании вакансии. Включение этих слов может улучшить соответствие ATS.",
+        "keywords_low_density_title": "Увеличьте плотность ключевых слов",
+        "keywords_low_density_desc": "В вашем резюме низкая плотность ключевых слов ({density:.1%}). Включите больше отраслевых ключевых слов для улучшения видимости в ATS.",
+        "keywords_no_section_title": "Добавьте или расширьте раздел навыков",
+        "keywords_no_section_desc": "Четкий раздел навыков помогает рекрутерам и системам ATS быстро определить вашу квалификацию.",
+
+        # Formatting messages
+        "format_too_many_sections_title": "Уменьшите количество разделов",
+        "format_too_many_sections_desc": "В вашем резюме {count} разделов, что может быть слишком много. Слишком много разделов может затруднить чтение и сканирование резюме.",
+        "format_too_few_sections_title": "Добавьте больше разделов в резюме",
+        "format_too_few_sections_desc": "В вашем резюме только {count} раздел(-ов). Добавление большего количества разделов может дать более полную картину вашей квалификации.",
+        "format_no_bullets_title": "Используйте маркированные списки для лучшей читаемости",
+        "format_no_bullets_desc": "Маркированные списки облегчают сканирование и чтение резюме. Рекрутеры обычно тратят всего 6-7 секунд на каждое резюме.",
+        "format_no_metrics_title": "Добавьте измеримые достижения",
+        "format_no_metrics_desc": "Измеримые достижения (числа, проценты, метрики) делают ваши достижения более конкретными и впечатляющими.",
+        "format_long_lines_title": "Рассмотрите возможность сокращения длинных строк",
+        "format_long_lines_desc": "Средняя длина строки составляет {avg:.0f} символов. Строки длиннее 80 символов могут быть труднее для чтения.",
+
+        # Content messages
+        "content_few_action_verbs_title": "Используйте больше глаголов действия",
+        "content_few_action_verbs_desc": "В вашем резюме используется {count} глагол(-ов) действия. Глаголы действия делают ваш опыт более динамичным и эффективно демонстрируют ваши достижения.",
+        "content_no_summary_title": "Добавьте профессиональное резюме",
+        "content_no_summary_desc": "Профессиональное резюме в верхней части вашего резюме дает быстрый обзор вашей квалификации и карьерных целей.",
+        "content_passive_language_title": "Замените пассивный язык на активный",
+        "content_passive_language_desc": "Обнаружено {count} пример(-ов) пассивного языка. Активный язык более эффективен и лучше демонстрирует ваш вклад.",
+        "content_no_results_title": "Добавьте измеримые результаты в опыт работы",
+        "content_no_results_desc": "В описаниях вашего опыта не хватает конкретных метрик. Измеримые достижения помогают рекрутерам понять влияние вашей работы.",
+
+        # Labels and UI text
+        "current_state": "Текущее состояние",
+        "recommendation": "Рекомендация",
+        "examples": "Примеры",
+        "no_suggestions": "Ваше резюме выглядит отлично! Нет предложений по оптимизации.",
+        "optimization_report": "ОТЧЕТ ОБ ОПТИМИЗАЦИИ РЕЗЮМЕ",
+        "total_suggestions": "Всего",
+        "high_priority": "Высокий приоритет",
+        "medium_priority": "Средний приоритет",
+        "low_priority": "Низкий приоритет",
     },
 }
 
@@ -350,7 +497,7 @@ def get_message(message_key: str, locale: str = DEFAULT_LANGUAGE, **kwargs: Any)
     """
     Get translated message by searching all message dictionaries.
 
-    This function searches error, success, and validation message dictionaries
+    This function searches error, success, validation, and optimization message dictionaries
     in that order, returning the first match found.
 
     Args:
@@ -377,6 +524,47 @@ def get_message(message_key: str, locale: str = DEFAULT_LANGUAGE, **kwargs: Any)
     if message_key in VALIDATION_MESSAGES.get(_validate_locale(locale), {}):
         return get_validation_message(message_key, locale, **kwargs)
 
+    # Try optimization messages
+    if message_key in OPTIMIZATION_MESSAGES.get(_validate_locale(locale), {}):
+        return get_optimization_message(message_key, locale, **kwargs)
+
     # Not found
     logger.error(f"Message key '{message_key}' not found in any translation dictionary")
     return message_key
+
+
+def get_optimization_message(
+    optimization_key: str,
+    locale: str = DEFAULT_LANGUAGE,
+    **kwargs: Any
+) -> str:
+    """
+    Get translated optimization feedback message for the given key.
+
+    Args:
+        optimization_key: Key identifying the optimization message
+        locale: Language code (default: 'en')
+        **kwargs: Parameters to substitute into optimization message
+
+    Returns:
+        Translated optimization message with parameters substituted
+
+    Examples:
+        >>> get_optimization_message("keywords_missing_title", "en")
+        'Add missing job-relevant keywords'
+        >>> get_optimization_message("keywords_low_density_desc", "en", density=0.02)
+        'Your resume has low keyword density (2.0%). Include more industry-relevant keywords...'
+    """
+    lang = _validate_locale(locale)
+
+    if optimization_key not in OPTIMIZATION_MESSAGES[lang]:
+        logger.warning(
+            f"Optimization key '{optimization_key}' not found for language '{lang}', checking default"
+        )
+        if optimization_key not in OPTIMIZATION_MESSAGES[DEFAULT_LANGUAGE]:
+            logger.error(f"Optimization key '{optimization_key}' not found in any language")
+            return optimization_key  # Return key as fallback
+        lang = DEFAULT_LANGUAGE
+
+    template = OPTIMIZATION_MESSAGES[lang][optimization_key]
+    return _format_message(template, **kwargs)
