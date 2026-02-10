@@ -13,12 +13,12 @@ import { MemoryRouter, Router } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
 import RegisterPage from '../RegisterPage';
 
-// Mock useAuthContext
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuthContext: vi.fn(),
+// Mock useAuth from react-oidc-context
+vi.mock('react-oidc-context', () => ({
+  useAuth: vi.fn(),
 }));
 
-const { useAuthContext } = require('@/contexts/AuthContext');
+const { useAuth } = require('react-oidc-context');
 
 describe('RegisterPage', () => {
   beforeEach(() => {
@@ -27,11 +27,11 @@ describe('RegisterPage', () => {
 
   describe('Component Rendering', () => {
     it('should render registration form correctly', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -41,15 +41,15 @@ describe('RegisterPage', () => {
       );
 
       expect(screen.getByText('Create Account')).toBeInTheDocument();
-      expect(screen.getByText(/Sign up to get started/)).toBeInTheDocument();
+      expect(screen.getByText(/Join the AgentHR platform today/)).toBeInTheDocument();
     });
 
     it('should render email input field', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -58,15 +58,15 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByPlaceholderText(/email address/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/enter your email/i)).toBeInTheDocument();
     });
 
     it('should render password input field', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -75,15 +75,15 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/create a password/i)).toBeInTheDocument();
     });
 
     it('should render confirm password input field', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -92,15 +92,15 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByPlaceholderText(/confirm password/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/confirm your password/i)).toBeInTheDocument();
     });
 
-    it('should render sign up button', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+    it('should render create account button', () => {
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -109,16 +109,16 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const signUpButton = screen.getByRole('button', { name: /sign up/i });
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
       expect(signUpButton).toBeInTheDocument();
     });
 
     it('should render link to login page', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -127,17 +127,16 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const loginLink = screen.getByText(/already have an account/i);
-      expect(loginLink).toBeInTheDocument();
+      expect(screen.getByText(/Already have an account\?/i)).toBeInTheDocument();
       expect(screen.getByText('Sign in')).toBeInTheDocument();
     });
 
     it('should render terms and conditions checkbox', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -147,7 +146,25 @@ describe('RegisterPage', () => {
       );
 
       expect(screen.getByRole('checkbox')).toBeInTheDocument();
-      expect(screen.getByText(/I agree to the terms and conditions/i)).toBeInTheDocument();
+      expect(screen.getByText(/Terms of Service/i)).toBeInTheDocument();
+      expect(screen.getByText(/Privacy Policy/i)).toBeInTheDocument();
+    });
+
+    it('should display email verification info alert', () => {
+      useAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        error: null,
+        signinRedirect: vi.fn(),
+      });
+
+      render(
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText(/After registration, you'll receive a verification email/)).toBeInTheDocument();
     });
   });
 
@@ -155,11 +172,11 @@ describe('RegisterPage', () => {
     it('should show error for invalid email format', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -168,13 +185,15 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const emailInput = screen.getByPlaceholderText(/email address/i);
+      const emailInput = screen.getByPlaceholderText(/enter your email/i);
       await user.type(emailInput, 'invalidemail');
-      await user.tab(); // Trigger blur
+
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
+      await user.click(signUpButton);
 
       // Should show email format validation error
       await waitFor(() => {
-        const errorMessage = screen.queryByText(/invalid email format/i);
+        const errorMessage = screen.queryByText(/Please enter a valid email address/i);
         expect(errorMessage).toBeInTheDocument();
       });
     });
@@ -182,11 +201,11 @@ describe('RegisterPage', () => {
     it('should accept valid email format', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -195,36 +214,44 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const emailInput = screen.getByPlaceholderText(/email address/i);
+      const emailInput = screen.getByPlaceholderText(/enter your email/i);
       await user.type(emailInput, 'test@example.com');
-      await user.tab();
 
-      // Should not show email format error
-      expect(screen.queryByText(/invalid email format/i)).not.toBeInTheDocument();
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
+      await user.type(passwordInput, 'password123');
+
+      const confirmPasswordInput = screen.getByPlaceholderText(/confirm your password/i);
+      await user.type(confirmPasswordInput, 'password123');
+
+      const termsCheckbox = screen.getByRole('checkbox');
+      await user.click(termsCheckbox);
+
+      // Should not show email format error when form is valid
+      expect(screen.queryByText(/Please enter a valid email address/i)).not.toBeInTheDocument();
     });
 
     it('should require email field', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
         <MemoryRouter>
           <RegisterPage />
-        </MemoryRouter>
+        </MemoryRouter
       );
 
-      const signUpButton = screen.getByRole('button', { name: /sign up/i });
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
       await user.click(signUpButton);
 
       // Should show required field error
       await waitFor(() => {
-        const errorMessage = screen.queryByText(/email is required/i);
+        const errorMessage = screen.queryByText(/Email is required/i);
         expect(errorMessage).toBeInTheDocument();
       });
     });
@@ -234,11 +261,11 @@ describe('RegisterPage', () => {
     it('should enforce minimum password length of 8 characters', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -247,12 +274,14 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'short');
-      await user.tab();
+
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
+      await user.click(signUpButton);
 
       await waitFor(() => {
-        const errorMessage = screen.queryByText(/password must be at least 8 characters/i);
+        const errorMessage = screen.queryByText(/Password must be at least 8 characters/i);
         expect(errorMessage).toBeInTheDocument();
       });
     });
@@ -260,11 +289,11 @@ describe('RegisterPage', () => {
     it('should accept valid password length', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -273,21 +302,20 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'password123');
-      await user.tab();
 
-      expect(screen.queryByText(/password must be at least 8 characters/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Password must be at least 8 characters/i)).not.toBeInTheDocument();
     });
 
     it('should show password strength indicator', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -296,19 +324,19 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
 
       // Type weak password
       await user.type(passwordInput, 'password');
       await waitFor(() => {
-        expect(screen.getByText(/weak/i)).toBeInTheDocument();
+        expect(screen.getByText('Weak')).toBeInTheDocument();
       });
 
       // Clear and type stronger password
       await user.clear(passwordInput);
-      await user.type(passwordInput, 'P@ssw0rd123!');
+      await user.type(passwordInput, 'Str0ng!P@ss');
       await waitFor(() => {
-        expect(screen.getByText(/strong/i)).toBeInTheDocument();
+        expect(screen.getByText('Strong')).toBeInTheDocument();
       });
     });
   });
@@ -317,11 +345,11 @@ describe('RegisterPage', () => {
     it('should require passwords to match', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -330,15 +358,17 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
-      const confirmPasswordInput = screen.getByPlaceholderText(/confirm password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
+      const confirmPasswordInput = screen.getByPlaceholderText(/confirm your password/i);
 
       await user.type(passwordInput, 'password123');
       await user.type(confirmPasswordInput, 'differentpassword');
-      await user.tab();
+
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
+      await user.click(signUpButton);
 
       await waitFor(() => {
-        const errorMessage = screen.queryByText(/passwords do not match/i);
+        const errorMessage = screen.queryByText(/Passwords do not match/i);
         expect(errorMessage).toBeInTheDocument();
       });
     });
@@ -346,11 +376,11 @@ describe('RegisterPage', () => {
     it('should accept matching passwords', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -359,24 +389,23 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
-      const confirmPasswordInput = screen.getByPlaceholderText(/confirm password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
+      const confirmPasswordInput = screen.getByPlaceholderText(/confirm your password/i);
 
       await user.type(passwordInput, 'password123');
       await user.type(confirmPasswordInput, 'password123');
-      await user.tab();
 
-      expect(screen.queryByText(/passwords do not match/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Passwords do not match/i)).not.toBeInTheDocument();
     });
 
     it('should show error when confirm password is empty', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -385,14 +414,14 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'password123');
 
-      const confirmPasswordInput = screen.getByPlaceholderText(/confirm password/i);
-      await user.tab();
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
+      await user.click(signUpButton);
 
       await waitFor(() => {
-        const errorMessage = screen.queryByText(/please confirm your password/i);
+        const errorMessage = screen.queryByText(/Please confirm your password/i);
         expect(errorMessage).toBeInTheDocument();
       });
     });
@@ -402,11 +431,11 @@ describe('RegisterPage', () => {
     it('should require terms checkbox to be checked', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -416,39 +445,40 @@ describe('RegisterPage', () => {
       );
 
       // Fill form with valid data but don't check terms
-      await user.type(screen.getByPlaceholderText(/email address/i), 'test@example.com');
-      await user.type(screen.getByPlaceholderText(/password/i), 'password123');
-      await user.type(screen.getByPlaceholderText(/confirm password/i), 'password123');
+      await user.type(screen.getByPlaceholderText(/enter your email/i), 'test@example.com');
+      await user.type(screen.getByPlaceholderText(/create a password/i), 'password123');
+      await user.type(screen.getByPlaceholderText(/confirm your password/i), 'password123');
 
-      const signUpButton = screen.getByRole('button', { name: /sign up/i });
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
       await user.click(signUpButton);
 
       await waitFor(() => {
-        const errorMessage = screen.queryByText(/you must agree to the terms and conditions/i);
+        const errorMessage = screen.queryByText(/You must agree to the terms and conditions/i);
         expect(errorMessage).toBeInTheDocument();
       });
     });
 
     it('should allow form submission when terms are agreed', async () => {
       const user = userEvent.setup();
+      const mockSigninRedirect = vi.fn();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: mockSigninRedirect,
       });
 
       render(
         <MemoryRouter>
           <RegisterPage />
-        </MemoryRouter>
+        </MemoryRouter
       );
 
       // Fill form and check terms
-      await user.type(screen.getByPlaceholderText(/email address/i), 'test@example.com');
-      await user.type(screen.getByPlaceholderText(/password/i), 'password123');
-      await user.type(screen.getByPlaceholderText(/confirm password/i), 'password123');
+      await user.type(screen.getByPlaceholderText(/enter your email/i), 'test@example.com');
+      await user.type(screen.getByPlaceholderText(/create a password/i), 'password123');
+      await user.type(screen.getByPlaceholderText(/confirm your password/i), 'password123');
 
       const termsCheckbox = screen.getByRole('checkbox');
       await user.click(termsCheckbox);
@@ -463,11 +493,11 @@ describe('RegisterPage', () => {
       const history = createMemoryHistory();
       history.push('/register');
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -479,27 +509,7 @@ describe('RegisterPage', () => {
       const signInLink = screen.getByText('Sign in');
       await user.click(signInLink);
 
-      expect(history.location.pathname).toBe('/login');
-    });
-  });
-
-  describe('Email Verification Info', () => {
-    it('should display email verification information', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        login: vi.fn(),
-      });
-
-      render(
-        <MemoryRouter>
-          <RegisterPage />
-        </MemoryRouter>
-      );
-
-      expect(screen.getByText(/email verification/i)).toBeInTheDocument();
-      expect(screen.getByText(/we'll send you a verification link/i)).toBeInTheDocument();
+      expect(history.location.pathname).toBe('/auth/login');
     });
   });
 
@@ -508,11 +518,11 @@ describe('RegisterPage', () => {
       const history = createMemoryHistory();
       history.push('/register');
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: true,
+      useAuth.mockReturnValue({
+        user: { profile: { sub: '123' } },
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -527,11 +537,11 @@ describe('RegisterPage', () => {
     });
 
     it('should not redirect unauthenticated users', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       const history = createMemoryHistory();
@@ -551,11 +561,11 @@ describe('RegisterPage', () => {
     it('should show "Weak" for simple passwords', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -564,11 +574,11 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'password');
 
       await waitFor(() => {
-        const strengthIndicator = screen.getByText(/weak/i);
+        const strengthIndicator = screen.getByText('Weak');
         expect(strengthIndicator).toBeInTheDocument();
       });
     });
@@ -576,11 +586,11 @@ describe('RegisterPage', () => {
     it('should show "Fair" for moderate passwords', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -589,11 +599,11 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'Password1');
 
       await waitFor(() => {
-        const strengthIndicator = screen.getByText(/fair/i);
+        const strengthIndicator = screen.getByText('Fair');
         expect(strengthIndicator).toBeInTheDocument();
       });
     });
@@ -601,11 +611,11 @@ describe('RegisterPage', () => {
     it('should show "Good" for strong passwords', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -614,11 +624,11 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'P@ssword123');
 
       await waitFor(() => {
-        const strengthIndicator = screen.getByText(/good/i);
+        const strengthIndicator = screen.getByText('Good');
         expect(strengthIndicator).toBeInTheDocument();
       });
     });
@@ -626,24 +636,24 @@ describe('RegisterPage', () => {
     it('should show "Strong" for very strong passwords', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
         <MemoryRouter>
           <RegisterPage />
-        </MemoryRouter
+        </MemoryRouter>
       );
 
-      const passwordInput = screen.getByPlaceholderText(/password/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
       await user.type(passwordInput, 'Str0ng!P@ssw0rd#2026');
 
       await waitFor(() => {
-        const strengthIndicator = screen.getByText(/strong/i);
+        const strengthIndicator = screen.getByText('Strong');
         expect(strengthIndicator).toBeInTheDocument();
       });
     });
@@ -653,11 +663,11 @@ describe('RegisterPage', () => {
     it('should allow typing in all form fields', async () => {
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -666,9 +676,9 @@ describe('RegisterPage', () => {
         </MemoryRouter>
       );
 
-      const emailInput = screen.getByPlaceholderText(/email address/i);
-      const passwordInput = screen.getByPlaceholderText(/password/i);
-      const confirmPasswordInput = screen.getByPlaceholderText(/confirm password/i);
+      const emailInput = screen.getByPlaceholderText(/enter your email/i);
+      const passwordInput = screen.getByPlaceholderText(/create a password/i);
+      const confirmPasswordInput = screen.getByPlaceholderText(/confirm your password/i);
 
       await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
@@ -677,6 +687,76 @@ describe('RegisterPage', () => {
       expect(emailInput).toHaveValue('test@example.com');
       expect(passwordInput).toHaveValue('password123');
       expect(confirmPasswordInput).toHaveValue('password123');
+    });
+
+    it('should clear field errors when user starts typing', async () => {
+      const user = userEvent.setup();
+
+      useAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        error: null,
+        signinRedirect: vi.fn(),
+      });
+
+      render(
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter
+      );
+
+      // Trigger validation error
+      const signUpButton = screen.getByRole('button', { name: /create account/i });
+      await user.click(signUpButton);
+
+      // Check that error appears
+      await waitFor(() => {
+        expect(screen.queryByText(/Email is required/i)).toBeInTheDocument();
+      });
+
+      // Start typing in email field
+      const emailInput = screen.getByPlaceholderText(/enter your email/i);
+      await user.type(emailInput, 'test');
+
+      // Error should be cleared
+      expect(screen.queryByText(/Email is required/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Loading State', () => {
+    it('should disable form while loading', () => {
+      useAuth.mockReturnValue({
+        user: null,
+        isLoading: true,
+        error: null,
+        signinRedirect: vi.fn(),
+      });
+
+      render(
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      );
+
+      const signUpButton = screen.getByRole('button', { name: /creating account/i });
+      expect(signUpButton).toBeDisabled();
+    });
+
+    it('should show loading text on button while loading', () => {
+      useAuth.mockReturnValue({
+        user: null,
+        isLoading: true,
+        error: null,
+        signinRedirect: vi.fn(),
+      });
+
+      render(
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText('Creating account...')).toBeInTheDocument();
     });
   });
 });

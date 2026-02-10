@@ -13,12 +13,12 @@ import { MemoryRouter, Router } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
 import LoginPage from '../LoginPage';
 
-// Mock useAuthContext
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuthContext: vi.fn(),
+// Mock useAuth from react-oidc-context
+vi.mock('react-oidc-context', () => ({
+  useAuth: vi.fn(),
 }));
 
-const { useAuthContext } = require('@/contexts/AuthContext');
+const { useAuth } = require('react-oidc-context');
 
 describe('LoginPage', () => {
   beforeEach(() => {
@@ -27,11 +27,11 @@ describe('LoginPage', () => {
 
   describe('Component Rendering', () => {
     it('should render login form correctly', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -41,15 +41,15 @@ describe('LoginPage', () => {
       );
 
       expect(screen.getByText('Welcome Back')).toBeInTheDocument();
-      expect(screen.getByText(/Sign in to your account/)).toBeInTheDocument();
+      expect(screen.getByText(/Sign in to access the AgentHR platform/)).toBeInTheDocument();
     });
 
     it('should render login button', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -62,12 +62,12 @@ describe('LoginPage', () => {
       expect(loginButton).toBeInTheDocument();
     });
 
-    it('should render email and password input fields', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+    it('should render email and password input fields (disabled for Keycloak)', () => {
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -76,17 +76,21 @@ describe('LoginPage', () => {
         </MemoryRouter>
       );
 
-      // Note: These fields are for visual purposes only as actual auth happens via Keycloak
-      expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
+      // Note: These fields are visual/disabled since actual auth happens via Keycloak
+      const emailInput = screen.getByPlaceholderText(/email/i);
+      const passwordInput = screen.getByPlaceholderText(/password/i);
+      expect(emailInput).toBeInTheDocument();
+      expect(passwordInput).toBeInTheDocument();
+      expect(emailInput).toBeDisabled();
+      expect(passwordInput).toBeDisabled();
     });
 
     it('should render "Forgot Password" link', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -95,15 +99,15 @@ describe('LoginPage', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText('Forgot Password?')).toBeInTheDocument();
+      expect(screen.getByText('Forgot password?')).toBeInTheDocument();
     });
 
     it('should render link to registration page', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -114,20 +118,37 @@ describe('LoginPage', () => {
 
       const registerLink = screen.getByText(/don't have an account/i);
       expect(registerLink).toBeInTheDocument();
-      expect(screen.getByText('Sign up')).toBeInTheDocument();
+      expect(screen.getByText('Create one')).toBeInTheDocument();
+    });
+
+    it('should display info alert about Keycloak redirect', () => {
+      useAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        error: null,
+        signinRedirect: vi.fn(),
+      });
+
+      render(
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText(/You'll be redirected to Keycloak/)).toBeInTheDocument();
     });
   });
 
   describe('Login Flow', () => {
-    it('should call login function when login button is clicked', async () => {
-      const mockLogin = vi.fn();
+    it('should call signinRedirect when login button is clicked', async () => {
+      const mockSigninRedirect = vi.fn();
       const user = userEvent.setup();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: mockLogin,
+        signinRedirect: mockSigninRedirect,
       });
 
       render(
@@ -139,18 +160,17 @@ describe('LoginPage', () => {
       const loginButton = screen.getByRole('button', { name: /sign in/i });
       await user.click(loginButton);
 
-      expect(mockLogin).toHaveBeenCalledTimes(1);
+      expect(mockSigninRedirect).toHaveBeenCalledTimes(1);
     });
 
     it('should trigger redirect to Keycloak on login', () => {
-      // The login function in AuthContext calls signinRedirect
-      const mockLogin = vi.fn();
+      const mockSigninRedirect = vi.fn();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: mockLogin,
+        signinRedirect: mockSigninRedirect,
       });
 
       render(
@@ -162,17 +182,17 @@ describe('LoginPage', () => {
       const loginButton = screen.getByRole('button', { name: /sign in/i });
       loginButton.click();
 
-      expect(mockLogin).toHaveBeenCalled();
+      expect(mockSigninRedirect).toHaveBeenCalled();
     });
   });
 
   describe('Loading State', () => {
     it('should show loading state during authentication', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: true,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -187,11 +207,11 @@ describe('LoginPage', () => {
     });
 
     it('should show "Signing in..." text while loading', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: true,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -204,11 +224,11 @@ describe('LoginPage', () => {
     });
 
     it('should disable login button while loading', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: true,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -225,13 +245,12 @@ describe('LoginPage', () => {
   describe('Error Handling', () => {
     it('should display error message when authentication fails', () => {
       const mockError = new Error('Authentication failed');
-      mockError.message = 'Invalid username or password';
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: mockError,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -242,25 +261,6 @@ describe('LoginPage', () => {
 
       expect(screen.getByText(/authentication failed/i)).toBeInTheDocument();
     });
-
-    it('should show error alert with error details', () => {
-      const mockError = new Error('Login failed: Invalid credentials');
-
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
-        isLoading: false,
-        error: mockError,
-        login: vi.fn(),
-      });
-
-      render(
-        <MemoryRouter>
-          <LoginPage />
-        </MemoryRouter>
-      );
-
-      expect(screen.getByText('Login failed: Invalid credentials')).toBeInTheDocument();
-    });
   });
 
   describe('Redirect Behavior', () => {
@@ -268,11 +268,11 @@ describe('LoginPage', () => {
       const history = createMemoryHistory();
       history.push('/login');
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: true,
+      useAuth.mockReturnValue({
+        user: { profile: { sub: '123' } },
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -291,11 +291,11 @@ describe('LoginPage', () => {
       history.push('/login');
       const from = { pathname: '/dashboard' };
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: true,
+      useAuth.mockReturnValue({
+        user: { profile: { sub: '123' } },
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -314,11 +314,31 @@ describe('LoginPage', () => {
     });
 
     it('should not redirect unauthenticated users', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
+      });
+
+      const history = createMemoryHistory();
+      history.push('/login');
+
+      render(
+        <Router location={history.location} navigator={history}>
+          <LoginPage />
+        </Router>
+      );
+
+      expect(history.location.pathname).toBe('/login');
+    });
+
+    it('should not redirect while loading', () => {
+      useAuth.mockReturnValue({
+        user: null,
+        isLoading: true,
+        error: null,
+        signinRedirect: vi.fn(),
       });
 
       const history = createMemoryHistory();
@@ -335,16 +355,16 @@ describe('LoginPage', () => {
   });
 
   describe('Navigation', () => {
-    it('should navigate to registration page when sign up link is clicked', async () => {
+    it('should navigate to registration page when create one link is clicked', async () => {
       const user = userEvent.setup();
       const history = createMemoryHistory();
       history.push('/login');
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -353,10 +373,10 @@ describe('LoginPage', () => {
         </Router>
       );
 
-      const signUpLink = screen.getByText('Sign up');
-      await user.click(signUpLink);
+      const createOneLink = screen.getByText('Create one');
+      await user.click(createOneLink);
 
-      expect(history.location.pathname).toBe('/register');
+      expect(history.location.pathname).toBe('/auth/register');
     });
 
     it('should preserve location state when navigating to register', async () => {
@@ -365,11 +385,11 @@ describe('LoginPage', () => {
       history.push('/login');
       const fromLocation = { pathname: '/protected-page', state: { from: '/dashboard' } };
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -382,91 +402,20 @@ describe('LoginPage', () => {
         </Router>
       );
 
-      const signUpLink = screen.getByText('Sign up');
-      await user.click(signUpLink);
+      const createOneLink = screen.getByText('Create one');
+      await user.click(createOneLink);
 
       expect(history.location.state).toBeDefined();
     });
   });
 
-  describe('Form Interaction', () => {
-    it('should allow typing in email field', async () => {
-      const user = userEvent.setup();
-
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        login: vi.fn(),
-      });
-
-      render(
-        <MemoryRouter>
-          <LoginPage />
-        </MemoryRouter>
-      );
-
-      const emailInput = screen.getByPlaceholderText(/email/i);
-      await user.type(emailInput, 'test@example.com');
-
-      expect(emailInput).toHaveValue('test@example.com');
-    });
-
-    it('should allow typing in password field', async () => {
-      const user = userEvent.setup();
-
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        login: vi.fn(),
-      });
-
-      render(
-        <MemoryRouter>
-          <LoginPage />
-        </MemoryRouter>
-      );
-
-      const passwordInput = screen.getByPlaceholderText(/password/i);
-      await user.type(passwordInput, 'password123');
-
-      expect(passwordInput).toHaveValue('password123');
-    });
-
-    it('should not submit form on Enter key (actual auth via Keycloak)', async () => {
-      const user = userEvent.setup();
-      const mockLogin = vi.fn();
-
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        login: mockLogin,
-      });
-
-      render(
-        <MemoryRouter>
-          <LoginPage />
-        </MemoryRouter>
-      );
-
-      const emailInput = screen.getByPlaceholderText(/email/i);
-      await user.type(emailInput, 'test@example.com');
-
-      // The form submission is handled by the login button, not Enter key
-      // since actual authentication happens via Keycloak redirect
-      expect(mockLogin).not.toHaveBeenCalled();
-    });
-  });
-
   describe('Visual Design', () => {
     it('should render login form in a Paper component', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -481,11 +430,11 @@ describe('LoginPage', () => {
     });
 
     it('should display email and password icons', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -498,36 +447,17 @@ describe('LoginPage', () => {
       const icons = document.querySelectorAll('svg');
       expect(icons.length).toBeGreaterThan(0);
     });
-
-    it('should have gradient background', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        login: vi.fn(),
-      });
-
-      render(
-        <MemoryRouter>
-          <LoginPage />
-        </MemoryRouter>
-      );
-
-      // Check for the main box wrapper with background style
-      const wrapper = document.querySelector('style');
-      expect(wrapper).toBeDefined();
-    });
   });
 
-  describe('Integration with AuthContext', () => {
-    it('should use login function from AuthContext', () => {
-      const mockLogin = vi.fn();
+  describe('Integration with OIDC Auth', () => {
+    it('should use signinRedirect from useAuth', () => {
+      const mockSigninRedirect = vi.fn();
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: null,
-        login: mockLogin,
+        signinRedirect: mockSigninRedirect,
       });
 
       render(
@@ -539,15 +469,15 @@ describe('LoginPage', () => {
       const loginButton = screen.getByRole('button', { name: /sign in/i });
       loginButton.click();
 
-      expect(mockLogin).toHaveBeenCalledTimes(1);
+      expect(mockSigninRedirect).toHaveBeenCalledTimes(1);
     });
 
-    it('should access isAuthenticated state from AuthContext', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: true,
+    it('should access user state from useAuth', () => {
+      useAuth.mockReturnValue({
+        user: { profile: { sub: '123', email: 'test@example.com' } },
         isLoading: false,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       const history = createMemoryHistory();
@@ -559,16 +489,16 @@ describe('LoginPage', () => {
         </Router>
       );
 
-      // Should trigger redirect because isAuthenticated is true
+      // Should trigger redirect because user is authenticated
       expect(history.location.pathname).toBe('/');
     });
 
-    it('should access isLoading state from AuthContext', () => {
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+    it('should access isLoading state from useAuth', () => {
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: true,
         error: null,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -580,14 +510,14 @@ describe('LoginPage', () => {
       expect(screen.getByText('Signing in...')).toBeInTheDocument();
     });
 
-    it('should access error state from AuthContext', () => {
+    it('should access error state from useAuth', () => {
       const mockError = new Error('Test error');
 
-      useAuthContext.mockReturnValue({
-        isAuthenticated: false,
+      useAuth.mockReturnValue({
+        user: null,
         isLoading: false,
         error: mockError,
-        login: vi.fn(),
+        signinRedirect: vi.fn(),
       });
 
       render(
@@ -596,7 +526,7 @@ describe('LoginPage', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText('Test error')).toBeInTheDocument();
+      expect(screen.getByText(/Authentication failed/)).toBeInTheDocument();
     });
   });
 });
