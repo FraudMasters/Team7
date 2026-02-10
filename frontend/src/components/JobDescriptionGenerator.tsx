@@ -86,26 +86,26 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
   const [additionalSkillInput, setAdditionalSkillInput] = useState('');
 
   const experienceLabel = useMemo(() => {
-    if (formData.min_experience_months === 0) return 'No experience';
+    if (formData.min_experience_months === 0) return t('jobDescriptionGenerator.fields.experience.noExperience');
     if (formData.min_experience_months < 12) {
-      return `${formData.min_experience_months} months`;
+      return `${formData.min_experience_months} ${t('jobDescriptionGenerator.fields.experience.months')}`;
     }
     const years = Math.floor(formData.min_experience_months / 12);
     const months = formData.min_experience_months % 12;
     if (months === 0) {
-      return `${years}+ year${years > 1 ? 's' : ''}`;
+      return t('jobDescriptionGenerator.fields.experience.years', { years, plural: years > 1 ? 's' : '' });
     }
-    return `${years}y ${months}m`;
-  }, [formData.min_experience_months]);
+    return t('jobDescriptionGenerator.fields.experience.yearsMonths', { years, months });
+  }, [formData.min_experience_months, t]);
 
   const handleGenerate = async () => {
     // Validation
     if (!formData.title.trim()) {
-      setError('Job title is required');
+      setError(t('jobDescriptionGenerator.error.jobTitleRequired'));
       return;
     }
     if (formData.required_skills.length === 0) {
-      setError('Add at least one required skill');
+      setError(t('jobDescriptionGenerator.error.atLeastOneSkill'));
       return;
     }
 
@@ -119,7 +119,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
         onComplete(description);
       }
     } catch (err) {
-      setError(err instanceof Error ? err : 'Failed to generate job description');
+      setError(err instanceof Error ? err : t('jobDescriptionGenerator.error.generationFailed'));
     } finally {
       setIsGenerating(false);
     }
@@ -183,7 +183,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
         <Divider sx={{ mb: 3 }} />
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant="h5" fontWeight={600}>
-            Generated Job Description
+            {t('jobDescriptionGenerator.results.title')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
@@ -192,14 +192,14 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
               startIcon={<Icon name="refresh-cw" size={16} />}
               disabled={isGenerating}
             >
-              Regenerate
+              {t('jobDescriptionGenerator.buttons.regenerate')}
             </Button>
             <Button
               variant="outlined"
               onClick={handleReset}
               startIcon={<Icon name="edit" size={16} />}
             >
-              Edit Inputs
+              {t('jobDescriptionGenerator.buttons.editInputs')}
             </Button>
             <Button
               variant="contained"
@@ -210,7 +210,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
               }}
               startIcon={<Icon name="check" size={16} />}
             >
-              Use This Description
+              {t('jobDescriptionGenerator.buttons.useDescription')}
             </Button>
           </Box>
         </Box>
@@ -230,7 +230,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
             {/* Responsibilities */}
             <Box>
               <Typography variant="h6" fontWeight={600} gutterBottom>
-                Key Responsibilities
+                {t('jobDescriptionGenerator.results.responsibilities')}
               </Typography>
               <Box component="ul" sx={{ pl: 2, m: 0 }}>
                 {generatedDescription.responsibilities.map((resp, idx) => (
@@ -244,7 +244,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
             {/* Requirements */}
             <Box>
               <Typography variant="h6" fontWeight={600} gutterBottom>
-                Requirements & Qualifications
+                {t('jobDescriptionGenerator.results.requirements')}
               </Typography>
               <Box component="ul" sx={{ pl: 2, m: 0 }}>
                 {generatedDescription.requirements.map((req, idx) => (
@@ -259,7 +259,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
             {generatedDescription.benefits.length > 0 && (
               <Box>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Benefits & Perks
+                  {t('jobDescriptionGenerator.results.benefits')}
                 </Typography>
                 <Box component="ul" sx={{ pl: 2, m: 0 }}>
                   {generatedDescription.benefits.map((benefit, idx) => (
@@ -274,7 +274,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
             {/* Company Culture */}
             <Box>
               <Typography variant="h6" fontWeight={600} gutterBottom>
-                Company Culture
+                {t('jobDescriptionGenerator.results.companyCulture')}
               </Typography>
               <Typography variant="body1" color="text.secondary">
                 {generatedDescription.company_culture}
@@ -284,7 +284,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
             {/* Interview Process */}
             <Box>
               <Typography variant="h6" fontWeight={600} gutterBottom>
-                Interview Process
+                {t('jobDescriptionGenerator.results.interviewProcess')}
               </Typography>
               <Typography variant="body1" color="text.secondary">
                 {generatedDescription.interview_process}
@@ -294,8 +294,11 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
             {/* Metadata */}
             <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
               <Typography variant="caption" color="text.secondary">
-                Generated by {generatedDescription.provider} ({generatedDescription.model}) at{' '}
-                {new Date(generatedDescription.generated_at).toLocaleString()}
+                {t('jobDescriptionGenerator.results.metadata', {
+                  provider: generatedDescription.provider,
+                  model: generatedDescription.model,
+                  timestamp: new Date(generatedDescription.generated_at).toLocaleString()
+                })}
               </Typography>
             </Box>
           </CardContent>
@@ -315,7 +318,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                 <Icon name="arrow-left" size={20} />
               </IconButton>
               <Typography variant="h4" component="h1" fontWeight={600}>
-                AI Job Description Generator
+                {t('jobDescriptionGenerator.title')}
               </Typography>
             </Box>
           )}
@@ -324,9 +327,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
           {!generatedDescription && (
             <Alert severity="info" sx={{ mb: 3 }}>
               <Typography variant="body2">
-                Generate professional, inclusive job descriptions using AI. Simply provide the job details
-                below and our AI will create a comprehensive description with responsibilities, requirements,
-                benefits, and more.
+                {t('jobDescriptionGenerator.subtitle')}
               </Typography>
             </Alert>
           )}
@@ -335,10 +336,10 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
           {error && (
             <ErrorMessage
               error={error}
-              title="Generation Failed"
+              title={t('jobDescriptionGenerator.error.title')}
               actions={[
                 {
-                  label: 'Retry',
+                  label: t('jobDescriptionGenerator.error.retry'),
                   onClick: () => {
                     setError(null);
                     handleGenerate();
@@ -346,7 +347,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                   primary: true,
                 },
                 {
-                  label: 'Reset',
+                  label: t('jobDescriptionGenerator.error.reset'),
                   onClick: () => setError(null),
                   variant: 'outlined',
                 },
@@ -360,17 +361,17 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
               {/* Basic Information Section */}
               <Box>
                 <Typography variant="h6" gutterBottom>
-                  Basic Information
+                  {t('jobDescriptionGenerator.sections.basicInfo')}
                 </Typography>
 
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="Job Title *"
+                      label={`${t('jobDescriptionGenerator.fields.jobTitle')} *`}
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="e.g., Senior Python Developer, Product Manager, UX Designer"
+                      placeholder={t('jobDescriptionGenerator.fields.jobTitlePlaceholder')}
                       required
                       disabled={isGenerating}
                     />
@@ -378,36 +379,36 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
 
                   <Grid item xs={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Seniority Level</InputLabel>
+                      <InputLabel>{t('jobDescriptionGenerator.fields.seniorityLevel')}</InputLabel>
                       <Select
                         value={formData.seniority_level}
-                        label="Seniority Level"
+                        label={t('jobDescriptionGenerator.fields.seniorityLevel')}
                         onChange={(e) => setFormData({ ...formData, seniority_level: e.target.value })}
                         disabled={isGenerating}
                       >
-                        <MenuItem value="">Not specified</MenuItem>
-                        <MenuItem value="junior">Junior</MenuItem>
-                        <MenuItem value="mid">Mid-level</MenuItem>
-                        <MenuItem value="senior">Senior</MenuItem>
-                        <MenuItem value="lead">Lead/Principal</MenuItem>
+                        <MenuItem value="">{t('jobDescriptionGenerator.fields.seniorityLevels.notSpecified')}</MenuItem>
+                        <MenuItem value="junior">{t('jobDescriptionGenerator.fields.seniorityLevels.junior')}</MenuItem>
+                        <MenuItem value="mid">{t('jobDescriptionGenerator.fields.seniorityLevels.mid')}</MenuItem>
+                        <MenuItem value="senior">{t('jobDescriptionGenerator.fields.seniorityLevels.senior')}</MenuItem>
+                        <MenuItem value="lead">{t('jobDescriptionGenerator.fields.seniorityLevels.lead')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
 
                   <Grid item xs={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Employment Type</InputLabel>
+                      <InputLabel>{t('jobDescriptionGenerator.fields.employmentType')}</InputLabel>
                       <Select
                         value={formData.employment_type}
-                        label="Employment Type"
+                        label={t('jobDescriptionGenerator.fields.employmentType')}
                         onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
                         disabled={isGenerating}
                       >
-                        <MenuItem value="">Not specified</MenuItem>
-                        <MenuItem value="full-time">Full-time</MenuItem>
-                        <MenuItem value="part-time">Part-time</MenuItem>
-                        <MenuItem value="contract">Contract</MenuItem>
-                        <MenuItem value="freelance">Freelance</MenuItem>
+                        <MenuItem value="">{t('jobDescriptionGenerator.fields.employmentTypes.notSpecified')}</MenuItem>
+                        <MenuItem value="full-time">{t('jobDescriptionGenerator.fields.employmentTypes.fullTime')}</MenuItem>
+                        <MenuItem value="part-time">{t('jobDescriptionGenerator.fields.employmentTypes.partTime')}</MenuItem>
+                        <MenuItem value="contract">{t('jobDescriptionGenerator.fields.employmentTypes.contract')}</MenuItem>
+                        <MenuItem value="freelance">{t('jobDescriptionGenerator.fields.employmentTypes.freelance')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -415,7 +416,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                   <Grid item xs={12}>
                     <Box>
                       <Typography gutterBottom>
-                        Experience Required: {experienceLabel}
+                        {t('jobDescriptionGenerator.fields.experienceRequired')}: {experienceLabel}
                       </Typography>
                       <Slider
                         value={formData.min_experience_months}
@@ -438,17 +439,17 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
 
                   <Grid item xs={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Work Format</InputLabel>
+                      <InputLabel>{t('jobDescriptionGenerator.fields.workFormat')}</InputLabel>
                       <Select
                         value={formData.work_format}
-                        label="Work Format"
+                        label={t('jobDescriptionGenerator.fields.workFormat')}
                         onChange={(e) => setFormData({ ...formData, work_format: e.target.value })}
                         disabled={isGenerating}
                       >
-                        <MenuItem value="">Not specified</MenuItem>
-                        <MenuItem value="remote">Remote</MenuItem>
-                        <MenuItem value="office">In-office</MenuItem>
-                        <MenuItem value="hybrid">Hybrid</MenuItem>
+                        <MenuItem value="">{t('jobDescriptionGenerator.fields.workFormats.notSpecified')}</MenuItem>
+                        <MenuItem value="remote">{t('jobDescriptionGenerator.fields.workFormats.remote')}</MenuItem>
+                        <MenuItem value="office">{t('jobDescriptionGenerator.fields.workFormats.office')}</MenuItem>
+                        <MenuItem value="hybrid">{t('jobDescriptionGenerator.fields.workFormats.hybrid')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -456,10 +457,10 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                   <Grid item xs={6}>
                     <TextField
                       fullWidth
-                      label="Location"
+                      label={t('jobDescriptionGenerator.fields.location')}
                       value={formData.location}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      placeholder="e.g., San Francisco, Remote, London"
+                      placeholder={t('jobDescriptionGenerator.fields.locationPlaceholder')}
                       disabled={isGenerating}
                     />
                   </Grid>
@@ -467,10 +468,10 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                   <Grid item xs={6}>
                     <TextField
                       fullWidth
-                      label="Industry"
+                      label={t('jobDescriptionGenerator.fields.industry')}
                       value={formData.industry}
                       onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                      placeholder="e.g., Technology, Finance, Healthcare"
+                      placeholder={t('jobDescriptionGenerator.fields.industryPlaceholder')}
                       disabled={isGenerating}
                     />
                   </Grid>
@@ -478,10 +479,10 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                   <Grid item xs={6}>
                     <TextField
                       fullWidth
-                      label="Salary Range"
+                      label={t('jobDescriptionGenerator.fields.salaryRange')}
                       value={formData.salary_range}
                       onChange={(e) => setFormData({ ...formData, salary_range: e.target.value })}
-                      placeholder="e.g., $80,000 - $120,000"
+                      placeholder={t('jobDescriptionGenerator.fields.salaryRangePlaceholder')}
                       disabled={isGenerating}
                     />
                   </Grid>
@@ -493,13 +494,13 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
               {/* Skills Section */}
               <Box>
                 <Typography variant="h6" gutterBottom>
-                  Skills & Requirements
+                  {t('jobDescriptionGenerator.sections.skills')}
                 </Typography>
 
                 {/* Required Skills */}
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Required Skills *
+                    {`${t('jobDescriptionGenerator.fields.requiredSkills')} *`}
                   </Typography>
                   <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                     <TextField
@@ -507,7 +508,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                       value={skillInput}
                       onChange={(e) => setSkillInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addRequiredSkill())}
-                      placeholder="Add a skill (e.g., Python, React, Project Management)"
+                      placeholder={t('jobDescriptionGenerator.fields.requiredSkillsPlaceholder')}
                       disabled={isGenerating}
                     />
                     <Button
@@ -516,7 +517,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                       startIcon={<Icon name="plus" size={16} />}
                       disabled={isGenerating}
                     >
-                      Add
+                      {t('jobDescriptionGenerator.fields.addSkill')}
                     </Button>
                   </Stack>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -530,7 +531,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                     ))}
                     {formData.required_skills.length === 0 && (
                       <Typography variant="body2" color="text.secondary" italic>
-                        Add at least one required skill
+                        {t('jobDescriptionGenerator.fields.atLeastOneSkillHint')}
                       </Typography>
                     )}
                   </Box>
@@ -539,7 +540,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                 {/* Additional Skills */}
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
-                    Additional Preferred Skills (Optional)
+                    {t('jobDescriptionGenerator.fields.additionalSkills')}
                   </Typography>
                   <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                     <TextField
@@ -547,7 +548,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                       value={additionalSkillInput}
                       onChange={(e) => setAdditionalSkillInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addAdditionalSkill())}
-                      placeholder="Add preferred skills"
+                      placeholder={t('jobDescriptionGenerator.fields.additionalSkillsPlaceholder')}
                       disabled={isGenerating}
                     />
                     <Button
@@ -556,7 +557,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                       startIcon={<Icon name="plus" size={16} />}
                       disabled={isGenerating}
                     >
-                      Add
+                      {t('jobDescriptionGenerator.fields.addSkill')}
                     </Button>
                   </Stack>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -577,38 +578,38 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
               {/* Generation Options */}
               <Box>
                 <Typography variant="h6" gutterBottom>
-                  Generation Options
+                  {t('jobDescriptionGenerator.sections.generationOptions')}
                 </Typography>
 
                 <Grid container spacing={2}>
                   <Grid item xs={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Tone</InputLabel>
+                      <InputLabel>{t('jobDescriptionGenerator.fields.tone')}</InputLabel>
                       <Select
                         value={formData.tone}
-                        label="Tone"
+                        label={t('jobDescriptionGenerator.fields.tone')}
                         onChange={(e) => setFormData({ ...formData, tone: e.target.value as 'professional' | 'casual' | 'formal' | 'friendly' })}
                         disabled={isGenerating}
                       >
-                        <MenuItem value="professional">Professional</MenuItem>
-                        <MenuItem value="casual">Casual</MenuItem>
-                        <MenuItem value="formal">Formal</MenuItem>
-                        <MenuItem value="friendly">Friendly</MenuItem>
+                        <MenuItem value="professional">{t('jobDescriptionGenerator.fields.tones.professional')}</MenuItem>
+                        <MenuItem value="casual">{t('jobDescriptionGenerator.fields.tones.casual')}</MenuItem>
+                        <MenuItem value="formal">{t('jobDescriptionGenerator.fields.tones.formal')}</MenuItem>
+                        <MenuItem value="friendly">{t('jobDescriptionGenerator.fields.tones.friendly')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
 
                   <Grid item xs={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Language</InputLabel>
+                      <InputLabel>{t('jobDescriptionGenerator.fields.language')}</InputLabel>
                       <Select
                         value={formData.language}
-                        label="Language"
+                        label={t('jobDescriptionGenerator.fields.language')}
                         onChange={(e) => setFormData({ ...formData, language: e.target.value as 'en' | 'ru' })}
                         disabled={isGenerating}
                       >
-                        <MenuItem value="en">English</MenuItem>
-                        <MenuItem value="ru">Russian</MenuItem>
+                        <MenuItem value="en">{t('jobDescriptionGenerator.fields.languages.en')}</MenuItem>
+                        <MenuItem value="ru">{t('jobDescriptionGenerator.fields.languages.ru')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -625,7 +626,7 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
                   startIcon={isGenerating ? <CircularProgress size={20} /> : <Icon name="sparkles" size={20} />}
                   sx={{ minWidth: 200 }}
                 >
-                  {isGenerating ? 'Generating...' : 'Generate Description'}
+                  {isGenerating ? t('jobDescriptionGenerator.buttons.generating') : t('jobDescriptionGenerator.buttons.generate')}
                 </Button>
               </Box>
             </Stack>
