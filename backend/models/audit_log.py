@@ -27,6 +27,10 @@ class AuditActionType(str, enum.Enum):
     VACANCY_DELETED = "vacancy_deleted"
     VACANCY_VIEWED = "vacancy_viewed"
 
+    # Saved job operations
+    JOB_SAVED = "job_saved"
+    JOB_UNSAVED = "job_unsaved"
+
     # User operations
     USER_CREATED = "user_created"
     USER_UPDATED = "user_updated"

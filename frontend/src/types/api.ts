@@ -2130,242 +2130,210 @@ export interface AuthErrorResponse {
   type: string;
 }
 
-// ==================== Job Seeker Profile Types ====================
+// ==================== Job Search Types ====================
 
 /**
- * Employment type enum for work history
+ * Filters for job search
  */
-export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'internship' | 'freelance' | 'self_employed';
+export interface JobSearchFilters {
+  /** Location filter (partial match) */
+  location?: string;
+  /** Minimum salary */
+  salary_min?: number;
+  /** Maximum salary */
+  salary_max?: number;
+  /** Work format: remote, office, hybrid */
+  work_format?: 'remote' | 'office' | 'hybrid';
+  /** Employment type: full-time, part-time, contract */
+  employment_type?: 'full-time' | 'part-time' | 'contract';
+  /** Industry sector */
+  industry?: string;
+  /** List of required skills (OR logic) */
+  skills?: string[];
+}
 
 /**
- * Degree type enum for education
+ * Job search request
  */
-export type DegreeType = 'high_school' | 'associate' | 'bachelor' | 'master' | 'doctorate' | 'certificate' | 'other';
+export interface JobSearchRequest {
+  /** Search query for job title and description */
+  query?: string | null;
+  /** Filter criteria */
+  filters?: JobSearchFilters | null;
+  /** Number of records to skip (pagination) */
+  skip?: number;
+  /** Maximum number of records to return */
+  limit?: number;
+  /** Sort field: date, salary_asc, salary_desc, relevance */
+  sort_by?: 'date' | 'salary_asc' | 'salary_desc' | 'relevance';
+}
 
 /**
- * Proficiency level enum for skills
+ * Job search result item
  */
-export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
-
-/**
- * Job seeker status enum
- */
-export type JobSeekerStatus = 'actively_looking' | 'open' | 'not_looking';
-
-/**
- * Job seeker profile response
- */
-export interface JobSeekerProfile {
+export interface JobSearchResult {
+  /** Job vacancy ID */
   id: string;
-  user_id: string;
-  organization_id: string;
-  phone: string | null;
-  location: string | null;
-  bio: string | null;
-  linkedin_url: string | null;
-  portfolio_url: string | null;
-  years_of_experience: number | null;
-  current_title: string | null;
-  current_company: string | null;
+  /** Job title */
+  title: string;
+  /** Job description */
+  description: string;
+  /** Required technical skills */
+  required_skills: string[];
+  /** Minimum experience in months */
+  min_experience_months: number | null;
+  /** Additional skills */
+  additional_requirements: string[];
+  /** Industry */
   industry: string | null;
-  job_seeker_status: JobSeekerStatus | null;
-  preferred_locations: string | null;
-  preferred_job_types: string | null;
-  expected_salary: string | null;
-  resume_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * Job seeker profile create request
- */
-export interface JobSeekerProfileCreate {
-  phone?: string;
-  location?: string;
-  bio?: string;
-  linkedin_url?: string;
-  portfolio_url?: string;
-  years_of_experience?: number;
-  current_title?: string;
-  current_company?: string;
-  industry?: string;
-  job_seeker_status?: JobSeekerStatus;
-  preferred_locations?: string;
-  preferred_job_types?: string;
-  expected_salary?: string;
-  resume_id?: string;
-}
-
-/**
- * Job seeker profile update request
- */
-export interface JobSeekerProfileUpdate {
-  phone?: string;
-  location?: string;
-  bio?: string;
-  linkedin_url?: string;
-  portfolio_url?: string;
-  years_of_experience?: number;
-  current_title?: string;
-  current_company?: string;
-  industry?: string;
-  job_seeker_status?: JobSeekerStatus;
-  preferred_locations?: string;
-  preferred_job_types?: string;
-  expected_salary?: string;
-  resume_id?: string;
-}
-
-/**
- * Work history item response
- */
-export interface WorkHistoryItem {
-  id: string;
-  resume_id: string;
-  company_name: string;
-  position_title: string;
-  start_date: string;
-  end_date: string | null;
-  description: string | null;
+  /** Work format */
+  work_format: string | null;
+  /** Location */
   location: string | null;
-  employment_type: EmploymentType;
+  /** Minimum salary */
+  salary_min: number | null;
+  /** Maximum salary */
+  salary_max: number | null;
+  /** English level */
+  english_level: string | null;
+  /** Employment type */
+  employment_type: string | null;
+  /** Creation timestamp */
   created_at: string;
-  updated_at: string;
 }
 
 /**
- * Work history create request
+ * Job search response
  */
-export interface WorkHistoryCreate {
-  company_name: string;
-  position_title: string;
-  start_date: string;
-  end_date?: string;
-  description?: string;
-  location?: string;
-  employment_type?: EmploymentType;
+export interface JobSearchResponse {
+  /** Total number of matching jobs */
+  total: number;
+  /** List of job results */
+  jobs: JobSearchResult[];
+  /** Search query that was executed */
+  query: string;
+  /** Filters that were applied */
+  filters_applied: Record<string, unknown>;
+  /** Time taken to execute search in seconds */
+  execution_time_seconds: number;
+  /** Number of results skipped */
+  skip: number;
+  /** Maximum number of results returned */
+  limit: number;
 }
 
-/**
- * Work history update request
- */
-export interface WorkHistoryUpdate {
-  company_name?: string;
-  position_title?: string;
-  start_date?: string;
-  end_date?: string;
-  description?: string;
-  location?: string;
-  employment_type?: EmploymentType;
-}
+// ==================== Job Applications Types ====================
 
 /**
- * Work history list response
+ * Job application status enum
  */
-export interface WorkHistoryListResponse {
-  work_history: WorkHistoryItem[];
-  count: number;
-}
+export type JobApplicationStatus = 'pending' | 'submitted' | 'under_review' | 'rejected' | 'accepted';
 
 /**
- * Education item response
+ * Job application submit request
  */
-export interface EducationItem {
-  id: string;
-  resume_id: string;
-  institution_name: string;
-  degree: string;
-  field_of_study: string | null;
-  start_date: string;
-  end_date: string | null;
-  description: string | null;
-  location: string | null;
-  degree_type: DegreeType;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * Education create request
- */
-export interface EducationCreate {
+export interface JobApplicationSubmitRequest {
+  /** ID of the vacancy to apply for */
+  vacancy_id: string;
+  /** ID of the resume to submit (optional) */
   resume_id?: string;
-  institution_name: string;
-  degree: string;
-  field_of_study?: string;
-  start_date: string;
-  end_date?: string;
-  description?: string;
-  location?: string;
-  degree_type?: DegreeType;
+  /** Contact email */
+  email: string;
+  /** Contact phone number */
+  phone?: string;
+  /** Cover letter text */
+  cover_letter?: string;
 }
 
 /**
- * Education update request
+ * Job application response
  */
-export interface EducationUpdate {
-  institution_name?: string;
-  degree?: string;
-  field_of_study?: string;
-  start_date?: string;
-  end_date?: string;
-  description?: string;
-  location?: string;
-  degree_type?: DegreeType;
-}
-
-/**
- * Education list response
- */
-export interface EducationListResponse {
-  education: EducationItem[];
-  count: number;
-}
-
-/**
- * Skill item response
- */
-export interface SkillItem {
+export interface JobApplicationResponse {
+  /** Application ID */
   id: string;
-  resume_id: string;
-  name: string;
-  category: string | null;
-  proficiency_level: ProficiencyLevel;
-  years_of_experience: number | null;
-  description: string | null;
+  /** ID of the vacancy */
+  vacancy_id: string;
+  /** Title of the vacancy */
+  vacancy_title?: string;
+  /** ID of the resume submitted */
+  resume_id?: string;
+  /** Contact email */
+  email: string;
+  /** Contact phone */
+  phone?: string;
+  /** Cover letter text */
+  cover_letter?: string;
+  /** Application status */
+  status: JobApplicationStatus;
+  /** Submission timestamp */
   created_at: string;
+  /** Last update timestamp */
   updated_at: string;
 }
 
 /**
- * Skill create request
+ * Job applications list response
  */
-export interface SkillCreate {
-  resume_id?: string;
-  name: string;
-  category?: string;
-  proficiency_level?: ProficiencyLevel;
-  years_of_experience?: number;
-  description?: string;
+export interface JobApplicationsListResponse {
+  /** List of applications */
+  applications: JobApplicationResponse[];
+  /** Total count of applications */
+  total: number;
+  /** Page size */
+  limit: number;
+  /** Number of records skipped */
+  skip: number;
+}
+
+// ==================== Saved Jobs Types ====================
+
+/**
+ * Saved job response
+ */
+export interface SavedJobResponse {
+  /** Saved job ID */
+  id: string;
+  /** User ID who saved the job */
+  user_id: string;
+  /** Job vacancy ID */
+  vacancy_id: string;
+  /** Job vacancy title */
+  vacancy_title: string | null;
+  /** Job vacancy description */
+  vacancy_description: string | null;
+  /** Creation timestamp */
+  created_at: string;
+  /** Last update timestamp */
+  updated_at: string;
 }
 
 /**
- * Skill update request
+ * Saved jobs list response
  */
-export interface SkillUpdate {
-  name?: string;
-  category?: string;
-  proficiency_level?: ProficiencyLevel;
-  years_of_experience?: number;
-  description?: string;
+export interface SavedJobsListResponse {
+  /** Total number of saved jobs */
+  total: number;
+  /** List of saved jobs */
+  saved_jobs: SavedJobResponse[];
 }
 
 /**
- * Skill list response
+ * Save job request
  */
-export interface SkillListResponse {
-  skills: SkillItem[];
-  count: number;
+export interface SaveJobRequest {
+  /** Job vacancy ID to save */
+  vacancy_id: string;
+  /** User ID who is saving the job */
+  user_id: string;
+}
+
+/**
+ * Check if job saved response
+ */
+export interface CheckJobSavedResponse {
+  /** Whether the job is saved by the user */
+  is_saved: boolean;
+  /** The saved job ID if saved, null otherwise */
+  saved_job_id: string | null;
 }
 

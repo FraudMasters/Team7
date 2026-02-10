@@ -66,6 +66,16 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
         back_populates="vacancy",
         cascade="all, delete-orphan"
     )
+    applications: Mapped[list["JobApplication"]] = relationship(
+        "JobApplication",
+        back_populates="vacancy",
+        cascade="all, delete-orphan"
+    )
+    saved_jobs: Mapped[list["SavedJob"]] = relationship(
+        "SavedJob",
+        back_populates="vacancy",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<JobVacancy(id={self.id}, title={self.title})>"

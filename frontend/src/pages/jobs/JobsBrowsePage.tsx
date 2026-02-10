@@ -1,5 +1,5 @@
 // Импорт хуков React для управления состоянием
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 // Импорт компонентов MUI для оформления интерфейса
 import {
   Container,      // Контейнер для ограничения ширины содержимого
@@ -26,94 +26,96 @@ import {
   Search as SearchIcon,
   FilterList as FilterIcon,
   Clear as ClearIcon,
+  LocationOn,
+  AttachMoney,
 } from '@mui/icons-material';
-// Импорт кастомного хука для получения данных о вакансиях
-import { useJobs } from '../../hooks/useJobs';
+// Импорт кастомного хука для поиска вакансий
+import { useJobSearch } from '../../hooks/useJobSearch';
 // Импорт компонента карточки вакансии
 import { JobCard } from '../../components/jobs/JobCard';
+// Импорт кастомного компонента Slider
+import { Slider } from '../../components/ui';
 
 // Основной компонент страницы просмотра вакансий
 export function JobsBrowsePage() {
   // Хук для интернационализации
   const { t } = useTranslation();
-  // Состояние для текста поиска
-  const [searchTerm, setSearchTerm] = useState('');
+
   // Состояние для фильтров вакансий
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [filters, setFilters] = useState<{
-    workFormat?: string; // Формат работы (удаленно/офис/гибрид)
-    excludeSkills?: string[]; // Исключаемые навыки
+    location?: string; // Локация вакансии
+    salaryRange?: number[]; // Диапазон зарплаты [min, max]
+    workFormat?: 'remote' | 'office' | 'hybrid'; // Формат работы
+    employmentType?: 'full-time' | 'part-time' | 'contract'; // Тип занятости
   }>({});
 
-  // Ключ localStorage для сохранения исключаемых навыков
-  const EXCLUDED_SKILLS_STORAGE_KEY = 'excludedJobSkills';
-
-  // Загрузка исключаемых навыков из localStorage при монтировании компонента
+  // Debounce для поискового запроса
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(EXCLUDED_SKILLS_STORAGE_KEY);
-      if (stored) {
-        const excludedSkills = JSON.parse(stored) as string[];
-        setFilters((prev) => ({ ...prev, excludeSkills: excludedSkills }));
-      }
-    } catch {
-      // Игнорируем ошибки при чтении из localStorage
-    }
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  // Сохранение исключаемых навыков в localStorage при их изменении
-  useEffect(() => {
-    try {
-      if (filters.excludeSkills && filters.excludeSkills.length > 0) {
-        localStorage.setItem(EXCLUDED_SKILLS_STORAGE_KEY, JSON.stringify(filters.excludeSkills));
-      } else {
-        localStorage.removeItem(EXCLUDED_SKILLS_STORAGE_KEY);
-      }
-    } catch {
-      // Игнорируем ошибки при записи в localStorage
-    }
-  }, [filters.excludeSkills]);
-
-  // Получение данных о вакансиях с использованием кастомного хука
-  const { data, isLoading, error } = useJobs();
-
-  // Доступные опции навыков (в будущем могут быть получены из API)
-  const skillOptions = [
-    'Python', 'Java', 'JavaScript', 'TypeScript', 'React', 'Angular', 'Vue.js',
-    'Node.js', 'Django', 'Flask', 'Spring', 'AWS', 'Azure', 'Docker', 'Kubernetes',
-    'SQL', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST', 'Git', 'CI/CD',
+  // Опции локаций для автозаполнения
+  const locationOptions = [
+    'Remote', 'New York', 'San Francisco', 'Los Angeles', 'Chicago',
+    'Boston', 'Seattle', 'Austin', 'Denver', 'Miami', 'Atlanta',
+    'London', 'Paris', 'Berlin', 'Amsterdam', 'Barcelona', 'Rome',
+    'Toronto', 'Vancouver', 'Sydney', 'Melbourne', 'Tokyo', 'Singapore',
+    'Dubai', 'Tel Aviv', 'Bangalore', 'Mumbai', 'Sao Paulo',
   ];
 
-  // Кастомный фильтр для case-insensitive поиска навыков в Autocomplete
-  const skillFilterOptions = createFilterOptions({
+  // Кастомный фильтр для case-insensitive поиска локаций
+  const locationFilterOptions = createFilterOptions({
     matchFrom: 'any',
     limit: 100,
     stringify: (option: string) => option.toLowerCase(),
   });
 
-  // Фильтрация вакансий по поисковому запросу и выбранным фильтрам
-  const filteredJobs = data?.vacancies.filter((job) => {
-    // Проверка совпадения поискового запроса с названием или описанием вакансии
-    const matchesSearch =
-      searchTerm === '' ||
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase());
+  // Формирование параметров для запроса поиска
+  const searchParams = useCallback(() => {
+    const params: Record<string, any> = {
+      query: debouncedQuery || null,
+      limit: 100,
+    };
 
-    // Проверка совпадения формата работы
-    const matchesFormat = !filters.workFormat || job.work_format === filters.workFormat;
+    if (filters.location || filters.salaryRange || filters.workFormat || filters.employmentType) {
+      params.filters = {};
+      if (filters.location) params.filters.location = filters.location;
+      if (filters.salaryRange) {
+        params.filters.salary_min = filters.salaryRange[0];
+        params.filters.salary_max = filters.salaryRange[1];
+      }
+      if (filters.workFormat) params.filters.work_format = filters.workFormat;
+      if (filters.employmentType) params.filters.employment_type = filters.employmentType;
+    }
 
-    // Проверка исключаемых навыков - вакансии, требующие эти навыки, исключаются
-    const matchesExcludeSkills =
-      !filters.excludeSkills ||
-      filters.excludeSkills.length === 0 ||
-      !filters.excludeSkills.some((skill) =>
-        job.required_skills?.some((jobSkill: string) =>
-          jobSkill.toLowerCase().includes(skill.toLowerCase())
-        )
-      );
+    return params;
+  }, [debouncedQuery, filters]);
 
-    // Возвращаем вакансию, если она соответствует всем критериям
-    return matchesSearch && matchesFormat && matchesExcludeSkills;
-  }) ?? [];
+  // Получение данных о вакансиях с использованием кастомного хука
+  const { data, isLoading, error } = useJobSearch(searchParams());
+
+  // Получаем результаты поиска из ответа API
+  const searchResults = data?.results ?? [];
+  const totalResults = data?.total ?? 0;
+
+  // Очистка всех фильтров
+  const handleClearFilters = useCallback(() => {
+    setFilters({});
+    setSearchQuery('');
+  }, []);
+
+  // Проверка, есть ли активные фильтры
+  const hasActiveFilters = Object.keys(filters).length > 0 || searchQuery !== '';
+
+  // Форматирование значения зарплаты для слайдера
+  const formatSalary = useCallback((value: number) => {
+    return `$${(value / 1000).toFixed(0)}k`;
+  }, []);
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
@@ -132,79 +134,161 @@ export function JobsBrowsePage() {
         sx={{
           p: 2,           // Внутренний отступ
           mb: 4,          // Внешний отступ снизу
-          display: 'flex',
-          gap: 2,         // Расстояние между элементами
-          alignItems: 'center',
-          flexWrap: 'wrap', // Перенос элементов на новую строку
         }}
       >
-        {/* Поле поиска вакансий */}
-        <TextField
-          placeholder="Search jobs..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-          }}
-          sx={{ flexGrow: 1, minWidth: 200 }}
-        />
-        {/* Выпадающий список для выбора формата работы */}
-        <FormControl sx={{ minWidth: 150 }}>
-          <InputLabel>Work Format</InputLabel>
-          <Select
-            value={filters.workFormat || ''}
-            label="Work Format"
-            onChange={(e) => setFilters({ ...filters, workFormat: e.target.value || undefined })}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="remote">Remote</MenuItem>
-            <MenuItem value="office">Office</MenuItem>
-            <MenuItem value="hybrid">Hybrid</MenuItem>
-          </Select>
-        </FormControl>
-        {/* Автозаполнение для исключаемых навыков с кнопкой очистки */}
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Autocomplete
-            multiple
-            options={skillOptions}
-            filterOptions={skillFilterOptions}
-            value={filters.excludeSkills || []}
-            onChange={(_, newValue) => {
-              // Удаляем дубликаты перед сохранением
-              const uniqueSkills = Array.from(new Set(newValue));
-              setFilters({ ...filters, excludeSkills: uniqueSkills });
+        {/* Первая строка: поиск и кнопка очистки */}
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+          {/* Поле поиска вакансий */}
+          <TextField
+            placeholder="Search jobs by title or keywords..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
             }}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => (
-                <Chip
-                  variant="outlined"
-                  label={option}
-                  {...getTagProps({ index })}
-                  key={option}
-                />
-              ))
-            }
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label={t('jobsBrowse.excludeStacks.title')}
-                placeholder={t('jobsBrowse.excludeStacks.placeholder')}
-              />
-            )}
-            sx={{ minWidth: 250 }}
+            sx={{ flexGrow: 1, minWidth: 250 }}
           />
-          {filters.excludeSkills && filters.excludeSkills.length > 0 && (
+          {/* Кнопка очистки всех фильтров */}
+          {hasActiveFilters && (
             <Button
               variant="outlined"
               size="small"
-              onClick={() => setFilters({ ...filters, excludeSkills: [] })}
+              onClick={handleClearFilters}
               startIcon={<ClearIcon />}
             >
-              {t('jobsBrowse.excludeStacks.clear')}
+              Clear All
             </Button>
           )}
-        </Stack>
+        </Box>
+
+        {/* Вторая строка: фильтры */}
+        <Grid container spacing={2}>
+          {/* Фильтр по локации */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Autocomplete
+              options={locationOptions}
+              filterOptions={locationFilterOptions}
+              value={filters.location || null}
+              onChange={(_, newValue) => {
+                setFilters({ ...filters, location: newValue || undefined });
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Location"
+                  placeholder="Filter by location"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <>
+                        <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />
+                        {params.InputProps.startAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          </Grid>
+
+          {/* Фильтр по формату работы */}
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Work Format</InputLabel>
+              <Select
+                value={filters.workFormat || ''}
+                label="Work Format"
+                onChange={(e) => setFilters({ ...filters, workFormat: e.target.value as 'remote' | 'office' | 'hybrid' | undefined })}
+              >
+                <MenuItem value="">All Formats</MenuItem>
+                <MenuItem value="remote">Remote</MenuItem>
+                <MenuItem value="office">Office</MenuItem>
+                <MenuItem value="hybrid">Hybrid</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Фильтр по типу занятости */}
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Employment Type</InputLabel>
+              <Select
+                value={filters.employmentType || ''}
+                label="Employment Type"
+                onChange={(e) => setFilters({ ...filters, employmentType: e.target.value as 'full-time' | 'part-time' | 'contract' | undefined })}
+              >
+                <MenuItem value="">All Types</MenuItem>
+                <MenuItem value="full-time">Full-time</MenuItem>
+                <MenuItem value="part-time">Part-time</MenuItem>
+                <MenuItem value="contract">Contract</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Кнопка очистки фильтра занятости (если активен) */}
+          <Grid item xs={12} sm={6} md={3}>
+            {filters.employmentType && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setFilters({ ...filters, employmentType: undefined })}
+                startIcon={<ClearIcon />}
+                fullWidth
+              >
+                Clear Type
+              </Button>
+            )}
+          </Grid>
+        </Grid>
+
+        {/* Третья строка: слайдер зарплаты */}
+        <Box sx={{ mt: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <AttachMoney sx={{ color: 'text.secondary', fontSize: 20 }} />
+            <Typography variant="body2" color="text.secondary">
+              Salary Range
+            </Typography>
+            {filters.salaryRange && (
+              <Chip
+                label={`${formatSalary(filters.salaryRange[0])} - ${formatSalary(filters.salaryRange[1])}`}
+                size="small"
+                onDelete={() => setFilters({ ...filters, salaryRange: undefined })}
+              />
+            )}
+          </Stack>
+          <Slider
+            range
+            min={0}
+            max={300000}
+            step={5000}
+            value={filters.salaryRange || [0, 300000]}
+            onChange={(_, newValue) => {
+              setFilters({ ...filters, salaryRange: newValue as number[] });
+            }}
+            valueLabelFormat={(value) => formatSalary(value)}
+            valueLabelDisplay="auto"
+            aria-label="Salary range filter"
+          />
+          <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              ${((filters.salaryRange?.[0] ?? 0) / 1000).toFixed(0)}k
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              ${((filters.salaryRange?.[1] ?? 300000) / 1000).toFixed(0)}k
+            </Typography>
+          </Stack>
+        </Box>
       </Paper>
+
+      {/* Отображение количества результатов */}
+      {!isLoading && !error && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            {totalResults} {totalResults === 1 ? 'job' : 'jobs'} found
+            {hasActiveFilters && ' matching your filters'}
+          </Typography>
+        </Box>
+      )}
 
       {/* Отображение состояния загрузки, ошибки или списка вакансий */}
       {isLoading ? (
@@ -216,16 +300,31 @@ export function JobsBrowsePage() {
         // Состояние ошибки при загрузке
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography color="error">Failed to load jobs</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Please try again later
+          </Typography>
         </Box>
-      ) : filteredJobs.length === 0 ? (
+      ) : searchResults.length === 0 ? (
         // Состояние отсутствия вакансий после применения фильтров
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography color="text.secondary">{t('jobsBrowse.excludeStacks.noFilteredJobs')}</Typography>
+          <FilterIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {hasActiveFilters ? 'No jobs match your filters' : 'No jobs available'}
+          </Typography>
+          {hasActiveFilters && (
+            <Button
+              variant="outlined"
+              onClick={handleClearFilters}
+              sx={{ mt: 2 }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </Box>
       ) : (
         // Сетка с карточками вакансий
         <Grid container spacing={2}>
-          {filteredJobs.map((job) => (
+          {searchResults.map((job) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={job.id}>
               <JobCard job={job} />
             </Grid>

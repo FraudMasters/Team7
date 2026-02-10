@@ -1,69 +1,64 @@
-export interface SavedJob {
-  id: string;
-  vacancy_id: string;
-  title: string;
-  description: string;
-  required_skills: string[];
-  min_experience_months: number;
-  industry?: string;
-  work_format?: 'remote' | 'office' | 'hybrid';
-  location?: string;
-  salary_min?: number;
-  salary_max?: number;
-  employment_type?: string;
-  saved_at: string;
-}
-
-export interface SavedJobsResponse {
-  saved_jobs: SavedJob[];
-  total: number;
-}
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { savedJobsClient } from '../api/savedJobs';
+import type {
+  SaveJobRequest,
+  SavedJobResponse,
+  SavedJobsListResponse,
+  CheckJobSavedResponse,
+} from '@/types/api';
 
-export function useSavedJobs(params?: { limit?: number; skip?: number }) {
+export function useSavedJobs(userId: string, params?: { skip?: number; limit?: number }) {
   return useQuery({
-    queryKey: ['saved-jobs', params],
+    queryKey: ['saved-jobs', userId, params],
     queryFn: async () => {
-      const response = await apiClient.get<SavedJobsResponse>('/saved-jobs', { params });
-      return response.data;
+      return await savedJobsClient.getSavedJobs(
+        userId,
+        params?.skip ?? 0,
+        params?.limit ?? 100
+      );
     },
+    enabled: !!userId,
   });
 }
 
-export function useSavedJob(id: string) {
+export function useCheckJobSaved(vacancyId: string, userId: string) {
   return useQuery({
-    queryKey: ['saved-job', id],
+    queryKey: ['check-job-saved', vacancyId, userId],
     queryFn: async () => {
-      const response = await apiClient.get<SavedJob>(`/saved-jobs/${id}`);
-      return response.data;
+      return await savedJobsClient.checkJobSaved(vacancyId, userId);
     },
-    enabled: !!id,
+    enabled: !!vacancyId && !!userId,
   });
 }
 
 export function useSaveJob() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (vacancyId: string) => {
-      const response = await apiClient.post<SavedJob>('/saved-jobs', { vacancy_id: vacancyId });
-      return response.data;
+    mutationFn: async (request: SaveJobRequest) => {
+      return await savedJobsClient.saveJob(request);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs', variables.user_id] });
+      queryClient.invalidateQueries({ queryKey: ['check-job-saved', variables.vacancy_id, variables.user_id] });
     },
   });
 }
 
-export function useRemoveSavedJob() {
+export function useUnsaveJob() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (savedJobId: string) => {
-      await apiClient.delete(`/saved-jobs/${savedJobId}`);
+    mutationFn: async ({ savedJobId, vacancyId, userId }: { savedJobId?: string; vacancyId?: string; userId: string }) => {
+      if (savedJobId) {
+        await savedJobsClient.unsaveJob(savedJobId);
+      } else if (vacancyId && userId) {
+        await savedJobsClient.unsaveJobByVacancy(vacancyId, userId);
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs', variables.userId] });
+      if (variables.vacancyId) {
+        queryClient.invalidateQueries({ queryKey: ['check-job-saved', variables.vacancyId, variables.userId] });
+      }
     },
   });
 }

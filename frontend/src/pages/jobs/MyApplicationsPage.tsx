@@ -12,6 +12,7 @@ import {
   Select,
   MenuItem,
   InputLabel,
+  Chip,
 } from '@mui/material';
 // Иконки MUI
 import { Search as SearchIcon, WorkOutline as WorkIcon } from '@mui/icons-material';
@@ -146,10 +147,10 @@ export function MyApplicationsPage() {
           onRetry={() => window.location.reload()}
         />
       ) : filteredApplications.length === 0 ? (
-        // Состояние пустого списка
-        <Box sx={{ textAlign: 'center', py: 8 }}>
+        // Пустое состояние - нет заявок
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
           <WorkIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
+          <Typography variant="h6" gutterBottom>
             {searchTerm || filters.status ? 'No applications match your search' : 'No applications yet'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -168,13 +169,29 @@ export function MyApplicationsPage() {
               Browse Jobs
             </Typography>
           )}
-        </Box>
+        </Paper>
       ) : (
         // Сетка карточек заявок
         <Grid container spacing={2}>
-          {filteredApplications.map((application) => (
+          {filteredApplications.map((application, index) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={application.id}>
-              <ApplicationCard application={application} />
+              <Box
+                sx={{
+                  animation: `fadeInUp 0.5s ease-out ${index * 50}ms both`,
+                  '@keyframes fadeInUp': {
+                    '0%': {
+                      opacity: 0,
+                      transform: 'translateY(20px)',
+                    },
+                    '100%': {
+                      opacity: 1,
+                      transform: 'translateY(0)',
+                    },
+                  },
+                }}
+              >
+                <ApplicationCard application={application} />
+              </Box>
             </Grid>
           ))}
         </Grid>

@@ -12,6 +12,8 @@ import {
   Divider,
   CircularProgress,
   Grid,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 // Импорт иконок Material UI
 import {
@@ -19,9 +21,14 @@ import {
   WorkOutline,
   AttachMoney,
   Business,
+  BookmarkBorder,
+  Bookmark,
 } from '@mui/icons-material';
 // Импорт хука для получения данных о вакансии
 import { useJob } from '../../hooks/useJobs';
+// Импорт хуков авторизации и сохранённых вакансий
+import { useAuth } from '../../hooks/useAuth';
+import { useCheckJobSaved, useSaveJob, useUnsaveJob } from '../../hooks/useSavedJobs';
 
 /**
  * Компонент страницы детализации вакансии
@@ -32,6 +39,32 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   // Получение данных о вакансии, состояния загрузки и ошибок
   const { data: job, isLoading, error } = useJob(id || '');
+  // Получение данных авторизованного пользователя
+  const { user } = useAuth();
+  // Проверка сохранена ли вакансия
+  const { data: savedStatus } = useCheckJobSaved(id || '', user?.id ?? '');
+  // Мутации для сохранения и удаления из сохранённых
+  const saveJob = useSaveJob();
+  const unsaveJob = useUnsaveJob();
+
+  // Обработчик сохранения вакансии
+  const handleSaveJob = () => {
+    if (!user || !id) return;
+    saveJob.mutate({
+      vacancy_id: id,
+      user_id: user.id,
+    });
+  };
+
+  // Обработчик удаления вакансии из сохранённых
+  const handleUnsaveJob = () => {
+    if (!user || !id) return;
+    unsaveJob.mutate({
+      savedJobId: savedStatus?.saved_job_id ?? undefined,
+      vacancyId: id,
+      userId: user.id,
+    });
+  };
 
   // Отображение индикатора загрузки
   if (isLoading) {
@@ -164,13 +197,31 @@ export function JobDetailPage() {
               Apply Now
             </Button>
             {/* Кнопка сохранения вакансии */}
-            <Button
-              variant="outlined"
-              size="large"
-              sx={{ minWidth: 120 }}
-            >
-              Save
-            </Button>
+            <Tooltip title={savedStatus?.is_saved ? 'Remove from saved' : 'Save job'}>
+              <IconButton
+                variant="outlined"
+                size="large"
+                onClick={savedStatus?.is_saved ? handleUnsaveJob : handleSaveJob}
+                disabled={!user || saveJob.isPending || unsaveJob.isPending}
+                aria-label={savedStatus?.is_saved ? 'Remove from saved' : 'Save job'}
+                sx={{
+                  minWidth: 48,
+                  height: 48,
+                  border: 1,
+                  borderColor: 'divider',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                {savedStatus?.is_saved ? (
+                  <Bookmark color="primary" />
+                ) : (
+                  <BookmarkBorder />
+                )}
+              </IconButton>
+            </Tooltip>
           </Stack>
         </Stack>
       </Paper>

@@ -5,7 +5,7 @@ import enum
 from typing import Optional
 
 from sqlalchemy import Enum, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, UUIDMixin
 
@@ -58,6 +58,12 @@ class Resume(Base, UUIDMixin, TimestampMixin):
     raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    job_applications: Mapped[list["JobApplication"]] = relationship(
+        "JobApplication",
+        back_populates="resume"
+    )
 
     def __repr__(self) -> str:
         return f"<Resume(id={self.id}, org={self.organization_id}, filename={self.filename}, status={self.status.value})>"

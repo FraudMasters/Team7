@@ -4,7 +4,7 @@ User model for authentication and authorization
 from typing import Optional
 
 from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, UUIDMixin
 
@@ -36,6 +36,18 @@ class User(Base, UUIDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+
+    # Relationships
+    job_applications: Mapped[list["JobApplication"]] = relationship(
+        "JobApplication",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    saved_jobs: Mapped[list["SavedJob"]] = relationship(
+        "SavedJob",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, is_active={self.is_active})>"

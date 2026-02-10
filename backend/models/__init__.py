@@ -3,13 +3,11 @@ SQLAlchemy database models for Resume Analysis System
 """
 from .base import Base
 from .resume import Resume
-from .work_history import WorkHistory, EmploymentType
-from .education import Education, DegreeType
-from .skill import Skill, ProficiencyLevel
 from .resume_analysis import ResumeAnalysis
 from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
 from .job_vacancy import JobVacancy
+from .job_application import JobApplication, ApplicationStatus
 from .match_result import MatchResult
 from .skill_taxonomy import SkillTaxonomy
 from .custom_synonyms import CustomSynonym
@@ -19,7 +17,6 @@ from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
 from .hiring_stage import HiringStage, HiringStageName
-from .job_seeker_profile import JobSeekerProfile
 from .analytics_event import AnalyticsEvent
 from .recruiter import Recruiter
 from .report import Report, ScheduledReport
@@ -34,6 +31,7 @@ from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRES
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
 from .ats_result import ATSResult
 from .saved_search import SavedSearch
+from .saved_job import SavedJob
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .audit_log import AuditLog, AuditActionType
@@ -43,16 +41,12 @@ from .organization_explanation_preferences import OrganizationExplanationPrefere
 __all__ = [
     "Base",
     "Resume",
-    "WorkHistory",
-    "EmploymentType",
-    "Education",
-    "DegreeType",
-    "Skill",
-    "ProficiencyLevel",
     "ResumeAnalysis",
     "AnalysisResult",
     "ResumeComparison",
     "JobVacancy",
+    "JobApplication",
+    "ApplicationStatus",
     "MatchResult",
     "SkillTaxonomy",
     "CustomSynonym",
@@ -63,7 +57,6 @@ __all__ = [
     "UserPreferences",
     "HiringStage",
     "HiringStageName",
-    "JobSeekerProfile",
     "AnalyticsEvent",
     "Recruiter",
     "Report",
@@ -86,6 +79,7 @@ __all__ = [
     "BackupStatus",
     "ATSResult",
     "SavedSearch",
+    "SavedJob",
     "SearchAlert",
     "SearchHistory",
     "AuditLog",

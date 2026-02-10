@@ -256,6 +256,7 @@ async def root() -> JSONResponse:
 from api import (
     resumes,
     analysis,
+    saved_jobs,
     matching,
     matching_weights,
     skill_taxonomies,
@@ -268,7 +269,6 @@ from api import (
     vacancies,
     ranking,
     candidates,
-    education,
     industry_classifier,
     skill_suggestions,
     taxonomy_import_export,
@@ -276,7 +276,6 @@ from api import (
     taxonomy_versions,
     batch,
     work_experience,
-    work_history,
     skill_gap_analysis,
     backups,
     ats_simulation,
@@ -286,11 +285,11 @@ from api import (
     candidate_notes,
     candidate_activities,
     search,
+    job_search,
+    job_applications,
     config,
     websocket,
     auth,
-    profiles,
-    skills,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -308,10 +307,6 @@ app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
 app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
-app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
-app.include_router(work_history.router, prefix="/api/profiles/me/work-history", tags=["Work History"])
-app.include_router(education.router, prefix="/api/profiles/me/education", tags=["Education"])
-app.include_router(skills.router, prefix="/api/profiles/me/skills", tags=["Skills"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
 app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
 app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
@@ -328,6 +323,9 @@ app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["C
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
+app.include_router(job_applications.router, prefix="/api/job-applications", tags=["Job Applications"])
+app.include_router(saved_jobs.router, prefix="/api/saved-jobs", tags=["Saved Jobs"])
 app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

@@ -120,6 +120,28 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
     return date.toLocaleDateString();
   };
 
+  /**
+   * Получает цвет чипа на основе статуса заявки
+   * @param status - Статус заявки
+   * @returns Цвет чипа Material UI
+   */
+  const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
+    switch (status) {
+      case 'pending':
+        return 'default';
+      case 'under_review':
+        return 'info';
+      case 'interview':
+        return 'warning';
+      case 'offered':
+        return 'success';
+      case 'rejected':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
   return (
     <Card
       component={Link}
@@ -166,11 +188,12 @@ export function ApplicationCard({ application, saved = false, onSave }: Applicat
           </IconButton>
         </Stack>
 
-        {/* Чип статуса заявки */}
+        {/* Чип статуса заявки с цветовой индикацией */}
         <Box sx={{ mb: 2 }}>
           <Chip
             label={application.stage_name || application.status}
             size="small"
+            color={getStatusColor(application.status)}
             sx={{
               borderRadius: 1,
               fontSize: '0.75rem',

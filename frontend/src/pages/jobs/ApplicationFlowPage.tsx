@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { config } from '@/config';
 import { useJob } from '../../hooks/useJobs';
+import { useSubmitJobApplication } from '../../hooks/useJobApplications';
 import ResumeUploader from '../../components/ResumeUploader';
 
 const steps = ['Upload Resume', 'Contact Info', 'Review', 'Submit'];
@@ -31,30 +32,40 @@ export function ApplicationFlowPage() {
     phone: '',
     coverLetter: '',
   });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const submitMutation = useSubmitJobApplication();
 
   const handleUploadComplete = (id: string) => {
     setResumeId(id);
     setActiveStep(1);
+    setSubmitError(null);
+  };
+
+  const handleUploadError = (error: string) => {
+    setSubmitError(error);
   };
 
   const handleSubmit = async () => {
     if (!resumeId || !id) return;
 
-    setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
 
     try {
-      // TODO: Implement actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await submitMutation.mutateAsync({
+        vacancy_id: id,
+        resume_id: resumeId,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        cover_letter: formData.coverLetter || undefined,
+      });
       setActiveStep(3);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Submission failed');
-    } finally {
-      setSubmitting(false);
+      setSubmitError(err.detail || 'Failed to submit application. Please try again.');
     }
   };
+
+  const isSubmitting = submitMutation.isPending;
 
   if (jobLoading) {
     return (
@@ -89,7 +100,7 @@ export function ApplicationFlowPage() {
               <ResumeUploader
                 uploadUrl={`${config.api.url}/api/resumes/upload`}
                 onUploadComplete={handleUploadComplete}
-                onUploadError={() => {}}
+                onUploadError={handleUploadError}
                 onUploadStart={() => {}}
               />
             </Stack>
@@ -110,6 +121,8 @@ export function ApplicationFlowPage() {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  error={!formData.email}
+                  helperText={!formData.email ? 'Email is required' : ''}
                 />
                 <TextField
                   label="Phone"
@@ -117,6 +130,7 @@ export function ApplicationFlowPage() {
                   fullWidth
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
                 />
                 <TextField
                   label="Cover Letter (Optional)"
@@ -125,7 +139,7 @@ export function ApplicationFlowPage() {
                   fullWidth
                   value={formData.coverLetter}
                   onChange={(e) => setFormData({ ...formData, coverLetter: e.target.value })}
-                  placeholder="Tell us why you're a great fit..."
+                  placeholder="Tell us why you're a great fit for this role..."
                 />
               </Stack>
 
@@ -148,28 +162,43 @@ export function ApplicationFlowPage() {
               <Typography variant="h6">Review Your Application</Typography>
 
               <Box>
-                <Typography variant="body2" color="text.secondary">Email</Typography>
-                <Typography>{formData.email}</Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Email
+                </Typography>
+                <Typography variant="body1">{formData.email}</Typography>
               </Box>
 
               {formData.phone && (
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Phone</Typography>
-                  <Typography>{formData.phone}</Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Phone
+                  </Typography>
+                  <Typography variant="body1">{formData.phone}</Typography>
                 </Box>
               )}
 
-              {error && <Alert severity="error">{error}</Alert>}
+              {formData.coverLetter && (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Cover Letter
+                  </Typography>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {formData.coverLetter}
+                  </Typography>
+                </Box>
+              )}
+
+              {submitError && <Alert severity="error">{submitError}</Alert>}
 
               <Stack direction="row" spacing={2}>
                 <Button onClick={() => setActiveStep(1)}>Back</Button>
                 <Button
                   variant="contained"
                   onClick={handleSubmit}
-                  disabled={submitting}
-                  startIcon={submitting ? <CircularProgress size={16} /> : null}
+                  disabled={isSubmitting}
+                  startIcon={isSubmitting ? <CircularProgress size={16} /> : null}
                 >
-                  {submitting ? 'Submitting...' : 'Submit Application'}
+                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
                 </Button>
               </Stack>
             </Stack>
