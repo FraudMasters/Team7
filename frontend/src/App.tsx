@@ -35,6 +35,7 @@ import { SalaryCalculatorPage } from './pages/jobs/SalaryCalculatorPage';
 import { InterviewTipsPage } from './pages/jobs/InterviewTipsPage';
 import { JobAlertsPage } from './pages/jobs/JobAlertsPage';
 import { SettingsPage } from './pages/jobs/SettingsPage';
+import { ResumeOptimizationPage } from './pages/jobs/ResumeOptimizationPage';
 
 // Recruiter Pages
 import { DashboardPage } from './pages/recruiter/DashboardPage';
@@ -114,6 +115,7 @@ function App() {
           <Route path="tips" element={<InterviewTipsPage />} />
           <Route path="alerts" element={<JobAlertsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="resume-optimization/:id" element={<ResumeOptimizationPage />} />
         </Route>
 
         {/* Candidate Profile */}
