@@ -304,6 +304,7 @@ const StyledTextarea = styled.textarea<{
   error?: boolean;
   size: TextFieldSize;
   disabled?: boolean;
+  hasLabel: boolean;
 }>`
   width: 100%;
   border: 1px solid ${props => props.error ? props.theme.error.main : props.theme.divider};
@@ -313,6 +314,7 @@ const StyledTextarea = styled.textarea<{
   font-family: ${props => props.theme.typography.fontFamily};
   font-size: ${props => getSizeStyles(props.size).fontSize};
   padding: 8px 12px;
+  margin-top: ${props => props.hasLabel ? '8px' : '0'};
   outline: none;
   transition: border-color ${props => props.theme.transitions.duration.shorter}ms ${props => props.transitions.easing.easeInOut},
               box-shadow ${props => props.theme.transitions.duration.shorter}ms ${props => props.transitions.easing.easeInOut};
@@ -340,6 +342,31 @@ const StyledTextarea = styled.textarea<{
 `;
 
 /**
+ * Styled label for multiline TextField (non-floating)
+ */
+const MultilineLabel = styled.label<{ hasError: boolean; disabled?: boolean; required?: boolean }>`
+  display: block;
+  color: ${props => {
+    if (props.disabled) return props.theme.text.disabled;
+    if (props.hasError) return props.theme.error.main;
+    return props.theme.text.primary;
+  }};
+  font-family: ${props => props.theme.typography.fontFamily};
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  pointer-events: none;
+
+  /* Required indicator */
+  ${props => props.required && `
+    &::after {
+      content: ' *';
+      color: ${props.theme.error.main};
+    }
+  `}
+`;
+
+/**
  * Adornment container
  */
 const Adornment = styled.div<{ position: 'start' | 'end' }>`
@@ -355,8 +382,12 @@ const Adornment = styled.div<{ position: 'start' | 'end' }>`
 
 /**
  * Helper text container
+ *
+ * Displays additional guidance or error messages below the input.
+ * The helper text is colored red when in an error state, otherwise uses hint color.
+ * Supports id prop for accessibility association via aria-describedby.
  */
-const HelperText = styled.p<{ error?: boolean }>`
+const HelperText = styled.p<{ error?: boolean; id?: string }>`
   margin: 4px 0 0 0;
   font-size: 0.75rem;
   color: ${props => props.error ? props.theme.error.main : props.theme.text.hint};
@@ -370,10 +401,28 @@ const HelperText = styled.p<{ error?: boolean }>`
  * Built with Emotion to replace Material-UI TextField component.
  * Compatible with react-hook-form.
  *
+ * ## Helper Text Pattern
+ *
+ * The TextField supports two types of helper text:
+ * - `helperText`: General guidance that appears below the input (e.g., "Enter your email address")
+ * - `errorMessage`: Error message that replaces helperText when validation fails (e.g., "Email is required")
+ *
+ * When both `error={true}` and `errorMessage` are provided, the error message takes precedence
+ * and is displayed in red. When `error={true}` without `errorMessage`, the helperText is shown in red.
+ *
+ * The helper text is automatically associated with the input via `aria-describedby` for accessibility.
+ *
  * @example
  * ```tsx
  * // Basic text field
  * <TextField label="Name" placeholder="Enter name" />
+ *
+ * // With helper text
+ * <TextField
+ *   label="Email"
+ *   type="email"
+ *   helperText="We'll send account updates to this address"
+ * />
  *
  * // With value and change handler
  * <TextField
@@ -384,13 +433,21 @@ const HelperText = styled.p<{ error?: boolean }>`
  *   fullWidth
  * />
  *
- * // With error state
+ * // With error state and message
  * <TextField
  *   label="Password"
  *   type="password"
  *   error
  *   errorMessage="Password is required"
  *   required
+ * />
+ *
+ * // With helper text that shows error styling
+ * <TextField
+ *   label="Email"
+ *   type="email"
+ *   error
+ *   helperText="Please enter a valid email address"
  * />
  *
  * // With adornments
@@ -405,6 +462,7 @@ const HelperText = styled.p<{ error?: boolean }>`
  *   label="Description"
  *   multiline
  *   rows={4}
+ *   helperText="Provide a detailed description"
  *   fullWidth
  * />
  *
@@ -414,15 +472,17 @@ const HelperText = styled.p<{ error?: boolean }>`
  *   type="number"
  *   min={0}
  *   max={100}
+ *   helperText="Enter a value between 0 and 100"
  * />
  *
  * // Date input
  * <TextField
  *   label="Birthday"
  *   type="date"
+ *   helperText="Select your date of birth"
  * />
  *
- * // With react-hook-form
+ * // With react-hook-form (recommended pattern)
  * <Controller
  *   name="email"
  *   control={control}
@@ -430,6 +490,7 @@ const HelperText = styled.p<{ error?: boolean }>`
  *     <TextField
  *       {...field}
  *       label="Email"
+ *       helperText="We'll send account updates to this address"
  *       error={!!errors.email}
  *       errorMessage={errors.email?.message}
  *     />
@@ -459,11 +520,17 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps>(
     endAdornment,
     disabled = false,
     inputRef,
+    id,
     ...rest
   }, ref) => {
     const { theme } = useEmotionTheme();
     const [focused, setFocused] = React.useState(false);
     const [internalValue, setInternalValue] = React.useState(rest.value || '');
+
+    // Generate unique ID for helper text accessibility
+    // Use useId if available (React 18+), otherwise fallback to id-based generation
+    const reactId = (React as any).useId?.() || '';
+    const helperTextId = id ? `${id}-helper-text` : `textfield-helper-text-${reactId}`;
 
     // Determine if field has a value
     const hasValue = internalValue !== undefined && internalValue !== '';
@@ -495,8 +562,12 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps>(
     // Merge input props
     const mergedInputProps = { ...rest, ...InputProps };
 
-    // Get error message
+    // Get error message or helper text
+    // When error has errorMessage, show that; otherwise show helperText
     const displayHelperText = error && errorMessage ? errorMessage : helperText;
+
+    // Build aria-describedby for accessibility
+    const ariaDescribedBy = displayHelperText ? helperTextId : mergedInputProps['aria-describedby'];
 
     const containerProps = {
       ref,
@@ -511,20 +582,24 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps>(
     const inputElement = multiline ? (
       <StyledTextarea
         {...(mergedInputProps as any)}
+        id={id}
         ref={inputRef}
         error={error}
         size={size}
         disabled={disabled}
+        hasLabel={!!label}
         rows={rows}
-        placeholder={label ? undefined : mergedInputProps.placeholder}
+        placeholder={mergedInputProps.placeholder}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onChange={handleChange}
+        aria-describedby={ariaDescribedBy}
       />
     ) : (
       <>
         <StyledInput
           {...mergedInputProps}
+          id={id}
           ref={inputRef}
           error={error}
           size={size}
@@ -535,6 +610,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps>(
           onFocus={handleFocus}
           onBlur={handleBlur}
           onChange={handleChange}
+          aria-describedby={ariaDescribedBy}
         />
         {startAdornment && <Adornment position="start">{startAdornment}</Adornment>}
         {endAdornment && <Adornment position="end">{endAdornment}</Adornment>}
@@ -543,9 +619,20 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps>(
 
     return (
       <StyledContainer {...containerProps}>
+        {label && multiline && (
+          <MultilineLabel
+            htmlFor={id}
+            hasError={error}
+            disabled={disabled}
+            required={required}
+          >
+            {label}
+          </MultilineLabel>
+        )}
         {label && !multiline && (
           <StyledLabel
             as="label"
+            htmlFor={id}
             hasValue={hasValue}
             isFocused={focused}
             hasError={error}
@@ -559,7 +646,10 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps>(
         )}
         {inputElement}
         {displayHelperText && (
-          <HelperText error={error && !!errorMessage}>
+          <HelperText
+            id={helperTextId}
+            error={error && !!errorMessage}
+          >
             {displayHelperText}
           </HelperText>
         )}
