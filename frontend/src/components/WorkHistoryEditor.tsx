@@ -402,7 +402,7 @@ const WorkHistoryEditor: React.FC<WorkHistoryEditorProps> = ({
             value={formData.company_name}
             onChange={handleFieldChange('company_name')}
             error={!!fieldErrors.company_name}
-            helperText={fieldErrors.company_name}
+            helperText={fieldErrors.company_name || 'The name of the company you worked for'}
             disabled={submitting || readOnly}
             fullWidth
             required
@@ -416,7 +416,7 @@ const WorkHistoryEditor: React.FC<WorkHistoryEditorProps> = ({
             value={formData.position_title}
             onChange={handleFieldChange('position_title')}
             error={!!fieldErrors.position_title}
-            helperText={fieldErrors.position_title}
+            helperText={fieldErrors.position_title || 'Your job title or role at this company'}
             disabled={submitting || readOnly}
             fullWidth
             required
@@ -448,7 +448,7 @@ const WorkHistoryEditor: React.FC<WorkHistoryEditorProps> = ({
               value={formData.start_date}
               onChange={handleFieldChange('start_date')}
               error={!!fieldErrors.start_date}
-              helperText={fieldErrors.start_date}
+              helperText={fieldErrors.start_date || 'When you started this position'}
               disabled={submitting || readOnly}
               fullWidth
               required
@@ -463,7 +463,7 @@ const WorkHistoryEditor: React.FC<WorkHistoryEditorProps> = ({
               value={formData.end_date}
               onChange={handleFieldChange('end_date')}
               error={!!fieldErrors.end_date}
-              helperText={fieldErrors.end_date}
+              helperText={fieldErrors.end_date || (formData.is_current ? 'Not required for current position' : 'When you left this position')}
               disabled={submitting || readOnly || formData.is_current}
               fullWidth
               required={!formData.is_current}
@@ -491,6 +491,7 @@ const WorkHistoryEditor: React.FC<WorkHistoryEditorProps> = ({
             placeholder="e.g., San Francisco, CA or Remote"
             value={formData.location}
             onChange={handleFieldChange('location')}
+            helperText="City, state/country, or indicate if this was a remote position"
             disabled={submitting || readOnly}
             fullWidth
             size="small"
@@ -511,6 +512,7 @@ const WorkHistoryEditor: React.FC<WorkHistoryEditorProps> = ({
             placeholder="Describe your responsibilities, achievements, and impact in this role..."
             value={formData.description}
             onChange={handleFieldChange('description')}
+            helperText="Optional: Describe your key responsibilities, achievements, projects, and impact"
             disabled={submitting || readOnly}
             fullWidth
             size="small"

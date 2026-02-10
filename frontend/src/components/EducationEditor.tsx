@@ -381,7 +381,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
             value={formData.institution_name}
             onChange={handleFieldChange('institution_name')}
             error={!!fieldErrors.institution_name}
-            helperText={fieldErrors.institution_name}
+            helperText={fieldErrors.institution_name || 'The official name of the school, college, or university you attended'}
             disabled={submitting || readOnly}
             fullWidth
             required
@@ -395,7 +395,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
             value={formData.degree}
             onChange={handleFieldChange('degree')}
             error={!!fieldErrors.degree}
-            helperText={fieldErrors.degree}
+            helperText={fieldErrors.degree || 'The type of degree you earned (e.g., Bachelor of Science, Master of Arts)'}
             disabled={submitting || readOnly}
             fullWidth
             required
@@ -408,6 +408,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
             placeholder="e.g., Computer Science"
             value={formData.field_of_study}
             onChange={handleFieldChange('field_of_study')}
+            helperText="Your major, area of concentration, or primary focus of study"
             disabled={submitting || readOnly}
             fullWidth
             size="small"
@@ -438,7 +439,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
               value={formData.start_date}
               onChange={handleFieldChange('start_date')}
               error={!!fieldErrors.start_date}
-              helperText={fieldErrors.start_date}
+              helperText={fieldErrors.start_date || 'When you started this program'}
               disabled={submitting || readOnly}
               fullWidth
               required
@@ -453,7 +454,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
               value={formData.end_date}
               onChange={handleFieldChange('end_date')}
               error={!!fieldErrors.end_date}
-              helperText={fieldErrors.end_date}
+              helperText={fieldErrors.end_date || 'Leave blank if currently enrolled'}
               disabled={submitting || readOnly}
               fullWidth
               size="small"
@@ -467,6 +468,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
             placeholder="e.g., Cambridge, MA"
             value={formData.location}
             onChange={handleFieldChange('location')}
+            helperText="City and state/country where the institution is located"
             disabled={submitting || readOnly}
             fullWidth
             size="small"
@@ -487,6 +489,7 @@ const EducationEditor: React.FC<EducationEditorProps> = ({
             placeholder="Describe your achievements, honors, thesis, or other notable details..."
             value={formData.description}
             onChange={handleFieldChange('description')}
+            helperText="Optional: Highlight achievements, honors, thesis topic, GPA, or relevant coursework"
             disabled={submitting || readOnly}
             fullWidth
             size="small"
