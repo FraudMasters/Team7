@@ -1026,5 +1026,65 @@
       "clear": "Clear filters",
       "noFilteredJobs": "All jobs are hidden by your filters"
     }
+  },
+  "optimization": {
+    "title": "Resume Optimization Suggestions",
+    "loading": "Analyzing resume for optimization opportunities...",
+    "error": "Failed to load optimization suggestions",
+    "noSuggestions": {
+      "title": "No Optimization Suggestions",
+      "message": "Your resume looks great! No immediate improvements needed."
+    },
+    "score": "Score",
+    "suggestions_one": "{{count}} suggestion",
+    "suggestions_other": "{{count}} suggestions",
+    "highPriority": "high",
+    "mediumPriority": "medium",
+    "lowPriority": "low",
+    "priority": {
+      "high": {
+        "label": "High",
+        "description": "Important improvement"
+      },
+      "medium": {
+        "label": "Medium",
+        "description": "Recommended improvement"
+      },
+      "low": {
+        "label": "Low",
+        "description": "Nice to have"
+      }
+    },
+    "category": {
+      "keywords": "Keywords",
+      "structure": "Structure",
+      "readability": "Readability",
+      "impact": "Impact",
+      "action_verbs": "Action Verbs",
+      "summary": "Summary",
+      "active_language": "Active Language",
+      "achievements": "Achievements"
+    },
+    "filter": {
+      "all": "All",
+      "high": "High Priority",
+      "medium": "Medium Priority",
+      "low": "Low Priority"
+    },
+    "missingKeywords": "Missing Keywords",
+    "labels": {
+      "current": "Current:",
+      "recommended": "Recommended:",
+      "examples": "Examples:"
+    },
+    "showing": "Showing {{max}} of {{total}} suggestions",
+    "stats": {
+      "total": "Total Suggestions",
+      "highPriority": "High Priority",
+      "mediumPriority": "Medium Priority",
+      "lowPriority": "Low Priority",
+      "optimizationScore": "Optimization Score"
+    },
+    "description": "AI-powered suggestions to improve your resume and increase your chances of getting noticed by recruiters."
   }
 }
