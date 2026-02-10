@@ -32,6 +32,9 @@
  * // Get tag suggestions based on usage
  * const suggestions = await candidateTagsClient.getSuggestions('org-123', 5);
  *
+ * // Get intelligent tag suggestions based on resume content
+ * const intelligentSuggestions = await candidateTagsClient.getIntelligentSuggestions('org-123', 'resume-456', 5);
+ *
  * // Merge two tags
  * const result = await candidateTagsClient.mergeTags('old-tag-id', 'new-tag-id');
  *
@@ -53,6 +56,7 @@ import type {
   CandidateTagsResponse,
   AssignTagRequest,
   TagSuggestionsResponse,
+  IntelligentTagSuggestionResponse,
   MergeTagsRequest,
   MergeTagsResponse,
   ApiError,
@@ -410,6 +414,49 @@ export class CandidateTagsClient {
 
       const response = await this.client.get<TagSuggestionsResponse>(
         '/api/candidate-tags/suggestions',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get intelligent tag suggestions based on resume content analysis
+   *
+   * Analyzes the resume text to extract keywords and suggests relevant tags
+   * based on semantic matching with the organization's existing tags.
+   *
+   * @param organizationId - Organization ID
+   * @param resumeId - Resume ID to analyze for tag suggestions
+   * @param limit - Optional limit on number of suggestions (default: 10, max: 100)
+   * @returns Intelligent tag suggestions with relevance scores and extracted keywords
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * // Get top 10 intelligent suggestions for a resume
+   * const suggestions = await candidateTagsClient.getIntelligentSuggestions('org-123', 'resume-456');
+   *
+   * // Get top 5 intelligent suggestions
+   * const top5 = await candidateTagsClient.getIntelligentSuggestions('org-123', 'resume-456', 5);
+   * ```
+   */
+  async getIntelligentSuggestions(
+    organizationId: string,
+    resumeId: string,
+    limit: number = 10
+  ): Promise<IntelligentTagSuggestionResponse> {
+    try {
+      const params: Record<string, number | string> = {
+        organization_id: organizationId,
+        resume_id: resumeId,
+      };
+      if (limit !== undefined) params.limit = limit;
+
+      const response = await this.client.get<IntelligentTagSuggestionResponse>(
+        '/api/candidate-tags/intelligent-suggestions',
         { params }
       );
       return response.data;
