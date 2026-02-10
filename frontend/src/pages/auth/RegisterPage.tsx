@@ -237,10 +237,10 @@ const RegisterPage: React.FC = () => {
                         }
                       }}
                       error={!!errors.firstName}
-                      helperText={errors.firstName}
+                      helperText={errors.firstName || 'Your legal first name'}
                       disabled={isLoading}
                       autoFocus
-                      aria-describedby={errors.firstName ? 'firstName-error' : undefined}
+                      aria-describedby={errors.firstName ? 'firstName-error' : 'firstName-helper'}
                     />
                     <TextField
                       label="Last Name"
@@ -256,9 +256,9 @@ const RegisterPage: React.FC = () => {
                         }
                       }}
                       error={!!errors.lastName}
-                      helperText={errors.lastName}
+                      helperText={errors.lastName || 'Your legal last name'}
                       disabled={isLoading}
-                      aria-describedby={errors.lastName ? 'lastName-error' : undefined}
+                      aria-describedby={errors.lastName ? 'lastName-error' : 'lastName-helper'}
                     />
                   </Stack>
 
@@ -277,9 +277,9 @@ const RegisterPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.email}
-                    helperText={errors.email}
+                    helperText={errors.email || "We'll send account updates to this address"}
                     disabled={isLoading}
-                    aria-describedby={errors.email ? 'email-error' : undefined}
+                    aria-describedby={errors.email ? 'email-error' : 'email-helper'}
                   />
 
                   {/* Password Field */}
@@ -297,9 +297,9 @@ const RegisterPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.password}
-                    helperText={errors.password}
+                    helperText={errors.password || 'Must be 8+ characters with uppercase, lowercase, and number'}
                     disabled={isLoading}
-                    aria-describedby={errors.password ? 'password-error' : undefined}
+                    aria-describedby={errors.password ? 'password-error' : 'password-helper'}
                   />
 
                   {/* Confirm Password Field */}
@@ -317,10 +317,10 @@ const RegisterPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.confirmPassword}
-                    helperText={errors.confirmPassword}
+                    helperText={errors.confirmPassword || 'Re-enter your password to confirm'}
                     disabled={isLoading}
                     aria-describedby={
-                      errors.confirmPassword ? 'confirmPassword-error' : undefined
+                      errors.confirmPassword ? 'confirmPassword-error' : 'confirmPassword-helper'
                     }
                   />
 

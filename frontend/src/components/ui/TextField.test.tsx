@@ -333,10 +333,45 @@ describe('TextField Component', () => {
       expect(screen.getByRole('textbox')).toHaveAttribute('aria-label', 'Search field');
     });
 
-    it('supports aria-describedby for helper text', () => {
+    it('associates helper text with input via aria-describedby', () => {
       renderWithTheme(<TextField helperText="Help text" />);
+      const input = screen.getByRole('textbox');
       const helperText = screen.getByText('Help text');
+
       expect(helperText).toBeInTheDocument();
+      expect(helperText).toHaveAttribute('id');
+      expect(input).toHaveAttribute('aria-describedby', helperText.id);
+    });
+
+    it('associates error message with input via aria-describedby', () => {
+      renderWithTheme(
+        <TextField
+          error
+          errorMessage="This field is required"
+          helperText="Help text"
+        />
+      );
+      const input = screen.getByRole('textbox');
+      const errorMessage = screen.getByText('This field is required');
+
+      expect(errorMessage).toBeInTheDocument();
+      expect(errorMessage).toHaveAttribute('id');
+      expect(input).toHaveAttribute('aria-describedby', errorMessage.id);
+    });
+
+    it('associates helper text with multiline textarea', () => {
+      renderWithTheme(<TextField multiline helperText="Enter your description" />);
+      const textarea = screen.getByRole('textbox');
+      const helperText = screen.getByText('Enter your description');
+
+      expect(helperText).toBeInTheDocument();
+      expect(helperText).toHaveAttribute('id');
+      expect(textarea).toHaveAttribute('aria-describedby', helperText.id);
+    });
+
+    it('shows non-floating label for multiline', () => {
+      renderWithTheme(<TextField multiline label="Description" />);
+      expect(screen.getByText('Description')).toBeInTheDocument();
     });
   });
 

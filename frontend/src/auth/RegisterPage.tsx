@@ -156,10 +156,10 @@ const RegisterPage: React.FC = () => {
    * Redirect authenticated users away from registration page
    */
   React.useEffect(() => {
-    if (auth.user && !auth.auth.isLoading) {
+    if (auth.user && !auth.isLoading) {
       navigate('/', { replace: true });
     }
-  }, [auth.user, auth.auth.isLoading, navigate]);
+  }, [auth.user, auth.isLoading, navigate]);
 
   // Password strength indicator
   const getPasswordStrength = () => {

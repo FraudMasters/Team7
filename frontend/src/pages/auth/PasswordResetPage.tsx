@@ -200,7 +200,7 @@ const PasswordResetPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.email}
-                    helperText={errors.email}
+                    helperText={errors.email || "We'll send password reset instructions to this email address"}
                     disabled={isLoading || !!successMessage}
                     autoFocus
                     aria-describedby={errors.email ? 'email-error' : undefined}

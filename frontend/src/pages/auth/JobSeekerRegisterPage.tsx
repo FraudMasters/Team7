@@ -238,7 +238,7 @@ const JobSeekerRegisterPage: React.FC = () => {
                         }
                       }}
                       error={!!errors.firstName}
-                      helperText={errors.firstName}
+                      helperText={errors.firstName || 'Enter your legal first name'}
                       disabled={isLoading}
                       autoFocus
                       aria-describedby={errors.firstName ? 'firstName-error' : undefined}
@@ -257,7 +257,7 @@ const JobSeekerRegisterPage: React.FC = () => {
                         }
                       }}
                       error={!!errors.lastName}
-                      helperText={errors.lastName}
+                      helperText={errors.lastName || 'Enter your legal last name'}
                       disabled={isLoading}
                       aria-describedby={errors.lastName ? 'lastName-error' : undefined}
                     />
@@ -278,7 +278,7 @@ const JobSeekerRegisterPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.email}
-                    helperText={errors.email}
+                    helperText={errors.email || "We'll send account updates to this email"}
                     disabled={isLoading}
                     aria-describedby={errors.email ? 'email-error' : undefined}
                   />
@@ -298,7 +298,7 @@ const JobSeekerRegisterPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.password}
-                    helperText={errors.password}
+                    helperText={errors.password || 'Must be at least 8 characters with uppercase, lowercase, and number'}
                     disabled={isLoading}
                     aria-describedby={errors.password ? 'password-error' : undefined}
                   />
@@ -318,7 +318,7 @@ const JobSeekerRegisterPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.confirmPassword}
-                    helperText={errors.confirmPassword}
+                    helperText={errors.confirmPassword || 'Re-enter your password to confirm'}
                     disabled={isLoading}
                     aria-describedby={
                       errors.confirmPassword ? 'confirmPassword-error' : undefined

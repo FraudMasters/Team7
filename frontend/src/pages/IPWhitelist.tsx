@@ -650,6 +650,7 @@ const IPWhitelistPage: React.FC = () => {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Office Network"
+              helperText="A descriptive name for this IP whitelist rule"
               disabled={submitting}
             />
 
@@ -661,6 +662,7 @@ const IPWhitelistPage: React.FC = () => {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Optional description"
+              helperText="Optional additional details about this rule"
               disabled={submitting}
             />
 
@@ -686,7 +688,7 @@ const IPWhitelistPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, cidr_notation: e.target.value })}
                 placeholder="192.168.1.0/24"
                 disabled={submitting}
-                helperText="Enter IP range in CIDR notation"
+                helperText="Enter an IP range using CIDR notation (e.g., 192.168.1.0/24 for a range of 256 addresses)"
               />
             ) : (
               <>
@@ -698,6 +700,7 @@ const IPWhitelistPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, start_ip: e.target.value })}
                   placeholder="192.168.1.1"
                   disabled={submitting}
+                  helperText="The starting IP address of the range (e.g., 192.168.1.1)"
                 />
                 <TextField
                   label="End IP Address"
@@ -707,6 +710,7 @@ const IPWhitelistPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, end_ip: e.target.value })}
                   placeholder="192.168.1.100"
                   disabled={submitting}
+                  helperText="The ending IP address of the range (e.g., 192.168.1.100)"
                 />
               </>
             )}

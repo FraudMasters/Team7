@@ -390,7 +390,7 @@ const SkillsEditor: React.FC<SkillsEditorProps> = ({
             value={formData.name}
             onChange={handleFieldChange('name')}
             error={!!fieldErrors.name}
-            helperText={fieldErrors.name || 'Start typing to see suggestions...'}
+            helperText={fieldErrors.name || 'The name of your skill or technology'}
             disabled={submitting || readOnly}
             fullWidth
             required
@@ -410,7 +410,7 @@ const SkillsEditor: React.FC<SkillsEditorProps> = ({
             value={formData.category}
             onChange={handleFieldChange('category')}
             error={!!fieldErrors.category}
-            helperText={fieldErrors.category}
+            helperText={fieldErrors.category || 'Group your skills into categories for better organization'}
             disabled={submitting || readOnly}
             fullWidth
             required
@@ -452,7 +452,7 @@ const SkillsEditor: React.FC<SkillsEditorProps> = ({
                 value={formData.years_of_experience}
                 onChange={handleFieldChange('years_of_experience')}
                 error={!!fieldErrors.years_of_experience}
-                helperText={fieldErrors.years_of_experience}
+                helperText={fieldErrors.years_of_experience || 'How many years have you used this skill?'}
                 disabled={submitting || readOnly}
                 fullWidth
                 size="small"
@@ -469,6 +469,7 @@ const SkillsEditor: React.FC<SkillsEditorProps> = ({
             placeholder="Provide details about your experience with this skill..."
             value={formData.description}
             onChange={handleFieldChange('description')}
+            helperText="Optional: Describe how you have applied this skill in projects or work"
             disabled={submitting || readOnly}
             fullWidth
             size="small"

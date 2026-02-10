@@ -506,7 +506,7 @@ const CommunicationsPage: React.FC = () => {
                           fullWidth
                           type="number"
                           defaultValue={30}
-                          helperText="Minutes between automatic syncs"
+                          helperText="How often to check for new emails automatically (recommended: 15-60 minutes)"
                           size="small"
                         />
                       </Box>

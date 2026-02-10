@@ -90,7 +90,7 @@ export function ForgotPasswordPage() {
                   autoComplete="email"
                   autoFocus
                   disabled={isLoading}
-                  helperText="We'll send you a link to reset your password"
+                  helperText="Enter your email to receive reset instructions"
                 />
 
                 <Button

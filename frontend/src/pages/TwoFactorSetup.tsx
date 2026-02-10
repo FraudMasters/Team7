@@ -549,6 +549,7 @@ const TwoFactorSetupPage: React.FC = () => {
                   placeholder="123456"
                   value={verifyCode}
                   onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  helperText={t('twoFactor.setup.verificationCodeHelper') || 'Enter the 6-digit code from your authenticator app'}
                   inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '1.5rem' } }}
                   sx={{ mb: 3 }}
                 />
@@ -702,6 +703,7 @@ const TwoFactorSetupPage: React.FC = () => {
             placeholder="123456"
             value={disableCode}
             onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            helperText={t('twoFactor.disable.verificationCodeHelper') || 'Enter a verification code from your authenticator app to confirm'}
             inputProps={{ maxLength: 6, style: { textAlign: 'center' } }}
             margin="normal"
           />

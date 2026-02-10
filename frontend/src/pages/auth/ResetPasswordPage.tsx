@@ -122,6 +122,7 @@ export function ResetPasswordPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   autoComplete="new-password"
                   disabled={isLoading}
+                  helperText="Re-enter your password to confirm"
                 />
 
                 <Button

@@ -292,7 +292,7 @@ const OrganizationSettings: React.FC = () => {
                 onChange={(e) => handleFieldChange('name', e.target.value)}
                 onBlur={handleNameBlur}
                 error={!!errors.name}
-                helperText={errors.name || (t('organization.settings.nameHelper') || 'The official name of your organization')}
+                helperText={errors.name || (t('organization.settings.nameHelper') || 'The official name of your organization (2-100 characters)')}
                 placeholder={t('organization.settings.namePlaceholder') || 'Acme Corporation'}
                 disabled={saving}
                 inputProps={{ maxLength: 100 }}
@@ -312,7 +312,7 @@ const OrganizationSettings: React.FC = () => {
                 value={formData.slug}
                 onChange={(e) => handleFieldChange('slug', e.target.value.toLowerCase())}
                 error={!!errors.slug}
-                helperText={errors.slug || (t('organization.settings.slugHelper') || 'Unique identifier for your organization (used in URLs)')}
+                helperText={errors.slug || (t('organization.settings.slugHelper') || 'Unique identifier used in URLs. Lowercase letters, numbers, and hyphens only (2-50 characters)')}
                 placeholder={t('organization.settings.slugPlaceholder') || 'acme-corporation'}
                 disabled={saving}
                 inputProps={{ maxLength: 50 }}
@@ -349,7 +349,7 @@ const OrganizationSettings: React.FC = () => {
                 value={formData.logo_url}
                 onChange={(e) => handleFieldChange('logo_url', e.target.value)}
                 error={!!errors.logo_url}
-                helperText={errors.logo_url || (t('organization.settings.logoUrlHelper') || 'URL to your organization logo')}
+                helperText={errors.logo_url || (t('organization.settings.logoUrlHelper') || 'Optional: URL to your organization logo image')}
                 placeholder={t('organization.settings.logoUrlPlaceholder') || 'https://example.com/logo.png'}
                 disabled={saving}
               />
