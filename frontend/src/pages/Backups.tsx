@@ -627,6 +627,7 @@ const BackupsPage: React.FC = () => {
             value={backupName}
             onChange={(e) => setBackupName(e.target.value)}
             placeholder={`Backup ${format(new Date(), 'yyyy-MM-dd HH:mm')}`}
+            helperText="Optional: A descriptive name for this backup (defaults to timestamp if empty)"
             sx={{ mb: 2 }}
           />
           <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
@@ -801,7 +802,8 @@ const BackupsPage: React.FC = () => {
                 label="Backup Schedule (Cron)"
                 value={config.backup_schedule}
                 onChange={(e) => setConfig({ ...config, backup_schedule: e.target.value })}
-                helperText="Default: 0 2 * * * (daily at 2 AM)"
+                helperText="Schedule for automated backups using cron expression (e.g., 0 2 * * * runs daily at 2 AM, 0 */6 * * * runs every 6 hours)"
+                placeholder="0 2 * * *"
               />
             </Grid>
             <Grid item xs={12}>
@@ -827,6 +829,8 @@ const BackupsPage: React.FC = () => {
                 label="S3 Region"
                 value={config.s3_region}
                 onChange={(e) => setConfig({ ...config, s3_region: e.target.value })}
+                helperText="AWS region for your S3 bucket (e.g., us-east-1, eu-west-1)"
+                placeholder="us-east-1"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -836,6 +840,8 @@ const BackupsPage: React.FC = () => {
                 value={config.s3_bucket}
                 onChange={(e) => setConfig({ ...config, s3_bucket: e.target.value })}
                 disabled={!config.s3_enabled}
+                helperText="Name of the S3 bucket where backups will be stored"
+                placeholder="my-backup-bucket"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -846,6 +852,7 @@ const BackupsPage: React.FC = () => {
                 onChange={(e) => setConfig({ ...config, s3_endpoint: e.target.value })}
                 placeholder="https://s3.amazonaws.com"
                 disabled={!config.s3_enabled}
+                helperText="Custom S3 endpoint URL (leave empty for AWS S3, required for S3-compatible services like MinIO)"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -856,6 +863,7 @@ const BackupsPage: React.FC = () => {
                 onChange={(e) => setConfig({ ...config, s3_access_key: e.target.value })}
                 type="password"
                 disabled={!config.s3_enabled}
+                helperText="S3 access key ID for authentication"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -866,6 +874,7 @@ const BackupsPage: React.FC = () => {
                 onChange={(e) => setConfig({ ...config, s3_secret_key: e.target.value })}
                 type="password"
                 disabled={!config.s3_enabled}
+                helperText="S3 secret access key for authentication (kept confidential)"
               />
             </Grid>
             <Grid item xs={12}>
@@ -876,7 +885,8 @@ const BackupsPage: React.FC = () => {
                 value={config.notification_email}
                 onChange={(e) => setConfig({ ...config, notification_email: e.target.value })}
                 type="email"
-                helperText="Receive email notifications for backup failures"
+                helperText="Optional: Email address to receive notifications for backup failures and important events"
+                placeholder="admin@example.com"
               />
             </Grid>
           </Grid>
