@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,6 +12,8 @@ import {
   CardActionArea,
   Button,
   Chip,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   DescriptionOutlined,
@@ -21,86 +23,110 @@ import {
   BusinessCenter,
   Star,
 } from '@mui/icons-material';
+import { resumeTemplatesClient, type ResumeTemplateResponse } from '@/api/resume-templates';
 
 /**
- * Resume template configuration
+ * Resume template configuration with UI properties
  */
-interface ResumeTemplate {
-  id: string;
-  name: string;
-  description: string;
+interface ResumeTemplate extends ResumeTemplateResponse {
   category: 'professional' | 'creative' | 'technical' | 'entry-level';
-  previewImage: string;
   features: string[];
   recommendedFor: string[];
   color: string;
 }
 
 /**
- * Available resume templates
+ * Map template_type to category
  */
-const RESUME_TEMPLATES: ResumeTemplate[] = [
-  {
-    id: 'modern-professional',
-    name: 'Modern Professional',
-    description: 'Clean and contemporary design for corporate roles',
-    category: 'professional',
-    previewImage: '/templates/modern-professional.png',
-    features: ['ATS-Friendly', 'Clean Layout', 'Professional Font'],
-    recommendedFor: ['Business Analyst', 'Project Manager', 'Consultant'],
-    color: '#1976d2',
-  },
-  {
-    id: 'executive',
-    name: 'Executive',
-    description: 'Sophisticated layout for senior professionals',
-    category: 'professional',
-    previewImage: '/templates/executive.png',
-    features: ['Elegant Design', 'Leadership Focus', 'Strategic Layout'],
-    recommendedFor: ['CEO', 'Director', 'VP', 'Senior Manager'],
-    color: '#2e7d32',
-  },
-  {
-    id: 'creative-designer',
-    name: 'Creative Designer',
-    description: 'Bold and artistic template for creative industries',
-    category: 'creative',
-    previewImage: '/templates/creative-designer.png',
-    features: ['Visual Layout', 'Portfolio Section', 'Color Options'],
-    recommendedFor: ['Graphic Designer', 'Art Director', 'UX Designer'],
-    color: '#9c27b0',
-  },
-  {
-    id: 'tech-developer',
-    name: 'Tech Developer',
-    description: 'Optimized for software engineering roles',
-    category: 'technical',
-    previewImage: '/templates/tech-developer.png',
-    features: ['Skills Highlight', 'Projects Section', 'GitHub Integration'],
-    recommendedFor: ['Software Engineer', 'Full Stack Developer', 'DevOps'],
-    color: '#f57c00',
-  },
-  {
-    id: 'data-scientist',
-    name: 'Data Scientist',
-    description: 'Perfect for analytics and ML roles',
-    category: 'technical',
-    previewImage: '/templates/data-scientist.png',
-    features: ['Quantitative Focus', 'Research Section', 'Publication Area'],
-    recommendedFor: ['Data Scientist', 'ML Engineer', 'Research Analyst'],
-    color: '#0097a7',
-  },
-  {
-    id: 'entry-level',
-    name: 'Entry Level',
-    description: 'Great template for recent graduates',
-    category: 'entry-level',
-    previewImage: '/templates/entry-level.png',
-    features: ['Education Focus', 'Simple Layout', 'Internship Section'],
-    recommendedFor: ['Recent Graduate', 'Intern', 'Junior Associate'],
-    color: '#546e7a',
-  },
-];
+const getTemplateCategory = (templateType: string): ResumeTemplate['category'] => {
+  const typeLower = templateType.toLowerCase();
+  if (typeLower.includes('creative') || typeLower.includes('designer')) {
+    return 'creative';
+  } else if (typeLower.includes('tech') || typeLower.includes('developer') || typeLower.includes('data')) {
+    return 'technical';
+  } else if (typeLower.includes('entry') || typeLower.includes('junior')) {
+    return 'entry-level';
+  }
+  return 'professional';
+};
+
+/**
+ * Get color for template type
+ */
+const getTemplateColor = (templateType: string): string => {
+  const typeLower = templateType.toLowerCase();
+  if (typeLower.includes('creative')) {
+    return '#9c27b0';
+  } else if (typeLower.includes('tech') || typeLower.includes('developer')) {
+    return '#f57c00';
+  } else if (typeLower.includes('data')) {
+    return '#0097a7';
+  } else if (typeLower.includes('entry') || typeLower.includes('junior')) {
+    return '#546e7a';
+  } else if (typeLower.includes('executive')) {
+    return '#2e7d32';
+  }
+  return '#1976d2';
+};
+
+/**
+ * Generate features from template config
+ */
+const getTemplateFeatures = (template: ResumeTemplateResponse): string[] => {
+  const features: string[] = [];
+  if (template.is_ats_compliant) {
+    features.push('ATS-Friendly');
+  }
+  if (template.style_config?.primary_color) {
+    features.push('Custom Colors');
+  }
+  if (template.layout_config?.margins) {
+    features.push('Adjustable Layout');
+  }
+  if (template.section_config) {
+    features.push('Custom Sections');
+  }
+  // Add default features if none
+  if (features.length === 0) {
+    features.push('Clean Layout', 'Professional Font');
+  }
+  return features.slice(0, 3);
+};
+
+/**
+ * Generate recommended roles based on template type
+ */
+const getRecommendedRoles = (templateType: string): string[] => {
+  const typeLower = templateType.toLowerCase();
+  if (typeLower.includes('modern')) {
+    return ['Business Analyst', 'Project Manager', 'Consultant'];
+  } else if (typeLower.includes('executive')) {
+    return ['CEO', 'Director', 'VP', 'Senior Manager'];
+  } else if (typeLower.includes('creative')) {
+    return ['Graphic Designer', 'Art Director', 'UX Designer'];
+  } else if (typeLower.includes('tech') || typeLower.includes('developer')) {
+    return ['Software Engineer', 'Full Stack Developer', 'DevOps'];
+  } else if (typeLower.includes('data')) {
+    return ['Data Scientist', 'ML Engineer', 'Research Analyst'];
+  } else if (typeLower.includes('entry') || typeLower.includes('junior')) {
+    return ['Recent Graduate', 'Intern', 'Junior Associate'];
+  }
+  return ['Professional', 'Manager', 'Specialist'];
+};
+
+/**
+ * Transform API template to UI template
+ */
+const transformTemplate = (apiTemplate: ResumeTemplateResponse): ResumeTemplate => {
+  const category = getTemplateCategory(apiTemplate.template_type);
+  return {
+    ...apiTemplate,
+    category,
+    features: getTemplateFeatures(apiTemplate),
+    recommendedFor: getRecommendedRoles(apiTemplate.template_type),
+    color: getTemplateColor(apiTemplate.template_type),
+  };
+};
 
 /**
  * Get category icon
@@ -151,17 +177,45 @@ const ResumeTemplatesPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
+  const [templates, setTemplates] = useState<ResumeTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<
     ResumeTemplate['category'] | 'all'
   >('all');
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
 
   /**
-   * Get unique categories from templates
+   * Load templates from API on component mount
+   */
+  useEffect(() => {
+    const loadTemplates = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await resumeTemplatesClient.listResumeTemplates({
+          is_active: true,
+        });
+        const transformedTemplates = data.templates.map(transformTemplate);
+        setTemplates(transformedTemplates);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load templates';
+        setError(errorMessage);
+        console.error('Error loading resume templates:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTemplates();
+  }, []);
+
+  /**
+   * Get unique categories from loaded templates
    */
   const categories: Array<(ResumeTemplate['category'] | 'all')> = [
     'all',
-    ...Array.from(new Set(RESUME_TEMPLATES.map((t) => t.category))),
+    ...Array.from(new Set(templates.map((t) => t.category))),
   ];
 
   /**
@@ -169,8 +223,8 @@ const ResumeTemplatesPage: React.FC = () => {
    */
   const filteredTemplates =
     selectedCategory === 'all'
-      ? RESUME_TEMPLATES
-      : RESUME_TEMPLATES.filter((t) => t.category === selectedCategory);
+      ? templates
+      : templates.filter((t) => t.category === selectedCategory);
 
   /**
    * Handle template selection
@@ -201,174 +255,207 @@ const ResumeTemplatesPage: React.FC = () => {
           'Choose from our professionally designed resume templates to create a standout resume.'}
       </Typography>
 
-      {/* Category Filter */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mr: 1 }}>
-            Filter by:
+      {/* Loading State */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+          <CircularProgress size={40} />
+          <Typography sx={{ ml: 2 }} color="text.secondary">
+            Loading templates...
           </Typography>
-          {categories.map((category) => (
-            <Chip
-              key={category}
-              label={
-                category === 'all'
-                  ? 'All Templates'
-                  : category.charAt(0).toUpperCase() + category.slice(1)
-              }
-              onClick={() => setSelectedCategory(category)}
-              color={selectedCategory === category ? 'primary' : 'default'}
-              variant={selectedCategory === category ? 'filled' : 'outlined'}
-              icon={category !== 'all' ? getCategoryIcon(category) : undefined}
-              sx={{ textTransform: 'capitalize' }}
-            />
-          ))}
         </Box>
-      </Paper>
+      )}
 
-      {/* Templates Grid */}
-      <Grid container spacing={3}>
-        {filteredTemplates.map((template) => (
-          <Grid item xs={12} sm={6} md={4} key={template.id}>
-            <Card
-              sx={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                transform: hoveredTemplate === template.id ? 'translateY(-4px)' : 'none',
-                boxShadow:
-                  hoveredTemplate === template.id ? 8 : 1,
-                borderLeft: `4px solid ${template.color}`,
-              }}
-              onMouseEnter={() => setHoveredTemplate(template.id)}
-              onMouseLeave={() => setHoveredTemplate(null)}
-            >
-              <CardActionArea
-                onClick={() => handleSelectTemplate(template.id)}
-                sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+      {/* Error State */}
+      {error && !loading && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* No Templates State */}
+      {!loading && !error && templates.length === 0 && (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No templates available
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Please check back later or contact support.
+          </Typography>
+        </Paper>
+      )}
+
+      {/* Category Filter - Show only when not loading and templates exist */}
+      {!loading && !error && templates.length > 0 && (
+        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ mr: 1 }}>
+              Filter by:
+            </Typography>
+            {categories.map((category) => (
+              <Chip
+                key={category}
+                label={
+                  category === 'all'
+                    ? 'All Templates'
+                    : category.charAt(0).toUpperCase() + category.slice(1)
+                }
+                onClick={() => setSelectedCategory(category)}
+                color={selectedCategory === category ? 'primary' : 'default'}
+                variant={selectedCategory === category ? 'filled' : 'outlined'}
+                icon={category !== 'all' ? getCategoryIcon(category) : undefined}
+                sx={{ textTransform: 'capitalize' }}
+              />
+            ))}
+          </Box>
+        </Paper>
+      )}
+
+      {/* Templates Grid - Show only when not loading and templates exist */}
+      {!loading && !error && templates.length > 0 && (
+        <Grid container spacing={3}>
+          {filteredTemplates.map((template) => (
+            <Grid item xs={12} sm={6} md={4} key={template.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  transform: hoveredTemplate === template.id ? 'translateY(-4px)' : 'none',
+                  boxShadow:
+                    hoveredTemplate === template.id ? 8 : 1,
+                  borderLeft: `4px solid ${template.color}`,
+                }}
+                onMouseEnter={() => setHoveredTemplate(template.id)}
+                onMouseLeave={() => setHoveredTemplate(null)}
               >
-                {/* Template Preview */}
-                <CardMedia
-                  component="div"
-                  sx={{
-                    height: 200,
-                    bgcolor: template.color + '20',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                  }}
+                <CardActionArea
+                  onClick={() => handleSelectTemplate(template.id)}
+                  sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
                 >
-                  <DescriptionOutlined
-                    sx={{ fontSize: 80, color: template.color, opacity: 0.5 }}
-                  />
-                  <Chip
-                    label={template.category}
-                    size="small"
+                  {/* Template Preview */}
+                  <CardMedia
+                    component="div"
                     sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      bgcolor: template.color,
-                      color: 'white',
-                      textTransform: 'capitalize',
+                      height: 200,
+                      bgcolor: template.color + '20',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
                     }}
-                  />
-                </CardMedia>
-
-                <CardContent sx={{ flexGrow: 1 }}>
-                  {/* Template Name */}
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
-                    {template.name}
-                  </Typography>
-
-                  {/* Template Description */}
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    paragraph
-                    sx={{ minHeight: 40 }}
                   >
-                    {template.description}
-                  </Typography>
-
-                  {/* Features */}
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                      Features:
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {template.features.slice(0, 3).map((feature) => (
-                        <Chip
-                          key={feature}
-                          label={feature}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem', height: 20 }}
-                        />
-                      ))}
-                    </Box>
-                  </Box>
-
-                  {/* Recommended For */}
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                      Recommended for:
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {template.recommendedFor.slice(0, 2).map((role) => (
-                        <Chip
-                          key={role}
-                          label={role}
-                          size="small"
-                          sx={{
-                            fontSize: '0.7rem',
-                            height: 20,
-                            bgcolor: 'action.hover',
-                          }}
-                        />
-                      ))}
-                      {template.recommendedFor.length > 2 && (
-                        <Chip
-                          label={`+${template.recommendedFor.length - 2}`}
-                          size="small"
-                          sx={{
-                            fontSize: '0.7rem',
-                            height: 20,
-                            bgcolor: 'action.hover',
-                          }}
-                        />
-                      )}
-                    </Box>
-                  </Box>
-
-                  {/* Action Buttons */}
-                  <Box sx={{ display: 'flex', gap: 1, mt: 'auto' }}>
-                    <Button
-                      variant="contained"
+                    <DescriptionOutlined
+                      sx={{ fontSize: 80, color: template.color, opacity: 0.5 }}
+                    />
+                    <Chip
+                      label={template.category}
                       size="small"
-                      fullWidth
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectTemplate(template.id);
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        bgcolor: template.color,
+                        color: 'white',
+                        textTransform: 'capitalize',
                       }}
+                    />
+                  </CardMedia>
+
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    {/* Template Name */}
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      {template.name}
+                    </Typography>
+
+                    {/* Template Description */}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      paragraph
+                      sx={{ minHeight: 40 }}
                     >
-                      Use Template
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={(e) => handlePreviewTemplate(template.id, e)}
-                    >
-                      Preview
-                    </Button>
-                  </Box>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                      {template.description}
+                    </Typography>
+
+                    {/* Features */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary" gutterBottom>
+                        Features:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {template.features.slice(0, 3).map((feature) => (
+                          <Chip
+                            key={feature}
+                            label={feature}
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.7rem', height: 20 }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+
+                    {/* Recommended For */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary" gutterBottom>
+                        Recommended for:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {template.recommendedFor.slice(0, 2).map((role) => (
+                          <Chip
+                            key={role}
+                            label={role}
+                            size="small"
+                            sx={{
+                              fontSize: '0.7rem',
+                              height: 20,
+                              bgcolor: 'action.hover',
+                            }}
+                          />
+                        ))}
+                        {template.recommendedFor.length > 2 && (
+                          <Chip
+                            label={`+${template.recommendedFor.length - 2}`}
+                            size="small"
+                            sx={{
+                              fontSize: '0.7rem',
+                              height: 20,
+                              bgcolor: 'action.hover',
+                            }}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+
+                    {/* Action Buttons */}
+                    <Box sx={{ display: 'flex', gap: 1, mt: 'auto' }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectTemplate(template.id);
+                        }}
+                      >
+                        Use Template
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={(e) => handlePreviewTemplate(template.id, e)}
+                      >
+                        Preview
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       {/* Info Section */}
       <Paper

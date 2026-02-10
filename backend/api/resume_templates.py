@@ -8,16 +8,48 @@ and deleting resume templates with support for ATS-friendly layouts and styling.
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from database import get_db
 from models.resume_template import ResumeTemplate
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _template_to_dict(template: ResumeTemplate) -> dict:
+    """
+    Convert ResumeTemplate model to dictionary for API response.
+
+    Args:
+        template: ResumeTemplate model instance
+
+    Returns:
+        Dictionary representation of the template
+    """
+    return {
+        "id": str(template.id),
+        "organization_id": template.organization_id,
+        "name": template.name,
+        "description": template.description,
+        "template_type": template.template_type,
+        "layout_config": template.layout_config,
+        "style_config": template.style_config,
+        "section_config": template.section_config,
+        "preview_url": template.preview_url,
+        "is_default": template.is_default,
+        "is_active": template.is_active,
+        "is_ats_compliant": template.is_ats_compliant,
+        "created_by": template.created_by,
+        "created_at": template.created_at.isoformat() if template.created_at else None,
+        "updated_at": template.updated_at.isoformat() if template.updated_at else None,
+    }
 
 
 class ResumeTemplateCreate(BaseModel):
@@ -84,7 +116,10 @@ class ResumeTemplateListResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["Resume Templates"],
 )
-async def create_resume_template(request: ResumeTemplateCreate) -> JSONResponse:
+async def create_resume_template(
+    request: ResumeTemplateCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Create a resume template.
 
@@ -93,6 +128,7 @@ async def create_resume_template(request: ResumeTemplateCreate) -> JSONResponse:
 
     Args:
         request: Create request with resume template details
+        db: Database session
 
     Returns:
         JSON response with created resume template
@@ -123,25 +159,28 @@ async def create_resume_template(request: ResumeTemplateCreate) -> JSONResponse:
     try:
         logger.info(f"Creating resume template: {request.name}, type: {request.template_type}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        template_response = {
-            "id": "placeholder-id",
-            "organization_id": request.organization_id,
-            "name": request.name,
-            "description": request.description,
-            "template_type": request.template_type,
-            "layout_config": request.layout_config,
-            "style_config": request.style_config,
-            "section_config": request.section_config,
-            "preview_url": request.preview_url,
-            "is_default": request.is_default,
-            "is_active": request.is_active,
-            "is_ats_compliant": request.is_ats_compliant,
-            "created_by": request.created_by,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
-        }
+        # Create new ResumeTemplate instance
+        new_template = ResumeTemplate(
+            organization_id=request.organization_id,
+            name=request.name,
+            description=request.description,
+            template_type=request.template_type,
+            layout_config=request.layout_config,
+            style_config=request.style_config,
+            section_config=request.section_config,
+            preview_url=request.preview_url,
+            is_default=request.is_default,
+            is_active=request.is_active,
+            is_ats_compliant=request.is_ats_compliant,
+            created_by=request.created_by,
+        )
+
+        # Add to database and commit
+        db.add(new_template)
+        await db.commit()
+        await db.refresh(new_template)
+
+        template_response = _template_to_dict(new_template)
 
         logger.info(f"Created resume template with ID: {template_response['id']}")
 
@@ -150,6 +189,13 @@ async def create_resume_template(request: ResumeTemplateCreate) -> JSONResponse:
             content=template_response,
         )
 
+    except SQLAlchemyError as e:
+        logger.error(f"Database error creating resume template: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: Failed to create resume template",
+        ) from e
     except HTTPException:
         raise
     except Exception as e:
@@ -162,6 +208,7 @@ async def create_resume_template(request: ResumeTemplateCreate) -> JSONResponse:
 
 @router.get("/", tags=["Resume Templates"])
 async def list_resume_templates(
+    db: AsyncSession = Depends(get_db),
     organization_id: Optional[str] = Query(None, description="Filter by organization ID (None for global templates)"),
     template_type: Optional[str] = Query(None, description="Filter by template type"),
     is_default: Optional[bool] = Query(None, description="Filter by default status"),
@@ -177,6 +224,7 @@ async def list_resume_templates(
     by organization, template type, default status, and ATS compliance.
 
     Args:
+        db: Database session
         organization_id: Optional organization ID filter (None for global templates)
         template_type: Optional template type filter
         is_default: Optional default status filter
@@ -203,13 +251,36 @@ async def list_resume_templates(
     try:
         logger.info(f"Listing resume templates with filters: organization_id={organization_id}, template_type={template_type}, is_ats_compliant={is_ats_compliant}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        templates = []
+        # Build query
+        stmt = select(ResumeTemplate)
+
+        # Apply filters
+        if organization_id is not None:
+            stmt = stmt.where(ResumeTemplate.organization_id == organization_id)
+        if template_type is not None:
+            stmt = stmt.where(ResumeTemplate.template_type == template_type)
+        if is_default is not None:
+            stmt = stmt.where(ResumeTemplate.is_default == is_default)
+        if is_active is not None:
+            stmt = stmt.where(ResumeTemplate.is_active == is_active)
+        if is_ats_compliant is not None:
+            stmt = stmt.where(ResumeTemplate.is_ats_compliant == is_ats_compliant)
+
+        # Get total count before pagination
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_count = await db.scalar(count_stmt)
+
+        # Apply pagination and ordering
+        stmt = stmt.order_by(ResumeTemplate.created_at.desc())
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Execute query
+        result = await db.execute(stmt)
+        templates = result.scalars().all()
 
         response_data = {
-            "templates": templates,
-            "total_count": len(templates),
+            "templates": [_template_to_dict(t) for t in templates],
+            "total_count": total_count or 0,
         }
 
         logger.info(f"Retrieved {response_data['total_count']} resume templates")
@@ -219,6 +290,12 @@ async def list_resume_templates(
             content=response_data,
         )
 
+    except SQLAlchemyError as e:
+        logger.error(f"Database error listing resume templates: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: Failed to list resume templates",
+        ) from e
     except Exception as e:
         logger.error(f"Error listing resume templates: {e}", exc_info=True)
         raise HTTPException(
@@ -228,7 +305,10 @@ async def list_resume_templates(
 
 
 @router.get("/{template_id}", tags=["Resume Templates"])
-async def get_resume_template(template_id: str) -> JSONResponse:
+async def get_resume_template(
+    template_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Get a specific resume template by ID.
 
@@ -237,6 +317,7 @@ async def get_resume_template(template_id: str) -> JSONResponse:
 
     Args:
         template_id: Unique identifier of the resume template
+        db: Database session
 
     Returns:
         JSON response with resume template details
@@ -259,37 +340,19 @@ async def get_resume_template(template_id: str) -> JSONResponse:
     try:
         logger.info(f"Getting resume template: {template_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        template_response = {
-            "id": template_id,
-            "organization_id": None,
-            "name": "Modern Professional",
-            "description": "Clean modern design with sidebar",
-            "template_type": "modern",
-            "layout_config": {
-                "margins": "normal",
-                "sections": ["header", "experience", "education", "skills"]
-            },
-            "style_config": {
-                "primary_color": "#2563eb",
-                "font": "Arial",
-                "font_size": 11
-            },
-            "section_config": {
-                "header": {"enabled": True, "position": "top"},
-                "experience": {"enabled": True, "position": "main"},
-                "education": {"enabled": True, "position": "main"},
-                "skills": {"enabled": True, "position": "sidebar"}
-            },
-            "preview_url": "/previews/modern-professional.png",
-            "is_default": True,
-            "is_active": True,
-            "is_ats_compliant": True,
-            "created_by": None,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
-        }
+        # Query for template
+        stmt = select(ResumeTemplate).where(ResumeTemplate.id == template_id)
+        result = await db.execute(stmt)
+        template = result.scalar_one_or_none()
+
+        if template is None:
+            logger.warning(f"Resume template not found: {template_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume template not found: {template_id}",
+            )
+
+        template_response = _template_to_dict(template)
 
         logger.info(f"Retrieved resume template: {template_id}")
 
@@ -300,6 +363,12 @@ async def get_resume_template(template_id: str) -> JSONResponse:
 
     except HTTPException:
         raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting resume template: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: Failed to get resume template",
+        ) from e
     except Exception as e:
         logger.error(f"Error getting resume template: {e}", exc_info=True)
         raise HTTPException(
@@ -312,6 +381,7 @@ async def get_resume_template(template_id: str) -> JSONResponse:
 async def update_resume_template(
     template_id: str,
     request: ResumeTemplateUpdate,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Update a resume template.
@@ -322,6 +392,7 @@ async def update_resume_template(
     Args:
         template_id: Unique identifier of the resume template
         request: Update request with fields to update
+        db: Database session
 
     Returns:
         JSON response with updated resume template
@@ -348,25 +419,43 @@ async def update_resume_template(
     try:
         logger.info(f"Updating resume template: {template_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        template_response = {
-            "id": template_id,
-            "organization_id": None,
-            "name": request.name or "Modern Professional",
-            "description": request.description or "Clean modern design with sidebar",
-            "template_type": "modern",
-            "layout_config": request.layout_config or {"margins": "normal"},
-            "style_config": request.style_config or {"primary_color": "#2563eb"},
-            "section_config": request.section_config or {"experience": {"enabled": True}},
-            "preview_url": request.preview_url,
-            "is_default": request.is_default if request.is_default is not None else True,
-            "is_active": request.is_active if request.is_active is not None else True,
-            "is_ats_compliant": request.is_ats_compliant if request.is_ats_compliant is not None else True,
-            "created_by": None,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T01:00:00Z",
-        }
+        # Query for template
+        stmt = select(ResumeTemplate).where(ResumeTemplate.id == template_id)
+        result = await db.execute(stmt)
+        template = result.scalar_one_or_none()
+
+        if template is None:
+            logger.warning(f"Resume template not found for update: {template_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume template not found: {template_id}",
+            )
+
+        # Update only provided fields
+        if request.name is not None:
+            template.name = request.name
+        if request.description is not None:
+            template.description = request.description
+        if request.layout_config is not None:
+            template.layout_config = request.layout_config
+        if request.style_config is not None:
+            template.style_config = request.style_config
+        if request.section_config is not None:
+            template.section_config = request.section_config
+        if request.preview_url is not None:
+            template.preview_url = request.preview_url
+        if request.is_default is not None:
+            template.is_default = request.is_default
+        if request.is_active is not None:
+            template.is_active = request.is_active
+        if request.is_ats_compliant is not None:
+            template.is_ats_compliant = request.is_ats_compliant
+
+        # Commit changes
+        await db.commit()
+        await db.refresh(template)
+
+        template_response = _template_to_dict(template)
 
         logger.info(f"Updated resume template: {template_id}")
 
@@ -377,6 +466,13 @@ async def update_resume_template(
 
     except HTTPException:
         raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error updating resume template: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: Failed to update resume template",
+        ) from e
     except Exception as e:
         logger.error(f"Error updating resume template: {e}", exc_info=True)
         raise HTTPException(
@@ -386,7 +482,10 @@ async def update_resume_template(
 
 
 @router.delete("/{template_id}", tags=["Resume Templates"])
-async def delete_resume_template(template_id: str) -> JSONResponse:
+async def delete_resume_template(
+    template_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Delete a resume template.
 
@@ -394,6 +493,7 @@ async def delete_resume_template(template_id: str) -> JSONResponse:
 
     Args:
         template_id: Unique identifier of the resume template
+        db: Database session
 
     Returns:
         JSON response confirming deletion
@@ -414,8 +514,21 @@ async def delete_resume_template(template_id: str) -> JSONResponse:
     try:
         logger.info(f"Deleting resume template: {template_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Query for template
+        stmt = select(ResumeTemplate).where(ResumeTemplate.id == template_id)
+        result = await db.execute(stmt)
+        template = result.scalar_one_or_none()
+
+        if template is None:
+            logger.warning(f"Resume template not found for deletion: {template_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume template not found: {template_id}",
+            )
+
+        # Delete the template
+        await db.delete(template)
+        await db.commit()
 
         logger.info(f"Deleted resume template: {template_id}")
 
@@ -429,6 +542,13 @@ async def delete_resume_template(template_id: str) -> JSONResponse:
 
     except HTTPException:
         raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error deleting resume template: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: Failed to delete resume template",
+        ) from e
     except Exception as e:
         logger.error(f"Error deleting resume template: {e}", exc_info=True)
         raise HTTPException(
