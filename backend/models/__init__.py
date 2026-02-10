@@ -3,6 +3,7 @@ SQLAlchemy database models for Resume Analysis System
 """
 from .base import Base
 from .resume import Resume
+from .resume_template import ResumeTemplate
 from .resume_analysis import ResumeAnalysis
 from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
@@ -41,6 +42,7 @@ from .organization_explanation_preferences import OrganizationExplanationPrefere
 __all__ = [
     "Base",
     "Resume",
+    "ResumeTemplate",
     "ResumeAnalysis",
     "AnalysisResult",
     "ResumeComparison",
