@@ -86,6 +86,18 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "deletion_request_not_found": "Deletion request with ID '{id}' not found",
         "cannot_cancel_request": "Cannot cancel request with status '{status}'. Only pending requests can be cancelled",
         "internal_error": "An internal error occurred. Please try again",
+
+        # Job Description generation errors
+        "job_description_generation_failed": "Failed to generate job description",
+        "job_description_invalid_title": "Invalid job title provided",
+        "job_description_empty_skills": "At least one required skill must be provided",
+        "job_description_invalid_experience": "Invalid experience value. Must be a positive number",
+        "job_description_invalid_seniority": "Invalid seniority level '{value}'. Valid values: {valid}",
+        "job_description_invalid_tone": "Invalid tone '{value}'. Valid values: {valid}",
+        "job_description_invalid_language": "Invalid language '{value}'. Supported languages: {supported}",
+        "job_description_bias_detected": "Generated description contains potentially biased language. Please review and regenerate",
+        "job_description_too_short": "Generated description is too short. Please try again",
+        "job_description_missing_section": "Required section '{section}' is missing from generated description",
     },
     "ru": {
         # File upload errors
@@ -155,6 +167,18 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "deletion_request_not_found": "Запрос на удаление с ID '{id}' не найден",
         "cannot_cancel_request": "Нельзя отменить запрос со статусом '{status}'. Только ожидающие запросы могут быть отменены",
         "internal_error": "Произошла внутренняя ошибка. Попробуйте снова",
+
+        # Job Description generation errors
+        "job_description_generation_failed": "Не удалось сгенерировать описание вакансии",
+        "job_description_invalid_title": "Указано неверное название должности",
+        "job_description_empty_skills": "Должен быть указан хотя бы один обязательный навык",
+        "job_description_invalid_experience": "Неверное значение опыта. Должно быть положительным числом",
+        "job_description_invalid_seniority": "Неверный уровень '{value}'. Допустимые значения: {valid}",
+        "job_description_invalid_tone": "Неверный тон '{value}'. Допустимые значения: {valid}",
+        "job_description_invalid_language": "Неверный язык '{value}'. Поддерживаемые языки: {supported}",
+        "job_description_bias_detected": "Сгенерированное описание содержит потенциально предвзятый язык. Пожалуйста, просмотрите и сгенерируйте заново",
+        "job_description_too_short": "Сгенерированное описание слишком короткое. Попробуйте снова",
+        "job_description_missing_section": "Отсутствует обязательная секция '{section}' в сгенерированном описании",
     },
 }
 
@@ -172,6 +196,9 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         # Optimization success messages
         "optimization_completed": "Resume optimization completed successfully",
         "optimization_saved": "Optimization feedback saved successfully",
+        # Job Description success messages
+        "job_description_generated": "Job description generated successfully",
+        "job_description_saved": "Job description saved successfully",
     },
     "ru": {
         "file_uploaded": "Резюме успешно загружено",
@@ -184,6 +211,9 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         # Optimization success messages
         "optimization_completed": "Оптимизация резюме успешно завершена",
         "optimization_saved": "Результаты оптимизации успешно сохранены",
+        # Job Description success messages
+        "job_description_generated": "Описание вакансии успешно сгенерировано",
+        "job_description_saved": "Описание вакансии успешно сохранено",
     },
 }
 
@@ -202,6 +232,20 @@ VALIDATION_MESSAGES: Dict[str, Dict[str, str]] = {
         "resume_text_required": "Resume text is required for optimization",
         "invalid_keyword_density": "Keyword density must be between {min} and {max}",
         "invalid_min_action_verbs": "Minimum action verbs must be a positive integer",
+        # Job Description validation messages
+        "job_title_required": "Job title is required",
+        "job_title_too_short": "Job title must be at least {min} characters long",
+        "job_title_too_long": "Job title must not exceed {max} characters",
+        "required_skills_required": "At least one required skill must be provided",
+        "required_skills_too_few": "At least {min} skill(s) must be provided",
+        "min_experience_invalid": "Minimum experience must be a positive number",
+        "min_experience_too_low": "Minimum experience must be at least {min} months",
+        "seniority_invalid": "Invalid seniority level. Valid options: {valid}",
+        "tone_invalid": "Invalid tone. Valid options: {valid}",
+        "industry_too_long": "Industry name must not exceed {max} characters",
+        "location_too_long": "Location must not exceed {max} characters",
+        "employment_type_invalid": "Invalid employment type. Valid options: {valid}",
+        "work_format_invalid": "Invalid work format. Valid options: {valid}",
     },
     "ru": {
         "resume_id_required": "Требуется ID резюме",
@@ -215,6 +259,20 @@ VALIDATION_MESSAGES: Dict[str, Dict[str, str]] = {
         "resume_text_required": "Требуется текст резюме для оптимизации",
         "invalid_keyword_density": "Плотность ключевых слов должна быть между {min} и {max}",
         "invalid_min_action_verbs": "Минимальное количество глаголов должно быть положительным целым числом",
+        # Job Description validation messages
+        "job_title_required": "Требуется название должности",
+        "job_title_too_short": "Название должности должно содержать минимум {min} символов",
+        "job_title_too_long": "Название должности не должно превышать {max} символов",
+        "required_skills_required": "Должен быть указан хотя бы один обязательный навык",
+        "required_skills_too_few": "Должно быть указано минимум {min} навыков",
+        "min_experience_invalid": "Минимальный опыт должен быть положительным числом",
+        "min_experience_too_low": "Минимальный опыт должен составлять минимум {min} месяцев",
+        "seniority_invalid": "Неверный уровень должности. Допустимые варианты: {valid}",
+        "tone_invalid": "Неверный тон. Допустимые варианты: {valid}",
+        "industry_too_long": "Название индустрии не должно превышать {max} символов",
+        "location_too_long": "Местоположение не должно превышать {max} символов",
+        "employment_type_invalid": "Неверный тип занятости. Допустимые варианты: {valid}",
+        "work_format_invalid": "Неверный формат работы. Допустимые варианты: {valid}",
     },
 }
 
