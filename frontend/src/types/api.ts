@@ -1661,6 +1661,32 @@ export interface MergeTagsResponse {
   candidates_transferred: number;
 }
 
+/**
+ * Intelligent tag suggestion with relevance score
+ */
+export interface IntelligentTagSuggestion {
+  id: string;
+  organization_id: string;
+  tag_name: string;
+  tag_order: number;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  description: string | null;
+  relevance_score: number;
+}
+
+/**
+ * Intelligent tag suggestions response
+ */
+export interface IntelligentTagSuggestionResponse {
+  organization_id: string;
+  resume_id: string;
+  suggestions: IntelligentTagSuggestion[];
+  keywords_extracted: string[];
+  total_count: number;
+}
+
 // ==================== Candidates Types ====================
 
 /**
