@@ -94,7 +94,7 @@ export function CandidateTagsManager({
     .slice(0, 5);
 
   // Fetch intelligent tag suggestions when candidateId is provided
-  const { data: intelligentSuggestionsData, isLoading: intelligentLoading } = useQuery({
+  const { data: intelligentSuggestionsData, isLoading: intelligentLoading, error: intelligentError } = useQuery({
     queryKey: ['intelligent-tag-suggestions', candidateId],
     queryFn: async () => {
       if (!candidateId) return null;
@@ -102,6 +102,7 @@ export function CandidateTagsManager({
       return await candidateTagsClient.getIntelligentSuggestions('default-org', candidateId, 5);
     },
     enabled: !!candidateId && dialogOpen, // Only fetch when dialog is open and candidateId exists
+    retry: 1, // Retry once on failure
   });
 
   const intelligentSuggestions = intelligentSuggestionsData?.suggestions || [];
@@ -480,7 +481,7 @@ export function CandidateTagsManager({
           )}
 
           {/* Intelligent Tag Suggestions (when candidateId is provided) */}
-          {!editMode && candidateId && intelligentSuggestions.length > 0 && (
+          {!editMode && candidateId && (intelligentSuggestions.length > 0 || intelligentLoading || intelligentError) && (
             <>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
@@ -493,7 +494,11 @@ export function CandidateTagsManager({
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
                   <CircularProgress size={24} />
                 </Box>
-              ) : (
+              ) : intelligentError ? (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  Unable to load intelligent suggestions. You can still use Popular Tags above.
+                </Alert>
+              ) : intelligentSuggestions.length > 0 ? (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                   {intelligentSuggestions.map((suggestion: IntelligentTagSuggestion) => {
                     const isAssigned = assignedTags.some((t) => t.id === suggestion.id);
@@ -539,7 +544,7 @@ export function CandidateTagsManager({
                     );
                   })}
                 </Box>
-              )}
+              ) : null}
             </>
           )}
 

@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Maximum resume text length to prevent processing timeouts
+MAX_RESUME_TEXT_LENGTH = 50000  # 50,000 characters (~10 pages of text)
+
 
 class CandidateTagCreate(BaseModel):
     """Request model for creating a candidate tag."""
@@ -600,6 +603,15 @@ async def get_intelligent_tag_suggestions(
                     "total_count": 0,
                 },
             )
+
+        # Truncate resume text if too long to prevent processing timeouts
+        original_length = len(resume_text)
+        if original_length > MAX_RESUME_TEXT_LENGTH:
+            logger.info(
+                f"Resume text length ({original_length} chars) exceeds limit, "
+                f"truncating to {MAX_RESUME_TEXT_LENGTH} chars"
+            )
+            resume_text = resume_text[:MAX_RESUME_TEXT_LENGTH]
 
         # Detect language for keyword extraction (default to english)
         language = "english" if not resume.language or resume.language.startswith("en") else resume.language
