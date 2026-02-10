@@ -196,7 +196,12 @@
     },
     "refresh": "Refresh",
     "processingTime": "Processing Time: {{seconds}}s",
-    "reloadButton": "Reload Analysis"
+    "reloadButton": "Reload Analysis",
+    "viewOptimization": "View Optimization",
+    "tabs": {
+      "analysis": "Analysis",
+      "vacancyMatches": "Vacancy Matches"
+    }
   },
   "compare": {
     "title": "Job Comparison Results",

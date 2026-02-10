@@ -199,7 +199,12 @@
     },
     "refresh": "Обновить",
     "processingTime": "Время обработки: {{seconds}}с",
-    "reloadButton": "Обновить анализ"
+    "reloadButton": "Обновить анализ",
+    "viewOptimization": "Посмотреть оптимизацию",
+    "tabs": {
+      "analysis": "Анализ",
+      "vacancyMatches": "Совпадения вакансий"
+    }
   },
   "compare": {
     "title": "Результаты сравнения с вакансией",
