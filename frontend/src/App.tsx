@@ -48,6 +48,7 @@ import { CandidateDetailPage } from './pages/recruiter/CandidateDetailPage';
 import { WeightsPage } from './pages/recruiter/WeightsPage';
 import { SearchPage } from './pages/recruiter/SearchPage';
 import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
+import { JobDescriptionPage } from './pages/recruiter/JobDescriptionPage';
 
 // Additional Recruiter Pages
 import ComparePage from './pages/Compare';
@@ -147,6 +148,7 @@ function App() {
             <Route path=":id" element={<VacancyDetailPage />} />
             <Route path=":id/edit" element={<VacancyFormPage />} />
           </Route>
+          <Route path="job-descriptions" element={<JobDescriptionPage />} />
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
