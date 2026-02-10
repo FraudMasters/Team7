@@ -314,6 +314,7 @@ const SSOConfigForm: React.FC<SSOConfigFormProps> = ({
             onChange={(e) => setFormData({ ...formData, provider_name: e.target.value })}
             placeholder="e.g., Okta Production"
             disabled={submitting}
+            helperText="A friendly name to identify this SSO provider"
           />
         </Grid>
 
@@ -351,6 +352,9 @@ const SSOConfigForm: React.FC<SSOConfigFormProps> = ({
                 </Stack>
               </MenuItem>
             </Select>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1.5 }}>
+              Select your SAML 2.0 identity provider type
+            </Typography>
           </FormControl>
         </Grid>
       </Grid>
@@ -506,7 +510,7 @@ const SSOConfigForm: React.FC<SSOConfigFormProps> = ({
           <FormControl fullWidth>
             <InputLabel>Status</InputLabel>
             <Select
-              value={formData.isEnabled ? 'enabled' : 'disabled'}
+              value={formData.is_enabled ? 'enabled' : 'disabled'}
               label="Status"
               onChange={(e) =>
                 setFormData({ ...formData, is_enabled: e.target.value === 'enabled' })
@@ -516,6 +520,9 @@ const SSOConfigForm: React.FC<SSOConfigFormProps> = ({
               <MenuItem value="enabled">Enabled</MenuItem>
               <MenuItem value="disabled">Disabled</MenuItem>
             </Select>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1.5 }}>
+              Enable or disable this SSO configuration
+            </Typography>
           </FormControl>
         </Grid>
       </Grid>
