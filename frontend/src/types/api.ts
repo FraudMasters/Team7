@@ -2452,3 +2452,61 @@ export interface OptimizationFeedback {
   processing_time_ms?: number;
 }
 
+// ==================== Job Descriptions Types ====================
+
+/**
+ * Job description generation request
+ */
+export interface JobDescriptionGenerateRequest {
+  /** Job title (e.g., 'Senior Python Developer') */
+  title: string;
+  /** List of required technical skills */
+  required_skills: string[];
+  /** Minimum experience in months */
+  min_experience_months?: number;
+  /** Seniority level (junior, mid, senior, lead) */
+  seniority_level?: string;
+  /** Industry sector (e.g., 'Technology', 'Finance') */
+  industry?: string;
+  /** Work format (remote, office, hybrid) */
+  work_format?: string;
+  /** Job location */
+  location?: string;
+  /** Employment type (full-time, part-time, contract) */
+  employment_type?: string;
+  /** Salary range (e.g., '$80,000 - $120,000') */
+  salary_range?: string;
+  /** Additional preferred skills/qualifications */
+  additional_requirements?: string[];
+  /** Tone for the description (professional, casual, formal, friendly) */
+  tone?: 'professional' | 'casual' | 'formal' | 'friendly';
+  /** Language for the job description (en, ru) */
+  language?: 'en' | 'ru';
+}
+
+/**
+ * Job description generation response
+ */
+export interface JobDescriptionResponse {
+  /** Job title */
+  title: string;
+  /** Brief summary of the role */
+  summary: string;
+  /** Key responsibilities */
+  responsibilities: string[];
+  /** Requirements and qualifications */
+  requirements: string[];
+  /** Benefits and perks */
+  benefits: string[];
+  /** Company culture description */
+  company_culture: string;
+  /** Interview process overview */
+  interview_process: string;
+  /** LLM provider used */
+  provider: string;
+  /** Model name used */
+  model: string;
+  /** Timestamp of generation */
+  generated_at: string;
+}
+

@@ -74,6 +74,7 @@ export { webhooksClient, WebhooksClient } from './webhooks';
 // Organization management
 export { calendarClient, CalendarClient } from './calendar';
 export { interviewsClient, InterviewsClient } from './interviews';
+export { jobDescriptionsClient, JobDescriptionsClient } from './jobDescriptions';
 export { organizationsClient, OrganizationsClient } from './organizations';
 export { teamCommentsClient, TeamCommentsClient } from './teamComments';
 export { vacanciesClient, VacanciesClient } from './vacancies';
@@ -174,4 +175,6 @@ export type {
   DegreeType,
   ProficiencyLevel,
   JobSeekerStatus,
+  JobDescriptionGenerateRequest,
+  JobDescriptionResponse,
 } from '@/types/api';
