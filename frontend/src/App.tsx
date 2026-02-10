@@ -28,6 +28,7 @@ import { CandidateProfilePage } from './pages/jobs/CandidateProfilePage';
 import { JobSeekerProfilePage } from './pages/JobSeekerProfilePage';
 import { ResumeUploadPage } from './pages/jobs/ResumeUploadPage';
 import { ResumeResultsPage } from './pages/jobs/ResumeResultsPage';
+import { ResumeTemplatesPage } from './pages/jobs/ResumeTemplatesPage';
 import { RecommendedJobsPage } from './pages/jobs/RecommendedJobsPage';
 import { SkillAssessmentPage } from './pages/jobs/SkillAssessmentPage';
 import { LearningPage } from './pages/jobs/LearningPage';
@@ -106,6 +107,7 @@ function App() {
           <Route path="saved" element={<SavedJobsPage />} />
           <Route path="applications" element={<MyApplicationsPage />} />
           <Route path="upload" element={<ResumeUploadPage />} />
+          <Route path="resume-templates" element={<ResumeTemplatesPage />} />
           <Route path="resume-results/:id" element={<ResumeResultsPage />} />
           <Route path="recommended" element={<RecommendedJobsPage />} />
           <Route path="assessment" element={<SkillAssessmentPage />} />
