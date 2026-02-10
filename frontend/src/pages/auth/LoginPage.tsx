@@ -205,7 +205,7 @@ const LoginPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.email}
-                    helperText={errors.email}
+                    helperText={errors.email || 'Enter your registered email address'}
                     disabled={isLoading}
                     autoFocus
                     aria-describedby={errors.email ? 'email-error' : undefined}
@@ -226,7 +226,7 @@ const LoginPage: React.FC = () => {
                       }
                     }}
                     error={!!errors.password}
-                    helperText={errors.password}
+                    helperText={errors.password || 'Enter your password (min. 6 characters)'}
                     disabled={isLoading}
                     aria-describedby={errors.password ? 'password-error' : undefined}
                   />
