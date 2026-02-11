@@ -3,6 +3,10 @@ Batch resume upload and processing endpoints.
 
 This module provides endpoints for uploading multiple resume files at once,
 tracking batch processing status, and retrieving batch results.
+
+Supports:
+- Direct file uploads (PDF, DOCX)
+- ZIP archive uploads with automatic extraction
 """
 import logging
 from pathlib import Path
@@ -21,6 +25,7 @@ from models.batch_job import BatchJob, BatchJobStatus
 from models.resume import Resume, ResumeStatus
 from tasks.analysis_task import batch_analyze_resumes
 from celery_app import celery_app
+from utils.zip_extractor import extract_resumes_from_zip
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -41,15 +46,35 @@ def _extract_locale(request: Optional[Request]) -> str:
     return lang_code
 
 
-def validate_file_type(filename: str, content_type: str, locale: str = "en") -> None:
-    """Validate that the file type is allowed."""
+def validate_file_type(filename: str, content_type: str, locale: str = "en", allow_zip: bool = False) -> None:
+    """
+    Validate that the file type is allowed.
+
+    Args:
+        filename: Name of the uploaded file
+        content_type: MIME type of the file
+        locale: Language code for error messages
+        allow_zip: If True, also allow .zip files for batch upload
+
+    Raises:
+        HTTPException: If file type is not allowed
+    """
     file_ext = Path(filename).suffix.lower()
-    if file_ext not in settings.allowed_file_types:
-        allowed = ", ".join(settings.allowed_file_types)
+    allowed_types = list(settings.allowed_file_types)
+    if allow_zip and ".zip" not in allowed_types:
+        allowed_types.append(".zip")
+
+    if file_ext not in allowed_types:
+        allowed = ", ".join(allowed_types)
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=f"Invalid file type: {file_ext}. Allowed types: {allowed}",
         )
+
+
+def is_zip_file(filename: str) -> bool:
+    """Check if the file is a ZIP archive based on extension."""
+    return Path(filename).suffix.lower() == ".zip"
 
 
 def validate_file_size(file_size: int, locale: str = "en") -> None:
@@ -131,12 +156,13 @@ async def upload_batch(
     """
     Upload multiple resume files for batch processing.
 
-    This endpoint accepts multiple resume files (PDF or DOCX), validates each file,
-    stores them, creates database records, and initiates batch processing.
+    This endpoint accepts multiple resume files (PDF or DOCX) or ZIP archives
+    containing resume files. ZIP files are automatically extracted and each
+    valid resume file within is processed.
 
     Args:
         request: FastAPI request object
-        files: List of uploaded resume files
+        files: List of uploaded resume files (PDF, DOCX, or ZIP archives)
         notification_email: Optional email for completion notification
         analyze: Whether to analyze resumes after upload
         db: Database session
@@ -148,6 +174,13 @@ async def upload_batch(
         HTTPException(415): If file type is not supported
         HTTPException(413): If file size exceeds maximum
         HTTPException(500): If file storage or database operation fails
+
+    ZIP Processing:
+        - ZIP files are automatically extracted
+        - Only PDF and DOCX files within the archive are processed
+        - Nested directories are flattened
+        - Maximum 100 files per batch (including extracted files)
+        - Invalid files in ZIP are skipped with warnings
     """
     locale = _extract_locale(request)
 
@@ -181,6 +214,7 @@ async def upload_batch(
         # Store files and create resume records
         resume_ids = []
         failed_uploads = []
+        zip_files_processed = 0
 
         for file in files:
             try:
@@ -188,32 +222,100 @@ async def upload_batch(
                 file_content = await file.read()
                 file_size = len(file_content)
 
-                # Validate
-                validate_file_type(file.filename or "unknown", file.content_type or "application/octet-stream", locale)
+                # Validate file type (allow ZIP files for batch upload)
+                validate_file_type(
+                    file.filename or "unknown",
+                    file.content_type or "application/octet-stream",
+                    locale,
+                    allow_zip=True
+                )
                 validate_file_size(file_size, locale)
 
-                # Generate resume ID and save file
-                resume_id = uuid4()
-                safe_filename = Path(file.filename or "resume").name
-                file_extension = Path(safe_filename).suffix
-                stored_filename = f"{resume_id}{file_extension}"
-                file_path = UPLOAD_DIR / stored_filename
+                # Check if this is a ZIP file
+                if is_zip_file(file.filename or "unknown"):
+                    logger.info(f"Processing ZIP file: {file.filename}")
+                    zip_files_processed += 1
 
-                with open(file_path, "wb") as f:
-                    f.write(file_content)
+                    # Extract resumes from ZIP
+                    extraction_result = extract_resumes_from_zip(file_content)
 
-                # Create resume record
-                resume = Resume(
-                    id=resume_id,
-                    filename=file.filename or "unknown",
-                    file_path=str(file_path),
-                    content_type=file.content_type or "application/octet-stream",
-                    status=ResumeStatus.PENDING,
-                )
-                db.add(resume)
-                resume_ids.append(str(resume_id))
+                    if extraction_result.get("error"):
+                        failed_uploads.append(f"{file.filename} (ZIP error: {extraction_result['error']})")
+                        logger.warning(f"ZIP extraction failed for {file.filename}: {extraction_result['error']}")
+                        continue
 
-                logger.info(f"Stored file: {file.filename} -> {resume_id}")
+                    extracted_files = extraction_result.get("files", [])
+                    logger.info(
+                        f"Extracted {len(extracted_files)} files from {file.filename} "
+                        f"({extraction_result.get('skipped_count', 0)} skipped)"
+                    )
+
+                    # Process each extracted file
+                    for extracted_file in extracted_files:
+                        try:
+                            # Skip files that failed validation during extraction
+                            if not extracted_file.get("valid", True):
+                                validation_error = extracted_file.get("validation_error", "Unknown validation error")
+                                failed_uploads.append(f"{extracted_file['filename']} (from {file.filename}): {validation_error}")
+                                logger.warning(
+                                    f"Skipped invalid file {extracted_file['filename']} from ZIP: {validation_error}"
+                                )
+                                continue
+
+                            # Generate resume ID and save extracted file
+                            resume_id = uuid4()
+                            safe_filename = extracted_file["filename"]
+                            file_extension = f".{extracted_file['extension']}"
+                            stored_filename = f"{resume_id}{file_extension}"
+                            file_path = UPLOAD_DIR / stored_filename
+
+                            # Write extracted content to disk
+                            with open(file_path, "wb") as f:
+                                f.write(extracted_file["content"])
+
+                            # Determine content type
+                            content_type = "application/pdf" if file_extension == ".pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+                            # Create resume record
+                            resume = Resume(
+                                id=resume_id,
+                                filename=safe_filename,
+                                file_path=str(file_path),
+                                content_type=content_type,
+                                status=ResumeStatus.PENDING,
+                            )
+                            db.add(resume)
+                            resume_ids.append(str(resume_id))
+
+                            logger.info(f"Stored extracted file: {safe_filename} (from {file.filename}) -> {resume_id}")
+
+                        except Exception as e:
+                            failed_uploads.append(f"{extracted_file['filename']} (from {file.filename})")
+                            logger.error(f"Failed to store extracted file {extracted_file['filename']}: {e}")
+
+                else:
+                    # Process as regular file (PDF or DOCX)
+                    resume_id = uuid4()
+                    safe_filename = Path(file.filename or "resume").name
+                    file_extension = Path(safe_filename).suffix
+                    stored_filename = f"{resume_id}{file_extension}"
+                    file_path = UPLOAD_DIR / stored_filename
+
+                    with open(file_path, "wb") as f:
+                        f.write(file_content)
+
+                    # Create resume record
+                    resume = Resume(
+                        id=resume_id,
+                        filename=file.filename or "unknown",
+                        file_path=str(file_path),
+                        content_type=file.content_type or "application/octet-stream",
+                        status=ResumeStatus.PENDING,
+                    )
+                    db.add(resume)
+                    resume_ids.append(str(resume_id))
+
+                    logger.info(f"Stored file: {file.filename} -> {resume_id}")
 
             except HTTPException:
                 failed_uploads.append(file.filename)
@@ -223,6 +325,18 @@ async def upload_batch(
                 logger.error(f"Failed to store file {file.filename}: {e}")
 
         await db.commit()
+
+        # Log processing summary
+        if zip_files_processed > 0:
+            logger.info(
+                f"Batch upload summary: {len(files)} input files ({zip_files_processed} ZIP archives), "
+                f"{len(resume_ids)} resumes stored, {len(failed_uploads)} failures"
+            )
+        else:
+            logger.info(
+                f"Batch upload summary: {len(files)} files, "
+                f"{len(resume_ids)} resumes stored, {len(failed_uploads)} failures"
+            )
 
         # Update batch job with actual counts
         batch_job.total_files = len(resume_ids)
