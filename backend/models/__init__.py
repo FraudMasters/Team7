@@ -38,6 +38,8 @@ from .search_history import SearchHistory
 from .audit_log import AuditLog, AuditActionType
 from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
+from .batch_job import BatchJob, BatchJobStatus
+from .duplicate_resume import DuplicateResume
 
 __all__ = [
     "Base",
@@ -89,4 +91,7 @@ __all__ = [
     "ConfigChange",
     "ConfigChangeAction",
     "OrganizationExplanationPreferences",
+    "BatchJob",
+    "BatchJobStatus",
+    "DuplicateResume",
 ]
