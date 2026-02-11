@@ -25,7 +25,10 @@ from analyzers.performance_tracker import PerformanceTracker
 from analyzers.model_versioning import ModelVersionManager
 from analyzers.feedback_accumulator import FeedbackAccumulator
 from config import get_settings
-from tasks.notifications import send_model_retraining_notification
+from tasks.notifications import (
+    send_model_retraining_notification,
+    send_performance_degradation_alert,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -47,6 +50,210 @@ AUTO_ACTIVATION_PERFORMANCE_THRESHOLD = 0.85
 
 # Default dataset types for evaluation
 DEFAULT_EVALUATION_DATASETS = ["validation", "test"]
+
+
+def trigger_failure_alert(
+    model_name: str,
+    error_message: str,
+    error_type: str,
+    context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Trigger a failure alert notification for model retraining.
+
+    This function sends an alert notification when model retraining fails,
+    providing detailed error information to administrators.
+
+    Args:
+        model_name: Name of the model that failed retraining
+        error_message: Detailed error message describing the failure
+        error_type: Type of error (e.g., 'training_failed', 'version_creation_failed',
+                   'database_error', 'timeout', 'unexpected_error')
+        context: Optional additional context about the failure
+
+    Returns:
+        Dictionary containing alert results:
+        {
+            "alert_sent": True,
+            "alert_type": "failure",
+            "model_name": "ranking",
+            "error_type": "training_failed",
+            "processing_time_ms": 123.45
+        }
+
+    Example:
+        >>> result = trigger_failure_alert(
+        ...     'ranking',
+        ...     'Model training failed: insufficient data',
+        ...     'training_failed',
+        ...     {'training_samples': 10}
+        ... )
+        >>> print(result['alert_sent'])
+        True
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(
+            f"Triggering failure alert for {model_name}: "
+            f"error_type={error_type}, error={error_message[:100]}..."
+        )
+
+        # Build training result for notification
+        training_result = {
+            "status": "failed",
+            "error": error_message,
+            "error_type": error_type,
+            "context": context or {},
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Send failure notification
+        try:
+            notification_result = send_model_retraining_notification(
+                model_name=model_name,
+                training_result=training_result,
+            )
+            alert_sent = notification_result.get("status") == "sent"
+        except Exception as notify_error:
+            logger.error(
+                f"Failed to send failure alert notification: {notify_error}",
+                exc_info=True
+            )
+            alert_sent = False
+            notification_result = {"status": "failed", "error": str(notify_error)}
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "alert_sent": alert_sent,
+            "alert_type": "failure",
+            "model_name": model_name,
+            "error_type": error_type,
+            "notification_result": notification_result,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        if alert_sent:
+            logger.info(
+                f"Failure alert sent successfully for {model_name}: "
+                f"error_type={error_type}, time={processing_time_ms}ms"
+            )
+        else:
+            logger.warning(
+                f"Failure alert could not be sent for {model_name}: "
+                f"error_type={error_type}"
+            )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error triggering failure alert: {e}", exc_info=True)
+        return {
+            "alert_sent": False,
+            "alert_type": "failure",
+            "model_name": model_name,
+            "error_type": error_type,
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+
+def trigger_performance_degradation_alert(
+    model_name: str,
+    degradation_details: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Trigger a performance degradation alert for a model.
+
+    This function sends an alert notification when model performance
+    degradation is detected, before triggering retraining.
+
+    Args:
+        model_name: Name of the model with performance degradation
+        degradation_details: Dictionary containing degradation information:
+            - current_metrics: Current performance metrics
+            - baseline_metrics: Baseline performance metrics
+            - degradation_percentage: Percentage of degradation
+            - threshold: Threshold that was exceeded
+
+    Returns:
+        Dictionary containing alert results:
+        {
+            "alert_sent": True,
+            "alert_type": "performance_degradation",
+            "model_name": "ranking",
+            "degradation_percentage": 0.08,
+            "processing_time_ms": 123.45
+        }
+
+    Example:
+        >>> details = {"degradation_percentage": 0.08, "threshold": 0.05}
+        >>> result = trigger_performance_degradation_alert('ranking', details)
+        >>> print(result['alert_sent'])
+        True
+    """
+    start_time = time.time()
+
+    try:
+        degradation_pct = degradation_details.get("degradation_percentage", 0)
+        logger.info(
+            f"Triggering performance degradation alert for {model_name}: "
+            f"degradation={degradation_pct:.1%}"
+        )
+
+        # Add timestamp if not present
+        if "detected_at" not in degradation_details:
+            degradation_details["detected_at"] = datetime.utcnow().isoformat()
+
+        # Send performance degradation alert
+        try:
+            alert_result = send_performance_degradation_alert(
+                model_name=model_name,
+                degradation_details=degradation_details,
+            )
+            alert_sent = alert_result.get("status") == "sent"
+        except Exception as notify_error:
+            logger.error(
+                f"Failed to send performance degradation alert: {notify_error}",
+                exc_info=True
+            )
+            alert_sent = False
+            alert_result = {"status": "failed", "error": str(notify_error)}
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "alert_sent": alert_sent,
+            "alert_type": "performance_degradation",
+            "model_name": model_name,
+            "degradation_percentage": degradation_pct,
+            "alert_result": alert_result,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        if alert_sent:
+            logger.info(
+                f"Performance degradation alert sent successfully for {model_name}: "
+                f"degradation={degradation_pct:.1%}, time={processing_time_ms}ms"
+            )
+        else:
+            logger.warning(
+                f"Performance degradation alert could not be sent for {model_name}: "
+                f"degradation={degradation_pct:.1%}"
+            )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error triggering performance degradation alert: {e}", exc_info=True)
+        return {
+            "alert_sent": False,
+            "alert_type": "performance_degradation",
+            "model_name": model_name,
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
 
 
 def get_sync_session():
@@ -1672,6 +1879,30 @@ def automated_retraining_task(
             f"Retraining triggered for {model_name}: {', '.join(trigger_decision['reasons'])}"
         )
 
+        # Trigger performance degradation alert if applicable
+        if trigger_decision.get("performance_degraded"):
+            try:
+                degradation_details = {
+                    "degradation_percentage": trigger_decision.get(
+                        "degradation_details", {}
+                    ).get("max_degradation", 0),
+                    "threshold": MIN_PERFORMANCE_DEGRADATION_THRESHOLD,
+                    "current_metrics": trigger_decision.get("current_metrics", {}),
+                    "baseline_metrics": trigger_decision.get("baseline_metrics", {}),
+                }
+                alert_result = trigger_performance_degradation_alert(
+                    model_name=model_name,
+                    degradation_details=degradation_details,
+                )
+                logger.info(
+                    f"Performance degradation alert triggered: {alert_result.get('alert_sent')}"
+                )
+            except Exception as alert_error:
+                logger.error(
+                    f"Failed to trigger performance degradation alert: {alert_error}",
+                    exc_info=True
+                )
+
         # Steps 2-8: Execute core retraining logic with progress updates
         for step_name, step_num in [
             ("querying_feedback", 2),
@@ -1708,24 +1939,40 @@ def automated_retraining_task(
 
         # Send notification if requested
         if notify and result.get("status") in ["completed", "failed"]:
-            try:
-                logger.info(f"Sending retraining notification for {model_name}")
-                notification_result = send_model_retraining_notification(
-                    model_name=model_name,
-                    training_result=result,
-                )
-                result["notification_sent"] = notification_result.get("status") == "sent"
-                result["notification_result"] = notification_result
-
-                if result["status"] == "completed":
+            if result["status"] == "completed":
+                try:
+                    logger.info(f"Sending retraining notification for {model_name}")
+                    notification_result = send_model_retraining_notification(
+                        model_name=model_name,
+                        training_result=result,
+                    )
+                    result["notification_sent"] = notification_result.get("status") == "sent"
+                    result["notification_result"] = notification_result
                     logger.info(
                         f"Retraining notification sent: {notification_result.get('status')}"
                     )
-            except Exception as e:
-                logger.error(f"Failed to send retraining notification: {e}", exc_info=True)
-                result["notification_sent"] = False
-                if result["status"] == "completed":
+                except Exception as e:
+                    logger.error(f"Failed to send retraining notification: {e}", exc_info=True)
+                    result["notification_sent"] = False
                     result["notification_error"] = str(e)
+            else:
+                # Failed status - trigger failure alert
+                try:
+                    logger.info(f"Triggering failure alert for {model_name}")
+                    alert_result = trigger_failure_alert(
+                        model_name=model_name,
+                        error_message=result.get("error", "Unknown error"),
+                        error_type=result.get("error_type", "training_failed"),
+                        context={
+                            "training_event_id": result.get("training_event_id"),
+                            "processing_time_ms": result.get("processing_time_ms"),
+                        },
+                    )
+                    result["alert_sent"] = alert_result.get("alert_sent", False)
+                    result["alert_result"] = alert_result
+                except Exception as alert_error:
+                    logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                    result["alert_sent"] = False
 
         return result
 
@@ -1739,19 +1986,24 @@ def automated_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
-        # Send notification if requested
+        # Trigger failure alert
         if notify:
             try:
-                logger.info(f"Sending failure notification for {model_name}")
-                notification_result = send_model_retraining_notification(
+                logger.info(f"Triggering timeout failure alert for {model_name}")
+                alert_result = trigger_failure_alert(
                     model_name=model_name,
-                    training_result=error_result,
+                    error_message=error_result["error"],
+                    error_type="timeout",
+                    context={
+                        "task_id": str(self.request.id) if self.request.id else None,
+                        "processing_time_ms": error_result["processing_time_ms"],
+                    },
                 )
-                error_result["notification_sent"] = notification_result.get("status") == "sent"
-                error_result["notification_result"] = notification_result
-            except Exception as notify_error:
-                logger.error(f"Failed to send failure notification: {notify_error}", exc_info=True)
-                error_result["notification_sent"] = False
+                error_result["alert_sent"] = alert_result.get("alert_sent", False)
+                error_result["alert_result"] = alert_result
+            except Exception as alert_error:
+                logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                error_result["alert_sent"] = False
 
         return error_result
 
@@ -1765,19 +2017,25 @@ def automated_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
-        # Send notification if requested
+        # Trigger failure alert
         if notify:
             try:
-                logger.info(f"Sending failure notification for {model_name}")
-                notification_result = send_model_retraining_notification(
+                logger.info(f"Triggering error failure alert for {model_name}")
+                alert_result = trigger_failure_alert(
                     model_name=model_name,
-                    training_result=error_result,
+                    error_message=str(e),
+                    error_type="unexpected_error",
+                    context={
+                        "task_id": str(self.request.id) if self.request.id else None,
+                        "exception_type": type(e).__name__,
+                        "processing_time_ms": error_result["processing_time_ms"],
+                    },
                 )
-                error_result["notification_sent"] = notification_result.get("status") == "sent"
-                error_result["notification_result"] = notification_result
-            except Exception as notify_error:
-                logger.error(f"Failed to send failure notification: {notify_error}", exc_info=True)
-                error_result["notification_sent"] = False
+                error_result["alert_sent"] = alert_result.get("alert_sent", False)
+                error_result["alert_result"] = alert_result
+            except Exception as alert_error:
+                logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                error_result["alert_sent"] = False
 
         return error_result
 
@@ -1850,17 +2108,38 @@ def manual_retraining_task(
         result["trigger_type"] = "manual"
 
         # Send notification for manual retraining
-        try:
-            logger.info(f"Sending manual retraining notification for {model_name}")
-            notification_result = send_model_retraining_notification(
-                model_name=model_name,
-                training_result=result,
-            )
-            result["notification_sent"] = notification_result.get("status") == "sent"
-            result["notification_result"] = notification_result
-        except Exception as e:
-            logger.error(f"Failed to send manual retraining notification: {e}", exc_info=True)
-            result["notification_sent"] = False
+        if result.get("status") == "completed":
+            try:
+                logger.info(f"Sending manual retraining notification for {model_name}")
+                notification_result = send_model_retraining_notification(
+                    model_name=model_name,
+                    training_result=result,
+                )
+                result["notification_sent"] = notification_result.get("status") == "sent"
+                result["notification_result"] = notification_result
+            except Exception as e:
+                logger.error(f"Failed to send manual retraining notification: {e}", exc_info=True)
+                result["notification_sent"] = False
+        else:
+            # Failed status - trigger failure alert
+            try:
+                logger.info(f"Triggering failure alert for manual retraining of {model_name}")
+                alert_result = trigger_failure_alert(
+                    model_name=model_name,
+                    error_message=result.get("error", "Unknown error"),
+                    error_type=result.get("error_type", "training_failed"),
+                    context={
+                        "requested_by": requested_by,
+                        "trigger_type": "manual",
+                        "training_event_id": result.get("training_event_id"),
+                        "processing_time_ms": result.get("processing_time_ms"),
+                    },
+                )
+                result["alert_sent"] = alert_result.get("alert_sent", False)
+                result["alert_result"] = alert_result
+            except Exception as alert_error:
+                logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                result["alert_sent"] = False
 
         return result
 
@@ -1876,13 +2155,25 @@ def manual_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
-        # Send failure notification
+        # Trigger failure alert
         try:
-            send_model_retraining_notification(
+            logger.info(f"Triggering failure alert for manual retraining of {model_name}")
+            alert_result = trigger_failure_alert(
                 model_name=model_name,
-                training_result=error_result,
+                error_message=str(e),
+                error_type="unexpected_error",
+                context={
+                    "requested_by": requested_by,
+                    "trigger_type": "manual",
+                    "task_id": str(self.request.id) if self.request.id else None,
+                    "exception_type": type(e).__name__,
+                    "processing_time_ms": error_result["processing_time_ms"],
+                },
             )
-        except Exception:
-            pass
+            error_result["alert_sent"] = alert_result.get("alert_sent", False)
+            error_result["alert_result"] = alert_result
+        except Exception as alert_error:
+            logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+            error_result["alert_sent"] = False
 
         return error_result
