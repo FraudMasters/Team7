@@ -526,6 +526,172 @@ class RankingModel:
 
         return {}
 
+    @staticmethod
+    def compute_dcg(relevances: List[float], k: Optional[int] = None) -> float:
+        """
+        Compute Discounted Cumulative Gain (DCG).
+
+        DCG = sum(relevance_i / log2(i + 1)) for i in 1..k
+
+        Args:
+            relevances: List of relevance scores in ranked order
+            k: Optional cutoff position (if None, use all items)
+
+        Returns:
+            DCG score
+        """
+        if k is not None:
+            relevances = relevances[:k]
+
+        dcg = 0.0
+        for i, rel in enumerate(relevances, start=1):
+            dcg += rel / np.log2(i + 1)
+
+        return dcg
+
+    @staticmethod
+    def compute_ndcg(
+        predicted_relevances: List[float],
+        ideal_relevances: List[float],
+        k: Optional[int] = None,
+    ) -> float:
+        """
+        Compute Normalized Discounted Cumulative Gain (NDCG).
+
+        NDCG = DCG(predicted) / DCG(ideal)
+
+        Args:
+            predicted_relevances: Relevances in predicted ranking order
+            ideal_relevances: Relevances in ideal (perfect) order
+            k: Optional cutoff position (if None, use all items)
+
+        Returns:
+            NDCG score (0-1, where 1 is perfect ranking)
+        """
+        dcg = RankingModel.compute_dcg(predicted_relevances, k)
+
+        # Sort ideal relevances in descending order for ideal DCG
+        sorted_ideal = sorted(ideal_relevances, reverse=True)
+        idcg = RankingModel.compute_dcg(sorted_ideal, k)
+
+        if idcg == 0:
+            return 0.0
+
+        return dcg / idcg
+
+    @staticmethod
+    def compute_mrr(relevances: List[float], threshold: float = 0.5) -> float:
+        """
+        Compute Mean Reciprocal Rank (MRR).
+
+        MRR = 1 / rank of first relevant item
+
+        Args:
+            relevances: List of relevance scores in ranked order
+            threshold: Minimum relevance score to consider an item relevant
+
+        Returns:
+            Reciprocal rank (0 if no relevant item found, 1 if first item is relevant)
+        """
+        for i, rel in enumerate(relevances, start=1):
+            if rel >= threshold:
+                return 1.0 / i
+
+        return 0.0
+
+    def evaluate_ranking(
+        self,
+        predicted_ranking: List[Tuple[str, float]],
+        ground_truth: Dict[str, float],
+        k_values: Optional[List[int]] = None,
+    ) -> Dict[str, float]:
+        """
+        Evaluate ranking quality using NDCG and MRR metrics.
+
+        Args:
+            predicted_ranking: List of (item_id, predicted_score) tuples in ranked order
+            ground_truth: Dictionary mapping item_id to true relevance score
+            k_values: List of cutoff positions for NDCG@k (default: [5, 10, 20])
+
+        Returns:
+            Dictionary with NDCG@k and MRR metrics
+        """
+        if k_values is None:
+            k_values = [5, 10, 20]
+
+        metrics: Dict[str, float] = {}
+
+        # Extract relevances for predicted ranking
+        predicted_relevances = [
+            ground_truth.get(item_id, 0.0)
+            for item_id, _ in predicted_ranking
+        ]
+
+        # Get all ground truth relevances for ideal ranking
+        ideal_relevances = list(ground_truth.values())
+
+        # Compute NDCG@k for each k value
+        for k in k_values:
+            ndcg = self.compute_ndcg(predicted_relevances, ideal_relevances, k)
+            metrics[f"ndcg@{k}"] = ndcg
+
+        # Compute MRR
+        metrics["mrr"] = self.compute_mrr(predicted_relevances)
+
+        # Compute NDCG across all items (no cutoff)
+        metrics["ndcg"] = self.compute_ndcg(
+            predicted_relevances, ideal_relevances, k=None
+        )
+
+        return metrics
+
+    def evaluate_batch(
+        self,
+        rankings: List[List[Tuple[str, float]]],
+        ground_truths: List[Dict[str, float]],
+        k_values: Optional[List[int]] = None,
+    ) -> Dict[str, float]:
+        """
+        Evaluate ranking quality across multiple queries/vacancies.
+
+        Computes mean NDCG@k and MRR across all rankings.
+
+        Args:
+            rankings: List of predicted rankings, each being a list of (item_id, score) tuples
+            ground_truths: List of ground truth relevance dictionaries
+            k_values: List of cutoff positions for NDCG@k
+
+        Returns:
+            Dictionary with mean metrics across all rankings
+        """
+        if len(rankings) != len(ground_truths):
+            raise ValueError(
+                f"Number of rankings ({len(rankings)}) must match "
+                f"number of ground truths ({len(ground_truths)})"
+            )
+
+        if not rankings:
+            return {"ndcg": 0.0, "mrr": 0.0}
+
+        all_metrics: List[Dict[str, float]] = []
+
+        for ranking, gt in zip(rankings, ground_truths):
+            metrics = self.evaluate_ranking(ranking, gt, k_values)
+            all_metrics.append(metrics)
+
+        # Compute mean metrics
+        mean_metrics: Dict[str, float] = {}
+        metric_keys = all_metrics[0].keys()
+
+        for key in metric_keys:
+            values = [m[key] for m in all_metrics]
+            mean_metrics[f"mean_{key}"] = float(np.mean(values))
+            mean_metrics[f"std_{key}"] = float(np.std(values))
+
+        mean_metrics["n_queries"] = float(len(rankings))
+
+        return mean_metrics
+
 
 class RankingService:
     """
