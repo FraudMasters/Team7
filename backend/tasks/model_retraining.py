@@ -24,6 +24,7 @@ from models.skill_feedback import SkillFeedback
 from analyzers.performance_tracker import PerformanceTracker
 from analyzers.model_versioning import ModelVersionManager
 from analyzers.feedback_accumulator import FeedbackAccumulator
+from analyzers.mlflow_tracker import get_mlflow_tracker
 from config import get_settings
 from tasks.notifications import (
     send_model_retraining_notification,
@@ -1462,6 +1463,7 @@ def automated_retraining_task_core(
     auto_activate: bool = False,
     performance_threshold: float = AUTO_ACTIVATION_PERFORMANCE_THRESHOLD,
     db_session: Optional[Session] = None,
+    mlflow_run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Core automated retraining logic without Celery dependencies.
@@ -1475,6 +1477,7 @@ def automated_retraining_task_core(
         auto_activate: Whether to auto-activate if performance threshold met
         performance_threshold: Minimum F1 score for auto-activation
         db_session: Database session for queries
+        mlflow_run_id: Optional existing MLflow run ID to use
 
     Returns:
         Dictionary containing retraining results
@@ -1485,6 +1488,10 @@ def automated_retraining_task_core(
         'completed'
     """
     start_time = time.time()
+
+    # Get MLflow tracker for experiment tracking
+    mlflow_tracker = get_mlflow_tracker()
+    mlflow_run_context = None
 
     try:
         logger.info(
@@ -1507,6 +1514,28 @@ def automated_retraining_task_core(
                 "processing_time_ms": round((time.time() - start_time) * 1000, 2),
             }
 
+        # Start MLflow run for experiment tracking
+        mlflow_run_context = mlflow_tracker.start_run(
+            experiment_name=f"{model_name}_retraining",
+            run_name=f"{model_name}_retraining_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+            tags={
+                "model_name": model_name,
+                "trigger_type": "automated",
+                "auto_activate": str(auto_activate),
+            },
+        )
+        mlflow_run_context.__enter__()
+
+        # Log initial training parameters to MLflow
+        mlflow_tracker.log_params({
+            "model_name": model_name,
+            "days_back": days_back,
+            "auto_activate": auto_activate,
+            "performance_threshold": performance_threshold,
+            "min_feedback_samples": MIN_FEEDBACK_SAMPLES_FOR_TRAINING,
+            "min_retraining_interval_days": MIN_RETRAINING_INTERVAL_DAYS,
+        })
+
         try:
             # Step 1: Evaluate if retraining should be triggered
             logger.info(f"Step 1/8: Evaluating retraining trigger conditions")
@@ -1523,6 +1552,15 @@ def automated_retraining_task_core(
                 logger.info(
                     f"Retraining not triggered for {model_name}: {trigger_decision['reasons']}"
                 )
+                # Log skipped run to MLflow
+                mlflow_tracker.set_tags({
+                    "training_status": "skipped",
+                    "skip_reasons": ", ".join(trigger_decision["reasons"]),
+                })
+                mlflow_tracker.log_metrics({
+                    "training_triggered": 0,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                })
                 return {
                     "should_retrain": False,
                     "training_triggered": False,
@@ -1544,6 +1582,12 @@ def automated_retraining_task_core(
 
             logger.info(f"Using {training_samples} feedback samples for training")
 
+            # Log training samples to MLflow
+            mlflow_tracker.log_params({
+                "training_samples": training_samples,
+                "query_days_back": days_back,
+            })
+
             # Step 3: Create training event record
             logger.info(f"Step 3/8: Creating training event record")
 
@@ -1561,11 +1605,24 @@ def automated_retraining_task_core(
             )
             training_event_id = str(training_event.id)
 
+            # Log training event info to MLflow
+            mlflow_tracker.log_params({
+                "training_event_id": training_event_id,
+                "new_version": new_version,
+            })
+
             # Step 4: Prepare training data
             logger.info(f"Step 4/8: Preparing training data")
 
             training_data = prepare_training_data(feedback_entries, model_name)
             logger.info("Training data prepared successfully")
+
+            # Log training data statistics to MLflow
+            mlflow_tracker.log_params({
+                "correct_samples": training_data.get("correct_count", 0),
+                "incorrect_samples": training_data.get("incorrect_count", 0),
+                "accuracy_ratio": training_data.get("accuracy_ratio", 0.0),
+            })
 
             # Step 5: Train new model version
             logger.info(f"Step 5/8: Training new model version")
@@ -1579,6 +1636,17 @@ def automated_retraining_task_core(
                 training_event.training_status = "failed"
                 training_event.error_message = training_result.get("error", "Unknown error")
                 db_session.commit()
+
+                # Log failure to MLflow
+                mlflow_tracker.set_tags({
+                    "training_status": "failed",
+                    "error_message": training_result.get("error", "Unknown error"),
+                })
+                mlflow_tracker.log_metrics({
+                    "training_triggered": 1,
+                    "training_success": 0,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                })
 
                 return {
                     "should_retrain": True,
@@ -1601,6 +1669,16 @@ def automated_retraining_task_core(
                 "auc_score": training_metrics.get("auc_score", 0.0),
                 "sample_size": training_samples,
             }
+
+            # Log training metrics to MLflow
+            mlflow_tracker.log_metrics({
+                "accuracy": performance_metrics["accuracy"],
+                "precision": performance_metrics["precision"],
+                "recall": performance_metrics["recall"],
+                "f1_score": performance_metrics["f1_score"],
+                "auc_score": performance_metrics["auc_score"],
+                "training_samples": training_samples,
+            })
 
             # Step 6: Evaluate model performance
             logger.info(f"Step 6/8: Evaluating model performance")
@@ -1635,6 +1713,18 @@ def automated_retraining_task_core(
                 training_event.training_status = "failed"
                 training_event.error_message = "Failed to create model version"
                 db_session.commit()
+
+                # Log version creation failure to MLflow
+                mlflow_tracker.set_tags({
+                    "training_status": "failed",
+                    "error_message": "Failed to create model version",
+                })
+                mlflow_tracker.log_metrics({
+                    "training_triggered": 1,
+                    "training_success": 0,
+                    "model_version_created": 0,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                })
 
                 return {
                     "should_retrain": True,
@@ -1673,6 +1763,31 @@ def automated_retraining_task_core(
                 is_active = True
                 is_experiment = False
                 logger.info(f"Model {new_version} activated as production model")
+
+            # Log successful training completion to MLflow
+            mlflow_tracker.set_tags({
+                "training_status": "completed",
+                "model_version": new_version,
+                "model_version_id": new_version_id,
+                "is_active": str(is_active),
+                "is_experiment": str(is_experiment),
+            })
+            mlflow_tracker.log_metrics({
+                "training_triggered": 1,
+                "training_success": 1,
+                "model_version_created": 1,
+                "improvement_over_baseline": improvement,
+                "processing_time_ms": processing_time_ms,
+            })
+            # Log training metadata as artifact
+            mlflow_tracker.log_dict({
+                "trigger_reasons": trigger_decision.get("reasons", []),
+                "performance_degraded": trigger_decision.get("performance_degraded", False),
+                "sufficient_feedback": trigger_decision.get("sufficient_feedback", False),
+                "interval_satisfied": trigger_decision.get("interval_satisfied", False),
+                "feedback_volume_triggered": trigger_decision.get("feedback_volume_triggered", False),
+                "degradation_details": trigger_decision.get("degradation_details", {}),
+            }, "training_metadata.json")
 
             # Update training event as completed
             training_event.training_status = "completed"
@@ -1717,9 +1832,35 @@ def automated_retraining_task_core(
             # Close session if we created it
             if session_created and db_session:
                 db_session.close()
+            # End MLflow run if we started one
+            if mlflow_run_context:
+                try:
+                    mlflow_run_context.__exit__(None, None, None)
+                except Exception as cleanup_error:
+                    logger.warning(f"Error ending MLflow run: {cleanup_error}")
 
     except Exception as e:
         logger.error(f"Error in core automated retraining: {e}", exc_info=True)
+        # Log error to MLflow if available
+        try:
+            mlflow_tracker.set_tags({
+                "training_status": "failed",
+                "error_type": type(e).__name__,
+                "error_message": str(e)[:500],  # Truncate long error messages
+            })
+            mlflow_tracker.log_metrics({
+                "training_triggered": 1,
+                "training_success": 0,
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            })
+        except Exception as mlflow_error:
+            logger.warning(f"Failed to log error to MLflow: {mlflow_error}")
+        # End MLflow run on error
+        if mlflow_run_context:
+            try:
+                mlflow_run_context.__exit__(type(e), e, e.__traceback__)
+            except Exception as cleanup_error:
+                logger.warning(f"Error ending MLflow run on exception: {cleanup_error}")
         return {
             "should_retrain": True,
             "training_triggered": False,
@@ -2085,6 +2226,9 @@ def manual_retraining_task(
         f"Manual retraining requested for '{model_name}' by {requested_by or 'unknown'}"
     )
 
+    # Get MLflow tracker for manual training run tagging
+    mlflow_tracker = get_mlflow_tracker()
+
     try:
         # Create database session
         db_session = get_sync_session()
@@ -2106,6 +2250,16 @@ def manual_retraining_task(
         # Add manual retraining metadata
         result["requested_by"] = requested_by
         result["trigger_type"] = "manual"
+
+        # Log additional MLflow metadata for manual trigger
+        if result.get("mlflow_run_id") or result.get("status") == "completed":
+            try:
+                mlflow_tracker.set_tag("trigger_type", "manual")
+                if requested_by:
+                    mlflow_tracker.set_tag("requested_by", requested_by)
+                mlflow_tracker.log_param("bypass_trigger_evaluation", True)
+            except Exception as mlflow_err:
+                logger.warning(f"Failed to log manual trigger metadata to MLflow: {mlflow_err}")
 
         # Send notification for manual retraining
         if result.get("status") == "completed":
