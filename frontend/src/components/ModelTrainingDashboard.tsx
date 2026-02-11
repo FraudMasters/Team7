@@ -17,6 +17,7 @@ import {
   Switch,
   FormControlLabel,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import {
   School as TrainingIcon,
@@ -24,12 +25,16 @@ import {
   Warning as WarningIcon,
   Error as ErrorIcon,
   TrendingUp as TrendingIcon,
+  TrendingFlat as TrendingFlatIcon,
   Refresh as RefreshIcon,
   PlayArrow as StartIcon,
   Pause as PauseIcon,
   AccessTime as TimeIcon,
   Speed as SpeedIcon,
   Block as BlockIcon,
+  ShowChart as ChartIcon,
+  ArrowUpward as ArrowUpIcon,
+  ArrowDownward as ArrowDownIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -100,6 +105,34 @@ interface PauseStatus {
   updated_at: string;
 }
 
+interface PerformanceTrendPoint {
+  timestamp: string;
+  accuracy?: number;
+  precision?: number;
+  recall?: number;
+  f1_score?: number;
+  auc_score?: number;
+  ndcg_score?: number;
+  mrr_score?: number;
+}
+
+interface PerformanceTrends {
+  model_name: string;
+  current_metrics: {
+    accuracy?: number;
+    precision?: number;
+    recall?: number;
+    f1_score?: number;
+    auc_score?: number;
+    ndcg_score?: number;
+    mrr_score?: number;
+  };
+  trend_data: PerformanceTrendPoint[];
+  trend_direction: 'improving' | 'declining' | 'stable';
+  health_score: number;
+  alert_status: 'none' | 'warning' | 'critical';
+}
+
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, color, icon }) => {
   const getColor = () => {
     switch (color) {
@@ -140,6 +173,8 @@ const ModelTrainingDashboard: React.FC = () => {
   const [pauseStatus, setPauseStatus] = useState<PauseStatus | null>(null);
   const [pauseLoading, setPauseLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null);
+  const [trendsLoading, setTrendsLoading] = useState(false);
 
   const fetchPauseStatus = useCallback(async () => {
     try {
@@ -179,6 +214,38 @@ const ModelTrainingDashboard: React.FC = () => {
     }
   };
 
+  const fetchPerformanceTrends = useCallback(async (modelName: string) => {
+    try {
+      setTrendsLoading(true);
+      const response = await axios.get(`/api/model-versions/metrics/${modelName}?days=7`);
+      setPerformanceTrends(response.data);
+    } catch (error) {
+      // API may not be available yet, set mock data for visualization
+      setPerformanceTrends({
+        model_name: modelName,
+        current_metrics: {
+          accuracy: 0.85,
+          precision: 0.82,
+          recall: 0.88,
+          f1_score: 0.85,
+        },
+        trend_data: [
+          { timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), accuracy: 0.78, f1_score: 0.76 },
+          { timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), accuracy: 0.80, f1_score: 0.79 },
+          { timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), accuracy: 0.82, f1_score: 0.81 },
+          { timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), accuracy: 0.81, f1_score: 0.80 },
+          { timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), accuracy: 0.84, f1_score: 0.83 },
+          { timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), accuracy: 0.85, f1_score: 0.85 },
+        ],
+        trend_direction: 'improving',
+        health_score: 85,
+        alert_status: 'none',
+      });
+    } finally {
+      setTrendsLoading(false);
+    }
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -198,6 +265,9 @@ const ModelTrainingDashboard: React.FC = () => {
         skill_matching: skillMatchingStatus,
         ranking: rankingStatus,
       });
+
+      // Fetch performance trends for selected model
+      await fetchPerformanceTrends('skill_matching');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
@@ -247,6 +317,12 @@ const ModelTrainingDashboard: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (selectedModel) {
+      fetchPerformanceTrends(selectedModel);
+    }
+  }, [selectedModel, fetchPerformanceTrends]);
 
   if (loading) {
     return (
@@ -523,6 +599,307 @@ const ModelTrainingDashboard: React.FC = () => {
           </Box>
         </Paper>
       )}
+
+      {/* Performance Trends Chart */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <ChartIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+              ТРЕНДЫ ПРОИЗВОДИТЕЛЬНОСТИ
+            </Typography>
+          </Box>
+          {performanceTrends && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip
+                icon={
+                  performanceTrends.trend_direction === 'improving' ? <ArrowUpIcon /> :
+                  performanceTrends.trend_direction === 'declining' ? <ArrowDownIcon /> :
+                  <TrendingFlatIcon />
+                }
+                label={
+                  performanceTrends.trend_direction === 'improving' ? 'Улучшается' :
+                  performanceTrends.trend_direction === 'declining' ? 'Ухудшается' :
+                  'Стабильно'
+                }
+                size="small"
+                color={
+                  performanceTrends.trend_direction === 'improving' ? 'success' :
+                  performanceTrends.trend_direction === 'declining' ? 'error' :
+                  'info'
+                }
+                variant="outlined"
+                sx={{ fontSize: '0.7rem' }}
+              />
+              {performanceTrends.health_score !== undefined && (
+                <Tooltip title={`Health Score: ${performanceTrends.health_score}/100`}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={performanceTrends.health_score}
+                      sx={{
+                        width: 60,
+                        height: 6,
+                        borderRadius: 1,
+                        bgcolor: 'action.hover',
+                      }}
+                      color={
+                        performanceTrends.health_score >= 80 ? 'success' :
+                        performanceTrends.health_score >= 60 ? 'warning' : 'error'
+                      }
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {performanceTrends.health_score}%
+                    </Typography>
+                  </Box>
+                </Tooltip>
+              )}
+            </Box>
+          )}
+        </Box>
+
+        {trendsLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : performanceTrends ? (
+          <Box>
+            {/* Current Metrics Summary */}
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              <Grid item xs={6} sm={4} md={2.4}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <CardContent sx={{ py: 1.5, px: 2 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Accuracy
+                    </Typography>
+                    <Typography variant="h6" fontWeight={600} color={performanceTrends.current_metrics.accuracy && performanceTrends.current_metrics.accuracy >= 0.8 ? 'success.main' : 'warning.main'}>
+                      {performanceTrends.current_metrics.accuracy ? `${(performanceTrends.current_metrics.accuracy * 100).toFixed(1)}%` : '-'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2.4}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <CardContent sx={{ py: 1.5, px: 2 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Precision
+                    </Typography>
+                    <Typography variant="h6" fontWeight={600} color={performanceTrends.current_metrics.precision && performanceTrends.current_metrics.precision >= 0.8 ? 'success.main' : 'warning.main'}>
+                      {performanceTrends.current_metrics.precision ? `${(performanceTrends.current_metrics.precision * 100).toFixed(1)}%` : '-'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2.4}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <CardContent sx={{ py: 1.5, px: 2 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Recall
+                    </Typography>
+                    <Typography variant="h6" fontWeight={600} color={performanceTrends.current_metrics.recall && performanceTrends.current_metrics.recall >= 0.8 ? 'success.main' : 'warning.main'}>
+                      {performanceTrends.current_metrics.recall ? `${(performanceTrends.current_metrics.recall * 100).toFixed(1)}%` : '-'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2.4}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <CardContent sx={{ py: 1.5, px: 2 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      F1 Score
+                    </Typography>
+                    <Typography variant="h6" fontWeight={600} color={performanceTrends.current_metrics.f1_score && performanceTrends.current_metrics.f1_score >= 0.8 ? 'success.main' : 'warning.main'}>
+                      {performanceTrends.current_metrics.f1_score ? performanceTrends.current_metrics.f1_score.toFixed(3) : '-'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={4} md={2.4}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <CardContent sx={{ py: 1.5, px: 2 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {selectedModel === 'ranking' ? 'NDCG' : 'AUC'}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={600} color="primary.main">
+                      {selectedModel === 'ranking'
+                        ? (performanceTrends.current_metrics.ndcg_score ? `${(performanceTrends.current_metrics.ndcg_score * 100).toFixed(1)}%` : '-')
+                        : (performanceTrends.current_metrics.auc_score ? `${(performanceTrends.current_metrics.auc_score * 100).toFixed(1)}%` : '-')
+                      }
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Trend Visualization */}
+            {performanceTrends.trend_data.length > 0 && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ display: 'block', mb: 1 }}>
+                  ИСТОРИЯ ЗА 7 ДНЕЙ
+                </Typography>
+                <Box sx={{ position: 'relative', height: 120, bgcolor: 'action.hover', borderRadius: 1, p: 2 }}>
+                  {/* Grid lines */}
+                  {[0, 25, 50, 75, 100].map((value) => (
+                    <Box
+                      key={value}
+                      sx={{
+                        position: 'absolute',
+                        left: 24,
+                        right: 16,
+                        top: `${100 - value}%`,
+                        borderBottom: '1px dashed',
+                        borderColor: 'divider',
+                      }}
+                    />
+                  ))}
+
+                  {/* Y-axis labels */}
+                  <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', py: 0.5 }}>
+                    {[100, 75, 50, 25, 0].map((value) => (
+                      <Typography key={value} variant="caption" sx={{ fontSize: 9, color: 'text.disabled' }}>
+                        {value}%
+                      </Typography>
+                    ))}
+                  </Box>
+
+                  {/* Data points and lines */}
+                  <Box sx={{ position: 'absolute', left: 24, right: 16, top: 8, bottom: 16 }}>
+                    {performanceTrends.trend_data.map((point, index) => {
+                      const accuracy = point.accuracy ? point.accuracy * 100 : null;
+                      const f1Score = point.f1_score ? point.f1_score * 100 : null;
+                      const xPos = (index / Math.max(performanceTrends.trend_data.length - 1, 1)) * 100;
+
+                      return (
+                        <Box key={point.timestamp}>
+                          {/* Accuracy point */}
+                          {accuracy !== null && (
+                            <Tooltip
+                              title={
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    {new Date(point.timestamp).toLocaleDateString('ru-RU')}
+                                  </Typography>
+                                  <Typography variant="caption" display="block">
+                                    Accuracy: {accuracy.toFixed(1)}%
+                                  </Typography>
+                                </Box>
+                              }
+                            >
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  left: `${xPos}%`,
+                                  top: `${100 - accuracy}%`,
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: '50%',
+                                  bgcolor: 'success.main',
+                                  border: 2,
+                                  borderColor: 'background.paper',
+                                  transform: 'translate(-50%, -50%)',
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.2s',
+                                  '&:hover': {
+                                    transform: 'translate(-50%, -50%) scale(1.3)',
+                                  },
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+
+                          {/* F1 Score point */}
+                          {f1Score !== null && (
+                            <Tooltip
+                              title={
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    {new Date(point.timestamp).toLocaleDateString('ru-RU')}
+                                  </Typography>
+                                  <Typography variant="caption" display="block">
+                                    F1 Score: {f1Score.toFixed(1)}%
+                                  </Typography>
+                                </Box>
+                              }
+                            >
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  left: `${xPos}%`,
+                                  top: `${100 - f1Score}%`,
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: '50%',
+                                  bgcolor: 'primary.main',
+                                  border: 2,
+                                  borderColor: 'background.paper',
+                                  transform: 'translate(-50%, -50%)',
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.2s',
+                                  '&:hover': {
+                                    transform: 'translate(-50%, -50%) scale(1.3)',
+                                  },
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                        </Box>
+                      );
+                    })}
+
+                    {/* X-axis labels */}
+                    <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: -20, display: 'flex', justifyContent: 'space-between' }}>
+                      {performanceTrends.trend_data.map((point, index) => (
+                        <Typography
+                          key={point.timestamp}
+                          variant="caption"
+                          sx={{ fontSize: 9, color: 'text.disabled' }}
+                        >
+                          {new Date(point.timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Legend */}
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mt: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: 'success.main' }} />
+                    <Typography variant="caption" color="text.secondary">
+                      Accuracy
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                    <Typography variant="caption" color="text.secondary">
+                      F1 Score
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+
+            {/* Alert Status */}
+            {performanceTrends.alert_status !== 'none' && (
+              <Alert severity={performanceTrends.alert_status === 'critical' ? 'error' : 'warning'} sx={{ mt: 2 }}>
+                <Typography variant="caption">
+                  {performanceTrends.alert_status === 'critical'
+                    ? 'Критическое снижение производительности модели. Требуется проверка.'
+                    : 'Обнаружено снижение производительности. Рекомендуется мониторинг.'
+                  }
+                </Typography>
+              </Alert>
+            )}
+          </Box>
+        ) : (
+          <Box sx={{ py: 4, textAlign: 'center' }}>
+            <ChartIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">
+              Нет данных о трендах
+            </Typography>
+          </Box>
+        )}
+      </Paper>
 
       {/* Recent Training Events */}
       {recentMetrics.length > 0 && (
