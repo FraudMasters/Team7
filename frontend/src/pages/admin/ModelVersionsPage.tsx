@@ -11,10 +11,20 @@ import {
   MenuItem,
   Button,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  IconButton,
+  Tooltip,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Compare as CompareIcon,
   Speed as SpeedIcon,
+  Restore as RestoreIcon,
 } from '@mui/icons-material';
 import ModelVersionComparison from '@components/ModelVersionComparison';
 
@@ -43,6 +53,14 @@ const ModelVersionsPage: React.FC = () => {
   const [selectedModelName, setSelectedModelName] = useState<string>('skill_matching');
   const [versionA, setVersionA] = useState<string>('');
   const [versionB, setVersionB] = useState<string>('');
+  const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
+  const [versionToRollback, setVersionToRollback] = useState<ModelVersionOption | null>(null);
+  const [rollbackLoading, setRollbackLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   /**
    * Fetch available model versions
@@ -89,6 +107,69 @@ const ModelVersionsPage: React.FC = () => {
     setSelectedModelName(modelName);
     setVersionA('');
     setVersionB('');
+  };
+
+  /**
+   * Open rollback confirmation dialog
+   */
+  const handleRollbackClick = (version: ModelVersionOption) => {
+    setVersionToRollback(version);
+    setRollbackDialogOpen(true);
+  };
+
+  /**
+   * Close rollback dialog
+   */
+  const handleRollbackCancel = () => {
+    setRollbackDialogOpen(false);
+    setVersionToRollback(null);
+  };
+
+  /**
+   * Perform rollback to selected version
+   */
+  const handleRollbackConfirm = async () => {
+    if (!versionToRollback) return;
+
+    try {
+      setRollbackLoading(true);
+      const response = await fetch(`http://localhost:8000/api/model-versions/${versionToRollback.id}/activate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to activate model version');
+      }
+
+      setSnackbar({
+        open: true,
+        message: `Successfully rolled back to ${versionToRollback.version}`,
+        severity: 'success',
+      });
+
+      // Refresh the model versions list
+      await fetchModelVersions();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Failed to rollback model version',
+        severity: 'error',
+      });
+    } finally {
+      setRollbackLoading(false);
+      setRollbackDialogOpen(false);
+      setVersionToRollback(null);
+    }
+  };
+
+  /**
+   * Close snackbar
+   */
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   const filteredVersions = modelVersions.filter(v => v.model_name === selectedModelName);
@@ -210,6 +291,61 @@ const ModelVersionsPage: React.FC = () => {
         )}
       </Paper>
 
+      {/* Rollback Actions Panel */}
+      {!loading && filteredVersions.length > 0 && (
+        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" fontWeight={600} gutterBottom>
+            Model Rollback
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Click the rollback button to activate a previous model version
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            {filteredVersions.map((version) => (
+              <Box
+                key={version.id}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  p: 1.5,
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: version.is_active ? 'success.main' : 'divider',
+                  backgroundColor: version.is_active ? 'action.hover' : 'background.paper',
+                }}
+              >
+                <Typography variant="body2" fontWeight={500}>
+                  {version.version}
+                </Typography>
+                {version.is_active && (
+                  <Chip label="Active" size="small" color="success" />
+                )}
+                {version.performance_score !== null && (
+                  <Chip
+                    label={`Score: ${version.performance_score.toFixed(0)}`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+                <Tooltip title={version.is_active ? 'Currently active' : 'Rollback to this version'}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      color={version.is_active ? 'success' : 'primary'}
+                      onClick={() => handleRollbackClick(version)}
+                      disabled={version.is_active}
+                    >
+                      <RestoreIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      )}
+
       {/* Comparison Display */}
       {versionA && versionB && versionA !== versionB && (
         <ModelVersionComparison
@@ -227,6 +363,59 @@ const ModelVersionsPage: React.FC = () => {
           </Typography>
         </Paper>
       )}
+
+      {/* Rollback Confirmation Dialog */}
+      <Dialog
+        open={rollbackDialogOpen}
+        onClose={handleRollbackCancel}
+        aria-labelledby="rollback-dialog-title"
+        aria-describedby="rollback-dialog-description"
+      >
+        <DialogTitle id="rollback-dialog-title">
+          Confirm Model Rollback
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="rollback-dialog-description">
+            Are you sure you want to rollback to <strong>{versionToRollback?.version}</strong>?
+          </DialogContentText>
+          <DialogContentText sx={{ mt: 2, color: 'warning.main' }}>
+            This will activate this model version for the {selectedModelName} model,
+            replacing the currently active version.
+          </DialogContentText>
+          {versionToRollback?.performance_score !== null && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Performance Score: <strong>{versionToRollback?.performance_score?.toFixed(0)}</strong>
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleRollbackCancel} disabled={rollbackLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleRollbackConfirm}
+            variant="contained"
+            color="primary"
+            disabled={rollbackLoading}
+          >
+            {rollbackLoading ? 'Rolling back...' : 'Rollback'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };
