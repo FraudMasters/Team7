@@ -106,6 +106,28 @@ class CorrectionCreateResponse(BaseModel):
     message: str = Field(..., description="Success message")
 
 
+class FieldUpdateRequest(BaseModel):
+    """Request model for updating a parsed field."""
+
+    value: str = Field(..., description="The corrected value for the field")
+    original_value: Optional[str] = Field(
+        None,
+        description="The original AI-parsed value before correction"
+    )
+    reason: Optional[str] = Field(
+        None,
+        description="Reason for correction (e.g., 'position_was_incorrect', 'missing_skill')"
+    )
+
+
+class FieldUpdateResponse(BaseModel):
+    """Response model for field update."""
+
+    success: bool = Field(..., description="Whether field was updated successfully")
+    data: CorrectionResponse = Field(..., description="Created correction details")
+    message: str = Field(..., description="Success message")
+
+
 @router.get(
     "/{resume_id}",
     response_model=CorrectionsListResponse,
@@ -354,6 +376,144 @@ async def create_correction(
         logger.error(f"Error creating correction for resume {resume_id}: {e}", exc_info=True)
         await db.rollback()
         error_message = get_error_message("correction_save_failed", locale)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_message,
+        ) from e
+
+
+@router.put(
+    "/{resume_id}/fields/{field_name}",
+    response_model=FieldUpdateResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Parsing Corrections"],
+)
+async def update_parsed_field(
+    request: Request,
+    resume_id: str,
+    field_name: str,
+    field_update: FieldUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update an individual parsed field with correction tracking.
+
+    This endpoint allows users to update a specific parsed field value
+    while automatically creating a correction record for tracking purposes.
+
+    Args:
+        request: FastAPI request object
+        resume_id: UUID of the resume
+        field_name: Name of the field to update (e.g., 'position', 'skills', 'education')
+        field_update: Request body containing new value, original value, and reason
+        db: Database session
+
+    Returns:
+        JSON response with created correction details
+
+    Raises:
+        HTTPException(404): If resume not found
+        HTTPException(422): If resume_id format is invalid or field_name is invalid
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.put(
+        ...     "http://localhost:8000/api/parsing-corrections/123e4567-e89b-12d3-a456-426614174000/fields/position",
+        ...     json={
+        ...         "value": "Senior Software Engineer",
+        ...         "original_value": "Software Engineer",
+        ...         "reason": "position_was_incorrect"
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "success": true,
+            "data": {
+                "id": "456e7890-e89b-12d3-a456-426614174000",
+                "resume_id": "123e4567-e89b-12d3-a456-426614174000",
+                "field_name": "position",
+                "original_value": {"position": "Software Engineer"},
+                "corrected_value": {"position": "Senior Software Engineer"},
+                "reason": "position_was_incorrect",
+                "source_text_location": null,
+                "corrected_by": null,
+                "created_at": "2026-02-12T00:00:00Z"
+            },
+            "message": "Field updated successfully"
+        }
+    """
+    locale = _extract_locale(request)
+
+    # Validate resume_id format
+    try:
+        resume_uuid = UUID(resume_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid resume ID format: {resume_id}"
+        )
+
+    # Validate field_name
+    valid_fields = {
+        "position", "skills", "education", "work_experience",
+        "languages", "age", "raw_text", "other"
+    }
+    if field_name not in valid_fields:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid field_name '{field_name}'. Valid values: {', '.join(sorted(valid_fields))}"
+        )
+
+    try:
+        # Create new correction record to track this update
+        new_correction = ParsingCorrection(
+            resume_id=resume_uuid,
+            field_name=field_name,
+            original_value={field_name: field_update.original_value} if field_update.original_value else None,
+            corrected_value={field_name: field_update.value},
+            reason=field_update.reason,
+        )
+
+        db.add(new_correction)
+        await db.commit()
+        await db.refresh(new_correction)
+
+        # Build response
+        correction_response = CorrectionResponse(
+            id=str(new_correction.id),
+            resume_id=str(new_correction.resume_id),
+            field_name=new_correction.field_name,
+            original_value=new_correction.original_value,
+            corrected_value=new_correction.corrected_value,
+            reason=new_correction.reason,
+            source_text_location=new_correction.source_text_location,
+            corrected_by=str(new_correction.corrected_by) if new_correction.corrected_by else None,
+            created_at=new_correction.created_at.isoformat() if new_correction.created_at else None,
+        )
+
+        success_message = get_success_message("field_updated", locale)
+
+        logger.info(
+            f"Updated field '{field_name}' for resume {resume_id}: "
+            f"original={field_update.original_value}, new={field_update.value}, reason={field_update.reason}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "data": correction_response.model_dump(),
+                "message": success_message,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating field '{field_name}' for resume {resume_id}: {e}", exc_info=True)
+        await db.rollback()
+        error_message = get_error_message("field_update_failed", locale)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_message,

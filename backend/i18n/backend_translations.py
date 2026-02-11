@@ -104,6 +104,7 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "correction_save_failed": "Failed to save correction",
         "correction_update_failed": "Failed to update correction",
         "correction_not_found": "Correction not found",
+        "field_update_failed": "Failed to update field",
     },
     "ru": {
         # File upload errors
@@ -191,6 +192,7 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "correction_save_failed": "Не удалось сохранить исправление",
         "correction_update_failed": "Не удалось обновить исправление",
         "correction_not_found": "Исправление не найдено",
+        "field_update_failed": "Не удалось обновить поле",
     },
 }
 
@@ -215,6 +217,7 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "corrections_retrieved": "Corrections retrieved successfully",
         "correction_saved": "Correction saved successfully",
         "correction_updated": "Correction updated successfully",
+        "field_updated": "Field updated successfully",
     },
     "ru": {
         "file_uploaded": "Резюме успешно загружено",
@@ -234,6 +237,7 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         "corrections_retrieved": "Исправления успешно получены",
         "correction_saved": "Исправление успешно сохранено",
         "correction_updated": "Исправление успешно обновлено",
+        "field_updated": "Поле успешно обновлено",
     },
 }
 
