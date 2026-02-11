@@ -268,6 +268,7 @@ def extract_education(
                 - level: Degree level (Bachelor, Master, PhD, etc.)
                 - institution: Institution name
                 - field: Field of study (if detected)
+                - location: Character position (start, end) of the degree mention
             - highest_level: Highest education level detected
             - institutions: List of institution names
             - error: Error message if extraction failed
@@ -299,23 +300,24 @@ def extract_education(
         nlp = _get_model(language)
         doc = nlp(text)
 
-        # Extract education levels
+        # Extract education levels with location
         education_levels = EDUCATION_LEVELS.get(lang, EDUCATION_LEVELS["en"])
-        found_levels = []
+        found_levels_with_loc: List[Tuple[str, Tuple[int, int]]] = []
 
         for level in education_levels:
-            if re.search(rf"\b{re.escape(level)}\b", text, re.IGNORECASE):
-                found_levels.append(level)
+            pattern = rf"\b{re.escape(level)}\b"
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                found_levels_with_loc.append((level, (match.start(), match.end())))
 
-        # Extract organizations (institutions)
-        institutions = []
+        # Extract organizations (institutions) with location
+        institutions_with_loc: List[Tuple[str, Tuple[int, int]]] = []
         for ent in doc.ents:
             if ent.label_ == "ORG":
                 # Check if it's an educational institution
                 inst_patterns = INSTITUTION_PATTERNS.get(lang, INSTITUTION_PATTERNS["en"])
                 for pattern in inst_patterns:
                     if re.search(pattern, ent.text, re.IGNORECASE):
-                        institutions.append(ent.text)
+                        institutions_with_loc.append((ent.text, (ent.start_char, ent.end_char)))
                         break
 
         # Determine highest level
@@ -328,23 +330,31 @@ def extract_education(
         }
 
         highest_level = None
+        highest_location = None
         highest_rank = 0
-        for level in found_levels:
+        for level, loc in found_levels_with_loc:
             level_lower = level.lower()
             for key, rank in hierarchy.items():
                 if key in level_lower and rank > highest_rank:
                     highest_rank = rank
                     highest_level = level
+                    highest_location = loc
 
         # Build education entries
         education_entries = []
         if highest_level:
+            inst, inst_loc = institutions_with_loc[0] if institutions_with_loc else (None, None)
             entries = [{
                 "level": highest_level,
-                "institution": institutions[0] if institutions else None,
+                "institution": inst,
                 "field": None,  # Would require more complex parsing
+                "location": highest_location,
+                "institution_location": inst_loc,
             }]
             education_entries = entries
+
+        # Extract institution names for backward compatibility
+        institutions = [inst for inst, _ in institutions_with_loc]
 
         logger.info(f"Extracted education: {highest_level}, institutions: {len(institutions)}")
 
@@ -482,6 +492,7 @@ def extract_languages(
             - languages: List of language entries with:
                 - language: Language name
                 - proficiency: Proficiency level (if specified)
+                - location: Character position (start, end) if found
             - primary_language: Detected primary/resume language
             - error: Error message if extraction failed
 
@@ -489,12 +500,12 @@ def extract_languages(
         >>> text = "Languages: English (Native), Spanish (Intermediate), French (Basic)"
         >>> result = extract_languages(text)
         >>> print(result["languages"][0])
-        {'language': 'English', 'proficiency': 'Native'}
+        {'language': 'English', 'proficiency': 'Native', 'location': (10, 17)}
 
         >>> text = "Знание языков: Русский (родной), Английский (B2)"
         >>> result = extract_languages(text, language="ru")
         >>> print(result["languages"])
-        [{'language': 'Русский', 'proficiency': 'родной'}, {'language': 'Английский', 'proficiency': 'B2'}]
+        [{'language': 'Русский', 'proficiency': 'родной', 'location': (16, 23)}, ...]
     """
     try:
         if not text or not isinstance(text):
@@ -527,7 +538,7 @@ def extract_languages(
         # If no sections found, search entire text
         search_text = " ".join(lang_sections) if lang_sections else text
 
-        # Extract languages and proficiencies
+        # Extract languages and proficiencies with location tracking
         for pattern_type, pattern in lang_patterns:
             matches = re.finditer(pattern, search_text, re.IGNORECASE)
             for match in matches:
@@ -535,7 +546,11 @@ def extract_languages(
                 if pattern_type == "language":
                     # Check if we already have this language
                     if not any(l["language"] == term for l in found_languages):
-                        found_languages.append({"language": term, "proficiency": None})
+                        found_languages.append({
+                            "language": term,
+                            "proficiency": None,
+                            "location": (match.start(), match.end())
+                        })
                 elif pattern_type == "proficiency":
                     # Associate proficiency with most recent language
                     if found_languages and found_languages[-1]["proficiency"] is None:

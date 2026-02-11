@@ -8,7 +8,7 @@ experience, and calculating experience metrics.
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from config import get_settings
 from i18n.backend_translations import get_error_message, get_success_message
-from models.parsed_resume import ParsedResume, Skill, Education, WorkExperience, Language, ExperienceSummary
+from models.parsed_resume import ParsedResume, Skill, Education, WorkExperience, Language, ExperienceSummary, SourceTextLocation
 from parsers import PDFParser, DOCXParser
 from nlp.resume_entities import extract_resume_entities
 from analyzers.experience_calculator import calculate_dual_track_experience
@@ -176,6 +176,38 @@ def _detect_language(text: str) -> str:
     return "en"
 
 
+def _build_source_location(
+    location: Optional[Tuple[int, int]],
+    raw_text: str
+) -> Optional[SourceTextLocation]:
+    """
+    Build SourceTextLocation from character position tuple.
+
+    Args:
+        location: Tuple of (start, end) character positions
+        raw_text: Full text to extract the source segment from
+
+    Returns:
+        SourceTextLocation with text field populated, or None if location is None
+    """
+    if location is None or not raw_text:
+        return None
+
+    try:
+        start, end = location
+        if 0 <= start < end <= len(raw_text):
+            source_text = raw_text[start:end].strip()
+            return SourceTextLocation(
+                page=None,  # Page info not available from text extraction
+                bbox=None,  # BBox not available from text extraction
+                text=source_text,
+            )
+    except (TypeError, ValueError, IndexError):
+        pass
+
+    return None
+
+
 @router.post(
     "/parse",
     response_model=ResumeParseResponse,
@@ -284,12 +316,44 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
         logger.info("Calculating experience metrics...")
         experience_result = calculate_dual_track_experience(raw_text, language=language)
 
+        # Extract source locations for visual highlighting
+        position_data = entities.get("position", {}) or {}
+        age_data = entities.get("age", {}) or {}
+        education_data = entities.get("education", {}) or {}
+        languages_data = entities.get("languages", {}) or {}
+
+        # Get education entries list (from education_data dict)
+        education_entries = education_data.get("education_entries") or []
+
+        # Get languages list (from languages_data dict)
+        language_entries = languages_data.get("languages") or []
+
+        # Build source locations dictionary for each extracted field
+        source_locations = {
+            "position": _build_source_location(
+                position_data.get("location"), raw_text
+            ).model_dump(mode='json') if _build_source_location(position_data.get("location"), raw_text) else None,
+            "age": _build_source_location(
+                age_data.get("location"), raw_text
+            ).model_dump(mode='json') if _build_source_location(age_data.get("location"), raw_text) else None,
+            "education": [
+                _build_source_location(edu.get("location"), raw_text).model_dump(mode='json')
+                if _build_source_location(edu.get("location"), raw_text) else None
+                for edu in education_entries
+            ],
+            "languages": [
+                _build_source_location(lang.get("location"), raw_text).model_dump(mode='json')
+                if _build_source_location(lang.get("location"), raw_text) else None
+                for lang in language_entries
+            ],
+        }
+
         # Build parsed resume model
         parsed_resume = ParsedResume(
             raw_text=raw_text,
             language=language,
-            position=entities.get("position"),
-            age=entities.get("age"),
+            position=position_data.get("position"),
+            age=age_data.get("age"),
             skills=[
                 Skill(
                     name=skill.get("name", ""),
@@ -298,20 +362,22 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
                     variations=skill.get("variations", []),
                     sources=skill.get("sources", []),
                     confidence=skill.get("confidence", 0.0),
+                    source_text_location=_build_source_location(skill.get("location"), raw_text),
                 )
                 for skill in entities.get("skills", [])
             ],
             education=[
                 Education(
-                    degree=edu.get("degree"),
+                    degree=edu.get("degree") or edu.get("level"),
                     institution=edu.get("institution"),
-                    field_of_study=edu.get("field_of_study"),
+                    field_of_study=edu.get("field_of_study") or edu.get("field"),
                     start_date=edu.get("start_date"),
                     end_date=edu.get("end_date"),
                     gpa=edu.get("gpa"),
                     description=edu.get("description"),
+                    source_text_location=_build_source_location(edu.get("location"), raw_text),
                 )
-                for edu in entities.get("education", [])
+                for edu in education_entries
             ],
             work_experience=[
                 WorkExperience(
@@ -323,16 +389,18 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
                     description=exp.get("description"),
                     skills=exp.get("skills", []),
                     location=exp.get("location"),
+                    source_text_location=_build_source_location(exp.get("location_char"), raw_text),
                 )
                 for exp in entities.get("work_experience", [])
             ],
             languages=[
                 Language(
-                    name=lang.get("name", ""),
+                    name=lang.get("language") or lang.get("name", ""),
                     proficiency=lang.get("proficiency"),
                     certification=lang.get("certification"),
+                    source_text_location=_build_source_location(lang.get("location"), raw_text),
                 )
-                for lang in entities.get("languages", [])
+                for lang in language_entries
             ],
             experience_summary=ExperienceSummary(
                 total_months=experience_result.get("total_months", 0),
@@ -346,9 +414,9 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
                 "file_extension": file_ext,
                 "text_length": len(raw_text),
                 "num_skills": len(entities.get("skills", [])),
-                "num_education": len(entities.get("education", [])),
+                "num_education": len(education_entries),
                 "num_work_experience": len(entities.get("work_experience", [])),
-                "num_languages": len(entities.get("languages", [])),
+                "num_languages": len(language_entries),
             },
         )
 
@@ -367,6 +435,7 @@ async def parse_resume(request: Request, file: UploadFile = File(...)) -> JSONRe
             content={
                 "success": True,
                 "data": parsed_resume.model_dump(mode='json'),
+                "source_locations": source_locations,
                 "message": success_message,
                 "warnings": parsed_resume.warnings,
             },
