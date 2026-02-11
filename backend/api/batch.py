@@ -26,6 +26,12 @@ from models.resume import Resume, ResumeStatus
 from tasks.analysis_task import batch_analyze_resumes
 from celery_app import celery_app
 from utils.zip_extractor import extract_resumes_from_zip
+from utils.duplicate_detector import (
+    detect_duplicate,
+    record_duplicate,
+    DuplicateMatch,
+)
+from middleware.organization_context import get_organization_context
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -97,6 +103,16 @@ class BatchUploadRequest(BaseModel):
     analyze: bool = Field(True, description="Whether to analyze resumes after upload")
 
 
+class DuplicateInfo(BaseModel):
+    """Response model for duplicate detection information."""
+
+    resume_id: str = Field(..., description="ID of the duplicate resume")
+    filename: str = Field(..., description="Filename of the duplicate")
+    original_resume_id: str = Field(..., description="ID of the original resume")
+    match_type: str = Field(..., description="Type of match (exact or fuzzy)")
+    similarity_score: float = Field(..., description="Similarity score (1.0 for exact matches)")
+
+
 class BatchUploadResponse(BaseModel):
     """Response model for batch upload initiation."""
 
@@ -104,6 +120,8 @@ class BatchUploadResponse(BaseModel):
     total_files: int = Field(..., description="Number of files in the batch")
     status: str = Field(..., description="Initial status of the batch job")
     message: str = Field(..., description="Success message")
+    duplicates_detected: int = Field(0, description="Number of duplicate files detected")
+    duplicates: list[DuplicateInfo] = Field(default_factory=list, description="List of detected duplicates")
 
 
 class BatchStatusResponse(BaseModel):
@@ -127,6 +145,8 @@ class BatchFileItem(BaseModel):
     filename: str = Field(..., description="Original filename")
     status: str = Field(..., description="Processing status")
     error: Optional[str] = Field(None, description="Error message if failed")
+    is_duplicate: bool = Field(False, description="Whether this file is a duplicate")
+    original_resume_id: Optional[str] = Field(None, description="Original resume ID if duplicate")
 
 
 class BatchResultsResponse(BaseModel):
@@ -183,6 +203,7 @@ async def upload_batch(
         - Invalid files in ZIP are skipped with warnings
     """
     locale = _extract_locale(request)
+    organization_id = get_organization_context(request)
 
     if not files:
         raise HTTPException(
@@ -196,7 +217,7 @@ async def upload_batch(
             detail="Maximum 100 files allowed per batch",
         )
 
-    logger.info(f"Received batch upload request with {len(files)} files, analyze={analyze}, notification_email={notification_email}")
+    logger.info(f"Received batch upload request with {len(files)} files, analyze={analyze}, notification_email={notification_email}, organization_id={organization_id}")
 
     try:
         # Create batch job record
@@ -215,6 +236,9 @@ async def upload_batch(
         resume_ids = []
         failed_uploads = []
         zip_files_processed = 0
+
+        # Track detected duplicates
+        detected_duplicates: list[dict] = []
 
         for file in files:
             try:
@@ -289,6 +313,47 @@ async def upload_batch(
 
                             logger.info(f"Stored extracted file: {safe_filename} (from {file.filename}) -> {resume_id}")
 
+                            # Check for duplicates if organization context is available
+                            if organization_id:
+                                try:
+                                    duplicate_match = await detect_duplicate(
+                                        file_content=extracted_file["content"],
+                                        organization_id=organization_id,
+                                        db_session=db,
+                                        current_resume_id=str(resume_id),
+                                        batch_job_id=str(batch_id),
+                                        check_file_system=True,
+                                    )
+
+                                    if duplicate_match.is_duplicate and duplicate_match.original_resume_id:
+                                        # Record the duplicate
+                                        await record_duplicate(
+                                            original_resume_id=duplicate_match.original_resume_id,
+                                            duplicate_resume_id=str(resume_id),
+                                            content_hash=duplicate_match.content_hash,
+                                            organization_id=organization_id,
+                                            db_session=db,
+                                            batch_job_id=str(batch_id),
+                                            match_type=duplicate_match.match_type or "exact",
+                                            similarity_score=duplicate_match.similarity_score,
+                                        )
+
+                                        detected_duplicates.append({
+                                            "resume_id": str(resume_id),
+                                            "filename": safe_filename,
+                                            "original_resume_id": duplicate_match.original_resume_id,
+                                            "match_type": duplicate_match.match_type or "exact",
+                                            "similarity_score": duplicate_match.similarity_score,
+                                        })
+
+                                        logger.info(
+                                            f"Duplicate detected: {safe_filename} matches "
+                                            f"resume {duplicate_match.original_resume_id}"
+                                        )
+                                except Exception as dup_error:
+                                    # Log but don't fail the upload on duplicate detection error
+                                    logger.warning(f"Duplicate detection failed for {safe_filename}: {dup_error}")
+
                         except Exception as e:
                             failed_uploads.append(f"{extracted_file['filename']} (from {file.filename})")
                             logger.error(f"Failed to store extracted file {extracted_file['filename']}: {e}")
@@ -317,6 +382,47 @@ async def upload_batch(
 
                     logger.info(f"Stored file: {file.filename} -> {resume_id}")
 
+                    # Check for duplicates if organization context is available
+                    if organization_id:
+                        try:
+                            duplicate_match = await detect_duplicate(
+                                file_content=file_content,
+                                organization_id=organization_id,
+                                db_session=db,
+                                current_resume_id=str(resume_id),
+                                batch_job_id=str(batch_id),
+                                check_file_system=True,
+                            )
+
+                            if duplicate_match.is_duplicate and duplicate_match.original_resume_id:
+                                # Record the duplicate
+                                await record_duplicate(
+                                    original_resume_id=duplicate_match.original_resume_id,
+                                    duplicate_resume_id=str(resume_id),
+                                    content_hash=duplicate_match.content_hash,
+                                    organization_id=organization_id,
+                                    db_session=db,
+                                    batch_job_id=str(batch_id),
+                                    match_type=duplicate_match.match_type or "exact",
+                                    similarity_score=duplicate_match.similarity_score,
+                                )
+
+                                detected_duplicates.append({
+                                    "resume_id": str(resume_id),
+                                    "filename": file.filename or "unknown",
+                                    "original_resume_id": duplicate_match.original_resume_id,
+                                    "match_type": duplicate_match.match_type or "exact",
+                                    "similarity_score": duplicate_match.similarity_score,
+                                })
+
+                                logger.info(
+                                    f"Duplicate detected: {file.filename} matches "
+                                    f"resume {duplicate_match.original_resume_id}"
+                                )
+                        except Exception as dup_error:
+                            # Log but don't fail the upload on duplicate detection error
+                            logger.warning(f"Duplicate detection failed for {file.filename}: {dup_error}")
+
             except HTTPException:
                 failed_uploads.append(file.filename)
                 logger.warning(f"Failed to validate file: {file.filename}")
@@ -327,15 +433,16 @@ async def upload_batch(
         await db.commit()
 
         # Log processing summary
+        dup_count = len(detected_duplicates)
         if zip_files_processed > 0:
             logger.info(
                 f"Batch upload summary: {len(files)} input files ({zip_files_processed} ZIP archives), "
-                f"{len(resume_ids)} resumes stored, {len(failed_uploads)} failures"
+                f"{len(resume_ids)} resumes stored, {len(failed_uploads)} failures, {dup_count} duplicates"
             )
         else:
             logger.info(
                 f"Batch upload summary: {len(files)} files, "
-                f"{len(resume_ids)} resumes stored, {len(failed_uploads)} failures"
+                f"{len(resume_ids)} resumes stored, {len(failed_uploads)} failures, {dup_count} duplicates"
             )
 
         # Update batch job with actual counts
@@ -354,6 +461,8 @@ async def upload_batch(
                     "total_files": len(resume_ids),
                     "status": BatchJobStatus.failed.value,
                     "message": f"Batch created with errors. {len(failed_uploads)} files failed to upload.",
+                    "duplicates_detected": len(detected_duplicates),
+                    "duplicates": detected_duplicates,
                 }
             )
 
@@ -387,6 +496,8 @@ async def upload_batch(
                 "total_files": len(resume_ids),
                 "status": batch_job.status.value,
                 "message": f"Batch upload started with {len(resume_ids)} files",
+                "duplicates_detected": len(detected_duplicates),
+                "duplicates": detected_duplicates,
             }
         )
 
