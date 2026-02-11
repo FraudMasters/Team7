@@ -43,6 +43,12 @@ class ModelVersionManager:
     # Default fallback version when no active model is found
     DEFAULT_FALLBACK_VERSION = "v1.0.0"
 
+    # Default canary traffic allocation (10%)
+    DEFAULT_CANARY_TRAFFIC_PERCENTAGE = 10
+
+    # Maximum canary traffic before requiring promotion
+    MAX_CANARY_TRAFFIC_PERCENTAGE = 50
+
     def __init__(self, default_fallback_version: Optional[str] = None) -> None:
         """
         Initialize the model version manager.
@@ -1025,3 +1031,581 @@ class ModelVersionManager:
                 exc_info=True,
             )
             return []
+
+    def create_canary_deployment(
+        self,
+        model_name: str,
+        canary_version_id: str,
+        initial_traffic_percentage: Optional[float] = None,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Create a canary deployment for a model version with initial traffic allocation.
+
+        Canary deployments allow gradual rollout of new model versions by routing
+        a small percentage of traffic to the new version while monitoring performance.
+        This method sets up a model version as a canary with the specified traffic
+        allocation (default 10%).
+
+        Args:
+            model_name: Name of the model (e.g., 'skill_matching')
+            canary_version_id: UUID of the model version to use as canary
+            initial_traffic_percentage: Initial traffic percentage for canary (default: 10%)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with canary deployment information or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> canary = manager.create_canary_deployment(
+            ...     model_name='skill_matching',
+            ...     canary_version_id='uuid-here',
+            ...     initial_traffic_percentage=10
+            ... )
+            >>> print(canary['traffic_percentage'])
+            10
+        """
+        traffic_pct = initial_traffic_percentage or self.DEFAULT_CANARY_TRAFFIC_PERCENTAGE
+
+        # Validate traffic percentage
+        if traffic_pct <= 0 or traffic_pct > self.MAX_CANARY_TRAFFIC_PERCENTAGE:
+            logger.error(
+                f"Invalid canary traffic percentage: {traffic_pct}. "
+                f"Must be between 1 and {self.MAX_CANARY_TRAFFIC_PERCENTAGE}"
+            )
+            return None
+
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for create_canary_deployment({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get the canary model version
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(
+                    MLModelVersion.id == canary_version_id,
+                    MLModelVersion.model_name == model_name,
+                )
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(
+                    f"Canary model version {canary_version_id} not found for {model_name}"
+                )
+                return None
+
+            # Check for existing active canary
+            existing_canary = self.get_canary_model(model_name, db_session)
+            if existing_canary:
+                logger.warning(
+                    f"Existing canary deployment found for {model_name}: "
+                    f"{existing_canary['version']}. Rollback first to create new canary."
+                )
+                return None
+
+            # Get active model to ensure it exists
+            active_model = self.get_active_model(model_name, db_session)
+            if not active_model:
+                logger.error(f"No active model found for {model_name}, cannot create canary")
+                return None
+
+            # Update canary model configuration
+            canary_model.is_experiment = True
+            canary_model.is_active = True  # Canary is active but as experiment
+
+            # Set experiment config with canary settings
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config.update({
+                "traffic_percentage": traffic_pct,
+                "is_canary": True,
+                "canary_created_at": canary_model.updated_at.isoformat()
+                if canary_model.updated_at
+                else None,
+                "canary_status": "active",
+                "canary_stage": "initial",
+                "initial_traffic_percentage": traffic_pct,
+            })
+            canary_model.experiment_config = experiment_config
+
+            db_session.commit()
+
+            logger.info(
+                f"Created canary deployment for {model_name}:{canary_model.version} "
+                f"with {traffic_pct}% traffic allocation"
+            )
+
+            return {
+                "id": str(canary_model.id),
+                "model_name": canary_model.model_name,
+                "version": canary_model.version,
+                "file_path": canary_model.file_path,
+                "traffic_percentage": traffic_pct,
+                "is_canary": True,
+                "canary_status": "active",
+                "canary_stage": "initial",
+                "experiment_config": experiment_config,
+                "performance_score": float(canary_model.performance_score)
+                if canary_model.performance_score
+                else None,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error creating canary deployment for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def get_canary_model(
+        self, model_name: str, db_session: Optional[Any] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the current canary model for a given model name.
+
+        Returns the active canary deployment if one exists. A canary is identified
+        by having is_experiment=True and is_canary=True in experiment_config.
+
+        Args:
+            model_name: Name of the model
+            db_session: Optional database session for querying
+
+        Returns:
+            Dictionary with canary model information or None if no canary exists
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> canary = manager.get_canary_model('skill_matching')
+            >>> if canary:
+            ...     print(f"Canary version: {canary['version']}, traffic: {canary['traffic_percentage']}%")
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for get_canary_model({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Query for canary models (experimental with is_canary flag)
+            canary_models = (
+                db_session.query(MLModelVersion)
+                .filter(
+                    MLModelVersion.model_name == model_name,
+                    MLModelVersion.is_experiment == True,
+                )
+                .all()
+            )
+
+            # Filter for canary deployments
+            for model in canary_models:
+                if model.experiment_config and model.experiment_config.get("is_canary"):
+                    traffic_pct = model.experiment_config.get("traffic_percentage", 0)
+                    return {
+                        "id": str(model.id),
+                        "model_name": model.model_name,
+                        "version": model.version,
+                        "file_path": model.file_path,
+                        "traffic_percentage": traffic_pct,
+                        "is_canary": True,
+                        "canary_status": model.experiment_config.get("canary_status", "active"),
+                        "canary_stage": model.experiment_config.get("canary_stage", "initial"),
+                        "experiment_config": model.experiment_config,
+                        "performance_score": float(model.performance_score)
+                        if model.performance_score
+                        else None,
+                        "accuracy_metrics": model.accuracy_metrics or {},
+                        "model_metadata": model.model_metadata or {},
+                    }
+
+            logger.debug(f"No canary deployment found for {model_name}")
+            return None
+
+        except Exception as e:
+            logger.error(
+                f"Error getting canary model for {model_name}: {e}", exc_info=True
+            )
+            return None
+
+    def increase_canary_traffic(
+        self,
+        model_name: str,
+        increment_percentage: float = 10.0,
+        max_traffic_percentage: Optional[float] = None,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Increase traffic to the canary deployment incrementally.
+
+        This method implements gradual traffic shifting by increasing the canary's
+        traffic allocation in small increments. Traffic is capped at max_traffic_percentage
+        (default 50%) to prevent full rollout without explicit promotion.
+
+        Args:
+            model_name: Name of the model
+            increment_percentage: Amount to increase traffic by (default: 10%)
+            max_traffic_percentage: Maximum traffic percentage allowed (default: 50%)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with updated canary information or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.increase_canary_traffic('skill_matching', increment_percentage=10)
+            >>> print(result['traffic_percentage'])
+            20  # Increased from 10% to 20%
+        """
+        max_traffic = max_traffic_percentage or self.MAX_CANARY_TRAFFIC_PERCENTAGE
+
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for increase_canary_traffic({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get current canary model
+            canary = self.get_canary_model(model_name, db_session)
+            if not canary:
+                logger.warning(f"No canary deployment found for {model_name}")
+                return None
+
+            # Get the model version record
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == canary["id"])
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(f"Canary model {canary['id']} not found in database")
+                return None
+
+            current_traffic = canary.get("traffic_percentage", 0)
+            new_traffic = min(current_traffic + increment_percentage, max_traffic)
+
+            if new_traffic == current_traffic:
+                logger.info(
+                    f"Canary traffic for {model_name} already at maximum allowed: {current_traffic}%"
+                )
+                return canary
+
+            # Update experiment config
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config["traffic_percentage"] = new_traffic
+            experiment_config["canary_stage"] = self._get_canary_stage(new_traffic)
+            experiment_config["previous_traffic_percentage"] = current_traffic
+            experiment_config["last_traffic_update"] = canary_model.updated_at.isoformat()
+            canary_model.experiment_config = experiment_config
+
+            db_session.commit()
+
+            logger.info(
+                f"Increased canary traffic for {model_name}:{canary_model.version} "
+                f"from {current_traffic}% to {new_traffic}%"
+            )
+
+            return {
+                "id": str(canary_model.id),
+                "model_name": canary_model.model_name,
+                "version": canary_model.version,
+                "previous_traffic_percentage": current_traffic,
+                "traffic_percentage": new_traffic,
+                "is_canary": True,
+                "canary_status": experiment_config.get("canary_status", "active"),
+                "canary_stage": experiment_config.get("canary_stage"),
+                "experiment_config": experiment_config,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error increasing canary traffic for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def promote_canary_to_production(
+        self,
+        model_name: str,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Promote the canary deployment to full production.
+
+        This method promotes the canary model to become the new active production model.
+        The previous active model is deactivated, and the canary is converted to a
+        regular active model with 100% traffic.
+
+        Args:
+            model_name: Name of the model
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with promotion result or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.promote_canary_to_production('skill_matching')
+            >>> print(result['new_active_version'])
+            'v2.0.0'
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for promote_canary_to_production({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get current canary and active models
+            canary = self.get_canary_model(model_name, db_session)
+            active = self.get_active_model(model_name, db_session)
+
+            if not canary:
+                logger.error(f"No canary deployment found for {model_name}")
+                return None
+
+            # Get database records
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == canary["id"])
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(f"Canary model {canary['id']} not found in database")
+                return None
+
+            # Deactivate current active model if exists
+            if active:
+                old_active_model = (
+                    db_session.query(MLModelVersion)
+                    .filter(MLModelVersion.id == active["id"])
+                    .first()
+                )
+                if old_active_model:
+                    old_active_model.is_active = False
+                    logger.info(
+                        f"Deactivated previous active model {model_name}:{old_active_model.version}"
+                    )
+
+            # Promote canary to active production
+            previous_version = canary_model.version
+            canary_model.is_experiment = False
+            canary_model.is_active = True
+
+            # Update experiment config to reflect promotion
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config["is_canary"] = False
+            experiment_config["canary_status"] = "promoted"
+            experiment_config["promoted_at"] = canary_model.updated_at.isoformat()
+            experiment_config["traffic_percentage"] = 100
+            experiment_config["previous_active_version"] = active.get("version") if active else None
+            canary_model.experiment_config = experiment_config
+
+            db_session.commit()
+
+            logger.info(
+                f"Promoted canary {model_name}:{previous_version} to production"
+            )
+
+            return {
+                "model_name": model_name,
+                "new_active_version": previous_version,
+                "previous_active_version": active.get("version") if active else None,
+                "promotion_status": "success",
+                "traffic_percentage": 100,
+                "canary_id": str(canary_model.id),
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error promoting canary to production for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def rollback_canary(
+        self,
+        model_name: str,
+        reason: Optional[str] = None,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Rollback a canary deployment, routing all traffic back to the stable version.
+
+        This method deactivates the canary deployment and restores the previous
+        active model to handle 100% of traffic. The canary is marked as rolled back
+        for audit purposes.
+
+        Args:
+            model_name: Name of the model
+            reason: Optional reason for the rollback (for audit trail)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with rollback result or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.rollback_canary('skill_matching', reason='Performance degradation')
+            >>> print(result['active_version'])
+            'v1.0.0'  # Reverted to stable version
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for rollback_canary({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get current canary and active models
+            canary = self.get_canary_model(model_name, db_session)
+            active = self.get_active_model(model_name, db_session)
+
+            if not canary:
+                logger.warning(f"No canary deployment found for {model_name} to rollback")
+                return None
+
+            # Get the canary model record
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == canary["id"])
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(f"Canary model {canary['id']} not found in database")
+                return None
+
+            rolled_back_version = canary_model.version
+            previous_traffic = canary.get("traffic_percentage", 0)
+
+            # Deactivate canary
+            canary_model.is_active = False
+            canary_model.is_experiment = False
+
+            # Update experiment config to reflect rollback
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config["is_canary"] = False
+            experiment_config["canary_status"] = "rolled_back"
+            experiment_config["rolled_back_at"] = canary_model.updated_at.isoformat()
+            experiment_config["rollback_reason"] = reason
+            experiment_config["previous_traffic_percentage"] = previous_traffic
+            canary_model.experiment_config = experiment_config
+
+            # Ensure active model is properly set
+            if active:
+                active_model = (
+                    db_session.query(MLModelVersion)
+                    .filter(MLModelVersion.id == active["id"])
+                    .first()
+                )
+                if active_model:
+                    active_model.is_active = True
+                    active_model.is_experiment = False
+
+            db_session.commit()
+
+            logger.info(
+                f"Rolled back canary {model_name}:{rolled_back_version}, "
+                f"restored {active.get('version') if active else 'unknown'} as active"
+            )
+
+            return {
+                "model_name": model_name,
+                "rolled_back_version": rolled_back_version,
+                "active_version": active.get("version") if active else None,
+                "rollback_status": "success",
+                "reason": reason,
+                "previous_canary_traffic": previous_traffic,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error rolling back canary for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def get_canary_status(
+        self, model_name: str, db_session: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Get the current status of canary deployment for a model.
+
+        Returns comprehensive information about the canary deployment including
+        traffic allocation, performance metrics, and deployment stage.
+
+        Args:
+            model_name: Name of the model
+            db_session: Optional database session for querying
+
+        Returns:
+            Dictionary with canary status information
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> status = manager.get_canary_status('skill_matching')
+            >>> print(status['canary_active'])
+            True
+            >>> print(status['traffic_percentage'])
+            10
+        """
+        canary = self.get_canary_model(model_name, db_session)
+        active = self.get_active_model(model_name, db_session)
+
+        if not canary:
+            return {
+                "model_name": model_name,
+                "canary_active": False,
+                "canary_version": None,
+                "active_version": active.get("version") if active else None,
+                "traffic_percentage": 0,
+                "canary_stage": None,
+                "message": "No active canary deployment",
+            }
+
+        return {
+            "model_name": model_name,
+            "canary_active": True,
+            "canary_id": canary.get("id"),
+            "canary_version": canary.get("version"),
+            "active_version": active.get("version") if active else None,
+            "traffic_percentage": canary.get("traffic_percentage", 0),
+            "canary_stage": canary.get("canary_stage"),
+            "canary_status": canary.get("canary_status"),
+            "performance_score": canary.get("performance_score"),
+            "initial_traffic_percentage": canary.get("experiment_config", {}).get(
+                "initial_traffic_percentage"
+            ),
+            "experiment_config": canary.get("experiment_config"),
+        }
+
+    def _get_canary_stage(self, traffic_percentage: float) -> str:
+        """
+        Determine the canary stage based on traffic percentage.
+
+        Args:
+            traffic_percentage: Current traffic percentage allocated to canary
+
+        Returns:
+            String describing the canary stage
+        """
+        if traffic_percentage <= 10:
+            return "initial"
+        elif traffic_percentage <= 25:
+            return "early"
+        elif traffic_percentage <= 40:
+            return "mid"
+        elif traffic_percentage < 50:
+            return "advanced"
+        else:
+            return "pre_promotion"
