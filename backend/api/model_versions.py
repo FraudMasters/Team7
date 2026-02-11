@@ -121,6 +121,40 @@ class PerformanceMetricsResponse(BaseModel):
     last_updated: Optional[str] = Field(None, description="Timestamp of last update")
 
 
+class StatisticalTestResultResponse(BaseModel):
+    """Response model for individual statistical test results."""
+
+    test_type: str = Field(..., description="Type of statistical test performed")
+    statistic: float = Field(..., description="Test statistic value")
+    p_value: float = Field(..., description="P-value from the test")
+    is_significant: bool = Field(..., description="Whether result is statistically significant")
+    significance_level: float = Field(..., description="Significance level (alpha) used")
+    confidence_interval: Optional[List[float]] = Field(None, description="95% confidence interval for difference")
+    effect_size: Optional[float] = Field(None, description="Effect size measure (Cohen's d or Cramer's V)")
+    interpretation: str = Field(..., description="Human-readable interpretation of results")
+
+
+class ABTestResultsResponse(BaseModel):
+    """Response model for A/B test results with statistical significance data."""
+
+    model_name: str = Field(..., description="Name of the model being tested")
+    control_model: dict = Field(..., description="Control (active) model details")
+    treatment_model: Optional[dict] = Field(None, description="Treatment (experimental) model details")
+    control_metrics: dict = Field(..., description="Performance metrics for control model")
+    treatment_metrics: Optional[dict] = Field(None, description="Performance metrics for treatment model")
+    statistical_tests: List[StatisticalTestResultResponse] = Field(
+        ..., description="List of statistical test results"
+    )
+    winner: str = Field(..., description="Which model performed better (control, treatment, tie, or inconclusive)")
+    confidence: float = Field(..., description="Confidence level in the result (0-1)")
+    recommendation: str = Field(..., description="Actionable recommendation based on test results")
+    sample_sizes: dict = Field(..., description="Sample sizes for each group")
+    is_statistically_significant: bool = Field(
+        ..., description="Whether any test showed statistical significance"
+    )
+    timestamp: str = Field(..., description="ISO timestamp of the analysis")
+
+
 def _format_model_response(model: MLModelVersion) -> dict:
     """Format a MLModelVersion instance as a response dict."""
     return {
@@ -599,6 +633,230 @@ async def get_model_performance_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get model metrics: {str(e)}",
+        ) from e
+
+
+@router.get("/ab-test/{model_name}", tags=["Model Versions"])
+async def get_ab_test_results(
+    model_name: str,
+    significance_level: float = Query(0.05, description="Significance level (alpha) for statistical tests", ge=0.01, le=0.20),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get A/B test results with statistical significance data for a model.
+
+    This endpoint compares the active (control) model with any experimental
+    (treatment) model and returns statistical significance analysis including
+    chi-square tests, t-tests, confidence intervals, and effect sizes.
+
+    Args:
+        model_name: Name of the model to analyze (e.g., ranking, skill_matching)
+        significance_level: Significance level (alpha) for hypothesis tests (default: 0.05)
+        db: Database session
+
+    Returns:
+        JSON response with A/B test results, statistical tests, and recommendations
+
+    Raises:
+        HTTPException(404): If no active model is found for the given name
+        HTTPException(500): If analysis fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/model-versions/ab-test/ranking")
+        >>> response.json()
+        {
+            "model_name": "ranking",
+            "control_model": {"version": "v1.0.0", ...},
+            "treatment_model": {"version": "v2.0.0", ...},
+            "control_metrics": {"accuracy": 0.85, "f1_score": 0.83, ...},
+            "treatment_metrics": {"accuracy": 0.87, "f1_score": 0.86, ...},
+            "statistical_tests": [
+                {
+                    "test_type": "chi_square",
+                    "statistic": 4.5,
+                    "p_value": 0.034,
+                    "is_significant": true,
+                    "significance_level": 0.05,
+                    "effect_size": 0.15,
+                    "interpretation": "Statistically significant difference..."
+                }
+            ],
+            "winner": "treatment",
+            "confidence": 0.85,
+            "recommendation": "STRONG RECOMMENDATION: Promote treatment model...",
+            "sample_sizes": {"control": 1000, "treatment": 1000},
+            "is_statistically_significant": true,
+            "timestamp": "2024-01-15T10:30:00Z"
+        }
+    """
+    try:
+        logger.info(f"Getting A/B test results for model: {model_name}")
+
+        # Get the active (control) model
+        control_query = select(MLModelVersion).where(
+            MLModelVersion.model_name == model_name,
+            MLModelVersion.is_active == True,
+        )
+        control_result = await db.execute(control_query)
+        control_model = control_result.scalar_one_or_none()
+
+        if control_model is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No active model found for: {model_name}",
+            )
+
+        # Get the experimental (treatment) model
+        treatment_query = select(MLModelVersion).where(
+            MLModelVersion.model_name == model_name,
+            MLModelVersion.is_experiment == True,
+            MLModelVersion.is_active == False,
+        )
+        treatment_result = await db.execute(treatment_query)
+        treatment_model = treatment_result.scalars().first()
+
+        # Prepare control metrics
+        control_metrics = {
+            "accuracy": float(control_model.accuracy_metrics.get("accuracy", 0)) if control_model.accuracy_metrics else 0,
+            "precision": float(control_model.accuracy_metrics.get("precision", 0)) if control_model.accuracy_metrics else 0,
+            "recall": float(control_model.accuracy_metrics.get("recall", 0)) if control_model.accuracy_metrics else 0,
+            "f1_score": float(control_model.accuracy_metrics.get("f1_score", 0)) if control_model.accuracy_metrics else 0,
+            "auc_score": float(control_model.accuracy_metrics.get("auc_score", 0)) if control_model.accuracy_metrics else 0,
+            "sample_size": int(control_model.model_metadata.get("sample_size", 0)) if control_model.model_metadata else 0,
+            "performance_score": float(control_model.performance_score) if control_model.performance_score is not None else 0,
+        }
+
+        # Extract success/failure counts if available (for chi-square test)
+        if control_model.accuracy_metrics:
+            control_metrics["successes"] = control_model.accuracy_metrics.get("successes", 0)
+            control_metrics["failures"] = control_model.accuracy_metrics.get("failures", 0)
+
+        # Prepare treatment metrics if treatment model exists
+        treatment_metrics = {}
+        if treatment_model:
+            treatment_metrics = {
+                "accuracy": float(treatment_model.accuracy_metrics.get("accuracy", 0)) if treatment_model.accuracy_metrics else 0,
+                "precision": float(treatment_model.accuracy_metrics.get("precision", 0)) if treatment_model.accuracy_metrics else 0,
+                "recall": float(treatment_model.accuracy_metrics.get("recall", 0)) if treatment_model.accuracy_metrics else 0,
+                "f1_score": float(treatment_model.accuracy_metrics.get("f1_score", 0)) if treatment_model.accuracy_metrics else 0,
+                "auc_score": float(treatment_model.accuracy_metrics.get("auc_score", 0)) if treatment_model.accuracy_metrics else 0,
+                "sample_size": int(treatment_model.model_metadata.get("sample_size", 0)) if treatment_model.model_metadata else 0,
+                "performance_score": float(treatment_model.performance_score) if treatment_model.performance_score is not None else 0,
+            }
+
+            # Extract success/failure counts if available
+            if treatment_model.accuracy_metrics:
+                treatment_metrics["successes"] = treatment_model.accuracy_metrics.get("successes", 0)
+                treatment_metrics["failures"] = treatment_model.accuracy_metrics.get("failures", 0)
+
+        # Perform statistical analysis using ABTestAnalyzer
+        statistical_tests = []
+        winner = "control"
+        confidence = 0.0
+        recommendation = "No experimental model available for comparison."
+        is_statistically_significant = False
+
+        if treatment_model:
+            try:
+                from analyzers.ab_test_analyzer import ABTestAnalyzer
+
+                analyzer = ABTestAnalyzer(default_significance_level=significance_level)
+
+                # Perform comprehensive comparison
+                comparison = analyzer.compare_models(
+                    control_model_id=str(control_model.id),
+                    treatment_model_id=str(treatment_model.id),
+                    control_metrics=control_metrics,
+                    treatment_metrics=treatment_metrics,
+                    significance_level=significance_level,
+                )
+
+                # Extract statistical test results
+                for test_name, test_result in comparison.statistical_tests.items():
+                    test_response = {
+                        "test_type": test_result.test_type.value,
+                        "statistic": test_result.statistic,
+                        "p_value": test_result.p_value,
+                        "is_significant": test_result.is_significant,
+                        "significance_level": test_result.significance_level,
+                        "confidence_interval": list(test_result.confidence_interval) if test_result.confidence_interval else None,
+                        "effect_size": test_result.effect_size,
+                        "interpretation": test_result.interpretation,
+                    }
+                    statistical_tests.append(test_response)
+
+                    if test_result.is_significant:
+                        is_statistically_significant = True
+
+                winner = comparison.winner
+                confidence = comparison.confidence
+                recommendation = comparison.recommendation
+
+            except ImportError:
+                logger.warning("ABTestAnalyzer not available, using basic comparison")
+                # Fallback to simple comparison without statistical tests
+                control_f1 = control_metrics.get("f1_score", 0) or 0
+                treatment_f1 = treatment_metrics.get("f1_score", 0) or 0
+
+                if treatment_f1 > control_f1:
+                    winner = "treatment"
+                    diff_pct = (treatment_f1 - control_f1) / control_f1 * 100 if control_f1 > 0 else 0
+                    recommendation = f"Treatment model shows {diff_pct:.1f}% improvement in F1 score. Statistical analysis unavailable."
+                elif control_f1 > treatment_f1:
+                    winner = "control"
+                    diff_pct = (control_f1 - treatment_f1) / treatment_f1 * 100 if treatment_f1 > 0 else 0
+                    recommendation = f"Control model outperforms treatment by {diff_pct:.1f}% in F1 score. Statistical analysis unavailable."
+                else:
+                    winner = "tie"
+                    recommendation = "Both models show equivalent F1 scores. Statistical analysis unavailable."
+
+                confidence = 0.5
+
+        # Build response
+        from datetime import datetime, timezone
+
+        response_data = {
+            "model_name": model_name,
+            "control_model": _format_model_response(control_model),
+            "treatment_model": _format_model_response(treatment_model) if treatment_model else None,
+            "control_metrics": control_metrics,
+            "treatment_metrics": treatment_metrics if treatment_model else None,
+            "statistical_tests": statistical_tests,
+            "winner": winner,
+            "confidence": confidence,
+            "recommendation": recommendation,
+            "sample_sizes": {
+                "control": control_metrics.get("sample_size", 0),
+                "treatment": treatment_metrics.get("sample_size", 0) if treatment_model else 0,
+            },
+            "is_statistically_significant": is_statistically_significant,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        logger.info(
+            f"A/B test analysis complete for model: {model_name}, winner: {winner}, "
+            f"confidence: {confidence:.2%}, significant: {is_statistically_significant}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting A/B test results: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get A/B test results: {str(e)}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Error getting A/B test results: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get A/B test results: {str(e)}",
         ) from e
 
 
