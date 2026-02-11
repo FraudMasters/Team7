@@ -6,7 +6,7 @@ including A/B testing capabilities, performance tracking, and automatic model se
 The system supports:
 - Active model version management
 - A/B testing with configurable traffic allocation
-- Performance-based model promotion
+- Performance-based model promotion with statistical significance testing
 - Fallback handling for model failures
 """
 import hashlib
@@ -42,6 +42,12 @@ class ModelVersionManager:
 
     # Default fallback version when no active model is found
     DEFAULT_FALLBACK_VERSION = "v1.0.0"
+
+    # Default canary traffic allocation (10%)
+    DEFAULT_CANARY_TRAFFIC_PERCENTAGE = 10
+
+    # Maximum canary traffic before requiring promotion
+    MAX_CANARY_TRAFFIC_PERCENTAGE = 50
 
     def __init__(self, default_fallback_version: Optional[str] = None) -> None:
         """
@@ -441,31 +447,44 @@ class ModelVersionManager:
         model_name: str,
         min_performance_improvement: float = 5.0,
         min_sample_size: int = 100,
+        significance_level: float = 0.05,
+        min_confidence: float = 0.80,
         db_session: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Recommend whether an experimental model should be promoted to active.
 
-        Compares experimental model performance against the active model
-        and recommends promotion if:
+        Compares experimental model performance against the active model using
+        statistical significance testing and recommends promotion if:
         1. Performance improvement exceeds threshold
-        2. Sample size is sufficient
-        3. Accuracy metrics show consistent improvement
+        2. Sample size is sufficient for statistical power
+        3. Statistical tests show significant improvement
+        4. Confidence level meets minimum threshold
+
+        The method uses ABTestAnalyzer for statistical testing, including:
+        - Chi-square tests for success/failure rate comparisons
+        - T-tests for continuous metric comparisons
+        - Effect size calculations (Cohen's d, Cramer's V)
+        - Confidence intervals for metric differences
 
         Args:
             model_name: Name of the model
-            min_performance_improvement: Minimum performance gain to recommend promotion
+            min_performance_improvement: Minimum performance gain (%) to recommend promotion
             min_sample_size: Minimum sample size for statistical significance
+            significance_level: Significance level (alpha) for hypothesis tests (default: 0.05)
+            min_confidence: Minimum confidence level required for promotion (default: 0.80)
             db_session: Optional database session for querying
 
         Returns:
-            Dictionary with promotion recommendation or None if no clear winner
+            Dictionary with promotion recommendation including statistical analysis,
+            or None if no models available for comparison
 
         Example:
             >>> manager = ModelVersionManager()
             >>> rec = manager.recommend_promotion('skill_matching')
             >>> if rec['should_promote']:
             ...     print(f"Promote {rec['experiment_version']} to active")
+            ...     print(f"Statistical significance: p={rec['p_value']:.4f}")
         """
         active_model = self.get_active_model(model_name, db_session)
         experiments = self.get_experiment_models(model_name, db_session)
@@ -477,8 +496,23 @@ class ModelVersionManager:
             )
             return None
 
+        # Import ABTestAnalyzer for statistical testing
+        try:
+            from analyzers.ab_test_analyzer import ABTestAnalyzer
+
+            ab_analyzer = ABTestAnalyzer(
+                default_significance_level=significance_level,
+                min_sample_size=min_sample_size,
+            )
+        except ImportError:
+            logger.warning(
+                "ABTestAnalyzer not available, falling back to basic comparison"
+            )
+            ab_analyzer = None
+
         best_candidate = None
         best_improvement = 0.0
+        best_statistical_result = None
 
         for exp in experiments:
             # Check if experiment has sufficient sample size
@@ -494,36 +528,248 @@ class ModelVersionManager:
             exp_score = exp.get("performance_score", 0) or 0
 
             if exp_score > active_score:
-                improvement = ((exp_score - active_score) / active_score * 100)
+                improvement = ((exp_score - active_score) / active_score * 100) if active_score > 0 else 0
+
+                # Perform statistical analysis if ABTestAnalyzer is available
+                statistical_result = None
+                if ab_analyzer:
+                    statistical_result = self._analyze_statistical_significance(
+                        active_model=active_model,
+                        experiment_model=exp,
+                        ab_analyzer=ab_analyzer,
+                        significance_level=significance_level,
+                        db_session=db_session,
+                    )
+
+                # Consider both raw improvement and statistical significance
                 if improvement > best_improvement:
                     best_improvement = improvement
                     best_candidate = exp
+                    best_statistical_result = statistical_result
+
+        # Determine if promotion should be recommended
+        should_promote = False
+        promotion_reason = ""
+        confidence = 0.0
+        p_value = 1.0
+        effect_size = 0.0
+        statistical_tests = {}
+        confidence_interval = None
 
         if best_candidate and best_improvement >= min_performance_improvement:
+            if best_statistical_result:
+                # Extract statistical analysis results
+                confidence = best_statistical_result.get("confidence", 0.0)
+                p_value = best_statistical_result.get("p_value", 1.0)
+                effect_size = best_statistical_result.get("effect_size", 0.0)
+                statistical_tests = best_statistical_result.get("statistical_tests", {})
+                confidence_interval = best_statistical_result.get("confidence_interval")
+
+                # Check if statistical criteria are met
+                is_significant = best_statistical_result.get("is_significant", False)
+
+                if is_significant and confidence >= min_confidence:
+                    should_promote = True
+                    promotion_reason = (
+                        f"Statistically significant improvement of {best_improvement:.2f}% "
+                        f"with {confidence:.0%} confidence (p={p_value:.4f})"
+                    )
+                elif is_significant:
+                    should_promote = True  # Significant but lower confidence
+                    promotion_reason = (
+                        f"Statistically significant improvement of {best_improvement:.2f}% "
+                        f"but confidence ({confidence:.0%}) below threshold ({min_confidence:.0%}). "
+                        f"Consider gathering more data."
+                    )
+                elif best_improvement >= min_performance_improvement * 1.5:
+                    # Strong improvement without significance - might be underpowered
+                    should_promote = False
+                    promotion_reason = (
+                        f"Large improvement ({best_improvement:.2f}%) but not statistically "
+                        f"significant (p={p_value:.4f}). May need more samples."
+                    )
+                else:
+                    should_promote = False
+                    promotion_reason = (
+                        f"Improvement of {best_improvement:.2f}% but not statistically "
+                        f"significant (p={p_value:.4f}). Continue testing."
+                    )
+            else:
+                # Fallback to basic comparison without statistical testing
+                if best_improvement >= min_performance_improvement * 2:
+                    should_promote = True
+                    confidence = 0.5  # Conservative estimate
+                    promotion_reason = (
+                        f"Improvement of {best_improvement:.2f}% without statistical "
+                        f"testing (ABTestAnalyzer unavailable). Recommend manual review."
+                    )
+                else:
+                    should_promote = False
+                    promotion_reason = "Insufficient data for statistical analysis"
+
+        # Build result dictionary
+        result = {
+            "should_promote": should_promote,
+            "model_name": model_name,
+            "current_active": active_model["version"] if active_model else None,
+            "experiment_version": best_candidate["version"] if best_candidate else None,
+            "performance_improvement_pct": round(best_improvement, 2),
+            "active_score": active_model.get("performance_score", 0) if active_model else 0,
+            "experiment_score": best_candidate.get("performance_score", 0) if best_candidate else 0,
+            "reason": promotion_reason,
+            # Statistical confidence data
+            "statistical_confidence": {
+                "confidence": round(confidence, 4),
+                "p_value": round(p_value, 6),
+                "effect_size": round(effect_size, 4),
+                "is_significant": p_value < significance_level,
+                "significance_level": significance_level,
+                "min_confidence": min_confidence,
+                "confidence_interval": list(confidence_interval) if confidence_interval else None,
+                "sample_sizes": {
+                    "control": active_model.get("accuracy_metrics", {}).get("sample_size", 0) if active_model else 0,
+                    "treatment": best_candidate.get("accuracy_metrics", {}).get("sample_size", 0) if best_candidate else 0,
+                },
+            },
+            # Detailed statistical test results
+            "statistical_tests": statistical_tests,
+            # Recommendation metadata
+            "recommendation_metadata": {
+                "min_performance_improvement": min_performance_improvement,
+                "min_sample_size": min_sample_size,
+                "experiments_evaluated": len(experiments),
+                "experiments_meeting_threshold": len([
+                    e for e in experiments
+                    if e.get("accuracy_metrics", {}).get("sample_size", 0) >= min_sample_size
+                ]),
+            },
+        }
+
+        if should_promote:
             logger.info(
                 f"Recommending promotion of {best_candidate['version']} "
-                f"for {model_name} (improvement: {best_improvement:.2f}%)"
+                f"for {model_name}: {promotion_reason}"
             )
-            return {
-                "should_promote": True,
-                "model_name": model_name,
-                "current_active": active_model["version"],
-                "experiment_version": best_candidate["version"],
-                "performance_improvement_pct": round(best_improvement, 2),
-                "active_score": active_model.get("performance_score", 0),
-                "experiment_score": best_candidate.get("performance_score", 0),
-            }
+        else:
+            logger.info(
+                f"No promotion recommended for {model_name}: {promotion_reason}"
+            )
 
-        logger.info(
-            f"No experiment meets promotion criteria for {model_name} "
-            f"(best improvement: {best_improvement:.2f}%)"
-        )
-        return {
-            "should_promote": False,
-            "model_name": model_name,
-            "reason": "No experiment meets performance criteria",
-            "best_improvement_pct": round(best_improvement, 2),
+        return result
+
+    def _analyze_statistical_significance(
+        self,
+        active_model: Dict[str, Any],
+        experiment_model: Dict[str, Any],
+        ab_analyzer: Any,
+        significance_level: float,
+        db_session: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Perform statistical significance analysis between active and experiment models.
+
+        This internal method uses ABTestAnalyzer to compare models using various
+        statistical tests and returns a comprehensive analysis result.
+
+        Args:
+            active_model: Dictionary with active model information and metrics
+            experiment_model: Dictionary with experiment model information and metrics
+            ab_analyzer: ABTestAnalyzer instance for statistical testing
+            significance_level: Significance level (alpha) for tests
+            db_session: Optional database session for fetching historical data
+
+        Returns:
+            Dictionary with statistical analysis results including:
+            - confidence: Overall confidence level (0-1)
+            - p_value: Most significant p-value from tests
+            - effect_size: Effect size measure
+            - is_significant: Whether result is statistically significant
+            - statistical_tests: Detailed results from individual tests
+            - confidence_interval: Confidence interval for the difference
+        """
+        result = {
+            "confidence": 0.0,
+            "p_value": 1.0,
+            "effect_size": 0.0,
+            "is_significant": False,
+            "statistical_tests": {},
+            "confidence_interval": None,
         }
+
+        try:
+            # Extract metrics for both models
+            control_metrics = active_model.get("accuracy_metrics", {})
+            treatment_metrics = experiment_model.get("accuracy_metrics", {})
+
+            # Get sample sizes
+            control_sample = control_metrics.get("sample_size", 0)
+            treatment_sample = treatment_metrics.get("sample_size", 0)
+
+            # Try to get data from database if available
+            if db_session and active_model.get("id") and experiment_model.get("id"):
+                db_comparison = ab_analyzer.analyze_from_database(
+                    control_model_id=active_model["id"],
+                    treatment_model_id=experiment_model["id"],
+                    db_session=db_session,
+                    dataset_type="production",
+                    significance_level=significance_level,
+                )
+                if db_comparison:
+                    result["confidence"] = db_comparison.confidence
+                    result["p_value"] = min(
+                        (t.p_value for t in db_comparison.statistical_tests.values()),
+                        default=1.0,
+                    )
+                    result["effect_size"] = max(
+                        (t.effect_size or 0 for t in db_comparison.statistical_tests.values()),
+                        default=0.0,
+                    )
+                    result["is_significant"] = db_comparison.confidence >= 0.8
+                    result["statistical_tests"] = {
+                        k: v.to_dict() if hasattr(v, "to_dict") else v
+                        for k, v in db_comparison.statistical_tests.items()
+                    }
+                    return result
+
+            # Fall back to summary statistics comparison
+            if control_sample >= ab_analyzer.min_sample_size and treatment_sample >= ab_analyzer.min_sample_size:
+                comparison = ab_analyzer.compare_models(
+                    control_model_id=active_model.get("id", "unknown"),
+                    treatment_model_id=experiment_model.get("id", "unknown"),
+                    control_metrics=control_metrics,
+                    treatment_metrics=treatment_metrics,
+                    significance_level=significance_level,
+                    db_session=None,
+                )
+
+                result["confidence"] = comparison.confidence
+                result["p_value"] = min(
+                    (t.p_value for t in comparison.statistical_tests.values()),
+                    default=1.0,
+                )
+                result["effect_size"] = max(
+                    (t.effect_size or 0 for t in comparison.statistical_tests.values()),
+                    default=0.0,
+                )
+                result["is_significant"] = comparison.confidence >= 0.8
+                result["statistical_tests"] = {
+                    k: v.to_dict() if hasattr(v, "to_dict") else v
+                    for k, v in comparison.statistical_tests.items()
+                }
+
+                # Extract confidence interval if available
+                for test_result in comparison.statistical_tests.values():
+                    if test_result.confidence_interval:
+                        result["confidence_interval"] = test_result.confidence_interval
+                        break
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                f"Error performing statistical analysis: {e}", exc_info=True
+            )
+            return result
 
     def record_performance_metrics(
         self,
@@ -785,3 +1031,581 @@ class ModelVersionManager:
                 exc_info=True,
             )
             return []
+
+    def create_canary_deployment(
+        self,
+        model_name: str,
+        canary_version_id: str,
+        initial_traffic_percentage: Optional[float] = None,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Create a canary deployment for a model version with initial traffic allocation.
+
+        Canary deployments allow gradual rollout of new model versions by routing
+        a small percentage of traffic to the new version while monitoring performance.
+        This method sets up a model version as a canary with the specified traffic
+        allocation (default 10%).
+
+        Args:
+            model_name: Name of the model (e.g., 'skill_matching')
+            canary_version_id: UUID of the model version to use as canary
+            initial_traffic_percentage: Initial traffic percentage for canary (default: 10%)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with canary deployment information or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> canary = manager.create_canary_deployment(
+            ...     model_name='skill_matching',
+            ...     canary_version_id='uuid-here',
+            ...     initial_traffic_percentage=10
+            ... )
+            >>> print(canary['traffic_percentage'])
+            10
+        """
+        traffic_pct = initial_traffic_percentage or self.DEFAULT_CANARY_TRAFFIC_PERCENTAGE
+
+        # Validate traffic percentage
+        if traffic_pct <= 0 or traffic_pct > self.MAX_CANARY_TRAFFIC_PERCENTAGE:
+            logger.error(
+                f"Invalid canary traffic percentage: {traffic_pct}. "
+                f"Must be between 1 and {self.MAX_CANARY_TRAFFIC_PERCENTAGE}"
+            )
+            return None
+
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for create_canary_deployment({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get the canary model version
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(
+                    MLModelVersion.id == canary_version_id,
+                    MLModelVersion.model_name == model_name,
+                )
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(
+                    f"Canary model version {canary_version_id} not found for {model_name}"
+                )
+                return None
+
+            # Check for existing active canary
+            existing_canary = self.get_canary_model(model_name, db_session)
+            if existing_canary:
+                logger.warning(
+                    f"Existing canary deployment found for {model_name}: "
+                    f"{existing_canary['version']}. Rollback first to create new canary."
+                )
+                return None
+
+            # Get active model to ensure it exists
+            active_model = self.get_active_model(model_name, db_session)
+            if not active_model:
+                logger.error(f"No active model found for {model_name}, cannot create canary")
+                return None
+
+            # Update canary model configuration
+            canary_model.is_experiment = True
+            canary_model.is_active = True  # Canary is active but as experiment
+
+            # Set experiment config with canary settings
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config.update({
+                "traffic_percentage": traffic_pct,
+                "is_canary": True,
+                "canary_created_at": canary_model.updated_at.isoformat()
+                if canary_model.updated_at
+                else None,
+                "canary_status": "active",
+                "canary_stage": "initial",
+                "initial_traffic_percentage": traffic_pct,
+            })
+            canary_model.experiment_config = experiment_config
+
+            db_session.commit()
+
+            logger.info(
+                f"Created canary deployment for {model_name}:{canary_model.version} "
+                f"with {traffic_pct}% traffic allocation"
+            )
+
+            return {
+                "id": str(canary_model.id),
+                "model_name": canary_model.model_name,
+                "version": canary_model.version,
+                "file_path": canary_model.file_path,
+                "traffic_percentage": traffic_pct,
+                "is_canary": True,
+                "canary_status": "active",
+                "canary_stage": "initial",
+                "experiment_config": experiment_config,
+                "performance_score": float(canary_model.performance_score)
+                if canary_model.performance_score
+                else None,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error creating canary deployment for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def get_canary_model(
+        self, model_name: str, db_session: Optional[Any] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the current canary model for a given model name.
+
+        Returns the active canary deployment if one exists. A canary is identified
+        by having is_experiment=True and is_canary=True in experiment_config.
+
+        Args:
+            model_name: Name of the model
+            db_session: Optional database session for querying
+
+        Returns:
+            Dictionary with canary model information or None if no canary exists
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> canary = manager.get_canary_model('skill_matching')
+            >>> if canary:
+            ...     print(f"Canary version: {canary['version']}, traffic: {canary['traffic_percentage']}%")
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for get_canary_model({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Query for canary models (experimental with is_canary flag)
+            canary_models = (
+                db_session.query(MLModelVersion)
+                .filter(
+                    MLModelVersion.model_name == model_name,
+                    MLModelVersion.is_experiment == True,
+                )
+                .all()
+            )
+
+            # Filter for canary deployments
+            for model in canary_models:
+                if model.experiment_config and model.experiment_config.get("is_canary"):
+                    traffic_pct = model.experiment_config.get("traffic_percentage", 0)
+                    return {
+                        "id": str(model.id),
+                        "model_name": model.model_name,
+                        "version": model.version,
+                        "file_path": model.file_path,
+                        "traffic_percentage": traffic_pct,
+                        "is_canary": True,
+                        "canary_status": model.experiment_config.get("canary_status", "active"),
+                        "canary_stage": model.experiment_config.get("canary_stage", "initial"),
+                        "experiment_config": model.experiment_config,
+                        "performance_score": float(model.performance_score)
+                        if model.performance_score
+                        else None,
+                        "accuracy_metrics": model.accuracy_metrics or {},
+                        "model_metadata": model.model_metadata or {},
+                    }
+
+            logger.debug(f"No canary deployment found for {model_name}")
+            return None
+
+        except Exception as e:
+            logger.error(
+                f"Error getting canary model for {model_name}: {e}", exc_info=True
+            )
+            return None
+
+    def increase_canary_traffic(
+        self,
+        model_name: str,
+        increment_percentage: float = 10.0,
+        max_traffic_percentage: Optional[float] = None,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Increase traffic to the canary deployment incrementally.
+
+        This method implements gradual traffic shifting by increasing the canary's
+        traffic allocation in small increments. Traffic is capped at max_traffic_percentage
+        (default 50%) to prevent full rollout without explicit promotion.
+
+        Args:
+            model_name: Name of the model
+            increment_percentage: Amount to increase traffic by (default: 10%)
+            max_traffic_percentage: Maximum traffic percentage allowed (default: 50%)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with updated canary information or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.increase_canary_traffic('skill_matching', increment_percentage=10)
+            >>> print(result['traffic_percentage'])
+            20  # Increased from 10% to 20%
+        """
+        max_traffic = max_traffic_percentage or self.MAX_CANARY_TRAFFIC_PERCENTAGE
+
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for increase_canary_traffic({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get current canary model
+            canary = self.get_canary_model(model_name, db_session)
+            if not canary:
+                logger.warning(f"No canary deployment found for {model_name}")
+                return None
+
+            # Get the model version record
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == canary["id"])
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(f"Canary model {canary['id']} not found in database")
+                return None
+
+            current_traffic = canary.get("traffic_percentage", 0)
+            new_traffic = min(current_traffic + increment_percentage, max_traffic)
+
+            if new_traffic == current_traffic:
+                logger.info(
+                    f"Canary traffic for {model_name} already at maximum allowed: {current_traffic}%"
+                )
+                return canary
+
+            # Update experiment config
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config["traffic_percentage"] = new_traffic
+            experiment_config["canary_stage"] = self._get_canary_stage(new_traffic)
+            experiment_config["previous_traffic_percentage"] = current_traffic
+            experiment_config["last_traffic_update"] = canary_model.updated_at.isoformat()
+            canary_model.experiment_config = experiment_config
+
+            db_session.commit()
+
+            logger.info(
+                f"Increased canary traffic for {model_name}:{canary_model.version} "
+                f"from {current_traffic}% to {new_traffic}%"
+            )
+
+            return {
+                "id": str(canary_model.id),
+                "model_name": canary_model.model_name,
+                "version": canary_model.version,
+                "previous_traffic_percentage": current_traffic,
+                "traffic_percentage": new_traffic,
+                "is_canary": True,
+                "canary_status": experiment_config.get("canary_status", "active"),
+                "canary_stage": experiment_config.get("canary_stage"),
+                "experiment_config": experiment_config,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error increasing canary traffic for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def promote_canary_to_production(
+        self,
+        model_name: str,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Promote the canary deployment to full production.
+
+        This method promotes the canary model to become the new active production model.
+        The previous active model is deactivated, and the canary is converted to a
+        regular active model with 100% traffic.
+
+        Args:
+            model_name: Name of the model
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with promotion result or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.promote_canary_to_production('skill_matching')
+            >>> print(result['new_active_version'])
+            'v2.0.0'
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for promote_canary_to_production({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get current canary and active models
+            canary = self.get_canary_model(model_name, db_session)
+            active = self.get_active_model(model_name, db_session)
+
+            if not canary:
+                logger.error(f"No canary deployment found for {model_name}")
+                return None
+
+            # Get database records
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == canary["id"])
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(f"Canary model {canary['id']} not found in database")
+                return None
+
+            # Deactivate current active model if exists
+            if active:
+                old_active_model = (
+                    db_session.query(MLModelVersion)
+                    .filter(MLModelVersion.id == active["id"])
+                    .first()
+                )
+                if old_active_model:
+                    old_active_model.is_active = False
+                    logger.info(
+                        f"Deactivated previous active model {model_name}:{old_active_model.version}"
+                    )
+
+            # Promote canary to active production
+            previous_version = canary_model.version
+            canary_model.is_experiment = False
+            canary_model.is_active = True
+
+            # Update experiment config to reflect promotion
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config["is_canary"] = False
+            experiment_config["canary_status"] = "promoted"
+            experiment_config["promoted_at"] = canary_model.updated_at.isoformat()
+            experiment_config["traffic_percentage"] = 100
+            experiment_config["previous_active_version"] = active.get("version") if active else None
+            canary_model.experiment_config = experiment_config
+
+            db_session.commit()
+
+            logger.info(
+                f"Promoted canary {model_name}:{previous_version} to production"
+            )
+
+            return {
+                "model_name": model_name,
+                "new_active_version": previous_version,
+                "previous_active_version": active.get("version") if active else None,
+                "promotion_status": "success",
+                "traffic_percentage": 100,
+                "canary_id": str(canary_model.id),
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error promoting canary to production for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def rollback_canary(
+        self,
+        model_name: str,
+        reason: Optional[str] = None,
+        db_session: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Rollback a canary deployment, routing all traffic back to the stable version.
+
+        This method deactivates the canary deployment and restores the previous
+        active model to handle 100% of traffic. The canary is marked as rolled back
+        for audit purposes.
+
+        Args:
+            model_name: Name of the model
+            reason: Optional reason for the rollback (for audit trail)
+            db_session: Optional database session for querying and writing
+
+        Returns:
+            Dictionary with rollback result or None on failure
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.rollback_canary('skill_matching', reason='Performance degradation')
+            >>> print(result['active_version'])
+            'v1.0.0'  # Reverted to stable version
+        """
+        if db_session is None:
+            logger.debug(
+                f"No database session provided for rollback_canary({model_name}), returning None"
+            )
+            return None
+
+        try:
+            # Get current canary and active models
+            canary = self.get_canary_model(model_name, db_session)
+            active = self.get_active_model(model_name, db_session)
+
+            if not canary:
+                logger.warning(f"No canary deployment found for {model_name} to rollback")
+                return None
+
+            # Get the canary model record
+            canary_model = (
+                db_session.query(MLModelVersion)
+                .filter(MLModelVersion.id == canary["id"])
+                .first()
+            )
+
+            if not canary_model:
+                logger.error(f"Canary model {canary['id']} not found in database")
+                return None
+
+            rolled_back_version = canary_model.version
+            previous_traffic = canary.get("traffic_percentage", 0)
+
+            # Deactivate canary
+            canary_model.is_active = False
+            canary_model.is_experiment = False
+
+            # Update experiment config to reflect rollback
+            experiment_config = canary_model.experiment_config or {}
+            experiment_config["is_canary"] = False
+            experiment_config["canary_status"] = "rolled_back"
+            experiment_config["rolled_back_at"] = canary_model.updated_at.isoformat()
+            experiment_config["rollback_reason"] = reason
+            experiment_config["previous_traffic_percentage"] = previous_traffic
+            canary_model.experiment_config = experiment_config
+
+            # Ensure active model is properly set
+            if active:
+                active_model = (
+                    db_session.query(MLModelVersion)
+                    .filter(MLModelVersion.id == active["id"])
+                    .first()
+                )
+                if active_model:
+                    active_model.is_active = True
+                    active_model.is_experiment = False
+
+            db_session.commit()
+
+            logger.info(
+                f"Rolled back canary {model_name}:{rolled_back_version}, "
+                f"restored {active.get('version') if active else 'unknown'} as active"
+            )
+
+            return {
+                "model_name": model_name,
+                "rolled_back_version": rolled_back_version,
+                "active_version": active.get("version") if active else None,
+                "rollback_status": "success",
+                "reason": reason,
+                "previous_canary_traffic": previous_traffic,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error rolling back canary for {model_name}: {e}", exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return None
+
+    def get_canary_status(
+        self, model_name: str, db_session: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Get the current status of canary deployment for a model.
+
+        Returns comprehensive information about the canary deployment including
+        traffic allocation, performance metrics, and deployment stage.
+
+        Args:
+            model_name: Name of the model
+            db_session: Optional database session for querying
+
+        Returns:
+            Dictionary with canary status information
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> status = manager.get_canary_status('skill_matching')
+            >>> print(status['canary_active'])
+            True
+            >>> print(status['traffic_percentage'])
+            10
+        """
+        canary = self.get_canary_model(model_name, db_session)
+        active = self.get_active_model(model_name, db_session)
+
+        if not canary:
+            return {
+                "model_name": model_name,
+                "canary_active": False,
+                "canary_version": None,
+                "active_version": active.get("version") if active else None,
+                "traffic_percentage": 0,
+                "canary_stage": None,
+                "message": "No active canary deployment",
+            }
+
+        return {
+            "model_name": model_name,
+            "canary_active": True,
+            "canary_id": canary.get("id"),
+            "canary_version": canary.get("version"),
+            "active_version": active.get("version") if active else None,
+            "traffic_percentage": canary.get("traffic_percentage", 0),
+            "canary_stage": canary.get("canary_stage"),
+            "canary_status": canary.get("canary_status"),
+            "performance_score": canary.get("performance_score"),
+            "initial_traffic_percentage": canary.get("experiment_config", {}).get(
+                "initial_traffic_percentage"
+            ),
+            "experiment_config": canary.get("experiment_config"),
+        }
+
+    def _get_canary_stage(self, traffic_percentage: float) -> str:
+        """
+        Determine the canary stage based on traffic percentage.
+
+        Args:
+            traffic_percentage: Current traffic percentage allocated to canary
+
+        Returns:
+            String describing the canary stage
+        """
+        if traffic_percentage <= 10:
+            return "initial"
+        elif traffic_percentage <= 25:
+            return "early"
+        elif traffic_percentage <= 40:
+            return "mid"
+        elif traffic_percentage < 50:
+            return "advanced"
+        else:
+            return "pre_promotion"

@@ -23,8 +23,13 @@ from models.model_training_event import ModelTrainingEvent
 from models.skill_feedback import SkillFeedback
 from analyzers.performance_tracker import PerformanceTracker
 from analyzers.model_versioning import ModelVersionManager
+from analyzers.feedback_accumulator import FeedbackAccumulator
+from analyzers.mlflow_tracker import get_mlflow_tracker
 from config import get_settings
-from tasks.notifications import send_model_retraining_notification
+from tasks.notifications import (
+    send_model_retraining_notification,
+    send_performance_degradation_alert,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -35,6 +40,9 @@ MIN_PERFORMANCE_DEGRADATION_THRESHOLD = 0.05  # 5% drop
 # Minimum number of feedback samples required for retraining
 MIN_FEEDBACK_SAMPLES_FOR_TRAINING = 100
 
+# Feedback volume threshold for triggering retraining
+FEEDBACK_VOLUME_TRIGGER_THRESHOLD = 1000
+
 # Minimum number of days between retraining runs
 MIN_RETRAINING_INTERVAL_DAYS = 7
 
@@ -43,6 +51,210 @@ AUTO_ACTIVATION_PERFORMANCE_THRESHOLD = 0.85
 
 # Default dataset types for evaluation
 DEFAULT_EVALUATION_DATASETS = ["validation", "test"]
+
+
+def trigger_failure_alert(
+    model_name: str,
+    error_message: str,
+    error_type: str,
+    context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Trigger a failure alert notification for model retraining.
+
+    This function sends an alert notification when model retraining fails,
+    providing detailed error information to administrators.
+
+    Args:
+        model_name: Name of the model that failed retraining
+        error_message: Detailed error message describing the failure
+        error_type: Type of error (e.g., 'training_failed', 'version_creation_failed',
+                   'database_error', 'timeout', 'unexpected_error')
+        context: Optional additional context about the failure
+
+    Returns:
+        Dictionary containing alert results:
+        {
+            "alert_sent": True,
+            "alert_type": "failure",
+            "model_name": "ranking",
+            "error_type": "training_failed",
+            "processing_time_ms": 123.45
+        }
+
+    Example:
+        >>> result = trigger_failure_alert(
+        ...     'ranking',
+        ...     'Model training failed: insufficient data',
+        ...     'training_failed',
+        ...     {'training_samples': 10}
+        ... )
+        >>> print(result['alert_sent'])
+        True
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(
+            f"Triggering failure alert for {model_name}: "
+            f"error_type={error_type}, error={error_message[:100]}..."
+        )
+
+        # Build training result for notification
+        training_result = {
+            "status": "failed",
+            "error": error_message,
+            "error_type": error_type,
+            "context": context or {},
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Send failure notification
+        try:
+            notification_result = send_model_retraining_notification(
+                model_name=model_name,
+                training_result=training_result,
+            )
+            alert_sent = notification_result.get("status") == "sent"
+        except Exception as notify_error:
+            logger.error(
+                f"Failed to send failure alert notification: {notify_error}",
+                exc_info=True
+            )
+            alert_sent = False
+            notification_result = {"status": "failed", "error": str(notify_error)}
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "alert_sent": alert_sent,
+            "alert_type": "failure",
+            "model_name": model_name,
+            "error_type": error_type,
+            "notification_result": notification_result,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        if alert_sent:
+            logger.info(
+                f"Failure alert sent successfully for {model_name}: "
+                f"error_type={error_type}, time={processing_time_ms}ms"
+            )
+        else:
+            logger.warning(
+                f"Failure alert could not be sent for {model_name}: "
+                f"error_type={error_type}"
+            )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error triggering failure alert: {e}", exc_info=True)
+        return {
+            "alert_sent": False,
+            "alert_type": "failure",
+            "model_name": model_name,
+            "error_type": error_type,
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+
+def trigger_performance_degradation_alert(
+    model_name: str,
+    degradation_details: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Trigger a performance degradation alert for a model.
+
+    This function sends an alert notification when model performance
+    degradation is detected, before triggering retraining.
+
+    Args:
+        model_name: Name of the model with performance degradation
+        degradation_details: Dictionary containing degradation information:
+            - current_metrics: Current performance metrics
+            - baseline_metrics: Baseline performance metrics
+            - degradation_percentage: Percentage of degradation
+            - threshold: Threshold that was exceeded
+
+    Returns:
+        Dictionary containing alert results:
+        {
+            "alert_sent": True,
+            "alert_type": "performance_degradation",
+            "model_name": "ranking",
+            "degradation_percentage": 0.08,
+            "processing_time_ms": 123.45
+        }
+
+    Example:
+        >>> details = {"degradation_percentage": 0.08, "threshold": 0.05}
+        >>> result = trigger_performance_degradation_alert('ranking', details)
+        >>> print(result['alert_sent'])
+        True
+    """
+    start_time = time.time()
+
+    try:
+        degradation_pct = degradation_details.get("degradation_percentage", 0)
+        logger.info(
+            f"Triggering performance degradation alert for {model_name}: "
+            f"degradation={degradation_pct:.1%}"
+        )
+
+        # Add timestamp if not present
+        if "detected_at" not in degradation_details:
+            degradation_details["detected_at"] = datetime.utcnow().isoformat()
+
+        # Send performance degradation alert
+        try:
+            alert_result = send_performance_degradation_alert(
+                model_name=model_name,
+                degradation_details=degradation_details,
+            )
+            alert_sent = alert_result.get("status") == "sent"
+        except Exception as notify_error:
+            logger.error(
+                f"Failed to send performance degradation alert: {notify_error}",
+                exc_info=True
+            )
+            alert_sent = False
+            alert_result = {"status": "failed", "error": str(notify_error)}
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "alert_sent": alert_sent,
+            "alert_type": "performance_degradation",
+            "model_name": model_name,
+            "degradation_percentage": degradation_pct,
+            "alert_result": alert_result,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        if alert_sent:
+            logger.info(
+                f"Performance degradation alert sent successfully for {model_name}: "
+                f"degradation={degradation_pct:.1%}, time={processing_time_ms}ms"
+            )
+        else:
+            logger.warning(
+                f"Performance degradation alert could not be sent for {model_name}: "
+                f"degradation={degradation_pct:.1%}"
+            )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error triggering performance degradation alert: {e}", exc_info=True)
+        return {
+            "alert_sent": False,
+            "alert_type": "performance_degradation",
+            "model_name": model_name,
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
 
 
 def get_sync_session():
@@ -1037,6 +1249,8 @@ def should_trigger_retraining(
     performance_threshold: float = MIN_PERFORMANCE_DEGRADATION_THRESHOLD,
     min_feedback_samples: int = MIN_FEEDBACK_SAMPLES_FOR_TRAINING,
     min_interval_days: int = MIN_RETRAINING_INTERVAL_DAYS,
+    feedback_volume_threshold: int = FEEDBACK_VOLUME_TRIGGER_THRESHOLD,
+    feedback_accumulator: Optional[FeedbackAccumulator] = None,
 ) -> Dict[str, Any]:
     """
     Determine if model retraining should be triggered.
@@ -1044,6 +1258,7 @@ def should_trigger_retraining(
     Evaluates multiple criteria to determine if a model should be retrained:
     - Performance degradation compared to baseline
     - Sufficient feedback samples available
+    - Feedback volume threshold reached (1000+ feedbacks)
     - Minimum time interval since last retraining
 
     Args:
@@ -1052,6 +1267,8 @@ def should_trigger_retraining(
         performance_threshold: Performance degradation threshold (default: 0.05)
         min_feedback_samples: Minimum feedback samples required (default: 100)
         min_interval_days: Minimum days between retraining (default: 7)
+        feedback_volume_threshold: Feedback count to trigger retraining (default: 1000)
+        feedback_accumulator: Optional FeedbackAccumulator instance for volume tracking
 
     Returns:
         Dictionary with retraining decision and reasons:
@@ -1063,9 +1280,11 @@ def should_trigger_retraining(
             ],
             "performance_degraded": True,
             "sufficient_feedback": True,
+            "feedback_volume_triggered": True,
             "interval_satisfied": True,
             "current_metrics": {...},
-            "degradation_details": {...}
+            "degradation_details": {...},
+            "feedback_volume_count": 1200
         }
 
     Example:
@@ -1083,6 +1302,7 @@ def should_trigger_retraining(
 
     # Get baseline metrics (from active model)
     baseline_metrics = {}
+    active_model_version_id = None
     try:
         active_model = (
             db_session.query(MLModelVersion)
@@ -1097,6 +1317,7 @@ def should_trigger_retraining(
         )
 
         if active_model and active_model.accuracy_metrics:
+            active_model_version_id = str(active_model.id)
             # Use the active model's metrics as baseline
             baseline_metrics = {
                 "production": {
@@ -1139,6 +1360,50 @@ def should_trigger_retraining(
             f"Insufficient feedback for retraining: {feedback_count} < {min_feedback_samples}"
         )
 
+    # Check feedback volume threshold for automatic triggering
+    feedback_volume_triggered = False
+    feedback_volume_count = 0
+    try:
+        # Use provided accumulator or create a new one
+        accumulator = feedback_accumulator
+        if accumulator is None:
+            accumulator = FeedbackAccumulator(feedback_threshold=feedback_volume_threshold)
+
+        # Get feedback count for the active model version if available
+        if active_model_version_id:
+            feedback_volume_count = accumulator.get_feedback_count(model_name, active_model_version_id)
+
+            # Check if feedback volume threshold has been reached
+            if accumulator.should_trigger_retraining(model_name, active_model_version_id):
+                feedback_volume_triggered = True
+                if not should_retrain:
+                    should_retrain = True
+                reasons.append(
+                    f"Feedback volume threshold reached ({feedback_volume_count} feedbacks)"
+                )
+                logger.info(
+                    f"Feedback volume trigger activated for {model_name}: "
+                    f"{feedback_volume_count} feedbacks (threshold: {feedback_volume_threshold})"
+                )
+        else:
+            # Fallback to using database feedback count if no active model version
+            feedback_volume_count = feedback_count
+            if feedback_count >= feedback_volume_threshold:
+                feedback_volume_triggered = True
+                if not should_retrain:
+                    should_retrain = True
+                reasons.append(
+                    f"Feedback volume threshold reached ({feedback_count} feedbacks)"
+                )
+                logger.info(
+                    f"Feedback volume trigger activated for {model_name}: "
+                    f"{feedback_count} feedbacks (threshold: {feedback_volume_threshold})"
+                )
+    except Exception as e:
+        logger.error(f"Error checking feedback volume threshold: {e}", exc_info=True)
+        # Use database count as fallback
+        feedback_volume_count = feedback_count
+
     # Check time interval since last retraining
     interval_satisfied = True
     try:
@@ -1166,14 +1431,17 @@ def should_trigger_retraining(
     except Exception as e:
         logger.error(f"Error checking retraining interval: {e}", exc_info=True)
 
-    # Final decision: need sufficient feedback AND either degradation OR interval
-    if should_retrain and sufficient_feedback and interval_satisfied:
+    # Final decision: need sufficient feedback AND (degradation OR volume trigger) AND interval
+    # Feedback volume trigger can override performance degradation as a trigger mechanism
+    trigger_activated = performance_degraded or feedback_volume_triggered
+
+    if trigger_activated and sufficient_feedback and interval_satisfied:
         should_retrain = True
     elif not sufficient_feedback or not interval_satisfied:
         should_retrain = False
         reasons = [
             r for r in reasons
-            if "Performance degraded" in r  # Keep performance warnings
+            if "Performance degraded" in r or "Feedback volume" in r  # Keep trigger warnings
         ]
 
     return {
@@ -1181,6 +1449,8 @@ def should_trigger_retraining(
         "reasons": reasons,
         "performance_degraded": performance_degraded,
         "sufficient_feedback": sufficient_feedback,
+        "feedback_volume_triggered": feedback_volume_triggered,
+        "feedback_volume_count": feedback_volume_count,
         "interval_satisfied": interval_satisfied,
         "current_metrics": current_metrics,
         "degradation_details": degradation_details,
@@ -1193,6 +1463,7 @@ def automated_retraining_task_core(
     auto_activate: bool = False,
     performance_threshold: float = AUTO_ACTIVATION_PERFORMANCE_THRESHOLD,
     db_session: Optional[Session] = None,
+    mlflow_run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Core automated retraining logic without Celery dependencies.
@@ -1206,6 +1477,7 @@ def automated_retraining_task_core(
         auto_activate: Whether to auto-activate if performance threshold met
         performance_threshold: Minimum F1 score for auto-activation
         db_session: Database session for queries
+        mlflow_run_id: Optional existing MLflow run ID to use
 
     Returns:
         Dictionary containing retraining results
@@ -1216,6 +1488,10 @@ def automated_retraining_task_core(
         'completed'
     """
     start_time = time.time()
+
+    # Get MLflow tracker for experiment tracking
+    mlflow_tracker = get_mlflow_tracker()
+    mlflow_run_context = None
 
     try:
         logger.info(
@@ -1238,6 +1514,28 @@ def automated_retraining_task_core(
                 "processing_time_ms": round((time.time() - start_time) * 1000, 2),
             }
 
+        # Start MLflow run for experiment tracking
+        mlflow_run_context = mlflow_tracker.start_run(
+            experiment_name=f"{model_name}_retraining",
+            run_name=f"{model_name}_retraining_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+            tags={
+                "model_name": model_name,
+                "trigger_type": "automated",
+                "auto_activate": str(auto_activate),
+            },
+        )
+        mlflow_run_context.__enter__()
+
+        # Log initial training parameters to MLflow
+        mlflow_tracker.log_params({
+            "model_name": model_name,
+            "days_back": days_back,
+            "auto_activate": auto_activate,
+            "performance_threshold": performance_threshold,
+            "min_feedback_samples": MIN_FEEDBACK_SAMPLES_FOR_TRAINING,
+            "min_retraining_interval_days": MIN_RETRAINING_INTERVAL_DAYS,
+        })
+
         try:
             # Step 1: Evaluate if retraining should be triggered
             logger.info(f"Step 1/8: Evaluating retraining trigger conditions")
@@ -1254,6 +1552,15 @@ def automated_retraining_task_core(
                 logger.info(
                     f"Retraining not triggered for {model_name}: {trigger_decision['reasons']}"
                 )
+                # Log skipped run to MLflow
+                mlflow_tracker.set_tags({
+                    "training_status": "skipped",
+                    "skip_reasons": ", ".join(trigger_decision["reasons"]),
+                })
+                mlflow_tracker.log_metrics({
+                    "training_triggered": 0,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                })
                 return {
                     "should_retrain": False,
                     "training_triggered": False,
@@ -1275,6 +1582,12 @@ def automated_retraining_task_core(
 
             logger.info(f"Using {training_samples} feedback samples for training")
 
+            # Log training samples to MLflow
+            mlflow_tracker.log_params({
+                "training_samples": training_samples,
+                "query_days_back": days_back,
+            })
+
             # Step 3: Create training event record
             logger.info(f"Step 3/8: Creating training event record")
 
@@ -1292,11 +1605,24 @@ def automated_retraining_task_core(
             )
             training_event_id = str(training_event.id)
 
+            # Log training event info to MLflow
+            mlflow_tracker.log_params({
+                "training_event_id": training_event_id,
+                "new_version": new_version,
+            })
+
             # Step 4: Prepare training data
             logger.info(f"Step 4/8: Preparing training data")
 
             training_data = prepare_training_data(feedback_entries, model_name)
             logger.info("Training data prepared successfully")
+
+            # Log training data statistics to MLflow
+            mlflow_tracker.log_params({
+                "correct_samples": training_data.get("correct_count", 0),
+                "incorrect_samples": training_data.get("incorrect_count", 0),
+                "accuracy_ratio": training_data.get("accuracy_ratio", 0.0),
+            })
 
             # Step 5: Train new model version
             logger.info(f"Step 5/8: Training new model version")
@@ -1310,6 +1636,17 @@ def automated_retraining_task_core(
                 training_event.training_status = "failed"
                 training_event.error_message = training_result.get("error", "Unknown error")
                 db_session.commit()
+
+                # Log failure to MLflow
+                mlflow_tracker.set_tags({
+                    "training_status": "failed",
+                    "error_message": training_result.get("error", "Unknown error"),
+                })
+                mlflow_tracker.log_metrics({
+                    "training_triggered": 1,
+                    "training_success": 0,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                })
 
                 return {
                     "should_retrain": True,
@@ -1332,6 +1669,16 @@ def automated_retraining_task_core(
                 "auc_score": training_metrics.get("auc_score", 0.0),
                 "sample_size": training_samples,
             }
+
+            # Log training metrics to MLflow
+            mlflow_tracker.log_metrics({
+                "accuracy": performance_metrics["accuracy"],
+                "precision": performance_metrics["precision"],
+                "recall": performance_metrics["recall"],
+                "f1_score": performance_metrics["f1_score"],
+                "auc_score": performance_metrics["auc_score"],
+                "training_samples": training_samples,
+            })
 
             # Step 6: Evaluate model performance
             logger.info(f"Step 6/8: Evaluating model performance")
@@ -1366,6 +1713,18 @@ def automated_retraining_task_core(
                 training_event.training_status = "failed"
                 training_event.error_message = "Failed to create model version"
                 db_session.commit()
+
+                # Log version creation failure to MLflow
+                mlflow_tracker.set_tags({
+                    "training_status": "failed",
+                    "error_message": "Failed to create model version",
+                })
+                mlflow_tracker.log_metrics({
+                    "training_triggered": 1,
+                    "training_success": 0,
+                    "model_version_created": 0,
+                    "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                })
 
                 return {
                     "should_retrain": True,
@@ -1404,6 +1763,31 @@ def automated_retraining_task_core(
                 is_active = True
                 is_experiment = False
                 logger.info(f"Model {new_version} activated as production model")
+
+            # Log successful training completion to MLflow
+            mlflow_tracker.set_tags({
+                "training_status": "completed",
+                "model_version": new_version,
+                "model_version_id": new_version_id,
+                "is_active": str(is_active),
+                "is_experiment": str(is_experiment),
+            })
+            mlflow_tracker.log_metrics({
+                "training_triggered": 1,
+                "training_success": 1,
+                "model_version_created": 1,
+                "improvement_over_baseline": improvement,
+                "processing_time_ms": processing_time_ms,
+            })
+            # Log training metadata as artifact
+            mlflow_tracker.log_dict({
+                "trigger_reasons": trigger_decision.get("reasons", []),
+                "performance_degraded": trigger_decision.get("performance_degraded", False),
+                "sufficient_feedback": trigger_decision.get("sufficient_feedback", False),
+                "interval_satisfied": trigger_decision.get("interval_satisfied", False),
+                "feedback_volume_triggered": trigger_decision.get("feedback_volume_triggered", False),
+                "degradation_details": trigger_decision.get("degradation_details", {}),
+            }, "training_metadata.json")
 
             # Update training event as completed
             training_event.training_status = "completed"
@@ -1448,9 +1832,35 @@ def automated_retraining_task_core(
             # Close session if we created it
             if session_created and db_session:
                 db_session.close()
+            # End MLflow run if we started one
+            if mlflow_run_context:
+                try:
+                    mlflow_run_context.__exit__(None, None, None)
+                except Exception as cleanup_error:
+                    logger.warning(f"Error ending MLflow run: {cleanup_error}")
 
     except Exception as e:
         logger.error(f"Error in core automated retraining: {e}", exc_info=True)
+        # Log error to MLflow if available
+        try:
+            mlflow_tracker.set_tags({
+                "training_status": "failed",
+                "error_type": type(e).__name__,
+                "error_message": str(e)[:500],  # Truncate long error messages
+            })
+            mlflow_tracker.log_metrics({
+                "training_triggered": 1,
+                "training_success": 0,
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            })
+        except Exception as mlflow_error:
+            logger.warning(f"Failed to log error to MLflow: {mlflow_error}")
+        # End MLflow run on error
+        if mlflow_run_context:
+            try:
+                mlflow_run_context.__exit__(type(e), e, e.__traceback__)
+            except Exception as cleanup_error:
+                logger.warning(f"Error ending MLflow run on exception: {cleanup_error}")
         return {
             "should_retrain": True,
             "training_triggered": False,
@@ -1610,6 +2020,30 @@ def automated_retraining_task(
             f"Retraining triggered for {model_name}: {', '.join(trigger_decision['reasons'])}"
         )
 
+        # Trigger performance degradation alert if applicable
+        if trigger_decision.get("performance_degraded"):
+            try:
+                degradation_details = {
+                    "degradation_percentage": trigger_decision.get(
+                        "degradation_details", {}
+                    ).get("max_degradation", 0),
+                    "threshold": MIN_PERFORMANCE_DEGRADATION_THRESHOLD,
+                    "current_metrics": trigger_decision.get("current_metrics", {}),
+                    "baseline_metrics": trigger_decision.get("baseline_metrics", {}),
+                }
+                alert_result = trigger_performance_degradation_alert(
+                    model_name=model_name,
+                    degradation_details=degradation_details,
+                )
+                logger.info(
+                    f"Performance degradation alert triggered: {alert_result.get('alert_sent')}"
+                )
+            except Exception as alert_error:
+                logger.error(
+                    f"Failed to trigger performance degradation alert: {alert_error}",
+                    exc_info=True
+                )
+
         # Steps 2-8: Execute core retraining logic with progress updates
         for step_name, step_num in [
             ("querying_feedback", 2),
@@ -1646,24 +2080,40 @@ def automated_retraining_task(
 
         # Send notification if requested
         if notify and result.get("status") in ["completed", "failed"]:
-            try:
-                logger.info(f"Sending retraining notification for {model_name}")
-                notification_result = send_model_retraining_notification(
-                    model_name=model_name,
-                    training_result=result,
-                )
-                result["notification_sent"] = notification_result.get("status") == "sent"
-                result["notification_result"] = notification_result
-
-                if result["status"] == "completed":
+            if result["status"] == "completed":
+                try:
+                    logger.info(f"Sending retraining notification for {model_name}")
+                    notification_result = send_model_retraining_notification(
+                        model_name=model_name,
+                        training_result=result,
+                    )
+                    result["notification_sent"] = notification_result.get("status") == "sent"
+                    result["notification_result"] = notification_result
                     logger.info(
                         f"Retraining notification sent: {notification_result.get('status')}"
                     )
-            except Exception as e:
-                logger.error(f"Failed to send retraining notification: {e}", exc_info=True)
-                result["notification_sent"] = False
-                if result["status"] == "completed":
+                except Exception as e:
+                    logger.error(f"Failed to send retraining notification: {e}", exc_info=True)
+                    result["notification_sent"] = False
                     result["notification_error"] = str(e)
+            else:
+                # Failed status - trigger failure alert
+                try:
+                    logger.info(f"Triggering failure alert for {model_name}")
+                    alert_result = trigger_failure_alert(
+                        model_name=model_name,
+                        error_message=result.get("error", "Unknown error"),
+                        error_type=result.get("error_type", "training_failed"),
+                        context={
+                            "training_event_id": result.get("training_event_id"),
+                            "processing_time_ms": result.get("processing_time_ms"),
+                        },
+                    )
+                    result["alert_sent"] = alert_result.get("alert_sent", False)
+                    result["alert_result"] = alert_result
+                except Exception as alert_error:
+                    logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                    result["alert_sent"] = False
 
         return result
 
@@ -1677,19 +2127,24 @@ def automated_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
-        # Send notification if requested
+        # Trigger failure alert
         if notify:
             try:
-                logger.info(f"Sending failure notification for {model_name}")
-                notification_result = send_model_retraining_notification(
+                logger.info(f"Triggering timeout failure alert for {model_name}")
+                alert_result = trigger_failure_alert(
                     model_name=model_name,
-                    training_result=error_result,
+                    error_message=error_result["error"],
+                    error_type="timeout",
+                    context={
+                        "task_id": str(self.request.id) if self.request.id else None,
+                        "processing_time_ms": error_result["processing_time_ms"],
+                    },
                 )
-                error_result["notification_sent"] = notification_result.get("status") == "sent"
-                error_result["notification_result"] = notification_result
-            except Exception as notify_error:
-                logger.error(f"Failed to send failure notification: {notify_error}", exc_info=True)
-                error_result["notification_sent"] = False
+                error_result["alert_sent"] = alert_result.get("alert_sent", False)
+                error_result["alert_result"] = alert_result
+            except Exception as alert_error:
+                logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                error_result["alert_sent"] = False
 
         return error_result
 
@@ -1703,19 +2158,25 @@ def automated_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
-        # Send notification if requested
+        # Trigger failure alert
         if notify:
             try:
-                logger.info(f"Sending failure notification for {model_name}")
-                notification_result = send_model_retraining_notification(
+                logger.info(f"Triggering error failure alert for {model_name}")
+                alert_result = trigger_failure_alert(
                     model_name=model_name,
-                    training_result=error_result,
+                    error_message=str(e),
+                    error_type="unexpected_error",
+                    context={
+                        "task_id": str(self.request.id) if self.request.id else None,
+                        "exception_type": type(e).__name__,
+                        "processing_time_ms": error_result["processing_time_ms"],
+                    },
                 )
-                error_result["notification_sent"] = notification_result.get("status") == "sent"
-                error_result["notification_result"] = notification_result
-            except Exception as notify_error:
-                logger.error(f"Failed to send failure notification: {notify_error}", exc_info=True)
-                error_result["notification_sent"] = False
+                error_result["alert_sent"] = alert_result.get("alert_sent", False)
+                error_result["alert_result"] = alert_result
+            except Exception as alert_error:
+                logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                error_result["alert_sent"] = False
 
         return error_result
 
@@ -1765,6 +2226,9 @@ def manual_retraining_task(
         f"Manual retraining requested for '{model_name}' by {requested_by or 'unknown'}"
     )
 
+    # Get MLflow tracker for manual training run tagging
+    mlflow_tracker = get_mlflow_tracker()
+
     try:
         # Create database session
         db_session = get_sync_session()
@@ -1787,18 +2251,49 @@ def manual_retraining_task(
         result["requested_by"] = requested_by
         result["trigger_type"] = "manual"
 
+        # Log additional MLflow metadata for manual trigger
+        if result.get("mlflow_run_id") or result.get("status") == "completed":
+            try:
+                mlflow_tracker.set_tag("trigger_type", "manual")
+                if requested_by:
+                    mlflow_tracker.set_tag("requested_by", requested_by)
+                mlflow_tracker.log_param("bypass_trigger_evaluation", True)
+            except Exception as mlflow_err:
+                logger.warning(f"Failed to log manual trigger metadata to MLflow: {mlflow_err}")
+
         # Send notification for manual retraining
-        try:
-            logger.info(f"Sending manual retraining notification for {model_name}")
-            notification_result = send_model_retraining_notification(
-                model_name=model_name,
-                training_result=result,
-            )
-            result["notification_sent"] = notification_result.get("status") == "sent"
-            result["notification_result"] = notification_result
-        except Exception as e:
-            logger.error(f"Failed to send manual retraining notification: {e}", exc_info=True)
-            result["notification_sent"] = False
+        if result.get("status") == "completed":
+            try:
+                logger.info(f"Sending manual retraining notification for {model_name}")
+                notification_result = send_model_retraining_notification(
+                    model_name=model_name,
+                    training_result=result,
+                )
+                result["notification_sent"] = notification_result.get("status") == "sent"
+                result["notification_result"] = notification_result
+            except Exception as e:
+                logger.error(f"Failed to send manual retraining notification: {e}", exc_info=True)
+                result["notification_sent"] = False
+        else:
+            # Failed status - trigger failure alert
+            try:
+                logger.info(f"Triggering failure alert for manual retraining of {model_name}")
+                alert_result = trigger_failure_alert(
+                    model_name=model_name,
+                    error_message=result.get("error", "Unknown error"),
+                    error_type=result.get("error_type", "training_failed"),
+                    context={
+                        "requested_by": requested_by,
+                        "trigger_type": "manual",
+                        "training_event_id": result.get("training_event_id"),
+                        "processing_time_ms": result.get("processing_time_ms"),
+                    },
+                )
+                result["alert_sent"] = alert_result.get("alert_sent", False)
+                result["alert_result"] = alert_result
+            except Exception as alert_error:
+                logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+                result["alert_sent"] = False
 
         return result
 
@@ -1814,13 +2309,25 @@ def manual_retraining_task(
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
         }
 
-        # Send failure notification
+        # Trigger failure alert
         try:
-            send_model_retraining_notification(
+            logger.info(f"Triggering failure alert for manual retraining of {model_name}")
+            alert_result = trigger_failure_alert(
                 model_name=model_name,
-                training_result=error_result,
+                error_message=str(e),
+                error_type="unexpected_error",
+                context={
+                    "requested_by": requested_by,
+                    "trigger_type": "manual",
+                    "task_id": str(self.request.id) if self.request.id else None,
+                    "exception_type": type(e).__name__,
+                    "processing_time_ms": error_result["processing_time_ms"],
+                },
             )
-        except Exception:
-            pass
+            error_result["alert_sent"] = alert_result.get("alert_sent", False)
+            error_result["alert_result"] = alert_result
+        except Exception as alert_error:
+            logger.error(f"Failed to trigger failure alert: {alert_error}", exc_info=True)
+            error_result["alert_sent"] = False
 
         return error_result

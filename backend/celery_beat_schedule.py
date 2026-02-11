@@ -6,9 +6,15 @@ daily and weekly automated model retraining schedules. It integrates with
 the main Celery configuration to provide scheduled task execution.
 
 Schedule Overview:
+- Feedback volume check: Runs every 6 hours to check if feedback threshold is met
 - Daily automated retraining check: Runs every day at configured time
 - Weekly full model retraining: Runs once a week with more extensive training
 - Concept drift monitoring: Periodic checks for performance degradation
+
+Feedback Volume Trigger:
+- Monitors accumulated feedback counts per model
+- Automatically triggers retraining when threshold (default: 1000) is reached
+- Can be enabled/disabled via retraining_feedback_counter_enabled setting
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -35,6 +41,8 @@ def get_retraining_schedule_config() -> Dict[str, Any]:
     - weekly_hour: Hour for weekly retraining (default: 3 AM)
     - weekly_minute: Minute for weekly retraining (default: 0)
     - enabled: Whether automated retraining is enabled (default: True)
+    - feedback_volume_threshold: Number of feedbacks to trigger retraining (default: 1000)
+    - feedback_counter_enabled: Whether feedback volume triggers are enabled (default: True)
 
     Returns:
         Dictionary containing schedule configuration
@@ -43,6 +51,8 @@ def get_retraining_schedule_config() -> Dict[str, Any]:
         >>> config = get_retraining_schedule_config()
         >>> print(config['daily_hour'])
         2
+        >>> print(config['feedback_volume_threshold'])
+        1000
     """
     return {
         "daily_hour": getattr(settings, "retraining_daily_hour", 2),
@@ -52,12 +62,59 @@ def get_retraining_schedule_config() -> Dict[str, Any]:
         "weekly_minute": getattr(settings, "retraining_weekly_minute", 0),
         "enabled": getattr(settings, "retraining_enabled", True),
         "models": getattr(settings, "retraining_models", ["skill_matching", "ranking"]),
+        "feedback_volume_threshold": getattr(
+            settings, "retraining_feedback_volume_threshold", 1000
+        ),
+        "feedback_counter_enabled": getattr(
+            settings, "retraining_feedback_counter_enabled", True
+        ),
     }
 
 
 # Celery Beat schedule for automated model retraining
 # This schedule is imported by celery_config.py and merged into beat_schedule
 beat_schedule: Dict[str, Dict[str, Any]] = {
+    # ==============================================
+    # Feedback Volume Trigger Schedule
+    # ==============================================
+    "feedback-volume-check-skill-matching": {
+        "task": "tasks.model_retraining.check_feedback_volume_task",
+        "schedule": crontab(
+            hour="*/6",  # Check every 6 hours
+            minute=15,
+        ),
+        "args": ("skill_matching",),  # model_name
+        "kwargs": {
+            "feedback_threshold": get_retraining_schedule_config()[
+                "feedback_volume_threshold"
+            ],
+            "auto_trigger": True,  # Automatically trigger retraining if threshold met
+            "notify": True,  # Send notifications
+        },
+        "options": {
+            "expires": 21600,  # Task expires if not run within 6 hours
+            "queue": "learning",  # Route to learning queue
+        },
+    },
+    "feedback-volume-check-ranking": {
+        "task": "tasks.model_retraining.check_feedback_volume_task",
+        "schedule": crontab(
+            hour="*/6",  # Check every 6 hours
+            minute=30,
+        ),
+        "args": ("ranking",),  # model_name
+        "kwargs": {
+            "feedback_threshold": get_retraining_schedule_config()[
+                "feedback_volume_threshold"
+            ],
+            "auto_trigger": True,  # Automatically trigger retraining if threshold met
+            "notify": True,  # Send notifications
+        },
+        "options": {
+            "expires": 21600,  # Task expires if not run within 6 hours
+            "queue": "learning",  # Route to learning queue
+        },
+    },
     # ==============================================
     # Daily Automated Retraining Schedule
     # ==============================================
@@ -171,6 +228,11 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         # Filter to only include tasks for configured models
         filtered_schedule = {}
         for task_name, task_config in beat_schedule.items():
+            # Skip feedback volume tasks if counter is disabled
+            if "feedback-volume-check" in task_name:
+                if not config.get("feedback_counter_enabled", True):
+                    continue
+
             # Extract model name from task name or args
             model_name = None
             if task_config.get("args"):
@@ -281,6 +343,8 @@ logger.info(
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
     f"weekly on day {schedule_config['weekly_day']} at "
     f"{schedule_config['weekly_hour']:02d}:{schedule_config['weekly_minute']:02d}, "
+    f"feedback_threshold={schedule_config['feedback_volume_threshold']}, "
+    f"feedback_counter_enabled={schedule_config['feedback_counter_enabled']}, "
     f"enabled={schedule_config['enabled']}"
 )
 

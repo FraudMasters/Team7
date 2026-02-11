@@ -46,6 +46,11 @@ class BaseConfig(BaseSettings):
         celery_result_backend: Celery result backend URL
         backup_retention_days: Default backup retention period in days
         audit_log_retention_days: Default audit log retention period in days
+        mlflow_enabled: Whether MLflow experiment tracking is enabled
+        mlflow_tracking_uri: MLflow tracking server URI
+        mlflow_registry_uri: MLflow model registry URI
+        mlflow_artifact_root: Root directory for MLflow artifacts
+        mlflow_experiment_prefix: Prefix for MLflow experiment names
     """
 
     model_config = SettingsConfigDict(
@@ -312,6 +317,34 @@ class BaseConfig(BaseSettings):
         ge=0.0,
         le=1.0,
         description="Weight for overall fit assessment in ATS score",
+    )
+
+    # ==============================================
+    # MLflow Experiment Tracking Configuration
+    # ==============================================
+    mlflow_enabled: bool = Field(
+        default=False,
+        description="Enable MLflow experiment tracking for ML models",
+    )
+
+    mlflow_tracking_uri: Optional[str] = Field(
+        default=None,
+        description="MLflow tracking server URI (e.g., http://localhost:5000, sqlite:///mlflow.db)",
+    )
+
+    mlflow_registry_uri: Optional[str] = Field(
+        default=None,
+        description="MLflow model registry URI (defaults to tracking_uri if not set)",
+    )
+
+    mlflow_artifact_root: str = Field(
+        default="./mlruns",
+        description="Root directory for MLflow artifacts (for local tracking)",
+    )
+
+    mlflow_experiment_prefix: str = Field(
+        default="agenthr",
+        description="Prefix for MLflow experiment names",
     )
 
     @field_validator("database_url")
