@@ -6,7 +6,7 @@ including A/B testing capabilities, performance tracking, and automatic model se
 The system supports:
 - Active model version management
 - A/B testing with configurable traffic allocation
-- Performance-based model promotion
+- Performance-based model promotion with statistical significance testing
 - Fallback handling for model failures
 """
 import hashlib
@@ -441,31 +441,44 @@ class ModelVersionManager:
         model_name: str,
         min_performance_improvement: float = 5.0,
         min_sample_size: int = 100,
+        significance_level: float = 0.05,
+        min_confidence: float = 0.80,
         db_session: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Recommend whether an experimental model should be promoted to active.
 
-        Compares experimental model performance against the active model
-        and recommends promotion if:
+        Compares experimental model performance against the active model using
+        statistical significance testing and recommends promotion if:
         1. Performance improvement exceeds threshold
-        2. Sample size is sufficient
-        3. Accuracy metrics show consistent improvement
+        2. Sample size is sufficient for statistical power
+        3. Statistical tests show significant improvement
+        4. Confidence level meets minimum threshold
+
+        The method uses ABTestAnalyzer for statistical testing, including:
+        - Chi-square tests for success/failure rate comparisons
+        - T-tests for continuous metric comparisons
+        - Effect size calculations (Cohen's d, Cramer's V)
+        - Confidence intervals for metric differences
 
         Args:
             model_name: Name of the model
-            min_performance_improvement: Minimum performance gain to recommend promotion
+            min_performance_improvement: Minimum performance gain (%) to recommend promotion
             min_sample_size: Minimum sample size for statistical significance
+            significance_level: Significance level (alpha) for hypothesis tests (default: 0.05)
+            min_confidence: Minimum confidence level required for promotion (default: 0.80)
             db_session: Optional database session for querying
 
         Returns:
-            Dictionary with promotion recommendation or None if no clear winner
+            Dictionary with promotion recommendation including statistical analysis,
+            or None if no models available for comparison
 
         Example:
             >>> manager = ModelVersionManager()
             >>> rec = manager.recommend_promotion('skill_matching')
             >>> if rec['should_promote']:
             ...     print(f"Promote {rec['experiment_version']} to active")
+            ...     print(f"Statistical significance: p={rec['p_value']:.4f}")
         """
         active_model = self.get_active_model(model_name, db_session)
         experiments = self.get_experiment_models(model_name, db_session)
@@ -477,8 +490,23 @@ class ModelVersionManager:
             )
             return None
 
+        # Import ABTestAnalyzer for statistical testing
+        try:
+            from analyzers.ab_test_analyzer import ABTestAnalyzer
+
+            ab_analyzer = ABTestAnalyzer(
+                default_significance_level=significance_level,
+                min_sample_size=min_sample_size,
+            )
+        except ImportError:
+            logger.warning(
+                "ABTestAnalyzer not available, falling back to basic comparison"
+            )
+            ab_analyzer = None
+
         best_candidate = None
         best_improvement = 0.0
+        best_statistical_result = None
 
         for exp in experiments:
             # Check if experiment has sufficient sample size
@@ -494,36 +522,248 @@ class ModelVersionManager:
             exp_score = exp.get("performance_score", 0) or 0
 
             if exp_score > active_score:
-                improvement = ((exp_score - active_score) / active_score * 100)
+                improvement = ((exp_score - active_score) / active_score * 100) if active_score > 0 else 0
+
+                # Perform statistical analysis if ABTestAnalyzer is available
+                statistical_result = None
+                if ab_analyzer:
+                    statistical_result = self._analyze_statistical_significance(
+                        active_model=active_model,
+                        experiment_model=exp,
+                        ab_analyzer=ab_analyzer,
+                        significance_level=significance_level,
+                        db_session=db_session,
+                    )
+
+                # Consider both raw improvement and statistical significance
                 if improvement > best_improvement:
                     best_improvement = improvement
                     best_candidate = exp
+                    best_statistical_result = statistical_result
+
+        # Determine if promotion should be recommended
+        should_promote = False
+        promotion_reason = ""
+        confidence = 0.0
+        p_value = 1.0
+        effect_size = 0.0
+        statistical_tests = {}
+        confidence_interval = None
 
         if best_candidate and best_improvement >= min_performance_improvement:
+            if best_statistical_result:
+                # Extract statistical analysis results
+                confidence = best_statistical_result.get("confidence", 0.0)
+                p_value = best_statistical_result.get("p_value", 1.0)
+                effect_size = best_statistical_result.get("effect_size", 0.0)
+                statistical_tests = best_statistical_result.get("statistical_tests", {})
+                confidence_interval = best_statistical_result.get("confidence_interval")
+
+                # Check if statistical criteria are met
+                is_significant = best_statistical_result.get("is_significant", False)
+
+                if is_significant and confidence >= min_confidence:
+                    should_promote = True
+                    promotion_reason = (
+                        f"Statistically significant improvement of {best_improvement:.2f}% "
+                        f"with {confidence:.0%} confidence (p={p_value:.4f})"
+                    )
+                elif is_significant:
+                    should_promote = True  # Significant but lower confidence
+                    promotion_reason = (
+                        f"Statistically significant improvement of {best_improvement:.2f}% "
+                        f"but confidence ({confidence:.0%}) below threshold ({min_confidence:.0%}). "
+                        f"Consider gathering more data."
+                    )
+                elif best_improvement >= min_performance_improvement * 1.5:
+                    # Strong improvement without significance - might be underpowered
+                    should_promote = False
+                    promotion_reason = (
+                        f"Large improvement ({best_improvement:.2f}%) but not statistically "
+                        f"significant (p={p_value:.4f}). May need more samples."
+                    )
+                else:
+                    should_promote = False
+                    promotion_reason = (
+                        f"Improvement of {best_improvement:.2f}% but not statistically "
+                        f"significant (p={p_value:.4f}). Continue testing."
+                    )
+            else:
+                # Fallback to basic comparison without statistical testing
+                if best_improvement >= min_performance_improvement * 2:
+                    should_promote = True
+                    confidence = 0.5  # Conservative estimate
+                    promotion_reason = (
+                        f"Improvement of {best_improvement:.2f}% without statistical "
+                        f"testing (ABTestAnalyzer unavailable). Recommend manual review."
+                    )
+                else:
+                    should_promote = False
+                    promotion_reason = "Insufficient data for statistical analysis"
+
+        # Build result dictionary
+        result = {
+            "should_promote": should_promote,
+            "model_name": model_name,
+            "current_active": active_model["version"] if active_model else None,
+            "experiment_version": best_candidate["version"] if best_candidate else None,
+            "performance_improvement_pct": round(best_improvement, 2),
+            "active_score": active_model.get("performance_score", 0) if active_model else 0,
+            "experiment_score": best_candidate.get("performance_score", 0) if best_candidate else 0,
+            "reason": promotion_reason,
+            # Statistical confidence data
+            "statistical_confidence": {
+                "confidence": round(confidence, 4),
+                "p_value": round(p_value, 6),
+                "effect_size": round(effect_size, 4),
+                "is_significant": p_value < significance_level,
+                "significance_level": significance_level,
+                "min_confidence": min_confidence,
+                "confidence_interval": list(confidence_interval) if confidence_interval else None,
+                "sample_sizes": {
+                    "control": active_model.get("accuracy_metrics", {}).get("sample_size", 0) if active_model else 0,
+                    "treatment": best_candidate.get("accuracy_metrics", {}).get("sample_size", 0) if best_candidate else 0,
+                },
+            },
+            # Detailed statistical test results
+            "statistical_tests": statistical_tests,
+            # Recommendation metadata
+            "recommendation_metadata": {
+                "min_performance_improvement": min_performance_improvement,
+                "min_sample_size": min_sample_size,
+                "experiments_evaluated": len(experiments),
+                "experiments_meeting_threshold": len([
+                    e for e in experiments
+                    if e.get("accuracy_metrics", {}).get("sample_size", 0) >= min_sample_size
+                ]),
+            },
+        }
+
+        if should_promote:
             logger.info(
                 f"Recommending promotion of {best_candidate['version']} "
-                f"for {model_name} (improvement: {best_improvement:.2f}%)"
+                f"for {model_name}: {promotion_reason}"
             )
-            return {
-                "should_promote": True,
-                "model_name": model_name,
-                "current_active": active_model["version"],
-                "experiment_version": best_candidate["version"],
-                "performance_improvement_pct": round(best_improvement, 2),
-                "active_score": active_model.get("performance_score", 0),
-                "experiment_score": best_candidate.get("performance_score", 0),
-            }
+        else:
+            logger.info(
+                f"No promotion recommended for {model_name}: {promotion_reason}"
+            )
 
-        logger.info(
-            f"No experiment meets promotion criteria for {model_name} "
-            f"(best improvement: {best_improvement:.2f}%)"
-        )
-        return {
-            "should_promote": False,
-            "model_name": model_name,
-            "reason": "No experiment meets performance criteria",
-            "best_improvement_pct": round(best_improvement, 2),
+        return result
+
+    def _analyze_statistical_significance(
+        self,
+        active_model: Dict[str, Any],
+        experiment_model: Dict[str, Any],
+        ab_analyzer: Any,
+        significance_level: float,
+        db_session: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Perform statistical significance analysis between active and experiment models.
+
+        This internal method uses ABTestAnalyzer to compare models using various
+        statistical tests and returns a comprehensive analysis result.
+
+        Args:
+            active_model: Dictionary with active model information and metrics
+            experiment_model: Dictionary with experiment model information and metrics
+            ab_analyzer: ABTestAnalyzer instance for statistical testing
+            significance_level: Significance level (alpha) for tests
+            db_session: Optional database session for fetching historical data
+
+        Returns:
+            Dictionary with statistical analysis results including:
+            - confidence: Overall confidence level (0-1)
+            - p_value: Most significant p-value from tests
+            - effect_size: Effect size measure
+            - is_significant: Whether result is statistically significant
+            - statistical_tests: Detailed results from individual tests
+            - confidence_interval: Confidence interval for the difference
+        """
+        result = {
+            "confidence": 0.0,
+            "p_value": 1.0,
+            "effect_size": 0.0,
+            "is_significant": False,
+            "statistical_tests": {},
+            "confidence_interval": None,
         }
+
+        try:
+            # Extract metrics for both models
+            control_metrics = active_model.get("accuracy_metrics", {})
+            treatment_metrics = experiment_model.get("accuracy_metrics", {})
+
+            # Get sample sizes
+            control_sample = control_metrics.get("sample_size", 0)
+            treatment_sample = treatment_metrics.get("sample_size", 0)
+
+            # Try to get data from database if available
+            if db_session and active_model.get("id") and experiment_model.get("id"):
+                db_comparison = ab_analyzer.analyze_from_database(
+                    control_model_id=active_model["id"],
+                    treatment_model_id=experiment_model["id"],
+                    db_session=db_session,
+                    dataset_type="production",
+                    significance_level=significance_level,
+                )
+                if db_comparison:
+                    result["confidence"] = db_comparison.confidence
+                    result["p_value"] = min(
+                        (t.p_value for t in db_comparison.statistical_tests.values()),
+                        default=1.0,
+                    )
+                    result["effect_size"] = max(
+                        (t.effect_size or 0 for t in db_comparison.statistical_tests.values()),
+                        default=0.0,
+                    )
+                    result["is_significant"] = db_comparison.confidence >= 0.8
+                    result["statistical_tests"] = {
+                        k: v.to_dict() if hasattr(v, "to_dict") else v
+                        for k, v in db_comparison.statistical_tests.items()
+                    }
+                    return result
+
+            # Fall back to summary statistics comparison
+            if control_sample >= ab_analyzer.min_sample_size and treatment_sample >= ab_analyzer.min_sample_size:
+                comparison = ab_analyzer.compare_models(
+                    control_model_id=active_model.get("id", "unknown"),
+                    treatment_model_id=experiment_model.get("id", "unknown"),
+                    control_metrics=control_metrics,
+                    treatment_metrics=treatment_metrics,
+                    significance_level=significance_level,
+                    db_session=None,
+                )
+
+                result["confidence"] = comparison.confidence
+                result["p_value"] = min(
+                    (t.p_value for t in comparison.statistical_tests.values()),
+                    default=1.0,
+                )
+                result["effect_size"] = max(
+                    (t.effect_size or 0 for t in comparison.statistical_tests.values()),
+                    default=0.0,
+                )
+                result["is_significant"] = comparison.confidence >= 0.8
+                result["statistical_tests"] = {
+                    k: v.to_dict() if hasattr(v, "to_dict") else v
+                    for k, v in comparison.statistical_tests.items()
+                }
+
+                # Extract confidence interval if available
+                for test_result in comparison.statistical_tests.values():
+                    if test_result.confidence_interval:
+                        result["confidence_interval"] = test_result.confidence_interval
+                        break
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                f"Error performing statistical analysis: {e}", exc_info=True
+            )
+            return result
 
     def record_performance_metrics(
         self,
