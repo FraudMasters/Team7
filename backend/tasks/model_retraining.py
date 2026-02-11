@@ -23,6 +23,7 @@ from models.model_training_event import ModelTrainingEvent
 from models.skill_feedback import SkillFeedback
 from analyzers.performance_tracker import PerformanceTracker
 from analyzers.model_versioning import ModelVersionManager
+from analyzers.feedback_accumulator import FeedbackAccumulator
 from config import get_settings
 from tasks.notifications import send_model_retraining_notification
 
@@ -34,6 +35,9 @@ MIN_PERFORMANCE_DEGRADATION_THRESHOLD = 0.05  # 5% drop
 
 # Minimum number of feedback samples required for retraining
 MIN_FEEDBACK_SAMPLES_FOR_TRAINING = 100
+
+# Feedback volume threshold for triggering retraining
+FEEDBACK_VOLUME_TRIGGER_THRESHOLD = 1000
 
 # Minimum number of days between retraining runs
 MIN_RETRAINING_INTERVAL_DAYS = 7
@@ -1037,6 +1041,8 @@ def should_trigger_retraining(
     performance_threshold: float = MIN_PERFORMANCE_DEGRADATION_THRESHOLD,
     min_feedback_samples: int = MIN_FEEDBACK_SAMPLES_FOR_TRAINING,
     min_interval_days: int = MIN_RETRAINING_INTERVAL_DAYS,
+    feedback_volume_threshold: int = FEEDBACK_VOLUME_TRIGGER_THRESHOLD,
+    feedback_accumulator: Optional[FeedbackAccumulator] = None,
 ) -> Dict[str, Any]:
     """
     Determine if model retraining should be triggered.
@@ -1044,6 +1050,7 @@ def should_trigger_retraining(
     Evaluates multiple criteria to determine if a model should be retrained:
     - Performance degradation compared to baseline
     - Sufficient feedback samples available
+    - Feedback volume threshold reached (1000+ feedbacks)
     - Minimum time interval since last retraining
 
     Args:
@@ -1052,6 +1059,8 @@ def should_trigger_retraining(
         performance_threshold: Performance degradation threshold (default: 0.05)
         min_feedback_samples: Minimum feedback samples required (default: 100)
         min_interval_days: Minimum days between retraining (default: 7)
+        feedback_volume_threshold: Feedback count to trigger retraining (default: 1000)
+        feedback_accumulator: Optional FeedbackAccumulator instance for volume tracking
 
     Returns:
         Dictionary with retraining decision and reasons:
@@ -1063,9 +1072,11 @@ def should_trigger_retraining(
             ],
             "performance_degraded": True,
             "sufficient_feedback": True,
+            "feedback_volume_triggered": True,
             "interval_satisfied": True,
             "current_metrics": {...},
-            "degradation_details": {...}
+            "degradation_details": {...},
+            "feedback_volume_count": 1200
         }
 
     Example:
@@ -1083,6 +1094,7 @@ def should_trigger_retraining(
 
     # Get baseline metrics (from active model)
     baseline_metrics = {}
+    active_model_version_id = None
     try:
         active_model = (
             db_session.query(MLModelVersion)
@@ -1097,6 +1109,7 @@ def should_trigger_retraining(
         )
 
         if active_model and active_model.accuracy_metrics:
+            active_model_version_id = str(active_model.id)
             # Use the active model's metrics as baseline
             baseline_metrics = {
                 "production": {
@@ -1139,6 +1152,50 @@ def should_trigger_retraining(
             f"Insufficient feedback for retraining: {feedback_count} < {min_feedback_samples}"
         )
 
+    # Check feedback volume threshold for automatic triggering
+    feedback_volume_triggered = False
+    feedback_volume_count = 0
+    try:
+        # Use provided accumulator or create a new one
+        accumulator = feedback_accumulator
+        if accumulator is None:
+            accumulator = FeedbackAccumulator(feedback_threshold=feedback_volume_threshold)
+
+        # Get feedback count for the active model version if available
+        if active_model_version_id:
+            feedback_volume_count = accumulator.get_feedback_count(model_name, active_model_version_id)
+
+            # Check if feedback volume threshold has been reached
+            if accumulator.should_trigger_retraining(model_name, active_model_version_id):
+                feedback_volume_triggered = True
+                if not should_retrain:
+                    should_retrain = True
+                reasons.append(
+                    f"Feedback volume threshold reached ({feedback_volume_count} feedbacks)"
+                )
+                logger.info(
+                    f"Feedback volume trigger activated for {model_name}: "
+                    f"{feedback_volume_count} feedbacks (threshold: {feedback_volume_threshold})"
+                )
+        else:
+            # Fallback to using database feedback count if no active model version
+            feedback_volume_count = feedback_count
+            if feedback_count >= feedback_volume_threshold:
+                feedback_volume_triggered = True
+                if not should_retrain:
+                    should_retrain = True
+                reasons.append(
+                    f"Feedback volume threshold reached ({feedback_count} feedbacks)"
+                )
+                logger.info(
+                    f"Feedback volume trigger activated for {model_name}: "
+                    f"{feedback_count} feedbacks (threshold: {feedback_volume_threshold})"
+                )
+    except Exception as e:
+        logger.error(f"Error checking feedback volume threshold: {e}", exc_info=True)
+        # Use database count as fallback
+        feedback_volume_count = feedback_count
+
     # Check time interval since last retraining
     interval_satisfied = True
     try:
@@ -1166,14 +1223,17 @@ def should_trigger_retraining(
     except Exception as e:
         logger.error(f"Error checking retraining interval: {e}", exc_info=True)
 
-    # Final decision: need sufficient feedback AND either degradation OR interval
-    if should_retrain and sufficient_feedback and interval_satisfied:
+    # Final decision: need sufficient feedback AND (degradation OR volume trigger) AND interval
+    # Feedback volume trigger can override performance degradation as a trigger mechanism
+    trigger_activated = performance_degraded or feedback_volume_triggered
+
+    if trigger_activated and sufficient_feedback and interval_satisfied:
         should_retrain = True
     elif not sufficient_feedback or not interval_satisfied:
         should_retrain = False
         reasons = [
             r for r in reasons
-            if "Performance degraded" in r  # Keep performance warnings
+            if "Performance degraded" in r or "Feedback volume" in r  # Keep trigger warnings
         ]
 
     return {
@@ -1181,6 +1241,8 @@ def should_trigger_retraining(
         "reasons": reasons,
         "performance_degraded": performance_degraded,
         "sufficient_feedback": sufficient_feedback,
+        "feedback_volume_triggered": feedback_volume_triggered,
+        "feedback_volume_count": feedback_volume_count,
         "interval_satisfied": interval_satisfied,
         "current_metrics": current_metrics,
         "degradation_details": degradation_details,
