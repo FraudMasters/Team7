@@ -98,6 +98,12 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "job_description_bias_detected": "Generated description contains potentially biased language. Please review and regenerate",
         "job_description_too_short": "Generated description is too short. Please try again",
         "job_description_missing_section": "Required section '{section}' is missing from generated description",
+
+        # Parsing corrections errors
+        "corrections_retrieve_failed": "Failed to retrieve corrections",
+        "correction_save_failed": "Failed to save correction",
+        "correction_update_failed": "Failed to update correction",
+        "correction_not_found": "Correction not found",
     },
     "ru": {
         # File upload errors
@@ -179,6 +185,12 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
         "job_description_bias_detected": "Сгенерированное описание содержит потенциально предвзятый язык. Пожалуйста, просмотрите и сгенерируйте заново",
         "job_description_too_short": "Сгенерированное описание слишком короткое. Попробуйте снова",
         "job_description_missing_section": "Отсутствует обязательная секция '{section}' в сгенерированном описании",
+
+        # Parsing corrections errors
+        "corrections_retrieve_failed": "Не удалось получить исправления",
+        "correction_save_failed": "Не удалось сохранить исправление",
+        "correction_update_failed": "Не удалось обновить исправление",
+        "correction_not_found": "Исправление не найдено",
     },
 }
 
@@ -199,6 +211,10 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         # Job Description success messages
         "job_description_generated": "Job description generated successfully",
         "job_description_saved": "Job description saved successfully",
+        # Parsing corrections success messages
+        "corrections_retrieved": "Corrections retrieved successfully",
+        "correction_saved": "Correction saved successfully",
+        "correction_updated": "Correction updated successfully",
     },
     "ru": {
         "file_uploaded": "Резюме успешно загружено",
@@ -214,6 +230,10 @@ SUCCESS_MESSAGES: Dict[str, Dict[str, str]] = {
         # Job Description success messages
         "job_description_generated": "Описание вакансии успешно сгенерировано",
         "job_description_saved": "Описание вакансии успешно сохранено",
+        # Parsing corrections success messages
+        "corrections_retrieved": "Исправления успешно получены",
+        "correction_saved": "Исправление успешно сохранено",
+        "correction_updated": "Исправление успешно обновлено",
     },
 }
 
