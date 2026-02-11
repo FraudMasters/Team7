@@ -2508,5 +2508,9 @@ export interface JobDescriptionResponse {
   model: string;
   /** Timestamp of generation */
   generated_at: string;
+  /** Inclusiveness score (0-1) from bias checking */
+  inclusive_language_score?: number;
+  /** Bias warnings detected in the description */
+  bias_warnings?: string[];
 }
 
