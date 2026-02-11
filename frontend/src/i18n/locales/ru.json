@@ -1093,5 +1093,98 @@
       "optimizationScore": "Балл оптимизации"
     },
     "description": "Предложения на основе ИИ для улучшения вашего резюме и повышения заметности для рекрутеров."
+  },
+  "jobDescriptionGenerator": {
+    "title": "Генератор описаний вакансий на основе ИИ",
+    "subtitle": "Создавайте профессиональные, инклюзивные описания вакансий с помощью ИИ. Просто укажите детали вакансии ниже, и наш ИИ создаст полное описание с обязанностями, требованиями, льготами и многим другим.",
+    "backButton": "Вернуться к вакансиям",
+    "error": {
+      "title": "Ошибка генерации",
+      "retry": "Повторить",
+      "reset": "Сбросить",
+      "jobTitleRequired": "Название должности обязательно",
+      "atLeastOneSkill": "Добавьте хотя бы один обязательный навык",
+      "generationFailed": "Не удалось сгенерировать описание вакансии"
+    },
+    "sections": {
+      "basicInfo": "Базовая информация",
+      "skills": "Навыки и требования",
+      "generationOptions": "Параметры генерации"
+    },
+    "fields": {
+      "jobTitle": "Название должности",
+      "jobTitlePlaceholder": "например, Senior Python Developer, Product Manager, UX Designer",
+      "seniorityLevel": "Уровень должности",
+      "seniorityLevels": {
+        "notSpecified": "Не указан",
+        "junior": "Младший",
+        "mid": "Средний",
+        "senior": "Старший",
+        "lead": "Ведущий/Главный"
+      },
+      "employmentType": "Тип занятости",
+      "employmentTypes": {
+        "notSpecified": "Не указан",
+        "fullTime": "Полный день",
+        "partTime": "Частичная занятость",
+        "contract": "Контракт",
+        "freelance": "Фриланс"
+      },
+      "experienceRequired": "Требуемый опыт",
+      "experience": {
+        "noExperience": "Без опыта",
+        "months": "месяцев",
+        "years": "{{years}}+ год{{plural}}",
+        "yearsMonths": "{{years}}г {{months}}м"
+      },
+      "workFormat": "Формат работы",
+      "workFormats": {
+        "notSpecified": "Не указан",
+        "remote": "Удаленно",
+        "office": "В офисе",
+        "hybrid": "Гибридный"
+      },
+      "location": "Местоположение",
+      "locationPlaceholder": "например, Сан-Франциско, Удаленно, Лондон",
+      "industry": "Индустрия",
+      "industryPlaceholder": "например, Технологии, Финансы, Здравоохранение",
+      "salaryRange": "Зарплата",
+      "salaryRangePlaceholder": "например, $80,000 - $120,000",
+      "requiredSkills": "Обязательные навыки",
+      "requiredSkillsPlaceholder": "Добавьте навык (например, Python, React, Управление проектами)",
+      "addSkill": "Добавить",
+      "atLeastOneSkillHint": "Добавьте хотя бы один обязательный навык",
+      "additionalSkills": "Дополнительные предпочтительные навыки (необязательно)",
+      "additionalSkillsPlaceholder": "Добавьте предпочтительные навыки",
+      "tone": "Тон",
+      "tones": {
+        "professional": "Профессиональный",
+        "casual": "Непринужденный",
+        "formal": "Формальный",
+        "friendly": "Дружелюбный"
+      },
+      "language": "Язык",
+      "languages": {
+        "en": "Английский",
+        "ru": "Русский"
+      }
+    },
+    "buttons": {
+      "generate": "Сгенерировать описание",
+      "generating": "Генерация...",
+      "regenerate": "Перегенерировать",
+      "editInputs": "Редактировать ввод",
+      "useDescription": "Использовать это описание"
+    },
+    "results": {
+      "title": "Сгенерированное описание вакансии",
+      "summary": "Резюме",
+      "responsibilities": "Ключевые обязанности",
+      "requirements": "Требования и квалификация",
+      "benefits": "Льготы и преимущества",
+      "companyCulture": "Корпоративная культура",
+      "interviewProcess": "Процесс собеседования",
+      "metadata": "Сгенерировано {{provider}} ({{model}}) в {{timestamp}}"
+    }
   }
 }
