@@ -9,6 +9,27 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
+class SourceTextLocation(BaseModel):
+    """
+    Location of source text in the original document for visual highlighting.
+
+    This model stores the position information needed to highlight the
+    original text in the resume document viewer.
+
+    Attributes:
+        page: Page number (1-indexed) where the text appears
+        bbox: Bounding box coordinates [x0, y0, x1, y1] in document coordinates
+        text: The original text segment that was extracted
+    """
+
+    page: Optional[int] = Field(None, ge=1, description="Page number (1-indexed)")
+    bbox: Optional[List[float]] = Field(None, description="Bounding box [x0, y0, x1, y1]")
+    text: Optional[str] = Field(None, description="Original text segment")
+
+    def __repr__(self) -> str:
+        return f"<SourceTextLocation(page={self.page})>"
+
+
 class Skill(BaseModel):
     """
     Individual skill extracted from resume.
@@ -20,6 +41,7 @@ class Skill(BaseModel):
         variations: List of alternative names/synonyms for this skill
         sources: List of experience entry indices where this skill was used
         confidence: Confidence score for skill extraction (0.0 to 1.0)
+        source_text_location: Location in original document for visual highlighting
     """
 
     name: str = Field(..., description="Normalized skill name")
@@ -28,6 +50,7 @@ class Skill(BaseModel):
     variations: List[str] = Field(default_factory=list, description="Alternative names/synonyms")
     sources: List[int] = Field(default_factory=list, description="Experience entry indices where skill was used")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score for extraction")
+    source_text_location: Optional[SourceTextLocation] = Field(None, description="Location in original document")
 
     def __repr__(self) -> str:
         return f"<Skill(name={self.name}, category={self.category})>"
@@ -45,6 +68,7 @@ class Education(BaseModel):
         end_date: Graduation date (ISO format or partial date)
         gpa: Grade point average if mentioned
         description: Additional details (honors, thesis, etc.)
+        source_text_location: Location in original document for visual highlighting
     """
 
     degree: Optional[str] = Field(None, description="Degree level (Bachelor, Master, PhD)")
@@ -54,6 +78,7 @@ class Education(BaseModel):
     end_date: Optional[str] = Field(None, description="Graduation date (ISO or partial format)")
     gpa: Optional[str] = Field(None, description="Grade point average")
     description: Optional[str] = Field(None, description="Additional details (honors, thesis)")
+    source_text_location: Optional[SourceTextLocation] = Field(None, description="Location in original document")
 
     def __repr__(self) -> str:
         return f"<Education(degree={self.degree}, institution={self.institution})>"
@@ -72,6 +97,7 @@ class WorkExperience(BaseModel):
         description: Job description and achievements
         skills: List of skills used in this role
         location: Job location (city, country)
+        source_text_location: Location in original document for visual highlighting
     """
 
     company: Optional[str] = Field(None, description="Company/organization name")
@@ -82,6 +108,7 @@ class WorkExperience(BaseModel):
     description: Optional[str] = Field(None, description="Job description and achievements")
     skills: List[str] = Field(default_factory=list, description="Skills used in this role")
     location: Optional[str] = Field(None, description="Job location (city, country)")
+    source_text_location: Optional[SourceTextLocation] = Field(None, description="Location in original document")
 
     def __repr__(self) -> str:
         return f"<WorkExperience(company={self.company}, position={self.position})>"
@@ -95,11 +122,13 @@ class Language(BaseModel):
         name: Language name (English, Russian, etc.)
         proficiency: Proficiency level (native, fluent, intermediate, basic)
         certification: Language certification if any (IELTS, TOEFL, etc.)
+        source_text_location: Location in original document for visual highlighting
     """
 
     name: str = Field(..., description="Language name")
     proficiency: Optional[str] = Field(None, description="Proficiency level (native, fluent, intermediate, basic)")
     certification: Optional[str] = Field(None, description="Language certification (IELTS, TOEFL)")
+    source_text_location: Optional[SourceTextLocation] = Field(None, description="Location in original document")
 
     def __repr__(self) -> str:
         return f"<Language(name={self.name}, proficiency={self.proficiency})>"
