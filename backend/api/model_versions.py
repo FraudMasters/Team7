@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.ml_model_version import MLModelVersion
+from models.model_performance_snapshot import ModelPerformanceSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,32 @@ class ModelRollbackRequest(BaseModel):
 
     model_name: str = Field(..., description="Name of the model to rollback (e.g., ranking, skill_matching)")
     target_version: str = Field(..., description="Target version to rollback to (e.g., v1.0.0)")
+
+
+class PerformanceMetricPoint(BaseModel):
+    """Single performance metric data point for trend charts."""
+
+    timestamp: str = Field(..., description="ISO timestamp of the measurement")
+    accuracy: Optional[float] = Field(None, description="Accuracy metric (0-1)")
+    precision: Optional[float] = Field(None, description="Precision metric (0-1)")
+    recall: Optional[float] = Field(None, description="Recall metric (0-1)")
+    f1_score: Optional[float] = Field(None, description="F1 score metric (0-1)")
+    ndcg_score: Optional[float] = Field(None, description="NDCG score (0-1)")
+    mrr_score: Optional[float] = Field(None, description="MRR score (0-1)")
+    sample_count: Optional[int] = Field(None, description="Number of samples in this measurement")
+
+
+class PerformanceMetricsResponse(BaseModel):
+    """Response model for model performance metrics with trend data."""
+
+    model_name: str = Field(..., description="Name of the model")
+    active_version: Optional[str] = Field(None, description="Active version identifier")
+    current_metrics: dict = Field(..., description="Current aggregated performance metrics")
+    trend: List[PerformanceMetricPoint] = Field(..., description="Historical trend data points")
+    trend_direction: str = Field(..., description="Overall trend direction (improving, declining, stable)")
+    health_score: Optional[float] = Field(None, description="Overall model health score (0-100)")
+    alert_status: str = Field(..., description="Current alert status (none, warning, critical)")
+    last_updated: Optional[str] = Field(None, description="Timestamp of last update")
 
 
 def _format_model_response(model: MLModelVersion) -> dict:
@@ -371,6 +398,207 @@ async def get_active_model(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get active model: {str(e)}",
+        ) from e
+
+
+@router.get("/metrics/{model_name}", tags=["Model Versions"])
+async def get_model_performance_metrics(
+    model_name: str,
+    days: int = Query(7, description="Number of days of historical data to include", ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get performance metrics for a model with trend data.
+
+    This endpoint returns current performance metrics and historical trend data
+    for the specified model, useful for dashboards and performance monitoring.
+
+    Args:
+        model_name: Name of the model to get metrics for (e.g., ranking, skill_matching)
+        days: Number of days of historical data to include (default: 7, max: 90)
+        db: Database session
+
+    Returns:
+        JSON response with current metrics and trend data
+
+    Raises:
+        HTTPException(404): If no model is found with the given name
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/model-versions/metrics/ranking")
+        >>> response.json()
+        {
+            "model_name": "ranking",
+            "active_version": "v2.1.0",
+            "current_metrics": {
+                "accuracy": 0.85,
+                "precision": 0.82,
+                "recall": 0.88,
+                "f1_score": 0.85,
+                "ndcg_score": 0.91,
+                "mrr_score": 0.78
+            },
+            "trend": [...],
+            "trend_direction": "improving",
+            "health_score": 85.5,
+            "alert_status": "none",
+            "last_updated": "2024-01-15T10:30:00Z"
+        }
+    """
+    try:
+        logger.info(f"Getting performance metrics for model: {model_name}, days: {days}")
+
+        # Get active model version for this model name
+        active_query = select(MLModelVersion).where(
+            MLModelVersion.model_name == model_name,
+            MLModelVersion.is_active == True,
+        )
+        active_result = await db.execute(active_query)
+        active_model = active_result.scalar_one_or_none()
+
+        if active_model is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No active model found for: {model_name}",
+            )
+
+        # Get performance snapshots for trend data
+        from datetime import datetime, timedelta, timezone
+
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Query snapshots for the active model version, ordered by created_at desc
+        snapshot_query = (
+            select(ModelPerformanceSnapshot)
+            .where(
+                ModelPerformanceSnapshot.model_version_id == str(active_model.id),
+                ModelPerformanceSnapshot.created_at >= cutoff_date,
+            )
+            .order_by(ModelPerformanceSnapshot.created_at.desc())
+            .limit(30)  # Limit to 30 data points for charting
+        )
+        snapshot_result = await db.execute(snapshot_query)
+        snapshots = snapshot_result.scalars().all()
+
+        # Build trend data from snapshots
+        trend_data = []
+        for snapshot in reversed(snapshots):  # Reverse to get chronological order
+            trend_point = {
+                "timestamp": snapshot.created_at.isoformat() if snapshot.created_at else None,
+                "accuracy": float(snapshot.accuracy) if snapshot.accuracy is not None else None,
+                "precision": float(snapshot.precision) if snapshot.precision is not None else None,
+                "recall": float(snapshot.recall) if snapshot.recall is not None else None,
+                "f1_score": float(snapshot.f1_score) if snapshot.f1_score is not None else None,
+                "ndcg_score": float(snapshot.ndcg_score) if snapshot.ndcg_score is not None else None,
+                "mrr_score": float(snapshot.mrr_score) if snapshot.mrr_score is not None else None,
+                "sample_count": snapshot.sample_count,
+            }
+            trend_data.append(trend_point)
+
+        # Get current metrics from the most recent snapshot
+        current_metrics = {}
+        if snapshots:
+            latest = snapshots[0]  # Most recent snapshot (desc order)
+            current_metrics = {
+                "accuracy": float(latest.accuracy) if latest.accuracy is not None else None,
+                "precision": float(latest.precision) if latest.precision is not None else None,
+                "recall": float(latest.recall) if latest.recall is not None else None,
+                "f1_score": float(latest.f1_score) if latest.f1_score is not None else None,
+                "auc_score": float(latest.auc_score) if latest.auc_score is not None else None,
+                "ndcg_score": float(latest.ndcg_score) if latest.ndcg_score is not None else None,
+                "mrr_score": float(latest.mrr_score) if latest.mrr_score is not None else None,
+                "sample_count": latest.sample_count,
+                "evaluation_count": latest.evaluation_count,
+                "health_score": float(latest.health_score) if latest.health_score is not None else None,
+            }
+        else:
+            # No snapshots, use model's stored accuracy_metrics if available
+            if active_model.accuracy_metrics:
+                current_metrics = active_model.accuracy_metrics
+            else:
+                current_metrics = {
+                    "accuracy": None,
+                    "precision": None,
+                    "recall": None,
+                    "f1_score": None,
+                    "ndcg_score": None,
+                    "mrr_score": None,
+                }
+
+        # Determine trend direction
+        trend_direction = "stable"
+        if len(snapshots) >= 2:
+            latest_snapshot = snapshots[0]
+            oldest_snapshot = snapshots[-1]
+
+            # Compare F1 scores (or accuracy as fallback)
+            latest_score = latest_snapshot.f1_score or latest_snapshot.accuracy
+            oldest_score = oldest_snapshot.f1_score or oldest_snapshot.accuracy
+
+            if latest_score is not None and oldest_score is not None:
+                diff = float(latest_score) - float(oldest_score)
+                if diff > 0.02:  # 2% improvement threshold
+                    trend_direction = "improving"
+                elif diff < -0.02:  # 2% decline threshold
+                    trend_direction = "declining"
+                else:
+                    trend_direction = "stable"
+        elif snapshots:
+            # Use the snapshot's recorded trend if available
+            trend_direction = snapshots[0].performance_trend or "stable"
+
+        # Get alert status from latest snapshot or default to none
+        alert_status = "none"
+        if snapshots:
+            alert_status = snapshots[0].alert_status or "none"
+
+        # Calculate health score
+        health_score = None
+        if snapshots and snapshots[0].health_score is not None:
+            health_score = float(snapshots[0].health_score)
+        elif active_model.performance_score is not None:
+            health_score = float(active_model.performance_score)
+
+        # Get last updated timestamp
+        last_updated = None
+        if snapshots:
+            last_updated = snapshots[0].created_at.isoformat() if snapshots[0].created_at else None
+        elif active_model.updated_at:
+            last_updated = active_model.updated_at.isoformat()
+
+        response_data = {
+            "model_name": model_name,
+            "active_version": active_model.version,
+            "current_metrics": current_metrics,
+            "trend": trend_data,
+            "trend_direction": trend_direction,
+            "health_score": health_score,
+            "alert_status": alert_status,
+            "last_updated": last_updated,
+        }
+
+        logger.info(f"Retrieved performance metrics for model: {model_name}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting model metrics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get model metrics: {str(e)}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Error getting model metrics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get model metrics: {str(e)}",
         ) from e
 
 
