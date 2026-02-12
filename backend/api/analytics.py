@@ -5,11 +5,13 @@ This module provides endpoints for retrieving recruitment analytics metrics,
 including time-to-hire statistics, resume processing metrics, match rates,
 and other key performance indicators for the recruitment process.
 """
+import csv
+import io
 import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -2038,3 +2040,360 @@ async def get_ranking_accuracy(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve ranking accuracy metrics: {str(e)}",
         ) from e
+
+
+@router.get(
+    "/export",
+    tags=["Analytics"],
+)
+async def export_analytics(
+    format: str = Query("csv", description="Export format (csv or json)"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> StreamingResponse:
+    """
+    Export analytics data in CSV or JSON format.
+
+    This endpoint allows exporting recruitment analytics data for external
+    analysis and reporting. The export includes key metrics, quality metrics,
+    funnel data, and recruiter performance data aggregated for the specified
+    date range.
+
+    Supported formats:
+    - csv: Comma-separated values file suitable for spreadsheet applications
+    - json: JSON format for programmatic access
+
+    Args:
+        format: Export format - 'csv' or 'json' (default: csv)
+        start_date: Optional start date for filtering data (ISO 8601 format)
+        end_date: Optional end date for filtering data (ISO 8601 format)
+
+    Returns:
+        StreamingResponse with the exported data file
+
+    Raises:
+        HTTPException(400): If format is invalid or date format is incorrect
+        HTTPException(500): If data retrieval or export fails
+
+    Examples:
+        >>> import requests
+        >>> # Export as CSV
+        >>> response = requests.get("/api/analytics/export?format=csv")
+        >>> response.headers['content-type']
+        'text/csv'
+
+        >>> # Export with date range
+        >>> response = requests.get(
+        ...     "/api/analytics/export?format=csv&start_date=2024-01-01&end_date=2024-12-31"
+        ... )
+    """
+    try:
+        logger.info(
+            f"Exporting analytics - format: {format}, start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # Validate format
+        if format.lower() not in ["csv", "json"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid format '{format}'. Supported formats: csv, json",
+            )
+
+        # Gather all analytics data
+        export_data = await _gather_export_data(start_date, end_date)
+
+        if format.lower() == "csv":
+            return _generate_csv_response(export_data)
+        else:
+            return _generate_json_export_response(export_data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export analytics: {str(e)}",
+        ) from e
+
+
+async def _gather_export_data(
+    start_date: Optional[str],
+    end_date: Optional[str],
+) -> dict:
+    """
+    Gather all analytics data for export.
+
+    Args:
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary containing all analytics data for export
+    """
+    from datetime import datetime
+    from sqlalchemy import func
+    from models import Resume, MatchResult, HiringStage, AnalyticsEvent, Recruiter
+    from models.job_vacancy import JobVacancy
+    from database import get_db
+
+    export_data = {
+        "export_timestamp": datetime.utcnow().isoformat(),
+        "date_range": {
+            "start": start_date,
+            "end": end_date,
+        },
+        "key_metrics": [],
+        "funnel_data": [],
+        "recruiter_performance": [],
+        "skill_demand": [],
+        "source_tracking": [],
+    }
+
+    async for db in get_db():
+        # Parse date filters
+        start_dt = None
+        end_dt = None
+
+        if start_date:
+            try:
+                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
+                )
+
+        if end_date:
+            try:
+                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
+                )
+
+        # Key metrics
+        resume_query = select(func.count(Resume.id))
+        if start_dt:
+            resume_query = resume_query.where(Resume.created_at >= start_dt)
+        if end_dt:
+            resume_query = resume_query.where(Resume.created_at <= end_dt)
+
+        total_resumes_result = await db.execute(resume_query)
+        total_resumes = total_resumes_result.scalar() or 0
+
+        match_query = select(func.avg(MatchResult.match_percentage))
+        if start_dt:
+            match_query = match_query.where(MatchResult.created_at >= start_dt)
+        if end_dt:
+            match_query = match_query.where(MatchResult.created_at <= end_dt)
+
+        avg_match_result = await db.execute(match_query)
+        avg_match = avg_match_result.scalar() or 0
+
+        export_data["key_metrics"].append({
+            "metric": "total_resumes",
+            "value": total_resumes,
+        })
+        export_data["key_metrics"].append({
+            "metric": "average_match_percentage",
+            "value": round(float(avg_match), 2),
+        })
+
+        # Funnel data - count by stage
+        stage_query = select(HiringStage.stage_name, func.count(HiringStage.id).label('count'))
+        if start_dt:
+            stage_query = stage_query.where(HiringStage.created_at >= start_dt)
+        if end_dt:
+            stage_query = stage_query.where(HiringStage.created_at <= end_dt)
+        stage_query = stage_query.group_by(HiringStage.stage_name)
+
+        stage_result = await db.execute(stage_query)
+        for row in stage_result:
+            export_data["funnel_data"].append({
+                "stage": row[0],
+                "count": row[1],
+            })
+
+        # Recruiter performance
+        recruiter_query = select(Recruiter).where(Recruiter.is_active == True)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiters = recruiter_result.scalars().all()
+
+        for recruiter in recruiters:
+            # Get resumes processed by this recruiter
+            resumes_by_recruiter = select(func.count(AnalyticsEvent.id)).where(
+                AnalyticsEvent.event_type == "resume_uploaded",
+                AnalyticsEvent.recruiter_id == recruiter.id,
+            )
+            if start_dt:
+                resumes_by_recruiter = resumes_by_recruiter.where(AnalyticsEvent.created_at >= start_dt)
+            if end_dt:
+                resumes_by_recruiter = resumes_by_recruiter.where(AnalyticsEvent.created_at <= end_dt)
+
+            resumes_result = await db.execute(resumes_by_recruiter)
+            resumes_count = resumes_result.scalar() or 0
+
+            export_data["recruiter_performance"].append({
+                "recruiter_name": recruiter.name,
+                "recruiter_email": recruiter.email,
+                "department": recruiter.department or "N/A",
+                "resumes_processed": resumes_count,
+            })
+
+        # Skill demand
+        vacancy_query = select(JobVacancy)
+        if start_dt:
+            vacancy_query = vacancy_query.where(JobVacancy.created_at >= start_dt)
+        if end_dt:
+            vacancy_query = vacancy_query.where(JobVacancy.created_at <= end_dt)
+
+        vacancy_result = await db.execute(vacancy_query)
+        vacancies = vacancy_result.scalars().all()
+
+        skill_counts = {}
+        for vacancy in vacancies:
+            if vacancy.required_skills and isinstance(vacancy.required_skills, list):
+                for skill in vacancy.required_skills:
+                    if isinstance(skill, str) and skill.strip():
+                        skill_name = skill.strip()
+                        skill_counts[skill_name] = skill_counts.get(skill_name, 0) + 1
+
+        for skill_name, count in sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)[:20]:
+            export_data["skill_demand"].append({
+                "skill": skill_name,
+                "demand_count": count,
+            })
+
+        # Source tracking
+        source_query = select(AnalyticsEvent).where(
+            AnalyticsEvent.event_type == "resume_uploaded"
+        )
+        if start_dt:
+            source_query = source_query.where(AnalyticsEvent.created_at >= start_dt)
+        if end_dt:
+            source_query = source_query.where(AnalyticsEvent.created_at <= end_dt)
+
+        source_result = await db.execute(source_query)
+        source_events = source_result.scalars().all()
+
+        source_counts = {}
+        for event in source_events:
+            source = "unknown"
+            if event.event_data and isinstance(event.event_data, dict):
+                source = event.event_data.get("source", "unknown") or "unknown"
+                source = source.strip().lower() if isinstance(source, str) else "unknown"
+            source_counts[source] = source_counts.get(source, 0) + 1
+
+        for source, count in sorted(source_counts.items(), key=lambda x: x[1], reverse=True):
+            export_data["source_tracking"].append({
+                "source": source,
+                "candidate_count": count,
+            })
+
+        break
+
+    return export_data
+
+
+def _generate_csv_response(data: dict) -> StreamingResponse:
+    """
+    Generate a CSV streaming response from export data.
+
+    Args:
+        data: Dictionary containing analytics data
+
+    Returns:
+        StreamingResponse with CSV content
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header information
+    writer.writerow(["Analytics Export Report"])
+    writer.writerow(["Export Timestamp", data["export_timestamp"]])
+    writer.writerow(["Start Date", data["date_range"]["start"] or "All time"])
+    writer.writerow(["End Date", data["date_range"]["end"] or "Present"])
+    writer.writerow([])
+
+    # Write key metrics
+    writer.writerow(["=== KEY METRICS ==="])
+    writer.writerow(["Metric", "Value"])
+    for metric in data["key_metrics"]:
+        writer.writerow([metric["metric"], metric["value"]])
+    writer.writerow([])
+
+    # Write funnel data
+    writer.writerow(["=== HIRING FUNNEL ==="])
+    writer.writerow(["Stage", "Count"])
+    for stage in data["funnel_data"]:
+        writer.writerow([stage["stage"], stage["count"]])
+    writer.writerow([])
+
+    # Write recruiter performance
+    writer.writerow(["=== RECRUITER PERFORMANCE ==="])
+    writer.writerow(["Name", "Email", "Department", "Resumes Processed"])
+    for recruiter in data["recruiter_performance"]:
+        writer.writerow([
+            recruiter["recruiter_name"],
+            recruiter["recruiter_email"],
+            recruiter["department"],
+            recruiter["resumes_processed"],
+        ])
+    writer.writerow([])
+
+    # Write skill demand
+    writer.writerow(["=== SKILL DEMAND ==="])
+    writer.writerow(["Skill", "Demand Count"])
+    for skill in data["skill_demand"]:
+        writer.writerow([skill["skill"], skill["demand_count"]])
+    writer.writerow([])
+
+    # Write source tracking
+    writer.writerow(["=== SOURCE TRACKING ==="])
+    writer.writerow(["Source", "Candidate Count"])
+    for source in data["source_tracking"]:
+        writer.writerow([source["source"], source["candidate_count"]])
+
+    # Create response
+    output.seek(0)
+
+    def iter_csv():
+        yield output.getvalue()
+
+    return StreamingResponse(
+        iter_csv(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=analytics_export.csv"
+        },
+    )
+
+
+def _generate_json_export_response(data: dict) -> StreamingResponse:
+    """
+    Generate a JSON streaming response from export data.
+
+    Args:
+        data: Dictionary containing analytics data
+
+    Returns:
+        StreamingResponse with JSON content
+    """
+    import json
+
+    output = io.StringIO()
+    json.dump(data, output, indent=2, default=str)
+    output.seek(0)
+
+    def iter_json():
+        yield output.getvalue()
+
+    return StreamingResponse(
+        iter_json(),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": "attachment; filename=analytics_export.json"
+        },
+    )
