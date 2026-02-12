@@ -1872,6 +1872,148 @@ export interface ActivityTypesResponse {
   activity_types: string[];
 }
 
+// ==================== Filter Suggestions Types ====================
+
+/**
+ * Source of a filter suggestion
+ */
+export type FilterSuggestionSource = 'extracted' | 'inferred' | 'synonym' | 'provided';
+
+/**
+ * Single suggested filter item with confidence scoring
+ */
+export interface SuggestedFilterItem {
+  /** Type of filter (skills, location, education_level, languages) */
+  filter_type: string;
+  /** The filter value (string, array, number, or boolean) */
+  value: string | string[] | number | boolean;
+  /** Confidence score (0.0-1.0) */
+  confidence: number;
+  /** Source of suggestion */
+  source: FilterSuggestionSource;
+  /** Original text from JD that led to this suggestion */
+  original_text?: string;
+}
+
+/**
+ * Request for JD filter suggestions
+ */
+export interface FilterSuggestionRequest {
+  /** Job description text to analyze for filter suggestions */
+  job_description: string;
+  /** Maximum number of skills to suggest (1-50) */
+  max_skills?: number;
+  /** Minimum confidence threshold for suggestions (0.0-1.0) */
+  min_confidence?: number;
+}
+
+/**
+ * Request for structured vacancy filter suggestions
+ */
+export interface VacancyFilterRequest {
+  /** Job title */
+  title?: string;
+  /** Job description text */
+  description?: string;
+  /** List of required skills from vacancy */
+  skills?: string[];
+  /** List of additional requirements */
+  requirements?: string[];
+}
+
+/**
+ * Response from filter suggestions API
+ */
+export interface FilterSuggestionResponse {
+  /** List of suggested skill filters with confidence scores */
+  skills: SuggestedFilterItem[];
+  /** Suggested minimum years of experience */
+  min_experience_years: number | null;
+  /** Suggested maximum years of experience */
+  max_experience_years: number | null;
+  /** Detected seniority level (entry, mid, senior, lead, executive) */
+  seniority_level: string | null;
+  /** Suggested location filter */
+  location: SuggestedFilterItem | null;
+  /** Suggested education level filter */
+  education_level: SuggestedFilterItem | null;
+  /** List of suggested language filters */
+  languages: SuggestedFilterItem[];
+  /** Combined list of all suggested filters sorted by confidence */
+  all_filters: SuggestedFilterItem[];
+  /** Overall confidence in the suggestions (0.0-1.0) */
+  confidence: number;
+  /** Time taken to analyze the job description */
+  analysis_time_seconds: number;
+  /** Ready-to-use filters dictionary for search API */
+  search_filters: Record<string, unknown>;
+}
+
+// ==================== Alert Settings Types ====================
+
+/**
+ * Alert frequency options
+ */
+export type AlertFrequency = 'realtime' | 'daily' | 'weekly';
+
+/**
+ * Alert settings update request
+ */
+export interface AlertSettingsUpdate {
+  /** Enable or disable alerts for this saved search */
+  alert_enabled?: boolean;
+  /** Frequency of alerts */
+  alert_frequency?: AlertFrequency;
+}
+
+/**
+ * Alert settings response
+ */
+export interface AlertSettingsResponse {
+  /** Saved search UUID */
+  id: string;
+  /** Saved search name */
+  name: string;
+  /** Whether alerts are enabled */
+  alert_enabled: boolean;
+  /** Frequency of alerts (realtime, daily, weekly) */
+  alert_frequency: string | null;
+  /** ISO timestamp when last alert was sent */
+  last_alert_at: string | null;
+}
+
+/**
+ * Alert settings list response
+ */
+export interface AlertSettingsListResponse {
+  /** Total number of saved searches with alerts */
+  total: number;
+  /** Number of saved searches with alerts enabled */
+  alerts_enabled_count: number;
+  /** List of alert settings for saved searches */
+  alert_settings: AlertSettingsResponse[];
+}
+
+/**
+ * Apply saved search response (one-click apply)
+ */
+export interface ApplySearchResponse {
+  /** UUID of the applied saved search */
+  saved_search_id: string;
+  /** Name of the saved search */
+  saved_search_name: string;
+  /** Total number of matching candidates */
+  total: number;
+  /** List of candidate results */
+  candidates: Array<Record<string, unknown>>;
+  /** Search query that was executed */
+  query: string;
+  /** Filters that were applied */
+  filters_applied: Record<string, unknown>;
+  /** Time taken to execute search */
+  execution_time_seconds: number;
+}
+
 // ==================== Saved Searches Types ====================
 
 /**
@@ -1910,6 +2052,100 @@ export interface SavedSearchResponse {
 export interface SavedSearchListResponse {
   total: number;
   saved_searches: SavedSearchResponse[];
+}
+
+/**
+ * Request for creating a saved search with optional alert settings
+ */
+export interface SavedSearchWithAlertsCreate {
+  /** User-provided name for the saved search */
+  name: string;
+  /** Search query string with boolean operators */
+  query: string;
+  /** Filter settings (skills, experience_years, location, etc.) */
+  filters?: Record<string, unknown>;
+  /** Whether to enable alerts for this saved search */
+  alert_enabled?: boolean;
+  /** Frequency of alerts if enabled */
+  alert_frequency?: AlertFrequency;
+}
+
+/**
+ * Request for updating a saved search with alert settings
+ */
+export interface SavedSearchWithAlertsUpdate {
+  /** Updated name for the saved search */
+  name?: string;
+  /** Updated search query string */
+  query?: string;
+  /** Updated filter settings */
+  filters?: Record<string, unknown>;
+  /** Enable or disable alerts */
+  alert_enabled?: boolean;
+  /** Updated frequency of alerts */
+  alert_frequency?: AlertFrequency;
+}
+
+/**
+ * Response for a saved search including alert settings
+ */
+export interface SavedSearchWithAlertsResponse {
+  /** Saved search UUID */
+  id: string;
+  /** Saved search name */
+  name: string;
+  /** Search query string */
+  query: string;
+  /** Filter settings */
+  filters: Record<string, unknown>;
+  /** Whether alerts are enabled for this saved search */
+  alert_enabled: boolean;
+  /** Frequency of alerts if enabled */
+  alert_frequency: string | null;
+  /** Timestamp when last alert was sent */
+  last_alert_at: string | null;
+  /** Creation timestamp */
+  created_at: string;
+  /** Last update timestamp */
+  updated_at: string;
+}
+
+/**
+ * Response for listing saved searches with alert settings
+ */
+export interface SavedSearchListWithAlertsResponse {
+  /** Total number of saved searches */
+  total: number;
+  /** Number of saved searches with alerts enabled */
+  alerts_enabled_count: number;
+  /** List of saved searches with alert settings */
+  saved_searches: SavedSearchWithAlertsResponse[];
+}
+
+/**
+ * Request for updating alert settings on multiple saved searches
+ */
+export interface BulkAlertSettingsUpdate {
+  /** List of saved search UUIDs to update */
+  saved_search_ids: string[];
+  /** Enable or disable alerts for all specified saved searches */
+  alert_enabled?: boolean;
+  /** Set alert frequency for all specified saved searches */
+  alert_frequency?: AlertFrequency;
+}
+
+/**
+ * Response for bulk alert settings update
+ */
+export interface BulkAlertSettingsResponse {
+  /** Number of saved searches updated */
+  updated_count: number;
+  /** Number of saved searches that failed to update */
+  failed_count: number;
+  /** List of successfully updated alert settings */
+  updated: AlertSettingsResponse[];
+  /** List of failed updates with error details */
+  failed: Array<{ id: string; error: string }>;
 }
 
 // ==================== Candidate Search Types ====================
