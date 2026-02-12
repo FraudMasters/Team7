@@ -291,6 +291,51 @@ const JobDescriptionGenerator: React.FC<JobDescriptionGeneratorProps> = ({
               </Typography>
             </Box>
 
+            {/* Bias Warnings */}
+            {generatedDescription.bias_warnings && generatedDescription.bias_warnings.length > 0 && (
+              <Box>
+                <Alert severity="warning">
+                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    {t('jobDescriptionGenerator.results.biasWarnings.title')}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    {t('jobDescriptionGenerator.results.biasWarnings.description')}
+                  </Typography>
+                  <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                    {generatedDescription.bias_warnings.map((warning, idx) => (
+                      <Typography component="li" key={idx} variant="body2" sx={{ mb: 0.5 }}>
+                        {warning}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Alert>
+              </Box>
+            )}
+
+            {/* Inclusive Language Score */}
+            {generatedDescription.inclusive_language_score !== undefined && generatedDescription.inclusive_language_score !== null && (
+              <Box>
+                {generatedDescription.bias_warnings && generatedDescription.bias_warnings.length === 0 ? (
+                  <Alert severity="success">
+                    <Typography variant="body2">
+                      {t('jobDescriptionGenerator.results.biasWarnings.noWarnings')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1, fontWeight: 600 }}>
+                      {t('jobDescriptionGenerator.results.biasWarnings.inclusiveScore', {
+                        score: Math.round(generatedDescription.inclusive_language_score * 100)
+                      })}
+                    </Typography>
+                  </Alert>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    {t('jobDescriptionGenerator.results.biasWarnings.inclusiveScore', {
+                      score: Math.round(generatedDescription.inclusive_language_score * 100)
+                    })}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {/* Metadata */}
             <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
               <Typography variant="caption" color="text.secondary">
