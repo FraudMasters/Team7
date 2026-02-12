@@ -45,6 +45,7 @@ import type {
   SkillDemandResponse,
   SourceTrackingResponse,
   RecruiterPerformanceResponse,
+  RankingMetricsResponse,
   ApiError,
   AnalyticsExportFormat,
   AnalyticsExportRequest,
@@ -60,6 +61,7 @@ export type {
   SkillDemandResponse,
   SourceTrackingResponse,
   RecruiterPerformanceResponse,
+  RankingMetricsResponse,
   AnalyticsExportFormat,
   AnalyticsExportRequest,
   AnalyticsExportMetadata,
@@ -383,6 +385,56 @@ export class AnalyticsClient {
 
       const response: AxiosResponse<RecruiterPerformanceResponse> = await this.client.get(
         '/api/analytics/recruiter-performance',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Получение метрик точности ранжирования
+   *
+   * Возвращает данные о производительности ML-рекомендаций включая
+   * коэффициенты конверсии обратной связи, показатели успеха top-N рекомендаций
+   * и распределение уверенности ранжирования.
+   *
+   * @param startDate - Опциональная начальная дата для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная конечная дата для фильтрации (формат ISO 8601)
+   * @returns Метрики точности ранжирования
+   * @throws ApiError если получение данных не удалось
+   *
+   * @example
+   * ```ts
+   * // Получение метрик ранжирования
+   * const ranking = await analyticsClient.getRankingAccuracy();
+   *
+   * console.log('Проанализировано вакансий:', ranking.total_vacancies_analyzed);
+   *
+   * // Анализ конверсии обратной связи
+   * console.log('Коэффициент обратной связи:', ranking.feedback_conversion.feedback_rate);
+   * console.log('Положительная обратная связь:', ranking.feedback_conversion.positive_feedback_rate);
+   *
+   * // Анализ top-N успеха
+   * console.log('Top-5 успех:', ranking.top_n_performance.top_5_success_rate);
+   * console.log('Наймов из top-5:', ranking.top_n_performance.top_5_hired_count);
+   *
+   * // С фильтрацией по дате
+   * const ranking = await analyticsClient.getRankingAccuracy('2024-01-01', '2024-12-31');
+   * ```
+   */
+  async getRankingAccuracy(
+    startDate?: string,
+    endDate?: string
+  ): Promise<RankingMetricsResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<RankingMetricsResponse> = await this.client.get(
+        '/api/analytics/ranking-accuracy',
         { params }
       );
       return response.data;

@@ -2910,6 +2910,100 @@ export interface ScheduledReportStatus {
   total_runs?: number;
 }
 
+// ==================== Ranking Accuracy Metrics Types ====================
+
+/**
+ * Feedback conversion metrics for ranked recommendations
+ */
+export interface FeedbackConversionMetrics {
+  /** Total number of ranked recommendations generated */
+  total_recommendations: number;
+  /** Number of recommendations that received recruiter feedback */
+  recommendations_with_feedback: number;
+  /** Proportion of recommendations with feedback (0-1) */
+  feedback_rate: number;
+  /** Number of recommendations with positive feedback (approved/advanced) */
+  positive_feedback_count: number;
+  /** Number of recommendations with negative feedback (rejected/dismissed) */
+  negative_feedback_count: number;
+  /** Proportion of feedback that was positive (0-1) */
+  positive_feedback_rate: number;
+}
+
+/**
+ * Top-N recommendation success rate metrics
+ */
+export interface TopNRecommendationMetrics {
+  /** Success rate for top-1 ranked candidates (0-1) */
+  top_1_success_rate: number;
+  /** Success rate for top-3 ranked candidates (0-1) */
+  top_3_success_rate: number;
+  /** Success rate for top-5 ranked candidates (0-1) */
+  top_5_success_rate: number;
+  /** Success rate for top-10 ranked candidates (0-1) */
+  top_10_success_rate: number;
+  /** Number of top-1 ranked candidates hired */
+  top_1_hired_count: number;
+  /** Number of top-5 ranked candidates hired */
+  top_5_hired_count: number;
+  /** Number of top-10 ranked candidates hired */
+  top_10_hired_count: number;
+  /** Total number of hires in the period */
+  total_hires: number;
+}
+
+/**
+ * Ranking confidence distribution metrics
+ */
+export interface RankingConfidenceMetrics {
+  /** Recommendations with high confidence score (>0.8) */
+  high_confidence_count: number;
+  /** Recommendations with medium confidence score (0.5-0.8) */
+  medium_confidence_count: number;
+  /** Recommendations with low confidence score (<0.5) */
+  low_confidence_count: number;
+  /** Average ranking confidence score across all recommendations (0-1) */
+  avg_confidence_score: number;
+  /** Correlation between confidence score and actual success (0-1) */
+  confidence_accuracy_correlation?: number;
+}
+
+/**
+ * Ranking performance trend over time
+ */
+export interface RankingPerformanceTrend {
+  /** Time period identifier (e.g., '2024-01') */
+  period: string;
+  /** Overall success rate for the period (0-1) */
+  success_rate: number;
+  /** Feedback rate for the period (0-1) */
+  feedback_rate: number;
+  /** Average confidence for the period (0-1) */
+  avg_confidence: number;
+  /** Total recommendations in the period */
+  total_recommendations: number;
+}
+
+/**
+ * Response model for ranking accuracy analytics
+ */
+export interface RankingMetricsResponse {
+  /** Feedback conversion metrics */
+  feedback_conversion: FeedbackConversionMetrics;
+  /** Top-N recommendation success rate metrics */
+  top_n_performance: TopNRecommendationMetrics;
+  /** Ranking confidence distribution metrics */
+  confidence_distribution: RankingConfidenceMetrics;
+  /** Performance trends over time */
+  trends?: RankingPerformanceTrend[];
+  /** Start date of the analysis period (ISO 8601) */
+  period_start?: string;
+  /** End date of the analysis period (ISO 8601) */
+  period_end?: string;
+  /** Total number of vacancies with ranking data */
+  total_vacancies_analyzed: number;
+}
+
 // ==================== Parsing Correction Types ====================
 
 // Re-export types from parsingCorrection module for centralized access
