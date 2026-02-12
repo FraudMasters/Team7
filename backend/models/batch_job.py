@@ -16,6 +16,8 @@ class BatchJobStatus(str, enum.Enum):
 
     pending = "pending"
     processing = "processing"
+    paused = "paused"
+    cancelled = "cancelled"
     completed = "completed"
     failed = "failed"
 

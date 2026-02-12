@@ -34,6 +34,7 @@ class Resume(Base, UUIDMixin, TimestampMixin):
     Attributes:
         id: UUID primary key
         organization_id: Organization that owns this resume
+        vacancy_id: Optional vacancy ID if resume was submitted via vacancy-specific email
         filename: Original filename of uploaded resume
         file_path: Path to stored resume file
         content_type: MIME type of the file (e.g., application/pdf)
@@ -48,6 +49,9 @@ class Resume(Base, UUIDMixin, TimestampMixin):
 
     organization_id: Mapped[str] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    vacancy_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)

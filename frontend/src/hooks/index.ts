@@ -51,3 +51,9 @@ export {
   useSaveJob,
   useUnsaveJob,
 } from './useSavedJobs';
+
+export {
+  useWebSocketProgress,
+  type UseWebSocketProgressOptions,
+  type UseWebSocketProgressReturn,
+} from './useWebSocketProgress';

@@ -7,11 +7,17 @@ instead of sequentially, significantly reducing batch processing time.
 
 Progress updates are sent via WebSocket to connected clients for real-time
 monitoring of batch processing operations.
+
+Queue Management:
+- Supports pause/resume/cancel operations via batch job status checks
+- Tasks periodically check batch job status during processing
+- Graceful handling of pause/cancel requests mid-batch
 """
 import asyncio
 import logging
 import time
 from typing import Dict, Any, List, Optional
+from uuid import UUID
 
 from celery import shared_task, group
 from celery.exceptions import SoftTimeLimitExceeded
@@ -21,6 +27,89 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+# Batch status check exception for clean exit on pause/cancel
+class BatchPausedException(Exception):
+    """Raised when batch job is paused during processing."""
+    pass
+
+
+class BatchCancelledException(Exception):
+    """Raised when batch job is cancelled during processing."""
+    pass
+
+
+def _get_batch_job_status(batch_job_id: str) -> Optional[str]:
+    """
+    Check the current status of a batch job from the database.
+
+    This helper function fetches the batch job status to support
+    pause/resume/cancel functionality during batch processing.
+    Uses async database access wrapped in asyncio.run() for use
+    in sync Celery tasks.
+
+    Args:
+        batch_job_id: UUID string of the batch job
+
+    Returns:
+        Status string if job found, None if job not found or error
+    """
+    async def _fetch_status() -> Optional[str]:
+        from database import async_session_maker
+        from models.batch_job import BatchJob
+        from sqlalchemy import select
+
+        async with async_session_maker() as session:
+            try:
+                result = await session.execute(
+                    select(BatchJob.status).where(BatchJob.id == UUID(batch_job_id))
+                )
+                status = result.scalar_one_or_none()
+                return status.value if status else None
+            except Exception as e:
+                logger.debug(f"Failed to fetch batch job status: {e}")
+                return None
+
+    try:
+        return asyncio.run(_fetch_status())
+    except Exception as e:
+        logger.debug(f"Failed to check batch job status: {e}")
+        return None
+
+
+def _check_batch_status(batch_job_id: Optional[str]) -> str:
+    """
+    Check batch job status and raise exception if paused or cancelled.
+
+    This helper is called at strategic points during processing to
+    enable graceful handling of pause/cancel requests.
+
+    Args:
+        batch_job_id: UUID string of the batch job (optional)
+
+    Returns:
+        Current status string if continuing
+
+    Raises:
+        BatchPausedException: If batch is paused
+        BatchCancelledException: If batch is cancelled
+    """
+    if not batch_job_id:
+        # No batch job ID means no status tracking, continue processing
+        return "processing"
+
+    status = _get_batch_job_status(batch_job_id)
+
+    if status == "paused":
+        logger.info(f"Batch job {batch_job_id} is paused, stopping processing")
+        raise BatchPausedException(f"Batch job {batch_job_id} is paused")
+
+    if status == "cancelled":
+        logger.info(f"Batch job {batch_job_id} is cancelled, stopping processing")
+        raise BatchCancelledException(f"Batch job {batch_job_id} is cancelled")
+
+    return status or "processing"
 
 
 # Import core analysis function from analysis_task
@@ -143,6 +232,7 @@ def _analyze_single_resume(
     extract_experience: bool = True,
     detect_errors: bool = True,
     ws_manager: Optional[Any] = None,
+    batch_job_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Analyze a single resume as part of a parallel batch.
@@ -151,6 +241,8 @@ def _analyze_single_resume(
     for use in parallel groups. It includes retry logic, proper error handling,
     and real-time WebSocket progress updates.
 
+    Supports pause/cancel by checking batch job status before processing.
+
     Args:
         self: Celery task instance (bind=True)
         resume_id: Unique identifier of the resume to analyze
@@ -158,18 +250,24 @@ def _analyze_single_resume(
         extract_experience: Whether to calculate experience
         detect_errors: Whether to detect resume errors
         ws_manager: Optional WebSocket manager for progress updates (reserved for future use)
+        batch_job_id: Optional batch job ID for status checking (pause/cancel support)
 
     Returns:
         Dictionary containing analysis results
 
     Raises:
         SoftTimeLimitExceeded: If task exceeds time limit
+        BatchPausedException: If batch is paused during processing
+        BatchCancelledException: If batch is cancelled during processing
         Exception: For analysis errors (with retry)
     """
     start_time = time.time()
     task_id = self.request.id
 
     try:
+        # Check batch status before starting - allows early exit if paused/cancelled
+        _check_batch_status(batch_job_id)
+
         logger.info(f"[Parallel Task] Analyzing resume: {resume_id}")
 
         # Send parsing progress
@@ -180,6 +278,9 @@ def _analyze_single_resume(
             progress=25,
             message="Reading and parsing resume file...",
         )
+
+        # Check status before main analysis work
+        _check_batch_status(batch_job_id)
 
         # Get core analysis function
         analyze_resume_core = _get_analysis_core()
@@ -230,6 +331,18 @@ def _analyze_single_resume(
             )
 
         return result
+
+    except (BatchPausedException, BatchCancelledException) as e:
+        # Don't retry on pause/cancel - return a special status
+        logger.info(f"[Parallel Task] Resume {resume_id} skipped: {e}")
+        return {
+            "resume_id": resume_id,
+            "status": "skipped",
+            "skip_reason": "paused" if isinstance(e, BatchPausedException) else "cancelled",
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+            "task_id": task_id,
+        }
 
     except SoftTimeLimitExceeded:
         logger.error(f"[Parallel Task] Resume {resume_id} exceeded time limit")
@@ -295,6 +408,7 @@ def parallel_batch_analyze_resumes(
     detect_errors: bool = True,
     batch_size: Optional[int] = None,
     ws_manager: Optional[Any] = None,
+    batch_job_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Analyze multiple resumes in parallel using Celery groups.
@@ -305,6 +419,12 @@ def parallel_batch_analyze_resumes(
 
     Real-time progress updates are sent via WebSocket to connected clients.
 
+    Queue Management:
+    - Supports pause/resume/cancel via batch_job_id status checking
+    - Checks batch status before processing each batch
+    - Gracefully stops processing when paused or cancelled
+    - Returns current results with appropriate status
+
     Key Features:
     - Uses Celery group for parallel execution
     - Supports configurable batch size to control concurrency
@@ -313,6 +433,7 @@ def parallel_batch_analyze_resumes(
     - Sends real-time WebSocket progress updates
     - Handles individual failures without stopping entire batch
     - Returns sorted results matching input order
+    - Supports pause/resume/cancel operations
 
     Args:
         self: Celery task instance (bind=True)
@@ -324,6 +445,7 @@ def parallel_batch_analyze_resumes(
                     If None, processes all resumes in one batch.
                     If set, divides resumes into chunks of this size.
         ws_manager: Optional WebSocket manager for progress updates (reserved for future use)
+        batch_job_id: Optional batch job ID for pause/cancel status checking
 
     Returns:
         Dictionary containing batch analysis results:
@@ -334,7 +456,7 @@ def parallel_batch_analyze_resumes(
         - batch_size: Number of resumes processed in each parallel batch
         - num_batches: Number of parallel batches executed
         - processing_time_ms: Total batch processing time
-        - status: Overall task status (completed/failed)
+        - status: Overall task status (completed/failed/paused/cancelled)
 
     Raises:
         SoftTimeLimitExceeded: If task exceeds time limit
@@ -344,7 +466,8 @@ def parallel_batch_analyze_resumes(
         >>> from tasks.parallel_resume_tasks import parallel_batch_analyze_resumes
         >>> task = parallel_batch_analyze_resumes.delay(
         ...     resume_ids=["abc123", "def456", "ghi789"],
-        ...     batch_size=5
+        ...     batch_size=5,
+        ...     batch_job_id="550e8400-e29b-41d4-a716-446655440000"
         ... )
         >>> result = task.get()
         >>> print(result['successful'])
@@ -431,6 +554,35 @@ def parallel_batch_analyze_resumes(
 
         # Process each batch in parallel
         for batch_idx, batch in enumerate(resume_batches):
+            # Check batch status before processing - enables pause/cancel
+            try:
+                current_status = _check_batch_status(batch_job_id)
+                logger.debug(f"Batch job {batch_job_id} status: {current_status}")
+            except (BatchPausedException, BatchCancelledException) as e:
+                # Gracefully stop processing
+                status_type = "paused" if isinstance(e, BatchPausedException) else "cancelled"
+                logger.info(
+                    f"Batch processing {status_type} at batch {batch_idx}/{num_batches}"
+                )
+                _broadcast_batch_progress_safe(
+                    task_id=task_id,
+                    current=completed_count,
+                    total=len(resume_ids),
+                    message=f"Batch processing {status_type}",
+                )
+                processing_time_ms = round((time.time() - batch_start_time) * 1000, 2)
+                return {
+                    "total_resumes": len(resume_ids),
+                    "successful": total_successful,
+                    "failed": total_failed,
+                    "results": all_results,
+                    "batch_size": batch_size,
+                    "num_batches": batch_idx,
+                    "processing_time_ms": processing_time_ms,
+                    "status": status_type,
+                    "message": f"Batch processing {status_type} after {completed_count} resumes",
+                }
+
             batch_start = time.time()
 
             logger.info(
@@ -448,7 +600,7 @@ def parallel_batch_analyze_resumes(
 
             # Create a Celery group for parallel execution
             # Each resume in the batch gets its own task
-            # Note: ws_manager is passed through to subtasks
+            # Note: ws_manager and batch_job_id are passed through to subtasks
             parallel_tasks = group(
                 _analyze_single_resume.s(
                     resume_id=resume_id,
@@ -456,6 +608,7 @@ def parallel_batch_analyze_resumes(
                     extract_experience=extract_experience,
                     detect_errors=detect_errors,
                     ws_manager=ws_manager,
+                    batch_job_id=batch_job_id,
                 )
                 for resume_id in batch
             )
@@ -472,6 +625,7 @@ def parallel_batch_analyze_resumes(
             # Aggregate results
             batch_completed = []
             batch_failed = []
+            batch_skipped = 0
 
             for result in batch_results:
                 all_results.append(result)
@@ -479,6 +633,9 @@ def parallel_batch_analyze_resumes(
                 if result.get("status") == "completed":
                     total_successful += 1
                     batch_completed.append(result.get("resume_id"))
+                elif result.get("status") == "skipped":
+                    # Skipped due to pause/cancel - don't count as failed
+                    batch_skipped += 1
                 else:
                     total_failed += 1
                     batch_failed.append(result.get("resume_id"))
@@ -489,6 +646,7 @@ def parallel_batch_analyze_resumes(
             logger.info(
                 f"Batch {batch_idx + 1}/{num_batches} completed in {batch_time}ms: "
                 f"{sum(1 for r in batch_results if r.get('status') == 'completed')}/{len(batch)} successful"
+                f"{f', {batch_skipped} skipped' if batch_skipped else ''}"
             )
 
             # Broadcast progress after each batch
@@ -598,6 +756,7 @@ def batch_analyze_with_screening(
     extract_experience: bool = True,
     batch_size: Optional[int] = None,
     ws_manager: Optional[Any] = None,
+    batch_job_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Analyze resumes in parallel and optionally screen against vacancies.
@@ -607,6 +766,11 @@ def batch_analyze_with_screening(
     then triggers screening for each successfully analyzed resume.
 
     Real-time progress updates are sent via WebSocket to connected clients.
+
+    Queue Management:
+    - Supports pause/resume/cancel via batch_job_id status checking
+    - Analysis phase respects pause/cancel requests
+    - Returns early if batch is paused or cancelled
 
     Task Workflow:
     1. Analyze all resumes in parallel using parallel_batch_analyze_resumes
@@ -623,6 +787,7 @@ def batch_analyze_with_screening(
         extract_experience: Whether to calculate experience (default: True)
         batch_size: Maximum number of resumes to process in parallel.
         ws_manager: Optional WebSocket manager for progress updates (reserved for future use)
+        batch_job_id: Optional batch job ID for pause/cancel status checking
 
     Returns:
         Dictionary containing combined results:
@@ -630,13 +795,14 @@ def batch_analyze_with_screening(
         - analysis_results: Parallel batch analysis results
         - screening_results: Screening results per resume
         - processing_time_ms: Total processing time
-        - status: Overall task status
+        - status: Overall task status (completed/paused/cancelled/failed)
 
     Example:
         >>> from tasks.parallel_resume_tasks import batch_analyze_with_screening
         >>> task = batch_analyze_with_screening.delay(
         ...     resume_ids=["abc123", "def456"],
-        ...     vacancy_id="vac-789"
+        ...     vacancy_id="vac-789",
+        ...     batch_job_id="550e8400-e29b-41d4-a716-446655440000"
         ... )
         >>> result = task.get()
         >>> print(result['analysis_results']['successful'])
@@ -680,7 +846,28 @@ def batch_analyze_with_screening(
             detect_errors=True,
             batch_size=batch_size,
             ws_manager=ws_manager,
+            batch_job_id=batch_job_id,
         )
+
+        # Check if analysis was paused or cancelled
+        analysis_status = analysis_result.get("status", "completed")
+        if analysis_status in ("paused", "cancelled"):
+            logger.info(f"Analysis {analysis_status}, skipping screening phase")
+            _broadcast_batch_progress_safe(
+                task_id=task_id,
+                current=len(resume_ids),
+                total=len(resume_ids),
+                message=f"Batch processing {analysis_status}",
+            )
+            return {
+                "total_resumes": len(resume_ids),
+                "analysis_results": analysis_result,
+                "screening_results": [],
+                "screening_triggered_count": 0,
+                "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+                "status": analysis_status,
+                "message": f"Analysis {analysis_status}, screening not triggered",
+            }
 
         # Step 2: Screen successful resumes
         progress = {
