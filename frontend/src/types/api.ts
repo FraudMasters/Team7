@@ -2452,177 +2452,359 @@ export interface OptimizationFeedback {
   processing_time_ms?: number;
 }
 
-// ==================== Interview Types ====================
+// ==================== Job Descriptions Types ====================
 
 /**
- * Interview type enum
+ * Job description generation request
  */
-export type InterviewType = 'phone' | 'video' | 'onsite' | 'technical' | 'panel';
-
-/**
- * Interview status enum
- */
-export type InterviewStatus = 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no_show' | 'rescheduled';
-
-/**
- * Interview participant
- */
-export interface InterviewParticipant {
-  id: string;
-  recruiter_id: string | null;
-  candidate_id: string | null;
-  role: 'interviewer' | 'candidate' | 'organizer';
-  status: 'pending' | 'accepted' | 'declined';
-  joined_at: string | null;
-}
-
-/**
- * Interview create request
- */
-export interface InterviewCreate {
-  candidate_id: string;
-  vacancy_id?: string;
-  scheduled_start: string;
-  duration_minutes: number;
-  interview_type: InterviewType;
+export interface JobDescriptionGenerateRequest {
+  /** Job title (e.g., 'Senior Python Developer') */
   title: string;
-  description?: string;
+  /** List of required technical skills */
+  required_skills: string[];
+  /** Minimum experience in months */
+  min_experience_months?: number;
+  /** Seniority level (junior, mid, senior, lead) */
+  seniority_level?: string;
+  /** Industry sector (e.g., 'Technology', 'Finance') */
+  industry?: string;
+  /** Work format (remote, office, hybrid) */
+  work_format?: string;
+  /** Job location */
   location?: string;
-  meeting_link?: string;
-  meeting_room?: string;
-  participant_ids?: string[];
+  /** Employment type (full-time, part-time, contract) */
+  employment_type?: string;
+  /** Salary range (e.g., '$80,000 - $120,000') */
+  salary_range?: string;
+  /** Additional preferred skills/qualifications */
+  additional_requirements?: string[];
+  /** Tone for the description (professional, casual, formal, friendly) */
+  tone?: 'professional' | 'casual' | 'formal' | 'friendly';
+  /** Language for the job description (en, ru) */
+  language?: 'en' | 'ru';
 }
 
 /**
- * Interview update request
+ * Job description generation response
  */
-export interface InterviewUpdate {
-  scheduled_start?: string;
-  duration_minutes?: number;
-  interview_type?: InterviewType;
-  title?: string;
-  description?: string;
-  location?: string;
-  meeting_link?: string;
-  meeting_room?: string;
-  status?: InterviewStatus;
-  participant_ids?: string[];
-}
-
-/**
- * Interview response
- */
-export interface InterviewResponse {
-  id: string;
-  candidate_id: string;
-  vacancy_id: string | null;
-  scheduled_start: string;
-  scheduled_end: string;
-  duration_minutes: number;
-  interview_type: InterviewType;
+export interface JobDescriptionResponse {
+  /** Job title */
   title: string;
-  description: string | null;
-  location: string | null;
-  meeting_link: string | null;
-  meeting_room: string | null;
-  status: InterviewStatus;
-  participants: InterviewParticipant[];
-  calendar_event_id: string | null;
-  calendar_provider: string | null;
+  /** Brief summary of the role */
+  summary: string;
+  /** Key responsibilities */
+  responsibilities: string[];
+  /** Requirements and qualifications */
+  requirements: string[];
+  /** Benefits and perks */
+  benefits: string[];
+  /** Company culture description */
+  company_culture: string;
+  /** Interview process overview */
+  interview_process: string;
+  /** LLM provider used */
+  provider: string;
+  /** Model name used */
+  model: string;
+  /** Timestamp of generation */
+  generated_at: string;
+  /** Inclusiveness score (0-1) from bias checking */
+  inclusive_language_score?: number;
+  /** Bias warnings detected in the description */
+  bias_warnings?: string[];
+}
+
+// ==================== Salary Benchmarking Types ====================
+
+/**
+ * Salary benchmark request
+ */
+export interface SalaryBenchmarkRequest {
+  /** Job title or role */
+  role: string;
+  /** Location (city, state, or 'Remote') */
+  location: string;
+  /** Country code (ISO 3166-1 alpha-2) */
+  country?: string;
+  /** Experience level (entry, mid, senior, lead, executive) */
+  experience_level?: string;
+  /** Industry sector */
+  industry?: string;
+  /** Employment type */
+  employment_type?: string;
+}
+
+/**
+ * Salary benchmark response
+ */
+export interface SalaryBenchmarkResponse {
+  /** Job title */
+  role: string;
+  /** Location */
+  location: string;
+  /** 25th percentile salary */
+  salary_min: number;
+  /** Median salary (50th percentile) */
+  salary_median: number;
+  /** 75th percentile salary */
+  salary_max: number;
+  /** 90th percentile salary */
+  salary_p90?: number;
+  /** Currency code */
+  currency: string;
+  /** Number of data points */
+  sample_size?: number;
+  /** Data source */
+  data_source?: string;
+  /** Date when benchmark is effective */
+  effective_date?: string;
+}
+
+/**
+ * Salary suggestion request
+ */
+export interface SalarySuggestionRequest {
+  /** Resume UUID */
+  resume_id: string;
+  /** JobVacancy UUID */
+  vacancy_id: string;
+  /** Apply cost-of-living adjustments */
+  include_cost_of_living?: boolean;
+  /** Target location for cost adjustment */
+  target_location?: string;
+}
+
+/**
+ * Salary suggestion response
+ */
+export interface SalarySuggestionResponse {
+  /** Resume UUID */
+  resume_id: string;
+  /** JobVacancy UUID */
+  vacancy_id: string;
+  /** Suggested minimum salary */
+  suggested_min: number;
+  /** Suggested median salary */
+  suggested_median: number;
+  /** Suggested maximum salary */
+  suggested_max: number;
+  /** Currency code */
+  currency: string;
+  /** Confidence level (0-1) */
+  confidence: number;
+  /** Factors affecting the suggestion */
+  factors: Record<string, unknown>;
+  /** Underlying market data */
+  market_benchmark?: SalaryBenchmarkResponse;
+}
+
+/**
+ * Salary history create request
+ */
+export interface SalaryHistoryCreate {
+  /** Resume UUID */
+  resume_id: string;
+  /** Base salary amount */
+  salary_amount: number;
+  /** Payment frequency (annual, monthly, hourly, weekly) */
+  salary_frequency?: string;
+  /** Currency code */
+  currency?: string;
+  /** Effective date (YYYY-MM-DD) */
+  effective_date: string;
+  /** Salary type (current, previous, offer, projected) */
+  salary_type?: string;
+  /** Employment type */
+  employment_type?: string;
+  /** Job title */
+  job_title?: string;
+  /** Company name */
+  company_name?: string;
+  /** Job location */
+  location?: string;
+  /** Country code */
+  country?: string;
+  /** Annual bonus amount */
+  bonus_amount?: number;
+  /** Bonus type */
+  bonus_type?: string;
+  /** Annual equity value */
+  equity_value?: number;
+  /** Equity type */
+  equity_type?: string;
+  /** Other compensation details */
+  other_compensation?: Record<string, unknown>;
+  /** Whether data is confirmed */
+  is_confirmed?: boolean;
+  /** Data source */
+  data_source?: string;
+}
+
+/**
+ * Salary history response
+ */
+export interface SalaryHistoryResponse {
+  /** SalaryHistory UUID */
+  id: string;
+  /** Resume UUID */
+  resume_id: string;
+  /** Base salary */
+  salary_amount: number;
+  /** Payment frequency */
+  salary_frequency: string;
+  /** Currency code */
+  currency: string;
+  /** Effective date */
+  effective_date: string;
+  /** Salary type */
+  salary_type: string;
+  /** Employment type */
+  employment_type: string;
+  /** Job title */
+  job_title?: string;
+  /** Company name */
+  company_name?: string;
+  /** Location */
+  location?: string;
+  /** Bonus amount */
+  bonus_amount?: number;
+  /** Equity value */
+  equity_value?: number;
+  /** Total annual compensation */
+  total_compensation?: number;
+  /** Is confirmed */
+  is_confirmed: boolean;
+  /** Verification status */
+  verification_status: string;
+  /** Creation timestamp */
   created_at: string;
-  updated_at: string;
 }
 
 /**
- * Interview list response
+ * Salary history list response
  */
-export interface InterviewListResponse {
-  items: InterviewResponse[];
-  total: number;
+export interface SalaryHistoryListResponse {
+  resume_id: string;
+  history: SalaryHistoryResponse[];
+  total_count: number;
 }
 
 /**
- * Interviewer availability
+ * Offer comparison request
  */
-export interface InterviewerAvailability {
-  recruiter_id: string;
-  is_available: boolean;
-  conflicts: Array<{
-    start_time: string;
-    end_time: string;
-    title: string;
+export interface OfferComparisonRequest {
+  /** Resume UUID */
+  resume_id: string;
+  /** List of offers to compare */
+  offers: Array<{
+    salary: number;
+    location: string;
+    currency?: string;
+    bonus?: number;
+    equity?: number;
+    job_title?: string;
+    company?: string;
   }>;
+  /** Apply cost-of-living adjustments */
+  apply_cost_of_living?: boolean;
 }
 
 /**
- * Availability check request
+ * Offer comparison response
  */
-export interface AvailabilityCheckRequest {
-  interviewer_ids: string[];
-  start_time: string;
-  duration_minutes: number;
+export interface OfferComparisonResponse {
+  /** Resume UUID */
+  resume_id: string;
+  /** Compared offers with adjustments */
+  offers: Array<Record<string, unknown>>;
+  /** Recommendation based on analysis */
+  recommendation: string;
+  /** Detailed analysis */
+  analysis: Record<string, unknown>;
+  /** Candidate's current salary for comparison */
+  current_salary?: number;
 }
 
 /**
- * Availability check response
+ * Equity analysis request
  */
-export interface AvailabilityCheckResponse {
-  interviewers: InterviewerAvailability[];
-}
-
-// ==================== Calendar Connection Types ====================
-
-/**
- * Calendar provider type
- */
-export type CalendarProvider = 'google' | 'outlook' | 'exchange';
-
-/**
- * Calendar connection status
- */
-export type CalendarConnectionStatus = 'connected' | 'disconnected' | 'expired' | 'error';
-
-/**
- * Calendar connection create request
- */
-export interface CalendarConnectionCreate {
-  provider: CalendarProvider;
-  access_token: string;
-  refresh_token?: string;
-  token_expires_at?: string;
-  calendar_id?: string;
-  sync_enabled?: boolean;
+export interface EquityAnalysisRequest {
+  /** JobVacancy UUID */
+  vacancy_id: string;
+  /** Include demographic breakdown */
+  include_demographics?: boolean;
+  /** Pay gap threshold (default 0.05) */
+  pay_gap_threshold?: number;
 }
 
 /**
- * Calendar connection update request
+ * Equity analysis response
  */
-export interface CalendarConnectionUpdate {
-  sync_enabled?: boolean;
-  calendar_id?: string;
+export interface EquityAnalysisResponse {
+  /** JobVacancy UUID */
+  vacancy_id: string;
+  /** Job title */
+  role: string;
+  /** Total candidates analyzed */
+  total_candidates: number;
+  /** Overall mean salary */
+  mean_salary: number;
+  /** Overall median salary */
+  median_salary: number;
+  /** Salary range (min, max) */
+  salary_range: { min: number; max: number };
+  /** Demographic disparities */
+  disparities: Array<{
+    group: string;
+    mean_salary: number;
+    sample_size: number;
+    pay_gap: number;
+    is_fair: boolean;
+  }>;
+  /** Equity alerts */
+  alerts: string[];
+  /** Recommendations */
+  recommendations: string[];
 }
 
 /**
- * Calendar connection response
+ * Market trend data point
  */
-export interface CalendarConnectionResponse {
-  id: string;
-  recruiter_id: string;
-  provider: CalendarProvider;
-  status: CalendarConnectionStatus;
-  calendar_id: string | null;
-  sync_enabled: boolean;
-  last_sync_at: string | null;
-  created_at: string;
-  updated_at: string;
+export interface MarketTrendDataPoint {
+  /** Time period (e.g., '2024-Q1', '2024-01') */
+  period: string;
+  /** 25th percentile salary for the period */
+  salary_min: number;
+  /** Median salary for the period */
+  salary_median: number;
+  /** 75th percentile salary for the period */
+  salary_max: number;
+  /** Number of data points for the period */
+  sample_size?: number;
 }
 
 /**
- * Calendar connection list response
+ * Market trends response
  */
-export interface CalendarConnectionListResponse {
-  items: CalendarConnectionResponse[];
-  total: number;
+export interface MarketTrendsResponse {
+  /** Job title */
+  role: string;
+  /** Location */
+  location: string;
+  /** Currency code */
+  currency: string;
+  /** Period type (quarterly, monthly, yearly) */
+  period_type: string;
+  /** Salary trend data points */
+  trends: MarketTrendDataPoint[];
+  /** Year-over-year salary change percentage */
+  year_over_year_change?: number;
+  /** Quarter-over-quarter salary change percentage */
+  quarter_over_quarter_change?: number;
+  /** Data source */
+  data_source?: string;
+  /** Last update timestamp */
+  last_updated?: string;
 }
 
 // ==================== Parsing Correction Types ====================

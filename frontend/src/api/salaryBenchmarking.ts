@@ -60,6 +60,7 @@ import type {
   OfferComparisonResponse,
   EquityAnalysisRequest,
   EquityAnalysisResponse,
+  MarketTrendsResponse,
   ApiError,
 } from '@/types/api';
 
@@ -338,6 +339,50 @@ export class SalaryBenchmarkingClient {
       const response = await this.client.get<EquityAnalysisResponse>(url, {
         params: { vacancy_id: request.vacancy_id },
       });
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
+  }
+
+  /**
+   * Get market trends for a role and location over time
+   *
+   * @param request - Market trends request
+   * @returns Market trends data with historical salary changes
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const trends = await salaryBenchmarking.getMarketTrends({
+   *   role: 'Senior React Developer',
+   *   location: 'San Francisco, CA',
+   *   period_type: 'quarterly',
+   *   periods: 8,
+   * });
+   * ```
+   */
+  async getMarketTrends(request: {
+    role: string;
+    location: string;
+    country?: string;
+    period_type?: string;
+    periods?: number;
+  }): Promise<MarketTrendsResponse> {
+    try {
+      const params = new URLSearchParams();
+
+      params.append('role', request.role);
+      params.append('location', request.location);
+
+      if (request.country) params.append('country', request.country);
+      if (request.period_type) params.append('period_type', request.period_type);
+      if (request.periods) params.append('periods', String(request.periods));
+
+      const queryString = params.toString();
+      const url = `/api/salary-benchmarking/market-trends?${queryString}`;
+
+      const response = await this.client.get<MarketTrendsResponse>(url);
       return response.data;
     } catch (error) {
       throw transformError(error);

@@ -262,6 +262,7 @@ from api import (
     matching_weights,
     skill_taxonomies,
     custom_synonyms,
+    fairness,
     feedback,
     model_versions,
     comparisons,
@@ -288,6 +289,7 @@ from api import (
     search,
     job_search,
     job_applications,
+    job_descriptions,
     config,
     websocket,
     auth,
@@ -318,7 +320,6 @@ app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-e
 app.include_router(taxonomy_sharing.router, prefix="/api/taxonomy-sharing", tags=["Taxonomy Sharing"])
 app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", tags=["Taxonomy Versions"])
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
-app.include_router(inbound_email.router, prefix="/api/email", tags=["Inbound Email"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
@@ -332,6 +333,7 @@ app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
 app.include_router(job_applications.router, prefix="/api/job-applications", tags=["Job Applications"])
 app.include_router(saved_jobs.router, prefix="/api/saved-jobs", tags=["Saved Jobs"])
+app.include_router(job_descriptions.router, prefix="/api/job-descriptions", tags=["Job Descriptions"])
 app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
