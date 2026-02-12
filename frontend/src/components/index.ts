@@ -49,3 +49,9 @@ export { default as BiasReportExport } from './BiasReportExport';
 export { default as FairnessScorecard } from './FairnessScorecard';
 export { default as BiasMetricsChart } from './BiasMetricsChart';
 export { default as FeatureImportanceChart } from './FeatureImportanceChart';
+export { default as BatchProgressBar } from './BatchProgressBar';
+export type {
+  BatchProgressBarProps,
+  FileProgressItem,
+  FileStatus,
+} from './BatchProgressBar';
