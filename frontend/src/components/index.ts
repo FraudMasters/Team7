@@ -55,3 +55,9 @@ export type {
   FileProgressItem,
   FileStatus,
 } from './BatchProgressBar';
+export { default as FileStatusList } from './FileStatusList';
+export type {
+  FileStatusListProps,
+  FileStatusItem,
+  FileListStatus,
+} from './FileStatusList';
