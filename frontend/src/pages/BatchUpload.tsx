@@ -38,6 +38,8 @@ import {
   Pause as PauseIcon,
   PlayArrow as PlayArrowIcon,
   Stop as StopIcon,
+  Warning as WarningIcon,
+  ContentCopy as DuplicateIcon,
 } from '@mui/icons-material';
 import ErrorBoundary from '@components/ErrorBoundary';
 
@@ -49,10 +51,26 @@ const DRAFT_STORAGE_KEY = 'batch_upload_draft';
 interface FileItem {
   file: File;
   id: string;
-  status: 'pending' | 'uploading' | 'success' | 'error' | 'cancelled';
+  status: 'pending' | 'uploading' | 'success' | 'error' | 'cancelled' | 'duplicate';
   error?: string;
   progress?: number;
   abortController?: AbortController;
+  // Duplicate info
+  isDuplicate?: boolean;
+  duplicateOf?: string;
+  duplicateMatchType?: 'exact' | 'near';
+  duplicateSimilarity?: number;
+  resumeId?: string;
+}
+
+// Duplicate info from API response
+interface DuplicateInfo {
+  resume_id: string;
+  filename: string;
+  original_resume_id: string;
+  match_type: 'exact' | 'near' | string;
+  similarity_score: number;
+  detection_timestamp?: string;
 }
 
 // Draft data structure (serializable for localStorage)
@@ -77,6 +95,9 @@ interface BatchJob {
   created_at?: string;
   completed_at?: string;
   error_message?: string;
+  // Duplicate info
+  duplicates_detected?: number;
+  duplicates?: DuplicateInfo[];
 }
 
 /**
@@ -99,6 +120,10 @@ const BatchUploadPage: React.FC = () => {
   const [isPausing, setIsPausing] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
+  const [duplicatesDialog, setDuplicatesDialog] = useState(false);
+  const [acceptingDuplicate, setAcceptingDuplicate] = useState<string | null>(null);
+  const [rejectingDuplicate, setRejectingDuplicate] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Save draft to localStorage
@@ -438,7 +463,18 @@ const BatchUploadPage: React.FC = () => {
         if (response.ok) {
           const result = await response.json();
           setCurrentBatch(result);
-          setSuccess(`Batch upload started with ${result.total_files} files`);
+
+          // Handle duplicates from upload response
+          if (result.duplicates_detected > 0 && result.duplicates) {
+            setDuplicates(result.duplicates);
+            setSuccess(
+              `Batch upload started with ${result.total_files} files. ` +
+              `${result.duplicates_detected} duplicate(s) detected.`
+            );
+          } else {
+            setSuccess(`Batch upload started with ${result.total_files} files`);
+          }
+
           startPolling(result.batch_id);
           // Clear draft after successful upload
           try {
@@ -482,6 +518,10 @@ const BatchUploadPage: React.FC = () => {
             setPollInterval(null);
             if (data.status === 'completed') {
               setSuccess('Batch processing completed!');
+              // Fetch duplicates if any were detected
+              if (data.duplicates_detected && data.duplicates_detected > 0) {
+                fetchDuplicates();
+              }
             } else {
               setError(data.error_message || 'Batch processing failed');
             }
@@ -516,6 +556,8 @@ const BatchUploadPage: React.FC = () => {
     setSuccess(null);
     setError(null);
     setBatchResults(null);
+    setDuplicates([]);
+    setDuplicatesDialog(false);
     if (pollInterval) {
       clearInterval(pollInterval);
       setPollInterval(null);
@@ -634,6 +676,103 @@ const BatchUploadPage: React.FC = () => {
     }
   };
 
+  // Fetch duplicates for current batch
+  const fetchDuplicates = async () => {
+    if (!currentBatch) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/batch/${currentBatch.batch_id}/duplicates`);
+      if (response.ok) {
+        const data = await response.json();
+        setDuplicates(data.duplicates || []);
+        if (data.duplicates && data.duplicates.length > 0) {
+          setDuplicatesDialog(true);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch duplicates:', err);
+    }
+  };
+
+  // Accept duplicate (keep the duplicate resume)
+  const handleAcceptDuplicate = async (duplicate: DuplicateInfo) => {
+    setAcceptingDuplicate(duplicate.resume_id);
+    setError(null);
+
+    try {
+      // Accept by keeping the resume - we could add an API endpoint for this
+      // For now, we just remove it from the duplicates list to indicate it's been reviewed
+      setDuplicates((prev) => prev.filter((d) => d.resume_id !== duplicate.resume_id));
+      setSuccess(`Accepted duplicate: ${duplicate.filename}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to accept duplicate';
+      setError(errorMessage);
+    } finally {
+      setAcceptingDuplicate(null);
+    }
+  };
+
+  // Reject duplicate (delete the duplicate resume)
+  const handleRejectDuplicate = async (duplicate: DuplicateInfo) => {
+    setRejectingDuplicate(duplicate.resume_id);
+    setError(null);
+
+    try {
+      // Delete the duplicate resume
+      const response = await fetch(`${API_URL}/api/resumes/${duplicate.resume_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        setDuplicates((prev) => prev.filter((d) => d.resume_id !== duplicate.resume_id));
+        setSuccess(`Rejected duplicate: ${duplicate.filename}`);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to reject duplicate');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reject duplicate';
+      setError(errorMessage);
+    } finally {
+      setRejectingDuplicate(null);
+    }
+  };
+
+  // Accept all remaining duplicates
+  const handleAcceptAllDuplicates = () => {
+    setDuplicates([]);
+    setSuccess('All duplicates accepted');
+    setDuplicatesDialog(false);
+  };
+
+  // Reject all remaining duplicates
+  const handleRejectAllDuplicates = async () => {
+    setError(null);
+
+    try {
+      // Delete all duplicate resumes
+      const deletePromises = duplicates.map((dup) =>
+        fetch(`${API_URL}/api/resumes/${dup.resume_id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      await Promise.all(deletePromises);
+      setDuplicates([]);
+      setSuccess('All duplicates rejected');
+      setDuplicatesDialog(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reject all duplicates';
+      setError(errorMessage);
+    }
+  };
+
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
@@ -663,6 +802,8 @@ const BatchUploadPage: React.FC = () => {
         return <Chip size="small" label="Completed" color="success" />;
       case 'failed':
         return <Chip size="small" label="Failed" color="error" />;
+      case 'duplicate':
+        return <Chip size="small" label="Duplicate" color="warning" />;
       default:
         return <Chip size="small" label={status} />;
     }
@@ -924,7 +1065,13 @@ const BatchUploadPage: React.FC = () => {
                       <TableBody>
                         {files.map((fileItem) => (
                           <React.Fragment key={fileItem.id}>
-                            <TableRow>
+                            <TableRow
+                              sx={{
+                                bgcolor: fileItem.isDuplicate || fileItem.status === 'duplicate'
+                                  ? 'warning.lighter'
+                                  : 'inherit',
+                              }}
+                            >
                               <TableCell
                                 sx={{
                                   maxWidth: { xs: 120, md: 200 },
@@ -939,7 +1086,27 @@ const BatchUploadPage: React.FC = () => {
                                 {(fileItem.file.size / 1024).toFixed(1)} KB
                               </TableCell>
                               <TableCell>
-                                {fileItem.status === 'success' && <CheckIcon color="success" fontSize="small" />}
+                                {fileItem.status === 'success' && !fileItem.isDuplicate && <CheckIcon color="success" fontSize="small" />}
+                                {fileItem.status === 'success' && fileItem.isDuplicate && (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <DuplicateIcon color="warning" fontSize="small" />
+                                    <Typography variant="caption" color="warning.main">
+                                      Duplicate
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {fileItem.status === 'duplicate' && (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <DuplicateIcon color="warning" fontSize="small" />
+                                    <Chip
+                                      size="small"
+                                      label={fileItem.duplicateMatchType === 'exact' ? 'Exact' : 'Similar'}
+                                      color="warning"
+                                      variant="outlined"
+                                      sx={{ height: 20 }}
+                                    />
+                                  </Box>
+                                )}
                                 {fileItem.status === 'error' && (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <ErrorIcon color="error" fontSize="small" />
@@ -1156,6 +1323,21 @@ const BatchUploadPage: React.FC = () => {
                 >
                   View Results
                 </Button>
+                {/* Review Duplicates button - visible when batch has duplicates */}
+                {((currentBatch.duplicates_detected && currentBatch.duplicates_detected > 0) || duplicates.length > 0) && (
+                  <Tooltip title="Review detected duplicate resumes">
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<DuplicateIcon />}
+                      onClick={() => setDuplicatesDialog(true)}
+                      fullWidth={{ xs: true, sm: false }}
+                      sx={{ minHeight: 44 }}
+                    >
+                      Review Duplicates ({duplicates.length || currentBatch.duplicates_detected})
+                    </Button>
+                  </Tooltip>
+                )}
                 <Button
                   onClick={resetBatch}
                   fullWidth={{ xs: true, sm: false }}
@@ -1194,7 +1376,7 @@ const BatchUploadPage: React.FC = () => {
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: '1fr',
-                  sm: 'repeat(3, 1fr)',
+                  sm: 'repeat(4, 1fr)',
                 },
                 gap: 2,
               }}
@@ -1223,7 +1405,38 @@ const BatchUploadPage: React.FC = () => {
                   Failed
                 </Typography>
               </Paper>
+              <Paper sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h4" color="warning.main">
+                  {duplicates.length || currentBatch.duplicates_detected || 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Duplicates
+                </Typography>
+              </Paper>
             </Box>
+
+            {/* Duplicate Alert - shows when batch completes with duplicates */}
+            {currentBatch.status === 'completed' && (duplicates.length > 0 || (currentBatch.duplicates_detected && currentBatch.duplicates_detected > 0)) && (
+              <Alert
+                severity="warning"
+                sx={{ mt: 2 }}
+                action={
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="warning"
+                    onClick={() => setDuplicatesDialog(true)}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Review Now
+                  </Button>
+                }
+              >
+                <AlertTitle>Duplicate Resumes Detected</AlertTitle>
+                {duplicates.length || currentBatch.duplicates_detected} duplicate resume(s) were found in this batch.
+                Please review them to decide whether to keep or reject each duplicate.
+              </Alert>
+            )}
           </Paper>
         )}
 
@@ -1264,6 +1477,142 @@ const BatchUploadPage: React.FC = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setResultsDialog(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Duplicates Review Dialog */}
+        <Dialog
+          open={duplicatesDialog}
+          onClose={() => setDuplicatesDialog(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningIcon color="warning" />
+              Review Duplicate Resumes
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              These resumes have been flagged as duplicates of existing resumes in your system.
+              Review each one to decide whether to keep or reject them.
+            </Alert>
+            {duplicates.length === 0 ? (
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <CheckIcon color="success" sx={{ fontSize: 48, mb: 1 }} />
+                <Typography variant="body1" color="text.secondary">
+                  All duplicates have been reviewed!
+                </Typography>
+              </Box>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Filename</TableCell>
+                      <TableCell>Match Type</TableCell>
+                      <TableCell>Similarity</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {duplicates.map((dup) => (
+                      <TableRow
+                        key={dup.resume_id}
+                        sx={{
+                          bgcolor: 'warning.lighter',
+                          '&:hover': { bgcolor: 'warning.light' },
+                        }}
+                      >
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <DuplicateIcon color="warning" fontSize="small" />
+                            <Typography variant="body2">{dup.filename}</Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={dup.match_type === 'exact' ? 'Exact Match' : 'Similar'}
+                            color={dup.match_type === 'exact' ? 'warning' : 'default'}
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {Math.round((dup.similarity_score || 1) * 100)}%
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                            <Tooltip title="Keep this duplicate resume">
+                              <IconButton
+                                size="small"
+                                color="success"
+                                onClick={() => handleAcceptDuplicate(dup)}
+                                disabled={acceptingDuplicate === dup.resume_id || rejectingDuplicate === dup.resume_id}
+                                sx={{ minWidth: 44, minHeight: 44 }}
+                              >
+                                {acceptingDuplicate === dup.resume_id ? (
+                                  <CircularProgress size={20} color="inherit" />
+                                ) : (
+                                  <CheckIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete this duplicate resume">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRejectDuplicate(dup)}
+                                disabled={acceptingDuplicate === dup.resume_id || rejectingDuplicate === dup.resume_id}
+                                sx={{ minWidth: 44, minHeight: 44 }}
+                              >
+                                {rejectingDuplicate === dup.resume_id ? (
+                                  <CircularProgress size={20} color="inherit" />
+                                ) : (
+                                  <DeleteIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {duplicates.length > 1 && (
+                <>
+                  <Button
+                    variant="outlined"
+                    color="success"
+                    onClick={handleAcceptAllDuplicates}
+                    startIcon={<CheckIcon />}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Accept All
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={handleRejectAllDuplicates}
+                    startIcon={<DeleteIcon />}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Reject All
+                  </Button>
+                </>
+              )}
+            </Box>
+            <Button onClick={() => setDuplicatesDialog(false)} sx={{ minHeight: 44 }}>
+              Close
+            </Button>
           </DialogActions>
         </Dialog>
 
