@@ -32,6 +32,7 @@ from utils.duplicate_detector import (
     DuplicateMatch,
 )
 from middleware.organization_context import get_organization_context
+from models.duplicate_resume import DuplicateResume
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -592,6 +593,105 @@ async def get_batch_status(
             "error_message": batch.error_message,
         }
     )
+
+
+@router.get(
+    "/{batch_id}/duplicates",
+    tags=["Batch"],
+)
+async def get_batch_duplicates(
+    request: Request,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Get the list of duplicate resumes detected in a batch job.
+
+    This endpoint returns all duplicate resumes that were detected during
+    the batch upload process, allowing recruiters to review and take action
+    on potential duplicates.
+
+    Args:
+        request: FastAPI request object
+        batch_id: Unique identifier of the batch job
+        db: Database session
+
+    Returns:
+        JSON response with list of detected duplicates
+
+    Raises:
+        HTTPException(404): If batch job not found
+
+    Example:
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/batch/abc-123/duplicates"
+        ... )
+        >>> duplicates = response.json()
+    """
+    try:
+        batch_uuid = UUID(batch_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid batch ID format",
+        )
+
+    # Verify batch exists
+    batch_query = select(BatchJob).where(BatchJob.id == batch_uuid)
+    batch_result = await db.execute(batch_query)
+    batch = batch_result.scalar_one_or_none()
+
+    if not batch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch job not found",
+        )
+
+    try:
+        # Query duplicates for this batch
+        duplicates_query = (
+            select(DuplicateResume)
+            .where(DuplicateResume.batch_job_id == str(batch_uuid))
+            .order_by(DuplicateResume.detection_timestamp.desc())
+        )
+        result = await db.execute(duplicates_query)
+        duplicates = result.scalars().all()
+
+        duplicates_list = []
+        for dup in duplicates:
+            # Get the duplicate resume to fetch filename
+            resume_query = select(Resume).where(Resume.id == dup.duplicate_resume_id)
+            resume_result = await db.execute(resume_query)
+            resume = resume_result.scalar_one_or_none()
+
+            filename = resume.filename if resume else "Unknown"
+
+            duplicates_list.append({
+                "resume_id": str(dup.duplicate_resume_id),
+                "filename": filename,
+                "original_resume_id": str(dup.original_resume_id),
+                "match_type": "exact",  # Default match type
+                "similarity_score": 1.0,  # Default similarity score
+                "detection_timestamp": dup.detection_timestamp.isoformat() if dup.detection_timestamp else None,
+            })
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "batch_id": str(batch_uuid),
+                "total_duplicates": len(duplicates_list),
+                "duplicates": duplicates_list,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting batch duplicates: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get batch duplicates: {str(e)}",
+        ) from e
 
 
 @router.get(
