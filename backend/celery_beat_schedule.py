@@ -1,20 +1,28 @@
 """
-Celery Beat schedule configuration for automated model retraining.
+Celery Beat schedule configuration for automated model retraining and analytics reports.
 
 This module defines the periodic task schedule for Celery Beat, including
-daily and weekly automated model retraining schedules. It integrates with
-the main Celery configuration to provide scheduled task execution.
+daily and weekly automated model retraining schedules, and analytics email
+report schedules. It integrates with the main Celery configuration to provide
+scheduled task execution.
 
 Schedule Overview:
 - Feedback volume check: Runs every 6 hours to check if feedback threshold is met
 - Daily automated retraining check: Runs every day at configured time
 - Weekly full model retraining: Runs once a week with more extensive training
 - Concept drift monitoring: Periodic checks for performance degradation
+- Daily analytics email report: Sends daily summary at configured time
+- Weekly analytics email report: Sends weekly summary on configured day
 
 Feedback Volume Trigger:
 - Monitors accumulated feedback counts per model
 - Automatically triggers retraining when threshold (default: 1000) is reached
 - Can be enabled/disabled via retraining_feedback_counter_enabled setting
+
+Analytics Email Reports:
+- Daily reports: Key metrics summary sent every morning
+- Weekly reports: Comprehensive analytics sent once a week
+- Configurable recipients via analytics_report_default_recipients setting
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -67,6 +75,42 @@ def get_retraining_schedule_config() -> Dict[str, Any]:
         ),
         "feedback_counter_enabled": getattr(
             settings, "retraining_feedback_counter_enabled", True
+        ),
+    }
+
+
+def get_analytics_report_schedule_config() -> Dict[str, Any]:
+    """
+    Get analytics email report schedule configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether analytics email reports are enabled (default: True)
+    - daily_hour: Hour for daily reports (default: 8 AM)
+    - daily_minute: Minute for daily reports (default: 0)
+    - weekly_day: Day of week for weekly reports (default: 1 = Monday)
+    - weekly_hour: Hour for weekly reports (default: 9 AM)
+    - weekly_minute: Minute for weekly reports (default: 0)
+    - default_recipients: List of default email recipients
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_analytics_report_schedule_config()
+        >>> print(config['daily_hour'])
+        8
+        >>> print(config['weekly_day'])
+        1
+    """
+    return {
+        "enabled": getattr(settings, "analytics_email_reports_enabled", True),
+        "daily_hour": getattr(settings, "analytics_report_daily_hour", 8),
+        "daily_minute": getattr(settings, "analytics_report_daily_minute", 0),
+        "weekly_day": getattr(settings, "analytics_report_weekly_day", 1),  # Monday
+        "weekly_hour": getattr(settings, "analytics_report_weekly_hour", 9),
+        "weekly_minute": getattr(settings, "analytics_report_weekly_minute", 0),
+        "default_recipients": getattr(
+            settings, "analytics_report_default_recipients", []
         ),
     }
 
@@ -191,12 +235,46 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
             "queue": "learning",  # Route to learning queue
         },
     },
+    # ==============================================
+    # Analytics Email Reports Schedule
+    # ==============================================
+    "daily-analytics-email-report": {
+        "task": "tasks.analytics_email_reports.send_analytics_report",
+        "schedule": crontab(
+            hour=get_analytics_report_schedule_config()["daily_hour"],
+            minute=get_analytics_report_schedule_config()["daily_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "report_type": "daily",  # Daily report type
+        },
+        "options": {
+            "expires": 3600,  # Task expires if not run within 1 hour
+            "queue": "default",  # Use default queue for email tasks
+        },
+    },
+    "weekly-analytics-email-report": {
+        "task": "tasks.analytics_email_reports.send_analytics_report",
+        "schedule": crontab(
+            day_of_week=get_analytics_report_schedule_config()["weekly_day"],
+            hour=get_analytics_report_schedule_config()["weekly_hour"],
+            minute=get_analytics_report_schedule_config()["weekly_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "report_type": "weekly",  # Weekly report type
+        },
+        "options": {
+            "expires": 7200,  # Task expires if not run within 2 hours
+            "queue": "default",  # Use default queue for email tasks
+        },
+    },
 }
 
 
 def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     """
-    Get the Celery Beat schedule for automated retraining.
+    Get the Celery Beat schedule for automated retraining and analytics reports.
 
     This function returns the beat schedule dictionary, optionally filtered
     to include only enabled tasks based on configuration settings.
@@ -214,18 +292,26 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         ...     print(f"{name}: {config['task']}")
     """
     config = get_retraining_schedule_config()
+    analytics_config = get_analytics_report_schedule_config()
 
     if not config["enabled"] and enabled_only:
         logger.info("Automated retraining is disabled in settings")
+
+    if not analytics_config["enabled"] and enabled_only:
+        logger.info("Analytics email reports are disabled in settings")
+
+    # If both are disabled and we only want enabled tasks, return empty
+    if not config["enabled"] and not analytics_config["enabled"] and enabled_only:
         return {}
 
     logger.info(
         f"Retrieving beat schedule: {len(beat_schedule)} tasks, "
-        f"enabled={config['enabled']}, models={config['models']}"
+        f"retraining_enabled={config['enabled']}, models={config['models']}, "
+        f"analytics_reports_enabled={analytics_config['enabled']}"
     )
 
     if enabled_only:
-        # Filter to only include tasks for configured models
+        # Filter to only include enabled tasks
         filtered_schedule = {}
         for task_name, task_config in beat_schedule.items():
             # Skip feedback volume tasks if counter is disabled
@@ -233,17 +319,31 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
                 if not config.get("feedback_counter_enabled", True):
                     continue
 
-            # Extract model name from task name or args
-            model_name = None
-            if task_config.get("args"):
-                model_name = task_config["args"][0] if task_config["args"] else None
+            # Skip retraining tasks if retraining is disabled
+            if "retraining" in task_name:
+                if not config["enabled"]:
+                    continue
 
-            # Include task if model is in configured list
-            if model_name and model_name in config["models"]:
-                filtered_schedule[task_name] = task_config
-            elif not model_name:
-                # Include tasks without specific model (e.g., monitoring)
-                filtered_schedule[task_name] = task_config
+                # Extract model name from task name or args
+                model_name = None
+                if task_config.get("args"):
+                    model_name = task_config["args"][0] if task_config["args"] else None
+
+                # Include task if model is in configured list
+                if model_name and model_name in config["models"]:
+                    filtered_schedule[task_name] = task_config
+                elif not model_name:
+                    # Include tasks without specific model (e.g., monitoring)
+                    filtered_schedule[task_name] = task_config
+                continue
+
+            # Skip analytics email report tasks if analytics reports are disabled
+            if "analytics-email-report" in task_name:
+                if not analytics_config["enabled"]:
+                    continue
+
+            # Include other tasks
+            filtered_schedule[task_name] = task_config
 
         return filtered_schedule
 
@@ -338,6 +438,7 @@ def list_scheduled_tasks() -> Dict[str, Dict[str, Any]]:
 
 # Log schedule configuration on import
 schedule_config = get_retraining_schedule_config()
+analytics_config = get_analytics_report_schedule_config()
 logger.info(
     f"Celery Beat schedule loaded: "
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
@@ -345,7 +446,10 @@ logger.info(
     f"{schedule_config['weekly_hour']:02d}:{schedule_config['weekly_minute']:02d}, "
     f"feedback_threshold={schedule_config['feedback_volume_threshold']}, "
     f"feedback_counter_enabled={schedule_config['feedback_counter_enabled']}, "
-    f"enabled={schedule_config['enabled']}"
+    f"retraining_enabled={schedule_config['enabled']}, "
+    f"analytics_reports_enabled={analytics_config['enabled']}, "
+    f"analytics_daily_at={analytics_config['daily_hour']:02d}:{analytics_config['daily_minute']:02d}, "
+    f"analytics_weekly_on_day_{analytics_config['weekly_day']}_at_{analytics_config['weekly_hour']:02d}:{analytics_config['weekly_minute']:02d}"
 )
 
 
@@ -354,6 +458,7 @@ __all__ = [
     "beat_schedule",
     "get_beat_schedule",
     "get_retraining_schedule_config",
+    "get_analytics_report_schedule_config",
     "add_scheduled_task",
     "remove_scheduled_task",
     "list_scheduled_tasks",
