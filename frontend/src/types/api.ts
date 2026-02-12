@@ -2807,6 +2807,109 @@ export interface MarketTrendsResponse {
   last_updated?: string;
 }
 
+// ==================== Analytics Export Types ====================
+
+/**
+ * Supported export formats for analytics data
+ */
+export type AnalyticsExportFormat = 'json' | 'csv';
+
+/**
+ * Analytics sections that can be included in exports
+ */
+export type AnalyticsExportSection =
+  | 'key_metrics'
+  | 'funnel'
+  | 'recruiter_performance'
+  | 'source_tracking'
+  | 'stage_duration'
+  | 'quality_metrics'
+  | 'skill_demand'
+  | 'ranking_accuracy'
+  | 'taxonomy_usage';
+
+/**
+ * Request parameters for analytics data export
+ */
+export interface AnalyticsExportRequest {
+  /** Export format (json or csv) */
+  format?: AnalyticsExportFormat;
+  /** Start date for analytics data (ISO 8601 format) */
+  start_date?: string;
+  /** End date for analytics data (ISO 8601 format) */
+  end_date?: string;
+  /** Specific sections to include. If null, includes all sections */
+  sections?: AnalyticsExportSection[];
+  /** Whether to include export metadata in the response */
+  include_metadata?: boolean;
+  /** Filter by specific recruiter ID */
+  recruiter_id?: string;
+  /** Filter by specific vacancy ID */
+  vacancy_id?: string;
+}
+
+/**
+ * Metadata about an analytics export
+ */
+export interface AnalyticsExportMetadata {
+  /** ISO 8601 timestamp when export was generated */
+  export_timestamp: string;
+  /** Export format used (json or csv) */
+  format: string;
+  /** Start date of included data (ISO 8601) */
+  start_date?: string;
+  /** End date of included data (ISO 8601) */
+  end_date?: string;
+  /** List of analytics sections included in the export */
+  sections_included: string[];
+  /** Total number of data records in the export */
+  total_records: number;
+  /** Filters that were applied to the export */
+  filters_applied?: Record<string, unknown>;
+  /** User ID or system that generated the export */
+  generated_by?: string;
+}
+
+/**
+ * Configuration for scheduled analytics reports
+ */
+export interface ScheduledReportConfig {
+  /** Name/identifier for the scheduled report */
+  report_name: string;
+  /** Whether the scheduled report is enabled */
+  enabled?: boolean;
+  /** Cron expression for report schedule */
+  schedule_cron: string;
+  /** Export format for the report */
+  format?: AnalyticsExportFormat;
+  /** Analytics sections to include in the report */
+  sections: AnalyticsExportSection[];
+  /** Email addresses to receive the report */
+  recipients: string[];
+  /** Whether to include an executive summary in the email */
+  include_summary?: boolean;
+  /** Number of days to look back for data (default: 7 days) */
+  date_range_days?: number;
+}
+
+/**
+ * Status of a scheduled analytics report
+ */
+export interface ScheduledReportStatus {
+  /** Name of the scheduled report */
+  report_name: string;
+  /** Timestamp of last successful run */
+  last_run?: string;
+  /** Timestamp of next scheduled run */
+  next_run?: string;
+  /** Current status (active, paused, error) */
+  status: string;
+  /** Error message from last failed run, if any */
+  last_error?: string;
+  /** Total number of times the report has been run */
+  total_runs?: number;
+}
+
 // ==================== Parsing Correction Types ====================
 
 // Re-export types from parsingCorrection module for centralized access
