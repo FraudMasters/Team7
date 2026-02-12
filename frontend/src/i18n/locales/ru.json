@@ -1235,5 +1235,70 @@
     "page": "Страница {{page}}",
     "noValue": "Значение не извлечено",
     "noSourceText": "Расположение исходного текста недоступно"
+  },
+  "parsedDataEditor": {
+    "title": "Редактировать извлеченные данные",
+    "subtitle": "Проверьте и исправьте извлеченную информацию из резюме",
+    "loading": "Загрузка извлеченных данных...",
+    "correctedCount": "{{count}} исправлений",
+    "present": "Настоящее время",
+    "years": "лет",
+    "sections": {
+      "skills": "Навыки",
+      "education": "Образование",
+      "workExperience": "Опыт работы",
+      "languages": "Языки"
+    },
+    "skillsList": "Навыки ({{count}})",
+    "educationList": "Образование ({{count}})",
+    "workHistoryList": "Опыт работы ({{count}})",
+    "languagesList": "Языки ({{count}})",
+    "noSkills": "Навыки не были извлечены из резюме.",
+    "noEducation": "Образование не было извлечено из резюме.",
+    "noWorkHistory": "Опыт работы не был извлечен из резюме.",
+    "noLanguages": "Языки не были извлечены из резюме.",
+    "addSkill": "Добавить навык",
+    "addEducation": "Добавить образование",
+    "addWorkHistory": "Добавить опыт работы",
+    "success": {
+      "skillAdded": "Навык успешно добавлен",
+      "skillUpdated": "Навык успешно обновлен",
+      "educationAdded": "Образование успешно добавлено",
+      "educationUpdated": "Образование успешно обновлено",
+      "workHistoryAdded": "Опыт работы успешно добавлен",
+      "workHistoryUpdated": "Опыт работы успешно обновлен"
+    },
+    "reasons": {
+      "positionIncorrect": "Должность указана неверно",
+      "positionIncorrectDesc": "Название должности было извлечено неправильно",
+      "missingSkill": "Отсутствует навык",
+      "missingSkillDesc": "Навык не был обнаружен",
+      "incorrectSkill": "Неверный навык",
+      "incorrectSkillDesc": "Навык был извлечен неправильно",
+      "dateIncorrect": "Дата указана неверно",
+      "dateIncorrectDesc": "Дата была извлечена неправильно",
+      "companyIncorrect": "Компания указана неверно",
+      "companyIncorrectDesc": "Название компании было извлечено неправильно",
+      "educationIncorrect": "Образование указано неверно",
+      "educationIncorrectDesc": "Информация об образовании была извлечена неправильно",
+      "languageIncorrect": "Язык указан неверно",
+      "languageIncorrectDesc": "Язык был извлечен неправильно",
+      "fieldEmpty": "Поле пустое",
+      "fieldEmptyDesc": "Поле не было извлечено, хотя должно было быть",
+      "fieldIncomplete": "Поле неполное",
+      "fieldIncompleteDesc": "Была извлечена только часть поля",
+      "wrongFieldType": "Неверный тип поля",
+      "wrongFieldTypeDesc": "Данные были присвоены неверному полю",
+      "other": "Другое",
+      "otherDesc": "Другая причина, не указанная выше"
+    },
+    "correctionDialog": {
+      "title": "Почему вы вносите это исправление?",
+      "description": "Эта информация помогает нам улучшить точность парсинга.",
+      "reason": "Причина",
+      "note": "Дополнительные примечания (необязательно)",
+      "notePlaceholder": "Любой дополнительный контекст об этом исправлении...",
+      "confirm": "Подтвердить исправление"
+    }
   }
 }

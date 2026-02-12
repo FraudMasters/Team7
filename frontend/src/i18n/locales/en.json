@@ -1233,5 +1233,70 @@
     "page": "Page {{page}}",
     "noValue": "No value extracted",
     "noSourceText": "No source text location available"
+  },
+  "parsedDataEditor": {
+    "title": "Edit Parsed Data",
+    "subtitle": "Review and correct the parsed resume information",
+    "loading": "Loading parsed data...",
+    "correctedCount": "{{count}} corrections",
+    "present": "Present",
+    "years": "years",
+    "sections": {
+      "skills": "Skills",
+      "education": "Education",
+      "workExperience": "Work Experience",
+      "languages": "Languages"
+    },
+    "skillsList": "Skills ({{count}})",
+    "educationList": "Education ({{count}})",
+    "workHistoryList": "Work Experience ({{count}})",
+    "languagesList": "Languages ({{count}})",
+    "noSkills": "No skills were extracted from the resume.",
+    "noEducation": "No education was extracted from the resume.",
+    "noWorkHistory": "No work experience was extracted from the resume.",
+    "noLanguages": "No languages were extracted from the resume.",
+    "addSkill": "Add Skill",
+    "addEducation": "Add Education",
+    "addWorkHistory": "Add Work Experience",
+    "success": {
+      "skillAdded": "Skill added successfully",
+      "skillUpdated": "Skill updated successfully",
+      "educationAdded": "Education added successfully",
+      "educationUpdated": "Education updated successfully",
+      "workHistoryAdded": "Work experience added successfully",
+      "workHistoryUpdated": "Work experience updated successfully"
+    },
+    "reasons": {
+      "positionIncorrect": "Position was incorrect",
+      "positionIncorrectDesc": "The job title/position was parsed incorrectly",
+      "missingSkill": "Missing skill",
+      "missingSkillDesc": "A skill was not detected",
+      "incorrectSkill": "Incorrect skill",
+      "incorrectSkillDesc": "A skill was parsed incorrectly",
+      "dateIncorrect": "Date was incorrect",
+      "dateIncorrectDesc": "A date was parsed incorrectly",
+      "companyIncorrect": "Company was incorrect",
+      "companyIncorrectDesc": "Company name was parsed incorrectly",
+      "educationIncorrect": "Education was incorrect",
+      "educationIncorrectDesc": "Education information was parsed incorrectly",
+      "languageIncorrect": "Language was incorrect",
+      "languageIncorrectDesc": "Language was parsed incorrectly",
+      "fieldEmpty": "Field was empty",
+      "fieldEmptyDesc": "A field was not extracted when it should have been",
+      "fieldIncomplete": "Field was incomplete",
+      "fieldIncompleteDesc": "Only part of the field was extracted",
+      "wrongFieldType": "Wrong field type",
+      "wrongFieldTypeDesc": "Data was assigned to wrong field",
+      "other": "Other",
+      "otherDesc": "Other reason not listed above"
+    },
+    "correctionDialog": {
+      "title": "Why are you making this correction?",
+      "description": "This information helps us improve our parsing accuracy.",
+      "reason": "Reason",
+      "note": "Additional notes (optional)",
+      "notePlaceholder": "Any additional context about this correction...",
+      "confirm": "Confirm Correction"
+    }
   }
 }
