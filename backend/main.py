@@ -292,6 +292,7 @@ from api import (
     config,
     websocket,
     auth,
+    inbound_email,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -316,6 +317,7 @@ app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-e
 app.include_router(taxonomy_sharing.router, prefix="/api/taxonomy-sharing", tags=["Taxonomy Sharing"])
 app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", tags=["Taxonomy Versions"])
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
+app.include_router(inbound_email.router, prefix="/api/email", tags=["Inbound Email"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
