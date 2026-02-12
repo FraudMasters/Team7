@@ -35,7 +35,11 @@
     "yes": "Да",
     "no": "Нет",
     "or": "или",
-    "and": "и"
+    "and": "и",
+    "expand": "Развернуть",
+    "collapse": "Свернуть",
+    "copy": "Копировать",
+    "copied": "Скопировано"
   },
   "nav": {
     "home": "Главная",
@@ -1186,5 +1190,50 @@
       "interviewProcess": "Процесс собеседования",
       "metadata": "Сгенерировано {{provider}} ({{model}}) в {{timestamp}}"
     }
+  },
+  "visualFeedback": {
+    "title": "Визуальная обратная связь парсинга",
+    "fieldsCount": "{{count}} полей",
+    "correctedTooltip": "{{count}} полей было исправлено",
+    "corrected": "{{count}} исправлено",
+    "highlighting": "Выделение:",
+    "clearHighlight": "Очистить",
+    "searchPlaceholder": "Поиск полей...",
+    "noResults": "Нет полей, соответствующих \"{{query}}\"",
+    "noFieldsInCategory": "В этой категории нет полей",
+    "editField": "Редактировать",
+    "categories": {
+      "personal": "Личная информация",
+      "skills": "Навыки",
+      "experience": "Опыт работы",
+      "education": "Образование",
+      "languages": "Языки",
+      "other": "Другое"
+    },
+    "loading": {
+      "title": "Загрузка обратной связи парсинга..."
+    },
+    "error": {
+      "title": "Не удалось загрузить обратную связь парсинга"
+    },
+    "empty": {
+      "title": "Нет данных парсинга",
+      "message": "Загрузите резюме, чтобы увидеть визуальную обратную связь парсинга."
+    },
+    "sourceText": {
+      "title": "Исходный текст",
+      "characters": "символов"
+    },
+    "extractedFields": {
+      "title": "Извлеченные поля"
+    }
+  },
+  "fieldSourceHighlighter": {
+    "corrected": "Исправлено",
+    "extractedValue": "Извлеченное значение",
+    "sourceText": "Исходный текст",
+    "page": "Страница {{page}}",
+    "noValue": "Значение не извлечено",
+    "noSourceText": "Расположение исходного текста недоступно"
   }
 }
