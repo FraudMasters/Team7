@@ -161,6 +161,15 @@ class BatchResultsResponse(BaseModel):
     files: list[BatchFileItem] = Field(..., description="List of files with their status")
 
 
+class BatchControlResponse(BaseModel):
+    """Response model for batch control actions (pause/resume/cancel)."""
+
+    batch_id: str = Field(..., description="Unique identifier for the batch job")
+    status: str = Field(..., description="Current status of the batch job")
+    previous_status: str = Field(..., description="Previous status before the action")
+    message: str = Field(..., description="Success message describing the action taken")
+
+
 @router.post(
     "/upload",
     response_model=BatchUploadResponse,
@@ -841,3 +850,243 @@ async def list_batches(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list batches: {str(e)}",
         ) from e
+
+
+@router.post(
+    "/{batch_id}/pause",
+    response_model=BatchControlResponse,
+    tags=["Batch"],
+)
+async def pause_batch(
+    request: Request,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Pause a batch job that is currently processing.
+
+    This endpoint allows users to temporarily halt batch processing.
+    The batch can later be resumed using the /resume endpoint.
+
+    Args:
+        request: FastAPI request object
+        batch_id: Unique identifier of the batch job
+        db: Database session
+
+    Returns:
+        JSON response with updated batch status
+
+    Raises:
+        HTTPException(400): If batch cannot be paused (wrong status)
+        HTTPException(404): If batch job not found
+    """
+    try:
+        batch_uuid = UUID(batch_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid batch ID format",
+        )
+
+    query = select(BatchJob).where(BatchJob.id == batch_uuid)
+    result = await db.execute(query)
+    batch = result.scalar_one_or_none()
+
+    if not batch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch job not found",
+        )
+
+    previous_status = batch.status
+
+    # Only processing batches can be paused
+    if batch.status != BatchJobStatus.processing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot pause batch with status '{batch.status.value}'. Only processing batches can be paused.",
+        )
+
+    # Update status to paused
+    batch.status = BatchJobStatus.paused
+    await db.commit()
+
+    logger.info(f"Paused batch {batch_id} (was {previous_status.value})")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "batch_id": str(batch.id),
+            "status": batch.status.value,
+            "previous_status": previous_status.value,
+            "message": "Batch processing paused successfully",
+        }
+    )
+
+
+@router.post(
+    "/{batch_id}/resume",
+    response_model=BatchControlResponse,
+    tags=["Batch"],
+)
+async def resume_batch(
+    request: Request,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Resume a paused batch job.
+
+    This endpoint restarts batch processing for a previously paused batch.
+    The batch will continue processing from where it left off.
+
+    Args:
+        request: FastAPI request object
+        batch_id: Unique identifier of the batch job
+        db: Database session
+
+    Returns:
+        JSON response with updated batch status
+
+    Raises:
+        HTTPException(400): If batch cannot be resumed (wrong status)
+        HTTPException(404): If batch job not found
+    """
+    try:
+        batch_uuid = UUID(batch_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid batch ID format",
+        )
+
+    query = select(BatchJob).where(BatchJob.id == batch_uuid)
+    result = await db.execute(query)
+    batch = result.scalar_one_or_none()
+
+    if not batch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch job not found",
+        )
+
+    previous_status = batch.status
+
+    # Only paused batches can be resumed
+    if batch.status != BatchJobStatus.paused:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot resume batch with status '{batch.status.value}'. Only paused batches can be resumed.",
+        )
+
+    # Update status to processing and re-trigger the Celery task
+    batch.status = BatchJobStatus.processing
+
+    # Re-trigger the Celery task if we have resume IDs
+    if batch.celery_task_id:
+        try:
+            # Resume the batch analysis task
+            celery_task = batch_analyze_resumes.delay(
+                [],  # Empty list - the task should check for partial completion
+                batch_id=str(batch.id)
+            )
+            batch.celery_task_id = celery_task.id
+            logger.info(f"Resumed Celery task {celery_task.id} for batch {batch_id}")
+        except Exception as task_error:
+            logger.error(f"Error dispatching Celery task on resume: {task_error}", exc_info=True)
+            # Don't fail the resume, just log the error
+
+    await db.commit()
+
+    logger.info(f"Resumed batch {batch_id} (was {previous_status.value})")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "batch_id": str(batch.id),
+            "status": batch.status.value,
+            "previous_status": previous_status.value,
+            "message": "Batch processing resumed successfully",
+        }
+    )
+
+
+@router.post(
+    "/{batch_id}/cancel",
+    response_model=BatchControlResponse,
+    tags=["Batch"],
+)
+async def cancel_batch(
+    request: Request,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Cancel a batch job.
+
+    This endpoint permanently stops batch processing. Cancelled batches
+    cannot be resumed.
+
+    Args:
+        request: FastAPI request object
+        batch_id: Unique identifier of the batch job
+        db: Database session
+
+    Returns:
+        JSON response with updated batch status
+
+    Raises:
+        HTTPException(400): If batch cannot be cancelled (wrong status)
+        HTTPException(404): If batch job not found
+    """
+    try:
+        batch_uuid = UUID(batch_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid batch ID format",
+        )
+
+    query = select(BatchJob).where(BatchJob.id == batch_uuid)
+    result = await db.execute(query)
+    batch = result.scalar_one_or_none()
+
+    if not batch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch job not found",
+        )
+
+    previous_status = batch.status
+
+    # Only pending, processing, or paused batches can be cancelled
+    cancellable_statuses = [BatchJobStatus.pending, BatchJobStatus.processing, BatchJobStatus.paused]
+    if batch.status not in cancellable_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel batch with status '{batch.status.value}'. Only pending, processing, or paused batches can be cancelled.",
+        )
+
+    # Revoke the Celery task if it exists
+    if batch.celery_task_id:
+        try:
+            celery_app.control.revoke(batch.celery_task_id, terminate=True)
+            logger.info(f"Revoked Celery task {batch.celery_task_id} for batch {batch_id}")
+        except Exception as revoke_error:
+            logger.warning(f"Failed to revoke Celery task {batch.celery_task_id}: {revoke_error}")
+
+    # Update status to cancelled
+    batch.status = BatchJobStatus.cancelled
+    await db.commit()
+
+    logger.info(f"Cancelled batch {batch_id} (was {previous_status.value})")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "batch_id": str(batch.id),
+            "status": batch.status.value,
+            "previous_status": previous_status.value,
+            "message": "Batch processing cancelled successfully",
+        }
+    )
