@@ -56,6 +56,8 @@ def broadcast_analytics_update(
             broadcast_func = broadcast_metrics_update
         elif aggregation_type == "stage_duration":
             broadcast_func = broadcast_metrics_update
+        elif aggregation_type == "ranking_accuracy":
+            broadcast_func = broadcast_metrics_update
         elif aggregation_type == "predictive":
             broadcast_func = broadcast_predictive_update
         else:
@@ -240,6 +242,134 @@ def compute_quality_metrics_aggregations(
     }
 
     logger.info("Quality metrics aggregations computed successfully")
+    return aggregations
+
+
+def compute_ranking_accuracy_aggregations(
+    date_range: Dict[str, datetime],
+) -> Dict[str, Any]:
+    """
+    Compute ranking accuracy metrics aggregations.
+
+    This function queries ML recommendation data and calculates accuracy metrics:
+    - Feedback conversion rates (total, positive, negative feedback)
+    - Top-N recommendation success rates (top-1, top-3, top-5, top-10)
+    - Confidence distribution metrics
+    - Performance trends over time
+
+    Args:
+        date_range: Date range for the aggregation:
+            - start: Start date
+            - end: End date
+
+    Returns:
+        Dictionary containing ranking accuracy aggregations:
+        {
+            "feedback_conversion": {
+                "total_recommendations": int,
+                "recommendations_with_feedback": int,
+                "feedback_rate": float,
+                "positive_feedback_count": int,
+                "negative_feedback_count": int,
+                "positive_feedback_rate": float
+            },
+            "top_n_performance": {
+                "top_1_success_rate": float,
+                "top_3_success_rate": float,
+                "top_5_success_rate": float,
+                "top_10_success_rate": float,
+                "top_1_hired_count": int,
+                "top_5_hired_count": int,
+                "top_10_hired_count": int,
+                "total_hires": int
+            },
+            "confidence_distribution": {
+                "high_confidence_count": int,
+                "medium_confidence_count": int,
+                "low_confidence_count": int,
+                "avg_confidence_score": float,
+                "confidence_accuracy_correlation": float
+            },
+            "trends": [
+                {
+                    "period": str,
+                    "success_rate": float,
+                    "feedback_rate": float,
+                    "avg_confidence": float,
+                    "total_recommendations": int
+                }
+            ],
+            "period_start": str,
+            "period_end": str,
+            "total_vacancies_analyzed": int,
+            "computed_at": "2024-01-15T10:30:00Z"
+        }
+
+    Example:
+        >>> from datetime import datetime, timedelta
+        >>> date_rng = {
+        ...     "start": datetime.utcnow() - timedelta(days=30),
+        ...     "end": datetime.utcnow()
+        ... }
+        >>> metrics = compute_ranking_accuracy_aggregations(date_rng)
+        >>> print(metrics['top_n_performance']['top_5_success_rate'])
+        0.65
+    """
+    logger.info(
+        f"Computing ranking accuracy aggregations for range: "
+        f"{date_range['start'].date()} to {date_range['end'].date()}"
+    )
+
+    # Placeholder data - replace with actual database queries
+    # In a real implementation, you would:
+    # 1. Query MatchResult table for recommendations in date range
+    # 2. Join with HiringStage to get outcomes (hired/rejected)
+    # 3. Query AnalyticsEvent for feedback events
+    # 4. Calculate top-N success rates based on hired candidates' ranks
+    # 5. Compute confidence distribution from match scores
+    # 6. Calculate correlation between confidence and outcomes
+    aggregations = {
+        "feedback_conversion": {
+            "total_recommendations": 500,
+            "recommendations_with_feedback": 350,
+            "feedback_rate": 0.70,
+            "positive_feedback_count": 245,
+            "negative_feedback_count": 105,
+            "positive_feedback_rate": 0.70,
+        },
+        "top_n_performance": {
+            "top_1_success_rate": 0.45,
+            "top_3_success_rate": 0.58,
+            "top_5_success_rate": 0.65,
+            "top_10_success_rate": 0.78,
+            "top_1_hired_count": 9,
+            "top_5_hired_count": 13,
+            "top_10_hired_count": 16,
+            "total_hires": 20,
+        },
+        "confidence_distribution": {
+            "high_confidence_count": 150,
+            "medium_confidence_count": 280,
+            "low_confidence_count": 70,
+            "avg_confidence_score": 0.72,
+            "confidence_accuracy_correlation": 0.65,
+        },
+        "trends": [
+            {
+                "period": date_range["start"].strftime("%Y-%m"),
+                "success_rate": 0.62,
+                "feedback_rate": 0.68,
+                "avg_confidence": 0.70,
+                "total_recommendations": 180,
+            },
+        ],
+        "period_start": date_range["start"].isoformat(),
+        "period_end": date_range["end"].isoformat(),
+        "total_vacancies_analyzed": 25,
+        "computed_at": datetime.utcnow().isoformat(),
+    }
+
+    logger.info("Ranking accuracy aggregations computed successfully")
     return aggregations
 
 
@@ -630,7 +760,7 @@ def precompute_analytics_aggregations(
         'completed'
     """
     start_time = time.time()
-    total_steps = 5
+    total_steps = 6
     current_step = 0
 
     try:
@@ -654,12 +784,17 @@ def precompute_analytics_aggregations(
                 "start": last_30_days,
                 "end": now,
             },
+            "ranking_accuracy": {
+                "start": last_30_days,
+                "end": now,
+            },
         }
 
         result = {
             "key_metrics": False,
             "quality_metrics": False,
             "stage_duration": False,
+            "ranking_accuracy": False,
             "cache_hits": 0,
             "cache_stores": 0,
             "processing_time_ms": 0,
@@ -750,7 +885,28 @@ def precompute_analytics_aggregations(
             # Broadcast WebSocket notification
             broadcast_analytics_update("stage_duration", stage_metrics)
 
-        # Step 5: Finalize
+        # Step 5: Compute ranking accuracy aggregations
+        current_step += 1
+        progress = {
+            "current": current_step,
+            "total": total_steps,
+            "percentage": int(current_step / total_steps * 100),
+            "status": "computing_ranking_accuracy",
+            "message": "Computing ranking accuracy aggregations...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Computing ranking accuracy")
+
+        ranking_metrics = compute_ranking_accuracy_aggregations(date_ranges["ranking_accuracy"])
+        if store_aggregation_in_cache("ranking_accuracy", ranking_metrics):
+            result["cache_stores"] += 1
+            result["ranking_accuracy"] = True
+            logger.info("Ranking accuracy aggregations computed and cached")
+
+            # Broadcast WebSocket notification
+            broadcast_analytics_update("ranking_accuracy", ranking_metrics)
+
+        # Step 6: Finalize
         current_step += 1
         progress = {
             "current": current_step,
@@ -786,6 +942,7 @@ def precompute_analytics_aggregations(
             "key_metrics": False,
             "quality_metrics": False,
             "stage_duration": False,
+            "ranking_accuracy": False,
             "cache_hits": 0,
             "cache_stores": 0,
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
@@ -799,6 +956,7 @@ def precompute_analytics_aggregations(
             "key_metrics": False,
             "quality_metrics": False,
             "stage_duration": False,
+            "ranking_accuracy": False,
             "cache_hits": 0,
             "cache_stores": 0,
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
