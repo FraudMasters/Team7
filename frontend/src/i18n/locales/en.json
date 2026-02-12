@@ -142,6 +142,13 @@
     "title": "Analysis Results",
     "resumeId": "Resume ID: {{id}}",
     "noResumeId": "Error: No resume ID provided",
+    "tabs": {
+      "analysis": "Analysis",
+      "vacancyMatches": "Vacancy Matches",
+      "visualFeedback": "Visual Feedback",
+      "editData": "Edit Data"
+    },
+    "noDataForEditing": "No parsed data available for editing",
     "loading": {
       "title": "Analyzing resume...",
       "subtitle": "This may take a few moments"

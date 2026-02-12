@@ -142,6 +142,13 @@
     "title": "Результаты анализа",
     "resumeId": "ID резюме: {{id}}",
     "noResumeId": "Ошибка: Не указан ID резюме",
+    "tabs": {
+      "analysis": "Анализ",
+      "vacancyMatches": "Вакансии",
+      "visualFeedback": "Визуальный фидбек",
+      "editData": "Редактор"
+    },
+    "noDataForEditing": "Нет данных для редактирования",
     "loading": {
       "title": "Анализ резюме...",
       "subtitle": "Это может занять несколько минут"
