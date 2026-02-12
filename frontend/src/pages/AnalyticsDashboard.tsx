@@ -17,6 +17,7 @@ import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@compon
 import KeyMetrics from '@components/analytics/KeyMetrics';
 import SkillDemandChart from '@components/analytics/SkillDemandChart';
 import ReportBuilder from '@components/analytics/ReportBuilder';
+import AnalyticsExport from '@components/analytics/AnalyticsExport';
 
 /**
  * Analytics Dashboard Page (Recruiter Module)
@@ -106,14 +107,24 @@ const AnalyticsDashboardPage: React.FC = () => {
               {t('analyticsDashboard.subtitle')}
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Icon name="file" size={20} />}
-            onClick={handleOpenReportBuilder}
-            color="primary"
-          >
-            Generate Report
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <AnalyticsExport
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
+              compact={true}
+              onExportComplete={(config) => {
+                // Export completed
+              }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<Icon name="file" size={20} />}
+              onClick={handleOpenReportBuilder}
+              color="primary"
+            >
+              Generate Report
+            </Button>
+          </Box>
         </Box>
 
         {/* Date Range Filter */}
