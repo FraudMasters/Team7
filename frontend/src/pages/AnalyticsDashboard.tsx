@@ -13,7 +13,7 @@ import {
   Icon,
 } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
-import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
+import DashboardFilters, { DashboardFiltersState } from '@components/analytics/DashboardFilters';
 import KeyMetrics from '@components/analytics/KeyMetrics';
 import SkillDemandChart from '@components/analytics/SkillDemandChart';
 import FunnelVisualization from '@components/analytics/FunnelVisualization';
@@ -35,27 +35,31 @@ import AnalyticsExport from '@components/analytics/AnalyticsExport';
  */
 const AnalyticsDashboardPage: React.FC = () => {
   const { t } = useTranslation();
-  const [dateRange, setDateRange] = useState<DateRangeFilterType>({
-    startDate: '',
-    endDate: '',
-    preset: 'last_30_days',
+  const [filters, setFilters] = useState<DashboardFiltersState>({
+    dateRange: {
+      startDate: '',
+      endDate: '',
+      preset: 'last_30_days',
+    },
+    recruiterId: null,
+    vacancyId: null,
   });
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
   /**
-   * Handle date range change from DateRangeFilter component
+   * Handle filters change from DashboardFilters component
    */
-  const handleDateRangeChange = (newDateRange: DateRangeFilterType) => {
-    setDateRange(newDateRange);
+  const handleFiltersChange = (newFilters: DashboardFiltersState) => {
+    setFilters(newFilters);
   };
 
   /**
    * Handle apply button click
    */
-  const handleApplyFilter = (appliedDateRange: DateRangeFilterType) => {
-    setDateRange(appliedDateRange);
+  const handleApplyFilter = (appliedFilters: DashboardFiltersState) => {
+    setFilters(appliedFilters);
   };
 
   /**
@@ -112,8 +116,8 @@ const AnalyticsDashboardPage: React.FC = () => {
           </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <AnalyticsExport
-              startDate={dateRange.startDate}
-              endDate={dateRange.endDate}
+              startDate={filters.dateRange.startDate}
+              endDate={filters.dateRange.endDate}
               compact={true}
               onExportComplete={(config) => {
                 // Export completed
@@ -130,39 +134,43 @@ const AnalyticsDashboardPage: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Date Range Filter */}
+        {/* Dashboard Filters */}
         <Box sx={{ mb: 4 }}>
-          <DateRangeFilter
-            onDateRangeChange={handleDateRangeChange}
+          <DashboardFilters
+            onFiltersChange={handleFiltersChange}
             onApply={handleApplyFilter}
-            initialDateRange={{ preset: 'last_30_days' }}
-            showPresets={true}
+            initialFilters={{ dateRange: { preset: 'last_30_days' } }}
+            showRecruiterFilter={true}
+            showVacancyFilter={true}
           />
         </Box>
 
         {/* Key Metrics */}
         <Box sx={{ mb: 4 }}>
-          <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <KeyMetrics startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
         </Box>
 
         {/* Skill Demand */}
         <Box sx={{ mb: 4 }}>
-          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <SkillDemandChart startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
         </Box>
 
         {/* Funnel Visualization */}
         <Box sx={{ mb: 4 }}>
-          <FunnelVisualization startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <FunnelVisualization startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
         </Box>
 
         {/* Recruiter Performance */}
         <Box sx={{ mb: 4 }}>
-          <RecruiterPerformance startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <RecruiterPerformance
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+          />
         </Box>
 
         {/* Source Tracking */}
         <Box sx={{ mb: 4 }}>
-          <SourceTracking startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <SourceTracking startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
         </Box>
       </Container>
 
