@@ -35,6 +35,9 @@ import {
   Refresh as RefreshIcon,
   FolderOpen as FolderIcon,
   Close as CloseIcon,
+  Pause as PauseIcon,
+  PlayArrow as PlayArrowIcon,
+  Stop as StopIcon,
 } from '@mui/icons-material';
 import ErrorBoundary from '@components/ErrorBoundary';
 
@@ -93,6 +96,9 @@ const BatchUploadPage: React.FC = () => {
   const [resultsDialog, setResultsDialog] = useState(false);
   const [batchResults, setBatchResults] = useState<any>(null);
   const [hasDraft, setHasDraft] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Save draft to localStorage
@@ -523,6 +529,111 @@ const BatchUploadPage: React.FC = () => {
     }
   };
 
+  // Pause batch processing
+  const handlePauseBatch = async () => {
+    if (!currentBatch) return;
+
+    setIsPausing(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/batch/${currentBatch.batch_id}/pause`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentBatch((prev) => prev ? { ...prev, status: 'paused' } : null);
+        setSuccess('Batch processing paused');
+        // Stop polling while paused
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          setPollInterval(null);
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to pause batch');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to pause batch';
+      setError(errorMessage);
+    } finally {
+      setIsPausing(false);
+    }
+  };
+
+  // Resume batch processing
+  const handleResumeBatch = async () => {
+    if (!currentBatch) return;
+
+    setIsResuming(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/batch/${currentBatch.batch_id}/resume`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentBatch((prev) => prev ? { ...prev, status: 'processing' } : null);
+        setSuccess('Batch processing resumed');
+        // Restart polling
+        startPolling(currentBatch.batch_id);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to resume batch');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to resume batch';
+      setError(errorMessage);
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+  // Cancel batch processing
+  const handleCancelBatch = async () => {
+    if (!currentBatch) return;
+
+    setIsCancelling(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/batch/${currentBatch.batch_id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentBatch((prev) => prev ? { ...prev, status: 'cancelled' } : null);
+        setSuccess('Batch processing cancelled');
+        // Stop polling
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          setPollInterval(null);
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to cancel batch');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to cancel batch';
+      setError(errorMessage);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
@@ -544,6 +655,10 @@ const BatchUploadPage: React.FC = () => {
         return <Chip size="small" label="Pending" color="default" />;
       case 'processing':
         return <Chip size="small" label="Processing" color="info" />;
+      case 'paused':
+        return <Chip size="small" label="Paused" color="warning" />;
+      case 'cancelled':
+        return <Chip size="small" label="Cancelled" color="default" />;
       case 'completed':
         return <Chip size="small" label="Completed" color="success" />;
       case 'failed':
@@ -980,6 +1095,57 @@ const BatchUploadPage: React.FC = () => {
                   width: { xs: '100%', sm: 'auto' },
                 }}
               >
+                {/* Pause button - visible during processing */}
+                {currentBatch.status === 'processing' && (
+                  <Tooltip title="Pause batch processing">
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={isPausing ? <CircularProgress size={20} color="inherit" /> : <PauseIcon />}
+                      onClick={handlePauseBatch}
+                      disabled={isPausing}
+                      fullWidth={{ xs: true, sm: false }}
+                      sx={{ minHeight: 44 }}
+                    >
+                      Pause
+                    </Button>
+                  </Tooltip>
+                )}
+
+                {/* Resume button - visible when paused */}
+                {currentBatch.status === 'paused' && (
+                  <Tooltip title="Resume batch processing">
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={isResuming ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+                      onClick={handleResumeBatch}
+                      disabled={isResuming}
+                      fullWidth={{ xs: true, sm: false }}
+                      sx={{ minHeight: 44 }}
+                    >
+                      Resume
+                    </Button>
+                  </Tooltip>
+                )}
+
+                {/* Cancel button - visible during processing or paused */}
+                {(currentBatch.status === 'processing' || currentBatch.status === 'paused') && (
+                  <Tooltip title="Cancel batch processing">
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={isCancelling ? <CircularProgress size={20} color="inherit" /> : <StopIcon />}
+                      onClick={handleCancelBatch}
+                      disabled={isCancelling}
+                      fullWidth={{ xs: true, sm: false }}
+                      sx={{ minHeight: 44 }}
+                    >
+                      Cancel
+                    </Button>
+                  </Tooltip>
+                )}
+
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
