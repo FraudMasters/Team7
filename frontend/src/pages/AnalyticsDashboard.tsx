@@ -21,6 +21,7 @@ import SkillDemandChart from '@components/analytics/SkillDemandChart';
 import FunnelVisualization from '@components/analytics/FunnelVisualization';
 import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
 import SourceTracking from '@components/analytics/SourceTracking';
+import RankingAccuracyMetrics from '@components/analytics/RankingAccuracyMetrics';
 import ReportBuilder from '@components/analytics/ReportBuilder';
 import AnalyticsExport from '@components/analytics/AnalyticsExport';
 import { useAnalyticsRealTime } from '@/hooks';
@@ -260,6 +261,14 @@ const AnalyticsDashboardPage: React.FC = () => {
             startDate={filters.dateRange.startDate}
             endDate={filters.dateRange.endDate}
             refreshKey={refreshKey}
+          />
+        </Box>
+
+        {/* Ranking Accuracy Metrics */}
+        <Box sx={{ mb: 4 }}>
+          <RankingAccuracyMetrics
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
           />
         </Box>
       </Container>
