@@ -20,6 +20,7 @@ class NotificationType(str, enum.Enum):
     CANDIDATE_TAG_ADDED = "candidate_tag_added"
     CANDIDATE_RANKING_CHANGED = "candidate_ranking_changed"
     NEW_CANDIDATE_MATCH = "new_candidate_match"
+    CANDIDATE_REVIEW_REQUIRED = "candidate_review_required"
 
     # Vacancy-related notifications
     VACANCY_CREATED = "vacancy_created"

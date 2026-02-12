@@ -288,11 +288,11 @@ from api import (
     search,
     job_search,
     job_applications,
-    job_descriptions,
     config,
     websocket,
     auth,
     inbound_email,
+    hiring_manager,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -331,10 +331,10 @@ app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
 app.include_router(job_applications.router, prefix="/api/job-applications", tags=["Job Applications"])
 app.include_router(saved_jobs.router, prefix="/api/saved-jobs", tags=["Saved Jobs"])
-app.include_router(job_descriptions.router, prefix="/api/job-descriptions", tags=["Job Descriptions"])
 app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 
 
 if __name__ == "__main__":

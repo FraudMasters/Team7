@@ -157,9 +157,10 @@ class UpdateNotificationPreferenceResponse(BaseModel):
 )
 async def list_notifications(
     request: Request,
-    recipient_id: str = Query(..., description="Recipient recruiter ID"),
+    recipient_id: Optional[str] = Query(None, description="Recipient recruiter ID"),
     unread_only: bool = Query(False, description="Filter to only unread notifications"),
     notification_type: Optional[str] = Query(None, description="Filter by notification type"),
+    type: Optional[str] = Query(None, description="Filter by notification type (alias for notification_type)"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of records to return"),
     db: AsyncSession = Depends(get_db),
@@ -201,41 +202,48 @@ async def list_notifications(
         ... )
     """
     try:
+        # Use type as alias for notification_type if provided
+        effective_notification_type = type or notification_type
+
         logger.info(
             f"Fetching notifications - recipient_id: {recipient_id}, "
-            f"unreadOnly: {unread_only}, notification_type: {notification_type}, "
+            f"unreadOnly: {unread_only}, notification_type: {effective_notification_type}, "
             f"skip: {skip}, limit: {limit}"
         )
 
-        # Parse recipient_id as UUID
-        try:
-            recipient_uuid = UUID(recipient_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid recipient_id format: {recipient_id}",
-            )
-
-        # Verify recruiter exists
-        recruiter_query = select(Recruiter).where(Recruiter.id == recipient_uuid)
-        recruiter_result = await db.execute(recruiter_query)
-        recruiter = recruiter_result.scalar_one_or_none()
-
-        if not recruiter:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Recipient not found: {recipient_id}",
-            )
-
         # Build base query
-        query = select(Notification).where(Notification.recipient_id == recipient_uuid)
+        query = select(Notification)
+
+        # Parse recipient_id as UUID if provided
+        recipient_uuid = None
+        if recipient_id:
+            try:
+                recipient_uuid = UUID(recipient_id)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid recipient_id format: {recipient_id}",
+                )
+
+            # Verify recruiter exists
+            recruiter_query = select(Recruiter).where(Recruiter.id == recipient_uuid)
+            recruiter_result = await db.execute(recruiter_query)
+            recruiter = recruiter_result.scalar_one_or_none()
+
+            if not recruiter:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Recipient not found: {recipient_id}",
+                )
+
+            query = query.where(Notification.recipient_id == recipient_uuid)
 
         # Apply filters
         if unread_only:
             query = query.where(Notification.is_read == False)
 
-        if notification_type:
-            query = query.where(Notification.notification_type == notification_type)
+        if effective_notification_type:
+            query = query.where(Notification.notification_type == effective_notification_type)
 
         # Order by most recently created and paginate
         query = query.order_by(Notification.created_at.desc()).offset(skip).limit(limit)
@@ -263,7 +271,7 @@ async def list_notifications(
                 "created_at": notification.created_at.isoformat() if notification.created_at else None,
             })
 
-        logger.info(f"Retrieved {len(notifications_list)} notifications for recipient {recipient_id}")
+        logger.info(f"Retrieved {len(notifications_list)} notifications{f' for recipient {recipient_id}' if recipient_id else ''}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

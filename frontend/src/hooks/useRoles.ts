@@ -22,9 +22,10 @@ import { FEATURE_FLAGS, getFeatureFlag } from '@/config/features';
  * Standardized role names following PascalCase convention.
  * - JobSeeker: Can browse and apply for jobs
  * - Recruiter: Can manage vacancies and candidates
+ * - HiringManager: Can manage job requisitions and review candidates for their department
  * - Admin: Has superuser privileges and can access all routes
  */
-export type UserRole = 'JobSeeker' | 'Recruiter' | 'Admin';
+export type UserRole = 'JobSeeker' | 'Recruiter' | 'HiringManager' | 'Admin';
 
 /**
  * User information interface
@@ -148,7 +149,7 @@ export interface RolesResult {
    * The primary role for the user
    *
    * Returns the highest-privilege role:
-   * - Admin > Recruiter > JobSeeker
+   * - Admin > Recruiter > HiringManager > JobSeeker
    */
   primaryRole: UserRole | undefined;
 }
@@ -156,7 +157,7 @@ export interface RolesResult {
 /**
  * Get the primary (highest-privilege) role from an array of roles
  *
- * Admin has highest priority, followed by Recruiter, then JobSeeker.
+ * Admin has highest priority, followed by Recruiter, HiringManager, then JobSeeker.
  *
  * @param roles - Array of user roles
  * @returns The primary role
@@ -166,6 +167,7 @@ export interface RolesResult {
 function getPrimaryRole(roles: UserRole[]): UserRole | undefined {
   if (roles.includes('Admin')) return 'Admin';
   if (roles.includes('Recruiter')) return 'Recruiter';
+  if (roles.includes('HiringManager')) return 'HiringManager';
   if (roles.includes('JobSeeker')) return 'JobSeeker';
   return undefined;
 }
@@ -278,7 +280,7 @@ export function useRoles(): RolesResult {
       const mockRole = getFeatureFlag('MOCK_ROLE') as UserRole;
 
       // Validate mock role
-      const validRoles: UserRole[] = ['JobSeeker', 'Recruiter', 'Admin'];
+      const validRoles: UserRole[] = ['JobSeeker', 'Recruiter', 'HiringManager', 'Admin'];
       const normalizedMockRole = validRoles.includes(mockRole) ? mockRole : 'Admin';
 
       // Debug logging for mock mode
@@ -313,7 +315,7 @@ export function useRoles(): RolesResult {
      * in a future task. For now, we use the mock role as a fallback.
      */
     const mockRole = getFeatureFlag('MOCK_ROLE') as UserRole;
-    const validRoles: UserRole[] = ['JobSeeker', 'Recruiter', 'Admin'];
+    const validRoles: UserRole[] = ['JobSeeker', 'Recruiter', 'HiringManager', 'Admin'];
     const fallbackRole = validRoles.includes(mockRole) ? mockRole : 'Admin';
 
     // Debug logging for auth mode
@@ -356,7 +358,7 @@ export function useRoles(): RolesResult {
  * ```
  */
 export function isValidRole(role: string): role is UserRole {
-  return ['JobSeeker', 'Recruiter', 'Admin'].includes(role);
+  return ['JobSeeker', 'Recruiter', 'HiringManager', 'Admin'].includes(role);
 }
 
 /**
@@ -395,27 +397,31 @@ export function normalizeRole(role: string): UserRole | undefined {
  * Get role hierarchy level for comparison
  *
  * Returns numeric value for role priority:
- * - Admin: 3 (highest)
- * - Recruiter: 2
+ * - Admin: 4 (highest)
+ * - Recruiter: 3
+ * - HiringManager: 2
  * - JobSeeker: 1 (lowest)
  *
  * @param role - Role to get level for
- * @returns Numeric level (1-3) or 0 if invalid
+ * @returns Numeric level (1-4) or 0 if invalid
  *
  * @example
  * ```ts
  * import { getRoleLevel } from '@/hooks/useRoles';
  *
- * getRoleLevel('Admin')      // 3
- * getRoleLevel('Recruiter')  // 2
- * getRoleLevel('JobSeeker')  // 1
+ * getRoleLevel('Admin')        // 4
+ * getRoleLevel('Recruiter')    // 3
+ * getRoleLevel('HiringManager') // 2
+ * getRoleLevel('JobSeeker')    // 1
  * ```
  */
 export function getRoleLevel(role: UserRole): number {
   switch (role) {
     case 'Admin':
-      return 3;
+      return 4;
     case 'Recruiter':
+      return 3;
+    case 'HiringManager':
       return 2;
     case 'JobSeeker':
       return 1;

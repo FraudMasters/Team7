@@ -2452,65 +2452,176 @@ export interface OptimizationFeedback {
   processing_time_ms?: number;
 }
 
-// ==================== Job Descriptions Types ====================
+// ==================== Interview Types ====================
 
 /**
- * Job description generation request
+ * Interview type enum
  */
-export interface JobDescriptionGenerateRequest {
-  /** Job title (e.g., 'Senior Python Developer') */
-  title: string;
-  /** List of required technical skills */
-  required_skills: string[];
-  /** Minimum experience in months */
-  min_experience_months?: number;
-  /** Seniority level (junior, mid, senior, lead) */
-  seniority_level?: string;
-  /** Industry sector (e.g., 'Technology', 'Finance') */
-  industry?: string;
-  /** Work format (remote, office, hybrid) */
-  work_format?: string;
-  /** Job location */
-  location?: string;
-  /** Employment type (full-time, part-time, contract) */
-  employment_type?: string;
-  /** Salary range (e.g., '$80,000 - $120,000') */
-  salary_range?: string;
-  /** Additional preferred skills/qualifications */
-  additional_requirements?: string[];
-  /** Tone for the description (professional, casual, formal, friendly) */
-  tone?: 'professional' | 'casual' | 'formal' | 'friendly';
-  /** Language for the job description (en, ru) */
-  language?: 'en' | 'ru';
+export type InterviewType = 'phone' | 'video' | 'onsite' | 'technical' | 'panel';
+
+/**
+ * Interview status enum
+ */
+export type InterviewStatus = 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no_show' | 'rescheduled';
+
+/**
+ * Interview participant
+ */
+export interface InterviewParticipant {
+  id: string;
+  recruiter_id: string | null;
+  candidate_id: string | null;
+  role: 'interviewer' | 'candidate' | 'organizer';
+  status: 'pending' | 'accepted' | 'declined';
+  joined_at: string | null;
 }
 
 /**
- * Job description generation response
+ * Interview create request
  */
-export interface JobDescriptionResponse {
-  /** Job title */
+export interface InterviewCreate {
+  candidate_id: string;
+  vacancy_id?: string;
+  scheduled_start: string;
+  duration_minutes: number;
+  interview_type: InterviewType;
   title: string;
-  /** Brief summary of the role */
-  summary: string;
-  /** Key responsibilities */
-  responsibilities: string[];
-  /** Requirements and qualifications */
-  requirements: string[];
-  /** Benefits and perks */
-  benefits: string[];
-  /** Company culture description */
-  company_culture: string;
-  /** Interview process overview */
-  interview_process: string;
-  /** LLM provider used */
-  provider: string;
-  /** Model name used */
-  model: string;
-  /** Timestamp of generation */
-  generated_at: string;
-  /** Inclusiveness score (0-1) from bias checking */
-  inclusive_language_score?: number;
-  /** Bias warnings detected in the description */
-  bias_warnings?: string[];
+  description?: string;
+  location?: string;
+  meeting_link?: string;
+  meeting_room?: string;
+  participant_ids?: string[];
+}
+
+/**
+ * Interview update request
+ */
+export interface InterviewUpdate {
+  scheduled_start?: string;
+  duration_minutes?: number;
+  interview_type?: InterviewType;
+  title?: string;
+  description?: string;
+  location?: string;
+  meeting_link?: string;
+  meeting_room?: string;
+  status?: InterviewStatus;
+  participant_ids?: string[];
+}
+
+/**
+ * Interview response
+ */
+export interface InterviewResponse {
+  id: string;
+  candidate_id: string;
+  vacancy_id: string | null;
+  scheduled_start: string;
+  scheduled_end: string;
+  duration_minutes: number;
+  interview_type: InterviewType;
+  title: string;
+  description: string | null;
+  location: string | null;
+  meeting_link: string | null;
+  meeting_room: string | null;
+  status: InterviewStatus;
+  participants: InterviewParticipant[];
+  calendar_event_id: string | null;
+  calendar_provider: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Interview list response
+ */
+export interface InterviewListResponse {
+  items: InterviewResponse[];
+  total: number;
+}
+
+/**
+ * Interviewer availability
+ */
+export interface InterviewerAvailability {
+  recruiter_id: string;
+  is_available: boolean;
+  conflicts: Array<{
+    start_time: string;
+    end_time: string;
+    title: string;
+  }>;
+}
+
+/**
+ * Availability check request
+ */
+export interface AvailabilityCheckRequest {
+  interviewer_ids: string[];
+  start_time: string;
+  duration_minutes: number;
+}
+
+/**
+ * Availability check response
+ */
+export interface AvailabilityCheckResponse {
+  interviewers: InterviewerAvailability[];
+}
+
+// ==================== Calendar Connection Types ====================
+
+/**
+ * Calendar provider type
+ */
+export type CalendarProvider = 'google' | 'outlook' | 'exchange';
+
+/**
+ * Calendar connection status
+ */
+export type CalendarConnectionStatus = 'connected' | 'disconnected' | 'expired' | 'error';
+
+/**
+ * Calendar connection create request
+ */
+export interface CalendarConnectionCreate {
+  provider: CalendarProvider;
+  access_token: string;
+  refresh_token?: string;
+  token_expires_at?: string;
+  calendar_id?: string;
+  sync_enabled?: boolean;
+}
+
+/**
+ * Calendar connection update request
+ */
+export interface CalendarConnectionUpdate {
+  sync_enabled?: boolean;
+  calendar_id?: string;
+}
+
+/**
+ * Calendar connection response
+ */
+export interface CalendarConnectionResponse {
+  id: string;
+  recruiter_id: string;
+  provider: CalendarProvider;
+  status: CalendarConnectionStatus;
+  calendar_id: string | null;
+  sync_enabled: boolean;
+  last_sync_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Calendar connection list response
+ */
+export interface CalendarConnectionListResponse {
+  items: CalendarConnectionResponse[];
+  total: number;
 }
 

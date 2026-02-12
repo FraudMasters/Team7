@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Box, Typography } from '@mui/material';
 
 // Layouts
 import JobSeekerLayout from './layouts/JobSeekerLayout';
 import RecruiterLayout from './layouts/RecruiterLayout';
+import HiringManagerLayout from './layouts/HiringManagerLayout';
 
 // Authentication
 import ProtectedRoute from './auth/ProtectedRoute';
@@ -48,7 +50,12 @@ import { CandidateDetailPage } from './pages/recruiter/CandidateDetailPage';
 import { WeightsPage } from './pages/recruiter/WeightsPage';
 import { SearchPage } from './pages/recruiter/SearchPage';
 import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
-import { JobDescriptionPage } from './pages/recruiter/JobDescriptionPage';
+
+// Hiring Manager Pages
+import { DashboardPage as HiringManagerDashboardPage } from './pages/hiring-manager/DashboardPage';
+import { ReviewQueuePage as HiringManagerReviewQueuePage } from './pages/hiring-manager/ReviewQueuePage';
+import { CandidateDetailPage as HiringManagerCandidateDetailPage } from './pages/hiring-manager/CandidateDetailPage';
+import { InterviewSchedulePage as HiringManagerInterviewSchedulePage } from './pages/hiring-manager/InterviewSchedulePage';
 
 // Additional Recruiter Pages
 import ComparePage from './pages/Compare';
@@ -75,6 +82,49 @@ function ProtectedRecruiterLayout() {
     <ProtectedRoute requiredRoles={[UserRole.Recruiter, UserRole.Admin]} redirectTo="/auth/login">
       <RecruiterLayout />
     </ProtectedRoute>
+  );
+}
+
+/**
+ * Protected Hiring Manager Layout Wrapper
+ *
+ * Wraps the HiringManagerLayout with role-based access control.
+ * Only users with HiringManager, Recruiter, or Admin roles can access hiring manager routes.
+ */
+function ProtectedHiringManagerLayout() {
+  return (
+    <ProtectedRoute
+      requiredRoles={[UserRole.HiringManager, UserRole.Recruiter, UserRole.Admin]}
+      redirectTo="/auth/login"
+    >
+      <HiringManagerLayout />
+    </ProtectedRoute>
+  );
+}
+
+/**
+ * Placeholder component for hiring manager pages under development.
+ * Displays a coming soon message with the page name.
+ */
+function HiringManagerPlaceholder({ title }: { title: string }) {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '60vh',
+        gap: 2,
+      }}
+    >
+      <Typography variant="h4" component="h1" color="text.primary">
+        {title}
+      </Typography>
+      <Typography variant="body1" color="text.secondary">
+        This page is under development. Check back soon!
+      </Typography>
+    </Box>
   );
 }
 
@@ -148,11 +198,23 @@ function App() {
             <Route path=":id" element={<VacancyDetailPage />} />
             <Route path=":id/edit" element={<VacancyFormPage />} />
           </Route>
-          <Route path="job-descriptions" element={<JobDescriptionPage />} />
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+        </Route>
+
+        {/* Hiring Manager Flow - Protected with role-based access control */}
+        <Route path="/hiring-manager" element={<ProtectedHiringManagerLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<HiringManagerDashboardPage />} />
+          <Route path="review-queue" element={<HiringManagerReviewQueuePage />} />
+          <Route path="candidates/:id" element={<HiringManagerCandidateDetailPage />} />
+          <Route path="approvals" element={<HiringManagerPlaceholder title="Approvals" />} />
+          <Route path="schedule" element={<HiringManagerInterviewSchedulePage />} />
+          <Route path="profile" element={<HiringManagerPlaceholder title="Profile" />} />
+          <Route path="settings" element={<HiringManagerPlaceholder title="Settings" />} />
+          <Route path="notifications" element={<HiringManagerPlaceholder title="Notifications" />} />
         </Route>
 
         {/* Catch-all route - redirect to landing */}

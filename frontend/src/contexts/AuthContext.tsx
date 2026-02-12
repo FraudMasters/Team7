@@ -8,6 +8,7 @@ import type { UserRole } from '@/hooks/useRoles';
  * Standardized role names following PascalCase convention.
  * - JobSeeker: Can browse and apply for jobs
  * - Recruiter: Can manage vacancies and candidates
+ * - HiringManager: Can manage job requisitions and review candidates for their department
  * - Admin: Has superuser privileges and can access all routes
  */
 export type { UserRole };
