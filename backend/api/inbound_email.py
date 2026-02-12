@@ -82,6 +82,8 @@ class InboundEmailResponse(BaseModel):
     attachments_received: int = Field(0, description="Number of attachments received")
     attachments_queued: int = Field(0, description="Number of valid resume attachments queued for processing")
     resume_formats_rejected: int = Field(0, description="Number of attachments rejected due to format")
+    task_id: Optional[str] = Field(None, description="Celery task ID for tracking processing")
+    vacancy_id: Optional[str] = Field(None, description="Vacancy ID extracted from recipient email address")
 
 
 class WebhookStatusResponse(BaseModel):
@@ -318,15 +320,42 @@ async def receive_inbound_email(
                 }
             )
 
-        # TODO: Queue the email for async processing in a later subtask
-        # The process_inbound_email Celery task will:
-        # 1. Extract and store attachment content
-        # 2. Create resume records
-        # 3. Link to vacancy if vacancy_id is set
-        # 4. Trigger resume analysis
-        # 5. Send notification to relevant users
+        # Queue the email for async processing
+        from tasks.email_resume_task import process_inbound_email
 
-        # For now, return acceptance with details about what will be processed
+        # Prepare attachment data for Celery task (serialize to dict)
+        attachment_data = []
+        for attachment in valid_attachments:
+            attachment_data.append({
+                "filename": attachment.filename,
+                "content_type": attachment.content_type,
+                "content": attachment.content,  # Base64-encoded content
+                "size": attachment.size,
+            })
+
+        # Dispatch the Celery task with vacancy_id for resume linking
+        task = process_inbound_email.delay(
+            message_id=message_id,
+            from_email=str(email.from_email),
+            from_name=email.from_name,
+            to_addresses=email.to,
+            subject=email.subject,
+            text_body=email.text_body,
+            html_body=email.html_body,
+            attachments=attachment_data,
+            vacancy_id=vacancy_id,
+            organization_id=None,  # Will be determined from vacancy if available
+            provider=email.provider,
+            spam_score=email.spam_score,
+            received_at=email.received_at,
+        )
+
+        logger.info(
+            f"Dispatched email processing task {task.id} for message_id={message_id}, "
+            f"vacancy_id={vacancy_id}, attachments={len(valid_attachments)}"
+        )
+
+        # Return acceptance with details about what will be processed
         response_data = {
             "message_id": message_id,
             "status": "accepted",
@@ -334,6 +363,8 @@ async def receive_inbound_email(
             "attachments_received": len(email.attachments),
             "attachments_queued": len(valid_attachments),
             "resume_formats_rejected": rejected_count,
+            "task_id": task.id,
+            "vacancy_id": vacancy_id,
         }
 
         return JSONResponse(

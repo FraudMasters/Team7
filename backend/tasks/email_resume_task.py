@@ -139,6 +139,7 @@ async def _store_resume_from_attachment(
         resume = Resume(
             id=resume_id,
             organization_id=organization_id or str(uuid4()),  # Default org if not provided
+            vacancy_id=vacancy_id,  # Link to vacancy if provided via email
             filename=filename,
             file_path=str(file_path),
             content_type=content_type,
@@ -149,10 +150,9 @@ async def _store_resume_from_attachment(
             db.add(resume)
             await db.flush()
 
-            # If vacancy_id is provided, create a job application link
-            # This will be handled by the analysis/screening tasks
+            # Log vacancy linkage for tracking
             if vacancy_id:
-                logger.info(f"Resume {resume_id} linked to vacancy {vacancy_id}")
+                logger.info(f"Resume {resume_id} linked to vacancy {vacancy_id} via email submission")
 
             await db.commit()
 
@@ -161,6 +161,7 @@ async def _store_resume_from_attachment(
             "filename": filename,
             "file_path": str(file_path),
             "status": ResumeStatus.PENDING.value,
+            "vacancy_id": vacancy_id,
         }
 
     except Exception as e:
