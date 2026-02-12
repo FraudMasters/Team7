@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import SkillsEditor from './SkillsEditor';
 import EducationEditor from './EducationEditor';
 import WorkHistoryEditor from './WorkHistoryEditor';
+import { parsingCorrectionsClient } from '@/api/parsingCorrections';
 import type {
   SkillItem,
   EducationItem,
@@ -37,6 +38,7 @@ import type {
   CorrectableFieldName,
   CorrectionReason,
   ParsingCorrectionResponse,
+  ParsingCorrectionCreate,
 } from '@/types/parsingCorrection';
 
 /**
@@ -253,6 +255,7 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
   const [selectedReason, setSelectedReason] = useState<CorrectionReason | ''>('');
   const [correctionNote, setCorrectionNote] = useState('');
   const [correctionDialogError, setCorrectionDialogError] = useState<string | null>(null);
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   // Local data state (for modifications before save)
   const [localSkills, setLocalSkills] = useState<SkillItem[]>(skills);
@@ -449,8 +452,9 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
 
   /**
    * Handle correction dialog confirm
+   * Saves the correction to the API and notifies parent component
    */
-  const handleCorrectionConfirm = useCallback(() => {
+  const handleCorrectionConfirm = useCallback(async () => {
     if (!pendingCorrection) return;
 
     // Validate that a reason is selected
@@ -458,42 +462,61 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
       return;
     }
 
-    // Create correction object
-    const correction: ParsingCorrectionResponse = {
-      id: `correction-${Date.now()}`,
-      resume_id: resumeId,
-      field_name: pendingCorrection.fieldName,
-      original_value: pendingCorrection.originalValue as Record<string, unknown>,
-      corrected_value: pendingCorrection.correctedValue as Record<string, unknown>,
-      reason: selectedReason as CorrectionReason,
-      source_text_location: null,
-      corrected_by: null,
-      created_at: new Date().toISOString(),
-    };
-
-    // Notify parent
-    onCorrectionCreated?.(correction);
-
-    // Reset state
-    setCorrectionDialogOpen(false);
-    setPendingCorrection(null);
-    setSelectedReason('');
-    setCorrectionNote('');
+    setSavingCorrection(true);
     setCorrectionDialogError(null);
-    setEditState({ type: null, index: null, isNew: false });
-  }, [pendingCorrection, resumeId, selectedReason, onCorrectionCreated, validateCorrectionDialog]);
+
+    try {
+      // Build the correction payload
+      const correctionPayload: ParsingCorrectionCreate = {
+        field_name: pendingCorrection.fieldName,
+        original_value: pendingCorrection.originalValue as Record<string, unknown>,
+        corrected_value: pendingCorrection.correctedValue as Record<string, unknown>,
+        reason: selectedReason as CorrectionReason,
+      };
+
+      // Save correction via API
+      const response = await parsingCorrectionsClient.createCorrection(
+        resumeId,
+        correctionPayload
+      );
+
+      // Extract the created correction from the response
+      const correction: ParsingCorrectionResponse = response.data;
+
+      // Notify parent
+      onCorrectionCreated?.(correction);
+
+      // Reset state
+      setCorrectionDialogOpen(false);
+      setPendingCorrection(null);
+      setSelectedReason('');
+      setCorrectionNote('');
+      setCorrectionDialogError(null);
+      setEditState({ type: null, index: null, isNew: false });
+    } catch (err) {
+      const apiError = err as ApiError;
+      setCorrectionDialogError(
+        apiError.detail || t('parsedDataEditor.correctionDialog.saveError', 'Failed to save correction. Please try again.')
+      );
+    } finally {
+      setSavingCorrection(false);
+    }
+  }, [pendingCorrection, resumeId, selectedReason, onCorrectionCreated, validateCorrectionDialog, t]);
 
   /**
    * Handle correction dialog cancel
    */
   const handleCorrectionCancel = useCallback(() => {
+    // Prevent canceling while saving
+    if (savingCorrection) return;
+
     setCorrectionDialogOpen(false);
     setPendingCorrection(null);
     setSelectedReason('');
     setCorrectionNote('');
     setCorrectionDialogError(null);
     setEditState({ type: null, index: null, isNew: false });
-  }, []);
+  }, [savingCorrection]);
 
   /**
    * Handle delete item
@@ -976,7 +999,7 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
       {/* Correction Reason Dialog */}
       <Dialog
         open={correctionDialogOpen}
-        onClose={handleCorrectionCancel}
+        onClose={savingCorrection ? undefined : handleCorrectionCancel}
         maxWidth="sm"
         fullWidth
       >
@@ -1049,16 +1072,18 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCorrectionCancel} color="inherit">
+          <Button onClick={handleCorrectionCancel} color="inherit" disabled={savingCorrection}>
             {t('common.cancel', 'Cancel')}
           </Button>
           <Button
             onClick={handleCorrectionConfirm}
             variant="contained"
-            startIcon={<Icon name="check" size={16} />}
-            disabled={!selectedReason}
+            startIcon={savingCorrection ? <CircularProgress size={16} color="inherit" /> : <Icon name="check" size={16} />}
+            disabled={!selectedReason || savingCorrection}
           >
-            {t('parsedDataEditor.correctionDialog.confirm', 'Confirm Correction')}
+            {savingCorrection
+              ? t('parsedDataEditor.correctionDialog.saving', 'Saving...')
+              : t('parsedDataEditor.correctionDialog.confirm', 'Confirm Correction')}
           </Button>
         </DialogActions>
       </Dialog>
