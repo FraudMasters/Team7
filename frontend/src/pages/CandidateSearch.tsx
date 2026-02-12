@@ -34,6 +34,7 @@ import {
   BookmarkBorder as SavedSearchIcon,
   History as HistoryIcon,
   Download as DownloadIcon,
+  AutoAwesome as AISuggestionsIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -41,6 +42,7 @@ import { RankedCandidate } from '../types/api';
 import AdvancedSearchFilters from '../components/AdvancedSearchFilters';
 import SavedSearchManager from '../components/SavedSearchManager';
 import SearchHistory from '../components/SearchHistory';
+import AIFilterSuggestions from '../components/AIFilterSuggestions';
 import type { SavedSearchResponse } from '../types/api';
 
 interface Resume {
@@ -99,7 +101,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
  * Now with advanced search filters, saved searches, and search history.
  */
 type SortBy = 'match' | 'ranking';
-type SearchTab = 'search' | 'saved' | 'history';
+type SearchTab = 'search' | 'saved' | 'history' | 'ai';
 
 const CandidateSearchPage: React.FC = () => {
   const { t } = useTranslation();
@@ -227,6 +229,16 @@ const CandidateSearchPage: React.FC = () => {
   const handleHistoryRepeat = (query: string | null, filters: Record<string, unknown>) => {
     setAdvancedSearchEnabled(true);
     handleAdvancedSearch(query || '', filters);
+  };
+
+  /**
+   * Handle AI filter suggestions - apply filters from AI analysis
+   */
+  const handleAIFilterApply = (filters: Record<string, unknown>) => {
+    setAdvancedSearchEnabled(true);
+    setCurrentTab('search');
+    // Use the filters directly with an empty query since the filters contain all the search criteria
+    handleAdvancedSearch('', filters);
   };
 
   const handleSearch = async () => {
@@ -438,9 +450,9 @@ const CandidateSearchPage: React.FC = () => {
         {/* Search Tabs */}
         <Paper sx={{ mb: 3 }}>
           <Tabs
-            value={currentTab === 'search' ? 0 : currentTab === 'saved' ? 1 : 2}
+            value={currentTab === 'search' ? 0 : currentTab === 'saved' ? 1 : currentTab === 'history' ? 2 : 3}
             onChange={(_, newValue) => {
-              setCurrentTab(newValue === 0 ? 'search' : newValue === 1 ? 'saved' : 'history');
+              setCurrentTab(newValue === 0 ? 'search' : newValue === 1 ? 'saved' : newValue === 2 ? 'history' : 'ai');
             }}
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
@@ -457,6 +469,11 @@ const CandidateSearchPage: React.FC = () => {
             <Tab
               icon={<HistoryIcon />}
               label="Search History"
+              sx={{ textTransform: 'none' }}
+            />
+            <Tab
+              icon={<AISuggestionsIcon />}
+              label="AI Suggestions"
               sx={{ textTransform: 'none' }}
             />
           </Tabs>
@@ -511,6 +528,17 @@ const CandidateSearchPage: React.FC = () => {
               onRepeatSearch={handleHistoryRepeat}
               limit={20}
             />
+          </TabPanel>
+
+          {/* AI Suggestions Tab */}
+          <TabPanel value={3} index={currentTab === 'ai' ? 3 : -1}>
+            <Box sx={{ px: 2 }}>
+              <AIFilterSuggestions
+                onApplyFilters={handleAIFilterApply}
+                vacancyId={selectedVacancy}
+                disabled={searching}
+              />
+            </Box>
           </TabPanel>
         </Paper>
 
