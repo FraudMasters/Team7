@@ -58,6 +58,22 @@ from .analytics_export import (
     ScheduledReportConfig,
     ScheduledReportStatus,
 )
+from .filter_suggestions import (
+    FilterSuggestionRequest,
+    FilterSuggestionResponse,
+    SuggestedFilterItem,
+    VacancyFilterRequest,
+    AlertSettingsUpdate,
+    AlertSettingsResponse,
+    AlertSettingsListResponse,
+    ApplySearchResponse,
+    SavedSearchWithAlertsCreate,
+    SavedSearchWithAlertsUpdate,
+    SavedSearchWithAlertsResponse,
+    SavedSearchListWithAlertsResponse,
+    BulkAlertSettingsUpdate,
+    BulkAlertSettingsResponse,
+)
 
 __all__ = [
     "BackupResponse",
@@ -107,4 +123,19 @@ __all__ = [
     "TaxonomyUsageExport",
     "ScheduledReportConfig",
     "ScheduledReportStatus",
+    # Filter Suggestions & Alert Settings
+    "FilterSuggestionRequest",
+    "FilterSuggestionResponse",
+    "SuggestedFilterItem",
+    "VacancyFilterRequest",
+    "AlertSettingsUpdate",
+    "AlertSettingsResponse",
+    "AlertSettingsListResponse",
+    "ApplySearchResponse",
+    "SavedSearchWithAlertsCreate",
+    "SavedSearchWithAlertsUpdate",
+    "SavedSearchWithAlertsResponse",
+    "SavedSearchListWithAlertsResponse",
+    "BulkAlertSettingsUpdate",
+    "BulkAlertSettingsResponse",
 ]
