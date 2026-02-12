@@ -57,3 +57,9 @@ export {
   type UseWebSocketProgressOptions,
   type UseWebSocketProgressReturn,
 } from './useWebSocketProgress';
+
+export {
+  useAnalyticsRealTime,
+  type UseAnalyticsRealTimeOptions,
+  type UseAnalyticsRealTimeReturn,
+} from './useAnalyticsRealTime';

@@ -3004,6 +3004,92 @@ export interface RankingMetricsResponse {
   total_vacancies_analyzed: number;
 }
 
+// ==================== WebSocket Types ====================
+
+/**
+ * WebSocket message types
+ */
+export type WebSocketMessageType =
+  | 'notification'
+  | 'notification_ack'
+  | 'analytics_update'
+  | 'ping'
+  | 'pong'
+  | 'error'
+  | 'connection_established';
+
+/**
+ * Base WebSocket message structure
+ */
+export interface WebSocketMessage {
+  type: WebSocketMessageType;
+  id: string;
+  timestamp: string;
+  original_message_id?: string;
+  status?: string;
+  error?: string;
+}
+
+/**
+ * Notification data within WebSocket message
+ */
+export interface WebSocketNotificationData {
+  id: string;
+  recipient_id: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  is_read: boolean;
+  action_url?: string;
+  created_at: string;
+}
+
+/**
+ * WebSocket notification message
+ */
+export interface WebSocketNotificationMessage extends WebSocketMessage {
+  type: 'notification';
+  notification: WebSocketNotificationData;
+}
+
+/**
+ * WebSocket error message
+ */
+export interface WebSocketErrorMessage extends WebSocketMessage {
+  type: 'error';
+  error: string;
+  message?: string;
+}
+
+/**
+ * Analytics update message type
+ */
+export type AnalyticsUpdateType =
+  | 'key_metrics'
+  | 'quality_metrics'
+  | 'stage_duration'
+  | 'ranking_accuracy'
+  | 'predictive';
+
+/**
+ * Analytics update data sent via WebSocket
+ */
+export interface AnalyticsUpdateData {
+  update_type: AnalyticsUpdateType;
+  computed_at: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * WebSocket analytics update message
+ */
+export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
+  type: 'analytics_update';
+  update_type: AnalyticsUpdateType;
+  data: AnalyticsUpdateData;
+}
+
 // ==================== Parsing Correction Types ====================
 
 // Re-export types from parsingCorrection module for centralized access

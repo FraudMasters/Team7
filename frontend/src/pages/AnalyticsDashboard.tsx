@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -11,6 +11,8 @@ import {
   CircularProgress,
   Alert,
   Icon,
+  Snackbar,
+  Chip,
 } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import DashboardFilters, { DashboardFiltersState } from '@components/analytics/DashboardFilters';
@@ -21,6 +23,8 @@ import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
 import SourceTracking from '@components/analytics/SourceTracking';
 import ReportBuilder from '@components/analytics/ReportBuilder';
 import AnalyticsExport from '@components/analytics/AnalyticsExport';
+import { useAnalyticsRealTime } from '@/hooks';
+import type { AnalyticsUpdateType } from '@/types/api';
 
 /**
  * Analytics Dashboard Page (Recruiter Module)
@@ -32,6 +36,7 @@ import AnalyticsExport from '@components/analytics/AnalyticsExport';
  * - Source tracking analytics
  * - Skill demand trends
  * - Configurable date range filtering
+ * - Real-time updates via WebSocket
  */
 const AnalyticsDashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -47,6 +52,43 @@ const AnalyticsDashboardPage: React.FC = () => {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [showUpdateSnackbar, setShowUpdateSnackbar] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
+
+  /**
+   * Handle analytics updates from WebSocket
+   */
+  const handleAnalyticsUpdate = useCallback((updateType: AnalyticsUpdateType) => {
+    // Show notification for update
+    const updateTypeLabels: Record<AnalyticsUpdateType, string> = {
+      key_metrics: 'Key Metrics',
+      quality_metrics: 'Quality Metrics',
+      stage_duration: 'Stage Duration',
+      ranking_accuracy: 'Ranking Accuracy',
+      predictive: 'Predictive Analytics',
+    };
+
+    setUpdateMessage(`${updateTypeLabels[updateType] || updateType} updated`);
+    setShowUpdateSnackbar(true);
+  }, []);
+
+  /**
+   * WebSocket real-time connection for analytics updates
+   */
+  const {
+    isConnected,
+    isConnecting,
+    connectionError,
+    lastUpdate,
+    refreshKey,
+  } = useAnalyticsRealTime({
+    onUpdate: handleAnalyticsUpdate,
+    onError: (error) => {
+      // Silently handle connection errors - not critical for dashboard
+    },
+    autoReconnect: true,
+    maxReconnectAttempts: 10,
+  });
 
   /**
    * Handle filters change from DashboardFilters component
@@ -107,9 +149,40 @@ const AnalyticsDashboardPage: React.FC = () => {
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h4" as="h1" fontWeight={700} gutterBottom>
-              {t('analyticsDashboard.title')}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <Typography variant="h4" as="h1" fontWeight={700}>
+                {t('analyticsDashboard.title')}
+              </Typography>
+              {/* WebSocket Connection Status Indicator */}
+              <Chip
+                size="small"
+                label={isConnecting ? 'Connecting...' : isConnected ? 'Live' : 'Offline'}
+                color={isConnected ? 'success' : isConnecting ? 'warning' : 'default'}
+                variant={isConnected ? 'filled' : 'outlined'}
+                icon={
+                  <Box
+                    component="span"
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: isConnected ? 'success.main' : isConnecting ? 'warning.main' : 'text.disabled',
+                      animation: isConnecting ? 'pulse 1.5s infinite' : 'none',
+                      '@keyframes pulse': {
+                        '0%': { opacity: 1 },
+                        '50%': { opacity: 0.4 },
+                        '100%': { opacity: 1 },
+                      },
+                    }}
+                  />
+                }
+                sx={{
+                  '& .MuiChip-icon': {
+                    ml: 0.5,
+                  },
+                }}
+              />
+            </Box>
             <Typography variant="body1" color="secondary">
               {t('analyticsDashboard.subtitle')}
             </Typography>
@@ -119,7 +192,7 @@ const AnalyticsDashboardPage: React.FC = () => {
               startDate={filters.dateRange.startDate}
               endDate={filters.dateRange.endDate}
               compact={true}
-              onExportComplete={(config) => {
+              onExportComplete={() => {
                 // Export completed
               }}
             />
@@ -147,17 +220,29 @@ const AnalyticsDashboardPage: React.FC = () => {
 
         {/* Key Metrics */}
         <Box sx={{ mb: 4 }}>
-          <KeyMetrics startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
+          <KeyMetrics
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
         </Box>
 
         {/* Skill Demand */}
         <Box sx={{ mb: 4 }}>
-          <SkillDemandChart startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
+          <SkillDemandChart
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
         </Box>
 
         {/* Funnel Visualization */}
         <Box sx={{ mb: 4 }}>
-          <FunnelVisualization startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
+          <FunnelVisualization
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
         </Box>
 
         {/* Recruiter Performance */}
@@ -165,12 +250,17 @@ const AnalyticsDashboardPage: React.FC = () => {
           <RecruiterPerformance
             startDate={filters.dateRange.startDate}
             endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
           />
         </Box>
 
         {/* Source Tracking */}
         <Box sx={{ mb: 4 }}>
-          <SourceTracking startDate={filters.dateRange.startDate} endDate={filters.dateRange.endDate} />
+          <SourceTracking
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
         </Box>
       </Container>
 
@@ -235,8 +325,28 @@ const AnalyticsDashboardPage: React.FC = () => {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+          .connection-status-chip {
+            display: none !important;
+          }
         }
       `}</style>
+
+      {/* Real-time Update Notification */}
+      <Snackbar
+        open={showUpdateSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setShowUpdateSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setShowUpdateSnackbar(false)}
+          severity="info"
+          sx={{ width: '100%' }}
+          icon={<Icon name="refresh" size={18} />}
+        >
+          {updateMessage}
+        </Alert>
+      </Snackbar>
     </>
   );
 };
