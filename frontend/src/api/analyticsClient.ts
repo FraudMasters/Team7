@@ -3,7 +3,7 @@
  *
  * Этот модуль предоставляет клиент для работы с аналитикой через микросервис Analytics Service.
  * Поддерживает получение метрик производительности, воронки найма, спроса на навыки,
- * отслеживания источников и показателей эффективности рекрутеров.
+ * отслеживания источников, показателей эффективности рекрутеров и экспорт данных.
  *
  * @example
  * ```ts
@@ -26,6 +26,15 @@
  *
  * // Получение эффективности рекрутеров
  * const recruiters = await analyticsClient.getRecruiterPerformance('2024-01-01', '2024-12-31', 10);
+ *
+ * // Экспорт аналитики в CSV
+ * const blob = await analyticsClient.exportAnalytics({ format: 'csv' });
+ *
+ * // Экспорт аналитики в JSON с метаданными
+ * const result = await analyticsClient.exportAnalyticsJson({
+ *   start_date: '2024-01-01',
+ *   end_date: '2024-12-31',
+ * });
  * ```
  */
 
@@ -36,7 +45,11 @@ import type {
   SkillDemandResponse,
   SourceTrackingResponse,
   RecruiterPerformanceResponse,
+  RankingMetricsResponse,
   ApiError,
+  AnalyticsExportFormat,
+  AnalyticsExportRequest,
+  AnalyticsExportMetadata,
 } from '@/types/api';
 
 /**
@@ -48,6 +61,10 @@ export type {
   SkillDemandResponse,
   SourceTrackingResponse,
   RecruiterPerformanceResponse,
+  RankingMetricsResponse,
+  AnalyticsExportFormat,
+  AnalyticsExportRequest,
+  AnalyticsExportMetadata,
 };
 
 /**
@@ -370,6 +387,149 @@ export class AnalyticsClient {
         '/api/analytics/recruiter-performance',
         { params }
       );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Получение метрик точности ранжирования
+   *
+   * Возвращает данные о производительности ML-рекомендаций включая
+   * коэффициенты конверсии обратной связи, показатели успеха top-N рекомендаций
+   * и распределение уверенности ранжирования.
+   *
+   * @param startDate - Опциональная начальная дата для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная конечная дата для фильтрации (формат ISO 8601)
+   * @returns Метрики точности ранжирования
+   * @throws ApiError если получение данных не удалось
+   *
+   * @example
+   * ```ts
+   * // Получение метрик ранжирования
+   * const ranking = await analyticsClient.getRankingAccuracy();
+   *
+   * console.log('Проанализировано вакансий:', ranking.total_vacancies_analyzed);
+   *
+   * // Анализ конверсии обратной связи
+   * console.log('Коэффициент обратной связи:', ranking.feedback_conversion.feedback_rate);
+   * console.log('Положительная обратная связь:', ranking.feedback_conversion.positive_feedback_rate);
+   *
+   * // Анализ top-N успеха
+   * console.log('Top-5 успех:', ranking.top_n_performance.top_5_success_rate);
+   * console.log('Наймов из top-5:', ranking.top_n_performance.top_5_hired_count);
+   *
+   * // С фильтрацией по дате
+   * const ranking = await analyticsClient.getRankingAccuracy('2024-01-01', '2024-12-31');
+   * ```
+   */
+  async getRankingAccuracy(
+    startDate?: string,
+    endDate?: string
+  ): Promise<RankingMetricsResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<RankingMetricsResponse> = await this.client.get(
+        '/api/analytics/ranking-accuracy',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Экспорт аналитических данных
+   *
+   * Позволяет экспортировать данные аналитики в формате CSV или JSON
+   * для внешнего анализа и отчётности.
+   *
+   * @param options - Параметры экспорта
+   * @param options.format - Формат экспорта ('csv' или 'json', по умолчанию 'csv')
+   * @param options.start_date - Начальная дата для фильтрации (формат ISO 8601)
+   * @param options.end_date - Конечная дата для фильтрации (формат ISO 8601)
+   * @returns Blob с экспортированными данными для скачивания
+   * @throws ApiError если экспорт не удался
+   *
+   * @example
+   * ```ts
+   * // Экспорт в формате CSV
+   * const blob = await analyticsClient.exportAnalytics({ format: 'csv' });
+   *
+   * // Создание ссылки для скачивания
+   * const url = window.URL.createObjectURL(blob);
+   * const a = document.createElement('a');
+   * a.href = url;
+   * a.download = 'analytics_export.csv';
+   * a.click();
+   * window.URL.revokeObjectURL(url);
+   *
+   * // Экспорт за период
+   * const blob = await analyticsClient.exportAnalytics({
+   *   format: 'json',
+   *   start_date: '2024-01-01',
+   *   end_date: '2024-12-31',
+   * });
+   * ```
+   */
+  async exportAnalytics(options: AnalyticsExportRequest = {}): Promise<Blob> {
+    try {
+      const params: Record<string, string> = {};
+      if (options.format) params.format = options.format;
+      if (options.start_date) params.start_date = options.start_date;
+      if (options.end_date) params.end_date = options.end_date;
+
+      const response: AxiosResponse<Blob> = await this.client.get(
+        '/api/analytics/export',
+        {
+          params,
+          responseType: 'blob',
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Экспорт аналитических данных в формате JSON с метаданными
+   *
+   * Возвращает данные аналитики в формате JSON вместе с метаданными экспорта.
+   * Полезно для программной обработки данных.
+   *
+   * @param options - Параметры экспорта
+   * @param options.start_date - Начальная дата для фильтрации (формат ISO 8601)
+   * @param options.end_date - Конечная дата для фильтрации (формат ISO 8601)
+   * @returns Объект с данными экспорта и метаданными
+   * @throws ApiError если экспорт не удался
+   *
+   * @example
+   * ```ts
+   * const result = await analyticsClient.exportAnalyticsJson({
+   *   start_date: '2024-01-01',
+   *   end_date: '2024-12-31',
+   * });
+   *
+   * console.log('Экспортировано записей:', result.metadata.total_records);
+   * console.log('Данные:', result.data);
+   * ```
+   */
+  async exportAnalyticsJson(
+    options: Omit<AnalyticsExportRequest, 'format'> = {}
+  ): Promise<{ data: unknown; metadata: AnalyticsExportMetadata }> {
+    try {
+      const params: Record<string, string> = { format: 'json' };
+      if (options.start_date) params.start_date = options.start_date;
+      if (options.end_date) params.end_date = options.end_date;
+
+      const response: AxiosResponse<{ data: unknown; metadata: AnalyticsExportMetadata }> =
+        await this.client.get('/api/analytics/export', { params });
       return response.data;
     } catch (error) {
       throw this.transformError(error);

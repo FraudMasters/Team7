@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -11,47 +11,98 @@ import {
   CircularProgress,
   Alert,
   Icon,
+  Snackbar,
+  Chip,
 } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
-import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
+import DashboardFilters, { DashboardFiltersState } from '@components/analytics/DashboardFilters';
 import KeyMetrics from '@components/analytics/KeyMetrics';
 import SkillDemandChart from '@components/analytics/SkillDemandChart';
+import FunnelVisualization from '@components/analytics/FunnelVisualization';
+import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
+import SourceTracking from '@components/analytics/SourceTracking';
+import RankingAccuracyMetrics from '@components/analytics/RankingAccuracyMetrics';
 import ReportBuilder from '@components/analytics/ReportBuilder';
+import AnalyticsExport from '@components/analytics/AnalyticsExport';
+import { useAnalyticsRealTime } from '@/hooks';
+import type { AnalyticsUpdateType } from '@/types/api';
 
 /**
  * Analytics Dashboard Page (Recruiter Module)
  *
  * Shows hiring metrics and analytics with:
  * - Key metrics (time-to-hire, resumes processed, match rates)
+ * - Recruitment funnel visualization
+ * - Recruiter performance tracking
+ * - Source tracking analytics
  * - Skill demand trends
  * - Configurable date range filtering
- *
- * Note: Funnel, Recruiter Performance, and Source Tracking are disabled
- * due to backend API limitations (Enum types not created in DB).
+ * - Real-time updates via WebSocket
  */
 const AnalyticsDashboardPage: React.FC = () => {
   const { t } = useTranslation();
-  const [dateRange, setDateRange] = useState<DateRangeFilterType>({
-    startDate: '',
-    endDate: '',
-    preset: 'last_30_days',
+  const [filters, setFilters] = useState<DashboardFiltersState>({
+    dateRange: {
+      startDate: '',
+      endDate: '',
+      preset: 'last_30_days',
+    },
+    recruiterId: null,
+    vacancyId: null,
   });
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [showUpdateSnackbar, setShowUpdateSnackbar] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
 
   /**
-   * Handle date range change from DateRangeFilter component
+   * Handle analytics updates from WebSocket
    */
-  const handleDateRangeChange = (newDateRange: DateRangeFilterType) => {
-    setDateRange(newDateRange);
+  const handleAnalyticsUpdate = useCallback((updateType: AnalyticsUpdateType) => {
+    // Show notification for update
+    const updateTypeLabels: Record<AnalyticsUpdateType, string> = {
+      key_metrics: 'Key Metrics',
+      quality_metrics: 'Quality Metrics',
+      stage_duration: 'Stage Duration',
+      ranking_accuracy: 'Ranking Accuracy',
+      predictive: 'Predictive Analytics',
+    };
+
+    setUpdateMessage(`${updateTypeLabels[updateType] || updateType} updated`);
+    setShowUpdateSnackbar(true);
+  }, []);
+
+  /**
+   * WebSocket real-time connection for analytics updates
+   */
+  const {
+    isConnected,
+    isConnecting,
+    connectionError,
+    lastUpdate,
+    refreshKey,
+  } = useAnalyticsRealTime({
+    onUpdate: handleAnalyticsUpdate,
+    onError: (error) => {
+      // Silently handle connection errors - not critical for dashboard
+    },
+    autoReconnect: true,
+    maxReconnectAttempts: 10,
+  });
+
+  /**
+   * Handle filters change from DashboardFilters component
+   */
+  const handleFiltersChange = (newFilters: DashboardFiltersState) => {
+    setFilters(newFilters);
   };
 
   /**
    * Handle apply button click
    */
-  const handleApplyFilter = (appliedDateRange: DateRangeFilterType) => {
-    setDateRange(appliedDateRange);
+  const handleApplyFilter = (appliedFilters: DashboardFiltersState) => {
+    setFilters(appliedFilters);
   };
 
   /**
@@ -99,49 +150,126 @@ const AnalyticsDashboardPage: React.FC = () => {
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h4" as="h1" fontWeight={700} gutterBottom>
-              {t('analyticsDashboard.title')}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <Typography variant="h4" as="h1" fontWeight={700}>
+                {t('analyticsDashboard.title')}
+              </Typography>
+              {/* WebSocket Connection Status Indicator */}
+              <Chip
+                size="small"
+                label={isConnecting ? 'Connecting...' : isConnected ? 'Live' : 'Offline'}
+                color={isConnected ? 'success' : isConnecting ? 'warning' : 'default'}
+                variant={isConnected ? 'filled' : 'outlined'}
+                icon={
+                  <Box
+                    component="span"
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: isConnected ? 'success.main' : isConnecting ? 'warning.main' : 'text.disabled',
+                      animation: isConnecting ? 'pulse 1.5s infinite' : 'none',
+                      '@keyframes pulse': {
+                        '0%': { opacity: 1 },
+                        '50%': { opacity: 0.4 },
+                        '100%': { opacity: 1 },
+                      },
+                    }}
+                  />
+                }
+                sx={{
+                  '& .MuiChip-icon': {
+                    ml: 0.5,
+                  },
+                }}
+              />
+            </Box>
             <Typography variant="body1" color="secondary">
               {t('analyticsDashboard.subtitle')}
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Icon name="file" size={20} />}
-            onClick={handleOpenReportBuilder}
-            color="primary"
-          >
-            Generate Report
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <AnalyticsExport
+              startDate={filters.dateRange.startDate}
+              endDate={filters.dateRange.endDate}
+              compact={true}
+              onExportComplete={() => {
+                // Export completed
+              }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<Icon name="file" size={20} />}
+              onClick={handleOpenReportBuilder}
+              color="primary"
+            >
+              Generate Report
+            </Button>
+          </Box>
         </Box>
 
-        {/* Date Range Filter */}
+        {/* Dashboard Filters */}
         <Box sx={{ mb: 4 }}>
-          <DateRangeFilter
-            onDateRangeChange={handleDateRangeChange}
+          <DashboardFilters
+            onFiltersChange={handleFiltersChange}
             onApply={handleApplyFilter}
-            initialDateRange={{ preset: 'last_30_days' }}
-            showPresets={true}
+            initialFilters={{ dateRange: { preset: 'last_30_days' } }}
+            showRecruiterFilter={true}
+            showVacancyFilter={true}
           />
         </Box>
 
         {/* Key Metrics */}
         <Box sx={{ mb: 4 }}>
-          <KeyMetrics startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <KeyMetrics
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
         </Box>
 
         {/* Skill Demand */}
         <Box sx={{ mb: 4 }}>
-          <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <SkillDemandChart
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
         </Box>
 
-        {/* Placeholder for disabled features */}
+        {/* Funnel Visualization */}
         <Box sx={{ mb: 4 }}>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Additional analytics features (Funnel, Recruiter Performance, Source Tracking)
-            are temporarily disabled due to backend database migration requirements.
-          </Alert>
+          <FunnelVisualization
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
+        </Box>
+
+        {/* Recruiter Performance */}
+        <Box sx={{ mb: 4 }}>
+          <RecruiterPerformance
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
+        </Box>
+
+        {/* Source Tracking */}
+        <Box sx={{ mb: 4 }}>
+          <SourceTracking
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+            refreshKey={refreshKey}
+          />
+        </Box>
+
+        {/* Ranking Accuracy Metrics */}
+        <Box sx={{ mb: 4 }}>
+          <RankingAccuracyMetrics
+            startDate={filters.dateRange.startDate}
+            endDate={filters.dateRange.endDate}
+          />
         </Box>
       </Container>
 
@@ -206,8 +334,28 @@ const AnalyticsDashboardPage: React.FC = () => {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+          .connection-status-chip {
+            display: none !important;
+          }
         }
       `}</style>
+
+      {/* Real-time Update Notification */}
+      <Snackbar
+        open={showUpdateSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setShowUpdateSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setShowUpdateSnackbar(false)}
+          severity="info"
+          sx={{ width: '100%' }}
+          icon={<Icon name="refresh" size={18} />}
+        >
+          {updateMessage}
+        </Alert>
+      </Snackbar>
     </>
   );
 };

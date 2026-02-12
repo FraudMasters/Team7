@@ -2807,6 +2807,289 @@ export interface MarketTrendsResponse {
   last_updated?: string;
 }
 
+// ==================== Analytics Export Types ====================
+
+/**
+ * Supported export formats for analytics data
+ */
+export type AnalyticsExportFormat = 'json' | 'csv';
+
+/**
+ * Analytics sections that can be included in exports
+ */
+export type AnalyticsExportSection =
+  | 'key_metrics'
+  | 'funnel'
+  | 'recruiter_performance'
+  | 'source_tracking'
+  | 'stage_duration'
+  | 'quality_metrics'
+  | 'skill_demand'
+  | 'ranking_accuracy'
+  | 'taxonomy_usage';
+
+/**
+ * Request parameters for analytics data export
+ */
+export interface AnalyticsExportRequest {
+  /** Export format (json or csv) */
+  format?: AnalyticsExportFormat;
+  /** Start date for analytics data (ISO 8601 format) */
+  start_date?: string;
+  /** End date for analytics data (ISO 8601 format) */
+  end_date?: string;
+  /** Specific sections to include. If null, includes all sections */
+  sections?: AnalyticsExportSection[];
+  /** Whether to include export metadata in the response */
+  include_metadata?: boolean;
+  /** Filter by specific recruiter ID */
+  recruiter_id?: string;
+  /** Filter by specific vacancy ID */
+  vacancy_id?: string;
+}
+
+/**
+ * Metadata about an analytics export
+ */
+export interface AnalyticsExportMetadata {
+  /** ISO 8601 timestamp when export was generated */
+  export_timestamp: string;
+  /** Export format used (json or csv) */
+  format: string;
+  /** Start date of included data (ISO 8601) */
+  start_date?: string;
+  /** End date of included data (ISO 8601) */
+  end_date?: string;
+  /** List of analytics sections included in the export */
+  sections_included: string[];
+  /** Total number of data records in the export */
+  total_records: number;
+  /** Filters that were applied to the export */
+  filters_applied?: Record<string, unknown>;
+  /** User ID or system that generated the export */
+  generated_by?: string;
+}
+
+/**
+ * Configuration for scheduled analytics reports
+ */
+export interface ScheduledReportConfig {
+  /** Name/identifier for the scheduled report */
+  report_name: string;
+  /** Whether the scheduled report is enabled */
+  enabled?: boolean;
+  /** Cron expression for report schedule */
+  schedule_cron: string;
+  /** Export format for the report */
+  format?: AnalyticsExportFormat;
+  /** Analytics sections to include in the report */
+  sections: AnalyticsExportSection[];
+  /** Email addresses to receive the report */
+  recipients: string[];
+  /** Whether to include an executive summary in the email */
+  include_summary?: boolean;
+  /** Number of days to look back for data (default: 7 days) */
+  date_range_days?: number;
+}
+
+/**
+ * Status of a scheduled analytics report
+ */
+export interface ScheduledReportStatus {
+  /** Name of the scheduled report */
+  report_name: string;
+  /** Timestamp of last successful run */
+  last_run?: string;
+  /** Timestamp of next scheduled run */
+  next_run?: string;
+  /** Current status (active, paused, error) */
+  status: string;
+  /** Error message from last failed run, if any */
+  last_error?: string;
+  /** Total number of times the report has been run */
+  total_runs?: number;
+}
+
+// ==================== Ranking Accuracy Metrics Types ====================
+
+/**
+ * Feedback conversion metrics for ranked recommendations
+ */
+export interface FeedbackConversionMetrics {
+  /** Total number of ranked recommendations generated */
+  total_recommendations: number;
+  /** Number of recommendations that received recruiter feedback */
+  recommendations_with_feedback: number;
+  /** Proportion of recommendations with feedback (0-1) */
+  feedback_rate: number;
+  /** Number of recommendations with positive feedback (approved/advanced) */
+  positive_feedback_count: number;
+  /** Number of recommendations with negative feedback (rejected/dismissed) */
+  negative_feedback_count: number;
+  /** Proportion of feedback that was positive (0-1) */
+  positive_feedback_rate: number;
+}
+
+/**
+ * Top-N recommendation success rate metrics
+ */
+export interface TopNRecommendationMetrics {
+  /** Success rate for top-1 ranked candidates (0-1) */
+  top_1_success_rate: number;
+  /** Success rate for top-3 ranked candidates (0-1) */
+  top_3_success_rate: number;
+  /** Success rate for top-5 ranked candidates (0-1) */
+  top_5_success_rate: number;
+  /** Success rate for top-10 ranked candidates (0-1) */
+  top_10_success_rate: number;
+  /** Number of top-1 ranked candidates hired */
+  top_1_hired_count: number;
+  /** Number of top-5 ranked candidates hired */
+  top_5_hired_count: number;
+  /** Number of top-10 ranked candidates hired */
+  top_10_hired_count: number;
+  /** Total number of hires in the period */
+  total_hires: number;
+}
+
+/**
+ * Ranking confidence distribution metrics
+ */
+export interface RankingConfidenceMetrics {
+  /** Recommendations with high confidence score (>0.8) */
+  high_confidence_count: number;
+  /** Recommendations with medium confidence score (0.5-0.8) */
+  medium_confidence_count: number;
+  /** Recommendations with low confidence score (<0.5) */
+  low_confidence_count: number;
+  /** Average ranking confidence score across all recommendations (0-1) */
+  avg_confidence_score: number;
+  /** Correlation between confidence score and actual success (0-1) */
+  confidence_accuracy_correlation?: number;
+}
+
+/**
+ * Ranking performance trend over time
+ */
+export interface RankingPerformanceTrend {
+  /** Time period identifier (e.g., '2024-01') */
+  period: string;
+  /** Overall success rate for the period (0-1) */
+  success_rate: number;
+  /** Feedback rate for the period (0-1) */
+  feedback_rate: number;
+  /** Average confidence for the period (0-1) */
+  avg_confidence: number;
+  /** Total recommendations in the period */
+  total_recommendations: number;
+}
+
+/**
+ * Response model for ranking accuracy analytics
+ */
+export interface RankingMetricsResponse {
+  /** Feedback conversion metrics */
+  feedback_conversion: FeedbackConversionMetrics;
+  /** Top-N recommendation success rate metrics */
+  top_n_performance: TopNRecommendationMetrics;
+  /** Ranking confidence distribution metrics */
+  confidence_distribution: RankingConfidenceMetrics;
+  /** Performance trends over time */
+  trends?: RankingPerformanceTrend[];
+  /** Start date of the analysis period (ISO 8601) */
+  period_start?: string;
+  /** End date of the analysis period (ISO 8601) */
+  period_end?: string;
+  /** Total number of vacancies with ranking data */
+  total_vacancies_analyzed: number;
+}
+
+// ==================== WebSocket Types ====================
+
+/**
+ * WebSocket message types
+ */
+export type WebSocketMessageType =
+  | 'notification'
+  | 'notification_ack'
+  | 'analytics_update'
+  | 'ping'
+  | 'pong'
+  | 'error'
+  | 'connection_established';
+
+/**
+ * Base WebSocket message structure
+ */
+export interface WebSocketMessage {
+  type: WebSocketMessageType;
+  id: string;
+  timestamp: string;
+  original_message_id?: string;
+  status?: string;
+  error?: string;
+}
+
+/**
+ * Notification data within WebSocket message
+ */
+export interface WebSocketNotificationData {
+  id: string;
+  recipient_id: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  is_read: boolean;
+  action_url?: string;
+  created_at: string;
+}
+
+/**
+ * WebSocket notification message
+ */
+export interface WebSocketNotificationMessage extends WebSocketMessage {
+  type: 'notification';
+  notification: WebSocketNotificationData;
+}
+
+/**
+ * WebSocket error message
+ */
+export interface WebSocketErrorMessage extends WebSocketMessage {
+  type: 'error';
+  error: string;
+  message?: string;
+}
+
+/**
+ * Analytics update message type
+ */
+export type AnalyticsUpdateType =
+  | 'key_metrics'
+  | 'quality_metrics'
+  | 'stage_duration'
+  | 'ranking_accuracy'
+  | 'predictive';
+
+/**
+ * Analytics update data sent via WebSocket
+ */
+export interface AnalyticsUpdateData {
+  update_type: AnalyticsUpdateType;
+  computed_at: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * WebSocket analytics update message
+ */
+export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
+  type: 'analytics_update';
+  update_type: AnalyticsUpdateType;
+  data: AnalyticsUpdateData;
+}
+
 // ==================== Parsing Correction Types ====================
 
 // Re-export types from parsingCorrection module for centralized access
