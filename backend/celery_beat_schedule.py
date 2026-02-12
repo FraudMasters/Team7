@@ -1,10 +1,10 @@
 """
-Celery Beat schedule configuration for automated model retraining and analytics reports.
+Celery Beat schedule configuration for automated model retraining, analytics reports, and search alerts.
 
 This module defines the periodic task schedule for Celery Beat, including
-daily and weekly automated model retraining schedules, and analytics email
-report schedules. It integrates with the main Celery configuration to provide
-scheduled task execution.
+daily and weekly automated model retraining schedules, analytics email
+report schedules, and search alert processing schedules. It integrates with
+the main Celery configuration to provide scheduled task execution.
 
 Schedule Overview:
 - Feedback volume check: Runs every 6 hours to check if feedback threshold is met
@@ -13,6 +13,8 @@ Schedule Overview:
 - Concept drift monitoring: Periodic checks for performance degradation
 - Daily analytics email report: Sends daily summary at configured time
 - Weekly analytics email report: Sends weekly summary on configured day
+- Daily search alert processing: Processes pending alerts for daily-frequency saved searches
+- Weekly search alert processing: Processes pending alerts for weekly-frequency saved searches
 
 Feedback Volume Trigger:
 - Monitors accumulated feedback counts per model
@@ -23,6 +25,11 @@ Analytics Email Reports:
 - Daily reports: Key metrics summary sent every morning
 - Weekly reports: Comprehensive analytics sent once a week
 - Configurable recipients via analytics_report_default_recipients setting
+
+Search Alert Processing:
+- Daily alerts: Processes pending alerts for saved searches with daily frequency
+- Weekly alerts: Processes pending alerts for saved searches with weekly frequency
+- Configurable timing via alert_schedule settings
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -112,6 +119,40 @@ def get_analytics_report_schedule_config() -> Dict[str, Any]:
         "default_recipients": getattr(
             settings, "analytics_report_default_recipients", []
         ),
+    }
+
+
+def get_alert_schedule_config() -> Dict[str, Any]:
+    """
+    Get search alert processing schedule configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether search alerts are enabled (default: True)
+    - daily_hour: Hour for daily alert processing (default: 6 AM)
+    - daily_minute: Minute for daily alert processing (default: 0)
+    - weekly_day: Day of week for weekly alert processing (default: 0 = Sunday)
+    - weekly_hour: Hour for weekly alert processing (default: 7 AM)
+    - weekly_minute: Minute for weekly alert processing (default: 0)
+    - batch_size: Number of alerts to process in one batch (default: 100)
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_alert_schedule_config()
+        >>> print(config['daily_hour'])
+        6
+        >>> print(config['weekly_day'])
+        0
+    """
+    return {
+        "enabled": getattr(settings, "search_alerts_enabled", True),
+        "daily_hour": getattr(settings, "search_alert_daily_hour", 6),
+        "daily_minute": getattr(settings, "search_alert_daily_minute", 0),
+        "weekly_day": getattr(settings, "search_alert_weekly_day", 0),  # Sunday
+        "weekly_hour": getattr(settings, "search_alert_weekly_hour", 7),
+        "weekly_minute": getattr(settings, "search_alert_weekly_minute", 0),
+        "batch_size": getattr(settings, "search_alert_batch_size", 100),
     }
 
 
@@ -269,12 +310,46 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
             "queue": "default",  # Use default queue for email tasks
         },
     },
+    # ==============================================
+    # Search Alert Processing Schedule
+    # ==============================================
+    "daily-search-alert-processing": {
+        "task": "tasks.search_alerts.process_pending_alerts",
+        "schedule": crontab(
+            hour=get_alert_schedule_config()["daily_hour"],
+            minute=get_alert_schedule_config()["daily_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "batch_size": get_alert_schedule_config()["batch_size"],
+        },
+        "options": {
+            "expires": 3600,  # Task expires if not run within 1 hour
+            "queue": "default",  # Use default queue for alert tasks
+        },
+    },
+    "weekly-search-alert-processing": {
+        "task": "tasks.search_alerts.process_pending_alerts",
+        "schedule": crontab(
+            day_of_week=get_alert_schedule_config()["weekly_day"],
+            hour=get_alert_schedule_config()["weekly_hour"],
+            minute=get_alert_schedule_config()["weekly_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "batch_size": get_alert_schedule_config()["batch_size"],
+        },
+        "options": {
+            "expires": 7200,  # Task expires if not run within 2 hours
+            "queue": "default",  # Use default queue for alert tasks
+        },
+    },
 }
 
 
 def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     """
-    Get the Celery Beat schedule for automated retraining and analytics reports.
+    Get the Celery Beat schedule for automated retraining, analytics reports, and search alerts.
 
     This function returns the beat schedule dictionary, optionally filtered
     to include only enabled tasks based on configuration settings.
@@ -293,6 +368,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     """
     config = get_retraining_schedule_config()
     analytics_config = get_analytics_report_schedule_config()
+    alert_config = get_alert_schedule_config()
 
     if not config["enabled"] and enabled_only:
         logger.info("Automated retraining is disabled in settings")
@@ -300,14 +376,23 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     if not analytics_config["enabled"] and enabled_only:
         logger.info("Analytics email reports are disabled in settings")
 
-    # If both are disabled and we only want enabled tasks, return empty
-    if not config["enabled"] and not analytics_config["enabled"] and enabled_only:
+    if not alert_config["enabled"] and enabled_only:
+        logger.info("Search alerts are disabled in settings")
+
+    # If all are disabled and we only want enabled tasks, return empty
+    if (
+        not config["enabled"]
+        and not analytics_config["enabled"]
+        and not alert_config["enabled"]
+        and enabled_only
+    ):
         return {}
 
     logger.info(
         f"Retrieving beat schedule: {len(beat_schedule)} tasks, "
         f"retraining_enabled={config['enabled']}, models={config['models']}, "
-        f"analytics_reports_enabled={analytics_config['enabled']}"
+        f"analytics_reports_enabled={analytics_config['enabled']}, "
+        f"search_alerts_enabled={alert_config['enabled']}"
     )
 
     if enabled_only:
@@ -340,6 +425,11 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
             # Skip analytics email report tasks if analytics reports are disabled
             if "analytics-email-report" in task_name:
                 if not analytics_config["enabled"]:
+                    continue
+
+            # Skip search alert tasks if alerts are disabled
+            if "search-alert" in task_name:
+                if not alert_config["enabled"]:
                     continue
 
             # Include other tasks
@@ -439,6 +529,7 @@ def list_scheduled_tasks() -> Dict[str, Dict[str, Any]]:
 # Log schedule configuration on import
 schedule_config = get_retraining_schedule_config()
 analytics_config = get_analytics_report_schedule_config()
+alert_config = get_alert_schedule_config()
 logger.info(
     f"Celery Beat schedule loaded: "
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
@@ -449,17 +540,25 @@ logger.info(
     f"retraining_enabled={schedule_config['enabled']}, "
     f"analytics_reports_enabled={analytics_config['enabled']}, "
     f"analytics_daily_at={analytics_config['daily_hour']:02d}:{analytics_config['daily_minute']:02d}, "
-    f"analytics_weekly_on_day_{analytics_config['weekly_day']}_at_{analytics_config['weekly_hour']:02d}:{analytics_config['weekly_minute']:02d}"
+    f"analytics_weekly_on_day_{analytics_config['weekly_day']}_at_{analytics_config['weekly_hour']:02d}:{analytics_config['weekly_minute']:02d}, "
+    f"search_alerts_enabled={alert_config['enabled']}, "
+    f"search_alert_daily_at={alert_config['daily_hour']:02d}:{alert_config['daily_minute']:02d}, "
+    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}"
 )
 
 
 # Export schedule and utility functions
 __all__ = [
     "beat_schedule",
+    "CELERYBEAT_SCHEDULE",  # Legacy alias for Celery config compatibility
     "get_beat_schedule",
     "get_retraining_schedule_config",
     "get_analytics_report_schedule_config",
+    "get_alert_schedule_config",
     "add_scheduled_task",
     "remove_scheduled_task",
     "list_scheduled_tasks",
 ]
+
+# Legacy alias for Celery config compatibility
+CELERYBEAT_SCHEDULE = beat_schedule
