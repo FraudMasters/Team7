@@ -16,6 +16,9 @@ import { useTranslation } from 'react-i18next';
 import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
 import KeyMetrics from '@components/analytics/KeyMetrics';
 import SkillDemandChart from '@components/analytics/SkillDemandChart';
+import FunnelVisualization from '@components/analytics/FunnelVisualization';
+import RecruiterPerformance from '@components/analytics/RecruiterPerformance';
+import SourceTracking from '@components/analytics/SourceTracking';
 import ReportBuilder from '@components/analytics/ReportBuilder';
 import AnalyticsExport from '@components/analytics/AnalyticsExport';
 
@@ -24,11 +27,11 @@ import AnalyticsExport from '@components/analytics/AnalyticsExport';
  *
  * Shows hiring metrics and analytics with:
  * - Key metrics (time-to-hire, resumes processed, match rates)
+ * - Recruitment funnel visualization
+ * - Recruiter performance tracking
+ * - Source tracking analytics
  * - Skill demand trends
  * - Configurable date range filtering
- *
- * Note: Funnel, Recruiter Performance, and Source Tracking are disabled
- * due to backend API limitations (Enum types not created in DB).
  */
 const AnalyticsDashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -147,12 +150,19 @@ const AnalyticsDashboardPage: React.FC = () => {
           <SkillDemandChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
         </Box>
 
-        {/* Placeholder for disabled features */}
+        {/* Funnel Visualization */}
         <Box sx={{ mb: 4 }}>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Additional analytics features (Funnel, Recruiter Performance, Source Tracking)
-            are temporarily disabled due to backend database migration requirements.
-          </Alert>
+          <FunnelVisualization startDate={dateRange.startDate} endDate={dateRange.endDate} />
+        </Box>
+
+        {/* Recruiter Performance */}
+        <Box sx={{ mb: 4 }}>
+          <RecruiterPerformance startDate={dateRange.startDate} endDate={dateRange.endDate} />
+        </Box>
+
+        {/* Source Tracking */}
+        <Box sx={{ mb: 4 }}>
+          <SourceTracking startDate={dateRange.startDate} endDate={dateRange.endDate} />
         </Box>
       </Container>
 
