@@ -57,6 +57,7 @@ export { preferencesClient, PreferencesClient } from './preferences';
 // Document processing
 export { atsEvaluationClient, AtsEvaluationClient } from './atsEvaluation';
 export { resumesClient, ResumesClient } from './resume';
+export { parsingCorrectionsClient, ParsingCorrectionsClient } from './parsingCorrections';
 
 // Feedback & learning
 export { feedbackClient, FeedbackClient } from './feedback';
@@ -177,4 +178,30 @@ export type {
   JobSeekerStatus,
   JobDescriptionGenerateRequest,
   JobDescriptionResponse,
+  // Parsing correction types
+  SourceTextLocation,
+  CorrectionReason,
+  CorrectableFieldName,
+  ParsingCorrection,
+  ParsingCorrectionCreate,
+  ParsingCorrectionUpdate,
+  ParsingCorrectionResponse,
+  ParsingCorrectionsListResponse,
+  ParsingCorrectionCreateResponse,
+  FieldUpdateRequest,
+  FieldUpdateResponse,
+  LearningPatternType,
+  LearningFeedback,
+  LearningFeedbackCreate,
+  LearningFeedbackUpdate,
+  LearningFeedbackResponse,
+  LearningFeedbackListResponse,
+  LearningPatternSummary,
+  LearningFeedbackSummaryResponse,
+  FieldSourceLocation,
+  VisualParsingFeedback,
+  CorrectionStatistics,
+  CorrectionStatisticsResponse,
+  CorrectionsQueryParams,
+  LearningFeedbackQueryParams,
 } from '@/types/api';

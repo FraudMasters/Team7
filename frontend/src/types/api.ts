@@ -2625,3 +2625,34 @@ export interface CalendarConnectionListResponse {
   total: number;
 }
 
+// ==================== Parsing Correction Types ====================
+
+// Re-export types from parsingCorrection module for centralized access
+export type {
+  SourceTextLocation,
+  CorrectionReason,
+  CorrectableFieldName,
+  ParsingCorrection,
+  ParsingCorrectionCreate,
+  ParsingCorrectionUpdate,
+  ParsingCorrectionResponse,
+  ParsingCorrectionsListResponse,
+  ParsingCorrectionCreateResponse,
+  FieldUpdateRequest,
+  FieldUpdateResponse,
+  LearningPatternType,
+  LearningFeedback,
+  LearningFeedbackCreate,
+  LearningFeedbackUpdate,
+  LearningFeedbackResponse,
+  LearningFeedbackListResponse,
+  LearningPatternSummary,
+  LearningFeedbackSummaryResponse,
+  FieldSourceLocation,
+  VisualParsingFeedback,
+  CorrectionStatistics,
+  CorrectionStatisticsResponse,
+  CorrectionsQueryParams,
+  LearningFeedbackQueryParams,
+} from './parsingCorrection';
+
