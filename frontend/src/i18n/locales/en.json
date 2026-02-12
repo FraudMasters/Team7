@@ -1294,6 +1294,8 @@
       "title": "Why are you making this correction?",
       "description": "This information helps us improve our parsing accuracy.",
       "reason": "Reason",
+      "selectReason": "Select a reason...",
+      "reasonRequired": "Please select a reason for this correction",
       "note": "Additional notes (optional)",
       "notePlaceholder": "Any additional context about this correction...",
       "confirm": "Confirm Correction"

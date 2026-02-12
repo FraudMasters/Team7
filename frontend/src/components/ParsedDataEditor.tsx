@@ -250,8 +250,9 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
     originalValue: unknown;
     correctedValue: unknown;
   } | null>(null);
-  const [selectedReason, setSelectedReason] = useState<CorrectionReason>('other');
+  const [selectedReason, setSelectedReason] = useState<CorrectionReason | ''>('');
   const [correctionNote, setCorrectionNote] = useState('');
+  const [correctionDialogError, setCorrectionDialogError] = useState<string | null>(null);
 
   // Local data state (for modifications before save)
   const [localSkills, setLocalSkills] = useState<SkillItem[]>(skills);
@@ -435,10 +436,27 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
   }, [editState, localWorkHistory, onSave, t]);
 
   /**
+   * Validate correction dialog
+   */
+  const validateCorrectionDialog = useCallback((): boolean => {
+    if (!selectedReason) {
+      setCorrectionDialogError(t('parsedDataEditor.correctionDialog.reasonRequired', 'Please select a reason for this correction'));
+      return false;
+    }
+    setCorrectionDialogError(null);
+    return true;
+  }, [selectedReason, t]);
+
+  /**
    * Handle correction dialog confirm
    */
   const handleCorrectionConfirm = useCallback(() => {
     if (!pendingCorrection) return;
+
+    // Validate that a reason is selected
+    if (!validateCorrectionDialog()) {
+      return;
+    }
 
     // Create correction object
     const correction: ParsingCorrectionResponse = {
@@ -447,7 +465,7 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
       field_name: pendingCorrection.fieldName,
       original_value: pendingCorrection.originalValue as Record<string, unknown>,
       corrected_value: pendingCorrection.correctedValue as Record<string, unknown>,
-      reason: selectedReason,
+      reason: selectedReason as CorrectionReason,
       source_text_location: null,
       corrected_by: null,
       created_at: new Date().toISOString(),
@@ -459,10 +477,11 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
     // Reset state
     setCorrectionDialogOpen(false);
     setPendingCorrection(null);
-    setSelectedReason('other');
+    setSelectedReason('');
     setCorrectionNote('');
+    setCorrectionDialogError(null);
     setEditState({ type: null, index: null, isNew: false });
-  }, [pendingCorrection, resumeId, selectedReason, onCorrectionCreated]);
+  }, [pendingCorrection, resumeId, selectedReason, onCorrectionCreated, validateCorrectionDialog]);
 
   /**
    * Handle correction dialog cancel
@@ -470,8 +489,9 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
   const handleCorrectionCancel = useCallback(() => {
     setCorrectionDialogOpen(false);
     setPendingCorrection(null);
-    setSelectedReason('other');
+    setSelectedReason('');
     setCorrectionNote('');
+    setCorrectionDialogError(null);
     setEditState({ type: null, index: null, isNew: false });
   }, []);
 
@@ -973,15 +993,33 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
             {t('parsedDataEditor.correctionDialog.description', 'This information helps us improve our parsing accuracy.')}
           </Typography>
 
-          <FormControl fullWidth sx={{ mb: 2 }}>
+          {/* Correction Dialog Error */}
+          {correctionDialogError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCorrectionDialogError(null)}>
+              {correctionDialogError}
+            </Alert>
+          )}
+
+          <FormControl fullWidth sx={{ mb: 2 }} error={!selectedReason && !!correctionDialogError}>
             <InputLabel>
               {t('parsedDataEditor.correctionDialog.reason', 'Reason')}
             </InputLabel>
             <Select
               value={selectedReason}
-              onChange={(e) => setSelectedReason(e.target.value as CorrectionReason)}
+              onChange={(e) => {
+                setSelectedReason(e.target.value as CorrectionReason);
+                // Clear error when user selects a reason
+                if (correctionDialogError) {
+                  setCorrectionDialogError(null);
+                }
+              }}
               label={t('parsedDataEditor.correctionDialog.reason', 'Reason')}
             >
+              <MenuItem value="" disabled>
+                <Typography variant="body2" color="text.secondary">
+                  {t('parsedDataEditor.correctionDialog.selectReason', 'Select a reason...')}
+                </Typography>
+              </MenuItem>
               {correctionReasonOptions.map(option => (
                 <MenuItem key={option.value} value={option.value}>
                   <Box>
@@ -993,6 +1031,11 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
                 </MenuItem>
               ))}
             </Select>
+            {!selectedReason && correctionDialogError && (
+              <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                {correctionDialogError}
+              </Typography>
+            )}
           </FormControl>
 
           <TextField
@@ -1013,6 +1056,7 @@ const ParsedDataEditor: React.FC<ParsedDataEditorProps> = ({
             onClick={handleCorrectionConfirm}
             variant="contained"
             startIcon={<Icon name="check" size={16} />}
+            disabled={!selectedReason}
           >
             {t('parsedDataEditor.correctionDialog.confirm', 'Confirm Correction')}
           </Button>
