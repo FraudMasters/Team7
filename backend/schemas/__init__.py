@@ -24,6 +24,16 @@ from .plugin_manifest import (
     PluginEntryPoint,
     PluginCategory,
 )
+from .ranking_metrics import (
+    FeedbackConversionMetrics,
+    TopNRecommendationMetrics,
+    RankingConfidenceMetrics,
+    RankingPerformanceTrend,
+    RankingMetricsResponse,
+    RankingMetricsByVacancy,
+    RankingMetricsByRecruiter,
+    RankingLeaderboardResponse,
+)
 
 __all__ = [
     "BackupResponse",
@@ -43,4 +53,12 @@ __all__ = [
     "PluginDependency",
     "PluginEntryPoint",
     "PluginCategory",
+    "FeedbackConversionMetrics",
+    "TopNRecommendationMetrics",
+    "RankingConfidenceMetrics",
+    "RankingPerformanceTrend",
+    "RankingMetricsResponse",
+    "RankingMetricsByVacancy",
+    "RankingMetricsByRecruiter",
+    "RankingLeaderboardResponse",
 ]
