@@ -20,14 +20,35 @@ import {
   TextField,
   CircularProgress,
   IconButton,
+  Switch,
+  FormControlLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tooltip,
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
 import { savedSearchesClient } from '@/api/savedSearches';
+import { filterSuggestionsClient } from '@/api/filterSuggestions';
 import type {
   SavedSearchResponse,
   SavedSearchCreate,
   SavedSearchUpdate,
 } from '@/types/api';
+import type {
+  AlertSettingsUpdate,
+  AlertSettingsResponse,
+} from '@/api/filterSuggestions';
+
+/**
+ * Extended saved search response with alert settings
+ */
+interface SavedSearchWithAlerts extends SavedSearchResponse {
+  alert_enabled?: boolean;
+  alert_frequency?: string | null;
+  last_alert_at?: string | null;
+}
 
 /**
  * Form data for creating/editing saved searches
@@ -37,6 +58,11 @@ interface SavedSearchFormData {
   query: string;
   filters: Record<string, unknown>;
 }
+
+/**
+ * Alert frequency options
+ */
+type AlertFrequency = 'realtime' | 'daily' | 'weekly';
 
 /**
  * Saved search manager component props
@@ -52,11 +78,13 @@ interface SavedSearchManagerProps {
  * SavedSearchManager Component
  *
  * Provides a comprehensive interface for managing saved searches. Features include:
- * - List all saved searches
+ * - List all saved searches with alert status
  * - Create new saved search entries
  * - Edit existing saved search entries
  * - Delete saved searches
- * - Execute saved searches
+ * - One-click apply to execute saved searches instantly
+ * - Toggle alert settings with configurable frequency (real-time, daily, weekly)
+ * - Visual indicators for alert-enabled searches
  * - Real-time updates with optimistic UI
  *
  * @example
@@ -74,13 +102,19 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savedSearches, setSavedSearches] = useState<SavedSearchResponse[]>([]);
+  const [savedSearches, setSavedSearches] = useState<SavedSearchWithAlerts[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingSearch, setEditingSearch] = useState<SavedSearchResponse | null>(null);
+  const [editingSearch, setEditingSearch] = useState<SavedSearchWithAlerts | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [searchToDelete, setSearchToDelete] = useState<SavedSearchResponse | null>(null);
+  const [searchToDelete, setSearchToDelete] = useState<SavedSearchWithAlerts | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Alert settings state - map of search ID to alert settings
+  const [alertSettings, setAlertSettings] = useState<Record<string, AlertSettingsResponse>>({});
+
+  // One-click apply state
+  const [applyingSearchId, setApplyingSearchId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<SavedSearchFormData>({
@@ -128,7 +162,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
   /**
    * Open edit dialog
    */
-  const handleEdit = (search: SavedSearchResponse) => {
+  const handleEdit = (search: SavedSearchWithAlerts) => {
     setEditingSearch(search);
     setFormData({
       name: search.name,
@@ -141,16 +175,117 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
   /**
    * Handle executing a saved search
    */
-  const handleExecuteSearch = (search: SavedSearchResponse) => {
+  const handleExecuteSearch = (search: SavedSearchWithAlerts) => {
     if (onSearchSelect) {
       onSearchSelect(search);
     }
   };
 
   /**
+   * One-click apply saved search
+   * Executes the saved search directly and returns results via callback
+   */
+  const handleOneClickApply = async (search: SavedSearchWithAlerts) => {
+    setApplyingSearchId(search.id);
+    try {
+      await filterSuggestionsClient.applySavedSearch(search.id);
+
+      // Notify parent of the search results
+      if (onSearchSelect) {
+        onSearchSelect(search);
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to apply saved search';
+      setError(errorMessage);
+    } finally {
+      setApplyingSearchId(null);
+    }
+  };
+
+  /**
+   * Toggle alert settings for a saved search
+   */
+  const handleAlertToggle = async (search: SavedSearchWithAlerts, enabled: boolean) => {
+    const currentSettings = alertSettings[search.id];
+    const newFrequency = currentSettings?.alert_frequency || 'daily';
+
+    try {
+      const settings: AlertSettingsUpdate = {
+        alert_enabled: enabled,
+        alert_frequency: enabled ? (newFrequency as AlertFrequency) : undefined,
+      };
+
+      const updated = await filterSuggestionsClient.updateAlertSettings(search.id, settings);
+
+      // Update local state
+      setAlertSettings((prev) => ({
+        ...prev,
+        [search.id]: updated,
+      }));
+
+      // Update the search in the list
+      setSavedSearches((searches) =>
+        searches.map((s) =>
+          s.id === search.id
+            ? {
+                ...s,
+                alert_enabled: updated.alert_enabled,
+                alert_frequency: updated.alert_frequency,
+                last_alert_at: updated.last_alert_at,
+              }
+            : s
+        )
+      );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to update alert settings';
+      setError(errorMessage);
+    }
+  };
+
+  /**
+   * Change alert frequency for a saved search
+   */
+  const handleAlertFrequencyChange = async (
+    search: SavedSearchWithAlerts,
+    frequency: AlertFrequency
+  ) => {
+    try {
+      const settings: AlertSettingsUpdate = {
+        alert_frequency: frequency,
+      };
+
+      const updated = await filterSuggestionsClient.updateAlertSettings(search.id, settings);
+
+      // Update local state
+      setAlertSettings((prev) => ({
+        ...prev,
+        [search.id]: updated,
+      }));
+
+      // Update the search in the list
+      setSavedSearches((searches) =>
+        searches.map((s) =>
+          s.id === search.id
+            ? {
+                ...s,
+                alert_frequency: updated.alert_frequency,
+              }
+            : s
+        )
+      );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to update alert frequency';
+      setError(errorMessage);
+    }
+  };
+
+  /**
    * Open delete confirmation dialog
    */
-  const handleDeleteClick = (search: SavedSearchResponse) => {
+  const handleDeleteClick = (search: SavedSearchWithAlerts) => {
     setSearchToDelete(search);
     setDeleteDialogOpen(true);
   };
@@ -336,7 +471,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
 
         {/* Summary Statistics */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <Card variant="outlined" sx={{ borderColor: 'primary' }}>
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" color="primary" fontWeight={700}>
@@ -348,7 +483,7 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <Card variant="outlined" sx={{ borderColor: 'success' }}>
               <CardContent sx={{ textAlign: 'center', py: 1 }}>
                 <Typography variant="h4" color="success" fontWeight={700}>
@@ -356,6 +491,18 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                 </Typography>
                 <Typography variant="caption" color="secondary">
                   With Queries
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Card variant="outlined" sx={{ borderColor: 'warning' }}>
+              <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="h4" color="warning" fontWeight={700}>
+                  {savedSearches.filter((s) => s.alert_enabled).length}
+                </Typography>
+                <Typography variant="caption" color="secondary">
+                  Alerts Enabled
                 </Typography>
               </CardContent>
             </Card>
@@ -394,6 +541,8 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                 variant="outlined"
                 sx={{
                   transition: 'transform 0.2s, box-shadow 0.2s',
+                  borderLeft: search.alert_enabled ? '4px solid' : undefined,
+                  borderLeftColor: search.alert_enabled ? 'warning.main' : undefined,
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: 4,
@@ -403,9 +552,22 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" fontWeight={600} gutterBottom>
-                        {search.name}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography variant="h6" fontWeight={600}>
+                          {search.name}
+                        </Typography>
+                        {search.alert_enabled && (
+                          <Tooltip title="Alerts enabled">
+                            <Chip
+                              icon={<Icon name="bell" />}
+                              label={search.alert_frequency || 'daily'}
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                            />
+                          </Tooltip>
+                        )}
+                      </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
                         <Chip
                           icon={<Icon name="search" />}
@@ -422,13 +584,22 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                       </Box>
                     </Box>
                     <Stack direction="row" spacing={1}>
+                      {/* One-click Apply Button */}
                       <Button
                         size="small"
-                        onClick={() => handleExecuteSearch(search)}
-                        variant="outlined"
-                        startIcon={<Icon name="search" />}
+                        onClick={() => handleOneClickApply(search)}
+                        variant="contained"
+                        color="primary"
+                        startIcon={
+                          applyingSearchId === search.id ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <Icon name="play" />
+                          )
+                        }
+                        disabled={applyingSearchId === search.id}
                       >
-                        Run Search
+                        {applyingSearchId === search.id ? 'Applying...' : 'Apply'}
                       </Button>
                       <IconButton
                         size="small"
@@ -468,6 +639,48 @@ const SavedSearchManager: React.FC<SavedSearchManagerProps> = ({
                       </Box>
                     </>
                   )}
+
+                  {/* Alert Settings Section */}
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={search.alert_enabled || false}
+                            onChange={(e) => handleAlertToggle(search, e.target.checked)}
+                            color="warning"
+                          />
+                        }
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Icon name="bell" fontSize="small" />
+                            <Typography variant="body2">Get notified when new candidates match</Typography>
+                          </Box>
+                        }
+                      />
+                      {search.alert_enabled && (
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                          <InputLabel id={`alert-frequency-${search.id}`}>Frequency</InputLabel>
+                          <Select
+                            labelId={`alert-frequency-${search.id}`}
+                            value={search.alert_frequency || 'daily'}
+                            label="Frequency"
+                            onChange={(e) => handleAlertFrequencyChange(search, e.target.value as AlertFrequency)}
+                          >
+                            <MenuItem value="realtime">Real-time</MenuItem>
+                            <MenuItem value="daily">Daily</MenuItem>
+                            <MenuItem value="weekly">Weekly</MenuItem>
+                          </Select>
+                        </FormControl>
+                      )}
+                    </Box>
+                    {search.last_alert_at && (
+                      <Typography variant="caption" color="secondary">
+                        Last alert: {new Date(search.last_alert_at).toLocaleString()}
+                      </Typography>
+                    )}
+                  </Box>
 
                   <Typography variant="caption" color="secondary" sx={{ display: 'block', mt: 2 }}>
                     Last updated: {new Date(search.updated_at).toLocaleString()}

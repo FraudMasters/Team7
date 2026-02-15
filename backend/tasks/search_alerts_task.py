@@ -464,6 +464,12 @@ async def _process_saved_searches(
     """
     Process saved searches and create alerts for matches (async).
 
+    This function respects alert settings:
+    - Only processes saved searches where alert_enabled is True
+    - For 'daily' frequency: only creates alert if last_alert_at > 24 hours ago
+    - For 'weekly' frequency: only creates alert if last_alert_at > 7 days ago
+    - For 'realtime' frequency: always creates alert (no throttling)
+
     Args:
         resume_id: UUID of the resume to check
         resume_data: Dictionary containing resume information
@@ -471,21 +477,32 @@ async def _process_saved_searches(
     Returns:
         Dictionary with processing results
     """
+    from datetime import timedelta
+
     async with async_session_maker() as db:
-        # Query all saved searches
-        stmt = select(SavedSearch)
+        # Query only saved searches with alerts enabled
+        stmt = select(SavedSearch).where(
+            SavedSearch.alert_enabled == True
+        )
         result = await db.execute(stmt)
         saved_searches = result.scalars().all()
 
         matches_found = 0
         alerts_created = []
         match_details = []
+        searches_skipped_frequency = 0
 
         # Get unified matcher instance
         matcher = get_unified_matcher()
+        now = datetime.utcnow()
 
         # Check resume against each saved search
         for search in saved_searches:
+            # Check if alert should be sent based on frequency and last_alert_at
+            if not _should_send_alert(search, now):
+                searches_skipped_frequency += 1
+                continue
+
             match_result = await _check_resume_against_search(
                 db=db,
                 resume_id=resume_id,
@@ -504,6 +521,10 @@ async def _process_saved_searches(
                     is_sent=False,
                 )
                 db.add(alert)
+
+                # Update last_alert_at timestamp on the saved search
+                search.last_alert_at = now
+
                 await db.flush()
 
                 alerts_created.append({
@@ -530,11 +551,55 @@ async def _process_saved_searches(
             "resume_id": resume_id,
             "status": "completed",
             "total_searches_checked": len(saved_searches),
+            "searches_skipped_frequency": searches_skipped_frequency,
             "matches_found": matches_found,
             "alerts_created": len(alerts_created),
             "alert_ids": [a["alert_id"] for a in alerts_created],
             "match_details": match_details,
         }
+
+
+def _should_send_alert(saved_search: SavedSearch, now: datetime) -> bool:
+    """
+    Determine if an alert should be sent based on frequency and last_alert_at.
+
+    Args:
+        saved_search: The SavedSearch instance to check
+        now: Current datetime for comparison
+
+    Returns:
+        True if alert should be sent, False otherwise
+    """
+    from datetime import timedelta
+
+    # If no frequency set, default to realtime behavior
+    frequency = saved_search.alert_frequency or "realtime"
+
+    # If never sent an alert before, always send
+    if saved_search.last_alert_at is None:
+        return True
+
+    last_alert = saved_search.last_alert_at
+    time_since_last = now - last_alert
+
+    # Realtime: always send alerts (no throttling)
+    if frequency == "realtime":
+        return True
+
+    # Daily: only send if at least 24 hours have passed
+    if frequency == "daily":
+        return time_since_last >= timedelta(hours=24)
+
+    # Weekly: only send if at least 7 days have passed
+    if frequency == "weekly":
+        return time_since_last >= timedelta(days=7)
+
+    # Unknown frequency, default to realtime behavior
+    logger.warning(
+        f"Unknown alert_frequency '{frequency}' for saved search '{saved_search.name}', "
+        "defaulting to realtime behavior"
+    )
+    return True
 
 
 async def _process_pending_alerts_batch(
