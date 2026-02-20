@@ -1518,6 +1518,266 @@ class SourceTrackingResponse(BaseModel):
     total_candidates: int = Field(..., description="Total candidates across all sources")
 
 
+# =============================================================================
+# AI Explainability Endpoints
+# =============================================================================
+
+
+class ConfidenceInterval(BaseModel):
+    """Confidence interval for model predictions."""
+
+    lower: float = Field(..., description="Lower bound of confidence interval")
+    upper: float = Field(..., description="Upper bound of confidence interval")
+    confidence_level: float = Field(..., description="Statistical confidence level (e.g., 0.95 for 95%)")
+
+
+class ConfidenceDistribution(BaseModel):
+    """Distribution of confidence scores across predictions."""
+
+    high_confidence_count: int = Field(
+        ..., description="Number of predictions with high confidence (>=0.8)"
+    )
+    medium_confidence_count: int = Field(
+        ..., description="Number of predictions with medium confidence (0.5-0.8)"
+    )
+    low_confidence_count: int = Field(
+        ..., description="Number of predictions with low confidence (<0.5)"
+    )
+
+
+class ConfidenceMetricsResponse(BaseModel):
+    """Response model for AI confidence metrics."""
+
+    average_confidence: float = Field(..., description="Average model confidence across all predictions")
+    confidence_interval: ConfidenceInterval = Field(
+        ..., description="Confidence interval for the average confidence"
+    )
+    distribution: ConfidenceDistribution = Field(
+        ..., description="Distribution of predictions by confidence level"
+    )
+    confidence_accuracy_correlation: float = Field(
+        ..., description="Correlation between confidence and actual accuracy (-1 to 1)"
+    )
+
+
+@router.get(
+    "/ai-explainability/confidence",
+    response_model=ConfidenceMetricsResponse,
+    tags=["AI Explainability"],
+)
+async def get_confidence_metrics(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get AI model confidence metrics with uncertainty quantification.
+
+    This endpoint provides transparency into the ML model's prediction confidence,
+    including average confidence scores, confidence intervals, and distribution
+    breakdown. It helps recruiters understand how much to trust AI recommendations.
+
+    The confidence distribution categorizes predictions into:
+    - High confidence (>=0.8): Strong predictions with reliable scores
+    - Medium confidence (0.5-0.8): Moderate predictions requiring human review
+    - Low confidence (<0.5): Weak predictions needing manual evaluation
+
+    Args:
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with confidence metrics including average, intervals, and distribution
+
+    Raises:
+        HTTPException(400): If date format is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/analytics/ai-explainability/confidence")
+        >>> response.json()
+        {
+            "average_confidence": 0.78,
+            "confidence_interval": {
+                "lower": 0.66,
+                "upper": 0.90,
+                "confidence_level": 0.95
+            },
+            "distribution": {
+                "high_confidence_count": 150,
+                "medium_confidence_count": 80,
+                "low_confidence_count": 20
+            },
+            "confidence_accuracy_correlation": 0.72
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching AI confidence metrics - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        from sqlalchemy import func
+        from models.candidate_rank import CandidateRank, RankingFeedback
+        from database import get_db
+        import statistics
+
+        response_data = {}
+
+        async for db in get_db():
+            # Build base query for CandidateRank
+            query = select(CandidateRank).where(
+                CandidateRank.prediction_confidence.isnot(None)
+            )
+
+            # Apply date filters if provided
+            if start_date:
+                from datetime import datetime
+                try:
+                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    query = query.where(CandidateRank.created_at >= start_dt)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
+                    )
+
+            if end_date:
+                from datetime import datetime
+                try:
+                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    query = query.where(CandidateRank.created_at <= end_dt)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
+                    )
+
+            # Get all confidence values
+            result = await db.execute(query)
+            ranks = result.scalars().all()
+
+            if not ranks:
+                # Return defaults if no data
+                response_data = {
+                    "average_confidence": 0.0,
+                    "confidence_interval": {
+                        "lower": 0.0,
+                        "upper": 0.0,
+                        "confidence_level": 0.95,
+                    },
+                    "distribution": {
+                        "high_confidence_count": 0,
+                        "medium_confidence_count": 0,
+                        "low_confidence_count": 0,
+                    },
+                    "confidence_accuracy_correlation": 0.0,
+                }
+            else:
+                # Extract confidence values
+                confidences = [
+                    float(r.prediction_confidence)
+                    for r in ranks
+                    if r.prediction_confidence is not None
+                ]
+
+                # Calculate average confidence
+                avg_confidence = statistics.mean(confidences) if confidences else 0.0
+
+                # Calculate confidence interval (95% using standard deviation)
+                if len(confidences) > 1:
+                    std_dev = statistics.stdev(confidences)
+                    n = len(confidences)
+                    # Standard error of the mean
+                    standard_error = std_dev / (n ** 0.5)
+                    # 95% confidence interval (approximate using 1.96 * SE)
+                    margin = 1.96 * standard_error
+                    lower_bound = max(0.0, avg_confidence - margin)
+                    upper_bound = min(1.0, avg_confidence + margin)
+                else:
+                    lower_bound = avg_confidence
+                    upper_bound = avg_confidence
+
+                # Calculate distribution
+                high_confidence = sum(1 for c in confidences if c >= 0.8)
+                medium_confidence = sum(1 for c in confidences if 0.5 <= c < 0.8)
+                low_confidence = sum(1 for c in confidences if c < 0.5)
+
+                # Calculate confidence-accuracy correlation
+                # This requires feedback data to compare confidence vs actual outcomes
+                correlation = 0.0
+
+                # Get feedback data to calculate correlation
+                rank_ids = [r.id for r in ranks]
+                if rank_ids:
+                    feedback_query = select(RankingFeedback).where(
+                        RankingFeedback.rank_id.in_(rank_ids),
+                        RankingFeedback.was_helpful.isnot(None)
+                    )
+                    feedback_result = await db.execute(feedback_query)
+                    feedbacks = feedback_result.scalars().all()
+
+                    if len(feedbacks) >= 3:
+                        # Build paired data for correlation calculation
+                        confidence_values = []
+                        accuracy_values = []
+
+                        # Create lookup for ranks by id
+                        rank_lookup = {r.id: r for r in ranks}
+
+                        for fb in feedbacks:
+                            if fb.rank_id in rank_lookup:
+                                rank = rank_lookup[fb.rank_id]
+                                if rank.prediction_confidence is not None:
+                                    confidence_values.append(float(rank.prediction_confidence))
+                                    # Convert was_helpful to accuracy (1 for helpful, 0 for not)
+                                    accuracy_values.append(1.0 if fb.was_helpful else 0.0)
+
+                        # Calculate Pearson correlation if we have enough data
+                        if len(confidence_values) >= 3:
+                            try:
+                                correlation = statistics.correlation(
+                                    confidence_values, accuracy_values
+                                )
+                            except statistics.StatisticsError:
+                                correlation = 0.0
+
+                response_data = {
+                    "average_confidence": round(avg_confidence, 4),
+                    "confidence_interval": {
+                        "lower": round(lower_bound, 4),
+                        "upper": round(upper_bound, 4),
+                        "confidence_level": 0.95,
+                    },
+                    "distribution": {
+                        "high_confidence_count": high_confidence,
+                        "medium_confidence_count": medium_confidence,
+                        "low_confidence_count": low_confidence,
+                    },
+                    "confidence_accuracy_correlation": round(correlation, 4),
+                }
+
+            break
+
+        logger.info(
+            f"AI confidence metrics retrieved successfully - "
+            f"average: {response_data.get('average_confidence', 0)}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving AI confidence metrics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve AI confidence metrics: {str(e)}",
+        ) from e
+
+
 @router.get(
     "/source-tracking",
     response_model=SourceTrackingResponse,
