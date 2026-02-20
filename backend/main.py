@@ -256,6 +256,7 @@ async def root() -> JSONResponse:
 from api import (
     resumes,
     resume_templates,
+    resume_builder,
     analysis,
     saved_jobs,
     matching,
@@ -301,6 +302,7 @@ from api import (
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(resume_templates.router, prefix="/api/resume-templates", tags=["Resume Templates"])
+app.include_router(resume_builder.router, prefix="/api/resume-builder", tags=["Resume Builder"])
 app.include_router(analysis.router, prefix="/api/resumes", tags=["Analysis"])
 app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
 app.include_router(matching_weights.router, prefix="/api/matching-weights", tags=["Matching Weights"])
