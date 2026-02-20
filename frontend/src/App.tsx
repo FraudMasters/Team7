@@ -39,6 +39,7 @@ import { InterviewTipsPage } from './pages/jobs/InterviewTipsPage';
 import { JobAlertsPage } from './pages/jobs/JobAlertsPage';
 import { SettingsPage } from './pages/jobs/SettingsPage';
 import { ResumeOptimizationPage } from './pages/jobs/ResumeOptimizationPage';
+import { ResumeBuilderPage } from './pages/jobs/ResumeBuilderPage';
 
 // Recruiter Pages
 import { DashboardPage } from './pages/recruiter/DashboardPage';
@@ -160,6 +161,7 @@ function App() {
           <Route path="applications" element={<MyApplicationsPage />} />
           <Route path="upload" element={<ResumeUploadPage />} />
           <Route path="resume-templates" element={<ResumeTemplatesPage />} />
+          <Route path="resume-builder" element={<ResumeBuilderPage />} />
           <Route path="resume-results/:id" element={<ResumeResultsPage />} />
           <Route path="recommended" element={<RecommendedJobsPage />} />
           <Route path="assessment" element={<SkillAssessmentPage />} />
