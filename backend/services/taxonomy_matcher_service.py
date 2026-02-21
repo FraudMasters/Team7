@@ -22,6 +22,111 @@ from skills.skills_matcher import SkillsMatcher
 logger = logging.getLogger(__name__)
 
 
+# Built-in common skill aliases and abbreviations
+# These serve as a fallback when taxonomy data is not available
+_COMMON_SKILL_ALIASES: Dict[str, Dict[str, Any]] = {
+    # Programming languages
+    "js": {"resolved": "JavaScript", "industry": "tech", "context": "programming_language"},
+    "ts": {"resolved": "TypeScript", "industry": "tech", "context": "programming_language"},
+    "py": {"resolved": "Python", "industry": "tech", "context": "programming_language"},
+    "rb": {"resolved": "Ruby", "industry": "tech", "context": "programming_language"},
+    "java": {"resolved": "Java", "industry": "tech", "context": "programming_language"},
+    "csharp": {"resolved": "C#", "industry": "tech", "context": "programming_language"},
+    "c#": {"resolved": "C#", "industry": "tech", "context": "programming_language"},
+    "cpp": {"resolved": "C++", "industry": "tech", "context": "programming_language"},
+    "c++": {"resolved": "C++", "industry": "tech", "context": "programming_language"},
+    "golang": {"resolved": "Go", "industry": "tech", "context": "programming_language"},
+    "go": {"resolved": "Go", "industry": "tech", "context": "programming_language"},
+    "kt": {"resolved": "Kotlin", "industry": "tech", "context": "programming_language"},
+    "scala": {"resolved": "Scala", "industry": "tech", "context": "programming_language"},
+    "rust": {"resolved": "Rust", "industry": "tech", "context": "programming_language"},
+    "php": {"resolved": "PHP", "industry": "tech", "context": "programming_language"},
+    "swift": {"resolved": "Swift", "industry": "tech", "context": "programming_language"},
+    # Web frameworks
+    "reactjs": {"resolved": "React", "industry": "tech", "context": "web_framework"},
+    "react.js": {"resolved": "React", "industry": "tech", "context": "web_framework"},
+    "vuejs": {"resolved": "Vue", "industry": "tech", "context": "web_framework"},
+    "vue.js": {"resolved": "Vue", "industry": "tech", "context": "web_framework"},
+    "angularjs": {"resolved": "Angular", "industry": "tech", "context": "web_framework"},
+    "angular.js": {"resolved": "Angular", "industry": "tech", "context": "web_framework"},
+    "nextjs": {"resolved": "Next.js", "industry": "tech", "context": "web_framework"},
+    "next.js": {"resolved": "Next.js", "industry": "tech", "context": "web_framework"},
+    "nuxtjs": {"resolved": "Nuxt.js", "industry": "tech", "context": "web_framework"},
+    "nuxt.js": {"resolved": "Nuxt.js", "industry": "tech", "context": "web_framework"},
+    "svelte": {"resolved": "Svelte", "industry": "tech", "context": "web_framework"},
+    # Backend frameworks
+    "django": {"resolved": "Django", "industry": "tech", "context": "web_framework"},
+    "flask": {"resolved": "Flask", "industry": "tech", "context": "web_framework"},
+    "fastapi": {"resolved": "FastAPI", "industry": "tech", "context": "web_framework"},
+    "expressjs": {"resolved": "Express.js", "industry": "tech", "context": "web_framework"},
+    "express": {"resolved": "Express.js", "industry": "tech", "context": "web_framework"},
+    "nodejs": {"resolved": "Node.js", "industry": "tech", "context": "runtime"},
+    "node.js": {"resolved": "Node.js", "industry": "tech", "context": "runtime"},
+    "node": {"resolved": "Node.js", "industry": "tech", "context": "runtime"},
+    # Databases
+    "postgres": {"resolved": "PostgreSQL", "industry": "tech", "context": "database"},
+    "postgresql": {"resolved": "PostgreSQL", "industry": "tech", "context": "database"},
+    "mysql": {"resolved": "MySQL", "industry": "tech", "context": "database"},
+    "mongodb": {"resolved": "MongoDB", "industry": "tech", "context": "database"},
+    "redis": {"resolved": "Redis", "industry": "tech", "context": "database"},
+    "sqlite": {"resolved": "SQLite", "industry": "tech", "context": "database"},
+    # Cloud/DevOps
+    "aws": {"resolved": "Amazon Web Services", "industry": "tech", "context": "cloud"},
+    "gcp": {"resolved": "Google Cloud Platform", "industry": "tech", "context": "cloud"},
+    "azure": {"resolved": "Microsoft Azure", "industry": "tech", "context": "cloud"},
+    "k8s": {"resolved": "Kubernetes", "industry": "tech", "context": "devops"},
+    "kubernetes": {"resolved": "Kubernetes", "industry": "tech", "context": "devops"},
+    "docker": {"resolved": "Docker", "industry": "tech", "context": "devops"},
+    "ci/cd": {"resolved": "CI/CD", "industry": "tech", "context": "devops"},
+    "cicd": {"resolved": "CI/CD", "industry": "tech", "context": "devops"},
+    "terraform": {"resolved": "Terraform", "industry": "tech", "context": "devops"},
+    "ansible": {"resolved": "Ansible", "industry": "tech", "context": "devops"},
+    # Data Science / ML
+    "ml": {"resolved": "Machine Learning", "industry": "tech", "context": "data_science"},
+    "ai": {"resolved": "Artificial Intelligence", "industry": "tech", "context": "data_science"},
+    "nlp": {"resolved": "Natural Language Processing", "industry": "tech", "context": "data_science"},
+    "cv": {"resolved": "Computer Vision", "industry": "tech", "context": "data_science"},
+    "dl": {"resolved": "Deep Learning", "industry": "tech", "context": "data_science"},
+    "tensorflow": {"resolved": "TensorFlow", "industry": "tech", "context": "ml_framework"},
+    "pytorch": {"resolved": "PyTorch", "industry": "tech", "context": "ml_framework"},
+    "keras": {"resolved": "Keras", "industry": "tech", "context": "ml_framework"},
+    "pandas": {"resolved": "Pandas", "industry": "tech", "context": "data_analysis"},
+    "numpy": {"resolved": "NumPy", "industry": "tech", "context": "data_analysis"},
+    # Other common abbreviations
+    "api": {"resolved": "API", "industry": "tech", "context": "software"},
+    "rest": {"resolved": "REST API", "industry": "tech", "context": "software"},
+    "graphql": {"resolved": "GraphQL", "industry": "tech", "context": "software"},
+    "sql": {"resolved": "SQL", "industry": "tech", "context": "database"},
+    "html": {"resolved": "HTML", "industry": "tech", "context": "web"},
+    "css": {"resolved": "CSS", "industry": "tech", "context": "web"},
+    "sass": {"resolved": "Sass", "industry": "tech", "context": "web"},
+    "scss": {"resolved": "SCSS", "industry": "tech", "context": "web"},
+    "ui": {"resolved": "UI Design", "industry": "tech", "context": "design"},
+    "ux": {"resolved": "UX Design", "industry": "tech", "context": "design"},
+    "figma": {"resolved": "Figma", "industry": "tech", "context": "design_tool"},
+    # Testing
+    "tdd": {"resolved": "Test-Driven Development", "industry": "tech", "context": "methodology"},
+    "bdd": {"resolved": "Behavior-Driven Development", "industry": "tech", "context": "methodology"},
+    "jest": {"resolved": "Jest", "industry": "tech", "context": "testing"},
+    "pytest": {"resolved": "pytest", "industry": "tech", "context": "testing"},
+    "cypress": {"resolved": "Cypress", "industry": "tech", "context": "testing"},
+    # Mobile
+    "ios": {"resolved": "iOS Development", "industry": "tech", "context": "mobile"},
+    "android": {"resolved": "Android Development", "industry": "tech", "context": "mobile"},
+    "reactnative": {"resolved": "React Native", "industry": "tech", "context": "mobile"},
+    "react native": {"resolved": "React Native", "industry": "tech", "context": "mobile"},
+    "flutter": {"resolved": "Flutter", "industry": "tech", "context": "mobile"},
+    # Methodologies
+    "agile": {"resolved": "Agile", "industry": "tech", "context": "methodology"},
+    "scrum": {"resolved": "Scrum", "industry": "tech", "context": "methodology"},
+    "devops": {"resolved": "DevOps", "industry": "tech", "context": "methodology"},
+    # Version Control
+    "git": {"resolved": "Git", "industry": "tech", "context": "version_control"},
+    "github": {"resolved": "GitHub", "industry": "tech", "context": "version_control"},
+    "gitlab": {"resolved": "GitLab", "industry": "tech", "context": "version_control"},
+}
+
+
 @dataclass
 class TaxonomyMatchResult:
     """
@@ -450,33 +555,122 @@ class TaxonomyMatcherService:
         """
         Resolve a skill alias to its canonical form.
 
-        This is a synchronous method that uses cached data for fast lookups.
-        For database-backed resolution, use resolve_alias_async instead.
+        This is a synchronous method that uses cached data and built-in
+        alias mappings for fast lookups. For database-backed resolution
+        with custom taxonomy data, use resolve_alias_async instead.
+
+        The resolution process:
+        1. Check the alias cache for previously resolved aliases
+        2. Normalize the alias and check against built-in common aliases
+        3. Cache and return the result if found
 
         Args:
             alias: The alias or variant to resolve
-            industry: Optional industry filter
-            organization_id: Optional organization filter
+            industry: Optional industry filter (filters results by industry)
+            organization_id: Optional organization filter (for caching purposes)
 
         Returns:
             AliasResolution if found, None otherwise
 
-        Note:
-            This method is implemented in subtask-3-2. The current
-            implementation is a stub that returns None.
-
         Example:
             >>> resolution = service.resolve_alias("JS")
             >>> print(resolution.resolved_skill)  # 'JavaScript'
+            >>> print(resolution.industry)  # 'tech'
+            >>> print(resolution.confidence)  # 1.0
         """
+        # Validate input
+        if not alias or not isinstance(alias, str):
+            return None
+
         # Check cache first
         cache_key = f"{alias}:{industry}:{organization_id}"
         if cache_key in self._alias_cache:
+            logger.debug(f"Alias cache hit for '{alias}'")
             return self._alias_cache[cache_key]
 
-        # TODO: Implement full alias resolution in subtask-3-2
-        # For now, return None to indicate no match found
-        logger.debug(f"Alias resolution not yet implemented for '{alias}'")
+        # Normalize the alias for matching
+        normalized_alias = self.skills_matcher.normalize_skill(alias)
+
+        # Check against built-in common aliases
+        alias_data = _COMMON_SKILL_ALIASES.get(normalized_alias)
+
+        if alias_data:
+            # Apply industry filter if specified
+            if industry and alias_data.get("industry") != industry:
+                logger.debug(
+                    f"Alias '{alias}' found but filtered by industry "
+                    f"(expected: {industry}, got: {alias_data.get('industry')})"
+                )
+                return None
+
+            # Create the resolution result
+            resolution = AliasResolution(
+                alias=alias,
+                resolved_skill=alias_data["resolved"],
+                industry=alias_data.get("industry"),
+                context=alias_data.get("context"),
+                confidence=1.0,  # High confidence for exact alias matches
+            )
+
+            # Cache the result
+            self._alias_cache[cache_key] = resolution
+
+            logger.debug(
+                f"Resolved alias '{alias}' to '{resolution.resolved_skill}' "
+                f"(industry: {resolution.industry}, context: {resolution.context})"
+            )
+
+            return resolution
+
+        # Try to find a fuzzy match in the aliases
+        try:
+            from rapidfuzz import process, fuzz
+
+            alias_names = list(_COMMON_SKILL_ALIASES.keys())
+            result = process.extractOne(
+                normalized_alias,
+                alias_names,
+                scorer=fuzz.WRatio,
+            )
+
+            if result and result[1] >= self.fuzzy_threshold:
+                matched_alias = result[0]
+                alias_data = _COMMON_SKILL_ALIASES[matched_alias]
+
+                # Apply industry filter if specified
+                if industry and alias_data.get("industry") != industry:
+                    logger.debug(
+                        f"Fuzzy alias match for '{alias}' found but filtered by industry"
+                    )
+                    return None
+
+                # Create the resolution result with reduced confidence for fuzzy matches
+                confidence = result[1] / 100.0
+                resolution = AliasResolution(
+                    alias=alias,
+                    resolved_skill=alias_data["resolved"],
+                    industry=alias_data.get("industry"),
+                    context=alias_data.get("context"),
+                    confidence=confidence,
+                )
+
+                # Cache the result
+                self._alias_cache[cache_key] = resolution
+
+                logger.debug(
+                    f"Fuzzy resolved alias '{alias}' to '{resolution.resolved_skill}' "
+                    f"(confidence: {confidence:.2f})"
+                )
+
+                return resolution
+
+        except ImportError:
+            logger.warning("rapidfuzz not installed, skipping fuzzy alias matching")
+        except Exception as e:
+            logger.error(f"Error during fuzzy alias matching: {e}")
+
+        # No match found
+        logger.debug(f"No alias resolution found for '{alias}'")
         return None
 
     async def resolve_alias_async(
@@ -489,7 +683,15 @@ class TaxonomyMatcherService:
         """
         Resolve a skill alias to its canonical form asynchronously.
 
-        This method queries the database for alias/variant resolution.
+        This method queries the database for alias/variant resolution using
+        the skill taxonomy. If no database is available, it falls back to
+        the built-in alias mappings.
+
+        The resolution process:
+        1. Check the alias cache for previously resolved aliases
+        2. Query the database for taxonomy entries with matching variants
+        3. Fall back to built-in alias mappings if no database match
+        4. Cache and return the result
 
         Args:
             alias: The alias or variant to resolve
@@ -499,16 +701,100 @@ class TaxonomyMatcherService:
         Returns:
             AliasResolution if found, None otherwise
 
-        Note:
-            This method is implemented in subtask-3-2. The current
-            implementation is a stub that returns None.
-
         Example:
             >>> resolution = await service.resolve_alias_async("JS")
             >>> print(resolution.resolved_skill)  # 'JavaScript'
         """
-        # TODO: Implement full async alias resolution in subtask-3-2
-        # For now, fall back to the sync method
+        # Validate input
+        if not alias or not isinstance(alias, str):
+            return None
+
+        # Check cache first
+        cache_key = f"{alias}:{industry}:{organization_id}"
+        if cache_key in self._alias_cache:
+            logger.debug(f"Alias cache hit for '{alias}'")
+            return self._alias_cache[cache_key]
+
+        # Try database lookup if available
+        if self.db:
+            try:
+                normalized_alias = self.skills_matcher.normalize_skill(alias)
+
+                # Query taxonomy entries that have variants matching the alias
+                query = select(SkillTaxonomy).where(
+                    and_(
+                        SkillTaxonomy.is_active == True,
+                        SkillTaxonomy.is_latest == True,
+                        SkillTaxonomy.variants.isnot(None),
+                    )
+                )
+
+                # Apply organization filter if provided
+                if organization_id:
+                    query = query.where(SkillTaxonomy.organization_id == organization_id)
+
+                # Apply industry filter if provided
+                if industry:
+                    query = query.where(SkillTaxonomy.industry == industry)
+
+                result = await self.db.execute(query)
+                taxonomies = result.scalars().all()
+
+                # Search for matching variant
+                for taxonomy in taxonomies:
+                    if not taxonomy.variants:
+                        continue
+
+                    for variant in taxonomy.variants:
+                        normalized_variant = self.skills_matcher.normalize_skill(variant)
+
+                        # Check for exact match (normalized)
+                        if normalized_variant == normalized_alias:
+                            resolution = AliasResolution(
+                                alias=alias,
+                                resolved_skill=taxonomy.skill_name,
+                                taxonomy_id=taxonomy.id,
+                                industry=taxonomy.industry,
+                                context=taxonomy.context,
+                                confidence=1.0,
+                            )
+
+                            # Cache the result
+                            self._alias_cache[cache_key] = resolution
+
+                            logger.debug(
+                                f"Database resolved alias '{alias}' to '{resolution.resolved_skill}'"
+                            )
+
+                            return resolution
+
+                        # Check for case-insensitive match
+                        if variant.lower() == alias.lower():
+                            resolution = AliasResolution(
+                                alias=alias,
+                                resolved_skill=taxonomy.skill_name,
+                                taxonomy_id=taxonomy.id,
+                                industry=taxonomy.industry,
+                                context=taxonomy.context,
+                                confidence=0.95,
+                            )
+
+                            # Cache the result
+                            self._alias_cache[cache_key] = resolution
+
+                            logger.debug(
+                                f"Database resolved alias '{alias}' to '{resolution.resolved_skill}' "
+                                f"(case-insensitive match)"
+                            )
+
+                            return resolution
+
+                logger.debug(f"No database match found for alias '{alias}'")
+
+            except Exception as e:
+                logger.error(f"Error during database alias resolution: {e}")
+
+        # Fall back to sync method (built-in aliases)
         return self.resolve_alias(alias, industry=industry, organization_id=organization_id)
 
     def find_related_skills(
