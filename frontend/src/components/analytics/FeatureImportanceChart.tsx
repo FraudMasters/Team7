@@ -41,12 +41,15 @@ import {
 
 /**
  * Интерфейс отдельного признака (feature) с бэкенда
+ * Matches backend FeatureImportanceItem schema
  */
 interface FeatureItem {
   /** Название признака */
-  name: string;
+  feature_name: string;
   /** Важность признака (0-1) */
-  importance: number;
+  importance_score: number;
+  /** Ранг признака по важности */
+  rank: number;
   /** Описание признака */
   description: string;
   /** Категория признака */
@@ -153,7 +156,7 @@ const CustomTooltip: React.FC<{
           {data.formattedName}
         </Typography>
         <Typography variant="body2" color="primary.main" fontWeight={600}>
-          Importance: {formatImportance(data.importance)}
+          Importance: {formatImportance(data.importance_score)}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
           {data.description}
@@ -270,12 +273,12 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
     if (!featureData?.features) return [];
 
     return featureData.features
-      .sort((a, b) => b.importance - a.importance) // Сортировка по убыванию важности
+      .sort((a, b) => b.importance_score - a.importance_score) // Сортировка по убыванию важности
       .slice(0, maxFeatures)
       .map((feature, index) => ({
         ...feature,
-        formattedName: formatFeatureName(feature.name),
-        importancePercent: feature.importance * 100,
+        formattedName: formatFeatureName(feature.feature_name),
+        importancePercent: feature.importance_score * 100,
         index,
       }));
   }, [featureData, maxFeatures]);
@@ -285,7 +288,7 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
    */
   const totalImportance = React.useMemo(() => {
     if (!chartData.length) return 0;
-    return chartData.reduce((sum, f) => sum + f.importance, 0);
+    return chartData.reduce((sum, f) => sum + f.importance_score, 0);
   }, [chartData]);
 
   /**
@@ -428,7 +431,7 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
           <Card variant="outlined">
             <CardContent sx={{ textAlign: 'center', py: 1 }}>
               <Typography variant="h4" color="success.main" fontWeight={700}>
-                {formatImportance(chartData[0]?.importance || 0)}
+                {formatImportance(chartData[0]?.importance_score || 0)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Top Feature
@@ -440,7 +443,7 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
           <Card variant="outlined">
             <CardContent sx={{ textAlign: 'center', py: 1 }}>
               <Typography variant="h4" fontWeight={700}>
-                {formatImportance(chartData[Math.floor(chartData.length / 2)]?.importance || 0)}
+                {formatImportance(chartData[Math.floor(chartData.length / 2)]?.importance_score || 0)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Median Importance
@@ -503,7 +506,7 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
                 <RechartsTooltip content={<CustomTooltip />} />
                 <Bar dataKey="importancePercent" radius={[0, 4, 4, 0]}>
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={getBarColor(entry.importance, index)} />
+                    <Cell key={`cell-${index}`} fill={getBarColor(entry.importance_score, index)} />
                   ))}
                 </Bar>
               </BarChart>
@@ -551,14 +554,14 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
             </Typography>
             <Grid container spacing={1}>
               {chartData.slice(0, 5).map((feature, index) => (
-                <Grid item xs={12} sm={6} md={2.4} key={feature.name}>
+                <Grid item xs={12} sm={6} md={2.4} key={feature.feature_name}>
                   <Paper
                     variant="outlined"
                     sx={{
                       p: 1.5,
                       height: '100%',
                       borderLeft: 3,
-                      borderLeftColor: getBarColor(feature.importance, index),
+                      borderLeftColor: getBarColor(feature.importance_score, index),
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
@@ -569,7 +572,7 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({
                         sx={{ height: 18, fontSize: '0.65rem' }}
                       />
                       <Typography variant="caption" fontWeight={600}>
-                        {formatImportance(feature.importance)}
+                        {formatImportance(feature.importance_score)}
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
