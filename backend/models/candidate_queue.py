@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -54,10 +55,10 @@ class CandidateQueueItem(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "candidate_queue_items"
 
-    resume_id: Mapped[UUIDMixin] = mapped_column(
+    resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    vacancy_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    vacancy_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     priority: Mapped[QueuePriority] = mapped_column(
@@ -66,7 +67,7 @@ class CandidateQueueItem(Base, UUIDMixin, TimestampMixin):
     status: Mapped[QueueStatus] = mapped_column(
         default=QueueStatus.PENDING, nullable=False, index=True
     )
-    assigned_recruiter_id: Mapped[Optional[UUIDMixin]] = mapped_column(
+    assigned_recruiter_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("recruiters.id", ondelete="SET NULL"), nullable=True, index=True
     )
     queue_entered_at: Mapped[datetime] = mapped_column(
