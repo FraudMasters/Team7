@@ -80,6 +80,33 @@ class QueueMetricsResponse(BaseModel):
     throughput_last_7d: int = Field(0, description="Items completed in last 7 days")
 
 
+# Assignment models
+class AssignCandidatesRequest(BaseModel):
+    """Request model for assigning candidates to a recruiter."""
+
+    resume_ids: List[str] = Field(..., description="List of resume IDs to assign", min_length=1)
+    recruiter_id: str = Field(..., description="Recruiter ID to assign candidates to")
+
+
+class AssignCandidateResult(BaseModel):
+    """Result of assigning a single candidate in a bulk operation."""
+
+    resume_id: str = Field(..., description="Resume ID")
+    success: bool = Field(..., description="Whether the assignment was successful")
+    queue_item_id: Optional[str] = Field(None, description="Queue item ID if successful")
+    previous_recruiter_id: Optional[str] = Field(None, description="Previous recruiter ID if any")
+    message: str = Field(..., description="Success or error message")
+
+
+class AssignCandidatesResponse(BaseModel):
+    """Response model for bulk candidate assignment."""
+
+    total_requested: int = Field(..., description="Total number of candidates requested to assign")
+    successful: int = Field(..., description="Number of successfully assigned candidates")
+    failed: int = Field(..., description="Number of candidates that failed to assign")
+    results: List[AssignCandidateResult] = Field(..., description="Individual results for each candidate")
+
+
 # Priority ordering for sorting
 PRIORITY_ORDER = {
     QueuePriority.URGENT: 0,
@@ -672,4 +699,188 @@ async def get_queue_item(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get queue item: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/assign",
+    response_model=AssignCandidatesResponse,
+    tags=["Candidate Queue"],
+)
+async def assign_candidates(
+    request: Request,
+    assign_data: AssignCandidatesRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Assign candidates to a recruiter.
+
+    Updates the assigned_recruiter_id for the specified queue items.
+    Creates queue items for resumes that don't already have one.
+
+    Args:
+        request: FastAPI request object
+        assign_data: Assignment details (resume_ids, recruiter_id)
+        db: Database session
+
+    Returns:
+        JSON response with bulk operation results including success/failure counts
+
+    Raises:
+        HTTPException(400): Invalid recruiter_id or resume_ids format
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "resume_ids": ["resume-uuid-1", "resume-uuid-2"],
+        ...     "recruiter_id": "recruiter-uuid-123"
+        ... }
+        >>> response = requests.post(
+        ...     "/api/candidate-queue/assign",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "total_requested": 2,
+            "successful": 2,
+            "failed": 0,
+            "results": [
+                {
+                    "resume_id": "resume-uuid-1",
+                    "success": true,
+                    "queue_item_id": "queue-item-uuid-1",
+                    "previous_recruiter_id": null,
+                    "message": "Candidate assigned to recruiter"
+                },
+                ...
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Assigning {len(assign_data.resume_ids)} candidates to recruiter {assign_data.recruiter_id}"
+        )
+
+        from uuid import UUID
+
+        # Parse and validate recruiter_id
+        try:
+            recruiter_uuid = UUID(assign_data.recruiter_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid recruiter_id format: {assign_data.recruiter_id}",
+            )
+
+        results = []
+        successful_count = 0
+        failed_count = 0
+
+        # Process each resume_id
+        for resume_id in assign_data.resume_ids:
+            try:
+                # Parse resume_id as UUID
+                try:
+                    resume_uuid = UUID(resume_id)
+                except ValueError:
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "queue_item_id": None,
+                        "previous_recruiter_id": None,
+                        "message": f"Invalid resume ID format: {resume_id}",
+                    })
+                    failed_count += 1
+                    continue
+
+                # Verify resume exists
+                resume_query = select(Resume).where(Resume.id == resume_uuid)
+                resume_result = await db.execute(resume_query)
+                resume = resume_result.scalar_one_or_none()
+
+                if not resume:
+                    results.append({
+                        "resume_id": resume_id,
+                        "success": False,
+                        "queue_item_id": None,
+                        "previous_recruiter_id": None,
+                        "message": f"Resume not found: {resume_id}",
+                    })
+                    failed_count += 1
+                    continue
+
+                # Find existing queue item for this resume
+                queue_item_query = select(CandidateQueueItem).where(
+                    CandidateQueueItem.resume_id == resume_uuid
+                ).order_by(CandidateQueueItem.created_at.desc()).limit(1)
+                queue_item_result = await db.execute(queue_item_query)
+                queue_item = queue_item_result.scalar_one_or_none()
+
+                previous_recruiter_id = None
+
+                if queue_item:
+                    # Update existing queue item
+                    previous_recruiter_id = str(queue_item.assigned_recruiter_id) if queue_item.assigned_recruiter_id else None
+                    queue_item.assigned_recruiter_id = recruiter_uuid
+                    queue_item.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    await db.refresh(queue_item)
+                else:
+                    # Create new queue item for this resume
+                    queue_item = CandidateQueueItem(
+                        resume_id=resume_uuid,
+                        assigned_recruiter_id=recruiter_uuid,
+                        priority=QueuePriority.MEDIUM,
+                        status=QueueStatus.PENDING,
+                        queue_entered_at=datetime.now(timezone.utc),
+                    )
+                    db.add(queue_item)
+                    await db.commit()
+                    await db.refresh(queue_item)
+
+                results.append({
+                    "resume_id": resume_id,
+                    "success": True,
+                    "queue_item_id": str(queue_item.id),
+                    "previous_recruiter_id": previous_recruiter_id,
+                    "message": "Candidate assigned to recruiter",
+                })
+                successful_count += 1
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error assigning candidate {resume_id}: {e}", exc_info=True)
+                results.append({
+                    "resume_id": resume_id,
+                    "success": False,
+                    "queue_item_id": None,
+                    "previous_recruiter_id": None,
+                    "message": f"Failed to assign candidate: {str(e)}",
+                })
+                failed_count += 1
+
+        logger.info(
+            f"Assignment completed: {successful_count} successful, {failed_count} failed"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "total_requested": len(assign_data.resume_ids),
+                "successful": successful_count,
+                "failed": failed_count,
+                "results": results,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in assign operation: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to assign candidates: {str(e)}",
         ) from e
