@@ -138,83 +138,105 @@ export interface ModelConfidenceResponse {
 }
 
 /**
- * Feature importance item
+ * Feature importance item - matches API response structure
  */
 export interface FeatureImportanceItem {
-  name: string;
-  importance: number;
+  feature_name: string;
+  importance_score: number;
+  rank: number;
   description: string;
+  category: string;
 }
 
 /**
- * Feature importance response
+ * Feature importance response - matches API response structure
  */
 export interface FeatureImportanceResponse {
   features: FeatureImportanceItem[];
   model_version: string;
   model_type: string;
+  total_features: number;
+  last_updated: string;
 }
 
 /**
- * Feature contribution for ranking rationale
+ * Ranking factor detail - matches API RankingFactorDetail structure
  */
-export interface FeatureContribution {
-  name: string;
-  value: number;
+export interface RankingFactorDetail {
+  factor_name: string;
+  score: number;
+  weight: number;
   contribution: number;
-  impact: 'positive' | 'negative';
+  description: string;
+  raw_value?: number;
 }
 
 /**
- * Ranking rationale confidence interval
+ * Skills match detail - matches API SkillsMatchDetail structure
  */
-export interface RationaleConfidenceInterval {
-  lower: number;
-  upper: number;
+export interface SkillsMatchDetail {
+  matched_skills: string[];
+  missing_skills: string[];
+  additional_skills: string[];
+  match_percentage: number;
 }
 
 /**
- * Ranking rationale response
+ * Ranking rationale response - matches API response structure
  */
 export interface RankingRationaleResponse {
   candidate_id: string;
+  vacancy_id?: string;
   rank_score: number;
-  rank_position: number;
-  narrative: string;
-  feature_contributions: FeatureContribution[];
+  rank_position?: number;
+  recommendation: 'excellent' | 'good' | 'maybe' | 'poor';
+  confidence: number;
+  model_version: string;
+  model_type: string;
+  factors: RankingFactorDetail[];
+  skills_match?: SkillsMatchDetail;
+  summary: string;
   strengths: string[];
   weaknesses: string[];
-  confidence_interval: RationaleConfidenceInterval;
+  generated_at: string;
 }
 
 /**
- * Performance metrics for a single time point
+ * Performance metrics for a single time point - matches API data_points structure
  */
 export interface PerformanceMetricPoint {
-  date: string;
-  accuracy: number;
-  f1_score: number;
-  ndcg_score: number;
-  sample_size: number;
+  timestamp: string;
+  accuracy?: number;
+  precision?: number;
+  recall?: number;
+  f1_score?: number;
+  sample_count: number;
 }
 
 /**
- * Aggregated performance metrics
+ * Model performance trend - matches API models array structure
  */
-export interface PerformanceAggregates {
-  avg_accuracy: number;
-  avg_f1: number;
-  accuracy_change_pct: number;
+export interface ModelPerformanceTrend {
+  model_name: string;
+  model_version: string;
+  current_accuracy: number;
+  current_f1_score: number;
+  trend_direction: 'improving' | 'stable' | 'declining';
+  trend_change_pct: number;
+  data_points: PerformanceMetricPoint[];
+  alert_status?: string | null;
 }
 
 /**
- * Performance trends response
+ * Performance trends response - matches API response structure
  */
 export interface PerformanceTrendsResponse {
   period: string;
-  trend_direction: 'improving' | 'stable' | 'declining';
-  metrics: PerformanceMetricPoint[];
-  aggregates: PerformanceAggregates;
+  start_date: string;
+  end_date: string;
+  models: ModelPerformanceTrend[];
+  overall_trend: 'improving' | 'stable' | 'declining';
+  total_evaluations: number;
 }
 
 /**
@@ -347,7 +369,7 @@ export class AnalyticsClient {
    * ```ts
    * const importance = await analyticsClient.getFeatureImportance();
    * importance.features.forEach(f => {
-   *   console.log(`${f.name}: ${(f.importance * 100).toFixed(1)}%`);
+   *   console.log(`${f.feature_name}: ${(f.importance_score * 100).toFixed(1)}%`);
    * });
    * ```
    */
@@ -407,8 +429,10 @@ export class AnalyticsClient {
    * @example
    * ```ts
    * const trends = await analyticsClient.getPerformanceTrends('30d');
-   * console.log(`Trend: ${trends.trend_direction}`);
-   * console.log(`Avg accuracy: ${trends.aggregates.avg_accuracy}`);
+   * console.log(`Overall Trend: ${trends.overall_trend}`);
+   * trends.models.forEach(m => {
+   *   console.log(`${m.model_name}: accuracy=${m.current_accuracy}, f1=${m.current_f1_score}`);
+   * });
    * ```
    */
   async getPerformanceTrends(

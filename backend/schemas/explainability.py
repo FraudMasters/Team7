@@ -4,6 +4,8 @@ Pydantic schemas for AI explainability and transparency dashboard.
 This module provides schema definitions for ML model explainability features,
 including confidence metrics with uncertainty quantification, feature importance
 visualizations, candidate ranking rationale, and performance trend tracking.
+
+Note: These schemas match the actual API response models defined in api/analytics.py
 """
 from typing import Optional
 
@@ -33,7 +35,7 @@ class ConfidenceDistribution(BaseModel):
     """Distribution of predictions across confidence levels."""
 
     high_confidence_count: int = Field(
-        ..., description="Predictions with high confidence score (>0.8)"
+        ..., description="Predictions with high confidence score (>=0.8)"
     )
     medium_confidence_count: int = Field(
         ..., description="Predictions with medium confidence score (0.5-0.8)"
@@ -68,10 +70,20 @@ class ConfidenceMetricsResponse(BaseModel):
 class FeatureImportanceItem(BaseModel):
     """Single feature importance entry with description."""
 
-    name: str = Field(..., description="Feature name identifier")
-    importance: float = Field(..., description="Importance score (0-1, normalized)")
+    feature_name: str = Field(
+        ..., description="Name of the feature used in ML model"
+    )
+    importance_score: float = Field(
+        ..., description="Normalized importance score (0-1)"
+    )
+    rank: int = Field(
+        ..., description="Rank of this feature by importance (1 = most important)"
+    )
     description: str = Field(
-        ..., description="Human-readable description of what this feature measures"
+        ..., description="Human-readable description of the feature"
+    )
+    category: str = Field(
+        ..., description="Category of the feature (matching, experience, etc.)"
     )
 
 
@@ -79,7 +91,7 @@ class FeatureImportanceResponse(BaseModel):
     """Response model for feature importance from the trained model."""
 
     features: list[FeatureImportanceItem] = Field(
-        ..., description="List of features with their importance scores"
+        ..., description="List of features with their importance scores, sorted by importance"
     )
     model_version: str = Field(
         "1.0.0", description="Version identifier of the trained model"
@@ -88,7 +100,10 @@ class FeatureImportanceResponse(BaseModel):
         "random_forest", description="Type of ML model used for ranking"
     )
     total_features: int = Field(
-        ..., description="Total number of features used by the model"
+        ..., description="Total number of features in the model"
+    )
+    last_updated: str = Field(
+        ..., description="Timestamp when model was last trained/updated (ISO 8601)"
     )
 
 
@@ -97,37 +112,66 @@ class FeatureImportanceResponse(BaseModel):
 # =============================================================================
 
 
-class FeatureContribution(BaseModel):
-    """Contribution of a single feature to a candidate's ranking."""
+class RankingFactorDetail(BaseModel):
+    """Detail of a single ranking factor."""
 
-    name: str = Field(..., description="Feature name identifier")
-    value: float = Field(..., description="Raw feature value for this candidate")
+    factor_name: str = Field(
+        ..., description="Name of the ranking factor"
+    )
+    score: float = Field(
+        ..., description="Score for this factor (0-1 normalized)"
+    )
+    weight: float = Field(
+        ..., description="Weight/importance of this factor in the final score"
+    )
     contribution: float = Field(
-        ..., description="Weighted contribution to the final score (can be negative)"
+        ..., description="Contribution to final score (score * weight)"
     )
-    impact: str = Field(
-        ..., description="Impact direction: 'positive', 'negative', or 'neutral'"
+    description: str = Field(
+        ..., description="Human-readable explanation of this factor"
+    )
+    raw_value: Optional[float] = Field(
+        None, description="Raw value before normalization"
     )
 
 
-class RankingRationaleConfidenceInterval(BaseModel):
-    """Confidence interval for a specific ranking prediction."""
+class SkillsMatchDetail(BaseModel):
+    """Detailed skills match information."""
 
-    lower: float = Field(..., description="Lower bound of prediction confidence (0-1)")
-    upper: float = Field(..., description="Upper bound of prediction confidence (0-1)")
+    matched_skills: list[str] = Field(
+        ..., description="Skills the candidate has that match requirements"
+    )
+    missing_skills: list[str] = Field(
+        ..., description="Required skills the candidate lacks"
+    )
+    additional_skills: list[str] = Field(
+        ..., description="Extra skills the candidate has beyond requirements"
+    )
+    match_percentage: float = Field(
+        ..., description="Percentage of required skills matched (0-100)"
+    )
 
 
 class RankingRationaleResponse(BaseModel):
     """Response model for explaining a specific candidate's ranking."""
 
-    candidate_id: str = Field(..., description="UUID of the candidate")
-    rank_score: float = Field(..., description="Overall ranking score (0-1)")
-    rank_position: int = Field(..., description="Position in the ranked list (1-based)")
+    candidate_id: str = Field(
+        ..., description="UUID of the candidate"
+    )
+    rank_score: float = Field(
+        ..., description="Overall ranking score (0-1)"
+    )
+    rank_position: int = Field(
+        ..., description="Position in the ranked list (1-based)"
+    )
     narrative: str = Field(
         ..., description="Human-readable explanation of why this candidate received this ranking"
     )
-    feature_contributions: list[FeatureContribution] = Field(
-        ..., description="Breakdown of how each feature contributed to the ranking"
+    factors: list[RankingFactorDetail] = Field(
+        ..., description="Breakdown of how each factor contributed to the ranking"
+    )
+    confidence: float = Field(
+        ..., description="Model confidence in the prediction (0-1)"
     )
     strengths: list[str] = Field(
         ..., description="List of candidate's strengths identified by the model"
@@ -135,8 +179,8 @@ class RankingRationaleResponse(BaseModel):
     weaknesses: list[str] = Field(
         ..., description="List of candidate's weaknesses or areas for improvement"
     )
-    confidence_interval: RankingRationaleConfidenceInterval = Field(
-        ..., description="Confidence interval for this specific prediction"
+    skills_match: SkillsMatchDetail = Field(
+        ..., description="Detailed skills matching information"
     )
 
 
@@ -145,27 +189,55 @@ class RankingRationaleResponse(BaseModel):
 # =============================================================================
 
 
-class PerformanceMetricPoint(BaseModel):
-    """Single data point in the performance metrics time series."""
+class PerformanceTrendPoint(BaseModel):
+    """Single point in a performance trend time series."""
 
-    date: str = Field(..., description="Date of the measurement (ISO 8601)")
-    accuracy: float = Field(..., description="Accuracy score for this period (0-1)")
-    f1_score: float = Field(..., description="F1 score for this period (0-1)")
-    ndcg_score: float = Field(
-        ..., description="Normalized Discounted Cumulative Gain for this period (0-1)"
+    timestamp: str = Field(
+        ..., description="ISO 8601 timestamp for this data point"
     )
-    sample_size: int = Field(
-        ..., description="Number of predictions evaluated in this period"
+    accuracy: Optional[float] = Field(
+        None, description="Model accuracy at this point"
+    )
+    precision: Optional[float] = Field(
+        None, description="Model precision at this point"
+    )
+    recall: Optional[float] = Field(
+        None, description="Model recall at this point"
+    )
+    f1_score: Optional[float] = Field(
+        None, description="Model F1 score at this point"
+    )
+    sample_count: int = Field(
+        ..., description="Number of samples in this period"
     )
 
 
-class PerformanceAggregates(BaseModel):
-    """Aggregated statistics over the analysis period."""
+class ModelPerformanceTrend(BaseModel):
+    """Performance trend for a single model."""
 
-    avg_accuracy: float = Field(..., description="Average accuracy over the period (0-1)")
-    avg_f1: float = Field(..., description="Average F1 score over the period (0-1)")
-    accuracy_change_pct: float = Field(
-        ..., description="Percentage change in accuracy from start to end of period"
+    model_name: str = Field(
+        ..., description="Name of the model"
+    )
+    model_version: str = Field(
+        ..., description="Version of the model"
+    )
+    current_accuracy: float = Field(
+        ..., description="Current accuracy score"
+    )
+    current_f1_score: float = Field(
+        ..., description="Current F1 score"
+    )
+    trend_direction: str = Field(
+        ..., description="Overall trend direction: 'improving', 'declining', or 'stable'"
+    )
+    trend_change_pct: float = Field(
+        ..., description="Percentage change in F1 score over the period"
+    )
+    data_points: list[PerformanceTrendPoint] = Field(
+        ..., description="Time series data points for the period"
+    )
+    alert_status: Optional[str] = Field(
+        None, description="Alert status if performance is degraded"
     )
 
 
@@ -173,23 +245,39 @@ class PerformanceTrendsResponse(BaseModel):
     """Response model for model performance metrics over time."""
 
     period: str = Field(
-        ..., description="Analysis period identifier (e.g., '7d', '30d', '90d')"
+        ..., description="The time period for the trends (e.g., '7d', '30d', '90d')"
     )
-    trend_direction: str = Field(
-        ..., description="Overall trend: 'improving', 'stable', or 'declining'"
+    start_date: str = Field(
+        ..., description="Start date of the period (ISO 8601)"
     )
-    metrics: list[PerformanceMetricPoint] = Field(
-        ..., description="Time series of performance metrics"
+    end_date: str = Field(
+        ..., description="End date of the period (ISO 8601)"
     )
-    aggregates: PerformanceAggregates = Field(
-        ..., description="Aggregated statistics for the period"
+    models: list[ModelPerformanceTrend] = Field(
+        ..., description="Performance trends for each tracked model"
     )
-    period_start: Optional[str] = Field(
-        None, description="Start date of the analysis period (ISO 8601)"
+    overall_trend: str = Field(
+        ..., description="Overall system trend: 'improving', 'declining', or 'stable'"
     )
-    period_end: Optional[str] = Field(
-        None, description="End date of the analysis period (ISO 8601)"
+    total_evaluations: int = Field(
+        ..., description="Total model evaluations in the period"
     )
-    total_predictions: int = Field(
-        ..., description="Total number of predictions analyzed in this period"
-    )
+
+
+# =============================================================================
+# Legacy Aliases (for backward compatibility)
+# =============================================================================
+
+# These aliases maintain backward compatibility with code that uses the old names
+
+FeatureContribution = RankingFactorDetail
+"""Alias for backward compatibility - use RankingFactorDetail instead."""
+
+RankingRationaleConfidenceInterval = ConfidenceInterval
+"""Alias for backward compatibility."""
+
+PerformanceMetricPoint = PerformanceTrendPoint
+"""Alias for backward compatibility - use PerformanceTrendPoint instead."""
+
+PerformanceAggregates = ModelPerformanceTrend
+"""Alias for backward compatibility - structure differs, use ModelPerformanceTrend instead."""
