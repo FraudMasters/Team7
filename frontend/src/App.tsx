@@ -50,6 +50,7 @@ import { CandidateDetailPage } from './pages/recruiter/CandidateDetailPage';
 import { WeightsPage } from './pages/recruiter/WeightsPage';
 import { SearchPage } from './pages/recruiter/SearchPage';
 import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
+import { ReviewQueuePage as RecruiterReviewQueuePage } from './pages/recruiter/ReviewQueuePage';
 
 // Hiring Manager Pages
 import { DashboardPage as HiringManagerDashboardPage } from './pages/hiring-manager/DashboardPage';
@@ -181,6 +182,7 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="candidates" element={<CandidatesKanbanPage />} />
           <Route path="candidates/:id" element={<CandidateDetailPage />} />
+          <Route path="review-queue" element={<RecruiterReviewQueuePage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="saved-searches" element={<SavedSearchesPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
