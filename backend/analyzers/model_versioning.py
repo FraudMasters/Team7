@@ -1609,3 +1609,381 @@ class ModelVersionManager:
             return "advanced"
         else:
             return "pre_promotion"
+
+    def promote_challenger_to_champion(
+        self,
+        model_name: str,
+        challenger_version_id: str,
+        min_performance_improvement: float = 5.0,
+        min_sample_size: int = 100,
+        significance_level: float = 0.05,
+        min_confidence: float = 0.80,
+        force: bool = False,
+        db_session: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Promote a challenger (experimental) model to champion (active) with A/B test validation.
+
+        This method implements the champion/challenger pattern for model promotion,
+        using statistical significance testing to determine if the challenger should
+        replace the current champion model.
+
+        The promotion process:
+        1. Validates that the challenger exists and is an experimental model
+        2. Gets the current champion (active) model
+        3. Performs A/B test statistical analysis comparing champion vs challenger
+        4. Promotes challenger if it meets criteria (or force=True)
+        5. Demotes champion to inactive status
+
+        Args:
+            model_name: Name of the model (e.g., 'skill_matching')
+            challenger_version_id: UUID of the challenger model version to promote
+            min_performance_improvement: Minimum performance gain (%) required for promotion
+            min_sample_size: Minimum sample size for statistical significance
+            significance_level: Significance level (alpha) for hypothesis tests
+            min_confidence: Minimum confidence level required for auto-promotion
+            force: If True, skip statistical validation and force promotion
+            db_session: Database session for querying and writing
+
+        Returns:
+            Dictionary with promotion result including:
+            - success: Whether promotion was successful
+            - model_name: The model name
+            - challenger_version: The promoted challenger version
+            - previous_champion_version: The previous champion version
+            - statistical_analysis: A/B test analysis results (if not forced)
+            - promotion_reason: Reason for promotion decision
+            - promoted_at: Timestamp of promotion
+
+        Raises:
+            ValueError: If challenger not found or not an experimental model
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> result = manager.promote_challenger_to_champion(
+            ...     model_name='skill_matching',
+            ...     challenger_version_id='uuid-here',
+            ...     min_confidence=0.85
+            ... )
+            >>> if result['success']:
+            ...     print(f"Promoted {result['challenger_version']} to champion")
+            ...     print(f"Statistical confidence: {result['statistical_analysis']['confidence']:.2%}")
+        """
+        if db_session is None:
+            return {
+                "success": False,
+                "model_name": model_name,
+                "error": "No database session provided",
+                "challenger_version": None,
+                "previous_champion_version": None,
+            }
+
+        try:
+            # Get the challenger model
+            challenger_model = (
+                db_session.query(MLModelVersion)
+                .filter(
+                    MLModelVersion.id == challenger_version_id,
+                    MLModelVersion.model_name == model_name,
+                )
+                .first()
+            )
+
+            if not challenger_model:
+                logger.error(
+                    f"Challenger model {challenger_version_id} not found for {model_name}"
+                )
+                return {
+                    "success": False,
+                    "model_name": model_name,
+                    "error": f"Challenger model version {challenger_version_id} not found",
+                    "challenger_version": None,
+                    "previous_champion_version": None,
+                }
+
+            # Get the current champion model
+            champion_model = (
+                db_session.query(MLModelVersion)
+                .filter(
+                    MLModelVersion.model_name == model_name,
+                    MLModelVersion.is_active == True,
+                    MLModelVersion.is_experiment == False,
+                )
+                .first()
+            )
+
+            previous_champion_version = champion_model.version if champion_model else None
+            challenger_version = challenger_model.version
+
+            # Prepare statistical analysis result
+            statistical_analysis = None
+            should_promote = False
+            promotion_reason = ""
+
+            if force:
+                # Force promotion without statistical validation
+                should_promote = True
+                promotion_reason = "Forced promotion - statistical validation bypassed"
+                logger.warning(
+                    f"Force promoting challenger {model_name}:{challenger_version} "
+                    "without statistical validation"
+                )
+            else:
+                # Perform A/B test statistical analysis
+                recommendation = self.recommend_promotion(
+                    model_name=model_name,
+                    min_performance_improvement=min_performance_improvement,
+                    min_sample_size=min_sample_size,
+                    significance_level=significance_level,
+                    min_confidence=min_confidence,
+                    db_session=db_session,
+                )
+
+                if recommendation is None:
+                    return {
+                        "success": False,
+                        "model_name": model_name,
+                        "error": "No models available for comparison",
+                        "challenger_version": challenger_version,
+                        "previous_champion_version": previous_champion_version,
+                    }
+
+                # Check if the recommended challenger matches the requested one
+                recommended_version = recommendation.get("experiment_version")
+                if recommended_version != challenger_version:
+                    # Check if our specific challenger is a candidate
+                    experiments = self.get_experiment_models(model_name, db_session)
+                    challenger_exists = any(
+                        str(e["id"]) == str(challenger_version_id)
+                        for e in experiments
+                    )
+
+                    if not challenger_exists:
+                        return {
+                            "success": False,
+                            "model_name": model_name,
+                            "error": f"Challenger {challenger_version} is not an experimental model",
+                            "challenger_version": challenger_version,
+                            "previous_champion_version": previous_champion_version,
+                        }
+
+                    # Calculate stats for this specific challenger
+                    challenger_data = next(
+                        (e for e in experiments if str(e["id"]) == str(challenger_version_id)),
+                        None
+                    )
+
+                    if challenger_data and champion_model:
+                        # Build metrics for comparison
+                        champion_metrics = champion_model.accuracy_metrics or {}
+                        challenger_metrics = challenger_data.get("accuracy_metrics", {})
+
+                        champion_score = champion_model.performance_score or 0
+                        challenger_score = challenger_data.get("performance_score", 0) or 0
+
+                        improvement = 0
+                        if champion_score > 0:
+                            improvement = (challenger_score - champion_score) / champion_score * 100
+
+                        statistical_analysis = {
+                            "champion_score": float(champion_score),
+                            "challenger_score": float(challenger_score),
+                            "improvement_pct": round(improvement, 2),
+                            "sample_sizes": {
+                                "champion": champion_metrics.get("sample_size", 0),
+                                "challenger": challenger_metrics.get("sample_size", 0),
+                            },
+                            "meets_threshold": improvement >= min_performance_improvement,
+                            "confidence": 0.0,
+                            "is_significant": False,
+                        }
+
+                        if improvement >= min_performance_improvement:
+                            should_promote = True
+                            promotion_reason = (
+                                f"Challenger shows {improvement:.2f}% improvement over champion. "
+                                f"Meets minimum threshold of {min_performance_improvement}%."
+                            )
+                        else:
+                            promotion_reason = (
+                                f"Challenger improvement ({improvement:.2f}%) below "
+                                f"minimum threshold ({min_performance_improvement}%)."
+                            )
+                else:
+                    # The requested challenger is the recommended one
+                    should_promote = recommendation.get("should_promote", False)
+                    promotion_reason = recommendation.get("reason", "No reason provided")
+
+                    statistical_confidence = recommendation.get("statistical_confidence", {})
+                    statistical_analysis = {
+                        "champion_score": recommendation.get("active_score", 0),
+                        "challenger_score": recommendation.get("experiment_score", 0),
+                        "improvement_pct": recommendation.get("performance_improvement_pct", 0),
+                        "sample_sizes": statistical_confidence.get("sample_sizes", {}),
+                        "meets_threshold": should_promote,
+                        "confidence": statistical_confidence.get("confidence", 0),
+                        "p_value": statistical_confidence.get("p_value", 1),
+                        "effect_size": statistical_confidence.get("effect_size", 0),
+                        "is_significant": statistical_confidence.get("is_significant", False),
+                        "significance_level": statistical_confidence.get("significance_level", 0.05),
+                        "confidence_interval": statistical_confidence.get("confidence_interval"),
+                        "statistical_tests": recommendation.get("statistical_tests", {}),
+                    }
+
+            # Perform promotion if criteria met
+            if should_promote:
+                # Demote current champion if exists
+                if champion_model:
+                    champion_model.is_active = False
+                    champion_model.is_experiment = False
+                    logger.info(
+                        f"Demoted champion {model_name}:{previous_champion_version}"
+                    )
+
+                # Promote challenger to champion
+                challenger_model.is_active = True
+                challenger_model.is_experiment = False
+
+                # Update experiment config to reflect promotion
+                experiment_config = challenger_model.experiment_config or {}
+                experiment_config["promotion_type"] = "champion_challenger"
+                experiment_config["promoted_at"] = challenger_model.updated_at.isoformat()
+                experiment_config["previous_champion_version"] = previous_champion_version
+                experiment_config["promotion_reason"] = promotion_reason
+                experiment_config["was_forced"] = force
+                challenger_model.experiment_config = experiment_config
+
+                db_session.commit()
+
+                logger.info(
+                    f"Promoted challenger {model_name}:{challenger_version} to champion. "
+                    f"Reason: {promotion_reason}"
+                )
+
+                return {
+                    "success": True,
+                    "model_name": model_name,
+                    "challenger_version": challenger_version,
+                    "challenger_id": str(challenger_model.id),
+                    "previous_champion_version": previous_champion_version,
+                    "statistical_analysis": statistical_analysis,
+                    "promotion_reason": promotion_reason,
+                    "forced": force,
+                    "promoted_at": challenger_model.updated_at.isoformat(),
+                }
+            else:
+                # Promotion criteria not met
+                logger.info(
+                    f"Challenger {model_name}:{challenger_version} promotion rejected. "
+                    f"Reason: {promotion_reason}"
+                )
+
+                return {
+                    "success": False,
+                    "model_name": model_name,
+                    "challenger_version": challenger_version,
+                    "challenger_id": str(challenger_model.id),
+                    "previous_champion_version": previous_champion_version,
+                    "statistical_analysis": statistical_analysis,
+                    "promotion_reason": promotion_reason,
+                    "forced": False,
+                    "promoted_at": None,
+                }
+
+        except Exception as e:
+            logger.error(
+                f"Error promoting challenger to champion for {model_name}: {e}",
+                exc_info=True
+            )
+            if db_session:
+                db_session.rollback()
+            return {
+                "success": False,
+                "model_name": model_name,
+                "error": str(e),
+                "challenger_version": None,
+                "previous_champion_version": None,
+            }
+
+    def get_champion_challenger_status(
+        self,
+        model_name: str,
+        db_session: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get the current champion/challenger status for a model.
+
+        Returns information about the current champion (active) model and any
+        challenger (experimental) models, including performance comparison.
+
+        Args:
+            model_name: Name of the model
+            db_session: Database session for querying
+
+        Returns:
+            Dictionary with champion and challenger status
+
+        Example:
+            >>> manager = ModelVersionManager()
+            >>> status = manager.get_champion_challenger_status('skill_matching')
+            >>> print(f"Champion: {status['champion']['version']}")
+            >>> print(f"Challengers: {len(status['challengers'])}")
+        """
+        if db_session is None:
+            return {
+                "model_name": model_name,
+                "champion": None,
+                "challengers": [],
+                "has_challenger": False,
+            }
+
+        try:
+            # Get champion (active, non-experimental)
+            champion = self.get_active_model(model_name, db_session)
+
+            # Get challengers (experimental models)
+            challengers = self.get_experiment_models(model_name, db_session)
+
+            # Calculate comparison metrics if both exist
+            comparison = None
+            if champion and challengers:
+                champion_score = champion.get("performance_score", 0) or 0
+                best_challenger = max(
+                    challengers,
+                    key=lambda c: c.get("performance_score", 0) or 0
+                )
+                challenger_score = best_challenger.get("performance_score", 0) or 0
+
+                if champion_score > 0:
+                    improvement_pct = (challenger_score - champion_score) / champion_score * 100
+                else:
+                    improvement_pct = 0 if challenger_score == 0 else 100
+
+                comparison = {
+                    "best_challenger_version": best_challenger.get("version"),
+                    "best_challenger_score": challenger_score,
+                    "champion_score": champion_score,
+                    "improvement_pct": round(improvement_pct, 2),
+                }
+
+            return {
+                "model_name": model_name,
+                "champion": champion,
+                "challengers": challengers,
+                "has_challenger": len(challengers) > 0,
+                "challenger_count": len(challengers),
+                "comparison": comparison,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error getting champion/challenger status for {model_name}: {e}",
+                exc_info=True
+            )
+            return {
+                "model_name": model_name,
+                "champion": None,
+                "challengers": [],
+                "has_challenger": False,
+                "error": str(e),
+            }

@@ -14,7 +14,7 @@ from .skill_taxonomy import SkillTaxonomy
 from .skill_relationship import SkillRelationship, RelationshipType
 from .custom_synonyms import CustomSynonym
 from .skill_feedback import SkillFeedback
-from .ml_model_version import MLModelVersion
+from .ml_model_version import MLModelVersion, ModelRole
 from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
@@ -41,6 +41,7 @@ from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
+from .model_approval import ModelApprovalRequest, ApprovalStatus
 
 __all__ = [
     "Base",
@@ -59,6 +60,7 @@ __all__ = [
     "CustomSynonym",
     "SkillFeedback",
     "MLModelVersion",
+    "ModelRole",
     "ModelPerformanceHistory",
     "ModelTrainingEvent",
     "UserPreferences",
@@ -96,4 +98,6 @@ __all__ = [
     "OrganizationExplanationPreferences",
     "ResumeFeedback",
     "BuiltResume",
+    "ModelApprovalRequest",
+    "ApprovalStatus",
 ]
