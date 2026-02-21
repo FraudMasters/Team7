@@ -337,6 +337,112 @@ async def _get_children_skills(db: AsyncSession, parent_id: UUID) -> List[dict]:
     return children_list
 
 
+@router.get("/resolve-alias", tags=["Skill Taxonomies"])
+async def resolve_skill_alias(
+    alias: str = Query(..., description="Skill alias or variant to resolve (e.g., 'JS', 'React', 'Python')"),
+    industry: Optional[str] = Query(None, description="Filter by industry sector (optional)"),
+    include_inactive: bool = Query(False, description="Include inactive taxonomy entries in results"),
+    db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(get_current_token),
+) -> JSONResponse:
+    """
+    Resolve a skill alias to its canonical skill taxonomy entries.
+
+    This endpoint searches across organization taxonomies to find skills that match
+    the given alias, either as the canonical skill_name or as a variant. It helps
+    normalize skill names across different naming conventions and spellings.
+
+    Examples:
+        - "JS" -> JavaScript
+        - "React" -> React
+        - "k8s" -> Kubernetes
+        - "python" -> Python
+    """
+    try:
+        logger.info(f"Resolving skill alias: {alias}, industry: {industry}, include_inactive: {include_inactive}")
+
+        # Normalize alias for case-insensitive comparison
+        alias_lower = alias.lower().strip()
+
+        if not alias_lower:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Alias cannot be empty",
+            )
+
+        # Build base query
+        query = select(SkillTaxonomy)
+
+        if industry:
+            query = query.where(SkillTaxonomy.industry == industry)
+
+        if not include_inactive:
+            query = query.where(SkillTaxonomy.is_active == True)
+
+        # Execute query to get all matching industry taxonomies
+        result = await db.execute(query)
+        taxonomies = result.scalars().all()
+
+        # Search for matches in skill_name and variants
+        matches = []
+        for taxonomy in taxonomies:
+            # Check if alias matches skill_name (case-insensitive)
+            if taxonomy.skill_name.lower() == alias_lower:
+                matches.append(taxonomy)
+                continue
+
+            # Check if alias matches any variant (case-insensitive)
+            if taxonomy.variants:
+                for variant in taxonomy.variants:
+                    if variant.lower() == alias_lower:
+                        matches.append(taxonomy)
+                        break
+
+        # Build response
+        resolved_skills = []
+        for match in matches:
+            resolved_skills.append({
+                "id": str(match.id),
+                "industry": match.industry,
+                "skill_name": match.skill_name,
+                "context": match.context,
+                "variants": match.variants or [],
+                "extra_metadata": match.extra_metadata,
+                "is_active": match.is_active,
+                "parent_skill_id": str(match.parent_skill_id) if match.parent_skill_id else None,
+                "category_path": match.category_path or [],
+                "created_at": match.created_at.isoformat(),
+                "updated_at": match.updated_at.isoformat(),
+            })
+
+        response_data = {
+            "alias": alias,
+            "resolved": len(resolved_skills) > 0,
+            "matches_count": len(resolved_skills),
+            "matches": resolved_skills,
+            "filters": {
+                "industry": industry,
+                "include_inactive": include_inactive,
+            },
+        }
+
+        logger.info(f"Resolved alias '{alias}': found {len(resolved_skills)} matches")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resolving skill alias: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to resolve skill alias: {str(e)}",
+        ) from e
+
+
 @router.get("/{taxonomy_id}", tags=["Skill Taxonomies"])
 async def get_skill_taxonomy(
     taxonomy_id: str,
