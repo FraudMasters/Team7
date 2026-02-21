@@ -23,6 +23,8 @@ class SkillTaxonomy(Base, UUIDMixin, TimestampMixin):
         context: Context category (e.g., web_framework, language, database)
         variants: JSON array of alternative names/spellings for this skill
         extra_metadata: JSON object with additional skill metadata (description, category, etc.)
+        parent_skill_id: UUID of the parent skill for hierarchical categories (null for root)
+        category_path: JSON array of skill names from root to this skill (e.g., ["Tech", "Programming", "Python"])
         is_active: Whether this taxonomy entry is currently active
         version: Version number of this taxonomy entry
         previous_version_id: UUID of the previous version (null for initial version)
@@ -44,6 +46,10 @@ class SkillTaxonomy(Base, UUIDMixin, TimestampMixin):
     context: Mapped[Optional[str]] = mapped_column(nullable=True)
     variants: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     extra_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    parent_skill_id: Mapped[Optional[PyUUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("skill_taxonomies.id"), nullable=True, index=True
+    )
+    category_path: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
     version: Mapped[int] = mapped_column(nullable=False, default=1)
     previous_version_id: Mapped[Optional[PyUUID]] = mapped_column(
