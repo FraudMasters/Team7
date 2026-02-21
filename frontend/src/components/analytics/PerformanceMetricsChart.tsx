@@ -48,30 +48,40 @@ import {
  * Метрика производительности за один период
  */
 interface PerformanceMetricPoint {
-  /** Дата записи метрики */
-  date: string;
+  /** Время записи метрики */
+  timestamp: string;
   /** Точность модели */
-  accuracy: number;
+  accuracy?: number;
+  /** Precision */
+  precision?: number;
+  /** Recall */
+  recall?: number;
   /** F1-score */
-  f1_score: number;
-  /** NDCG score для ранжирования */
-  ndcg_score: number;
+  f1_score?: number;
   /** Размер выборки для расчета */
-  sample_size: number;
+  sample_count: number;
 }
 
 /**
- * Агрегированные метрики за период
+ * Тренд производительности модели
  */
-interface PerformanceAggregates {
-  /** Средняя точность */
-  avg_accuracy: number;
-  /** Средний F1-score */
-  avg_f1: number;
-  /** Изменение точности в процентах */
-  accuracy_change_pct: number;
-  /** Средний NDCG */
-  avg_ndcg?: number;
+interface ModelPerformanceTrend {
+  /** Название модели */
+  model_name: string;
+  /** Версия модели */
+  model_version: string;
+  /** Текущая точность */
+  current_accuracy: number;
+  /** Текущий F1-score */
+  current_f1_score: number;
+  /** Направление тренда */
+  trend_direction: 'improving' | 'stable' | 'declining';
+  /** Изменение тренда в процентах */
+  trend_change_pct: number;
+  /** Точки данных */
+  data_points: PerformanceMetricPoint[];
+  /** Статус алерта */
+  alert_status?: string | null;
 }
 
 /**
@@ -80,12 +90,16 @@ interface PerformanceAggregates {
 interface PerformanceTrendsResponse {
   /** Выбранный период */
   period: string;
-  /** Направление тренда */
-  trend_direction: 'improving' | 'stable' | 'declining';
-  /** Массив метрик по датам */
-  metrics: PerformanceMetricPoint[];
-  /** Агрегированные показатели */
-  aggregates: PerformanceAggregates;
+  /** Начальная дата */
+  start_date: string;
+  /** Конечная дата */
+  end_date: string;
+  /** Массив моделей с метриками */
+  models: ModelPerformanceTrend[];
+  /** Общее направление тренда */
+  overall_trend: 'improving' | 'stable' | 'declining';
+  /** Общее количество оценок */
+  total_evaluations: number;
 }
 
 /**
@@ -146,7 +160,13 @@ const getTrendInfo = (
 const CustomTooltip: React.FC<{
   active?: boolean;
   payload?: Array<{
-    payload: PerformanceMetricPoint & { formattedDate: string };
+    payload: {
+      formattedDate: string;
+      accuracy: number;
+      f1_score: number;
+      ndcg_score: number;
+      sample_size: number;
+    };
   }>;
 }> = ({ active, payload }) => {
   if (active && payload && payload.length) {
@@ -297,24 +317,46 @@ const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({
    * Подготовка данных для графика
    */
   const chartData = React.useMemo(() => {
-    if (!trendsData?.metrics) return [];
+    // Get first model's data points (or aggregate all models if needed)
+    if (!trendsData?.models || trendsData.models.length === 0) return [];
 
-    return trendsData.metrics.map((metric) => ({
-      ...metric,
-      formattedDate: new Date(metric.date).toLocaleDateString('en-US', {
+    const primaryModel = trendsData.models[0];
+    return primaryModel.data_points.map((point) => ({
+      formattedDate: new Date(point.timestamp).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       }),
-      accuracyPercent: metric.accuracy * 100,
-      f1Percent: metric.f1_score * 100,
-      ndcgPercent: metric.ndcg_score * 100,
+      date: point.timestamp,
+      accuracy: point.accuracy || 0,
+      f1_score: point.f1_score || 0,
+      ndcg_score: point.precision || 0, // Use precision as proxy for NDCG
+      sample_size: point.sample_count,
+      accuracyPercent: (point.accuracy || 0) * 100,
+      f1Percent: (point.f1_score || 0) * 100,
+      ndcgPercent: (point.precision || 0) * 100,
     }));
   }, [trendsData]);
 
   /**
    * Получить информацию о тренде
    */
-  const trendInfo = trendsData ? getTrendInfo(trendsData.trend_direction) : null;
+  const trendInfo = trendsData ? getTrendInfo(trendsData.overall_trend) : null;
+
+  /**
+   * Получить агрегированные данные из первой модели
+   */
+  const aggregates = React.useMemo(() => {
+    if (!trendsData?.models || trendsData.models.length === 0) {
+      return { avg_accuracy: 0, avg_f1: 0, accuracy_change_pct: 0, avg_ndcg: 0 };
+    }
+    const primaryModel = trendsData.models[0];
+    return {
+      avg_accuracy: primaryModel.current_accuracy,
+      avg_f1: primaryModel.current_f1_score,
+      accuracy_change_pct: primaryModel.trend_change_pct,
+      avg_ndcg: primaryModel.current_f1_score, // Use F1 as approximation for NDCG
+    };
+  }, [trendsData]);
 
   /**
    * Render loading state
@@ -369,7 +411,7 @@ const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({
   /**
    * Render empty state
    */
-  if (!trendsData || !trendsData.metrics || trendsData.metrics.length === 0) {
+  if (!trendsData || !trendsData.models || trendsData.models.length === 0 || chartData.length === 0) {
     return (
       <Alert severity="info" sx={{ mb: 3 }}>
         <AlertTitle>No Performance Data Available</AlertTitle>
@@ -378,8 +420,6 @@ const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({
       </Alert>
     );
   }
-
-  const { aggregates } = trendsData;
 
   return (
     <Box>
@@ -701,8 +741,8 @@ const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip
               icon={trendInfo?.icon as React.ReactElement}
-              label={`Model performance is ${trendsData.trend_direction}`}
-              color={trendsData.trend_direction === 'improving' ? 'success' : trendsData.trend_direction === 'declining' ? 'error' : 'warning'}
+              label={`Model performance is ${trendsData.overall_trend}`}
+              color={trendsData.overall_trend === 'improving' ? 'success' : trendsData.overall_trend === 'declining' ? 'error' : 'warning'}
               variant="outlined"
               size="small"
             />

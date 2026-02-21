@@ -48,27 +48,35 @@ import {
 } from '@mui/icons-material';
 
 /**
- * Интервал уверенности с бэкенда
+ * Детализация фактора ранжирования с бэкенда
  */
-interface ConfidenceInterval {
-  lower: number;
-  upper: number;
+interface RankingFactorDetail {
+  /** Название фактора */
+  factor_name: string;
+  /** Балл фактора */
+  score: number;
+  /** Вес фактора в модели */
+  weight: number;
+  /** Вклад в общий балл */
+  contribution: number;
+  /** Описание фактора */
+  description: string;
+  /** Сырое значение */
+  raw_value?: number;
 }
 
 /**
- * Вклад признака в ранжирование с бэкенда
+ * Детализация совпадения навыков
  */
-interface FeatureContribution {
-  /** Название признака */
-  name: string;
-  /** Значение признака для кандидата */
-  value: number;
-  /** Вклад в общий балл */
-  contribution: number;
-  /** Влияние: положительное или отрицательное */
-  impact: 'positive' | 'negative' | 'neutral';
-  /** Описание признака */
-  description?: string;
+interface SkillsMatchDetail {
+  /** Совпавшие навыки */
+  matched_skills: string[];
+  /** Отсутствующие навыки */
+  missing_skills: string[];
+  /** Дополнительные навыки */
+  additional_skills: string[];
+  /** Процент совпадения */
+  match_percentage: number;
 }
 
 /**
@@ -77,24 +85,32 @@ interface FeatureContribution {
 interface RankingRationaleResponse {
   /** ID кандидата */
   candidate_id: string;
-  /** Имя кандидата */
-  candidate_name?: string;
+  /** ID вакансии */
+  vacancy_id?: string;
   /** Балл ранжирования */
   rank_score: number;
   /** Позиция в рейтинге */
-  rank_position: number;
-  /** Текстовое описание (нарратив) */
-  narrative: string;
-  /** Вклады признаков */
-  feature_contributions: FeatureContribution[];
+  rank_position?: number;
+  /** Рекомендация */
+  recommendation: 'excellent' | 'good' | 'maybe' | 'poor';
+  /** Уверенность модели (0-1) */
+  confidence: number;
+  /** Версия модели */
+  model_version: string;
+  /** Тип модели */
+  model_type: string;
+  /** Факторы ранжирования */
+  factors: RankingFactorDetail[];
+  /** Совпадение навыков */
+  skills_match?: SkillsMatchDetail;
+  /** Текстовое описание (саммари) */
+  summary: string;
   /** Сильные стороны кандидата */
   strengths: string[];
   /** Слабые стороны кандидата */
   weaknesses: string[];
-  /** Интервал уверенности */
-  confidence_interval: ConfidenceInterval;
-  /** Вакансия */
-  vacancy_title?: string;
+  /** Время генерации */
+  generated_at: string;
 }
 
 /**
@@ -136,12 +152,21 @@ const formatNumber = (value: number): string => {
 };
 
 /**
- * Получить цвет для вклада
+ * Получить цвет для вклада на основе значения contribution
  */
-const getContributionColor = (impact: string): 'success' | 'error' | 'warning' => {
-  if (impact === 'positive') return 'success';
-  if (impact === 'negative') return 'error';
+const getContributionColor = (contribution: number): 'success' | 'error' | 'warning' => {
+  if (contribution > 0.05) return 'success';
+  if (contribution < -0.05) return 'error';
   return 'warning';
+};
+
+/**
+ * Определить тип влияния на основе contribution
+ */
+const getImpactType = (contribution: number): 'positive' | 'negative' | 'neutral' => {
+  if (contribution > 0.05) return 'positive';
+  if (contribution < -0.05) return 'negative';
+  return 'neutral';
 };
 
 /**
@@ -292,14 +317,14 @@ const RankingRationalePanel: React.FC<RankingRationalePanelProps> = ({
   );
 
   /**
-   * Сортировка вкладов признаков по величине вклада
+   * Сортировка факторов по величине вклада
    */
-  const sortedContributions = React.useMemo(() => {
-    if (!rationale?.feature_contributions) return [];
-    return [...rationale.feature_contributions].sort(
+  const sortedFactors = React.useMemo(() => {
+    if (!rationale?.factors) return [];
+    return [...rationale.factors].sort(
       (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)
     );
-  }, [rationale?.feature_contributions]);
+  }, [rationale?.factors]);
 
   /**
    * Render loading state
@@ -504,8 +529,7 @@ const RankingRationalePanel: React.FC<RankingRationalePanelProps> = ({
                     </Typography>
                     <Box sx={{ mt: 2 }}>
                       <Typography variant="caption" color="text.secondary">
-                        Confidence: {formatPercent(rationale.confidence_interval.lower)} -{' '}
-                        {formatPercent(rationale.confidence_interval.upper)}
+                        Confidence: {formatPercent(rationale.confidence)}
                       </Typography>
                     </Box>
                   </Paper>
@@ -530,7 +554,7 @@ const RankingRationalePanel: React.FC<RankingRationalePanelProps> = ({
                       }}
                     >
                       <Typography variant="body1" sx={{ lineHeight: 1.7 }}>
-                        {rationale.narrative}
+                        {rationale.summary}
                       </Typography>
                     </Paper>
                     {rationale.vacancy_title && (
@@ -631,57 +655,61 @@ const RankingRationalePanel: React.FC<RankingRationalePanelProps> = ({
               </Box>
 
               <Grid container spacing={2}>
-                {sortedContributions.slice(0, 8).map((contribution, index) => (
-                  <Grid item xs={12} sm={6} md={3} key={contribution.name}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2,
-                        bgcolor: 'grey.50',
-                        borderRadius: 2,
-                        borderLeft: 4,
-                        borderLeftColor: getContributionColor(contribution.impact) + '.main',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        {contribution.impact === 'positive' ? (
-                          <TrendingUpIcon fontSize="small" color="success" />
-                        ) : contribution.impact === 'negative' ? (
-                          <TrendingDownIcon fontSize="small" color="error" />
-                        ) : (
-                          <StarsIcon fontSize="small" color="warning" />
-                        )}
-                        <Typography variant="subtitle2" fontWeight={600}>
-                          {formatFeatureName(contribution.name)}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="h5"
-                        fontWeight="bold"
-                        color={getContributionColor(contribution.impact) + '.main'}
+                {sortedFactors.slice(0, 8).map((factor, index) => {
+                  const impact = getImpactType(factor.contribution);
+                  const contributionColor = getContributionColor(factor.contribution);
+                  return (
+                    <Grid item xs={12} sm={6} md={3} key={factor.factor_name}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 2,
+                          bgcolor: 'grey.50',
+                          borderRadius: 2,
+                          borderLeft: 4,
+                          borderLeftColor: contributionColor + '.main',
+                        }}
                       >
-                        {contribution.impact === 'negative' ? '-' : '+'}
-                        {formatPercent(Math.abs(contribution.contribution))}
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={Math.abs(contribution.contribution) * 500} // Scale for visibility
-                        color={getContributionColor(contribution.impact)}
-                        sx={{ mt: 1, height: 6, borderRadius: 3 }}
-                      />
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        Value: {formatPercent(contribution.value)}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                ))}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          {impact === 'positive' ? (
+                            <TrendingUpIcon fontSize="small" color="success" />
+                          ) : impact === 'negative' ? (
+                            <TrendingDownIcon fontSize="small" color="error" />
+                          ) : (
+                            <StarsIcon fontSize="small" color="warning" />
+                          )}
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {formatFeatureName(factor.factor_name)}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="h5"
+                          fontWeight="bold"
+                          color={contributionColor + '.main'}
+                        >
+                          {factor.contribution < 0 ? '-' : '+'}
+                          {formatPercent(Math.abs(factor.contribution))}
+                        </Typography>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.abs(factor.contribution) * 500} // Scale for visibility
+                          color={contributionColor}
+                          sx={{ mt: 1, height: 6, borderRadius: 3 }}
+                        />
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          Score: {formatPercent(factor.score)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  );
+                })}
               </Grid>
 
-              {/* Remaining contributions if more than 8 */}
-              {sortedContributions.length > 8 && (
+              {/* Remaining factors if more than 8 */}
+              {sortedFactors.length > 8 && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="caption" color="text.secondary">
-                    + {sortedContributions.length - 8} more factors
+                    + {sortedFactors.length - 8} more factors
                   </Typography>
                 </Box>
               )}
@@ -700,8 +728,7 @@ const RankingRationalePanel: React.FC<RankingRationalePanelProps> = ({
                   <Typography variant="body2" color="text.secondary">
                     This explanation shows how the ML model arrived at this candidate's ranking. The
                     feature contributions indicate which factors increased or decreased the match
-                    score. The confidence interval ({formatPercent(rationale.confidence_interval.lower)} -{' '}
-                    {formatPercent(rationale.confidence_interval.upper)}) reflects the model's
+                    score. The confidence ({formatPercent(rationale.confidence)}) reflects the model's
                     certainty in its prediction.
                   </Typography>
                 </Box>
