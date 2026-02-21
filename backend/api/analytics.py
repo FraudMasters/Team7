@@ -1778,6 +1778,188 @@ async def get_confidence_metrics(
         ) from e
 
 
+class FeatureImportanceItem(BaseModel):
+    """Single feature importance item."""
+
+    feature_name: str = Field(..., description="Name of the feature used in ML model")
+    importance_score: float = Field(..., description="Normalized importance score (0-1)")
+    rank: int = Field(..., description="Rank of this feature by importance (1 = most important)")
+    description: str = Field(..., description="Human-readable description of the feature")
+    category: str = Field(..., description="Category of the feature (matching, experience, etc.)")
+
+
+class FeatureImportanceResponse(BaseModel):
+    """Response model for feature importance endpoint."""
+
+    features: list[FeatureImportanceItem] = Field(
+        ..., description="List of features with importance scores, sorted by importance"
+    )
+    model_version: str = Field(..., description="Version of the ML model")
+    model_type: str = Field(..., description="Type of ML model used (e.g., random_forest)")
+    total_features: int = Field(..., description="Total number of features in the model")
+    last_updated: str = Field(..., description="Timestamp when model was last trained/updated")
+
+
+# Feature descriptions for explainability
+FEATURE_DESCRIPTIONS = {
+    "overall_match_score": "Overall compatibility score between candidate and job requirements",
+    "keyword_score": "Direct keyword matching between resume and job description",
+    "tfidf_score": "Term frequency-inverse document frequency score for relevant terms",
+    "vector_score": "Semantic similarity using vector embeddings",
+    "skills_match_ratio": "Ratio of required skills found in candidate's resume",
+    "experience_months": "Total work experience in months",
+    "experience_relevance": "How relevant the candidate's experience is to the job",
+    "education_level": "Normalized education level (higher = more advanced degree)",
+    "recent_experience": "Relevant experience gained in recent years",
+    "skill_rarity_score": "Value of having rare/specialized skills that match requirements",
+    "title_similarity": "Similarity between candidate's current/past titles and job title",
+    "freshness_score": "How recently the resume was updated",
+    "completeness_score": "How complete and detailed the resume is",
+}
+
+FEATURE_CATEGORIES = {
+    "overall_match_score": "matching",
+    "keyword_score": "matching",
+    "tfidf_score": "matching",
+    "vector_score": "matching",
+    "skills_match_ratio": "matching",
+    "experience_months": "experience",
+    "experience_relevance": "experience",
+    "recent_experience": "experience",
+    "education_level": "education",
+    "skill_rarity_score": "skills",
+    "title_similarity": "matching",
+    "freshness_score": "quality",
+    "completeness_score": "quality",
+}
+
+
+@router.get(
+    "/ai-explainability/feature-importance",
+    response_model=FeatureImportanceResponse,
+    tags=["AI Explainability"],
+)
+async def get_feature_importance() -> JSONResponse:
+    """
+    Get ML model feature importance for AI explainability.
+
+    This endpoint provides transparency into which features the ML ranking model
+    considers most important when making candidate recommendations. Feature importance
+    helps recruiters understand the factors driving AI recommendations.
+
+    Features are categorized into:
+    - matching: Skills and keyword matching scores
+    - experience: Work experience and relevance
+    - education: Education level and qualifications
+    - skills: Specialized and rare skills
+    - quality: Resume quality indicators (freshness, completeness)
+
+    Returns:
+        JSON response with feature importance scores, sorted by importance
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/analytics/ai-explainability/feature-importance")
+        >>> response.json()
+        {
+            "features": [
+                {
+                    "feature_name": "skills_match_ratio",
+                    "importance_score": 0.25,
+                    "rank": 1,
+                    "description": "Ratio of required skills found in candidate's resume",
+                    "category": "matching"
+                },
+                ...
+            ],
+            "model_version": "1.0.0",
+            "model_type": "random_forest",
+            "total_features": 13,
+            "last_updated": "2024-01-15T10:30:00Z"
+        }
+    """
+    try:
+        logger.info("Fetching feature importance for AI explainability")
+
+        from analyzers.ranking_service import RankingFeatures, get_ranking_service
+        from datetime import datetime
+
+        # Get the ranking service instance
+        service = get_ranking_service()
+        model = service.model
+
+        # Get feature importance from the model
+        importance_dict = model.get_feature_importance()
+
+        # Build feature list with metadata
+        features = []
+        if importance_dict:
+            # Sort by importance score descending
+            sorted_features = sorted(
+                importance_dict.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+
+            # Normalize importance scores to sum to 1
+            total_importance = sum(score for _, score in sorted_features)
+            if total_importance > 0:
+                normalized = [(name, score / total_importance) for name, score in sorted_features]
+            else:
+                normalized = sorted_features
+
+            for rank, (feature_name, importance_score) in enumerate(normalized, start=1):
+                features.append({
+                    "feature_name": feature_name,
+                    "importance_score": round(importance_score, 4),
+                    "rank": rank,
+                    "description": FEATURE_DESCRIPTIONS.get(
+                        feature_name, "No description available"
+                    ),
+                    "category": FEATURE_CATEGORIES.get(feature_name, "other"),
+                })
+        else:
+            # If model not trained, return features with equal importance
+            for rank, feature_name in enumerate(RankingFeatures.FEATURE_NAMES, start=1):
+                features.append({
+                    "feature_name": feature_name,
+                    "importance_score": round(1.0 / len(RankingFeatures.FEATURE_NAMES), 4),
+                    "rank": rank,
+                    "description": FEATURE_DESCRIPTIONS.get(
+                        feature_name, "No description available"
+                    ),
+                    "category": FEATURE_CATEGORIES.get(feature_name, "other"),
+                })
+
+        response_data = {
+            "features": features,
+            "model_version": model.version,
+            "model_type": model.model_type,
+            "total_features": len(features),
+            "last_updated": datetime.utcnow().isoformat() + "Z",
+        }
+
+        logger.info(
+            f"Feature importance retrieved successfully - "
+            f"total_features: {len(features)}, top_feature: {features[0]['feature_name'] if features else 'N/A'}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving feature importance: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve feature importance: {str(e)}",
+        ) from e
+
+
 @router.get(
     "/source-tracking",
     response_model=SourceTrackingResponse,
