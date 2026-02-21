@@ -421,6 +421,7 @@ class ResumeBuilderService:
 
         # Build response
         response = AISuggestionsResponse(
+            resume_id=str(resume_id),
             suggestions=suggestions,
             ats_score_before=ats_score_before,
             ats_score_potential=ats_score_potential,

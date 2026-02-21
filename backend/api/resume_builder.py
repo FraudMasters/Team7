@@ -151,6 +151,206 @@ def _resume_to_summary(resume: BuiltResume) -> Dict[str, Any]:
     }
 
 
+def _render_resume_to_html(content: Dict[str, Any]) -> str:
+    """
+    Render resume content dictionary to HTML for PDF generation.
+
+    Args:
+        content: Resume content dictionary with sections
+
+    Returns:
+        HTML string for PDF generation
+    """
+    html_parts = ['<!DOCTYPE html><html><head><meta charset="UTF-8">']
+    html_parts.append('<style>')
+    html_parts.append('body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }')
+    html_parts.append('h1 { color: #2c3e50; margin-bottom: 5px; }')
+    html_parts.append('h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-top: 20px; }')
+    html_parts.append('h3 { color: #34495e; margin-bottom: 3px; }')
+    html_parts.append('.contact-info { color: #7f8c8d; margin-bottom: 15px; }')
+    html_parts.append('.contact-info a { color: #3498db; text-decoration: none; }')
+    html_parts.append('.section { margin-bottom: 20px; }')
+    html_parts.append('.entry { margin-bottom: 15px; }')
+    html_parts.append('.entry-header { display: flex; justify-content: space-between; }')
+    html_parts.append('.entry-title { font-weight: bold; }')
+    html_parts.append('.entry-date { color: #7f8c8d; }')
+    html_parts.append('.entry-company { color: #34495e; font-style: italic; }')
+    html_parts.append('.entry-description { margin-top: 5px; }')
+    html_parts.append('.skills-container { display: flex; flex-wrap: wrap; gap: 8px; }')
+    html_parts.append('.skill-tag { background: #ecf0f1; padding: 4px 10px; border-radius: 4px; font-size: 14px; }')
+    html_parts.append('.skill-expert { background: #27ae60; color: white; }')
+    html_parts.append('.skill-advanced { background: #3498db; color: white; }')
+    html_parts.append('.summary { font-style: italic; color: #34495e; }')
+    html_parts.append('</style></head><body>')
+
+    # Personal Info
+    personal_info = content.get("personal_info", {})
+    if personal_info:
+        full_name = personal_info.get("full_name", "")
+        if full_name:
+            html_parts.append(f'<h1>{full_name}</h1>')
+
+        # Contact info line
+        contact_parts = []
+        if personal_info.get("email"):
+            contact_parts.append(f'<a href="mailto:{personal_info["email"]}">{personal_info["email"]}</a>')
+        if personal_info.get("phone"):
+            contact_parts.append(personal_info["phone"])
+        if personal_info.get("location"):
+            contact_parts.append(personal_info["location"])
+
+        if contact_parts:
+            html_parts.append(f'<div class="contact-info">{" | ".join(contact_parts)}</div>')
+
+        # Social links
+        social_links = personal_info.get("social_links", {})
+        if social_links:
+            link_parts = []
+            for platform, url in social_links.items():
+                if url:
+                    link_parts.append(f'<a href="{url}">{platform.title()}</a>')
+            if link_parts:
+                html_parts.append(f'<div class="contact-info">{" | ".join(link_parts)}</div>')
+
+    # Professional Summary
+    summary = content.get("professional_summary", "")
+    if summary:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Professional Summary</h2>')
+        html_parts.append(f'<p class="summary">{summary}</p>')
+        html_parts.append('</div>')
+
+    # Work Experience
+    work_experience = content.get("work_experience", [])
+    if work_experience:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Work Experience</h2>')
+        for entry in work_experience:
+            html_parts.append('<div class="entry">')
+            html_parts.append('<div class="entry-header">')
+            html_parts.append(f'<span class="entry-title">{entry.get("position", "")}</span>')
+            if entry.get("start_date"):
+                date_str = entry.get("start_date", "")
+                if entry.get("end_date"):
+                    date_str += f' - {entry["end_date"]}'
+                elif entry.get("is_current"):
+                    date_str += ' - Present'
+                html_parts.append(f'<span class="entry-date">{date_str}</span>')
+            html_parts.append('</div>')
+            if entry.get("company"):
+                html_parts.append(f'<div class="entry-company">{entry["company"]}</div>')
+            if entry.get("description"):
+                html_parts.append(f'<p class="entry-description">{entry["description"]}</p>')
+            highlights = entry.get("highlights", [])
+            if highlights:
+                html_parts.append('<ul>')
+                for highlight in highlights:
+                    html_parts.append(f'<li>{highlight}</li>')
+                html_parts.append('</ul>')
+            html_parts.append('</div>')
+        html_parts.append('</div>')
+
+    # Education
+    education = content.get("education", [])
+    if education:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Education</h2>')
+        for entry in education:
+            html_parts.append('<div class="entry">')
+            html_parts.append('<div class="entry-header">')
+            degree_parts = []
+            if entry.get("degree"):
+                degree_parts.append(entry["degree"])
+            if entry.get("field_of_study"):
+                degree_parts.append(f'in {entry["field_of_study"]}')
+            html_parts.append(f'<span class="entry-title">{" ".join(degree_parts)}</span>')
+            if entry.get("start_date"):
+                date_str = entry.get("start_date", "")
+                if entry.get("end_date"):
+                    date_str += f' - {entry["end_date"]}'
+                html_parts.append(f'<span class="entry-date">{date_str}</span>')
+            html_parts.append('</div>')
+            if entry.get("institution"):
+                html_parts.append(f'<div class="entry-company">{entry["institution"]}</div>')
+            if entry.get("gpa"):
+                html_parts.append(f'<div>GPA: {entry["gpa"]}</div>')
+            html_parts.append('</div>')
+        html_parts.append('</div>')
+
+    # Skills
+    skills = content.get("skills", [])
+    if skills:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Skills</h2>')
+        html_parts.append('<div class="skills-container">')
+        for skill in skills:
+            skill_name = skill.get("name", "")
+            proficiency = skill.get("proficiency_level", "").lower()
+            css_class = "skill-tag"
+            if proficiency == "expert":
+                css_class += " skill-expert"
+            elif proficiency == "advanced":
+                css_class += " skill-advanced"
+            html_parts.append(f'<span class="{css_class}">{skill_name}</span>')
+        html_parts.append('</div>')
+        html_parts.append('</div>')
+
+    # Certifications
+    certifications = content.get("certifications", [])
+    if certifications:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Certifications</h2>')
+        for entry in certifications:
+            html_parts.append('<div class="entry">')
+            html_parts.append(f'<span class="entry-title">{entry.get("name", "")}</span>')
+            if entry.get("issuer"):
+                html_parts.append(f' - <span class="entry-company">{entry["issuer"]}</span>')
+            if entry.get("issue_date"):
+                html_parts.append(f' <span class="entry-date">({entry["issue_date"]})</span>')
+            html_parts.append('</div>')
+        html_parts.append('</div>')
+
+    # Languages
+    languages = content.get("languages", [])
+    if languages:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Languages</h2>')
+        html_parts.append('<div class="skills-container">')
+        for lang in languages:
+            lang_name = lang.get("name", "")
+            proficiency = lang.get("proficiency", "")
+            html_parts.append(f'<span class="skill-tag">{lang_name}')
+            if proficiency:
+                html_parts.append(f' ({proficiency})')
+            html_parts.append('</span>')
+        html_parts.append('</div>')
+        html_parts.append('</div>')
+
+    # Projects
+    projects = content.get("projects", [])
+    if projects:
+        html_parts.append('<div class="section">')
+        html_parts.append('<h2>Projects</h2>')
+        for entry in projects:
+            html_parts.append('<div class="entry">')
+            html_parts.append(f'<span class="entry-title">{entry.get("name", "")}</span>')
+            if entry.get("url"):
+                html_parts.append(f' - <a href="{entry["url"]}">{entry["url"]}</a>')
+            if entry.get("description"):
+                html_parts.append(f'<p class="entry-description">{entry["description"]}</p>')
+            technologies = entry.get("technologies", [])
+            if technologies:
+                html_parts.append('<div class="skills-container">')
+                for tech in technologies:
+                    html_parts.append(f'<span class="skill-tag">{tech}</span>')
+                html_parts.append('</div>')
+            html_parts.append('</div>')
+        html_parts.append('</div>')
+
+    html_parts.append('</body></html>')
+    return ''.join(html_parts)
+
+
 # =============================================================================
 # CRUD Endpoints
 # =============================================================================
@@ -1202,8 +1402,21 @@ async def export_resume(
                 margin_left=20,
                 margin_right=20,
             )
-            result = pdf_generator.generate(resume.content, options)
             filename = f"{safe_title}_{timestamp}.pdf"
+
+            # Render resume content to HTML for PDF generation
+            html_content = _render_resume_to_html(resume.content)
+            result = await pdf_generator.generate_resume_pdf(
+                html=html_content,
+                filename=filename,
+                options=options,
+            )
+
+            if not result.success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to generate PDF: {result.error_message}",
+                )
 
             return StreamingResponse(
                 io.BytesIO(result.pdf_bytes),
@@ -1224,8 +1437,18 @@ async def export_resume(
                 margin_left=20,
                 margin_right=20,
             )
-            result = docx_generator.generate(resume.content, options)
             filename = f"{safe_title}_{timestamp}.docx"
+            result = await docx_generator.generate_resume_docx(
+                resume_content=resume.content,
+                filename=filename,
+                options=options,
+            )
+
+            if not result.success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to generate DOCX: {result.error_message}",
+                )
 
             return StreamingResponse(
                 io.BytesIO(result.docx_bytes),

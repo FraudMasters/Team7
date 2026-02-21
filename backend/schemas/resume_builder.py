@@ -138,12 +138,17 @@ class AISuggestion(BaseModel):
 
     id: str = Field(..., description="Unique suggestion identifier")
     type: str = Field(..., description="Suggestion type (content, grammar, keyword, format, ats)")
+    category: str = Field(default="", description="Category of the suggestion (alias for type, used by frontend)")
     section: str = Field(..., description="Target section (summary, work_experience, skills, etc.)")
     field: Optional[str] = Field(None, description="Specific field within section")
     entry_id: Optional[str] = Field(None, description="ID of the specific entry being improved")
     original_text: Optional[str] = Field(None, description="Original text to be replaced")
+    current_state: Optional[str] = Field(None, description="Current state of the content before suggestion")
     suggested_text: str = Field(..., description="Suggested improvement text")
+    recommendation: str = Field(default="", description="Recommendation text (alias for suggested_text, used by frontend)")
     reason: Optional[str] = Field(None, description="Explanation for the suggestion")
+    description: Optional[str] = Field(None, description="Description of the suggestion (used by frontend)")
+    title: Optional[str] = Field(None, description="Title/summary of the suggestion for display")
     priority: int = Field(0, description="Priority level (0=low, 1=medium, 2=high)", ge=0, le=2)
     impact_score: Optional[float] = Field(None, description="Expected impact on ATS score (0-100)", ge=0, le=100)
 
@@ -155,10 +160,43 @@ class AISuggestion(BaseModel):
             raise ValueError(f"Invalid type. Must be one of: {', '.join(valid_types)}")
         return v
 
+    @field_validator("category", always=True)
+    @classmethod
+    def set_category_from_type(cls, v, info):
+        """Set category to match type if not provided."""
+        if not v and "type" in info.data:
+            return info.data["type"]
+        return v
+
+    @field_validator("recommendation", always=True)
+    @classmethod
+    def set_recommendation_from_suggested_text(cls, v, info):
+        """Set recommendation to match suggested_text if not provided."""
+        if not v and "suggested_text" in info.data:
+            return info.data["suggested_text"]
+        return v
+
+    @field_validator("current_state", always=True)
+    @classmethod
+    def set_current_state_from_original(cls, v, info):
+        """Set current_state to match original_text if not provided."""
+        if not v and "original_text" in info.data:
+            return info.data["original_text"]
+        return v
+
+    @field_validator("description", always=True)
+    @classmethod
+    def set_description_from_reason(cls, v, info):
+        """Set description to match reason if not provided."""
+        if not v and "reason" in info.data:
+            return info.data["reason"]
+        return v
+
 
 class AISuggestionsResponse(BaseModel):
     """Response model for AI suggestions."""
 
+    resume_id: str = Field(..., description="ID of the resume these suggestions are for")
     suggestions: List[AISuggestion] = Field(default_factory=list, description="List of suggestions")
     ats_score_before: Optional[int] = Field(None, description="ATS score before applying suggestions", ge=0, le=100)
     ats_score_potential: Optional[int] = Field(None, description="Potential ATS score if all applied", ge=0, le=100)
