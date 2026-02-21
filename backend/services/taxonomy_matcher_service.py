@@ -127,6 +127,293 @@ _COMMON_SKILL_ALIASES: Dict[str, Dict[str, Any]] = {
 }
 
 
+# Built-in common skill relationships
+# These serve as a fallback when taxonomy relationship data is not available
+# Format: skill_name -> list of related skills with type and weight
+_COMMON_SKILL_RELATIONSHIPS: Dict[str, List[Dict[str, Any]]] = {
+    # Frontend Frameworks
+    "React": [
+        {"related": "Vue", "type": "similar", "weight": 0.8},
+        {"related": "Angular", "type": "similar", "weight": 0.7},
+        {"related": "Next.js", "type": "parent_child", "weight": 0.9},
+        {"related": "JavaScript", "type": "prerequisite", "weight": 1.0},
+        {"related": "TypeScript", "type": "related", "weight": 0.8},
+        {"related": "Redux", "type": "related", "weight": 0.85},
+        {"related": "React Native", "type": "related", "weight": 0.75},
+        {"related": "Frontend Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "Vue": [
+        {"related": "React", "type": "similar", "weight": 0.8},
+        {"related": "Angular", "type": "similar", "weight": 0.7},
+        {"related": "Nuxt.js", "type": "parent_child", "weight": 0.9},
+        {"related": "JavaScript", "type": "prerequisite", "weight": 1.0},
+        {"related": "Vuex", "type": "related", "weight": 0.8},
+        {"related": "Frontend Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "Angular": [
+        {"related": "React", "type": "similar", "weight": 0.7},
+        {"related": "Vue", "type": "similar", "weight": 0.7},
+        {"related": "TypeScript", "type": "prerequisite", "weight": 0.95},
+        {"related": "RxJS", "type": "related", "weight": 0.85},
+        {"related": "Frontend Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "Next.js": [
+        {"related": "React", "type": "parent_child", "weight": 1.0},
+        {"related": "Nuxt.js", "type": "similar", "weight": 0.75},
+        {"related": "Gatsby", "type": "similar", "weight": 0.7},
+        {"related": "JavaScript", "type": "prerequisite", "weight": 1.0},
+        {"related": "Node.js", "type": "related", "weight": 0.8},
+    ],
+    # Programming Languages
+    "JavaScript": [
+        {"related": "TypeScript", "type": "similar", "weight": 0.9},
+        {"related": "Node.js", "type": "related", "weight": 0.9},
+        {"related": "React", "type": "related", "weight": 0.85},
+        {"related": "Vue", "type": "related", "weight": 0.8},
+        {"related": "Angular", "type": "related", "weight": 0.75},
+        {"related": "Python", "type": "similar", "weight": 0.5},
+    ],
+    "TypeScript": [
+        {"related": "JavaScript", "type": "similar", "weight": 0.95},
+        {"related": "Angular", "type": "related", "weight": 0.9},
+        {"related": "React", "type": "related", "weight": 0.85},
+        {"related": "Node.js", "type": "related", "weight": 0.85},
+    ],
+    "Python": [
+        {"related": "Django", "type": "related", "weight": 0.9},
+        {"related": "Flask", "type": "related", "weight": 0.85},
+        {"related": "FastAPI", "type": "related", "weight": 0.85},
+        {"related": "Machine Learning", "type": "related", "weight": 0.8},
+        {"related": "Data Science", "type": "related", "weight": 0.8},
+        {"related": "JavaScript", "type": "similar", "weight": 0.5},
+    ],
+    "Go": [
+        {"related": "Kubernetes", "type": "related", "weight": 0.85},
+        {"related": "Docker", "type": "related", "weight": 0.8},
+        {"related": "Microservices", "type": "related", "weight": 0.85},
+        {"related": "Rust", "type": "similar", "weight": 0.6},
+    ],
+    "Rust": [
+        {"related": "Go", "type": "similar", "weight": 0.6},
+        {"related": "C++", "type": "similar", "weight": 0.7},
+        {"related": "Systems Programming", "type": "parent_child", "weight": 0.9},
+    ],
+    # Backend Frameworks
+    "Django": [
+        {"related": "Python", "type": "prerequisite", "weight": 1.0},
+        {"related": "Flask", "type": "similar", "weight": 0.7},
+        {"related": "FastAPI", "type": "similar", "weight": 0.75},
+        {"related": "PostgreSQL", "type": "related", "weight": 0.8},
+    ],
+    "Flask": [
+        {"related": "Python", "type": "prerequisite", "weight": 1.0},
+        {"related": "Django", "type": "similar", "weight": 0.7},
+        {"related": "FastAPI", "type": "similar", "weight": 0.8},
+    ],
+    "FastAPI": [
+        {"related": "Python", "type": "prerequisite", "weight": 1.0},
+        {"related": "Django", "type": "similar", "weight": 0.75},
+        {"related": "Flask", "type": "similar", "weight": 0.8},
+        {"related": "API Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "Express.js": [
+        {"related": "Node.js", "type": "prerequisite", "weight": 1.0},
+        {"related": "JavaScript", "type": "prerequisite", "weight": 0.95},
+        {"related": "FastAPI", "type": "similar", "weight": 0.6},
+        {"related": "API Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "Node.js": [
+        {"related": "JavaScript", "type": "prerequisite", "weight": 1.0},
+        {"related": "Express.js", "type": "related", "weight": 0.9},
+        {"related": "Next.js", "type": "related", "weight": 0.85},
+        {"related": "React", "type": "related", "weight": 0.75},
+    ],
+    # Databases
+    "PostgreSQL": [
+        {"related": "MySQL", "type": "similar", "weight": 0.8},
+        {"related": "SQL", "type": "prerequisite", "weight": 0.95},
+        {"related": "Django", "type": "related", "weight": 0.7},
+        {"related": "Database", "type": "parent_child", "weight": 0.9},
+    ],
+    "MySQL": [
+        {"related": "PostgreSQL", "type": "similar", "weight": 0.8},
+        {"related": "SQL", "type": "prerequisite", "weight": 0.95},
+        {"related": "Database", "type": "parent_child", "weight": 0.9},
+    ],
+    "MongoDB": [
+        {"related": "PostgreSQL", "type": "similar", "weight": 0.5},
+        {"related": "Node.js", "type": "related", "weight": 0.8},
+        {"related": "Express.js", "type": "related", "weight": 0.75},
+        {"related": "Database", "type": "parent_child", "weight": 0.9},
+    ],
+    "Redis": [
+        {"related": "Database", "type": "parent_child", "weight": 0.85},
+        {"related": "Caching", "type": "related", "weight": 0.95},
+        {"related": "Node.js", "type": "related", "weight": 0.7},
+    ],
+    # Cloud & DevOps
+    "AWS": [
+        {"related": "Amazon Web Services", "type": "similar", "weight": 1.0},
+        {"related": "Azure", "type": "similar", "weight": 0.7},
+        {"related": "GCP", "type": "similar", "weight": 0.7},
+        {"related": "Docker", "type": "related", "weight": 0.8},
+        {"related": "Kubernetes", "type": "related", "weight": 0.8},
+        {"related": "Cloud Computing", "type": "parent_child", "weight": 0.95},
+    ],
+    "Amazon Web Services": [
+        {"related": "AWS", "type": "similar", "weight": 1.0},
+        {"related": "Azure", "type": "similar", "weight": 0.7},
+        {"related": "GCP", "type": "similar", "weight": 0.7},
+    ],
+    "Azure": [
+        {"related": "Microsoft Azure", "type": "similar", "weight": 1.0},
+        {"related": "AWS", "type": "similar", "weight": 0.7},
+        {"related": "GCP", "type": "similar", "weight": 0.7},
+        {"related": "Cloud Computing", "type": "parent_child", "weight": 0.95},
+    ],
+    "Microsoft Azure": [
+        {"related": "Azure", "type": "similar", "weight": 1.0},
+    ],
+    "GCP": [
+        {"related": "Google Cloud Platform", "type": "similar", "weight": 1.0},
+        {"related": "AWS", "type": "similar", "weight": 0.7},
+        {"related": "Azure", "type": "similar", "weight": 0.7},
+        {"related": "Cloud Computing", "type": "parent_child", "weight": 0.95},
+    ],
+    "Google Cloud Platform": [
+        {"related": "GCP", "type": "similar", "weight": 1.0},
+    ],
+    "Docker": [
+        {"related": "Kubernetes", "type": "related", "weight": 0.9},
+        {"related": "Containerization", "type": "related", "weight": 0.95},
+        {"related": "DevOps", "type": "parent_child", "weight": 0.85},
+        {"related": "CI/CD", "type": "related", "weight": 0.8},
+    ],
+    "Kubernetes": [
+        {"related": "Docker", "type": "related", "weight": 0.9},
+        {"related": "Containerization", "type": "related", "weight": 0.95},
+        {"related": "DevOps", "type": "parent_child", "weight": 0.85},
+        {"related": "Go", "type": "related", "weight": 0.7},
+    ],
+    "CI/CD": [
+        {"related": "DevOps", "type": "parent_child", "weight": 0.95},
+        {"related": "Docker", "type": "related", "weight": 0.8},
+        {"related": "Jenkins", "type": "related", "weight": 0.85},
+        {"related": "GitHub Actions", "type": "related", "weight": 0.85},
+    ],
+    # Machine Learning & Data
+    "Machine Learning": [
+        {"related": "Deep Learning", "type": "parent_child", "weight": 0.85},
+        {"related": "Python", "type": "related", "weight": 0.9},
+        {"related": "TensorFlow", "type": "related", "weight": 0.85},
+        {"related": "PyTorch", "type": "related", "weight": 0.85},
+        {"related": "Data Science", "type": "similar", "weight": 0.8},
+        {"related": "AI", "type": "similar", "weight": 0.9},
+    ],
+    "Deep Learning": [
+        {"related": "Machine Learning", "type": "parent_child", "weight": 0.9},
+        {"related": "Neural Networks", "type": "related", "weight": 0.95},
+        {"related": "TensorFlow", "type": "related", "weight": 0.9},
+        {"related": "PyTorch", "type": "related", "weight": 0.9},
+    ],
+    "TensorFlow": [
+        {"related": "PyTorch", "type": "similar", "weight": 0.85},
+        {"related": "Keras", "type": "related", "weight": 0.9},
+        {"related": "Machine Learning", "type": "parent_child", "weight": 0.85},
+        {"related": "Python", "type": "prerequisite", "weight": 0.9},
+    ],
+    "PyTorch": [
+        {"related": "TensorFlow", "type": "similar", "weight": 0.85},
+        {"related": "Machine Learning", "type": "parent_child", "weight": 0.85},
+        {"related": "Python", "type": "prerequisite", "weight": 0.9},
+    ],
+    "Data Science": [
+        {"related": "Python", "type": "related", "weight": 0.9},
+        {"related": "Pandas", "type": "related", "weight": 0.9},
+        {"related": "NumPy", "type": "related", "weight": 0.85},
+        {"related": "Machine Learning", "type": "similar", "weight": 0.8},
+    ],
+    "Pandas": [
+        {"related": "NumPy", "type": "related", "weight": 0.9},
+        {"related": "Python", "type": "prerequisite", "weight": 1.0},
+        {"related": "Data Science", "type": "parent_child", "weight": 0.85},
+    ],
+    "NumPy": [
+        {"related": "Pandas", "type": "related", "weight": 0.9},
+        {"related": "Python", "type": "prerequisite", "weight": 1.0},
+    ],
+    # Mobile Development
+    "React Native": [
+        {"related": "React", "type": "prerequisite", "weight": 0.95},
+        {"related": "JavaScript", "type": "prerequisite", "weight": 0.9},
+        {"related": "Flutter", "type": "similar", "weight": 0.75},
+        {"related": "Mobile Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "Flutter": [
+        {"related": "Dart", "type": "prerequisite", "weight": 1.0},
+        {"related": "React Native", "type": "similar", "weight": 0.75},
+        {"related": "Mobile Development", "type": "parent_child", "weight": 0.9},
+    ],
+    "iOS Development": [
+        {"related": "Swift", "type": "prerequisite", "weight": 0.95},
+        {"related": "Mobile Development", "type": "parent_child", "weight": 0.9},
+        {"related": "Android Development", "type": "similar", "weight": 0.6},
+    ],
+    "Android Development": [
+        {"related": "Kotlin", "type": "prerequisite", "weight": 0.95},
+        {"related": "Mobile Development", "type": "parent_child", "weight": 0.9},
+        {"related": "iOS Development", "type": "similar", "weight": 0.6},
+    ],
+    # Design
+    "Figma": [
+        {"related": "UI Design", "type": "related", "weight": 0.9},
+        {"related": "UX Design", "type": "related", "weight": 0.85},
+        {"related": "Design Tools", "type": "parent_child", "weight": 0.9},
+    ],
+    "UI Design": [
+        {"related": "UX Design", "type": "similar", "weight": 0.85},
+        {"related": "Figma", "type": "related", "weight": 0.85},
+        {"related": "CSS", "type": "related", "weight": 0.7},
+    ],
+    "UX Design": [
+        {"related": "UI Design", "type": "similar", "weight": 0.85},
+        {"related": "Figma", "type": "related", "weight": 0.8},
+        {"related": "User Research", "type": "related", "weight": 0.85},
+    ],
+    # Testing
+    "Jest": [
+        {"related": "JavaScript", "type": "prerequisite", "weight": 0.9},
+        {"related": "React", "type": "related", "weight": 0.85},
+        {"related": "Testing", "type": "parent_child", "weight": 0.9},
+    ],
+    "pytest": [
+        {"related": "Python", "type": "prerequisite", "weight": 0.95},
+        {"related": "Testing", "type": "parent_child", "weight": 0.9},
+        {"related": "Django", "type": "related", "weight": 0.7},
+    ],
+    "Cypress": [
+        {"related": "JavaScript", "type": "prerequisite", "weight": 0.85},
+        {"related": "Testing", "type": "parent_child", "weight": 0.9},
+        {"related": "React", "type": "related", "weight": 0.75},
+    ],
+    # Methodologies
+    "Agile": [
+        {"related": "Scrum", "type": "similar", "weight": 0.85},
+        {"related": "Project Management", "type": "parent_child", "weight": 0.8},
+    ],
+    "Scrum": [
+        {"related": "Agile", "type": "parent_child", "weight": 0.9},
+        {"related": "Project Management", "type": "parent_child", "weight": 0.75},
+    ],
+    "DevOps": [
+        {"related": "CI/CD", "type": "related", "weight": 0.9},
+        {"related": "Docker", "type": "related", "weight": 0.85},
+        {"related": "Kubernetes", "type": "related", "weight": 0.85},
+        {"related": "AWS", "type": "related", "weight": 0.8},
+    ],
+}
+
+
 @dataclass
 class TaxonomyMatchResult:
     """
@@ -808,30 +1095,95 @@ class TaxonomyMatcherService:
         """
         Find skills related to the given skill.
 
-        This is a synchronous method that uses cached data for fast lookups.
-        For database-backed resolution, use find_related_skills_async instead.
+        This is a synchronous method that uses cached data and built-in
+        relationship mappings for fast lookups. For database-backed resolution
+        with custom taxonomy data, use find_related_skills_async instead.
+
+        The lookup process:
+        1. Normalize the skill name
+        2. Check against built-in common skill relationships
+        3. Filter by relationship types and minimum weight
+        4. Return matching RelatedSkill objects
 
         Args:
             skill_name: The skill to find relations for
             relationship_types: Types of relationships to include (default: all)
-            min_weight: Minimum relationship weight (default: 0.0)
-            organization_id: Optional organization filter
+                Valid types: 'parent_child', 'similar', 'prerequisite', 'related'
+            min_weight: Minimum relationship weight (default: 0.0, range: 0.0-1.0)
+            organization_id: Optional organization filter (for caching purposes)
 
         Returns:
-            List of RelatedSkill objects
-
-        Note:
-            This method is implemented in subtask-3-3. The current
-            implementation returns an empty list.
+            List of RelatedSkill objects, sorted by weight (descending)
 
         Example:
             >>> related = service.find_related_skills("React")
-            >>> print([r.skill_name for r in related])  # ['Vue', 'Angular', 'Frontend']
+            >>> print([r.skill_name for r in related])  # ['Vue', 'Angular', 'Next.js', ...]
+            >>> print([r.relationship_type for r in related])  # ['similar', 'similar', ...]
         """
-        # TODO: Implement full related skills lookup in subtask-3-3
-        # For now, return empty list
-        logger.debug(f"Related skills lookup not yet implemented for '{skill_name}'")
-        return []
+        # Validate input
+        if not skill_name or not isinstance(skill_name, str):
+            return []
+
+        # Validate min_weight
+        if not 0.0 <= min_weight <= 1.0:
+            logger.warning(f"min_weight {min_weight} out of range, clamping to [0.0, 1.0]")
+            min_weight = max(0.0, min(1.0, min_weight))
+
+        # Normalize the skill name for matching
+        normalized_skill = self.skills_matcher.normalize_skill(skill_name)
+
+        # Check built-in relationships
+        # First try exact match, then try normalized lookup
+        relationships_data = _COMMON_SKILL_RELATIONSHIPS.get(skill_name)
+
+        if not relationships_data:
+            # Try normalized lookup in the keys
+            for key in _COMMON_SKILL_RELATIONSHIPS.keys():
+                if self.skills_matcher.normalize_skill(key) == normalized_skill:
+                    relationships_data = _COMMON_SKILL_RELATIONSHIPS[key]
+                    break
+
+        if not relationships_data:
+            logger.debug(f"No relationships found for skill '{skill_name}'")
+            return []
+
+        # Convert to RelatedSkill objects and apply filters
+        related_skills: List[RelatedSkill] = []
+
+        for rel_data in relationships_data:
+            # Extract relationship info
+            related_name = rel_data.get("related")
+            rel_type = rel_data.get("type", "related")
+            weight = rel_data.get("weight", 1.0)
+
+            if not related_name:
+                continue
+
+            # Apply relationship type filter
+            if relationship_types and rel_type not in relationship_types:
+                continue
+
+            # Apply weight filter
+            if weight < min_weight:
+                continue
+
+            # Create RelatedSkill object
+            related_skill = RelatedSkill(
+                skill_name=related_name,
+                relationship_type=rel_type,
+                weight=weight,
+            )
+            related_skills.append(related_skill)
+
+        # Sort by weight (descending) for consistent ordering
+        related_skills.sort(key=lambda x: x.weight, reverse=True)
+
+        logger.debug(
+            f"Found {len(related_skills)} related skills for '{skill_name}' "
+            f"(types: {relationship_types}, min_weight: {min_weight})"
+        )
+
+        return related_skills
 
     async def find_related_skills_async(
         self,
@@ -844,27 +1196,61 @@ class TaxonomyMatcherService:
         """
         Find skills related to the given skill asynchronously.
 
-        This method queries the database for skill relationships.
+        This method queries the database for skill relationships using
+        the SkillRelationship model. If no database is available or no
+        relationships are found, it falls back to built-in mappings.
+
+        The lookup process:
+        1. Query database for relationships involving this skill
+        2. Filter by relationship types and minimum weight
+        3. Fall back to built-in mappings if no database or no results
+        4. Return matching RelatedSkill objects
 
         Args:
             skill_name: The skill to find relations for
             relationship_types: Types of relationships to include (default: all)
-            min_weight: Minimum relationship weight (default: 0.0)
+                Valid types: 'parent_child', 'similar', 'prerequisite', 'related'
+            min_weight: Minimum relationship weight (default: 0.0, range: 0.0-1.0)
             organization_id: Optional organization filter
 
         Returns:
-            List of RelatedSkill objects
-
-        Note:
-            This method is implemented in subtask-3-3. The current
-            implementation is a stub that returns an empty list.
+            List of RelatedSkill objects, sorted by weight (descending)
 
         Example:
             >>> related = await service.find_related_skills_async("React")
-            >>> print([r.skill_name for r in related])  # ['Vue', 'Angular', 'Frontend']
+            >>> print([r.skill_name for r in related])  # ['Vue', 'Angular', 'Next.js', ...]
         """
-        # TODO: Implement full async related skills lookup in subtask-3-3
-        # For now, fall back to the sync method
+        # Validate input
+        if not skill_name or not isinstance(skill_name, str):
+            return []
+
+        # Validate min_weight
+        if not 0.0 <= min_weight <= 1.0:
+            logger.warning(f"min_weight {min_weight} out of range, clamping to [0.0, 1.0]")
+            min_weight = max(0.0, min(1.0, min_weight))
+
+        # Try database lookup if available
+        if self.db:
+            try:
+                related_skills = await self._query_related_skills_from_db(
+                    skill_name,
+                    relationship_types=relationship_types,
+                    min_weight=min_weight,
+                    organization_id=organization_id,
+                )
+
+                if related_skills:
+                    logger.debug(
+                        f"Found {len(related_skills)} related skills from database for '{skill_name}'"
+                    )
+                    return related_skills
+
+            except Exception as e:
+                logger.error(f"Error querying related skills from database: {e}")
+                # Fall through to fallback
+
+        # Fall back to sync method (built-in mappings)
+        logger.debug(f"Falling back to built-in relationships for '{skill_name}'")
         return self.find_related_skills(
             skill_name,
             relationship_types=relationship_types,
@@ -1075,6 +1461,140 @@ class TaxonomyMatcherService:
             "version": taxonomy.version,
             "organization_id": taxonomy.organization_id,
         }
+
+    async def _query_related_skills_from_db(
+        self,
+        skill_name: str,
+        *,
+        relationship_types: Optional[List[str]] = None,
+        min_weight: float = 0.0,
+        organization_id: Optional[str] = None,
+    ) -> List[RelatedSkill]:
+        """
+        Query the database for skills related to the given skill.
+
+        This helper method queries the SkillRelationship table to find
+        relationships where the given skill is either the source or target.
+
+        Args:
+            skill_name: The skill to find relations for
+            relationship_types: Types of relationships to include (default: all)
+            min_weight: Minimum relationship weight (default: 0.0)
+            organization_id: Optional organization filter
+
+        Returns:
+            List of RelatedSkill objects, sorted by weight (descending)
+        """
+        if not self.db:
+            return []
+
+        try:
+            # First, find the taxonomy entry for this skill
+            normalized_skill = self.skills_matcher.normalize_skill(skill_name)
+
+            taxonomy_query = select(SkillTaxonomy).where(
+                and_(
+                    SkillTaxonomy.is_active == True,
+                    SkillTaxonomy.is_latest == True,
+                )
+            )
+
+            if organization_id:
+                taxonomy_query = taxonomy_query.where(
+                    SkillTaxonomy.organization_id == organization_id
+                )
+
+            result = await self.db.execute(taxonomy_query)
+            taxonomies = result.scalars().all()
+
+            # Find matching taxonomy
+            source_taxonomy = None
+            for taxonomy in taxonomies:
+                if self.skills_matcher.normalize_skill(taxonomy.skill_name) == normalized_skill:
+                    source_taxonomy = taxonomy
+                    break
+
+            if not source_taxonomy:
+                logger.debug(f"No taxonomy entry found for '{skill_name}'")
+                return []
+
+            source_id = source_taxonomy.id
+
+            # Query relationships where this skill is source or target
+            query = (
+                select(SkillRelationship, SkillTaxonomy)
+                .join(
+                    SkillTaxonomy,
+                    or_(
+                        and_(
+                            SkillRelationship.source_skill_id == source_id,
+                            SkillTaxonomy.id == SkillRelationship.target_skill_id,
+                        ),
+                        and_(
+                            SkillRelationship.target_skill_id == source_id,
+                            SkillTaxonomy.id == SkillRelationship.source_skill_id,
+                        ),
+                    ),
+                )
+                .where(
+                    and_(
+                        SkillRelationship.is_active == True,
+                        SkillTaxonomy.is_active == True,
+                    )
+                )
+            )
+
+            # Apply organization filter
+            if organization_id:
+                query = query.where(
+                    SkillRelationship.organization_id == organization_id
+                )
+
+            # Apply relationship type filter
+            if relationship_types:
+                query = query.where(
+                    SkillRelationship.relationship_type.in_(relationship_types)
+                )
+
+            result = await self.db.execute(query)
+            rows = result.all()
+
+            # Build RelatedSkill objects
+            related_skills: List[RelatedSkill] = []
+            seen_skills: Set[str] = set()
+
+            for relationship, related_taxonomy in rows:
+                # Skip duplicates
+                if related_taxonomy.skill_name in seen_skills:
+                    continue
+                seen_skills.add(related_taxonomy.skill_name)
+
+                # Get weight (default to 1.0 if not set)
+                weight = relationship.weight if relationship.weight is not None else 1.0
+
+                # Apply weight filter
+                if weight < min_weight:
+                    continue
+
+                # Determine relationship type from the relationship
+                rel_type = relationship.relationship_type or "related"
+
+                related_skill = RelatedSkill(
+                    skill_name=related_taxonomy.skill_name,
+                    relationship_type=rel_type,
+                    weight=weight,
+                    taxonomy_id=related_taxonomy.id,
+                )
+                related_skills.append(related_skill)
+
+            # Sort by weight (descending)
+            related_skills.sort(key=lambda x: x.weight, reverse=True)
+
+            return related_skills
+
+        except Exception as e:
+            logger.error(f"Error querying related skills from database: {e}")
+            return []
 
 
 # Factory function for dependency injection
