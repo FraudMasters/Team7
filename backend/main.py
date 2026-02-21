@@ -273,6 +273,7 @@ from api import (
     vacancies,
     ranking,
     candidates,
+    candidate_queue,
     industry_classifier,
     skill_suggestions,
     taxonomy_import_export,
@@ -319,6 +320,7 @@ app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
 app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
+app.include_router(candidate_queue.router, prefix="/api/candidate-queue", tags=["Candidate Queue"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
 app.include_router(skill_suggestions.router, prefix="/api/skill-suggestions", tags=["Skill Suggestions"])
 app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-export", tags=["Taxonomy Import/Export"])
