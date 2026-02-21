@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { config } from '@/config';
 import PublicTaxonomyBrowser from './PublicTaxonomyBrowser';
+import SkillHierarchyTree from './SkillHierarchyTree';
+import SkillRelationshipEditor from './SkillRelationshipEditor';
 import {
   Box,
   Paper,
@@ -30,6 +32,7 @@ import {
   Tabs,
   Menu,
   LinearProgress,
+  Autocomplete,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -43,6 +46,8 @@ import {
   Download as DownloadIcon,
   Upload as UploadIcon,
   FileDownload as FileDownloadIcon,
+  AccountTree as AccountTreeIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 
 /**
@@ -70,6 +75,10 @@ interface SkillTaxonomy {
   view_count: number;
   use_count: number;
   last_used_at?: string;
+  parent_skill_id?: string;
+  parent_skill_name?: string;
+  category_path?: string[];
+  children_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +100,7 @@ interface TaxonomyFormData {
   variants: string;
   context: string;
   is_active: boolean;
+  parent_skill_id: string;
 }
 
 /**
@@ -155,7 +165,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
   apiUrl = `${config.api.url}/api/skill-taxonomies`,
 }) => {
   const { t } = useTranslation();
-  const [currentTab, setCurrentTab] = useState<'manage' | 'browse'>('manage');
+  const [currentTab, setCurrentTab] = useState<'manage' | 'browse' | 'hierarchy' | 'relationships'>('manage');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [taxonomies, setTaxonomies] = useState<SkillTaxonomy[]>([]);
@@ -192,7 +202,12 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
     variants: '',
     context: '',
     is_active: true,
+    parent_skill_id: '',
   });
+
+  // Parent skill search state
+  const [parentSkillSearch, setParentSkillSearch] = useState<string>('');
+  const [availableParentSkills, setAvailableParentSkills] = useState<SkillTaxonomy[]>([]);
 
   // Available industries
   const industries = [
@@ -273,6 +288,67 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
   }, [selectedIndustry]);
 
   /**
+   * Search for parent skills (autocomplete)
+   */
+  const searchParentSkills = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        setAvailableParentSkills([]);
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          industry: selectedIndustry,
+          search: query,
+          is_active: 'true',
+        });
+
+        const response = await fetch(`${apiUrl}/?${params.toString()}`);
+
+        if (response.ok) {
+          const result: SkillTaxonomyListResponse = await response.json();
+          // Filter out the current skill being edited to prevent circular reference
+          const filtered = (result.skills || []).filter(
+            (s) => s.id !== editingTaxonomy?.id
+          );
+          setAvailableParentSkills(filtered);
+        }
+      } catch {
+        // Non-blocking error
+      }
+    },
+    [apiUrl, selectedIndustry, editingTaxonomy?.id]
+  );
+
+  /**
+   * Handle parent skill search input change
+   */
+  const handleParentSkillSearch = useCallback(
+    (query: string) => {
+      setParentSkillSearch(query);
+      searchParentSkills(query);
+    },
+    [searchParentSkills]
+  );
+
+  /**
+   * Handle parent skill selection
+   */
+  const handleParentSkillSelect = useCallback(
+    (skill: SkillTaxonomy | null) => {
+      if (skill) {
+        setFormData((prev) => ({ ...prev, parent_skill_id: skill.id }));
+        setParentSkillSearch(skill.skill_name);
+      } else {
+        setFormData((prev) => ({ ...prev, parent_skill_id: '' }));
+        setParentSkillSearch('');
+      }
+    },
+    []
+  );
+
+  /**
    * Handle industry change
    */
   const handleIndustryChange = (_event: React.SyntheticEvent, newValue: string) => {
@@ -289,7 +365,9 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
       variants: '',
       context: '',
       is_active: true,
+      parent_skill_id: '',
     });
+    setParentSkillSearch('');
     setDialogOpen(true);
   };
 
@@ -303,7 +381,9 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
       variants: taxonomy.variants.join(', '),
       context: taxonomy.context || '',
       is_active: taxonomy.is_active,
+      parent_skill_id: taxonomy.parent_skill_id || '',
     });
+    setParentSkillSearch(taxonomy.parent_skill_name || '');
     setDialogOpen(true);
   };
 
@@ -374,6 +454,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
             variants: variantsArray,
             context: formData.context || null,
             is_active: formData.is_active,
+            parent_skill_id: formData.parent_skill_id || null,
           }),
         });
 
@@ -398,6 +479,7 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                 variants: variantsArray,
                 context: formData.context || null,
                 is_active: formData.is_active,
+                parent_skill_id: formData.parent_skill_id || null,
               },
             ],
           }),
@@ -419,7 +501,9 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
         variants: '',
         context: '',
         is_active: true,
+        parent_skill_id: '',
       });
+      setParentSkillSearch('');
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : t('industryTaxonomy.errors.failedToCreate');
@@ -810,11 +894,13 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
           </Typography>
         </Box>
 
-        {/* View Tabs: Manage vs Browse */}
+        {/* View Tabs: Manage vs Browse vs Hierarchy vs Relationships */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={currentTab} onChange={(_e, newValue) => setCurrentTab(newValue)}>
             <Tab label="Manage Taxonomies" value="manage" />
             <Tab label="Browse Public" value="browse" />
+            <Tab icon={<AccountTreeIcon />} label="Hierarchy" value="hierarchy" iconPosition="start" />
+            <Tab icon={<LinkIcon />} label="Relationships" value="relationships" iconPosition="start" />
           </Tabs>
         </Box>
 
@@ -947,6 +1033,32 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
         {currentTab === 'browse' && (
           <PublicTaxonomyBrowser organizationId={organizationId} />
         )}
+
+        {/* Hierarchy tab content */}
+        {currentTab === 'hierarchy' && (
+          <SkillHierarchyTree
+            organizationId={organizationId}
+            industry={selectedIndustry}
+            apiUrl={apiUrl}
+            onSkillSelect={(skill) => {
+              // Find the full taxonomy and open edit dialog
+              const fullTaxonomy = taxonomies.find((t) => t.id === skill.id);
+              if (fullTaxonomy) {
+                handleEdit(fullTaxonomy);
+              }
+            }}
+          />
+        )}
+
+        {/* Relationships tab content */}
+        {currentTab === 'relationships' && (
+          <SkillRelationshipEditor
+            organizationId={organizationId}
+            apiUrl={`${config.api.url}/api/skill-relationships`}
+            taxonomyApiUrl={apiUrl}
+            onRelationshipChange={fetchTaxonomies}
+          />
+        )}
       </Paper>
 
       {/* Taxonomies List - Only show in manage tab */}
@@ -1058,6 +1170,22 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
                     </Box>
                   )}
 
+                  {/* Parent Skill Display */}
+                  {taxonomy.parent_skill_name && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                        {t('industryTaxonomy.skill.parentSkill', 'Parent Skill')}
+                      </Typography>
+                      <Chip
+                        icon={<AccountTreeIcon fontSize="small" />}
+                        label={taxonomy.parent_skill_name}
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                      />
+                    </Box>
+                  )}
+
                   <Divider sx={{ my: 1 }} />
 
                   <Box sx={{ mt: 2 }}>
@@ -1164,6 +1292,75 @@ const IndustryTaxonomyManager: React.FC<IndustryTaxonomyManagerProps> = ({
               <MenuItem value="tool">{t('industryTaxonomy.dialog.contextTool')}</MenuItem>
               <MenuItem value="library">{t('industryTaxonomy.dialog.contextLibrary')}</MenuItem>
             </TextField>
+
+            {/* Parent Skill Selector */}
+            <Autocomplete
+              value={
+                formData.parent_skill_id
+                  ? availableParentSkills.find((s) => s.id === formData.parent_skill_id) ||
+                    (editingTaxonomy?.parent_skill_name
+                      ? {
+                          id: formData.parent_skill_id,
+                          industry: selectedIndustry,
+                          skill_name: editingTaxonomy.parent_skill_name,
+                          variants: [],
+                          is_active: true,
+                          is_public: false,
+                          view_count: 0,
+                          use_count: 0,
+                          created_at: '',
+                          updated_at: '',
+                        }
+                      : null)
+                  : null
+              }
+              inputValue={parentSkillSearch}
+              onInputChange={(_event, newInputValue) => {
+                handleParentSkillSearch(newInputValue);
+              }}
+              onChange={(_event, newValue) => {
+                handleParentSkillSelect(newValue);
+              }}
+              options={availableParentSkills}
+              getOptionLabel={(option) => option.skill_name}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id}>
+                  <Box>
+                    <Typography variant="body2">{option.skill_name}</Typography>
+                    {option.context && (
+                      <Typography variant="caption" color="text.secondary">
+                        {option.context}
+                      </Typography>
+                    )}
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={t('industryTaxonomy.dialog.parentSkill', 'Parent Skill (Optional)')}
+                  placeholder={t('industryTaxonomy.dialog.parentSkillPlaceholder', 'Search for a parent skill...')}
+                  helperText={t(
+                    'industryTaxonomy.dialog.parentSkillHelper',
+                    'Set a parent skill to create a hierarchical category structure'
+                  )}
+                  disabled={submitting}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+              noOptionsText={t('industryTaxonomy.dialog.noParentSkills', 'Type to search for skills...')}
+              filterOptions={(options) => options}
+              freeSolo={false}
+              disabled={submitting}
+            />
 
             <FormControl fullWidth>
               <InputLabel>{t('industryTaxonomy.dialog.status')}</InputLabel>

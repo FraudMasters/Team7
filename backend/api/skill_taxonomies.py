@@ -53,6 +53,8 @@ class SkillTaxonomyUpdate(BaseModel):
     variants: Optional[List[str]] = Field(None, description="Alternative names/spellings")
     extra_metadata: Optional[dict] = Field(None, description="Additional skill metadata")
     is_active: Optional[bool] = Field(None, description="Whether this entry is active")
+    parent_skill_id: Optional[str] = Field(None, description="UUID of parent skill for hierarchical categories")
+    category_path: Optional[List[str]] = Field(None, description="Path from root to this skill")
 
 
 class SkillTaxonomyResponse(BaseModel):
@@ -65,8 +67,15 @@ class SkillTaxonomyResponse(BaseModel):
     variants: List[str] = Field(default_factory=list, description="Alternative names/spellings")
     extra_metadata: Optional[dict] = Field(None, description="Additional skill metadata")
     is_active: bool = Field(..., description="Whether this entry is active")
+    parent_skill_id: Optional[str] = Field(None, description="UUID of parent skill for hierarchical categories")
+    category_path: List[str] = Field(default_factory=list, description="Path from root to this skill")
+    children: Optional[List["SkillTaxonomyResponse"]] = Field(None, description="Child skills (when include_children=true)")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+
+
+# Enable self-referencing model for children
+SkillTaxonomyResponse.model_rebuild()
 
 
 class SkillTaxonomyListResponse(BaseModel):
@@ -145,6 +154,8 @@ async def create_skill_taxonomies(
                 "variants": new_taxonomy.variants or [],
                 "extra_metadata": new_taxonomy.extra_metadata,
                 "is_active": new_taxonomy.is_active,
+                "parent_skill_id": str(new_taxonomy.parent_skill_id) if new_taxonomy.parent_skill_id else None,
+                "category_path": new_taxonomy.category_path or [],
                 "created_at": new_taxonomy.created_at.isoformat(),
                 "updated_at": new_taxonomy.updated_at.isoformat(),
             })
@@ -179,14 +190,28 @@ async def create_skill_taxonomies(
 async def list_skill_taxonomies(
     industry: Optional[str] = Query(None, description="Filter by industry sector"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    context: Optional[str] = Query(None, description="Filter by context/category (e.g., web_framework, programming_language)"),
+    parent_id: Optional[str] = Query(None, description="Filter by parent skill ID for hierarchical queries"),
+    include_children: bool = Query(False, description="Include child skills in the response for hierarchical view"),
+    root_only: bool = Query(False, description="Only return root-level skills (skills without parents)"),
     db: AsyncSession = Depends(get_db),
     token_data: TokenData = Depends(get_current_token),
 ) -> JSONResponse:
     """
     List skill taxonomy entries with optional filters.
+
+    Supports hierarchical queries through:
+    - include_children: Includes nested children skills in the response
+    - parent_id: Filter to get direct children of a specific skill
+    - root_only: Get only root-level skills (no parent)
+    - context: Filter by skill context/category
     """
     try:
-        logger.info(f"Listing skill taxonomies with filters - industry: {industry}, is_active: {is_active}")
+        logger.info(
+            f"Listing skill taxonomies with filters - industry: {industry}, "
+            f"is_active: {is_active}, context: {context}, parent_id: {parent_id}, "
+            f"include_children: {include_children}, root_only: {root_only}"
+        )
 
         # Build query
         query = select(SkillTaxonomy)
@@ -195,6 +220,23 @@ async def list_skill_taxonomies(
             query = query.where(SkillTaxonomy.industry == industry)
         if is_active is not None:
             query = query.where(SkillTaxonomy.is_active == is_active)
+        if context:
+            query = query.where(SkillTaxonomy.context == context)
+
+        # Filter by parent_id
+        if parent_id:
+            try:
+                parent_uuid = UUID(parent_id)
+                query = query.where(SkillTaxonomy.parent_skill_id == parent_uuid)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid parent_id format",
+                )
+
+        # Filter to root-level skills only
+        if root_only:
+            query = query.where(SkillTaxonomy.parent_skill_id.is_(None))
 
         query = query.order_by(SkillTaxonomy.skill_name)
 
@@ -202,8 +244,9 @@ async def list_skill_taxonomies(
         taxonomies = result.scalars().all()
 
         # Build response
-        skills_list = [
-            {
+        skills_list = []
+        for t in taxonomies:
+            skill_data = {
                 "id": str(t.id),
                 "industry": t.industry,
                 "skill_name": t.skill_name,
@@ -211,16 +254,29 @@ async def list_skill_taxonomies(
                 "variants": t.variants or [],
                 "extra_metadata": t.extra_metadata,
                 "is_active": t.is_active,
+                "parent_skill_id": str(t.parent_skill_id) if t.parent_skill_id else None,
+                "category_path": t.category_path or [],
                 "created_at": t.created_at.isoformat(),
                 "updated_at": t.updated_at.isoformat(),
             }
-            for t in taxonomies
-        ]
+
+            # Include children if requested
+            if include_children:
+                children = await _get_children_skills(db, t.id)
+                skill_data["children"] = children
+
+            skills_list.append(skill_data)
 
         response_data = {
             "industry": industry or "all",
             "skills": skills_list,
             "total_count": len(skills_list),
+            "filters": {
+                "context": context,
+                "parent_id": parent_id,
+                "root_only": root_only,
+                "include_children": include_children,
+            },
         }
 
         return JSONResponse(
@@ -228,6 +284,8 @@ async def list_skill_taxonomies(
             content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing skill taxonomies: {e}", exc_info=True)
         raise HTTPException(
@@ -236,17 +294,169 @@ async def list_skill_taxonomies(
         ) from e
 
 
+async def _get_children_skills(db: AsyncSession, parent_id: UUID) -> List[dict]:
+    """
+    Recursively fetch children skills for hierarchical display.
+
+    Args:
+        db: Database session
+        parent_id: UUID of the parent skill
+
+    Returns:
+        List of child skill dictionaries with their children nested
+    """
+    result = await db.execute(
+        select(SkillTaxonomy)
+        .where(SkillTaxonomy.parent_skill_id == parent_id)
+        .order_by(SkillTaxonomy.skill_name)
+    )
+    children = result.scalars().all()
+
+    children_list = []
+    for child in children:
+        child_data = {
+            "id": str(child.id),
+            "industry": child.industry,
+            "skill_name": child.skill_name,
+            "context": child.context,
+            "variants": child.variants or [],
+            "extra_metadata": child.extra_metadata,
+            "is_active": child.is_active,
+            "parent_skill_id": str(child.parent_skill_id) if child.parent_skill_id else None,
+            "category_path": child.category_path or [],
+            "created_at": child.created_at.isoformat(),
+            "updated_at": child.updated_at.isoformat(),
+        }
+        # Recursively get grandchildren
+        grandchildren = await _get_children_skills(db, child.id)
+        if grandchildren:
+            child_data["children"] = grandchildren
+
+        children_list.append(child_data)
+
+    return children_list
+
+
+@router.get("/resolve-alias", tags=["Skill Taxonomies"])
+async def resolve_skill_alias(
+    alias: str = Query(..., description="Skill alias or variant to resolve (e.g., 'JS', 'React', 'Python')"),
+    industry: Optional[str] = Query(None, description="Filter by industry sector (optional)"),
+    include_inactive: bool = Query(False, description="Include inactive taxonomy entries in results"),
+    db: AsyncSession = Depends(get_db),
+    token_data: TokenData = Depends(get_current_token),
+) -> JSONResponse:
+    """
+    Resolve a skill alias to its canonical skill taxonomy entries.
+
+    This endpoint searches across organization taxonomies to find skills that match
+    the given alias, either as the canonical skill_name or as a variant. It helps
+    normalize skill names across different naming conventions and spellings.
+
+    Examples:
+        - "JS" -> JavaScript
+        - "React" -> React
+        - "k8s" -> Kubernetes
+        - "python" -> Python
+    """
+    try:
+        logger.info(f"Resolving skill alias: {alias}, industry: {industry}, include_inactive: {include_inactive}")
+
+        # Normalize alias for case-insensitive comparison
+        alias_lower = alias.lower().strip()
+
+        if not alias_lower:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Alias cannot be empty",
+            )
+
+        # Build base query
+        query = select(SkillTaxonomy)
+
+        if industry:
+            query = query.where(SkillTaxonomy.industry == industry)
+
+        if not include_inactive:
+            query = query.where(SkillTaxonomy.is_active == True)
+
+        # Execute query to get all matching industry taxonomies
+        result = await db.execute(query)
+        taxonomies = result.scalars().all()
+
+        # Search for matches in skill_name and variants
+        matches = []
+        for taxonomy in taxonomies:
+            # Check if alias matches skill_name (case-insensitive)
+            if taxonomy.skill_name.lower() == alias_lower:
+                matches.append(taxonomy)
+                continue
+
+            # Check if alias matches any variant (case-insensitive)
+            if taxonomy.variants:
+                for variant in taxonomy.variants:
+                    if variant.lower() == alias_lower:
+                        matches.append(taxonomy)
+                        break
+
+        # Build response
+        resolved_skills = []
+        for match in matches:
+            resolved_skills.append({
+                "id": str(match.id),
+                "industry": match.industry,
+                "skill_name": match.skill_name,
+                "context": match.context,
+                "variants": match.variants or [],
+                "extra_metadata": match.extra_metadata,
+                "is_active": match.is_active,
+                "parent_skill_id": str(match.parent_skill_id) if match.parent_skill_id else None,
+                "category_path": match.category_path or [],
+                "created_at": match.created_at.isoformat(),
+                "updated_at": match.updated_at.isoformat(),
+            })
+
+        response_data = {
+            "alias": alias,
+            "resolved": len(resolved_skills) > 0,
+            "matches_count": len(resolved_skills),
+            "matches": resolved_skills,
+            "filters": {
+                "industry": industry,
+                "include_inactive": include_inactive,
+            },
+        }
+
+        logger.info(f"Resolved alias '{alias}': found {len(resolved_skills)} matches")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resolving skill alias: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to resolve skill alias: {str(e)}",
+        ) from e
+
+
 @router.get("/{taxonomy_id}", tags=["Skill Taxonomies"])
 async def get_skill_taxonomy(
     taxonomy_id: str,
+    include_children: bool = Query(False, description="Include child skills in the response"),
     db: AsyncSession = Depends(get_db),
     token_data: TokenData = Depends(get_current_token),
 ) -> JSONResponse:
     """
     Get a specific skill taxonomy entry by ID.
+
+    Supports hierarchical queries through include_children parameter.
     """
     try:
-        logger.info(f"Getting skill taxonomy: {taxonomy_id}")
+        logger.info(f"Getting skill taxonomy: {taxonomy_id}, include_children: {include_children}")
 
         # Parse UUID
         try:
@@ -269,19 +479,28 @@ async def get_skill_taxonomy(
                 detail=f"Skill taxonomy not found: {taxonomy_id}",
             )
 
+        response_data = {
+            "id": str(taxonomy.id),
+            "industry": taxonomy.industry,
+            "skill_name": taxonomy.skill_name,
+            "context": taxonomy.context,
+            "variants": taxonomy.variants or [],
+            "extra_metadata": taxonomy.extra_metadata,
+            "is_active": taxonomy.is_active,
+            "parent_skill_id": str(taxonomy.parent_skill_id) if taxonomy.parent_skill_id else None,
+            "category_path": taxonomy.category_path or [],
+            "created_at": taxonomy.created_at.isoformat(),
+            "updated_at": taxonomy.updated_at.isoformat(),
+        }
+
+        # Include children if requested
+        if include_children:
+            children = await _get_children_skills(db, taxonomy.id)
+            response_data["children"] = children
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": str(taxonomy.id),
-                "industry": taxonomy.industry,
-                "skill_name": taxonomy.skill_name,
-                "context": taxonomy.context,
-                "variants": taxonomy.variants or [],
-                "extra_metadata": taxonomy.extra_metadata,
-                "is_active": taxonomy.is_active,
-                "created_at": taxonomy.created_at.isoformat(),
-                "updated_at": taxonomy.updated_at.isoformat(),
-            },
+            content=response_data,
         )
 
     except HTTPException:
@@ -339,6 +558,34 @@ async def update_skill_taxonomy(
             taxonomy.extra_metadata = request.extra_metadata
         if request.is_active is not None:
             taxonomy.is_active = request.is_active
+        if request.parent_skill_id is not None:
+            # Validate parent_skill_id if provided
+            try:
+                parent_uuid = UUID(request.parent_skill_id)
+                # Verify parent exists
+                parent_result = await db.execute(
+                    select(SkillTaxonomy).where(SkillTaxonomy.id == parent_uuid)
+                )
+                parent = parent_result.scalar_one_or_none()
+                if not parent:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Parent skill not found: {request.parent_skill_id}",
+                    )
+                # Prevent circular reference (skill can't be its own parent)
+                if parent_uuid == taxonomy_uuid:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="A skill cannot be its own parent",
+                    )
+                taxonomy.parent_skill_id = parent_uuid
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid parent_skill_id format",
+                )
+        if request.category_path is not None:
+            taxonomy.category_path = request.category_path
 
         await db.commit()
         await db.refresh(taxonomy)
@@ -353,6 +600,8 @@ async def update_skill_taxonomy(
                 "variants": taxonomy.variants or [],
                 "extra_metadata": taxonomy.extra_metadata,
                 "is_active": taxonomy.is_active,
+                "parent_skill_id": str(taxonomy.parent_skill_id) if taxonomy.parent_skill_id else None,
+                "category_path": taxonomy.category_path or [],
                 "created_at": taxonomy.created_at.isoformat(),
                 "updated_at": taxonomy.updated_at.isoformat(),
             },

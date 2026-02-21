@@ -11,6 +11,7 @@ from .job_vacancy import JobVacancy
 from .job_application import JobApplication, ApplicationStatus
 from .match_result import MatchResult
 from .skill_taxonomy import SkillTaxonomy
+from .skill_relationship import SkillRelationship, RelationshipType
 from .custom_synonyms import CustomSynonym
 from .skill_feedback import SkillFeedback
 from .ml_model_version import MLModelVersion
@@ -52,6 +53,8 @@ __all__ = [
     "ApplicationStatus",
     "MatchResult",
     "SkillTaxonomy",
+    "SkillRelationship",
+    "RelationshipType",
     "CustomSynonym",
     "SkillFeedback",
     "MLModelVersion",
