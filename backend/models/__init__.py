@@ -41,6 +41,7 @@ from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
+from .model_approval import ModelApprovalRequest, ApprovalStatus
 
 __all__ = [
     "Base",
@@ -96,4 +97,6 @@ __all__ = [
     "OrganizationExplanationPreferences",
     "ResumeFeedback",
     "BuiltResume",
+    "ModelApprovalRequest",
+    "ApprovalStatus",
 ]
