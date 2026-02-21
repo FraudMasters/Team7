@@ -107,6 +107,23 @@ class AssignCandidatesResponse(BaseModel):
     results: List[AssignCandidateResult] = Field(..., description="Individual results for each candidate")
 
 
+# Priority update models
+class UpdatePriorityRequest(BaseModel):
+    """Request model for updating queue item priority."""
+
+    priority: str = Field(..., description="New priority level (urgent, high, medium, low)")
+
+
+class UpdatePriorityResponse(BaseModel):
+    """Response model for priority update."""
+
+    id: str = Field(..., description="Queue item ID")
+    resume_id: str = Field(..., description="Resume ID")
+    previous_priority: str = Field(..., description="Previous priority level")
+    new_priority: str = Field(..., description="New priority level")
+    message: str = Field(..., description="Success message")
+
+
 # Priority ordering for sorting
 PRIORITY_ORDER = {
     QueuePriority.URGENT: 0,
@@ -699,6 +716,121 @@ async def get_queue_item(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get queue item: {str(e)}",
+        ) from e
+
+
+@router.put(
+    "/{queue_item_id}/priority",
+    response_model=UpdatePriorityResponse,
+    tags=["Candidate Queue"],
+)
+async def update_queue_item_priority(
+    request: Request,
+    queue_item_id: str,
+    priority_data: UpdatePriorityRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update the priority of a queue item.
+
+    Allows recruiters to change the priority level of a candidate in the queue.
+    Priority levels are: urgent, high, medium, low.
+
+    Args:
+        request: FastAPI request object
+        queue_item_id: Queue item UUID
+        priority_data: Priority update data containing new priority level
+        db: Database session
+
+    Returns:
+        JSON response with updated queue item details
+
+    Raises:
+        HTTPException(400): Invalid queue item ID or priority format
+        HTTPException(404): Queue item not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {"priority": "high"}
+        >>> response = requests.put(
+        ...     "/api/candidate-queue/abc-123/priority",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "id": "abc-123",
+            "resume_id": "resume-uuid-456",
+            "previous_priority": "medium",
+            "new_priority": "high",
+            "message": "Priority updated successfully"
+        }
+    """
+    try:
+        logger.info(f"Updating priority for queue item {queue_item_id} to {priority_data.priority}")
+
+        from uuid import UUID
+
+        # Parse queue_item_id as UUID
+        try:
+            queue_uuid = UUID(queue_item_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid queue item ID format: {queue_item_id}",
+            )
+
+        # Validate priority value
+        try:
+            new_priority = QueuePriority(priority_data.priority.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid priority: {priority_data.priority}. Must be one of: urgent, high, medium, low",
+            )
+
+        # Get the queue item
+        query = select(CandidateQueueItem).where(CandidateQueueItem.id == queue_uuid)
+        result = await db.execute(query)
+        queue_item = result.scalar_one_or_none()
+
+        if not queue_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Queue item not found: {queue_item_id}",
+            )
+
+        # Store previous priority for response
+        previous_priority = queue_item.priority
+
+        # Update priority
+        queue_item.priority = new_priority
+        queue_item.updated_at = datetime.now(timezone.utc)
+
+        await db.commit()
+        await db.refresh(queue_item)
+
+        logger.info(f"Priority updated for queue item {queue_item_id}: {previous_priority.value} -> {new_priority.value}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(queue_item.id),
+                "resume_id": str(queue_item.resume_id),
+                "previous_priority": previous_priority.value,
+                "new_priority": new_priority.value,
+                "message": "Priority updated successfully",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating priority for queue item {queue_item_id}: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update priority: {str(e)}",
         ) from e
 
 
