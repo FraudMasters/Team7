@@ -14,7 +14,7 @@ from .skill_taxonomy import SkillTaxonomy
 from .skill_relationship import SkillRelationship, RelationshipType
 from .custom_synonyms import CustomSynonym
 from .skill_feedback import SkillFeedback
-from .ml_model_version import MLModelVersion
+from .ml_model_version import MLModelVersion, ModelRole
 from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
@@ -60,6 +60,7 @@ __all__ = [
     "CustomSynonym",
     "SkillFeedback",
     "MLModelVersion",
+    "ModelRole",
     "ModelPerformanceHistory",
     "ModelTrainingEvent",
     "UserPreferences",
