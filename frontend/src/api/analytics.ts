@@ -107,6 +107,116 @@ export interface APIUsageAnalytics {
   top_errors: TopError[];
 }
 
+// ==================== AI Explainability Types ====================
+
+/**
+ * Confidence interval for model predictions
+ */
+export interface ConfidenceIntervalStats {
+  lower: number;
+  upper: number;
+  confidence_level: number;
+}
+
+/**
+ * Confidence distribution counts
+ */
+export interface ConfidenceDistribution {
+  high_confidence_count: number;
+  medium_confidence_count: number;
+  low_confidence_count: number;
+}
+
+/**
+ * Model confidence response
+ */
+export interface ModelConfidenceResponse {
+  average_confidence: number;
+  confidence_interval: ConfidenceIntervalStats;
+  distribution: ConfidenceDistribution;
+  confidence_accuracy_correlation: number;
+}
+
+/**
+ * Feature importance item
+ */
+export interface FeatureImportanceItem {
+  name: string;
+  importance: number;
+  description: string;
+}
+
+/**
+ * Feature importance response
+ */
+export interface FeatureImportanceResponse {
+  features: FeatureImportanceItem[];
+  model_version: string;
+  model_type: string;
+}
+
+/**
+ * Feature contribution for ranking rationale
+ */
+export interface FeatureContribution {
+  name: string;
+  value: number;
+  contribution: number;
+  impact: 'positive' | 'negative';
+}
+
+/**
+ * Ranking rationale confidence interval
+ */
+export interface RationaleConfidenceInterval {
+  lower: number;
+  upper: number;
+}
+
+/**
+ * Ranking rationale response
+ */
+export interface RankingRationaleResponse {
+  candidate_id: string;
+  rank_score: number;
+  rank_position: number;
+  narrative: string;
+  feature_contributions: FeatureContribution[];
+  strengths: string[];
+  weaknesses: string[];
+  confidence_interval: RationaleConfidenceInterval;
+}
+
+/**
+ * Performance metrics for a single time point
+ */
+export interface PerformanceMetricPoint {
+  date: string;
+  accuracy: number;
+  f1_score: number;
+  ndcg_score: number;
+  sample_size: number;
+}
+
+/**
+ * Aggregated performance metrics
+ */
+export interface PerformanceAggregates {
+  avg_accuracy: number;
+  avg_f1: number;
+  accuracy_change_pct: number;
+}
+
+/**
+ * Performance trends response
+ */
+export interface PerformanceTrendsResponse {
+  period: string;
+  trend_direction: 'improving' | 'stable' | 'declining';
+  metrics: PerformanceMetricPoint[];
+  aggregates: PerformanceAggregates;
+}
+
 /**
  * Analytics Client
  *
@@ -189,6 +299,133 @@ export class AnalyticsClient {
         `/api/analytics/api-usage/keys/${apiKeyId}`,
         { params }
       );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== AI Explainability Methods ====================
+
+  /**
+   * Get model confidence statistics
+   *
+   * Returns model confidence distribution and statistics including
+   * average confidence, confidence intervals, and distribution breakdown.
+   *
+   * @returns Model confidence statistics
+   * @throws ApiError if retrieval fails
+   *
+   * @example
+   * ```ts
+   * const confidence = await analyticsClient.getModelConfidence();
+   * console.log(`Average: ${confidence.average_confidence}`);
+   * console.log(`High confidence: ${confidence.distribution.high_confidence_count}`);
+   * ```
+   */
+  async getModelConfidence(): Promise<ModelConfidenceResponse> {
+    try {
+      const response = await this.apiClient
+        .getAxiosInstance()
+        .get<ModelConfidenceResponse>('/api/analytics/ai-explainability/confidence');
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get feature importance from the trained model
+   *
+   * Returns feature importance scores for all ranking features,
+   * showing which factors most influence candidate rankings.
+   *
+   * @returns Feature importance data with descriptions
+   * @throws ApiError if retrieval fails
+   *
+   * @example
+   * ```ts
+   * const importance = await analyticsClient.getFeatureImportance();
+   * importance.features.forEach(f => {
+   *   console.log(`${f.name}: ${(f.importance * 100).toFixed(1)}%`);
+   * });
+   * ```
+   */
+  async getFeatureImportance(): Promise<FeatureImportanceResponse> {
+    try {
+      const response = await this.apiClient
+        .getAxiosInstance()
+        .get<FeatureImportanceResponse>('/api/analytics/ai-explainability/feature-importance');
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get ranking rationale for a specific candidate
+   *
+   * Provides detailed explanation of why a candidate received their ranking,
+   * including feature contributions, strengths, weaknesses, and confidence interval.
+   *
+   * @param candidateId - Candidate UUID
+   * @returns Detailed ranking rationale
+   * @throws ApiError if retrieval fails
+   *
+   * @example
+   * ```ts
+   * const rationale = await analyticsClient.getRankingRationale('candidate-uuid');
+   * console.log(`Score: ${rationale.rank_score}`);
+   * console.log(`Narrative: ${rationale.narrative}`);
+   * ```
+   */
+  async getRankingRationale(candidateId: string): Promise<RankingRationaleResponse> {
+    try {
+      const response = await this.apiClient
+        .getAxiosInstance()
+        .get<RankingRationaleResponse>(
+          `/api/analytics/ai-explainability/ranking-rationale/${candidateId}`
+        );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Get model performance trends over time
+   *
+   * Returns time-series performance metrics (accuracy, F1, NDCG) with
+   * trend analysis and aggregated statistics.
+   *
+   * @param period - Time period for analysis ("7d", "30d", or "90d")
+   * @param startDate - Optional start date for filtering (ISO 8601 format)
+   * @param endDate - Optional end date for filtering (ISO 8601 format)
+   * @returns Performance trends with metrics and aggregates
+   * @throws ApiError if retrieval fails
+   *
+   * @example
+   * ```ts
+   * const trends = await analyticsClient.getPerformanceTrends('30d');
+   * console.log(`Trend: ${trends.trend_direction}`);
+   * console.log(`Avg accuracy: ${trends.aggregates.avg_accuracy}`);
+   * ```
+   */
+  async getPerformanceTrends(
+    period: '7d' | '30d' | '90d' = '30d',
+    startDate?: string,
+    endDate?: string
+  ): Promise<PerformanceTrendsResponse> {
+    try {
+      const params: Record<string, string> = { period };
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response = await this.apiClient
+        .getAxiosInstance()
+        .get<PerformanceTrendsResponse>('/api/analytics/ai-explainability/performance-trends', {
+          params,
+        });
       return response.data;
     } catch (error) {
       throw this.transformError(error);
