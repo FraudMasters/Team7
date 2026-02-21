@@ -71,6 +71,12 @@ import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 
+// AI Explainability Dashboard (lazy loaded)
+import { lazy, Suspense } from 'react';
+const AIExplainabilityDashboard = lazy(
+  () => import('./pages/admin/AIExplainabilityDashboard')
+);
+
 /**
  * Protected Recruiter Layout Wrapper
  *
@@ -216,6 +222,16 @@ function App() {
           <Route path="settings" element={<HiringManagerPlaceholder title="Settings" />} />
           <Route path="notifications" element={<HiringManagerPlaceholder title="Notifications" />} />
         </Route>
+
+        {/* Admin Routes - AI Explainability Dashboard */}
+        <Route
+          path="/admin/ai-explainability"
+          element={
+            <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography>Loading...</Typography></Box>}>
+              <AIExplainabilityDashboard />
+            </Suspense>
+          }
+        />
 
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
