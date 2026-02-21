@@ -1230,6 +1230,225 @@ async def get_candidate(
         ) from e
 
 
+# Card Preview Models
+class CandidateCardPreview(BaseModel):
+    """Response model for candidate card preview data."""
+
+    id: str = Field(..., description="Candidate ID (resume ID)")
+    filename: str = Field(..., description="Resume filename")
+    match_score: Optional[float] = Field(None, description="Overall match score (0-1)")
+    recommendation: Optional[str] = Field(None, description="Hiring recommendation")
+    confidence: Optional[float] = Field(None, description="Model confidence (0-1)")
+    tags: List[TagInfo] = Field(default_factory=list, description="Tags assigned to this candidate")
+    recent_activities: List[LatestActivityInfo] = Field(default_factory=list, description="Recent activities for this candidate")
+    vacancy_id: Optional[str] = Field(None, description="Associated vacancy ID if any")
+
+
+@router.get(
+    "/{candidate_id}/card-preview",
+    response_model=CandidateCardPreview,
+    tags=["Candidates"],
+)
+async def get_candidate_card_preview(
+    request: Request,
+    candidate_id: str,
+    vacancy_id: Optional[str] = Query(None, description="Optional vacancy ID to get match score for"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get a candidate's card preview data including match score, tags, and recent activity.
+
+    This endpoint provides optimized data for rendering candidate cards on the kanban board.
+    It includes:
+    - Match score (if vacancy_id is provided or candidate has an associated vacancy)
+    - Tags assigned to the candidate
+    - Recent activities for the candidate
+
+    Args:
+        request: FastAPI request object
+        candidate_id: Resume UUID
+        vacancy_id: Optional vacancy ID to compute match score for specific vacancy
+        db: Database session
+
+    Returns:
+        JSON response with candidate card preview data
+
+    Raises:
+        HTTPException(400): Invalid candidate ID format
+        HTTPException(404): Candidate not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> # Get card preview with match score for specific vacancy
+        >>> response = requests.get(
+        ...     "/api/candidates/abc-123/card-preview?vacancy_id=vac-456"
+        ... )
+        >>> response.json()
+        {
+            "id": "abc-123",
+            "filename": "john_doe_resume.pdf",
+            "match_score": 0.85,
+            "recommendation": "excellent",
+            "confidence": 0.88,
+            "tags": [{"id": "tag-1", "tag_name": "Top Talent", "color": "#00ff00", "organization_id": "org-1"}],
+            "recent_activities": [{"activity_type": "STAGE_CHANGED", "created_at": "2024-01-15T10:30:00"}],
+            "vacancy_id": "vac-456"
+        }
+    """
+    try:
+        logger.info(f"Fetching card preview for candidate: {candidate_id}, vacancy_id: {vacancy_id}")
+
+        # Parse candidate_id as UUID
+        try:
+            candidate_uuid = UUID(candidate_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid candidate ID format: {candidate_id}",
+            )
+
+        # Get the resume
+        resume_query = select(Resume).where(Resume.id == candidate_uuid)
+        resume_result = await db.execute(resume_query)
+        resume = resume_result.scalar_one_or_none()
+
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Candidate not found: {candidate_id}",
+            )
+
+        # Get the latest hiring stage to find associated vacancy
+        stage_query = (
+            select(HiringStage)
+            .where(HiringStage.resume_id == candidate_uuid)
+            .order_by(HiringStage.created_at.desc())
+            .limit(1)
+        )
+        stage_result = await db.execute(stage_query)
+        latest_stage = stage_result.scalar_one_or_none()
+
+        # Determine which vacancy to use for match score
+        target_vacancy_id = None
+        if vacancy_id:
+            try:
+                target_vacancy_id = UUID(vacancy_id)
+            except ValueError:
+                logger.warning(f"Invalid vacancy_id format: {vacancy_id}")
+        elif latest_stage and latest_stage.vacancy_id:
+            target_vacancy_id = latest_stage.vacancy_id
+
+        # Fetch match score from CandidateRank if available
+        match_score = None
+        recommendation = None
+        confidence = None
+
+        if target_vacancy_id:
+            from models.candidate_rank import CandidateRank
+
+            rank_query = select(CandidateRank).where(
+                CandidateRank.resume_id == candidate_uuid,
+                CandidateRank.vacancy_id == target_vacancy_id,
+            )
+            rank_result = await db.execute(rank_query)
+            candidate_rank = rank_result.scalar_one_or_none()
+
+            if candidate_rank:
+                match_score = float(candidate_rank.rank_score) if candidate_rank.rank_score else None
+                recommendation = candidate_rank.recommendation
+                confidence = float(candidate_rank.prediction_confidence) if candidate_rank.prediction_confidence else None
+
+        # Fetch tags for this resume
+        tags = []
+        all_tag_activities_result = await db.execute(
+            select(CandidateActivity, CandidateTag)
+            .outerjoin(
+                CandidateTag,
+                CandidateActivity.tag_id == CandidateTag.id
+            )
+            .where(
+                CandidateActivity.candidate_id == candidate_uuid,
+                CandidateActivity.activity_type.in_([
+                    CandidateActivityType.TAG_ADDED,
+                    CandidateActivityType.TAG_REMOVED
+                ]),
+            )
+            .order_by(CandidateActivity.created_at)
+        )
+        all_tag_activity_rows = all_tag_activities_result.all()
+
+        # Build a map of tag_id -> [(activity_type, timestamp, tag_name, tag_color)]
+        tag_activity_map = {}
+        for activity, tag in all_tag_activity_rows:
+            if tag:
+                tag_id_str = str(tag.id)
+                if tag_id_str not in tag_activity_map:
+                    tag_activity_map[tag_id_str] = []
+                tag_activity_map[tag_id_str].append({
+                    "activity_type": activity.activity_type,
+                    "timestamp": activity.created_at,
+                    "tag_name": tag.tag_name,
+                    "tag_color": tag.color,
+                    "organization_id": str(tag.organization_id),
+                })
+
+        # For each tag, check if the latest activity is TAG_ADDED
+        for tag_id, activities in tag_activity_map.items():
+            latest = max(activities, key=lambda x: x["timestamp"])
+            if latest["activity_type"] == CandidateActivityType.TAG_ADDED:
+                tags.append({
+                    "id": tag_id,
+                    "tag_name": latest["tag_name"],
+                    "color": latest["tag_color"],
+                    "organization_id": latest["organization_id"],
+                })
+
+        # Fetch recent activities for this resume (last 5)
+        recent_activities_result = await db.execute(
+            select(CandidateActivity)
+            .where(CandidateActivity.candidate_id == candidate_uuid)
+            .order_by(CandidateActivity.created_at.desc())
+            .limit(5)
+        )
+        recent_activities = recent_activities_result.scalars().all()
+
+        recent_activities_list = [
+            {
+                "activity_type": activity.activity_type.value,
+                "created_at": activity.created_at.isoformat(),
+            }
+            for activity in recent_activities
+        ]
+
+        preview_data = {
+            "id": str(resume.id),
+            "filename": resume.filename,
+            "match_score": match_score,
+            "recommendation": recommendation,
+            "confidence": confidence,
+            "tags": tags,
+            "recent_activities": recent_activities_list,
+            "vacancy_id": str(target_vacancy_id) if target_vacancy_id else None,
+        }
+
+        logger.info(f"Card preview retrieved for candidate {candidate_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=preview_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting card preview for candidate {candidate_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get candidate card preview: {str(e)}",
+        ) from e
+
+
 @router.put(
     "/{candidate_id}/stage",
     response_model=MoveCandidateResponse,
