@@ -1,6 +1,8 @@
 export { default as FeatureImportanceChart } from './FeatureImportanceChart';
 export type { FeatureImportanceItem, FeatureImportanceChartProps } from './FeatureImportanceChart';
 
+export { default as FeatureRadarChart } from './FeatureRadarChart';
+
 export { default as CandidateComparisonView } from './CandidateComparisonView';
 export type { CandidateComparisonViewProps } from './CandidateComparisonView';
 
