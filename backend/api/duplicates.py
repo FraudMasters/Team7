@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
@@ -1047,4 +1047,230 @@ async def reject_duplicate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reject duplicate: {str(e)}",
+        )
+
+
+class ScanExistingResponse(BaseModel):
+    """Response model for bulk duplicate scan of existing database."""
+
+    total_resumes_scanned: int = Field(..., description="Total number of resumes scanned")
+    duplicates_found: int = Field(..., description="Number of duplicate pairs found")
+    duplicates_recorded: int = Field(..., description="Number of duplicates successfully recorded")
+    errors: int = Field(0, description="Number of errors encountered during scan")
+    organization_id: str = Field(..., description="Organization ID")
+    message: str = Field(..., description="Success message")
+
+
+@router.post(
+    "/scan-existing",
+    response_model=ScanExistingResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Duplicates"],
+)
+async def scan_existing_database(
+    request: Request,
+    organization_id: Optional[str] = Query(None, description="Organization ID to scan for duplicates"),
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Scan existing database for duplicate resumes.
+
+    This endpoint performs a bulk duplicate detection scan on all resumes in the
+    organization's database. It computes content hashes for all resume files,
+    identifies duplicates, and records them in the DuplicateResume table.
+
+    This is useful for:
+    - Initial setup: detecting duplicates in an existing database
+    - Periodic maintenance: finding duplicates that may have bypassed detection
+    - Data cleanup: identifying duplicate files uploaded before duplicate detection was enabled
+
+    Args:
+        organization_id: Organization ID to scan for duplicates
+        db: Database session
+
+    Returns:
+        JSON response with scan statistics and duplicate count
+
+    Raises:
+        HTTPException(400): If organization_id is invalid
+        HTTPException(500): If scan fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/duplicates/scan-existing",
+        ...     params={"organization_id": "org-123"}
+        ... )
+        >>> response.json()
+        {
+            "total_resumes_scanned": 1500,
+            "duplicates_found": 25,
+            "duplicates_recorded": 25,
+            "errors": 0,
+            "organization_id": "org-123",
+            "message": "Successfully scanned 1500 resumes and found 25 duplicates"
+        }
+    """
+    try:
+        # Import organization context utility
+        from middleware.organization_context import get_organization_context
+
+        # Get organization_id from query parameter or request context
+        if not organization_id:
+            organization_id = get_organization_context(request)
+
+        # Validate organization_id
+        if not organization_id or not organization_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="organization_id is required (provide as query parameter or in X-Organization-ID header)",
+            )
+
+        logger.info(f"Starting bulk duplicate scan for organization: {organization_id}")
+
+        # Import utilities
+        from utils.duplicate_detector import compute_content_hash_from_file, record_duplicate
+        from pathlib import Path
+
+        # Get all resumes for this organization that have files
+        stmt = (
+            select(Resume)
+            .where(Resume.organization_id == organization_id)
+            .where(Resume.file_path.isnot(None))
+            .where(Resume.status != "FAILED")
+            .order_by(Resume.created_at.asc())
+        )
+
+        result = await db.execute(stmt)
+        resumes = result.scalars().all()
+
+        total_scanned = len(resumes)
+        logger.info(f"Found {total_scanned} resumes to scan for organization: {organization_id}")
+
+        if total_scanned == 0:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=ScanExistingResponse(
+                    total_resumes_scanned=0,
+                    duplicates_found=0,
+                    duplicates_recorded=0,
+                    errors=0,
+                    organization_id=organization_id,
+                    message="No resumes found to scan",
+                ).model_dump(),
+            )
+
+        # Build hash lookup: hash -> list of resume IDs
+        hash_lookup = {}
+        errors = 0
+
+        for resume in resumes:
+            try:
+                # Skip if file doesn't exist
+                file_path = Path(resume.file_path)
+                if not file_path.exists():
+                    logger.warning(f"Resume file not found: {resume.file_path}")
+                    errors += 1
+                    continue
+
+                # Compute content hash
+                content_hash = compute_content_hash_from_file(file_path)
+
+                # Update resume's content_hash if not set
+                if not resume.content_hash:
+                    resume.content_hash = content_hash
+
+                # Track hash -> resume mappings
+                if content_hash not in hash_lookup:
+                    hash_lookup[content_hash] = []
+                hash_lookup[content_hash].append(resume)
+
+            except Exception as e:
+                logger.error(f"Error processing resume {resume.id}: {e}")
+                errors += 1
+                continue
+
+        # Find duplicates: any hash with multiple resumes
+        duplicates_found = 0
+        duplicates_recorded = 0
+
+        for content_hash, resume_list in hash_lookup.items():
+            if len(resume_list) > 1:
+                # Sort by creation date to identify the original
+                resume_list.sort(key=lambda r: r.created_at)
+                original_resume = resume_list[0]
+
+                # All others are duplicates
+                for duplicate_resume in resume_list[1:]:
+                    duplicates_found += 1
+
+                    # Check if this duplicate is already recorded
+                    check_stmt = (
+                        select(DuplicateResume)
+                        .where(DuplicateResume.organization_id == organization_id)
+                        .where(DuplicateResume.original_resume_id == str(original_resume.id))
+                        .where(DuplicateResume.duplicate_resume_id == str(duplicate_resume.id))
+                    )
+                    check_result = await db.execute(check_stmt)
+                    existing = check_result.scalar_one_or_none()
+
+                    if existing:
+                        logger.debug(
+                            f"Duplicate already recorded: original={original_resume.id}, "
+                            f"duplicate={duplicate_resume.id}"
+                        )
+                        continue
+
+                    # Record the duplicate
+                    success = await record_duplicate(
+                        original_resume_id=str(original_resume.id),
+                        duplicate_resume_id=str(duplicate_resume.id),
+                        content_hash=content_hash,
+                        organization_id=organization_id,
+                        db_session=db,
+                        batch_job_id=None,
+                        match_type="exact",
+                        similarity_score=1.0,
+                    )
+
+                    if success:
+                        duplicates_recorded += 1
+                        logger.debug(
+                            f"Recorded duplicate: original={original_resume.id}, "
+                            f"duplicate={duplicate_resume.id}"
+                        )
+                    else:
+                        errors += 1
+
+        # Commit all changes
+        await db.commit()
+
+        logger.info(
+            f"Bulk duplicate scan completed for organization {organization_id}: "
+            f"scanned={total_scanned}, found={duplicates_found}, "
+            f"recorded={duplicates_recorded}, errors={errors}"
+        )
+
+        response_data = ScanExistingResponse(
+            total_resumes_scanned=total_scanned,
+            duplicates_found=duplicates_found,
+            duplicates_recorded=duplicates_recorded,
+            errors=errors,
+            organization_id=organization_id,
+            message=f"Successfully scanned {total_scanned} resumes and found {duplicates_found} duplicates",
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during bulk duplicate scan: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to scan for duplicates: {str(e)}",
         )
