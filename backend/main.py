@@ -272,6 +272,7 @@ from api import (
     reports,
     vacancies,
     ranking,
+    ranking_weights,
     candidates,
     candidate_queue,
     industry_classifier,
@@ -319,6 +320,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
+app.include_router(ranking_weights.router, prefix="/api/ranking-weights", tags=["Ranking Weights"])
 app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
 app.include_router(candidate_queue.router, prefix="/api/candidate-queue", tags=["Candidate Queue"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
