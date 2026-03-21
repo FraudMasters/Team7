@@ -15,7 +15,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
 from config.validation import validate_config, ConfigurationError
-from middleware.tenant_context import TenantContextMiddleware
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -98,17 +97,7 @@ app.add_middleware(
         "Origin",
         "Access-Control-Request-Method",
         "Access-Control-Request-Headers",
-        "X-Tenant-ID",
-        "X-Agency-ID",
     ],
-)
-
-
-# Configure tenant context middleware for multi-tenant agency support
-app.add_middleware(
-    TenantContextMiddleware,
-    require_tenant=False,  # Optional by default, can be required per endpoint
-    require_agency=False,
 )
 
 
@@ -265,9 +254,6 @@ async def root() -> JSONResponse:
 
 # Include API routers
 from api import (
-    agencies,
-    agency_analytics,
-    client_tenants,
     resumes,
     resume_templates,
     resume_builder,
@@ -278,7 +264,6 @@ from api import (
     skill_taxonomies,
     skill_relationships,
     custom_synonyms,
-    bias_alert_config,
     fairness,
     feedback,
     model_versions,
@@ -295,20 +280,16 @@ from api import (
     taxonomy_sharing,
     taxonomy_versions,
     batch,
-    billing,
     work_experience,
     skill_gap_analysis,
     backups,
-    data_export,
-    data_import,
-    migration,
     ats_simulation,
     performance_monitoring,
     workflow_stages,
     candidate_tags,
     candidate_notes,
     candidate_activities,
-    candidate_documents,
+    candidate_appeals,
     search,
     job_search,
     job_applications,
@@ -320,11 +301,8 @@ from api import (
     hiring_manager,
     parsing_corrections,
     filter_suggestions,
-    candidate_portal,
 )
 
-app.include_router(agencies.router, prefix="/api/agencies", tags=["Agencies"])
-app.include_router(client_tenants.router, prefix="/api/client-tenants", tags=["Client Tenants"])
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(resume_templates.router, prefix="/api/resume-templates", tags=["Resume Templates"])
 app.include_router(resume_builder.router, prefix="/api/resume-builder", tags=["Resume Builder"])
@@ -338,9 +316,7 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
-app.include_router(agency_analytics.router, prefix="/api/agency-analytics", tags=["Agency Analytics"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-app.include_router(bias_alert_config.router, prefix="/api/bias-alert-config", tags=["Bias Alert Configuration"])
 app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
@@ -352,19 +328,16 @@ app.include_router(taxonomy_import_export.router, prefix="/api/taxonomy-import-e
 app.include_router(taxonomy_sharing.router, prefix="/api/taxonomy-sharing", tags=["Taxonomy Sharing"])
 app.include_router(taxonomy_versions.router, prefix="/api/taxonomy-versions", tags=["Taxonomy Versions"])
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
-app.include_router(billing.router, prefix="/api/billing", tags=["Billing"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
-app.include_router(data_export.router, prefix="/api/data-export", tags=["Data Export"])
-app.include_router(data_import.router, prefix="/api/data-import", tags=["Data Import"])
-app.include_router(migration.router, prefix="/api/migration", tags=["Migration"])
 app.include_router(ats_simulation.router, prefix="/api/ats", tags=["ATS Simulation"])
 app.include_router(performance_monitoring.router, prefix="/api/performance", tags=["Performance Monitoring"])
 app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=["Workflow Stages"])
 app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["Candidate Tags"])
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
+app.include_router(candidate_appeals.router, prefix="/api/candidate-appeals", tags=["Candidate Appeals"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(filter_suggestions.router, prefix="/api/filter-suggestions", tags=["Filter Suggestions"])
 app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
@@ -376,8 +349,6 @@ app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
-app.include_router(candidate_portal.router, prefix="/api/candidate-portal", tags=["Candidate Portal"])
-app.include_router(candidate_documents.router, prefix="/api/candidate-documents", tags=["Candidate Documents"])
 
 
 if __name__ == "__main__":
