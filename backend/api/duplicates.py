@@ -69,6 +69,70 @@ class MergeCandidatesResponse(BaseModel):
     can_undo: bool = Field(..., description="Whether this merge can be undone")
 
 
+# Review queue models
+class ReviewQueueItem(BaseModel):
+    """Response model for a single review queue item."""
+
+    id: str = Field(..., description="Review queue item ID")
+    organization_id: str = Field(..., description="Organization ID")
+    original_resume_id: str = Field(..., description="Original resume ID")
+    duplicate_resume_id: str = Field(..., description="Duplicate resume ID")
+    original_filename: Optional[str] = Field(None, description="Original resume filename")
+    duplicate_filename: Optional[str] = Field(None, description="Duplicate resume filename")
+    confidence_score: float = Field(..., description="Similarity confidence score (0.0 to 1.0)")
+    status: str = Field(..., description="Review status (pending, in_review, approved, rejected)")
+    assigned_reviewer_id: Optional[str] = Field(None, description="Assigned reviewer ID")
+    queue_entered_at: str = Field(..., description="When duplicate entered the queue")
+    review_started_at: Optional[str] = Field(None, description="When review started")
+    review_completed_at: Optional[str] = Field(None, description="When review completed")
+    decision_reason: Optional[str] = Field(None, description="Reason for approval/rejection")
+    batch_job_id: Optional[str] = Field(None, description="Batch job ID if from batch upload")
+    wait_time_hours: Optional[float] = Field(None, description="Hours waiting in queue")
+    created_at: str = Field(..., description="Record creation timestamp")
+    updated_at: str = Field(..., description="Record update timestamp")
+
+
+class ReviewQueueListResponse(BaseModel):
+    """Response model for review queue list."""
+
+    total: int = Field(..., description="Total number of items matching filters")
+    items: List[ReviewQueueItem] = Field(..., description="Review queue items")
+    skip: int = Field(..., description="Number of items skipped")
+    limit: int = Field(..., description="Maximum items returned")
+
+
+class ApproveReviewRequest(BaseModel):
+    """Request model for approving a duplicate."""
+
+    decision_reason: Optional[str] = Field(None, description="Optional reason for approval")
+    reviewer_id: Optional[str] = Field(None, description="ID of user approving the duplicate")
+
+
+class ApproveReviewResponse(BaseModel):
+    """Response model for approving a duplicate."""
+
+    id: str = Field(..., description="Review queue item ID")
+    status: str = Field(..., description="New status (approved)")
+    review_completed_at: str = Field(..., description="When review was completed")
+    message: str = Field(..., description="Success message")
+
+
+class RejectReviewRequest(BaseModel):
+    """Request model for rejecting a duplicate."""
+
+    decision_reason: Optional[str] = Field(None, description="Optional reason for rejection")
+    reviewer_id: Optional[str] = Field(None, description="ID of user rejecting the duplicate")
+
+
+class RejectReviewResponse(BaseModel):
+    """Response model for rejecting a duplicate."""
+
+    id: str = Field(..., description="Review queue item ID")
+    status: str = Field(..., description="New status (rejected)")
+    review_completed_at: str = Field(..., description="When review was completed")
+    message: str = Field(..., description="Success message")
+
+
 @router.get(
     "",
     response_model=DuplicateListResponse,
@@ -374,4 +438,437 @@ async def merge_candidates(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to merge candidates: {str(e)}",
+        )
+
+
+@router.get(
+    "/review-queue",
+    response_model=ReviewQueueListResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Duplicates"],
+)
+async def list_review_queue(
+    organization_id: str = Query(..., description="Organization ID to filter review queue"),
+    status_filter: Optional[str] = Query(None, description="Filter by status (pending, in_review, approved, rejected)"),
+    assigned_reviewer_id: Optional[str] = Query(None, description="Filter by assigned reviewer ID"),
+    min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum confidence score"),
+    max_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="Maximum confidence score"),
+    sort_by: Optional[str] = Query("confidence_score", description="Sort by: confidence_score, wait_time, created_at"),
+    sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum items to return"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    List duplicates in the review queue with filtering and sorting.
+
+    Returns a paginated list of duplicate review items with their associated resume
+    information. Supports filtering by status, reviewer, and confidence score range.
+
+    Default sorting is by confidence score (highest first), then by wait time (oldest first).
+
+    Args:
+        organization_id: Organization ID to filter review queue
+        status_filter: Optional filter by review status
+        assigned_reviewer_id: Optional filter by assigned reviewer
+        min_confidence: Optional minimum confidence score filter
+        max_confidence: Optional maximum confidence score filter
+        sort_by: Sort field (confidence_score, wait_time, created_at)
+        sort_order: Sort order (asc or desc)
+        skip: Number of items to skip for pagination
+        limit: Maximum number of items to return
+        db: Database session
+
+    Returns:
+        JSON response with list of review queue items
+
+    Raises:
+        HTTPException(400): Invalid filter parameter format
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> # Get all pending items
+        >>> response = requests.get("/api/duplicates/review-queue?organization_id=org-123&status_filter=pending")
+        >>> # Get high confidence items
+        >>> response = requests.get("/api/duplicates/review-queue?organization_id=org-123&min_confidence=0.8")
+        >>> # Sort by wait time (oldest first)
+        >>> response = requests.get("/api/duplicates/review-queue?organization_id=org-123&sort_by=wait_time&sort_order=asc")
+    """
+    try:
+        # Validate organization_id
+        if not organization_id or not organization_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="organization_id is required and cannot be empty",
+            )
+
+        logger.info(
+            f"Fetching review queue - organization_id: {organization_id}, "
+            f"status_filter: {status_filter}, assigned_reviewer_id: {assigned_reviewer_id}, "
+            f"skip: {skip}, limit: {limit}"
+        )
+
+        # Build query filters
+        filters = [DuplicateReview.organization_id == organization_id]
+
+        if status_filter:
+            try:
+                status_enum = ReviewStatus(status_filter)
+                filters.append(DuplicateReview.status == status_enum)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status: {status_filter}. Must be one of: pending, in_review, approved, rejected",
+                )
+
+        if assigned_reviewer_id:
+            filters.append(DuplicateReview.assigned_reviewer_id == assigned_reviewer_id)
+
+        if min_confidence is not None:
+            filters.append(DuplicateReview.confidence_score >= min_confidence)
+
+        if max_confidence is not None:
+            filters.append(DuplicateReview.confidence_score <= max_confidence)
+
+        # Get total count
+        count_stmt = select(func.count(DuplicateReview.id)).where(*filters)
+        count_result = await db.execute(count_stmt)
+        total_count = count_result.scalar() or 0
+
+        # Build sort clause
+        if sort_by == "confidence_score":
+            sort_column = DuplicateReview.confidence_score
+        elif sort_by == "wait_time":
+            sort_column = DuplicateReview.queue_entered_at
+        elif sort_by == "created_at":
+            sort_column = DuplicateReview.created_at
+        else:
+            sort_column = DuplicateReview.confidence_score
+
+        if sort_order == "asc":
+            sort_clause = sort_column.asc()
+        else:
+            sort_clause = sort_column.desc()
+
+        # Get review queue items with related resume data
+        stmt = (
+            select(DuplicateReview)
+            .where(*filters)
+            .options(
+                selectinload(DuplicateReview.original_resume),
+                selectinload(DuplicateReview.duplicate_resume),
+            )
+            .order_by(sort_clause)
+            .limit(limit)
+            .offset(skip)
+        )
+
+        result = await db.execute(stmt)
+        review_items = result.scalars().all()
+
+        logger.info(
+            f"Found {len(review_items)} review items (total: {total_count}) "
+            f"for organization: {organization_id}"
+        )
+
+        # Build response
+        queue_items = []
+        now = datetime.utcnow()
+
+        for item in review_items:
+            # Get filenames from related resume objects if available
+            original_filename = None
+            duplicate_filename = None
+
+            if item.original_resume:
+                original_filename = item.original_resume.filename
+            if item.duplicate_resume:
+                duplicate_filename = item.duplicate_resume.filename
+
+            # Calculate wait time in hours
+            wait_time_hours = None
+            if item.status in [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]:
+                wait_time_delta = now - item.queue_entered_at
+                wait_time_hours = wait_time_delta.total_seconds() / 3600
+
+            queue_items.append(
+                ReviewQueueItem(
+                    id=str(item.id),
+                    organization_id=item.organization_id,
+                    original_resume_id=str(item.original_resume_id),
+                    duplicate_resume_id=str(item.duplicate_resume_id),
+                    original_filename=original_filename,
+                    duplicate_filename=duplicate_filename,
+                    confidence_score=item.confidence_score,
+                    status=item.status.value,
+                    assigned_reviewer_id=item.assigned_reviewer_id,
+                    queue_entered_at=item.queue_entered_at.isoformat(),
+                    review_started_at=item.review_started_at.isoformat() if item.review_started_at else None,
+                    review_completed_at=item.review_completed_at.isoformat() if item.review_completed_at else None,
+                    decision_reason=item.decision_reason,
+                    batch_job_id=str(item.batch_job_id) if item.batch_job_id else None,
+                    wait_time_hours=wait_time_hours,
+                    created_at=item.created_at.isoformat(),
+                    updated_at=item.updated_at.isoformat(),
+                )
+            )
+
+        response_data = ReviewQueueListResponse(
+            total=total_count,
+            items=queue_items,
+            skip=skip,
+            limit=limit,
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching review queue: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve review queue: {str(e)}",
+        )
+
+
+@router.post(
+    "/review-queue/{review_id}/approve",
+    response_model=ApproveReviewResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Duplicates"],
+)
+async def approve_duplicate(
+    review_id: str,
+    request: ApproveReviewRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Approve a duplicate in the review queue.
+
+    Marks a duplicate review item as approved, indicating that the two resumes
+    are confirmed to be duplicates and should be merged. Updates the status to
+    'approved' and records the completion timestamp and decision reason.
+
+    Args:
+        review_id: UUID of the review queue item to approve
+        request: Approval request with optional decision reason and reviewer ID
+        db: Database session
+
+    Returns:
+        JSON response with updated review item details
+
+    Raises:
+        HTTPException(400): If review_id is invalid
+        HTTPException(404): If review item is not found
+        HTTPException(409): If review item is already approved or rejected
+        HTTPException(500): If database update fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/duplicates/review-queue/review-uuid/approve",
+        ...     json={
+        ...         "decision_reason": "Confirmed same candidate by email and phone",
+        ...         "reviewer_id": "user-123"
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "id": "review-uuid",
+            "status": "approved",
+            "review_completed_at": "2026-03-21T10:30:00Z",
+            "message": "Duplicate approved successfully"
+        }
+    """
+    try:
+        # Validate review_id
+        if not review_id or not review_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="review_id is required and cannot be empty",
+            )
+
+        logger.info(f"Approving duplicate review: {review_id}")
+
+        # Find the review item
+        stmt = select(DuplicateReview).where(DuplicateReview.id == review_id)
+        result = await db.execute(stmt)
+        review_item = result.scalar_one_or_none()
+
+        if not review_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Review item not found: {review_id}",
+            )
+
+        # Check if already completed
+        if review_item.status in [ReviewStatus.APPROVED, ReviewStatus.REJECTED]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Review item already completed with status: {review_item.status.value}",
+            )
+
+        # Update the review item
+        review_item.status = ReviewStatus.APPROVED
+        review_item.review_completed_at = datetime.utcnow()
+
+        if request.decision_reason:
+            review_item.decision_reason = request.decision_reason
+
+        if request.reviewer_id:
+            review_item.assigned_reviewer_id = request.reviewer_id
+
+        # Set review_started_at if not already set
+        if not review_item.review_started_at:
+            review_item.review_started_at = datetime.utcnow()
+
+        await db.commit()
+        await db.refresh(review_item)
+
+        logger.info(f"Successfully approved duplicate review: {review_id}")
+
+        response_data = ApproveReviewResponse(
+            id=str(review_item.id),
+            status=review_item.status.value,
+            review_completed_at=review_item.review_completed_at.isoformat(),
+            message="Duplicate approved successfully",
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving duplicate review: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to approve duplicate: {str(e)}",
+        )
+
+
+@router.post(
+    "/review-queue/{review_id}/reject",
+    response_model=RejectReviewResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Duplicates"],
+)
+async def reject_duplicate(
+    review_id: str,
+    request: RejectReviewRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Reject a duplicate in the review queue.
+
+    Marks a duplicate review item as rejected, indicating that the two resumes
+    are NOT duplicates and should remain as separate candidates. Updates the
+    status to 'rejected' and records the completion timestamp and decision reason.
+
+    Args:
+        review_id: UUID of the review queue item to reject
+        request: Rejection request with optional decision reason and reviewer ID
+        db: Database session
+
+    Returns:
+        JSON response with updated review item details
+
+    Raises:
+        HTTPException(400): If review_id is invalid
+        HTTPException(404): If review item is not found
+        HTTPException(409): If review item is already approved or rejected
+        HTTPException(500): If database update fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/duplicates/review-queue/review-uuid/reject",
+        ...     json={
+        ...         "decision_reason": "Different candidates with similar names",
+        ...         "reviewer_id": "user-123"
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "id": "review-uuid",
+            "status": "rejected",
+            "review_completed_at": "2026-03-21T10:30:00Z",
+            "message": "Duplicate rejected successfully"
+        }
+    """
+    try:
+        # Validate review_id
+        if not review_id or not review_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="review_id is required and cannot be empty",
+            )
+
+        logger.info(f"Rejecting duplicate review: {review_id}")
+
+        # Find the review item
+        stmt = select(DuplicateReview).where(DuplicateReview.id == review_id)
+        result = await db.execute(stmt)
+        review_item = result.scalar_one_or_none()
+
+        if not review_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Review item not found: {review_id}",
+            )
+
+        # Check if already completed
+        if review_item.status in [ReviewStatus.APPROVED, ReviewStatus.REJECTED]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Review item already completed with status: {review_item.status.value}",
+            )
+
+        # Update the review item
+        review_item.status = ReviewStatus.REJECTED
+        review_item.review_completed_at = datetime.utcnow()
+
+        if request.decision_reason:
+            review_item.decision_reason = request.decision_reason
+
+        if request.reviewer_id:
+            review_item.assigned_reviewer_id = request.reviewer_id
+
+        # Set review_started_at if not already set
+        if not review_item.review_started_at:
+            review_item.review_started_at = datetime.utcnow()
+
+        await db.commit()
+        await db.refresh(review_item)
+
+        logger.info(f"Successfully rejected duplicate review: {review_id}")
+
+        response_data = RejectReviewResponse(
+            id=str(review_item.id),
+            status=review_item.status.value,
+            review_completed_at=review_item.review_completed_at.isoformat(),
+            message="Duplicate rejected successfully",
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting duplicate review: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reject duplicate: {str(e)}",
         )
