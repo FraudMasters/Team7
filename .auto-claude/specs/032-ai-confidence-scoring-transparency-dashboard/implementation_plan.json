@@ -152,8 +152,9 @@
               "Time period selector (7d/30d/90d) works"
             ]
           },
-          "status": "pending",
-          "notes": "Use Recharts LineChart. Show accuracy, precision, recall, F1 score trends. Allow period selection."
+          "status": "completed",
+          "notes": "✅ Created ModelAccuracyTrend component with Recharts LineChart showing model accuracy over time. Implements time period selector (7d/30d/90d) using ToggleButtonGroup. Features auto-refresh (60s), custom tooltip showing accuracy/confidence/prediction count, summary stats cards (current accuracy, change %, data points), trend indicators (improving/stable/declining), loading/error/empty states, and insights cards. Shows main accuracy line plus optional average confidence line (dashed). Follows patterns from RankingAccuracyMetrics.tsx and PerformanceMetricsChart.tsx with Russian comments and consistent Material UI styling. Component ready for dashboard integration. Committed in cb2d723.",
+          "updated_at": "2026-03-21T18:49:03.287882+00:00"
         },
         {
           "id": "subtask-2-3",
@@ -175,8 +176,9 @@
               "Feature descriptions visible on hover"
             ]
           },
-          "status": "pending",
-          "notes": "Horizontal bar chart showing feature importance scores. Include feature descriptions and categories."
+          "status": "completed",
+          "notes": "✅ Created FeatureImportanceChart component showing top 5 ranking factors with horizontal bar chart visualization. Implements interactive Recharts BarChart with color-coded bars (green/blue/cyan/orange/red based on importance level 0-100%). Features hover tooltips with detailed feature descriptions, categories, and direction indicators (positive/negative impact). Includes empty state, legend explaining importance levels, and i18n translation support. Uses same patterns as ModelAccuracyTrend.tsx (Recharts integration, Russian comments, MUI components). Component displays features sorted by importance descending, limited to maxFeatures (default 5). Ready for integration into TransparencyDashboard. Committed in next commit.",
+          "updated_at": "2026-03-21T18:52:27.290561+00:00"
         },
         {
           "id": "subtask-2-4",
@@ -556,6 +558,6 @@
   "planStatus": "in_progress",
   "xstateState": "backlog",
   "executionPhase": "coding",
-  "updated_at": "2026-03-21T18:43:28.358Z",
-  "last_updated": "2026-03-21T18:31:28.809485+00:00"
+  "updated_at": "2026-03-21T18:49:53.753Z",
+  "last_updated": "2026-03-21T18:52:27.290570+00:00"
 }
