@@ -11,6 +11,7 @@ import re
 from typing import Dict, List, Optional, Union
 
 from .ats_simulation import evaluate_resume_ats, get_simple_ats_checker
+from .ranking_service import RankingFeatures, RankingModel
 from .skill_gap_analyzer import SkillGapAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -1282,3 +1283,231 @@ def format_suggestions_for_display(
     lines.append("=" * 80)
 
     return "\n".join(lines)
+
+
+def predict_ranking_improvement(
+    resume_data: Union[str, Dict[str, Union[str, List, Dict]]],
+    vacancy_id: Union[str, Dict[str, Union[str, List]]],
+    *,
+    optimization_suggestions: Optional[List[Dict[str, Union[str, List[str]]]]] = None,
+) -> Dict[str, Union[float, Dict[str, float]]]:
+    """
+    Predict ranking improvement before and after resume optimization.
+
+    This function uses the ranking service to estimate how resume optimizations
+    will impact candidate ranking for a specific vacancy. It provides:
+    - Current (before) ranking score
+    - Predicted (after) ranking score
+    - Improvement delta and percentage change
+
+    Args:
+        resume_data: Resume data as string (raw text) or dict with:
+            - skills: List of skills
+            - experience: Experience data (dict or months)
+            - education: Education data
+            - title: Job title or summary
+        vacancy_id: Vacancy ID string or vacancy data dict with:
+            - required_skills: List of required skills
+            - title: Job title
+            - description: Job description
+        optimization_suggestions: Optional list of optimization suggestions
+            from generate_resume_optimization() to simulate improvements
+
+    Returns:
+        Dictionary containing:
+            - before_score: Current ranking score (0-1)
+            - after_score: Predicted ranking score after optimization (0-1)
+            - improvement: Score improvement delta
+            - improvement_percentage: Improvement as percentage (0-100)
+            - recommendation: Ranking recommendation (reject/maybe/interview/strong_candidate)
+            - before_recommendation: Current recommendation
+            - after_recommendation: Predicted recommendation after optimization
+
+    Examples:
+        >>> resume = {"skills": ["Python"], "experience": {"total_months": 24}}
+        >>> vacancy = {"required_skills": ["Python", "Django"], "title": "Backend Developer"}
+        >>> result = predict_ranking_improvement(resume, vacancy)
+        >>> result["improvement"] > 0
+        True
+
+        >>> # With optimization suggestions
+        >>> suggestions = generate_resume_optimization(resume_text, target_job_description=jd)
+        >>> result = predict_ranking_improvement(
+        ...     resume_data,
+        ...     vacancy_data,
+        ...     optimization_suggestions=suggestions["suggestions"]
+        ... )
+    """
+    try:
+        # Parse resume data
+        if isinstance(resume_data, str):
+            # Basic parsing if raw text provided
+            resume_dict = {
+                "skills": [],
+                "experience": {"total_months": 0},
+                "education": {},
+                "title": resume_data[:100] if resume_data else "",
+            }
+        else:
+            resume_dict = resume_data
+
+        # Parse vacancy data
+        if isinstance(vacancy_id, str):
+            # If just an ID is provided, create minimal vacancy data
+            vacancy_dict = {
+                "id": vacancy_id,
+                "required_skills": [],
+                "title": "",
+                "description": "",
+            }
+        else:
+            vacancy_dict = vacancy_id
+
+        # Initialize ranking model
+        ranking_model = RankingModel(model_type="random_forest")
+
+        # Extract features for BEFORE state (current resume)
+        before_features = RankingFeatures.extract_features(
+            resume_data=resume_dict,
+            vacancy_data=vacancy_dict,
+            match_result=None,
+        )
+
+        # Get BEFORE ranking score
+        before_score = ranking_model.predict_proba(before_features)
+        before_recommendation = _score_to_recommendation(before_score)
+
+        # Simulate AFTER state (optimized resume)
+        optimized_resume = _simulate_resume_optimization(
+            resume_dict,
+            vacancy_dict,
+            optimization_suggestions,
+        )
+
+        # Extract features for AFTER state (optimized resume)
+        after_features = RankingFeatures.extract_features(
+            resume_data=optimized_resume,
+            vacancy_data=vacancy_dict,
+            match_result=None,
+        )
+
+        # Get AFTER ranking score
+        after_score = ranking_model.predict_proba(after_features)
+        after_recommendation = _score_to_recommendation(after_score)
+
+        # Calculate improvement
+        improvement = after_score - before_score
+        improvement_percentage = (improvement / max(before_score, 0.01)) * 100
+
+        logger.info(
+            f"Ranking prediction: before={before_score:.3f}, after={after_score:.3f}, "
+            f"improvement={improvement:.3f} ({improvement_percentage:.1f}%)"
+        )
+
+        return {
+            "before_score": float(before_score),
+            "after_score": float(after_score),
+            "improvement": float(improvement),
+            "improvement_percentage": float(improvement_percentage),
+            "recommendation": after_recommendation,
+            "before_recommendation": before_recommendation,
+            "after_recommendation": after_recommendation,
+        }
+
+    except Exception as e:
+        logger.error(f"Error predicting ranking improvement: {e}", exc_info=True)
+        return {
+            "before_score": 0.0,
+            "after_score": 0.0,
+            "improvement": 0.0,
+            "improvement_percentage": 0.0,
+            "recommendation": "unknown",
+            "before_recommendation": "unknown",
+            "after_recommendation": "unknown",
+            "error": str(e),
+        }
+
+
+def _simulate_resume_optimization(
+    resume_data: Dict[str, Union[str, List, Dict]],
+    vacancy_data: Dict[str, Union[str, List]],
+    suggestions: Optional[List[Dict[str, Union[str, List[str]]]]] = None,
+) -> Dict[str, Union[str, List, Dict]]:
+    """
+    Simulate resume improvements based on optimization suggestions.
+
+    This creates a hypothetical "optimized" version of the resume by:
+    - Adding missing keywords from suggestions
+    - Improving completeness score
+    - Enhancing skill matching
+
+    Args:
+        resume_data: Original resume data
+        vacancy_data: Vacancy data with requirements
+        suggestions: Optional optimization suggestions
+
+    Returns:
+        Simulated optimized resume data
+    """
+    # Create a copy to avoid modifying original
+    import copy
+    optimized = copy.deepcopy(resume_data)
+
+    # Improvement 1: Add missing keywords/skills from vacancy
+    vacancy_skills = vacancy_data.get("required_skills", [])
+    current_skills = set(s.lower() for s in optimized.get("skills", []))
+
+    # Add skills that are missing but would be recommended
+    for vac_skill in vacancy_skills:
+        if vac_skill.lower() not in current_skills:
+            if isinstance(optimized.get("skills"), list):
+                optimized["skills"].append(vac_skill)
+            else:
+                optimized["skills"] = [vac_skill]
+
+    # Improvement 2: Boost completeness (simulate adding missing sections)
+    if suggestions:
+        # Check for completeness-related suggestions
+        has_completeness_issues = any(
+            s.get("category") == "completeness" or "complete" in s.get("title", "").lower()
+            for s in suggestions
+        )
+        if has_completeness_issues:
+            # Simulate improvement by marking resume as more complete
+            if "completeness_boost" not in optimized:
+                optimized["completeness_boost"] = 0.2  # 20% improvement
+
+    # Improvement 3: Enhance experience relevance (simulate better keywords)
+    if suggestions:
+        has_keyword_issues = any(
+            s.get("category") == "keywords" or s.get("type") == "keyword"
+            for s in suggestions
+        )
+        if has_keyword_issues:
+            # Boost experience relevance slightly
+            if isinstance(optimized.get("experience"), dict):
+                optimized["experience"]["relevance_boost"] = 0.15
+            else:
+                optimized["experience"] = {"relevance_boost": 0.15}
+
+    return optimized
+
+
+def _score_to_recommendation(score: float) -> str:
+    """
+    Convert ranking score to hiring recommendation.
+
+    Args:
+        score: Ranking score (0-1)
+
+    Returns:
+        Recommendation: reject, maybe, interview, or strong_candidate
+    """
+    if score >= 0.75:
+        return "strong_candidate"
+    elif score >= 0.6:
+        return "interview"
+    elif score >= 0.4:
+        return "maybe"
+    else:
+        return "reject"
