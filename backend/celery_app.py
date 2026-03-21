@@ -15,7 +15,7 @@ from config import get_settings
 from tasks import (
     analyze_resume_async,
     batch_analyze_resumes,
-    generate_scheduled_reports,
+    generate_scheduled_report,
     process_all_pending_reports,
 )
 
@@ -295,7 +295,7 @@ __all__ = [
     "long_running_task",
     "analyze_resume_async",
     "batch_analyze_resumes",
-    "generate_scheduled_reports",
+    "generate_scheduled_report",
     "process_all_pending_reports",
     "preload_ml_models",
     "health_check_with_models",

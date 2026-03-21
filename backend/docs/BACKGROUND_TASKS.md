@@ -170,11 +170,11 @@ print(f"Processed {result['successful']}/{result['total_resumes']} resumes")
 
 ## Report Generation Tasks
 
-### `generate_scheduled_reports`
+### `generate_scheduled_report`
 
 Generate and deliver a scheduled report with multiple formats.
 
-**Task Name**: `tasks.report_generation.generate_scheduled_reports`
+**Task Name**: `tasks.report_generation.generate_scheduled_report`
 
 **Parameters**:
 - `scheduled_report_id` (str): UUID of the scheduled report to generate
@@ -202,9 +202,9 @@ Generate and deliver a scheduled report with multiple formats.
 
 **Example Usage**:
 ```python
-from tasks.report_generation import generate_scheduled_reports
+from tasks.report_generation import generate_scheduled_report
 
-task = generate_scheduled_reports.delay("report-uuid-123")
+task = generate_scheduled_report.delay("report-uuid-123")
 result = task.get(timeout=120)
 
 if result['status'] == 'completed':
@@ -233,7 +233,7 @@ Periodic task to process all pending scheduled reports.
 
 **Workflow**:
 1. Query all active scheduled reports where `next_run_at <= now`
-2. For each pending report, trigger `generate_scheduled_reports` task
+2. For each pending report, trigger `generate_scheduled_report` task
 3. Update `next_run_at` based on schedule configuration
 4. Return summary of processed reports
 

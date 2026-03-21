@@ -747,12 +747,12 @@ async def _update_scheduled_report_timestamps(
 
 
 @shared_task(
-    name="tasks.report_generation.generate_scheduled_reports",
+    name="tasks.report_generation.generate_scheduled_report",
     bind=True,
     max_retries=2,
     default_retry_delay=60,
 )
-def generate_scheduled_reports(
+def generate_scheduled_report(
     self,
     scheduled_report_id: str,
 ) -> Dict[str, Any]:
@@ -795,8 +795,8 @@ def generate_scheduled_reports(
         Exception: For database, generation, or delivery errors
 
     Example:
-        >>> from tasks.report_generation import generate_scheduled_reports
-        >>> task = generate_scheduled_reports.delay("abc-123-def")
+        >>> from tasks.report_generation import generate_scheduled_report
+        >>> task = generate_scheduled_report.delay("abc-123-def")
         >>> result = task.get()
         >>> print(result['status'])
         'completed'
@@ -1083,7 +1083,7 @@ def process_all_pending_reports(
 
     Task Workflow:
     1. Query all active scheduled reports where next_run_at <= now
-    2. For each pending report, trigger generate_scheduled_reports task
+    2. For each pending report, trigger generate_scheduled_report task
     3. Update next_run_at based on schedule config
     4. Return summary of processed reports
 
@@ -1127,7 +1127,7 @@ def process_all_pending_reports(
         for report_id in pending_reports:
             try:
                 # Trigger report generation task
-                generate_scheduled_reports.delay(report_id)
+                generate_scheduled_report.delay(report_id)
                 reports_triggered += 1
                 logger.info(f"Triggered report generation for: {report_id}")
 
