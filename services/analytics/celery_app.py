@@ -21,6 +21,7 @@ celery_app = Celery(
     include=[
         "tasks.report_generation",
         "tasks.pdf_generation",
+        "tasks.export_tasks",
     ],
 )
 
@@ -38,6 +39,7 @@ celery_app.conf.update(
     task_routes={
         "tasks.report_generation.*": {"queue": "analytics_reports"},
         "tasks.pdf_generation.*": {"queue": "analytics_reports"},
+        "tasks.export_tasks.*": {"queue": "analytics_reports"},
     },
     # Worker settings
     worker_prefetch_multiplier=1,
