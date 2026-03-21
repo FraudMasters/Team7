@@ -24,6 +24,8 @@ from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
 from utils.audit_logger import log_audit_event, get_request_context
 from services.resume_cache_service import get_resume_cache
+from tasks.elasticsearch_indexing import index_single_resume
+from services.elasticsearch_service import ElasticsearchService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -248,6 +250,15 @@ async def upload_resume(
                 "content_type": file.content_type or "application/octet-stream",
             },
         )
+
+        # Trigger Elasticsearch indexing in background (asynchronous)
+        # This will index the resume once analysis is completed
+        try:
+            index_single_resume.delay(str(resume_id))
+            logger.info(f"Triggered Elasticsearch indexing for resume {resume_id}")
+        except Exception as index_err:
+            logger.warning(f"Failed to trigger Elasticsearch indexing for resume {resume_id}: {index_err}")
+            # Don't fail the upload if indexing trigger fails
 
         # Get translated success message
         success_message = get_success_message("file_uploaded", locale)
@@ -888,6 +899,15 @@ async def update_resume_status(
         except Exception as audit_err:
             logger.warning(f"Failed to log audit event: {audit_err}")
 
+        # Trigger Elasticsearch re-indexing after status update
+        # This ensures the search index reflects the latest resume status
+        try:
+            index_single_resume.delay(str(resume_record.id))
+            logger.info(f"Triggered Elasticsearch re-indexing for updated resume {resume_id}")
+        except Exception as index_err:
+            logger.warning(f"Failed to trigger Elasticsearch re-indexing for resume {resume_id}: {index_err}")
+            # Don't fail the update if indexing trigger fails
+
         logger.info(f"Updated resume {resume_id} status from {old_status} to {new_status.value}")
 
         # Return lowercase status for frontend compatibility
@@ -976,6 +996,17 @@ async def delete_resume(
 
             await db.delete(resume_record)
             await db.commit()
+
+            # Remove from Elasticsearch index
+            try:
+                es_service = ElasticsearchService()
+                await es_service.initialize()
+                await es_service.delete_document(str(resume_record.id))
+                await es_service.close()
+                logger.info(f"Removed resume {resume_id} from Elasticsearch index")
+            except Exception as es_err:
+                logger.warning(f"Failed to remove resume {resume_id} from Elasticsearch: {es_err}")
+                # Don't fail the delete operation if Elasticsearch removal fails
 
         # Invalidate cache for this resume before deleting file
         if file_path and file_path.exists():
