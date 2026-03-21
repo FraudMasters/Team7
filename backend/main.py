@@ -15,6 +15,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
 from config.validation import validate_config, ConfigurationError
+from middleware.rate_limit_middleware import RateLimitMiddleware
+from middleware.api_key_auth import APIKeyAuthMiddleware
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -99,6 +101,12 @@ app.add_middleware(
         "Access-Control-Request-Headers",
     ],
 )
+
+# Configure API key authentication middleware
+app.add_middleware(APIKeyAuthMiddleware)
+
+# Configure rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
 
 
 # Exception handlers
