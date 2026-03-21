@@ -232,19 +232,29 @@ async def create_report(
         ) from e
 
 
-@router.get("/", tags=["Reports"])
+@router.get(
+    "/",
+    response_model=ReportListResponse,
+    tags=["Reports"],
+)
 async def list_reports(
     organization_id: Optional[str] = Query(None, description="Filter by organization ID"),
     created_by: Optional[str] = Query(None, description="Filter by creator user ID"),
     is_public: Optional[bool] = Query(None, description="Filter by public status"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     List custom reports with optional filters.
+
+    This endpoint retrieves all custom reports, optionally filtered by organization,
+    creator, or public visibility status. Results include report metadata,
+    configuration, and metrics definitions for each saved report.
 
     Args:
         organization_id: Optional organization ID filter
         created_by: Optional creator user ID filter
         is_public: Optional public status filter
+        db: Database session
 
     Returns:
         JSON response with list of report entries
@@ -256,17 +266,68 @@ async def list_reports(
         >>> import requests
         >>> response = requests.get("/api/reports/?organization_id=org123")
         >>> response.json()
+        {
+            "organization_id": "org123",
+            "reports": [
+                {
+                    "id": "report-123",
+                    "organization_id": "org123",
+                    "name": "Monthly Hiring Report",
+                    "description": "Overview of hiring metrics",
+                    "created_by": "user456",
+                    "metrics": ["time_to_hire", "resumes_processed"],
+                    "filters": {"start_date": "2024-01-01"},
+                    "is_public": True,
+                    "created_at": "2024-01-25T00:00:00Z",
+                    "updated_at": "2024-01-25T00:00:00Z"
+                }
+            ],
+            "total_count": 1
+        }
     """
     try:
         logger.info(f"Listing reports with filters - organization_id: {organization_id}, created_by: {created_by}, is_public: {is_public}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Build query with filters
+        query = select(Report).where(Report.is_active == True)
+
+        if organization_id:
+            query = query.where(Report.organization_id == organization_id)
+
+        if created_by:
+            query = query.where(Report.created_by == created_by)
+
+        if is_public is not None:
+            # Filter by is_public field in configuration JSON
+            query = query.where(Report.configuration["is_public"].astext.cast(bool) == is_public)
+
+        # Execute query
+        result = await db.execute(query)
+        reports = result.scalars().all()
+
+        # Build response data
+        report_list = []
+        for report in reports:
+            report_list.append({
+                "id": str(report.id),
+                "organization_id": report.organization_id,
+                "name": report.name,
+                "description": report.description,
+                "created_by": report.created_by,
+                "metrics": report.configuration.get("metrics", []),
+                "filters": report.configuration.get("filters", {}),
+                "is_public": report.configuration.get("is_public", False),
+                "created_at": report.created_at.isoformat(),
+                "updated_at": report.updated_at.isoformat(),
+            })
+
         response_data = {
             "organization_id": organization_id,
-            "reports": [],
-            "total_count": 0,
+            "reports": report_list,
+            "total_count": len(report_list),
         }
+
+        logger.info(f"Retrieved {len(report_list)} reports")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -281,13 +342,25 @@ async def list_reports(
         ) from e
 
 
-@router.get("/{report_id}", tags=["Reports"])
-async def get_report(report_id: str) -> JSONResponse:
+@router.get(
+    "/{report_id}",
+    response_model=ReportResponse,
+    tags=["Reports"],
+)
+async def get_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Get a specific report by ID.
 
+    This endpoint retrieves detailed information about a single custom report,
+    including its configuration, metrics, filters, and metadata. The report
+    must be active to be retrieved.
+
     Args:
         report_id: Unique identifier of the report
+        db: Database session
 
     Returns:
         JSON response with report details
@@ -300,28 +373,57 @@ async def get_report(report_id: str) -> JSONResponse:
         >>> import requests
         >>> response = requests.get("/api/reports/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "organization_id": "org123",
+            "name": "Monthly Hiring Report",
+            "description": "Overview of hiring metrics for this month",
+            "created_by": "user456",
+            "metrics": ["time_to_hire", "resumes_processed", "match_rates"],
+            "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
+            "is_public": True,
+            "created_at": "2024-01-25T00:00:00Z",
+            "updated_at": "2024-01-25T00:00:00Z"
+        }
     """
     try:
         logger.info(f"Getting report: {report_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Query report by ID
+        query = select(Report).where(Report.id == report_id, Report.is_active == True)
+        result = await db.execute(query)
+        report = result.scalar_one_or_none()
+
+        if not report:
+            logger.warning(f"Report not found: {report_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report not found: {report_id}",
+            )
+
+        # Build response data
+        response_data = {
+            "id": str(report.id),
+            "organization_id": report.organization_id,
+            "name": report.name,
+            "description": report.description,
+            "created_by": report.created_by,
+            "metrics": report.configuration.get("metrics", []),
+            "filters": report.configuration.get("filters", {}),
+            "is_public": report.configuration.get("is_public", False),
+            "created_at": report.created_at.isoformat(),
+            "updated_at": report.updated_at.isoformat(),
+        }
+
+        logger.info(f"Retrieved report: {report_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": report_id,
-                "organization_id": "org123",
-                "name": "Sample Report",
-                "description": "A sample report",
-                "created_by": "user456",
-                "metrics": ["time_to_hire", "resumes_processed"],
-                "filters": {},
-                "is_public": True,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-            },
+            content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting report: {e}", exc_info=True)
         raise HTTPException(
