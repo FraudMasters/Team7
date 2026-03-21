@@ -42,7 +42,7 @@ import {
 } from '@mui/icons-material';
 
 // Импорт API клиента и типов
-import { analyticsClient, type FunnelMetricsResponse, type SourceTrackingResponse } from '@/api/analytics';
+import { analyticsClient, type FunnelMetricsResponse, type SourceTrackingResponse, type RecruiterPerformanceResponse } from '@/api/analytics';
 
 // Интерфейс для метрик воронки
 interface FunnelMetrics {
@@ -115,22 +115,15 @@ export function AdvancedAnalyticsPage() {
   // Состояние данных источников кандидатов
   const [sourceData, setSourceData] = useState<SourceTrackingResponse | null>(null);
 
+  // Состояние данных производительности рекрутеров
+  const [recruiterData, setRecruiterData] = useState<RecruiterPerformanceResponse | null>(null);
+
   // Тестовые данные для времени найма (не реализовано в этом подзадании)
   const timeToFillData: TimeToFillMetrics[] = [
     { vacancy_id: '1', vacancy_title: 'Senior React Developer', days: 28 },
     { vacancy_id: '2', vacancy_title: 'Product Manager', days: 35 },
     { vacancy_id: '3', vacancy_title: 'DevOps Engineer', days: 21 },
   ];
-
-  // Тестовые данные для производительности рекрутера (не реализовано в этом подзадании)
-  const recruiterPerformanceData: RecruiterPerformanceMetrics = {
-    total_candidates_processed: 156,
-    total_interviews_conducted: 48,
-    successful_hires: 12,
-    success_rate: 7.7,
-    avg_time_per_candidate: 4.2,
-    interview_completion_rate: 92.5,
-  };
 
   // Загрузка данных при монтировании и изменении периода
   useEffect(() => {
@@ -161,14 +154,16 @@ export function AdvancedAnalyticsPage() {
         const startDateStr = startDate.toISOString().split('T')[0];
         const endDateStr = endDate.toISOString().split('T')[0];
 
-        // Параллельная загрузка данных воронки и источников
-        const [funnelResponse, sourceResponse] = await Promise.all([
+        // Параллельная загрузка данных воронки, источников и производительности рекрутеров
+        const [funnelResponse, sourceResponse, recruiterResponse] = await Promise.all([
           analyticsClient.getFunnelMetrics(startDateStr, endDateStr),
           analyticsClient.getSourceTracking(startDateStr, endDateStr),
+          analyticsClient.getRecruiterPerformance(startDateStr, endDateStr, 10),
         ]);
 
         setFunnelData(funnelResponse);
         setSourceData(sourceResponse);
+        setRecruiterData(recruiterResponse);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки данных аналитики');
       } finally {
@@ -467,7 +462,13 @@ export function AdvancedAnalyticsPage() {
                             </Typography>
                           </Box>
                           <Typography variant="h4" fontWeight={700}>
-                            {recruiterPerformanceData.total_candidates_processed}
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters ? (
+                              recruiterData.recruiters.reduce((sum, r) => sum + r.resumes_processed, 0)
+                            ) : (
+                              '--'
+                            )}
                           </Typography>
                         </Stack>
                       </CardContent>
@@ -484,7 +485,13 @@ export function AdvancedAnalyticsPage() {
                             </Typography>
                           </Box>
                           <Typography variant="h4" fontWeight={700}>
-                            {recruiterPerformanceData.total_interviews_conducted}
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters ? (
+                              recruiterData.recruiters.reduce((sum, r) => sum + r.interviews_conducted, 0)
+                            ) : (
+                              '--'
+                            )}
                           </Typography>
                         </Stack>
                       </CardContent>
@@ -501,7 +508,13 @@ export function AdvancedAnalyticsPage() {
                             </Typography>
                           </Box>
                           <Typography variant="h4" fontWeight={700}>
-                            {recruiterPerformanceData.successful_hires}
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters ? (
+                              recruiterData.recruiters.reduce((sum, r) => sum + r.hires, 0)
+                            ) : (
+                              '--'
+                            )}
                           </Typography>
                         </Stack>
                       </CardContent>
@@ -518,7 +531,17 @@ export function AdvancedAnalyticsPage() {
                             </Typography>
                           </Box>
                           <Typography variant="h4" fontWeight={700}>
-                            {recruiterPerformanceData.success_rate.toFixed(1)}%
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters && recruiterData.recruiters.length > 0 ? (
+                              (
+                                recruiterData.recruiters.reduce((sum, r) => sum + r.placement_rate, 0) /
+                                recruiterData.recruiters.length *
+                                100
+                              ).toFixed(1) + '%'
+                            ) : (
+                              '--'
+                            )}
                           </Typography>
                         </Stack>
                       </CardContent>
@@ -535,7 +558,16 @@ export function AdvancedAnalyticsPage() {
                             </Typography>
                           </Box>
                           <Typography variant="h4" fontWeight={700}>
-                            {recruiterPerformanceData.avg_time_per_candidate.toFixed(1)} days
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters && recruiterData.recruiters.length > 0 ? (
+                              (
+                                recruiterData.recruiters.reduce((sum, r) => sum + r.average_time_to_hire_days, 0) /
+                                recruiterData.recruiters.length
+                              ).toFixed(1) + ' days'
+                            ) : (
+                              '--'
+                            )}
                           </Typography>
                         </Stack>
                       </CardContent>
@@ -552,13 +584,35 @@ export function AdvancedAnalyticsPage() {
                             </Typography>
                           </Box>
                           <Typography variant="h4" fontWeight={700}>
-                            {recruiterPerformanceData.interview_completion_rate.toFixed(1)}%
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters && recruiterData.recruiters.length > 0 ? (
+                              (() => {
+                                const totalInterviews = recruiterData.recruiters.reduce((sum, r) => sum + r.interviews_conducted, 0);
+                                const totalResumes = recruiterData.recruiters.reduce((sum, r) => sum + r.resumes_processed, 0);
+                                return totalResumes > 0 ? ((totalInterviews / totalResumes) * 100).toFixed(1) + '%' : '0%';
+                              })()
+                            ) : (
+                              '--'
+                            )}
                           </Typography>
                         </Stack>
                       </CardContent>
                     </Card>
                   </Grid>
                 </Grid>
+
+                {error && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    Failed to load recruiter performance data: {error}
+                  </Alert>
+                )}
+
+                {!loading && recruiterData?.recruiters.length === 0 && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    No recruiter performance data available for the selected time period.
+                  </Alert>
+                )}
               </TabPanel>
             </Paper>
           </>

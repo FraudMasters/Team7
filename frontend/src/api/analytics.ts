@@ -290,6 +290,29 @@ export interface SourceTrackingResponse {
 }
 
 /**
+ * Recruiter metrics - matches API RecruiterMetrics structure
+ */
+export interface RecruiterMetrics {
+  recruiter_id: string;
+  recruiter_name: string;
+  resumes_processed: number;
+  interviews_conducted: number;
+  hires: number;
+  placement_rate: number;
+  average_time_to_hire_days: number;
+}
+
+/**
+ * Recruiter performance response - matches API RecruiterPerformanceResponse structure
+ */
+export interface RecruiterPerformanceResponse {
+  recruiters: RecruiterMetrics[];
+  period_start: string | null;
+  period_end: string | null;
+  total_recruiters: number;
+}
+
+/**
  * Конфигурация по умолчанию для клиента аналитики
  */
 const DEFAULT_CONFIG = {
@@ -603,6 +626,47 @@ export class AnalyticsClient {
 
       const response: AxiosResponse<SourceTrackingResponse> = await this.client.get(
         '/api/analytics/source-tracking',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Получение метрик производительности рекрутеров
+   *
+   * Возвращает метрики производительности для рекрутеров, включая обработанных
+   * кандидатов, проведенные интервью, нанятых сотрудников и процент трудоустройства.
+   *
+   * @param startDate - Опциональная дата начала для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная дата окончания для фильтрации (формат ISO 8601)
+   * @param limit - Количество рекрутеров для возврата (по умолчанию 10, максимум 100)
+   * @returns Метрики производительности рекрутеров
+   * @throws ApiError если получение данных не удалось
+   *
+   * @example
+   * ```ts
+   * const performance = await analyticsClient.getRecruiterPerformance();
+   * console.log(`Total recruiters: ${performance.total_recruiters}`);
+   * performance.recruiters.forEach(r => {
+   *   console.log(`${r.recruiter_name}: ${r.hires} hires, ${(r.placement_rate * 100).toFixed(1)}% placement rate`);
+   * });
+   * ```
+   */
+  async getRecruiterPerformance(
+    startDate?: string,
+    endDate?: string,
+    limit: number = 10
+  ): Promise<RecruiterPerformanceResponse> {
+    try {
+      const params: Record<string, string | number> = { limit };
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<RecruiterPerformanceResponse> = await this.client.get(
+        '/api/analytics/recruiter-performance',
         { params }
       );
       return response.data;
