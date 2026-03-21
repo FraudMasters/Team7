@@ -1,10 +1,11 @@
 """
-Celery Beat schedule configuration for automated model retraining, analytics reports, and search alerts.
+Celery Beat schedule configuration for automated model retraining, analytics reports, search alerts, and fairness monitoring.
 
 This module defines the periodic task schedule for Celery Beat, including
 daily and weekly automated model retraining schedules, analytics email
-report schedules, and search alert processing schedules. It integrates with
-the main Celery configuration to provide scheduled task execution.
+report schedules, search alert processing schedules, and fairness monitoring
+schedules. It integrates with the main Celery configuration to provide
+scheduled task execution.
 
 Schedule Overview:
 - Feedback volume check: Runs every 6 hours to check if feedback threshold is met
@@ -15,6 +16,7 @@ Schedule Overview:
 - Weekly analytics email report: Sends weekly summary on configured day
 - Daily search alert processing: Processes pending alerts for daily-frequency saved searches
 - Weekly search alert processing: Processes pending alerts for weekly-frequency saved searches
+- Fairness metrics monitoring: Periodic monitoring of bias detection and fairness metrics
 
 Feedback Volume Trigger:
 - Monitors accumulated feedback counts per model
@@ -30,6 +32,11 @@ Search Alert Processing:
 - Daily alerts: Processes pending alerts for saved searches with daily frequency
 - Weekly alerts: Processes pending alerts for saved searches with weekly frequency
 - Configurable timing via alert_schedule settings
+
+Fairness Monitoring:
+- Daily fairness metrics check: Monitors bias and fairness metrics daily
+- Configurable thresholds via fairness_monitoring settings
+- Automated alerts when fairness thresholds are exceeded
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -156,36 +163,33 @@ def get_alert_schedule_config() -> Dict[str, Any]:
     }
 
 
-def get_elasticsearch_indexing_config() -> Dict[str, Any]:
+def get_fairness_monitoring_schedule_config() -> Dict[str, Any]:
     """
-    Get Elasticsearch bulk indexing schedule configuration from settings.
+    Get fairness monitoring schedule configuration from settings.
 
     Returns schedule configuration with defaults for:
-    - enabled: Whether scheduled bulk indexing is enabled (default: False)
-    - hour: Hour for indexing (default: 3 AM)
-    - minute: Minute for indexing (default: 0)
-    - day_of_week: Day of week for indexing (default: 0 = Sunday)
-    - batch_size: Number of resumes to index per batch (default: 100)
-
-    Note: Bulk indexing is typically a one-time or manually triggered operation.
-    Enable scheduled indexing only if you need periodic re-indexing.
+    - enabled: Whether fairness monitoring is enabled (default: True)
+    - daily_hour: Hour for daily fairness check (default: 4 AM)
+    - daily_minute: Minute for daily fairness check (default: 0)
+    - lookback_days: Number of days to look back for analysis (default: 30)
+    - alert_threshold: Threshold for triggering alerts (default: 0.8)
 
     Returns:
         Dictionary containing schedule configuration
 
     Example:
-        >>> config = get_elasticsearch_indexing_config()
-        >>> print(config['enabled'])
-        False
-        >>> print(config['batch_size'])
-        100
+        >>> config = get_fairness_monitoring_schedule_config()
+        >>> print(config['daily_hour'])
+        4
+        >>> print(config['lookback_days'])
+        30
     """
     return {
-        "enabled": getattr(settings, "elasticsearch_bulk_indexing_enabled", False),
-        "hour": getattr(settings, "elasticsearch_indexing_hour", 3),
-        "minute": getattr(settings, "elasticsearch_indexing_minute", 0),
-        "day_of_week": getattr(settings, "elasticsearch_indexing_day", 0),  # Sunday
-        "batch_size": getattr(settings, "elasticsearch_indexing_batch_size", 100),
+        "enabled": getattr(settings, "fairness_monitoring_enabled", True),
+        "daily_hour": getattr(settings, "fairness_monitoring_daily_hour", 4),
+        "daily_minute": getattr(settings, "fairness_monitoring_daily_minute", 0),
+        "lookback_days": getattr(settings, "fairness_monitoring_lookback_days", 30),
+        "alert_threshold": getattr(settings, "fairness_monitoring_alert_threshold", 0.8),
     }
 
 
@@ -378,22 +382,22 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
         },
     },
     # ==============================================
-    # Elasticsearch Bulk Indexing Schedule
+    # Fairness Monitoring Schedule
     # ==============================================
-    "elasticsearch-bulk-index-resumes": {
-        "task": "tasks.elasticsearch_indexing.bulk_index_resumes",
+    "monitor_fairness_metrics": {
+        "task": "tasks.fairness_monitoring.monitor_fairness_metrics_task",
         "schedule": crontab(
-            day_of_week=get_elasticsearch_indexing_config()["day_of_week"],
-            hour=get_elasticsearch_indexing_config()["hour"],
-            minute=get_elasticsearch_indexing_config()["minute"],
+            hour=get_fairness_monitoring_schedule_config()["daily_hour"],
+            minute=get_fairness_monitoring_schedule_config()["daily_minute"],
         ),
         "args": (),  # No positional args
         "kwargs": {
-            "batch_size": get_elasticsearch_indexing_config()["batch_size"],
+            "lookback_days": get_fairness_monitoring_schedule_config()["lookback_days"],
+            "alert_threshold": get_fairness_monitoring_schedule_config()["alert_threshold"],
         },
         "options": {
-            "expires": 7200,  # Task expires if not run within 2 hours
-            "queue": "default",  # Use default queue for indexing tasks
+            "expires": 3600,  # Task expires if not run within 1 hour
+            "queue": "learning",  # Route to learning queue
         },
     },
 }
@@ -421,7 +425,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     config = get_retraining_schedule_config()
     analytics_config = get_analytics_report_schedule_config()
     alert_config = get_alert_schedule_config()
-    elasticsearch_config = get_elasticsearch_indexing_config()
+    fairness_config = get_fairness_monitoring_schedule_config()
 
     if not config["enabled"] and enabled_only:
         logger.info("Automated retraining is disabled in settings")
@@ -432,15 +436,15 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     if not alert_config["enabled"] and enabled_only:
         logger.info("Search alerts are disabled in settings")
 
-    if not elasticsearch_config["enabled"] and enabled_only:
-        logger.info("Elasticsearch bulk indexing is disabled in settings")
+    if not fairness_config["enabled"] and enabled_only:
+        logger.info("Fairness monitoring is disabled in settings")
 
     # If all are disabled and we only want enabled tasks, return empty
     if (
         not config["enabled"]
         and not analytics_config["enabled"]
         and not alert_config["enabled"]
-        and not elasticsearch_config["enabled"]
+        and not fairness_config["enabled"]
         and enabled_only
     ):
         return {}
@@ -450,7 +454,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         f"retraining_enabled={config['enabled']}, models={config['models']}, "
         f"analytics_reports_enabled={analytics_config['enabled']}, "
         f"search_alerts_enabled={alert_config['enabled']}, "
-        f"elasticsearch_indexing_enabled={elasticsearch_config['enabled']}"
+        f"fairness_monitoring_enabled={fairness_config['enabled']}"
     )
 
     if enabled_only:
@@ -490,9 +494,9 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
                 if not alert_config["enabled"]:
                     continue
 
-            # Skip elasticsearch indexing tasks if indexing is disabled
-            if "elasticsearch" in task_name:
-                if not elasticsearch_config["enabled"]:
+            # Skip fairness monitoring tasks if disabled
+            if "fairness" in task_name:
+                if not fairness_config["enabled"]:
                     continue
 
             # Include other tasks
@@ -593,6 +597,7 @@ def list_scheduled_tasks() -> Dict[str, Dict[str, Any]]:
 schedule_config = get_retraining_schedule_config()
 analytics_config = get_analytics_report_schedule_config()
 alert_config = get_alert_schedule_config()
+fairness_config = get_fairness_monitoring_schedule_config()
 logger.info(
     f"Celery Beat schedule loaded: "
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
@@ -606,22 +611,27 @@ logger.info(
     f"analytics_weekly_on_day_{analytics_config['weekly_day']}_at_{analytics_config['weekly_hour']:02d}:{analytics_config['weekly_minute']:02d}, "
     f"search_alerts_enabled={alert_config['enabled']}, "
     f"search_alert_daily_at={alert_config['daily_hour']:02d}:{alert_config['daily_minute']:02d}, "
-    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}"
+    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}, "
+    f"fairness_monitoring_enabled={fairness_config['enabled']}, "
+    f"fairness_monitoring_daily_at={fairness_config['daily_hour']:02d}:{fairness_config['daily_minute']:02d}"
 )
 
 
 # Export schedule and utility functions
 __all__ = [
     "beat_schedule",
+    "celery_schedule",  # Alias for compatibility
     "CELERYBEAT_SCHEDULE",  # Legacy alias for Celery config compatibility
     "get_beat_schedule",
     "get_retraining_schedule_config",
     "get_analytics_report_schedule_config",
     "get_alert_schedule_config",
+    "get_fairness_monitoring_schedule_config",
     "add_scheduled_task",
     "remove_scheduled_task",
     "list_scheduled_tasks",
 ]
 
-# Legacy alias for Celery config compatibility
+# Aliases for compatibility
 CELERYBEAT_SCHEDULE = beat_schedule
+celery_schedule = beat_schedule
