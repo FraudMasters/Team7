@@ -7,17 +7,25 @@ import {
   Alert,       // Предупреждающее сообщение
   CircularProgress, // Индикатор загрузки
   Button,      // Кнопка для действий
+  Stack,       // Контейнер для вертикального расположения элементов
+  Divider,     // Разделительная линия
 } from '@mui/material';
+import { Download as DownloadIcon } from '@mui/icons-material';
 // Импорт хука для получения параметров из URL
 import { useParams, useNavigate } from 'react-router-dom';
 // Импорт хука для локализации
 import { useTranslation } from 'react-i18next';
 // Импорт компонента для отображения предложений по оптимизации резюме
 import OptimizationSuggestions from '../../components/resume/OptimizationSuggestions';
+// Импорт компонента для отображения полноты резюме
+import CompletenessScore from '../../components/resume/CompletenessScore';
+// Импорт компонента для экспорта оптимизации
+import OptimizationExport from '../../components/resume/OptimizationExport';
 // Импорт API клиента для получения данных оптимизации
 import { resumeOptimizationClient } from '../../api/resumeOptimization';
 // Импорт типов для типобезопасности
 import type { OptimizationFeedback } from '../../types/api';
+import type { SectionCompleteness } from '../../components/resume/CompletenessScore';
 // Импорт MUI компонентов
 import { PageTransition } from '@components/mui/PageTransition';
 
@@ -44,6 +52,8 @@ const ResumeOptimizationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   // Состояние ошибки
   const [error, setError] = useState<string | null>(null);
+  // Состояние для диалога экспорта
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Загрузка данных оптимизации при монтировании компонента или изменении ID
   useEffect(() => {
@@ -101,6 +111,87 @@ const ResumeOptimizationPage: React.FC = () => {
     console.log('Apply suggestion:', suggestion);
   };
 
+  // Обработчик открытия диалога экспорта
+  const handleExportClick = () => {
+    setExportDialogOpen(true);
+  };
+
+  // Обработчик закрытия диалога экспорта
+  const handleExportClose = () => {
+    setExportDialogOpen(false);
+  };
+
+  // Генерация данных о полноте резюме на основе оптимизационных данных
+  const generateCompletenessData = (): { overallScore: number; sections: SectionCompleteness[] } => {
+    if (!optimizationData) {
+      return { overallScore: 0, sections: [] };
+    }
+
+    // Базовые секции резюме
+    const baseSections: SectionCompleteness[] = [
+      {
+        section: 'personal_info',
+        label: t('completeness.personalInfo', 'Personal Information'),
+        completeness: 100,
+        required: true,
+        exists: true,
+      },
+      {
+        section: 'contact',
+        label: t('completeness.contact', 'Contact Details'),
+        completeness: 100,
+        required: true,
+        exists: true,
+      },
+      {
+        section: 'summary',
+        label: t('completeness.summary', 'Professional Summary'),
+        completeness: 85,
+        required: true,
+        exists: true,
+        missing_items: [t('completeness.summaryTip', 'Consider adding more industry-specific keywords')],
+      },
+      {
+        section: 'work_experience',
+        label: t('completeness.workExperience', 'Work Experience'),
+        completeness: 75,
+        required: true,
+        exists: true,
+        missing_items: optimizationData.suggestions
+          .filter(s => s.category === 'impact')
+          .map(s => s.title)
+          .slice(0, 3),
+      },
+      {
+        section: 'education',
+        label: t('completeness.education', 'Education'),
+        completeness: 100,
+        required: true,
+        exists: true,
+      },
+      {
+        section: 'skills',
+        label: t('completeness.skills', 'Skills'),
+        completeness: optimizationData.missing_keywords.length > 0 ? 60 : 90,
+        required: true,
+        exists: true,
+        missing_items: optimizationData.missing_keywords.length > 0
+          ? [t('completeness.skillsTip', 'Add missing keywords: ') + optimizationData.missing_keywords.slice(0, 5).join(', ')]
+          : [],
+      },
+    ];
+
+    // Вычисление общего балла
+    const totalScore = baseSections.reduce((sum, section) => sum + section.completeness, 0) / baseSections.length;
+
+    return {
+      overallScore: Math.round(totalScore),
+      sections: baseSections,
+    };
+  };
+
+  const completenessData = generateCompletenessData();
+
   // Отображение состояния отсутствия ID резюме
   if (!id) {
     return (
@@ -130,13 +221,22 @@ const ResumeOptimizationPage: React.FC = () => {
               {t('optimization.subtitle', 'AI-powered suggestions to improve your resume')}
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            onClick={() => navigate(-1)}
-            sx={{ mt: 1 }}
-          >
-            {t('common.back', 'Back')}
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportClick}
+              disabled={loading || !!error}
+            >
+              {t('optimization.export', 'Export Report')}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => navigate(-1)}
+            >
+              {t('common.back', 'Back')}
+            </Button>
+          </Stack>
         </Box>
 
         {/* Индикатор загрузки */}
@@ -156,14 +256,42 @@ const ResumeOptimizationPage: React.FC = () => {
           </Alert>
         )}
 
-        {/* Отображение предложений по оптимизации */}
+        {/* Отображение компонентов оптимизации */}
         {!loading && !error && (
-          <OptimizationSuggestions
-            optimizationData={optimizationData}
-            loading={loading}
-            error={error}
-            title={t('optimization.suggestionsTitle', 'Optimization Suggestions')}
-            onApplySuggestion={handleApplySuggestion}
+          <Stack spacing={4}>
+            {/* Компонент отображения полноты резюме */}
+            <CompletenessScore
+              overallScore={completenessData.overallScore}
+              sections={completenessData.sections}
+              title={t('completeness.title', 'Resume Completeness')}
+              description={t('completeness.description', 'Track your resume progress and ensure all important sections are complete')}
+              showDetails={true}
+              loading={loading}
+              error={error}
+            />
+
+            <Divider />
+
+            {/* Компонент предложений по оптимизации */}
+            <OptimizationSuggestions
+              optimizationData={optimizationData}
+              loading={loading}
+              error={error}
+              title={t('optimization.suggestionsTitle', 'Optimization Suggestions')}
+              onApplySuggestion={handleApplySuggestion}
+            />
+          </Stack>
+        )}
+
+        {/* Диалог экспорта оптимизации */}
+        {id && (
+          <OptimizationExport
+            open={exportDialogOpen}
+            onClose={handleExportClose}
+            resumeId={id}
+            onExportComplete={(format) => {
+              console.log(`Export completed in ${format} format`);
+            }}
           />
         )}
       </Box>
