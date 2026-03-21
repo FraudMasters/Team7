@@ -1,13 +1,25 @@
 /**
- * API Usage Analytics Client
+ * Analytics API Client
  *
- * Provides methods for retrieving API usage analytics including
- * request counts, response times, error rates, and endpoint usage statistics.
+ * Этот модуль предоставляет клиент для работы с аналитикой через микросервис Analytics Service.
+ * Поддерживает получение метрик использования API, AI объяснимости, трендов производительности моделей.
  *
- * @module api/analytics
+ * @example
+ * ```ts
+ * import { analyticsClient, AnalyticsClient } from '@/api/analytics';
+ *
+ * // Получение аналитики использования API
+ * const apiUsage = await analyticsClient.getAPIUsageAnalytics();
+ *
+ * // Получение важности фичей модели
+ * const importance = await analyticsClient.getFeatureImportance();
+ *
+ * // Получение объяснения ранжирования кандидата
+ * const rationale = await analyticsClient.getRankingRationale('candidate-uuid');
+ * ```
  */
 
-import { ApiClient } from './client';
+import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import type { ApiError } from '@/types/api';
 
 /**
@@ -240,51 +252,51 @@ export interface PerformanceTrendsResponse {
 }
 
 /**
- * Single data point in model accuracy trend
+ * Конфигурация по умолчанию для клиента аналитики
  */
-export interface ModelAccuracyDataPoint {
-  timestamp: string;
-  accuracy: number;
-  precision: number;
-  recall: number;
-  f1_score: number;
-  sample_size: number;
-}
+const DEFAULT_CONFIG = {
+  baseURL: import.meta.env.VITE_API_GATEWAY_URL ?? 'http://localhost:8888',
+  timeout: 10000, // 10 секунд
+  headers: {
+    'Content-Type': 'application/json',
+  },
+};
 
 /**
- * Model accuracy trend over time - matches API response structure
- */
-export interface ModelAccuracyTrendResponse {
-  model_name: string;
-  period: string;
-  data_points: ModelAccuracyDataPoint[];
-  summary: {
-    avg_accuracy: number;
-    avg_f1_score: number;
-    trend: string;
-    total_samples: number;
-  };
-}
-
-/**
- * Analytics Client
+ * Класс клиента API для работы с аналитикой
  *
- * Handles API usage analytics retrieval operations.
+ * Предоставляет методы для получения аналитики использования API,
+ * AI объяснимости и метрик производительности с proper
+ * обработкой ошибок и типобезопасностью.
  */
 export class AnalyticsClient {
-  /**
-   * @param apiClient - The API client instance
-   */
-  constructor(private apiClient: ApiClient) {}
+  private client: AxiosInstance;
 
   /**
-   * Get API usage analytics
+   * Создание нового экземпляра клиента аналитики
    *
-   * @param startDate - Optional start date for filtering (ISO 8601 format)
-   * @param endDate - Optional end date for filtering (ISO 8601 format)
-   * @param interval - Time interval for aggregation (hour, day, week)
-   * @returns API usage analytics data
-   * @throws ApiError if retrieval fails
+   * @param config - Опциональные переопределения конфигурации
+   */
+  constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
+    const finalConfig = { ...DEFAULT_CONFIG, ...config };
+
+    this.client = axios.create(finalConfig);
+
+    // Интерцептор ответов для обработки ошибок
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => Promise.reject(this.transformError(error))
+    );
+  }
+
+  /**
+   * Получение аналитики использования API
+   *
+   * @param startDate - Опциональная дата начала для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная дата окончания для фильтрации (формат ISO 8601)
+   * @param interval - Интервал времени для агрегации (hour, day, week)
+   * @returns Данные аналитики использования API
+   * @throws ApiError если получение данных не удалось
    *
    * @example
    * ```ts
@@ -310,7 +322,7 @@ export class AnalyticsClient {
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
 
-      const response = await this.apiClient.getAxiosInstance().get<APIUsageAnalytics>(
+      const response: AxiosResponse<APIUsageAnalytics> = await this.client.get(
         '/api/analytics/api-usage',
         { params }
       );
@@ -321,13 +333,13 @@ export class AnalyticsClient {
   }
 
   /**
-   * Get usage summary for a specific API key
+   * Получение сводки использования для конкретного API ключа
    *
-   * @param apiKeyId - API key UUID
-   * @param startDate - Optional start date for filtering (ISO 8601 format)
-   * @param endDate - Optional end date for filtering (ISO 8601 format)
-   * @returns API usage summary for the key
-   * @throws ApiError if retrieval fails
+   * @param apiKeyId - UUID API ключа
+   * @param startDate - Опциональная дата начала для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная дата окончания для фильтрации (формат ISO 8601)
+   * @returns Сводка использования API для ключа
+   * @throws ApiError если получение данных не удалось
    *
    * @example
    * ```ts
@@ -344,7 +356,7 @@ export class AnalyticsClient {
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
 
-      const response = await this.apiClient.getAxiosInstance().get<APIUsageSummary>(
+      const response: AxiosResponse<APIUsageSummary> = await this.client.get(
         `/api/analytics/api-usage/keys/${apiKeyId}`,
         { params }
       );
@@ -357,13 +369,13 @@ export class AnalyticsClient {
   // ==================== AI Explainability Methods ====================
 
   /**
-   * Get model confidence statistics
+   * Получение статистики уверенности модели
    *
-   * Returns model confidence distribution and statistics including
-   * average confidence, confidence intervals, and distribution breakdown.
+   * Возвращает распределение уверенности модели и статистику, включая
+   * среднюю уверенность, доверительные интервалы и разбивку распределения.
    *
-   * @returns Model confidence statistics
-   * @throws ApiError if retrieval fails
+   * @returns Статистика уверенности модели
+   * @throws ApiError если получение данных не удалось
    *
    * @example
    * ```ts
@@ -374,9 +386,9 @@ export class AnalyticsClient {
    */
   async getModelConfidence(): Promise<ModelConfidenceResponse> {
     try {
-      const response = await this.apiClient
-        .getAxiosInstance()
-        .get<ModelConfidenceResponse>('/api/analytics/ai-explainability/confidence');
+      const response: AxiosResponse<ModelConfidenceResponse> = await this.client.get(
+        '/api/analytics/ai-explainability/confidence'
+      );
       return response.data;
     } catch (error) {
       throw this.transformError(error);
@@ -384,13 +396,13 @@ export class AnalyticsClient {
   }
 
   /**
-   * Get feature importance from the trained model
+   * Получение важности фичей из обученной модели
    *
-   * Returns feature importance scores for all ranking features,
-   * showing which factors most influence candidate rankings.
+   * Возвращает оценки важности фичей для всех фичей ранжирования,
+   * показывая какие факторы больше всего влияют на ранжирование кандидатов.
    *
-   * @returns Feature importance data with descriptions
-   * @throws ApiError if retrieval fails
+   * @returns Данные важности фичей с описаниями
+   * @throws ApiError если получение данных не удалось
    *
    * @example
    * ```ts
@@ -402,9 +414,9 @@ export class AnalyticsClient {
    */
   async getFeatureImportance(): Promise<FeatureImportanceResponse> {
     try {
-      const response = await this.apiClient
-        .getAxiosInstance()
-        .get<FeatureImportanceResponse>('/api/analytics/ai-explainability/feature-importance');
+      const response: AxiosResponse<FeatureImportanceResponse> = await this.client.get(
+        '/api/analytics/ai-explainability/feature-importance'
+      );
       return response.data;
     } catch (error) {
       throw this.transformError(error);
@@ -412,29 +424,27 @@ export class AnalyticsClient {
   }
 
   /**
-   * Get ranking rationale for a specific candidate
+   * Получение обоснования ранжирования для конкретного кандидата
    *
-   * Provides detailed explanation of why a candidate received their ranking,
-   * including feature contributions, strengths, weaknesses, and confidence interval.
+   * Предоставляет детальное объяснение того, почему кандидат получил свой ранг,
+   * включая вклады фичей, сильные и слабые стороны, и доверительный интервал.
    *
-   * @param candidateId - Candidate UUID
-   * @returns Detailed ranking rationale
-   * @throws ApiError if retrieval fails
+   * @param candidateId - UUID кандидата
+   * @returns Детальное обоснование ранжирования
+   * @throws ApiError если получение данных не удалось
    *
    * @example
    * ```ts
    * const rationale = await analyticsClient.getRankingRationale('candidate-uuid');
    * console.log(`Score: ${rationale.rank_score}`);
-   * console.log(`Narrative: ${rationale.narrative}`);
+   * console.log(`Summary: ${rationale.summary}`);
    * ```
    */
   async getRankingRationale(candidateId: string): Promise<RankingRationaleResponse> {
     try {
-      const response = await this.apiClient
-        .getAxiosInstance()
-        .get<RankingRationaleResponse>(
-          `/api/analytics/ai-explainability/ranking-rationale/${candidateId}`
-        );
+      const response: AxiosResponse<RankingRationaleResponse> = await this.client.get(
+        `/api/analytics/ai-explainability/ranking-rationale/${candidateId}`
+      );
       return response.data;
     } catch (error) {
       throw this.transformError(error);
@@ -442,16 +452,16 @@ export class AnalyticsClient {
   }
 
   /**
-   * Get model performance trends over time
+   * Получение трендов производительности модели во времени
    *
-   * Returns time-series performance metrics (accuracy, F1, NDCG) with
-   * trend analysis and aggregated statistics.
+   * Возвращает временные ряды метрик производительности (точность, F1, NDCG) с
+   * анализом трендов и агрегированной статистикой.
    *
-   * @param period - Time period for analysis ("7d", "30d", or "90d")
-   * @param startDate - Optional start date for filtering (ISO 8601 format)
-   * @param endDate - Optional end date for filtering (ISO 8601 format)
-   * @returns Performance trends with metrics and aggregates
-   * @throws ApiError if retrieval fails
+   * @param period - Период времени для анализа ("7d", "30d", или "90d")
+   * @param startDate - Опциональная дата начала для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная дата окончания для фильтрации (формат ISO 8601)
+   * @returns Тренды производительности с метриками и агрегатами
+   * @throws ApiError если получение данных не удалось
    *
    * @example
    * ```ts
@@ -472,11 +482,10 @@ export class AnalyticsClient {
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
 
-      const response = await this.apiClient
-        .getAxiosInstance()
-        .get<PerformanceTrendsResponse>('/api/analytics/ai-explainability/performance-trends', {
-          params,
-        });
+      const response: AxiosResponse<PerformanceTrendsResponse> = await this.client.get(
+        '/api/analytics/ai-explainability/performance-trends',
+        { params }
+      );
       return response.data;
     } catch (error) {
       throw this.transformError(error);
@@ -484,31 +493,58 @@ export class AnalyticsClient {
   }
 
   /**
-   * Transform unknown error to ApiError
+   * Преобразование ошибки Axios в стандартизированную ошибку API
+   *
+   * @param error - Ошибка Axios
+   * @returns Преобразованная ошибка API
    */
   private transformError(error: unknown): ApiError {
-    if (error && typeof error === 'object' && 'detail' in error) {
-      const apiError = error as { detail: string; status?: number };
+    const axiosError = error as AxiosError<{ detail?: string }>;
+
+    // Ошибка сети (нет ответа)
+    if (!axiosError.response) {
+      if (axiosError.code === 'ECONNABORTED') {
+        return {
+          detail: 'Таймаут запроса. Проверьте соединение и попробуйте снова.',
+          status: 408,
+        };
+      }
       return {
-        detail: apiError.detail,
-        status: apiError.status || 0,
+        detail: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
+        status: 0,
       };
     }
+
+    // Сервер вернул ошибку
+    const status = axiosError.response.status;
+    const data = axiosError.response.data;
+
+    // Используем сообщение об ошибке от сервера, если доступно
+    if (data?.detail) {
+      return { detail: data.detail, status };
+    }
+
+    // Сообщения об ошибках по умолчанию для разных кодов статуса
+    const defaultMessages: Record<number, string> = {
+      400: 'Неверный запрос. Проверьте введенные данные.',
+      401: 'Не авторизован. Войдите в систему.',
+      403: 'Доступ запрещен. У вас нет прав для выполнения этого действия.',
+      404: 'Данные не найдены.',
+      422: 'Ошибка валидации. Проверьте введенные данные.',
+      429: 'Слишком много запросов. Попробуйте позже.',
+      500: 'Ошибка сервера. Попробуйте позже.',
+      502: 'Ошибка шлюза. Попробуйте позже.',
+      503: 'Сервис недоступен. Попробуйте позже.',
+    };
+
     return {
-      detail: error instanceof Error ? error.message : 'An unknown error occurred',
-      status: 0,
+      detail: data?.detail || defaultMessages[status] || 'Произошла непредвиденная ошибка.',
+      status,
     };
   }
 }
 
 /**
- * Default analytics client instance
+ * Экземпляр клиента аналитики по умолчанию
  */
-export const analyticsClient = new AnalyticsClient(
-  new (require('./client').ApiClient)()
-);
-
-/**
- * Export analytics client class
- */
-export default AnalyticsClient;
+export const analyticsClient = new AnalyticsClient();
