@@ -43,6 +43,7 @@ from .organization_explanation_preferences import OrganizationExplanationPrefere
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
 from .diversity_metrics import DiversityMetrics, DiversityGoal
+from .pipeline_stage import PipelineStageTransition, PipelineStage, TransitionReason
 
 __all__ = [
     "Base",
@@ -102,4 +103,7 @@ __all__ = [
     "BuiltResume",
     "DiversityMetrics",
     "DiversityGoal",
+    "PipelineStageTransition",
+    "PipelineStage",
+    "TransitionReason",
 ]
