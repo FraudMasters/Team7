@@ -1006,3 +1006,205 @@ async def get_funnel_conversion(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Не удалось получить метрики конверсии воронки: {str(e)}",
         ) from e
+
+
+class DiversityMetricsResponse(BaseModel):
+    """Метрики разнообразия и инклюзивности в процессе найма."""
+
+    # Гендерное разнообразие
+    gender_distribution: dict = Field(..., description="Распределение кандидатов по гендеру")
+    gender_hire_rate: dict = Field(..., description="Коэффициент найма по гендеру")
+
+    # Возрастное разнообразие
+    age_distribution: dict = Field(..., description="Распределение кандидатов по возрастным группам")
+    age_hire_rate: dict = Field(..., description="Коэффициент найма по возрастным группам")
+
+    # Этническое разнообразие
+    ethnicity_distribution: dict = Field(..., description="Распределение кандидатов по этнической принадлежности")
+    ethnicity_hire_rate: dict = Field(..., description="Коэффициент найма по этнической принадлежности")
+
+    # Образовательное разнообразие
+    education_distribution: dict = Field(..., description="Распределение кандидатов по уровню образования")
+    education_hire_rate: dict = Field(..., description="Коэффициент найма по уровню образования")
+
+    # Метрики инклюзивности
+    diversity_index: float = Field(..., description="Индекс разнообразия (0-1, более высокий = более разнообразный)")
+    inclusion_score: float = Field(..., description="Оценка инклюзивности (0-1)")
+    bias_detection_score: float = Field(..., description="Оценка обнаружения предвзятости (0-1, ниже = меньше предвзятости)")
+
+    # Сводка
+    total_candidates: int = Field(..., description="Общее количество кандидатов")
+    total_hires: int = Field(..., description="Общее количество нанятых")
+
+
+@router.get(
+    "/diversity-metrics",
+    response_model=DiversityMetricsResponse,
+    tags=["Analytics"],
+)
+async def get_diversity_metrics(
+    start_date: Optional[str] = Query(None, description="Фильтр начальной даты (формат ISO 8601)"),
+    end_date: Optional[str] = Query(None, description="Фильтр конечной даты (формат ISO 8601)"),
+) -> JSONResponse:
+    """
+    Получить метрики разнообразия и инклюзивности в процессе найма.
+
+    Этот эндпоинт предоставляет метрики о разнообразии кандидатов и показатели инклюзивности
+    в процессе рекрутинга. Метрики включают гендерное, возрастное и этническое разнообразие,
+    а также образовательное разнообразие и оценки предвзятости. Эти данные помогают организациям
+    отслеживать и улучшать свои практики DEI (Diversity, Equity, and Inclusion).
+
+    Args:
+        start_date: Опциональная начальная дата для фильтрации метрик (формат ISO 8601)
+        end_date: Опциональная конечная дата для фильтрации метрик (формат ISO 8601)
+
+    Returns:
+        JSON ответ с метриками разнообразия, включая распределение по гендеру, возрасту, этнической принадлежности и образованию
+
+    Raises:
+        HTTPException(500): Если не удалось получить данные
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8006/api/analytics/diversity-metrics")
+        >>> response.json()
+        {
+            "gender_distribution": {
+                "Male": 450,
+                "Female": 420,
+                "Non-binary": 80,
+                "Prefer not to say": 50
+            },
+            "gender_hire_rate": {
+                "Male": 0.08,
+                "Female": 0.09,
+                "Non-binary": 0.10,
+                "Prefer not to say": 0.06
+            },
+            "age_distribution": {
+                "18-25": 200,
+                "26-35": 450,
+                "36-45": 250,
+                "46-55": 80,
+                "56+": 20
+            },
+            "age_hire_rate": {
+                "18-25": 0.07,
+                "26-35": 0.10,
+                "36-45": 0.08,
+                "46-55": 0.06,
+                "56+": 0.05
+            },
+            "ethnicity_distribution": {
+                "Asian": 300,
+                "Black": 180,
+                "Hispanic": 150,
+                "White": 320,
+                "Other": 50
+            },
+            "ethnicity_hire_rate": {
+                "Asian": 0.09,
+                "Black": 0.08,
+                "Hispanic": 0.07,
+                "White": 0.09,
+                "Other": 0.08
+            },
+            "education_distribution": {
+                "High School": 120,
+                "Bachelor": 520,
+                "Master": 280,
+                "PhD": 80
+            },
+            "education_hire_rate": {
+                "High School": 0.05,
+                "Bachelor": 0.09,
+                "Master": 0.10,
+                "PhD": 0.11
+            },
+            "diversity_index": 0.82,
+            "inclusion_score": 0.78,
+            "bias_detection_score": 0.15,
+            "total_candidates": 1000,
+            "total_hires": 90
+        }
+    """
+    try:
+        logger.info(
+            f"Получение метрик разнообразия - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # Возвращаем placeholder ответ
+        # Интеграция с базой данных будет добавлена в последующем подзадаче
+        response_data = {
+            "gender_distribution": {
+                "Male": 450,
+                "Female": 420,
+                "Non-binary": 80,
+                "Prefer not to say": 50,
+            },
+            "gender_hire_rate": {
+                "Male": 0.08,
+                "Female": 0.09,
+                "Non-binary": 0.10,
+                "Prefer not to say": 0.06,
+            },
+            "age_distribution": {
+                "18-25": 200,
+                "26-35": 450,
+                "36-45": 250,
+                "46-55": 80,
+                "56+": 20,
+            },
+            "age_hire_rate": {
+                "18-25": 0.07,
+                "26-35": 0.10,
+                "36-45": 0.08,
+                "46-55": 0.06,
+                "56+": 0.05,
+            },
+            "ethnicity_distribution": {
+                "Asian": 300,
+                "Black": 180,
+                "Hispanic": 150,
+                "White": 320,
+                "Other": 50,
+            },
+            "ethnicity_hire_rate": {
+                "Asian": 0.09,
+                "Black": 0.08,
+                "Hispanic": 0.07,
+                "White": 0.09,
+                "Other": 0.08,
+            },
+            "education_distribution": {
+                "High School": 120,
+                "Bachelor": 520,
+                "Master": 280,
+                "PhD": 80,
+            },
+            "education_hire_rate": {
+                "High School": 0.05,
+                "Bachelor": 0.09,
+                "Master": 0.10,
+                "PhD": 0.11,
+            },
+            "diversity_index": 0.82,
+            "inclusion_score": 0.78,
+            "bias_detection_score": 0.15,
+            "total_candidates": 1000,
+            "total_hires": 90,
+        }
+
+        logger.info("Метрики разнообразия успешно получены")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка получения метрик разнообразия: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось получить метрики разнообразия: {str(e)}",
+        ) from e
