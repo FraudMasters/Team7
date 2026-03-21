@@ -28,7 +28,6 @@ import type {
   HealthResponse,
   ApiClientConfig,
   ApiError,
-  LanguagePreferenceResponse,
 } from '@/types/api';
 
 /**
@@ -229,24 +228,6 @@ export class ApiClient {
   async post<T = unknown>(url: string, data?: unknown): Promise<AxiosResponse<T>> {
     try {
       return await this.client.post<T>(url, data);
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Update language preference
-   *
-   * @param language - Language code to set as preference
-   * @returns Language preference response
-   */
-  async updateLanguagePreference(language: string): Promise<LanguagePreferenceResponse> {
-    try {
-      const response: AxiosResponse<LanguagePreferenceResponse> = await this.client.post(
-        '/api/preferences/language',
-        { language }
-      );
-      return response.data;
     } catch (error) {
       throw this.transformError(error);
     }
