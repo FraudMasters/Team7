@@ -11,6 +11,7 @@ import re
 from typing import Dict, List, Optional, Union
 
 from .ats_simulation import evaluate_resume_ats, get_simple_ats_checker
+from .skill_gap_analyzer import SkillGapAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,18 @@ def generate_resume_optimization(
                 - visual_issues: List of visual/formatting issues
                 - suggestions: List of ATS improvement suggestions
                 - feedback: Detailed ATS feedback
+            - skill_gap_result: Dictionary with skill gap analysis results (if target_job_description and required_skills provided):
+                - candidate_skills: Skills extracted from resume
+                - required_skills: Skills required by job
+                - matched_skills: Skills that match requirements
+                - missing_skills: Required skills not found
+                - partial_match_skills: Skills present but at insufficient level
+                - missing_skill_details: Detailed info about each missing skill
+                - gap_severity: Overall severity (critical, moderate, minimal, none)
+                - gap_percentage: Percentage of required skills missing (0-100)
+                - bridgeability_score: Score indicating how easily gaps can be bridged (0-1)
+                - estimated_time_to_bridge: Estimated hours to bridge all gaps
+                - priority_ordering: Order of priority for addressing gaps
             - score: Overall optimization score (0-100)
             - error: Error message if analysis failed
 
@@ -204,6 +217,28 @@ def generate_resume_optimization(
         elif check_ats and not target_job_description:
             logger.info("ATS check skipped: no job description provided")
 
+        # 6. Skill gap analysis
+        skill_gap_result = None
+        if target_job_description and required_skills:
+            skill_gap_analysis = _analyze_skill_gaps(
+                resume_text,
+                resume_data,
+                target_job_description,
+                job_title,
+                required_skills
+            )
+            skill_gap_result = skill_gap_analysis.get("skill_gap_result")
+            skill_gap_suggestions = skill_gap_analysis.get("suggestions", [])
+            suggestions.extend(skill_gap_suggestions)
+            logger.info(
+                f"Skill gap analysis completed: "
+                f"{len(skill_gap_result.get('missing_skills', []) if skill_gap_result else [])} missing skills, "
+                f"severity={skill_gap_result.get('gap_severity', 'N/A') if skill_gap_result else 'N/A'}, "
+                f"{len(skill_gap_suggestions)} suggestions"
+            )
+        elif target_job_description and not required_skills:
+            logger.info("Skill gap analysis skipped: no required skills provided")
+
         # Count by priority
         high_priority = sum(1 for s in suggestions if s.get("priority") == "high")
         medium_priority = sum(1 for s in suggestions if s.get("priority") == "medium")
@@ -232,6 +267,7 @@ def generate_resume_optimization(
             "missing_keywords": missing_keywords if missing_keywords else None,
             "completeness": completeness_result,
             "ats_result": ats_result,
+            "skill_gap_result": skill_gap_result,
             "score": score,
             "error": None,
         }
@@ -976,6 +1012,166 @@ def _analyze_ats_compatibility(
 
     return {
         "ats_result": ats_result,
+        "suggestions": suggestions,
+    }
+
+
+def _analyze_skill_gaps(
+    resume_text: str,
+    resume_data: Optional[Dict[str, Union[str, List, Dict]]],
+    target_job_description: str,
+    job_title: Optional[str] = None,
+    required_skills: Optional[List[str]] = None,
+) -> Dict[str, Union[Dict, List[Dict[str, Union[str, List[str]]]]]]:
+    """
+    Analyze skill gaps using the SkillGapAnalyzer.
+
+    Args:
+        resume_text: Resume text content
+        resume_data: Optional structured resume data
+        target_job_description: Job description for skill matching
+        job_title: Job title for analysis
+        required_skills: List of required skills
+
+    Returns:
+        Dictionary with skill_gap_result and suggestions
+    """
+    suggestions = []
+    skill_gap_result = None
+
+    try:
+        # Extract candidate skills from resume_data
+        candidate_skills = []
+        if resume_data:
+            skills = resume_data.get("skills", [])
+            if isinstance(skills, list):
+                candidate_skills = skills
+            elif isinstance(skills, str):
+                # Extract skills from string
+                candidate_skills = [s.strip() for s in skills.split(",") if s.strip()]
+
+        # If no skills in resume_data, try to extract from resume_text
+        if not candidate_skills:
+            # Basic skill extraction from text
+            common_skills = [
+                "python", "java", "javascript", "typescript", "react", "angular", "vue",
+                "node", "django", "flask", "sql", "nosql", "mongodb", "postgresql",
+                "aws", "azure", "gcp", "docker", "kubernetes", "git", "ci/cd",
+                "agile", "scrum", "leadership", "communication", "teamwork",
+                "problem-solving", "analytical", "project management", "data analysis",
+                "machine learning", "ai", "deep learning", "nlp", "cloud",
+                "microservices", "api", "rest", "graphql", "testing", "devops"
+            ]
+            text_lower = resume_text.lower()
+            candidate_skills = [skill for skill in common_skills if skill in text_lower]
+
+        # Default job title if not provided
+        if not job_title:
+            job_title = "Position"
+
+        # Ensure we have required skills
+        if not required_skills:
+            required_skills = []
+
+        # Only analyze if we have both candidate and required skills
+        if candidate_skills and required_skills:
+            # Initialize skill gap analyzer
+            analyzer = SkillGapAnalyzer()
+
+            # Perform skill gap analysis
+            gap_result = analyzer.analyze(
+                resume_text=resume_text,
+                candidate_skills=candidate_skills,
+                job_title=job_title,
+                job_description=target_job_description,
+                required_skills=required_skills,
+            )
+
+            # Convert to dictionary
+            skill_gap_result = gap_result.to_dict()
+
+            # Generate suggestions based on skill gap analysis
+            if gap_result.missing_skills:
+                # Priority based on gap severity
+                priority_map = {
+                    "critical": "high",
+                    "moderate": "high",
+                    "minimal": "medium",
+                    "none": "low"
+                }
+                priority = priority_map.get(gap_result.gap_severity, "medium")
+
+                # Add missing skills suggestion
+                suggestions.append({
+                    "type": "skill",
+                    "priority": priority,
+                    "category": "skill_gaps",
+                    "title": f"Develop {len(gap_result.missing_skills)} missing skill(s)",
+                    "description": f"Your resume is missing {len(gap_result.missing_skills)} skill(s) "
+                                  f"required for this position. Gap severity: {gap_result.gap_severity}. "
+                                  f"Estimated time to bridge: {gap_result.estimated_time_to_bridge} hours.",
+                    "current_state": f"Missing {len(gap_result.missing_skills)} of "
+                                    f"{len(gap_result.required_skills)} required skills "
+                                    f"({gap_result.gap_percentage:.1f}% gap)",
+                    "recommendation": f"Focus on developing these skills: "
+                                     f"{', '.join(gap_result.priority_ordering[:5])}" +
+                                     ("..." if len(gap_result.priority_ordering) > 5 else ""),
+                    "examples": [
+                        f"Learn {skill} ({gap_result.missing_skill_details.get(skill, {}).get('required_level', 'intermediate')} level)"
+                        for skill in gap_result.priority_ordering[:3]
+                    ]
+                })
+
+            # Add suggestion for partial matches
+            if gap_result.partial_match_skills:
+                suggestions.append({
+                    "type": "skill",
+                    "priority": "medium",
+                    "category": "skill_improvement",
+                    "title": f"Improve {len(gap_result.partial_match_skills)} skill(s)",
+                    "description": f"You have {len(gap_result.partial_match_skills)} skill(s) that need "
+                                  f"to be improved to meet the required proficiency level.",
+                    "current_state": f"{len(gap_result.partial_match_skills)} skills at insufficient level",
+                    "recommendation": "Strengthen these skills to match job requirements",
+                    "examples": [
+                        f"Improve {skill} proficiency"
+                        for skill in gap_result.partial_match_skills[:3]
+                    ]
+                })
+
+            # Add positive feedback for good skill match
+            if gap_result.gap_severity == "none" or (
+                gap_result.matched_skills and len(gap_result.matched_skills) > len(gap_result.missing_skills)
+            ):
+                logger.info(
+                    f"Strong skill match: {len(gap_result.matched_skills)} matched skills, "
+                    f"gap severity: {gap_result.gap_severity}"
+                )
+
+        else:
+            logger.info("Skill gap analysis skipped: insufficient skill data")
+
+    except Exception as e:
+        logger.error(f"Error during skill gap analysis: {e}")
+        # Add generic suggestion
+        suggestions.append({
+            "type": "skill",
+            "priority": "medium",
+            "category": "skill_gaps",
+            "title": "Unable to analyze skill gaps",
+            "description": "Could not perform detailed skill gap analysis. "
+                          "Ensure your resume has a clear skills section.",
+            "current_state": "Skill gap analysis failed",
+            "recommendation": "Add or improve your skills section with relevant technologies and tools",
+            "examples": [
+                "Add a dedicated skills section",
+                "List technical skills explicitly",
+                "Include proficiency levels for key skills"
+            ]
+        })
+
+    return {
+        "skill_gap_result": skill_gap_result,
         "suggestions": suggestions,
     }
 
