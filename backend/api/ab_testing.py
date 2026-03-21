@@ -113,6 +113,34 @@ class RecordResultResponse(BaseModel):
     created_at: str = Field(..., description="Timestamp when result was recorded")
 
 
+class VariantStatistics(BaseModel):
+    """Statistics for a single variant."""
+
+    variant: str = Field(..., description="Variant identifier (a or b)")
+    total_matches: int = Field(..., description="Total number of matches for this variant")
+    outcomes: dict = Field(..., description="Breakdown of outcomes (hired/rejected/pending/shortlisted)")
+    hired_count: int = Field(..., description="Number of hired outcomes")
+    rejected_count: int = Field(..., description="Number of rejected outcomes")
+    pending_count: int = Field(..., description="Number of pending outcomes")
+    shortlisted_count: int = Field(..., description="Number of shortlisted outcomes")
+    conversion_rate: float = Field(..., description="Conversion rate (hired / total) as percentage")
+
+
+class ABTestResultsResponse(BaseModel):
+    """Response model for A/B test results and statistics."""
+
+    test_id: str = Field(..., description="A/B test ID")
+    test_name: str = Field(..., description="A/B test name")
+    status: str = Field(..., description="Current test status")
+    start_date: Optional[str] = Field(None, description="When the test started")
+    end_date: Optional[str] = Field(None, description="When the test ended")
+    variant_a: VariantStatistics = Field(..., description="Statistics for variant A")
+    variant_b: VariantStatistics = Field(..., description="Statistics for variant B")
+    total_results: int = Field(..., description="Total number of results across both variants")
+    winner: Optional[str] = Field(None, description="Winning variant based on conversion rate (if significant difference)")
+    improvement: Optional[float] = Field(None, description="Percentage improvement of winner over loser")
+
+
 # ============================================================================
 # API Endpoints
 # ============================================================================
@@ -552,4 +580,169 @@ async def record_result(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to record result: {str(e)}",
+        )
+
+
+@router.get("/{test_id}/results", response_model=ABTestResultsResponse)
+async def get_ab_test_results(
+    test_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get A/B test results and statistics.
+
+    This endpoint retrieves comprehensive statistics comparing variant A and variant B
+    performance, including outcome breakdowns, conversion rates, and determines if there
+    is a clear winner based on hiring success rates.
+
+    The conversion rate is calculated as (hired / total_matches) * 100 for each variant.
+    A winner is declared if one variant has a conversion rate at least 5 percentage points
+    higher than the other and has at least 10 total matches.
+
+    Args:
+        test_id: A/B test ID
+        db: Database session
+
+    Returns:
+        JSON response with test details and comparative statistics for both variants
+
+    Raises:
+        HTTPException(404): If test not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/ab-testing/test-123/results")
+        >>> response.json()
+        {
+            "test_id": "test-123",
+            "test_name": "Skills vs Experience Weight Test",
+            "status": "running",
+            "start_date": "2026-03-15T10:00:00",
+            "end_date": null,
+            "variant_a": {
+                "variant": "a",
+                "total_matches": 45,
+                "outcomes": {"hired": 12, "rejected": 18, "pending": 10, "shortlisted": 5},
+                "hired_count": 12,
+                "rejected_count": 18,
+                "pending_count": 10,
+                "shortlisted_count": 5,
+                "conversion_rate": 26.67
+            },
+            "variant_b": {
+                "variant": "b",
+                "total_matches": 48,
+                "outcomes": {"hired": 18, "rejected": 15, "pending": 10, "shortlisted": 5},
+                "hired_count": 18,
+                "rejected_count": 15,
+                "pending_count": 10,
+                "shortlisted_count": 5,
+                "conversion_rate": 37.50
+            },
+            "total_results": 93,
+            "winner": "b",
+            "improvement": 10.83
+        }
+    """
+    try:
+        test_uuid = UUID(test_id)
+
+        # Get test details
+        query = select(ABTest).where(ABTest.id == test_uuid)
+        result = await db.execute(query)
+        ab_test = result.scalar_one_or_none()
+
+        if not ab_test:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"A/B test {test_id} not found",
+            )
+
+        # Get all results for this test
+        results_query = select(ABTestResult).where(ABTestResult.ab_test_id == test_uuid)
+        results_result = await db.execute(results_query)
+        all_results = results_result.scalars().all()
+
+        # Calculate statistics for each variant
+        def calculate_variant_stats(variant: str, results: List[ABTestResult]) -> VariantStatistics:
+            variant_results = [r for r in results if r.variant_assigned == variant]
+            total = len(variant_results)
+
+            # Count outcomes
+            hired = sum(1 for r in variant_results if r.outcome == "hired")
+            rejected = sum(1 for r in variant_results if r.outcome == "rejected")
+            pending = sum(1 for r in variant_results if r.outcome == "pending")
+            shortlisted = sum(1 for r in variant_results if r.outcome == "shortlisted")
+
+            # Calculate conversion rate (hired / total)
+            conversion_rate = (hired / total * 100) if total > 0 else 0.0
+
+            outcomes = {
+                "hired": hired,
+                "rejected": rejected,
+                "pending": pending,
+                "shortlisted": shortlisted,
+            }
+
+            return VariantStatistics(
+                variant=variant,
+                total_matches=total,
+                outcomes=outcomes,
+                hired_count=hired,
+                rejected_count=rejected,
+                pending_count=pending,
+                shortlisted_count=shortlisted,
+                conversion_rate=round(conversion_rate, 2),
+            )
+
+        variant_a_stats = calculate_variant_stats("a", all_results)
+        variant_b_stats = calculate_variant_stats("b", all_results)
+
+        # Determine winner (if there's a significant difference)
+        # Consider a variant a winner if:
+        # 1. It has at least 10 matches
+        # 2. Its conversion rate is at least 5 percentage points higher
+        winner = None
+        improvement = None
+
+        min_matches = 10
+        min_improvement = 5.0
+
+        if variant_a_stats.total_matches >= min_matches and variant_b_stats.total_matches >= min_matches:
+            diff = variant_b_stats.conversion_rate - variant_a_stats.conversion_rate
+
+            if abs(diff) >= min_improvement:
+                if diff > 0:
+                    winner = "b"
+                    improvement = round(diff, 2)
+                else:
+                    winner = "a"
+                    improvement = round(abs(diff), 2)
+
+        logger.info(f"Retrieved results for A/B test {test_id} - Total: {len(all_results)}, Winner: {winner}")
+
+        return ABTestResultsResponse(
+            test_id=test_id,
+            test_name=ab_test.name,
+            status=ab_test.status.value,
+            start_date=ab_test.start_date.isoformat() if ab_test.start_date else None,
+            end_date=ab_test.end_date.isoformat() if ab_test.end_date else None,
+            variant_a=variant_a_stats,
+            variant_b=variant_b_stats,
+            total_results=len(all_results),
+            winner=winner,
+            improvement=improvement,
+        )
+
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid test ID format",
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving A/B test results for {test_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve A/B test results: {str(e)}",
         )
