@@ -3,6 +3,9 @@ export type { FeatureImportanceItem, FeatureImportanceChartProps } from './Featu
 
 export { default as FeatureRadarChart } from './FeatureRadarChart';
 
+export { default as InteractiveFeatureBreakdown } from './InteractiveFeatureBreakdown';
+export type { InteractiveFeature, InteractiveFeatureBreakdownProps, SubFeatureItem } from './InteractiveFeatureBreakdown';
+
 export { default as CandidateComparisonView } from './CandidateComparisonView';
 export type { CandidateComparisonViewProps } from './CandidateComparisonView';
 
