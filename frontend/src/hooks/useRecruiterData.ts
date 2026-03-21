@@ -87,16 +87,45 @@ export interface ReviewQueueFilters {
   limit?: number;
 }
 
+/**
+ * Time-to-hire performance metrics
+ */
+export interface TimeToHireMetrics {
+  average_days: number;
+  median_days: number;
+  min_days: number;
+  max_days: number;
+  percentile_25: number;
+  percentile_75: number;
+}
+
+/**
+ * Resume processing metrics
+ */
+export interface ResumeMetrics {
+  total_processed: number;
+  processed_this_month: number;
+  processed_this_week: number;
+  processing_rate_avg: number;
+}
+
+/**
+ * Skill matching performance metrics
+ */
+export interface MatchRateMetrics {
+  overall_match_rate: number;
+  high_confidence_matches: number;
+  low_confidence_matches: number;
+  average_confidence: number;
+}
+
+/**
+ * Key analytics metrics response from backend
+ */
 export interface AnalyticsMetrics {
-  time_to_hire: number;
-  applications_per_job: number;
-  source_performance?: Record<string, number>;
-  funnel_metrics?: {
-    views: number;
-    applications: number;
-    interviews: number;
-    offers: number;
-  };
+  time_to_hire: TimeToHireMetrics;
+  resumes: ResumeMetrics;
+  match_rates: MatchRateMetrics;
 }
 
 /**
