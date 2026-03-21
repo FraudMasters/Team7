@@ -472,45 +472,23 @@ class ElasticsearchService:
 
         # Full-text search with boolean query parser
         if query.query_string:
-            try:
-                # Parse boolean query syntax
-                parser = QueryParser()
-                parsed_query = parser.parse(query.query_string)
+            # Parse boolean query syntax
+            parser = QueryParser()
+            parsed_query = parser.parse(query.query_string)
 
-                if parsed_query and "query" in parsed_query:
-                    # Extract the query portion from the parsed result
-                    must_clauses.append(parsed_query["query"])
-                    logger.debug(f"Parsed boolean query: {query.query_string}")
-                else:
-                    # Fallback to simple multi_match if parsing returns None
-                    must_clauses.append(
-                        {
-                            "multi_match": {
-                                "query": query.query_string,
-                                "fields": [
-                                    "raw_text^2",  # Boost raw text
-                                    "skills^3",  # Boost skills more
-                                    "education",
-                                    "location",
-                                ],
-                                "type": "best_fields",
-                                "operator": "or",
-                            }
-                        }
-                    )
-            except ValueError as e:
-                # If query parsing fails, log error and fallback to simple search
-                logger.warning(
-                    f"Failed to parse boolean query '{query.query_string}': {e}. "
-                    f"Falling back to simple search."
-                )
+            if parsed_query and "query" in parsed_query:
+                # Extract the query portion from the parsed result
+                must_clauses.append(parsed_query["query"])
+                logger.debug(f"Parsed boolean query: {query.query_string}")
+            else:
+                # Empty query or None - use simple multi_match
                 must_clauses.append(
                     {
                         "multi_match": {
                             "query": query.query_string,
                             "fields": [
-                                "raw_text^2",
-                                "skills^3",
+                                "raw_text^2",  # Boost raw text
+                                "skills^3",  # Boost skills more
                                 "education",
                                 "location",
                             ],
