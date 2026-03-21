@@ -1,4 +1,4 @@
-#!/Users/fraud/Projects/agenthr/.auto-claude/worktrees/tasks/062-linkedin-sourcing-candidate-import/services/data_extractor/.venv/bin/python3
+#!/Users/fraud/Projects/agenthr/.auto-claude/worktrees/tasks/033-advanced-analytics-reporting-dashboard/services/data_extractor/.venv/bin/python3
 """A command line tool for extracting text and images from PDF and
 output it to plain text, html, xml or tags."""
 import argparse

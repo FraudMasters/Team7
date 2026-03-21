@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /Users/fraud/Projects/agenthr/.auto-claude/worktrees/tasks/062-linkedin-sourcing-candidate-import/agenthr-cli/.venv
+set -gx VIRTUAL_ENV /Users/fraud/Projects/agenthr/.auto-claude/worktrees/tasks/033-advanced-analytics-reporting-dashboard/agenthr-cli/.venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
