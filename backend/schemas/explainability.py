@@ -182,6 +182,18 @@ class RankingRationaleResponse(BaseModel):
     skills_match: SkillsMatchDetail = Field(
         ..., description="Detailed skills matching information"
     )
+    ranking_rationale: Optional[str] = Field(
+        None, description="Detailed explanation of why candidate ranked at this position (when detailed mode is enabled)"
+    )
+    strengths_analysis: Optional[list[str]] = Field(
+        None, description="Detailed analysis of candidate strengths (when detailed mode is enabled)"
+    )
+    improvement_areas: Optional[list[str]] = Field(
+        None, description="Detailed analysis of areas for improvement (when detailed mode is enabled)"
+    )
+    overall_assessment: Optional[str] = Field(
+        None, description="Overall assessment and summary (when detailed mode is enabled)"
+    )
 
 
 # =============================================================================

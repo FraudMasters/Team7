@@ -55,6 +55,10 @@ class ExplainRequest(BaseModel):
         True,
         description="Whether to use LLM for narrative generation (requires API key)"
     )
+    detailed: bool = Field(
+        False,
+        description="Whether to include detailed narrative sections (ranking_rationale, strengths_analysis, improvement_areas, overall_assessment)"
+    )
 
 
 class ExplainResponse(BaseModel):
@@ -83,6 +87,18 @@ class ExplainResponse(BaseModel):
     )
     percentile_explanation: str = Field(
         "", description="Natural language percentile comparison explanation"
+    )
+    ranking_rationale: Optional[str] = Field(
+        None, description="Detailed explanation of why candidate ranked at this position (detailed mode)"
+    )
+    strengths_analysis: Optional[List[str]] = Field(
+        None, description="Detailed analysis of candidate strengths (detailed mode)"
+    )
+    improvement_areas: Optional[List[str]] = Field(
+        None, description="Detailed analysis of areas for improvement (detailed mode)"
+    )
+    overall_assessment: Optional[str] = Field(
+        None, description="Overall assessment and summary (detailed mode)"
     )
     provider: str = Field(..., description="LLM provider used")
     model: str = Field(..., description="Model name used")
@@ -319,6 +335,26 @@ async def explain_ranking(
             use_llm=use_llm,
         )
 
+        # Generate detailed narrative if requested
+        detailed_narrative = None
+        if request.detailed and use_llm:
+            logger.info("Generating detailed narrative sections")
+            try:
+                detailed_narrative = await generator.generate_detailed_narrative(
+                    candidate_name=resume.filename or None,
+                    rank_score=float(ranking.rank_score),
+                    rank_position=ranking.rank_position,
+                    feature_contributions=ranking.feature_contributions or {},
+                    ranking_factors=ranking.ranking_factors or {},
+                    job_title=vacancy.title,
+                    job_description=vacancy.description or "",
+                    recommendation=ranking.recommendation or "good",
+                    all_candidate_scores=all_candidate_scores,
+                )
+            except Exception as e:
+                logger.warning(f"Detailed narrative generation failed: {e}")
+                # Continue without detailed narrative
+
         # Build response
         response_data = {
             "resume_id": request.resume_id,
@@ -339,6 +375,10 @@ async def explain_ranking(
             "highlight_sections": explanation.highlight_sections,
             "percentile_rank": explanation.percentile_rank,
             "percentile_explanation": explanation.percentile_explanation,
+            "ranking_rationale": detailed_narrative.get("ranking_rationale") if detailed_narrative else None,
+            "strengths_analysis": detailed_narrative.get("strengths_analysis") if detailed_narrative else None,
+            "improvement_areas": detailed_narrative.get("improvement_areas") if detailed_narrative else None,
+            "overall_assessment": detailed_narrative.get("overall_assessment") if detailed_narrative else None,
             "provider": explanation.provider,
             "model": explanation.model,
             "generated_at": explanation.generated_at,
