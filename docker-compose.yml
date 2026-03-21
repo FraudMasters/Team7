@@ -5,6 +5,7 @@ x-backend-common-env: &backend-common-env
   REDIS_URL: redis://redis:6379/0
   CELERY_BROKER_URL: redis://redis:6379/0
   CELERY_RESULT_BACKEND: redis://redis:6379/0
+  ELASTICSEARCH_URL: http://elasticsearch:9200
   MODELS_CACHE_PATH: /app/models_cache
   PYTHONPATH: /app:/app/services
   # Hugging Face optimizations
