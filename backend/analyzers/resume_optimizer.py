@@ -5,9 +5,12 @@ This module provides functions to analyze resumes and generate optimization
 recommendations including keyword analysis, formatting suggestions, and
 content improvements.
 """
+import asyncio
 import logging
 import re
 from typing import Dict, List, Optional, Union
+
+from .ats_simulation import evaluate_resume_ats, get_simple_ats_checker
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +26,15 @@ def generate_resume_optimization(
     resume_data: Optional[Dict[str, Union[str, List, Dict]]] = None,
     *,
     target_job_description: Optional[str] = None,
+    job_title: Optional[str] = None,
+    required_skills: Optional[List[str]] = None,
     check_keywords: bool = True,
     check_formatting: bool = True,
     check_content: bool = True,
+    check_ats: bool = True,
     min_keyword_density: float = MIN_KEYWORD_DENSITY,
     min_action_verbs: int = MIN_ACTION_VERBS,
-) -> Dict[str, Optional[Union[List[Dict[str, Union[str, List[str]]]], str, int]]]:
+) -> Dict[str, Optional[Union[List[Dict[str, Union[str, List[str]]]], str, int, float, Dict]]]:
     """
     Generate optimization suggestions for a resume.
 
@@ -36,6 +42,7 @@ def generate_resume_optimization(
     - Keyword analysis and missing keywords detection
     - Formatting recommendations (structure, length, sections)
     - Content improvements (action verbs, quantifiable achievements, clarity)
+    - ATS compatibility checks and scoring
 
     Args:
         resume_text: Raw resume text content
@@ -46,18 +53,21 @@ def generate_resume_optimization(
             - contact: Dict with email, phone, linked_in, etc.
             - summary: Professional summary or objective
         target_job_description: Optional job description to compare against for keyword matching
+        job_title: Optional job title for ATS evaluation
+        required_skills: Optional list of required skills for ATS evaluation
         check_keywords: Whether to perform keyword analysis
         check_formatting: Whether to provide formatting recommendations
         check_content: Whether to provide content improvement suggestions
+        check_ats: Whether to perform ATS compatibility check (requires target_job_description)
         min_keyword_density: Minimum keyword density threshold (0.0-1.0)
         min_action_verbs: Minimum recommended action verbs count
 
     Returns:
         Dictionary containing:
             - suggestions: List of optimization suggestions with:
-                - type: Suggestion type (keyword, formatting, content)
+                - type: Suggestion type (keyword, formatting, content, ats)
                 - priority: Priority level (high, medium, low)
-                - category: Category (e.g., 'keywords', 'structure', 'action_verbs')
+                - category: Category (e.g., 'keywords', 'structure', 'action_verbs', 'ats')
                 - title: Short suggestion title
                 - description: Detailed suggestion description
                 - current_state: Current state description
@@ -74,6 +84,17 @@ def generate_resume_optimization(
                 - missing_sections: List of missing section names
                 - present_sections: List of present section names
                 - suggestions: List of completeness-related suggestions
+            - ats_result: Dictionary with ATS evaluation results (if check_ats=True):
+                - passed: Whether resume passes ATS threshold
+                - overall_score: Overall ATS score (0-1)
+                - keyword_score: Keyword matching score (0-1)
+                - experience_score: Experience relevance score (0-1)
+                - education_score: Education match score (0-1)
+                - fit_score: Overall fit score (0-1)
+                - ats_issues: List of ATS-specific issues
+                - visual_issues: List of visual/formatting issues
+                - suggestions: List of ATS improvement suggestions
+                - feedback: Detailed ATS feedback
             - score: Overall optimization score (0-100)
             - error: Error message if analysis failed
 
@@ -162,6 +183,27 @@ def generate_resume_optimization(
             f"{len(completeness_suggestions)} suggestions"
         )
 
+        # 5. ATS compatibility check
+        ats_result = None
+        if check_ats and target_job_description:
+            ats_analysis = _analyze_ats_compatibility(
+                resume_text,
+                resume_data,
+                target_job_description,
+                job_title,
+                required_skills
+            )
+            ats_result = ats_analysis.get("ats_result")
+            ats_suggestions = ats_analysis.get("suggestions", [])
+            suggestions.extend(ats_suggestions)
+            logger.info(
+                f"ATS analysis completed: passed={ats_result.get('passed') if ats_result else 'N/A'}, "
+                f"score={ats_result.get('overall_score', 0):.2f}, "
+                f"{len(ats_suggestions)} suggestions"
+            )
+        elif check_ats and not target_job_description:
+            logger.info("ATS check skipped: no job description provided")
+
         # Count by priority
         high_priority = sum(1 for s in suggestions if s.get("priority") == "high")
         medium_priority = sum(1 for s in suggestions if s.get("priority") == "medium")
@@ -189,6 +231,7 @@ def generate_resume_optimization(
             "keywords_found": keywords_found if keywords_found else None,
             "missing_keywords": missing_keywords if missing_keywords else None,
             "completeness": completeness_result,
+            "ats_result": ats_result,
             "score": score,
             "error": None,
         }
@@ -773,6 +816,166 @@ def _analyze_completeness(
         "score": completeness_score,
         "missing_sections": missing_sections,
         "present_sections": present_sections,
+        "suggestions": suggestions,
+    }
+
+
+def _analyze_ats_compatibility(
+    resume_text: str,
+    resume_data: Optional[Dict[str, Union[str, List, Dict]]],
+    target_job_description: str,
+    job_title: Optional[str] = None,
+    required_skills: Optional[List[str]] = None,
+) -> Dict[str, Union[Dict, List[Dict[str, Union[str, List[str]]]]]]:
+    """
+    Analyze resume ATS compatibility using the ATS simulation module.
+
+    Args:
+        resume_text: Resume text content
+        resume_data: Optional structured resume data
+        target_job_description: Job description for ATS matching
+        job_title: Job title for evaluation
+        required_skills: List of required skills
+
+    Returns:
+        Dictionary with ats_result and suggestions
+    """
+    suggestions = []
+    ats_result = None
+
+    try:
+        # Extract required skills if not provided
+        if not required_skills and resume_data:
+            skills = resume_data.get("skills", [])
+            if isinstance(skills, list):
+                required_skills = skills[:10]  # Limit to top 10
+            elif isinstance(skills, str):
+                # Extract skills from string
+                required_skills = [s.strip() for s in skills.split(",") if s.strip()][:10]
+
+        # Default required skills if still empty
+        if not required_skills:
+            required_skills = ["communication", "teamwork", "problem-solving"]
+
+        # Default job title if not provided
+        if not job_title:
+            job_title = "Position"
+
+        # Run ATS evaluation (synchronously)
+        try:
+            # Try async evaluation first
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        ats_score_result = loop.run_until_complete(
+            evaluate_resume_ats(
+                resume_text=resume_text,
+                job_title=job_title,
+                job_description=target_job_description,
+                required_skills=required_skills,
+                use_llm=False,  # Use rule-based for faster response
+            )
+        )
+
+        # Convert ATSScoreResult to dictionary
+        ats_result = ats_score_result.to_dict()
+
+        # Generate suggestions based on ATS result
+        if not ats_score_result.passed:
+            suggestions.append({
+                "type": "ats",
+                "priority": "high",
+                "category": "ats_compatibility",
+                "title": "Improve ATS compatibility",
+                "description": f"Your resume has an ATS score of {ats_score_result.overall_score:.1%}. "
+                              f"Many companies use ATS systems to filter resumes, so improving "
+                              f"your score can increase your chances of getting noticed.",
+                "current_state": f"ATS score: {ats_score_result.overall_score:.1%}",
+                "recommendation": "Address the ATS issues identified below to improve your score",
+                "examples": ats_score_result.suggestions[:3] if ats_score_result.suggestions else []
+            })
+
+        # Add keyword-specific suggestions from ATS
+        if ats_score_result.missing_keywords:
+            suggestions.append({
+                "type": "ats",
+                "priority": "high" if len(ats_score_result.missing_keywords) > 5 else "medium",
+                "category": "ats_keywords",
+                "title": "Add ATS-critical keywords",
+                "description": f"The ATS identified {len(ats_score_result.missing_keywords)} "
+                              f"missing keyword(s) that are important for this job posting.",
+                "current_state": f"Missing {len(ats_score_result.missing_keywords)} ATS keywords",
+                "recommendation": f"Add these keywords: {', '.join(ats_score_result.missing_keywords[:5])}" +
+                                ("..." if len(ats_score_result.missing_keywords) > 5 else ""),
+                "examples": [
+                    f"Include '{kw}' in your skills or experience sections"
+                    for kw in ats_score_result.missing_keywords[:3]
+                ]
+            })
+
+        # Add formatting suggestions from ATS
+        if ats_score_result.visual_issues:
+            suggestions.append({
+                "type": "ats",
+                "priority": "medium",
+                "category": "ats_formatting",
+                "title": "Fix ATS formatting issues",
+                "description": f"The ATS detected {len(ats_score_result.visual_issues)} "
+                              f"formatting issue(s) that may affect parsing.",
+                "current_state": f"{len(ats_score_result.visual_issues)} visual/formatting issues",
+                "recommendation": "Address these formatting issues for better ATS parsing",
+                "examples": ats_score_result.visual_issues[:3]
+            })
+
+        # Add ATS-specific issues
+        if ats_score_result.ats_issues:
+            suggestions.append({
+                "type": "ats",
+                "priority": "high" if ats_score_result.disqualified else "medium",
+                "category": "ats_issues",
+                "title": "Address ATS-specific concerns",
+                "description": f"The ATS identified {len(ats_score_result.ats_issues)} "
+                              f"concern(s) that may impact your application.",
+                "current_state": f"{len(ats_score_result.ats_issues)} ATS issues found",
+                "recommendation": "Review and address these ATS-specific issues",
+                "examples": ats_score_result.ats_issues[:3]
+            })
+
+        # Add positive feedback if passed
+        if ats_score_result.passed and ats_score_result.overall_score >= 0.8:
+            logger.info(
+                f"Resume passed ATS check with strong score: {ats_score_result.overall_score:.1%}"
+            )
+
+        logger.info(
+            f"ATS compatibility analysis complete: score={ats_score_result.overall_score:.2f}, "
+            f"passed={ats_score_result.passed}, {len(suggestions)} suggestions generated"
+        )
+
+    except Exception as e:
+        logger.error(f"ATS compatibility analysis failed: {e}")
+        # Add a suggestion about ATS check failure
+        suggestions.append({
+            "type": "ats",
+            "priority": "low",
+            "category": "ats_error",
+            "title": "ATS check unavailable",
+            "description": "Unable to perform full ATS compatibility check. "
+                          "Ensure your resume follows standard formatting.",
+            "current_state": "ATS analysis failed",
+            "recommendation": "Follow ATS best practices: use standard fonts, avoid images/tables, "
+                            "include relevant keywords",
+            "examples": [
+                "Use standard section headings (Experience, Education, Skills)",
+                "Avoid complex formatting, tables, or images",
+                "Include keywords from the job description"
+            ]
+        })
+
+    return {
+        "ats_result": ats_result,
         "suggestions": suggestions,
     }
 
