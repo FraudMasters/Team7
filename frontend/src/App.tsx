@@ -41,12 +41,6 @@ import { SettingsPage } from './pages/jobs/SettingsPage';
 import { ResumeOptimizationPage } from './pages/jobs/ResumeOptimizationPage';
 import { ResumeBuilderPage } from './pages/jobs/ResumeBuilderPage';
 
-// Candidate Portal Pages
-import { CandidatePortalDashboard } from './pages/jobs/CandidatePortalDashboard';
-import { DocumentsPage } from './pages/jobs/DocumentsPage';
-import { InterviewSchedulingPage } from './pages/jobs/InterviewSchedulingPage';
-import CommunicationHistoryPage from './pages/jobs/CommunicationHistoryPage';
-
 // Recruiter Pages
 import { DashboardPage } from './pages/recruiter/DashboardPage';
 import { CandidatesKanbanPage } from './pages/recruiter/CandidatesKanbanPage';
@@ -78,10 +72,9 @@ import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
-import ReportBuilderPage from './pages/recruiter/ReportBuilderPage';
 
-// Agency Pages
-import { AgencyDashboardPage, ClientManagementPage, BillingDashboardPage } from './pages';
+// Candidate Pages
+import AppealPortal from './pages/candidate/AppealPortal';
 
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
@@ -195,12 +188,9 @@ function App() {
           <Route index element={<JobSeekerProfilePage />} />
         </Route>
 
-        {/* Candidate Portal */}
-        <Route path="/candidate" element={<JobSeekerLayout />}>
-          <Route path="dashboard" element={<CandidatePortalDashboard />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="interviews" element={<InterviewSchedulingPage />} />
-          <Route path="communications" element={<CommunicationHistoryPage />} />
+        {/* Candidate Routes */}
+        <Route path="/candidate">
+          <Route path="appeal" element={<AppealPortal />} />
         </Route>
 
         {/* Recruiter Flow - Protected with role-based access control */}
@@ -228,16 +218,8 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
-          <Route path="analytics/reports/builder" element={<ReportBuilderPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
-        </Route>
-
-        {/* Agency Flow - Multi-tenant agency management */}
-        <Route path="/agency" element={<ProtectedRecruiterLayout />}>
-          <Route path="dashboard" element={<AgencyDashboardPage />} />
-          <Route path="clients" element={<ClientManagementPage />} />
-          <Route path="billing" element={<BillingDashboardPage />} />
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}
