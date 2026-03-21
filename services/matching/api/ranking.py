@@ -34,13 +34,43 @@ class RankingWeights(BaseModel):
     """Custom weights for ranking criteria."""
 
     skill_match_weight: float = Field(
-        0.5, description="Weight for skill match percentage (0.0-1.0)", ge=0, le=1
+        0.25, description="Weight for skill match percentage (0.0-1.0)", ge=0, le=1
     )
     experience_weight: float = Field(
-        0.3, description="Weight for experience match (0.0-1.0)", ge=0, le=1
+        0.15, description="Weight for experience match (0.0-1.0)", ge=0, le=1
+    )
+    education_weight: float = Field(
+        0.10, description="Weight for education match (0.0-1.0)", ge=0, le=1
+    )
+    location_weight: float = Field(
+        0.05, description="Weight for location match (0.0-1.0)", ge=0, le=1
+    )
+    keyword_weight: float = Field(
+        0.10, description="Weight for keyword matching (0.0-1.0)", ge=0, le=1
+    )
+    tfidf_weight: float = Field(
+        0.10, description="Weight for TF-IDF similarity (0.0-1.0)", ge=0, le=1
+    )
+    vector_weight: float = Field(
+        0.10, description="Weight for vector similarity (0.0-1.0)", ge=0, le=1
     )
     recency_weight: float = Field(
-        0.2, description="Weight for resume recency (0.0-1.0)", ge=0, le=1
+        0.05, description="Weight for resume recency (0.0-1.0)", ge=0, le=1
+    )
+    culture_fit_weight: float = Field(
+        0.05, description="Weight for culture fit (0.0-1.0)", ge=0, le=1
+    )
+    salary_match_weight: float = Field(
+        0.02, description="Weight for salary match (0.0-1.0)", ge=0, le=1
+    )
+    availability_weight: float = Field(
+        0.01, description="Weight for availability match (0.0-1.0)", ge=0, le=1
+    )
+    certifications_weight: float = Field(
+        0.01, description="Weight for certifications match (0.0-1.0)", ge=0, le=1
+    )
+    industry_experience_weight: float = Field(
+        0.01, description="Weight for industry experience (0.0-1.0)", ge=0, le=1
     )
 
 
@@ -159,7 +189,17 @@ async def rank_resumes(
         total_weight = (
             weights.skill_match_weight +
             weights.experience_weight +
-            weights.recency_weight
+            weights.education_weight +
+            weights.location_weight +
+            weights.keyword_weight +
+            weights.tfidf_weight +
+            weights.vector_weight +
+            weights.recency_weight +
+            weights.culture_fit_weight +
+            weights.salary_match_weight +
+            weights.availability_weight +
+            weights.certifications_weight +
+            weights.industry_experience_weight
         )
         if abs(total_weight - 1.0) > 0.1:
             logger.warning(
@@ -168,7 +208,17 @@ async def rank_resumes(
             # Normalize weights
             weights.skill_match_weight /= total_weight
             weights.experience_weight /= total_weight
+            weights.education_weight /= total_weight
+            weights.location_weight /= total_weight
+            weights.keyword_weight /= total_weight
+            weights.tfidf_weight /= total_weight
+            weights.vector_weight /= total_weight
             weights.recency_weight /= total_weight
+            weights.culture_fit_weight /= total_weight
+            weights.salary_match_weight /= total_weight
+            weights.availability_weight /= total_weight
+            weights.certifications_weight /= total_weight
+            weights.industry_experience_weight /= total_weight
 
         # Get vacancy data or use cached match results
         vacancy_data = request.vacancy_data
