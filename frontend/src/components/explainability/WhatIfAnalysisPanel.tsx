@@ -27,7 +27,9 @@ import {
   Psychology as PsychologyIcon,
   Info as InfoIcon,
   CheckCircle as CheckIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
+import { Autocomplete, TextField } from '@mui/material';
 import { explainability } from '@/api/explainability';
 import type {
   WhatIfAnalysisResponse,
@@ -69,8 +71,12 @@ interface WhatIfAnalysisPanelProps {
   vacancyId: string;
   /** Original ranking score for comparison */
   originalScore?: number;
+  /** Original ranking position */
+  originalRank?: number;
   /** Original recommendation level */
   originalRecommendation?: string;
+  /** Vacancy required skills for skill addition dropdown */
+  vacancySkills?: string[];
   /** Callback when analysis completes */
   onAnalysisComplete?: (result: WhatIfAnalysisResponse) => void;
   /** API endpoint URL (optional, uses default if not provided) */
@@ -170,7 +176,9 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
   resumeId,
   vacancyId,
   originalScore,
+  originalRank,
   originalRecommendation,
+  vacancySkills = [],
   onAnalysisComplete,
   apiUrl = '/api/explainability/what-if',
 }) => {
@@ -182,6 +190,9 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
   // Feature adjustment values
   const [adjustments, setAdjustments] = useState<AvailableAdjustments>({});
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+
+  // Skill addition state
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
   /**
    * Fetch what-if analysis from backend
@@ -222,6 +233,24 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
   };
 
   /**
+   * Update skills match ratio when skills are added/removed
+   */
+  useEffect(() => {
+    if (selectedSkills.length > 0 && vacancySkills.length > 0) {
+      // Each skill added increases match ratio by ~10%
+      const skillBoost = (selectedSkills.length * 0.10);
+      setAdjustments((prev) => ({
+        ...prev,
+        skills_match_ratio: Math.min(skillBoost, 0.3),
+      }));
+    } else if (selectedSkills.length === 0 && adjustments.skills_match_ratio !== undefined) {
+      // Remove skills_match_ratio if no skills selected
+      const { skills_match_ratio, ...rest } = adjustments;
+      setAdjustments(rest);
+    }
+  }, [selectedSkills, vacancySkills]);
+
+  /**
    * Debounced analysis fetch
    */
   useEffect(() => {
@@ -240,6 +269,14 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
       ...prev,
       [featureName]: value,
     }));
+    setSelectedPreset('');
+  };
+
+  /**
+   * Handle skill selection change
+   */
+  const handleSkillsChange = (_event: React.SyntheticEvent, value: string[]) => {
+    setSelectedSkills(value);
     setSelectedPreset('');
   };
 
@@ -287,6 +324,7 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
   const handleReset = () => {
     setAdjustments({});
     setSelectedPreset('');
+    setSelectedSkills([]);
     setResult(null);
     setError(null);
   };
@@ -373,7 +411,7 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={handleReset}
-              disabled={Object.keys(adjustments).length === 0}
+              disabled={Object.keys(adjustments).length === 0 && selectedSkills.length === 0}
               size="small"
             >
               {t('whatIfAnalysis.reset')}
@@ -383,7 +421,7 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
 
         {/* Score Comparison Cards */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
                 <Typography variant="caption" color="text.secondary" gutterBottom>
@@ -404,7 +442,7 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Card
               variant="outlined"
               sx={{
@@ -450,7 +488,7 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Card
               variant="outlined"
               sx={{
@@ -482,6 +520,52 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
               </CardContent>
             </Card>
           </Grid>
+
+          {/* Rank Change Card */}
+          {originalRank !== undefined && (
+            <Grid item xs={12} sm={3}>
+              <Card
+                variant="outlined"
+                sx={{
+                  borderColor: scoreDelta > 0 ? 'success.main' : scoreDelta < 0 ? 'error.main' : 'divider',
+                }}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    {t('whatIfAnalysis.predictedRank')}
+                  </Typography>
+                  {result ? (
+                    <>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                        <Typography variant="h4" fontWeight={700} color="primary.main">
+                          #{originalRank}
+                        </Typography>
+                        {scoreDelta !== 0 && (
+                          <>
+                            <Typography variant="h6" color="text.secondary">→</Typography>
+                            <Typography
+                              variant="h4"
+                              fontWeight={700}
+                              color={scoreDelta > 0 ? 'success.main' : scoreDelta < 0 ? 'error.main' : 'text.primary'}
+                            >
+                              #{Math.max(1, Math.round(originalRank - (scoreDelta * 10)))}
+                            </Typography>
+                          </>
+                        )}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {scoreDelta > 0 ? t('whatIfAnalysis.rankImprovement') : scoreDelta < 0 ? t('whatIfAnalysis.rankDrop') : t('whatIfAnalysis.noRankChange')}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="h4" color="text.secondary">
+                      #{originalRank}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
 
         {/* Preset Scenarios */}
@@ -548,6 +632,56 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           {t('whatIfAnalysis.adjustments.description')}
         </Typography>
+
+        {/* Skill Addition Dropdown */}
+        {vacancySkills.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" fontWeight={500} gutterBottom>
+              {t('whatIfAnalysis.skillAddition.title')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              {t('whatIfAnalysis.skillAddition.description')}
+            </Typography>
+            <Autocomplete
+              multiple
+              id="skill-addition-dropdown"
+              options={vacancySkills}
+              value={selectedSkills}
+              onChange={handleSkillsChange}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  variant="outlined"
+                  placeholder={t('whatIfAnalysis.skillAddition.placeholder')}
+                  size="small"
+                />
+              )}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip
+                    label={option}
+                    {...getTagProps({ index })}
+                    size="small"
+                    color="primary"
+                    variant="filled"
+                    icon={<AddIcon />}
+                  />
+                ))
+              }
+              disabled={loading}
+              sx={{ mb: 2 }}
+            />
+            {selectedSkills.length > 0 && (
+              <Alert severity="info" variant="outlined">
+                <Typography variant="body2">
+                  {t('whatIfAnalysis.skillAddition.impact', { count: selectedSkills.length })}
+                </Typography>
+              </Alert>
+            )}
+          </Box>
+        )}
+
+        <Divider sx={{ my: 3 }} />
 
         <Stack spacing={3}>
           {FEATURE_ADJUSTMENTS.map((feature) => {

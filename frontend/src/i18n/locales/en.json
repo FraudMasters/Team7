@@ -992,8 +992,18 @@
     "originalScore": "Original Score",
     "adjustedScore": "Adjusted Score",
     "scoreChange": "Score Change",
+    "predictedRank": "Predicted Rank",
+    "rankImprovement": "Rank improved",
+    "rankDrop": "Rank decreased",
+    "noRankChange": "No rank change",
     "changeFromOriginal": "from original",
     "updating": "Updating analysis...",
+    "skillAddition": {
+      "title": "Add Skills to Resume",
+      "description": "Select skills from the vacancy requirements to see how they would improve the candidate's ranking",
+      "placeholder": "Select skills to add...",
+      "impact": "Adding {{count}} skill(s) will increase the skills match ratio"
+    },
     "presets": {
       "title": "Quick Scenarios",
       "description": "Click a preset to see how different changes would affect the ranking",
