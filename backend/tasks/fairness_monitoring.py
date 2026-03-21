@@ -1021,6 +1021,7 @@ def monitor_fairness(
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Storing metrics")
 
         violations_detected = len(violating_vacancies)
+        alerts_sent = 0
         for violation_info in violating_vacancies:
             vac_id = violation_info["vacancy_id"]
             demo_group = violation_info["demographic_group"]
@@ -1035,6 +1036,29 @@ def monitor_fairness(
 
             # FairnessMetrics and FairnessAlert records are already stored
             # by the FairnessCalculator.analyze_vacancy_fairness() method above
+
+            # Send notification alert for this violation
+            try:
+                violation_details = {
+                    "demographic_group": demo_group,
+                    "violation": violation,
+                    "current_metrics": violation_info["current_metrics"],
+                    "detected_at": datetime.utcnow().isoformat(),
+                }
+
+                # Trigger async notification task
+                send_fairness_alert.delay(vac_id, violation_details)
+                alerts_sent += 1
+
+                logger.info(
+                    f"Triggered fairness alert notification for vacancy {vac_id}, "
+                    f"demographic_group={demo_group}, severity={severity}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to trigger fairness alert notification for vacancy {vac_id}: {e}",
+                    exc_info=True
+                )
 
         # Step 6: Generate monitoring report
         current_step += 1
@@ -1053,6 +1077,7 @@ def monitor_fairness(
         result = {
             "vacancies_checked": vacancies_checked,
             "violations_detected": violations_detected,
+            "alerts_sent": alerts_sent,
             "violating_vacancies": violating_vacancies,
             "demographic_groups_analyzed": demographic_groups,
             "monitoring_time_ms": processing_time_ms,
@@ -1062,7 +1087,7 @@ def monitor_fairness(
 
         logger.info(
             f"Fairness monitoring completed: {vacancies_checked} vacancies checked, "
-            f"{violations_detected} violations detected in {processing_time_ms}ms"
+            f"{violations_detected} violations detected, {alerts_sent} alerts sent in {processing_time_ms}ms"
         )
 
         return result
