@@ -251,6 +251,44 @@ export interface PerformanceTrendsResponse {
   total_evaluations: number;
 }
 
+// ==================== Recruiting Analytics Types ====================
+
+/**
+ * Funnel stage metrics - matches API FunnelStageMetrics structure
+ */
+export interface FunnelStageMetrics {
+  stage_name: string;
+  count: number;
+  conversion_rate_from_previous: number | null;
+  conversion_rate_from_start: number;
+}
+
+/**
+ * Funnel metrics response - matches API FunnelMetricsResponse structure
+ */
+export interface FunnelMetricsResponse {
+  stages: FunnelStageMetrics[];
+  total_candidates: number;
+}
+
+/**
+ * Source metrics - matches API SourceMetrics structure
+ */
+export interface SourceMetrics {
+  source: string;
+  candidate_count: number;
+  conversion_rate: number;
+  hired_count: number;
+}
+
+/**
+ * Source tracking response - matches API SourceTrackingResponse structure
+ */
+export interface SourceTrackingResponse {
+  sources: SourceMetrics[];
+  total_candidates: number;
+}
+
 /**
  * Конфигурация по умолчанию для клиента аналитики
  */
@@ -484,6 +522,87 @@ export class AnalyticsClient {
 
       const response: AxiosResponse<PerformanceTrendsResponse> = await this.client.get(
         '/api/analytics/ai-explainability/performance-trends',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== Recruiting Analytics Methods ====================
+
+  /**
+   * Получение метрик визуализации воронки найма
+   *
+   * Возвращает метрики воронки найма, показывая количество кандидатов
+   * на каждом этапе и коэффициенты конверсии между этапами.
+   *
+   * @param startDate - Опциональная дата начала для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная дата окончания для фильтрации (формат ISO 8601)
+   * @returns Метрики воронки с количеством этапов и коэффициентами конверсии
+   * @throws ApiError если получение данных не удалось
+   *
+   * @example
+   * ```ts
+   * const funnel = await analyticsClient.getFunnelMetrics();
+   * console.log(`Total candidates: ${funnel.total_candidates}`);
+   * funnel.stages.forEach(s => {
+   *   console.log(`${s.stage_name}: ${s.count} (${(s.conversion_rate_from_start * 100).toFixed(1)}%)`);
+   * });
+   * ```
+   */
+  async getFunnelMetrics(
+    startDate?: string,
+    endDate?: string
+  ): Promise<FunnelMetricsResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<FunnelMetricsResponse> = await this.client.get(
+        '/api/analytics/funnel',
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Получение аналитики отслеживания источников кандидатов
+   *
+   * Возвращает аналитику о том, откуда приходят кандидаты, включая
+   * источники, такие как рефералы, LinkedIn, сайт компании и т.д.
+   * Для каждого источника отслеживается количество кандидатов и коэффициенты конверсии.
+   *
+   * @param startDate - Опциональная дата начала для фильтрации (формат ISO 8601)
+   * @param endDate - Опциональная дата окончания для фильтрации (формат ISO 8601)
+   * @returns Метрики источников с количеством кандидатов и коэффициентами конверсии
+   * @throws ApiError если получение данных не удалось
+   *
+   * @example
+   * ```ts
+   * const sources = await analyticsClient.getSourceTracking();
+   * console.log(`Total candidates: ${sources.total_candidates}`);
+   * sources.sources.forEach(s => {
+   *   console.log(`${s.source}: ${s.candidate_count} candidates, ${(s.conversion_rate * 100).toFixed(1)}% conversion`);
+   * });
+   * ```
+   */
+  async getSourceTracking(
+    startDate?: string,
+    endDate?: string
+  ): Promise<SourceTrackingResponse> {
+    try {
+      const params: Record<string, string> = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response: AxiosResponse<SourceTrackingResponse> = await this.client.get(
+        '/api/analytics/source-tracking',
         { params }
       );
       return response.data;
