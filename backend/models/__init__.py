@@ -9,7 +9,6 @@ from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
 from .job_vacancy import JobVacancy
 from .job_application import JobApplication, ApplicationStatus
-from .candidate_document import CandidateDocument, DocumentType
 from .match_result import MatchResult
 from .skill_taxonomy import SkillTaxonomy
 from .skill_relationship import SkillRelationship, RelationshipType
@@ -32,7 +31,6 @@ from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
-from .import_job import ImportJob, ImportJobStatus, ImportFormat
 from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .saved_job import SavedJob
@@ -43,7 +41,7 @@ from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
-from .bias_alert_config import BiasAlertConfig
+from .agency import Agency
 
 __all__ = [
     "Base",
@@ -55,8 +53,6 @@ __all__ = [
     "JobVacancy",
     "JobApplication",
     "ApplicationStatus",
-    "CandidateDocument",
-    "DocumentType",
     "MatchResult",
     "SkillTaxonomy",
     "SkillRelationship",
@@ -89,9 +85,6 @@ __all__ = [
     "BackupConfig",
     "BackupType",
     "BackupStatus",
-    "ImportJob",
-    "ImportJobStatus",
-    "ImportFormat",
     "ATSResult",
     "SavedSearch",
     "SavedJob",
@@ -104,5 +97,5 @@ __all__ = [
     "OrganizationExplanationPreferences",
     "ResumeFeedback",
     "BuiltResume",
-    "BiasAlertConfig",
+    "Agency",
 ]
