@@ -19,6 +19,8 @@ import {
   IconButton,
   Divider,
   Autocomplete,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -28,8 +30,11 @@ import {
   Clear as ClearIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  TextFields as TextFieldsIcon,
+  AccountTree as VisualBuilderIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import QueryBuilder from './QueryBuilder';
 
 /**
  * Boolean operator types for search queries
@@ -141,6 +146,9 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
   // Search mode
   const [semanticSearch, setSemanticSearch] = useState<boolean>(defaultFilters.semanticSearch || false);
 
+  // Query builder mode ('text' or 'visual')
+  const [queryMode, setQueryMode] = useState<'text' | 'visual'>('text');
+
   // UI state
   const [expanded, setExpanded] = useState(true);
 
@@ -207,6 +215,13 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
     const booleanQuery = queryParts.join(' ');
 
     return baseQuery ? `${baseQuery} ${booleanQuery}` : booleanQuery;
+  };
+
+  /**
+   * Handle query change from visual builder
+   */
+  const handleQueryBuilderChange = (query: string) => {
+    setSearchQuery(query);
   };
 
   /**
@@ -351,32 +366,73 @@ const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
         <Collapse in={expanded}>
           <Box sx={{ p: 3 }}>
             <Grid container spacing={3}>
-              {/* Main Search Query */}
+              {/* Query Mode Toggle */}
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label={t('advancedSearch.searchQuery')}
-                  placeholder={t('advancedSearch.searchPlaceholder')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSearch();
-                    }
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <IconButton
-                        size="small"
-                        onClick={clearFilters}
-                        disabled={!searchQuery && filterGroups.length === 0}
-                      >
-                        <ClearIcon />
-                      </IconButton>
-                    ),
-                  }}
-                />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {t('advancedSearch.queryMode', 'Query Mode')}
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={queryMode}
+                    exclusive
+                    onChange={(_, newMode) => {
+                      if (newMode !== null) {
+                        setQueryMode(newMode);
+                      }
+                    }}
+                    size="small"
+                  >
+                    <ToggleButton value="text">
+                      <TextFieldsIcon sx={{ mr: 1, fontSize: '1rem' }} />
+                      {t('advancedSearch.textQuery', 'Text Query')}
+                    </ToggleButton>
+                    <ToggleButton value="visual">
+                      <VisualBuilderIcon sx={{ mr: 1, fontSize: '1rem' }} />
+                      {t('advancedSearch.visualBuilder', 'Visual Builder')}
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
               </Grid>
+
+              {/* Main Search Query - Text Mode */}
+              {queryMode === 'text' && (
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label={t('advancedSearch.searchQuery')}
+                    placeholder={t('advancedSearch.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSearch();
+                      }
+                    }}
+                    InputProps={{
+                      endAdornment: (
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchQuery('')}
+                          disabled={!searchQuery}
+                        >
+                          <ClearIcon />
+                        </IconButton>
+                      ),
+                    }}
+                  />
+                </Grid>
+              )}
+
+              {/* Visual Query Builder Mode */}
+              {queryMode === 'visual' && (
+                <Grid item xs={12}>
+                  <QueryBuilder
+                    onQueryChange={handleQueryBuilderChange}
+                    initialQuery={searchQuery}
+                    disabled={loading}
+                  />
+                </Grid>
+              )}
 
               {/* Semantic Search Toggle */}
               <Grid item xs={12}>
