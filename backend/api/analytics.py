@@ -3353,6 +3353,296 @@ async def get_source_tracking(
         ) from e
 
 
+class SourceEffectivenessMetrics(BaseModel):
+    """Source effectiveness analytics metrics."""
+
+    source: str = Field(..., description="Candidate source (e.g., referral, LinkedIn, website)")
+    total_candidates: int = Field(..., description="Total candidates from this source")
+    hired_count: int = Field(..., description="Number of candidates hired from this source")
+    conversion_rate: float = Field(..., description="Conversion rate (hired/total) for this source (0-1)")
+    avg_time_to_hire: Optional[float] = Field(None, description="Average time to hire in days for this source")
+    interview_count: int = Field(0, description="Number of candidates who reached interview stage")
+    interview_rate: float = Field(0.0, description="Rate of candidates reaching interview (0-1)")
+
+
+class SourceEffectivenessResponse(BaseModel):
+    """Response model for source effectiveness analytics."""
+
+    sources: list[SourceEffectivenessMetrics] = Field(..., description="List of source effectiveness metrics")
+    total_candidates: int = Field(..., description="Total candidates across all sources")
+    best_source: Optional[str] = Field(None, description="Most effective source by conversion rate")
+
+
+@router.get(
+    "/source-effectiveness",
+    response_model=SourceEffectivenessResponse,
+    tags=["Analytics"],
+)
+async def get_source_effectiveness(
+    db: AsyncSession = Depends(get_db),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get source effectiveness analytics.
+
+    This endpoint provides comprehensive effectiveness metrics for candidate recruiting sources,
+    including conversion rates, time-to-hire, and interview progression rates. This helps
+    identify which recruiting channels (LinkedIn, referrals, job boards, etc.) produce
+    the best quality candidates and optimize recruitment budget allocation.
+
+    Key metrics per source:
+    - Conversion rate: Percentage of candidates who get hired
+    - Average time-to-hire: How quickly candidates from this source get hired
+    - Interview rate: Percentage of candidates who reach interview stage
+    - Total volume: Number of candidates from each source
+
+    Args:
+        db: Database session (injected by FastAPI)
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with source effectiveness metrics and best performing source
+
+    Raises:
+        HTTPException(400): If date format is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/analytics/source-effectiveness")
+        >>> response.json()
+        {
+            "sources": [
+                {
+                    "source": "referral",
+                    "total_candidates": 120,
+                    "hired_count": 18,
+                    "conversion_rate": 0.15,
+                    "avg_time_to_hire": 25.5,
+                    "interview_count": 45,
+                    "interview_rate": 0.375
+                },
+                {
+                    "source": "linkedin",
+                    "total_candidates": 350,
+                    "hired_count": 28,
+                    "conversion_rate": 0.08,
+                    "avg_time_to_hire": 32.0,
+                    "interview_count": 105,
+                    "interview_rate": 0.3
+                }
+            ],
+            "total_candidates": 720,
+            "best_source": "referral"
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching source effectiveness - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # Parse date filters
+        date_filter_start = None
+        date_filter_end = None
+        if start_date:
+            try:
+                date_filter_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {str(e)}",
+                ) from e
+
+        if end_date:
+            try:
+                date_filter_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {str(e)}",
+                ) from e
+
+        # Calculate source effectiveness metrics
+        from models.analytics_event import AnalyticsEvent
+        from collections import defaultdict
+
+        source_data = defaultdict(lambda: {
+            "total": 0,
+            "hired": 0,
+            "interview": 0,
+            "resume_ids": set(),
+            "hired_resume_ids": set(),
+        })
+
+        # Query resume_uploaded events to get source information
+        upload_query = select(AnalyticsEvent).where(
+            AnalyticsEvent.event_type == "resume_uploaded"
+        )
+
+        # Apply date filters
+        if date_filter_start:
+            upload_query = upload_query.where(AnalyticsEvent.created_at >= date_filter_start)
+        if date_filter_end:
+            upload_query = upload_query.where(AnalyticsEvent.created_at <= date_filter_end)
+
+        upload_result = await db.execute(upload_query)
+        upload_events = upload_result.scalars().all()
+
+        # Extract source from event_data and count candidates per source
+        resume_to_source = {}
+        for event in upload_events:
+            # Get source from event_data JSON field
+            source = "unknown"
+            if event.event_data and isinstance(event.event_data, dict):
+                source = event.event_data.get("source", "unknown")
+                if not source or not isinstance(source, str):
+                    source = "unknown"
+                # Normalize source name (lowercase, strip whitespace)
+                source = source.strip().lower() if source.strip() else "unknown"
+            else:
+                source = "unknown"
+
+            # Track resume to source mapping
+            if event.entity_id:
+                resume_to_source[str(event.entity_id)] = source
+                source_data[source]["total"] += 1
+                source_data[source]["resume_ids"].add(str(event.entity_id))
+
+        # Get hired candidates
+        from models.hiring_stage import HiringStage
+
+        hired_query = select(
+            HiringStage.resume_id,
+            HiringStage.created_at,
+            HiringStage.updated_at
+        ).where(
+            HiringStage.stage_name == "hired"
+        )
+
+        # Apply date filters
+        if date_filter_start:
+            hired_query = hired_query.where(HiringStage.created_at >= date_filter_start)
+        if date_filter_end:
+            hired_query = hired_query.where(HiringStage.created_at <= date_filter_end)
+
+        hired_result = await db.execute(hired_query)
+        hired_rows = hired_result.all()
+
+        # Track hired candidates by source
+        for row in hired_rows:
+            resume_id = str(row[0])
+            if resume_id in resume_to_source:
+                source = resume_to_source[resume_id]
+                source_data[source]["hired"] += 1
+                source_data[source]["hired_resume_ids"].add(resume_id)
+
+        # Get interview stage candidates
+        interview_query = select(HiringStage.resume_id).where(
+            HiringStage.stage_name.in_(["screening", "interview", "technical", "offer"])
+        )
+
+        # Apply date filters
+        if date_filter_start:
+            interview_query = interview_query.where(HiringStage.created_at >= date_filter_start)
+        if date_filter_end:
+            interview_query = interview_query.where(HiringStage.created_at <= date_filter_end)
+
+        interview_result = await db.execute(interview_query)
+        interview_resume_ids = set([str(row[0]) for row in interview_result])
+
+        # Count interview candidates by source
+        for resume_id in interview_resume_ids:
+            if resume_id in resume_to_source:
+                source = resume_to_source[resume_id]
+                source_data[source]["interview"] += 1
+
+        # Calculate average time to hire per source
+        source_time_to_hire = {}
+        for source, data in source_data.items():
+            if data["hired_resume_ids"]:
+                # Query for time to hire for hired candidates from this source
+                time_query = select(
+                    HiringStage.resume_id,
+                    func.min(HiringStage.created_at).label("start_date"),
+                    func.max(HiringStage.created_at).label("end_date")
+                ).where(
+                    HiringStage.resume_id.in_([row for row in data["hired_resume_ids"]])
+                ).group_by(HiringStage.resume_id)
+
+                time_result = await db.execute(time_query)
+                time_rows = time_result.all()
+
+                total_days = 0
+                count = 0
+                for row in time_rows:
+                    if row[1] and row[2]:
+                        days = (row[2] - row[1]).days
+                        if days >= 0:
+                            total_days += days
+                            count += 1
+
+                if count > 0:
+                    source_time_to_hire[source] = round(total_days / count, 1)
+
+        # Build sources list with metrics
+        sources_list = []
+        for source, data in source_data.items():
+            total = data["total"]
+            hired = data["hired"]
+            interview = data["interview"]
+
+            # Calculate metrics
+            conversion_rate = round(hired / total, 3) if total > 0 else 0.0
+            interview_rate = round(interview / total, 3) if total > 0 else 0.0
+            avg_time = source_time_to_hire.get(source)
+
+            sources_list.append({
+                "source": source,
+                "total_candidates": total,
+                "hired_count": hired,
+                "conversion_rate": conversion_rate,
+                "avg_time_to_hire": avg_time,
+                "interview_count": interview,
+                "interview_rate": interview_rate,
+            })
+
+        # Sort by conversion rate descending
+        sources_list.sort(key=lambda x: x["conversion_rate"], reverse=True)
+
+        # Identify best source
+        best_source = sources_list[0]["source"] if sources_list and sources_list[0]["conversion_rate"] > 0 else None
+
+        # Calculate total candidates
+        total_candidates = sum(data["total"] for data in source_data.values())
+
+        response_data = {
+            "sources": sources_list,
+            "total_candidates": total_candidates,
+            "best_source": best_source,
+        }
+
+        logger.info(
+            f"Source effectiveness retrieved successfully - {len(sources_list)} sources, "
+            f"{total_candidates} total candidates, best source: {best_source}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving source effectiveness: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve source effectiveness: {str(e)}",
+        ) from e
+
+
 @router.get(
     "/ranking-accuracy",
     response_model=RankingMetricsResponse,
