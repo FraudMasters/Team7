@@ -110,6 +110,25 @@ class ScheduleReportResponse(BaseModel):
     created_at: str = Field(..., description="Время создания")
 
 
+class ScheduleReportUpdate(BaseModel):
+    """Модель запроса для обновления запланированного отчета."""
+
+    name: Optional[str] = Field(None, description="Название расписания")
+    configuration: Optional[Dict] = Field(None, description="Конфигурация отчета с метриками и фильтрами")
+    schedule_config: Optional[Dict] = Field(None, description="Настройки расписания (frequency, day_of_week, day_of_month, hour, minute)")
+    delivery_config: Optional[Dict] = Field(None, description="Настройки доставки (format, include_charts, include_summary)")
+    recipients: Optional[List[str]] = Field(None, description="Список адресов электронной почты получателей")
+    is_active: Optional[bool] = Field(None, description="Активно ли расписание")
+
+
+class ScheduleReportListResponse(BaseModel):
+    """Модель ответа для списка запланированных отчетов."""
+
+    organization_id: Optional[str] = Field(None, description="Идентификатор организации (если отфильтрован)")
+    schedules: List[ScheduleReportResponse] = Field(..., description="Список запланированных отчетов")
+    total_count: int = Field(..., description="Общее количество записей")
+
+
 @router.post(
     "/",
     response_model=ReportResponse,
@@ -800,4 +819,253 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Не удалось создать запланированный отчет: {str(e)}",
+        ) from e
+
+
+@router.get("/schedule", tags=["Reports"])
+async def list_scheduled_reports(
+    organization_id: Optional[str] = Query(None, description="Фильтр по ID организации"),
+    is_active: Optional[bool] = Query(None, description="Фильтр по статусу активности"),
+) -> JSONResponse:
+    """
+    Получить список запланированных отчетов с опциональными фильтрами.
+
+    Args:
+        organization_id: Опциональный фильтр по ID организации
+        is_active: Опциональный фильтр по статусу активности
+
+    Returns:
+        JSON ответ со списком запланированных отчетов
+
+    Raises:
+        HTTPException(500): Если запрос к базе данных не удался
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8006/api/reports/schedule?organization_id=org123")
+        >>> response.json()
+    """
+    try:
+        logger.info(f"Получение списка запланированных отчетов с фильтрами - organization_id: {organization_id}, is_active: {is_active}")
+
+        # Возвращаем placeholder ответ
+        response_data = {
+            "organization_id": organization_id,
+            "schedules": [],
+            "total_count": 0,
+        }
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка получения списка запланированных отчетов: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось получить список запланированных отчетов: {str(e)}",
+        ) from e
+
+
+@router.get("/schedule/{schedule_id}", tags=["Reports"])
+async def get_scheduled_report(schedule_id: str) -> JSONResponse:
+    """
+    Получить конкретный запланированный отчет по ID.
+
+    Args:
+        schedule_id: Уникальный идентификатор расписания
+
+    Returns:
+        JSON ответ с деталями запланированного отчета
+
+    Raises:
+        HTTPException(404): Если запланированный отчет не найден
+        HTTPException(500): Если запрос к базе данных не удался
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8006/api/reports/schedule/123e4567-e89b-12d3-a456-426614174000")
+        >>> response.json()
+    """
+    try:
+        logger.info(f"Получение запланированного отчета: {schedule_id}")
+
+        # Возвращаем placeholder ответ
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        next_run = (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": schedule_id,
+                "name": "Еженедельный отчет аналитики",
+                "organization_id": "org123",
+                "report_id": None,
+                "configuration": {
+                    "metrics": ["time_to_hire", "resumes_processed"],
+                    "filters": {}
+                },
+                "schedule_config": {
+                    "frequency": "weekly",
+                    "day_of_week": 1,
+                    "hour": 9,
+                    "minute": 0
+                },
+                "delivery_config": {
+                    "format": "pdf",
+                    "include_charts": True,
+                    "include_summary": True
+                },
+                "recipients": ["manager@example.com"],
+                "is_active": True,
+                "next_run_at": next_run.isoformat() + "Z",
+                "created_at": now.isoformat() + "Z",
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка получения запланированного отчета: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось получить запланированный отчет: {str(e)}",
+        ) from e
+
+
+@router.put("/schedule/{schedule_id}", tags=["Reports"])
+async def update_scheduled_report(
+    schedule_id: str, request: ScheduleReportUpdate
+) -> JSONResponse:
+    """
+    Обновить запланированный отчет.
+
+    Args:
+        schedule_id: Уникальный идентификатор расписания
+        request: Запрос на обновление с полями для изменения
+
+    Returns:
+        JSON ответ с обновленной записью запланированного отчета
+
+    Raises:
+        HTTPException(404): Если запланированный отчет не найден
+        HTTPException(422): Если проверка не удалась
+        HTTPException(500): Если операция с базой данных не удалась
+
+    Examples:
+        >>> import requests
+        >>> data = {"name": "Обновленное расписание", "is_active": False}
+        >>> response = requests.put(
+        ...     "http://localhost:8006/api/reports/schedule/123",
+        ...     json=data
+        ... )
+        >>> response.json()
+    """
+    try:
+        logger.info(f"Обновление запланированного отчета: {schedule_id}")
+
+        # Проверка формата email если recipients обновляются
+        if request.recipients:
+            import re
+            email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+            for email in request.recipients:
+                if not re.match(email_pattern, email):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Неверный адрес электронной почты: {email}",
+                    )
+
+        # Проверка schedule_config если обновляется
+        if request.schedule_config:
+            freq = request.schedule_config.get("frequency")
+            if freq and freq not in ["daily", "weekly", "monthly"]:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Частота должна быть одной из: daily, weekly, monthly",
+                )
+
+            hour = request.schedule_config.get("hour")
+            if hour is not None and (not isinstance(hour, int) or hour < 0 or hour > 23):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Час должен быть целым числом от 0 до 23",
+                )
+
+            minute = request.schedule_config.get("minute")
+            if minute is not None and (not isinstance(minute, int) or minute < 0 or minute > 59):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Минута должна быть целым числом от 0 до 59",
+                )
+
+        # Проверка формата delivery_config если обновляется
+        if request.delivery_config:
+            format_type = request.delivery_config.get("format")
+            if format_type and format_type not in ["pdf", "csv", "both"]:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Формат должен быть одним из: pdf, csv, both",
+                )
+
+        # Возвращаем placeholder ответ
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        next_run = (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": schedule_id,
+                "name": request.name or "Еженедельный отчет аналитики",
+                "report_id": None,
+                "next_run_at": next_run.isoformat() + "Z",
+                "created_at": "2024-01-25T00:00:00Z",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка обновления запланированного отчета: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось обновить запланированный отчет: {str(e)}",
+        ) from e
+
+
+@router.delete("/schedule/{schedule_id}", tags=["Reports"])
+async def delete_scheduled_report(schedule_id: str) -> JSONResponse:
+    """
+    Удалить запланированный отчет.
+
+    Args:
+        schedule_id: Уникальный идентификатор расписания
+
+    Returns:
+        JSON ответ, подтверждающий удаление
+
+    Raises:
+        HTTPException(404): Если запланированный отчет не найден
+        HTTPException(500): Если операция с базой данных не удалась
+
+    Examples:
+        >>> import requests
+        >>> response = requests.delete("http://localhost:8006/api/reports/schedule/123")
+        >>> response.json()
+        {"message": "Запланированный отчет успешно удален"}
+    """
+    try:
+        logger.info(f"Удаление запланированного отчета: {schedule_id}")
+
+        # Возвращаем placeholder ответ
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": f"Запланированный отчет {schedule_id} успешно удален"},
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка удаления запланированного отчета: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось удалить запланированный отчет: {str(e)}",
         ) from e
