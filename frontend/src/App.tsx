@@ -41,6 +41,9 @@ import { SettingsPage } from './pages/jobs/SettingsPage';
 import { ResumeOptimizationPage } from './pages/jobs/ResumeOptimizationPage';
 import { ResumeBuilderPage } from './pages/jobs/ResumeBuilderPage';
 
+// Candidate Portal Pages
+import { CandidatePortalDashboard } from './pages/jobs/CandidatePortalDashboard';
+
 // Recruiter Pages
 import { DashboardPage } from './pages/recruiter/DashboardPage';
 import { CandidatesKanbanPage } from './pages/recruiter/CandidatesKanbanPage';
@@ -184,6 +187,11 @@ function App() {
         {/* Candidate Profile */}
         <Route path="/profile" element={<JobSeekerLayout />}>
           <Route index element={<JobSeekerProfilePage />} />
+        </Route>
+
+        {/* Candidate Portal */}
+        <Route path="/candidate" element={<JobSeekerLayout />}>
+          <Route path="dashboard" element={<CandidatePortalDashboard />} />
         </Route>
 
         {/* Recruiter Flow - Protected with role-based access control */}
