@@ -7,11 +7,17 @@ saved reports with metrics and filters.
 """
 import logging
 from typing import Dict, List, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.report import Report
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +122,10 @@ class ScheduleReportResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["Reports"],
 )
-async def create_report(request: ReportCreate) -> JSONResponse:
+async def create_report(
+    request: ReportCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Create a custom report.
 
@@ -125,6 +134,7 @@ async def create_report(request: ReportCreate) -> JSONResponse:
 
     Args:
         request: Create request with report details
+        db: Database session
 
     Returns:
         JSON response with created report entry
@@ -170,25 +180,42 @@ async def create_report(request: ReportCreate) -> JSONResponse:
                 detail="At least one metric must be provided",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        from datetime import datetime
-        now = datetime.utcnow().isoformat() + "Z"
-
-        response_data = {
-            "id": "placeholder-report-id",
-            "organization_id": request.organization_id or "default",
-            "name": request.name,
-            "description": request.description,
-            "created_by": request.created_by,
+        # Build configuration JSON from metrics, filters, and is_public
+        configuration = {
             "metrics": request.metrics,
             "filters": request.filters,
             "is_public": request.is_public,
-            "created_at": now,
-            "updated_at": now,
         }
 
-        logger.info(f"Created report '{request.name}' with ID: {response_data['id']}")
+        # Create new report
+        new_report = Report(
+            organization_id=request.organization_id or "default",
+            name=request.name,
+            description=request.description,
+            report_type="custom",
+            configuration=configuration,
+            created_by=request.created_by,
+            is_active=True,
+        )
+        db.add(new_report)
+        await db.flush()
+
+        response_data = {
+            "id": str(new_report.id),
+            "organization_id": new_report.organization_id,
+            "name": new_report.name,
+            "description": new_report.description,
+            "created_by": new_report.created_by,
+            "metrics": new_report.configuration.get("metrics", []),
+            "filters": new_report.configuration.get("filters", {}),
+            "is_public": new_report.configuration.get("is_public", False),
+            "created_at": new_report.created_at.isoformat(),
+            "updated_at": new_report.updated_at.isoformat(),
+        }
+
+        await db.commit()
+
+        logger.info(f"Created report '{request.name}' with ID: {new_report.id}")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
