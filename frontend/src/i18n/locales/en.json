@@ -819,11 +819,26 @@
     "title": "AI Ranking Explanation",
     "rankScore": "Ranking Score",
     "rankPosition": "Position",
+    "tabs": {
+      "overview": "Overview",
+      "details": "Details",
+      "comparison": "Comparison",
+      "whatIf": "What-If"
+    },
     "recommendation": {
+      "title": "Recommendation",
       "excellent": "Excellent Candidate",
       "good": "Good Candidate",
       "fair": "Fair Candidate",
       "poor": "Poor Candidate"
+    },
+    "comparison": {
+      "comingSoon": "Comparison Coming Soon",
+      "description": "Compare this candidate with others to understand relative strengths and weaknesses. This feature will allow side-by-side analysis of multiple candidates."
+    },
+    "whatIf": {
+      "comingSoon": "What-If Analysis Coming Soon",
+      "description": "Explore how changes to candidate attributes would affect their ranking score. Test different scenarios to understand which factors have the most impact."
     },
     "confidenceInterval": {
       "title": "Confidence Interval",
