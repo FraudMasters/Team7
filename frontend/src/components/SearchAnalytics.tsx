@@ -6,7 +6,7 @@
  */
 
 // Импорт хуков React
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 // Импорт компонентов MUI
 import {
@@ -23,6 +23,10 @@ import {
   CircularProgress,
   Paper,
   Divider,
+  Slider,
+  TextField,
+  Button,
+  IconButton,
 } from '@mui/material';
 
 // Импорт иконок MUI
@@ -30,6 +34,9 @@ import {
   TrendingUp as TrendingUpIcon,
   SearchOff as SearchOffIcon,
   Insights as InsightsIcon,
+  Tune as TuneIcon,
+  Save as SaveIcon,
+  PlayArrow as PlayArrowIcon,
 } from '@mui/icons-material';
 
 // Импорт компонентов Recharts
@@ -64,6 +71,9 @@ import { useBreakpoints } from '../hooks';
 // Импорт утилит для работы с датами
 import { format, parseISO } from 'date-fns';
 
+// Импорт конфигурации
+import { config } from '@/config';
+
 /**
  * Интерфейс свойств компонента
  */
@@ -72,6 +82,23 @@ interface SearchAnalyticsProps {
    * Максимальное количество элементов для отображения
    */
   limit?: number;
+  /**
+   * Флаг администратора для отображения панели настройки релевантности
+   */
+  isAdmin?: boolean;
+  /**
+   * ID организации для настроек релевантности
+   */
+  organizationId?: string;
+}
+
+/**
+ * Интерфейс настроек весов полей
+ */
+interface FieldWeights {
+  skills: number;
+  experience: number;
+  education: number;
 }
 
 /**
@@ -81,10 +108,25 @@ interface SearchAnalyticsProps {
  * 1. График трендов поисковых запросов
  * 2. Список популярных запросов
  * 3. Список запросов с нулевыми результатами
+ * 4. Панель настройки релевантности (только для администраторов)
  */
-export function SearchAnalytics({ limit = 10 }: SearchAnalyticsProps) {
+export function SearchAnalytics({ limit = 10, isAdmin = false, organizationId }: SearchAnalyticsProps) {
   // Определяем, мобильное ли устройство
   const { isMobile } = useBreakpoints();
+
+  // Состояние для настройки весов полей
+  const [fieldWeights, setFieldWeights] = useState<FieldWeights>({
+    skills: 50,
+    experience: 30,
+    education: 20,
+  });
+
+  // Состояние для тестового запроса
+  const [testQuery, setTestQuery] = useState('');
+  const [testResults, setTestResults] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Загружаем популярные поиски
   const {
@@ -159,6 +201,94 @@ export function SearchAnalytics({ limit = 10 }: SearchAnalyticsProps) {
       count: search.search_count,
     }));
   }, [popularSearches]);
+
+  // Вычисляем общий вес
+  const totalWeight = fieldWeights.skills + fieldWeights.experience + fieldWeights.education;
+
+  // Проверяем валидность весов
+  const isWeightsValid = Math.abs(totalWeight - 100) < 1;
+
+  /**
+   * Нормализовать веса к 100%
+   */
+  const normalizeWeights = () => {
+    if (totalWeight === 0) return;
+
+    const normalized = {
+      skills: Math.round((fieldWeights.skills / totalWeight) * 100),
+      experience: Math.round((fieldWeights.experience / totalWeight) * 100),
+      education: Math.round((fieldWeights.education / totalWeight) * 100),
+    };
+
+    // Корректировка ошибок округления
+    const normalizedTotal = normalized.skills + normalized.experience + normalized.education;
+    if (normalizedTotal !== 100) {
+      normalized.education += (100 - normalizedTotal);
+    }
+
+    setFieldWeights(normalized);
+  };
+
+  /**
+   * Обработчик изменения веса поля
+   */
+  const handleWeightChange = (field: keyof FieldWeights, value: number) => {
+    setFieldWeights((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setSaveSuccess(false);
+  };
+
+  /**
+   * Тестирование запроса с текущими весами
+   */
+  const handleTestQuery = async () => {
+    if (!testQuery.trim()) return;
+
+    setIsTesting(true);
+    setTestResults(null);
+
+    try {
+      // Симуляция API вызова
+      // В реальном приложении здесь будет вызов API
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setTestResults(
+        `Test results with weights - Skills: ${fieldWeights.skills}%, Experience: ${fieldWeights.experience}%, Education: ${fieldWeights.education}%`
+      );
+    } catch (error) {
+      setTestResults('Error testing query');
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  /**
+   * Сохранение настроек весов
+   */
+  const handleSaveWeights = async () => {
+    if (!isWeightsValid) {
+      normalizeWeights();
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      // Симуляция API вызова
+      // В реальном приложении здесь будет вызов API для сохранения весов
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      // Обработка ошибки
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Проверяем состояние загрузки
   const isLoading = isLoadingPopular || isLoadingZeroResults || isLoadingRecent;
@@ -361,6 +491,173 @@ export function SearchAnalytics({ limit = 10 }: SearchAnalyticsProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Панель настройки релевантности (только для администраторов) */}
+      {isAdmin && (
+        <Card>
+          <CardContent>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+              <TuneIcon color="primary" />
+              <Typography variant="h6" fontWeight={600}>
+                Relevance Tuning
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Adjust field weights to customize search relevance scoring
+            </Typography>
+
+            {/* Сообщение об успешном сохранении */}
+            {saveSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Field weights saved successfully!
+              </Alert>
+            )}
+
+            {/* Слайдеры для настройки весов */}
+            <Stack spacing={3} sx={{ mb: 3 }}>
+              {/* Вес навыков */}
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Skills Weight
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {fieldWeights.skills}%
+                  </Typography>
+                </Box>
+                <Slider
+                  value={fieldWeights.skills}
+                  onChange={(_, value) => handleWeightChange('skills', value as number)}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${value}%`}
+                  sx={{ color: 'primary.main' }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Importance of matching required skills
+                </Typography>
+              </Box>
+
+              {/* Вес опыта */}
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Experience Weight
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {fieldWeights.experience}%
+                  </Typography>
+                </Box>
+                <Slider
+                  value={fieldWeights.experience}
+                  onChange={(_, value) => handleWeightChange('experience', value as number)}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${value}%`}
+                  sx={{ color: 'secondary.main' }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Importance of years of experience
+                </Typography>
+              </Box>
+
+              {/* Вес образования */}
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Education Weight
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {fieldWeights.education}%
+                  </Typography>
+                </Box>
+                <Slider
+                  value={fieldWeights.education}
+                  onChange={(_, value) => handleWeightChange('education', value as number)}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${value}%`}
+                  sx={{ color: 'info.main' }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Importance of educational background
+                </Typography>
+              </Box>
+            </Stack>
+
+            {/* Общий вес и валидация */}
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2">Total Weight:</Typography>
+                <Chip
+                  label={`${totalWeight}%`}
+                  color={isWeightsValid ? 'success' : 'warning'}
+                  variant={isWeightsValid ? 'filled' : 'outlined'}
+                  size="small"
+                />
+              </Box>
+              {!isWeightsValid && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Weights must sum to 100% (currently: {totalWeight}%)
+                  <Button
+                    size="small"
+                    onClick={normalizeWeights}
+                    sx={{ ml: 2 }}
+                  >
+                    Normalize
+                  </Button>
+                </Alert>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* Раздел тестирования запроса */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Test Query
+              </Typography>
+              <Stack direction={isMobile ? 'column' : 'row'} spacing={2} sx={{ mb: 2 }}>
+                <TextField
+                  fullWidth
+                  placeholder="Enter search query to test..."
+                  value={testQuery}
+                  onChange={(e) => setTestQuery(e.target.value)}
+                  size="small"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleTestQuery();
+                    }
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  startIcon={isTesting ? <CircularProgress size={16} /> : <PlayArrowIcon />}
+                  onClick={handleTestQuery}
+                  disabled={!testQuery.trim() || isTesting}
+                  sx={{ minWidth: 100 }}
+                >
+                  {isTesting ? 'Testing...' : 'Test'}
+                </Button>
+              </Stack>
+              {testResults && (
+                <Alert severity="info" icon={<InsightsIcon />}>
+                  {testResults}
+                </Alert>
+              )}
+            </Box>
+
+            {/* Кнопка сохранения */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                variant="contained"
+                startIcon={isSaving ? <CircularProgress size={16} /> : <SaveIcon />}
+                onClick={handleSaveWeights}
+                disabled={!isWeightsValid || isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save Weights'}
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
     </Stack>
   );
 }

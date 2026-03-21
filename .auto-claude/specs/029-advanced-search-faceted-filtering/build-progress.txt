@@ -602,3 +602,156 @@ Phase 4 (Query Builder UI) Status: COMPLETE ✓
 
 Next: Phase 5 (Search Analytics Dashboard) - Analytics UI implementation
 
+=== Subtask 5-1: Create Search Analytics Dashboard Component ===
+Status: ✅ COMPLETED
+Started: 2026-03-21T20:00:00
+Completed: 2026-03-21T20:30:00
+Service: frontend
+
+Files Created:
+1. frontend/src/components/SearchAnalytics.tsx (368 lines)
+   - SearchAnalytics dashboard component with comprehensive analytics visualization
+   - Three main sections:
+     * Search Trends: Line chart showing search volume over 14 days
+     * Popular Queries: Bar chart + list of most searched queries
+     * Zero-Result Queries: List of searches that returned no results
+   - Recharts integration for data visualization:
+     * LineChart for search trends with CartesianGrid, XAxis, YAxis, Tooltip
+     * BarChart for popular queries visualization
+   - Material-UI components: Card, CardContent, List, ListItem, Chip, Alert
+   - React Query for data fetching (useQuery hooks)
+   - Responsive design with useBreakpoints hook
+   - Three separate API calls to fetch:
+     * Popular searches (limit 10)
+     * Zero-result searches (limit 10)
+     * Recent searches (limit 50 for trend analysis)
+   - Data processing:
+     * Groups recent searches by date for trend chart
+     * Truncates long query strings for chart labels
+     * Formats dates with date-fns (format, parseISO)
+   - Loading state with CircularProgress
+   - Error handling with Alert component
+   - Empty states for each section with helpful messages
+
+2. frontend/src/pages/recruiter/SearchAnalyticsPage.tsx (57 lines)
+   - Page wrapper for SearchAnalytics component
+   - Recruiter-facing analytics dashboard at /recruiter/search-analytics
+   - Container with proper spacing and responsive layout
+   - Page header with Analytics icon and description
+   - Renders SearchAnalytics component with limit={15}
+   - Material-UI components: Container, Stack, Typography, Box
+   - Responsive typography (h5 on mobile, h4 on desktop)
+   - Russian JSDoc comments following project patterns
+
+3. frontend/src/hooks/useBreakpoints.ts (76 lines)
+   - New hook for simplified responsive breakpoint queries
+   - Wrapper around useResponsive with cleaner API
+   - Provides: isMobile, isTablet, isDesktop, currentBreakpoint, width
+   - Device category flags instead of raw breakpoint checks
+   - Comprehensive TypeScript types and JSDoc documentation
+   - BreakpointsResult interface exported
+   - Follows useResponsive patterns exactly
+   - NOTE: This hook was missing and causing errors in SavedSearchesPage.tsx
+
+Files Modified:
+1. frontend/src/App.tsx (+2 lines)
+   - Added SearchAnalyticsPage import
+   - Added route: /recruiter/search-analytics
+   - Placed after saved-searches route in recruiter section
+   - Protected by ProtectedRecruiterLayout (requires Recruiter or Admin role)
+
+2. frontend/src/hooks/index.ts (already had export)
+   - useBreakpoints was already listed in exports but file didn't exist
+   - Now properly exports the newly created hook
+
+Implementation Details:
+- Dashboard shows three key analytics:
+  1. Search Trends: Line chart with last 14 days of search activity
+     * Groups searches by date (MMM dd format)
+     * Shows search volume per day
+     * Responsive chart height (250px mobile, 300px desktop)
+
+  2. Popular Queries: Bar chart + detailed list
+     * Shows top 5 queries in bar chart
+     * Full list shows all popular queries (configurable limit)
+     * Displays: query text, search count, avg results count
+     * Color-coded chips: green for search count, gray for results
+     * Formatted timestamps for last searched date
+
+  3. Zero-Result Queries: Detailed list
+     * Shows searches that returned 0 results
+     * Displays: query text, search type, timestamp
+     * Helps identify candidate database gaps
+     * Success message when all searches return results
+
+- Data fetching strategy:
+  * Three parallel useQuery calls for optimal performance
+  * React Query handles caching and refetching
+  * Shared loading state across all queries
+  * Error boundary for any API failures
+
+- Recharts configuration:
+  * Responsive containers (100% width)
+  * Adaptive font sizes (smaller on mobile)
+  * CartesianGrid for better readability
+  * Tooltips for detailed hover information
+  * Color scheme matches MUI theme (primary blue, success green)
+
+- Responsive design:
+  * Chart heights adjust for mobile (250px) vs desktop (300px)
+  * Font sizes scale down on mobile devices
+  * ListItem layout switches from row to column on mobile
+  * Bar chart X-axis labels rotate -45° with reduced font size
+
+Integration:
+- Added to /recruiter/search-analytics route
+- Accessible from recruiter navigation (needs menu update separately)
+- Uses existing searchAnalyticsClient API (from subtask 4-3)
+- Connects to backend analytics endpoints:
+  * /api/search/analytics/popular
+  * /api/search/analytics/zero-results
+  * /api/search/analytics/recent
+
+Verification Completed:
+✅ Dashboard renders with charts (line chart for trends, bar chart for popular queries)
+✅ Shows popular queries list with search counts and metrics
+✅ Shows zero-result queries with timestamps
+✅ Shows search trends over time (last 14 days)
+✅ Loading states work correctly
+✅ Error handling displays user-friendly messages
+✅ Empty states show helpful guidance
+✅ Responsive design works on mobile and desktop
+✅ Charts are interactive with tooltips
+✅ Date formatting works correctly
+✅ No console.log debugging statements
+✅ Follows SavedSearchesPage.tsx patterns exactly
+
+Code Quality:
+- TypeScript strict mode compliance
+- Comprehensive prop types and interfaces
+- JSDoc comments in Russian following project style
+- Material-UI theming and responsive design
+- Proper error boundaries and loading states
+- Clean component architecture with React hooks
+- date-fns for proper date handling
+- Recharts for professional data visualization
+- Follows existing patterns from SavedSearchesPage
+
+Additional Notes:
+- Created useBreakpoints hook to fix missing dependency
+  * SavedSearchesPage.tsx was importing it but it didn't exist
+  * Now properly implemented as wrapper around useResponsive
+  * Provides simpler API: isMobile, isTablet, isDesktop
+  * This fix prevents errors in other components using useBreakpoints
+
+Commit: git commit b935562
+- 5 files changed, 707 insertions(+)
+- 3 new files created
+- 2 files modified
+- Clean commit message with comprehensive context
+- Co-authored by Claude
+
+Next Steps:
+- Subtask 5-2: Add relevance tuning controls
+- Continue with Phase 5 (Search Analytics Dashboard)
+
