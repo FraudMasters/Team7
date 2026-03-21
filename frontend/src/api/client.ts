@@ -3,7 +3,7 @@
  *
  * This module provides a typed Axios client for communicating with the
  * backend resume analysis service. Handles resume upload, analysis,
- * job matching, skill taxonomies, feedback, model versions,
+ * job matching, skill taxonomies, model versions,
  * resume comparisons, and health check endpoints.
  *
  * @example
@@ -23,13 +23,6 @@
  * const comparison = await apiClient.compareMultipleResumes({
  *   vacancy_id: 'vacancy-123',
  *   resume_ids: ['resume1', 'resume2', 'resume3'],
- * });
- *
- * // Submit feedback
- * const feedback = await apiClient.submitMatchFeedback({
- *   match_id: 'match123',
- *   skill: 'React',
- *   was_correct: true,
  * });
  * ```
  */
@@ -52,16 +45,10 @@ import type {
   UploadProgressCallback,
   ApiClientConfig,
   ApiError,
-  FeedbackCreate,
-  FeedbackUpdate,
-  FeedbackResponse,
-  FeedbackListResponse,
   ModelVersionCreate,
   ModelVersionUpdate,
   ModelVersionResponse,
   ModelVersionListResponse,
-  MatchFeedbackRequest,
-  MatchFeedbackResponse,
   ComparisonCreate,
   ComparisonUpdate,
   ComparisonResponse,
@@ -446,136 +433,11 @@ export class ApiClient {
     }
   }
 
-  // ==================== Feedback ====================
 
-  /**
-   * Create feedback entries
-   *
-   * @param request - Create request with list of feedback entries
-   * @returns Created feedback entries
-   * @throws ApiError if creation fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.createFeedback({
-   *   feedback: [
-   *     {
-   *       resume_id: 'abc123',
-   *       vacancy_id: 'vac456',
-   *       skill: 'React',
-   *       was_correct: true,
-   *       confidence_score: 0.95,
-   *       feedback_source: 'frontend',
-   *     },
-   *   ],
-   * });
-   * ```
-   */
-  async createFeedback(request: FeedbackCreate): Promise<FeedbackListResponse> {
-    try {
-      const response: AxiosResponse<FeedbackListResponse> = await this.client.post(
-        '/api/feedback/',
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 
-  /**
-   * List feedback entries with optional filters
-   *
-   * @param resumeId - Optional resume ID filter
-   * @param vacancyId - Optional vacancy ID filter
-   * @param skill - Optional skill filter
-   * @param wasCorrect - Optional correctness filter
-   * @param processed - Optional processed status filter
-   * @param feedbackSource - Optional feedback source filter
-   * @returns List of feedback entries
-   * @throws ApiError if listing fails
-   */
-  async listFeedback(
-    resumeId?: string,
-    vacancyId?: string,
-    skill?: string,
-    wasCorrect?: boolean,
-    processed?: boolean,
-    feedbackSource?: string
-  ): Promise<FeedbackListResponse> {
-    try {
-      const params: Record<string, string | boolean> = {};
-      if (resumeId) params.resume_id = resumeId;
-      if (vacancyId) params.vacancy_id = vacancyId;
-      if (skill) params.skill = skill;
-      if (wasCorrect !== undefined) params.was_correct = wasCorrect;
-      if (processed !== undefined) params.processed = processed;
-      if (feedbackSource) params.feedback_source = feedbackSource;
 
-      const response: AxiosResponse<FeedbackListResponse> = await this.client.get(
-        '/api/feedback/',
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 
-  /**
-   * Get a specific feedback entry by ID
-   *
-   * @param id - Feedback entry ID
-   * @returns Feedback entry
-   * @throws ApiError if not found
-   */
-  async getFeedback(id: string): Promise<FeedbackResponse> {
-    try {
-      const response: AxiosResponse<FeedbackResponse> = await this.client.get(
-        `/api/feedback/${id}`
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 
-  /**
-   * Update a feedback entry
-   *
-   * @param id - Feedback entry ID
-   * @param request - Update request
-   * @returns Updated feedback entry
-   * @throws ApiError if update fails
-   */
-  async updateFeedback(
-    id: string,
-    request: FeedbackUpdate
-  ): Promise<FeedbackResponse> {
-    try {
-      const response: AxiosResponse<FeedbackResponse> = await this.client.put(
-        `/api/feedback/${id}`,
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Delete a specific feedback entry
-   *
-   * @param id - Feedback entry ID
-   * @throws ApiError if deletion fails
-   */
-  async deleteFeedback(id: string): Promise<void> {
-    try {
-      await this.client.delete(`/api/feedback/${id}`);
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 
   // ==================== Model Versions ====================
 
@@ -758,36 +620,6 @@ export class ApiClient {
     }
   }
 
-  // ==================== Matching Feedback ====================
-
-  /**
-   * Submit feedback on a skill match result
-   *
-   * @param request - Feedback request with match_id, skill, and correctness
-   * @returns Created feedback entry
-   * @throws ApiError if submission fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.submitMatchFeedback({
-   *   match_id: 'match123',
-   *   skill: 'React',
-   *   was_correct: true,
-   *   confidence_score: 0.95,
-   * });
-   * ```
-   */
-  async submitMatchFeedback(request: MatchFeedbackRequest): Promise<MatchFeedbackResponse> {
-    try {
-      const response: AxiosResponse<MatchFeedbackResponse> = await this.client.post(
-        '/api/matching/feedback',
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 
   // ==================== Comparisons ====================
 
