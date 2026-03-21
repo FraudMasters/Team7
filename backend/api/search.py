@@ -7,10 +7,12 @@ This module provides endpoints for:
 - Range filters for experience years, match score, and date ranges
 - Sorting by relevance, date, or experience
 - Search history tracking and retrieval
+- Elasticsearch integration for advanced boolean query parsing
 
-Leverages PostgreSQL full-text search for fast, flexible queries.
+Supports both PostgreSQL full-text search and Elasticsearch-based search.
 """
 import logging
+import time
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -21,8 +23,12 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import SearchHistory
+from models import SearchHistory, Resume, ResumeAnalysis
 from services.search_service import SearchService, SearchFilters, get_search_service
+from services.elasticsearch_service import (
+    ElasticsearchService,
+    SearchQuery as ESSearchQuery,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +44,7 @@ class SearchRequest(BaseModel):
     skip: int = Field(0, ge=0, description="Number of results to skip (pagination)")
     limit: int = Field(100, ge=1, le=200, description="Maximum number of results to return")
     sort_by: str = Field("relevance", description="Sort field: relevance, date, or experience")
+    use_elasticsearch: bool = Field(False, description="Use Elasticsearch for search (supports advanced boolean queries)")
 
 
 class FilterRequest(BaseModel):
@@ -179,58 +186,127 @@ async def search_candidates(
         logger.info(
             f"Searching candidates - query: {search_data.query}, "
             f"filters: {search_data.filters}, skip: {search_data.skip}, "
-            f"limit: {search_data.limit}, sort_by: {search_data.sort_by}"
+            f"limit: {search_data.limit}, sort_by: {search_data.sort_by}, "
+            f"use_elasticsearch: {search_data.use_elasticsearch}"
         )
 
-        # Get search service
-        search_service = get_search_service(db)
+        start_time = time.time()
 
-        # Build SearchFilters from request data
-        filters = None
-        if search_data.filters:
-            filters = SearchFilters(
-                skills=search_data.filters.get("skills"),
-                min_experience_years=search_data.filters.get("min_experience_years"),
-                max_experience_years=search_data.filters.get("max_experience_years"),
-                location=search_data.filters.get("location"),
-                education_level=search_data.filters.get("education_level"),
-                languages=search_data.filters.get("languages"),
-                min_match_score=search_data.filters.get("min_match_score"),
-                max_match_score=search_data.filters.get("max_match_score"),
-                date_from=search_data.filters.get("date_from"),
-                date_to=search_data.filters.get("date_to"),
-                vacancy_id=search_data.filters.get("vacancy_id"),
-                stage_id=search_data.filters.get("stage_id"),
-                tag_ids=search_data.filters.get("tag_ids"),
+        # Route to Elasticsearch or PostgreSQL based on use_elasticsearch flag
+        if search_data.use_elasticsearch:
+            # Use Elasticsearch for advanced boolean query support
+            es_service = ElasticsearchService()
+            await es_service.initialize()
+
+            # Build SearchQuery for Elasticsearch
+            es_query = ESSearchQuery(
+                query_string=search_data.query,
+                skills=search_data.filters.get("skills") if search_data.filters else None,
+                min_experience_years=search_data.filters.get("min_experience_years") if search_data.filters else None,
+                max_experience_years=search_data.filters.get("max_experience_years") if search_data.filters else None,
+                location=search_data.filters.get("location") if search_data.filters else None,
+                education_level=search_data.filters.get("education_level") if search_data.filters else None,
+                languages=search_data.filters.get("languages") if search_data.filters else None,
+                from_=search_data.skip,
+                size=search_data.limit,
+                sort_by=search_data.sort_by,
+                filters=search_data.filters,
             )
 
-        # Execute search
-        result = await search_service.search_candidates(
-            query=search_data.query,
-            filters=filters,
-            skip=search_data.skip,
-            limit=search_data.limit,
-            sort_by=search_data.sort_by,
-        )
+            # Execute Elasticsearch search
+            es_result = await es_service.search(es_query)
 
-        logger.info(
-            f"Search completed: {result.total} total candidates, "
-            f"returned {len(result.candidates)} results in "
-            f"{result.execution_time_seconds:.3f}s"
-        )
+            # Transform Elasticsearch results to API response format
+            candidates = []
+            for hit in es_result.hits:
+                source = hit.get("_source", {})
+                candidate = {
+                    "id": hit.get("_id"),
+                    "score": hit.get("_score"),
+                    "resume_id": source.get("resume_id"),
+                    "raw_text": source.get("raw_text", "")[:200] + "...",  # Truncate for response
+                    "skills": source.get("skills", []),
+                    "experience_years": source.get("experience_years"),
+                    "education": source.get("education", []),
+                    "location": source.get("location"),
+                    "languages": source.get("languages", []),
+                    "indexed_at": source.get("indexed_at"),
+                }
+                candidates.append(candidate)
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "total": result.total,
-                "candidates": result.candidates,
-                "query": result.query,
-                "filters_applied": result.filters_applied,
-                "execution_time_seconds": result.execution_time_seconds,
-                "skip": search_data.skip,
-                "limit": search_data.limit,
-            },
-        )
+            execution_time = time.time() - start_time
+
+            logger.info(
+                f"Elasticsearch search completed: {es_result.total} total candidates, "
+                f"returned {len(candidates)} results in {execution_time:.3f}s"
+            )
+
+            # Close Elasticsearch client
+            await es_service.close()
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "total": es_result.total,
+                    "candidates": candidates,
+                    "query": search_data.query or "",
+                    "filters_applied": search_data.filters or {},
+                    "execution_time_seconds": execution_time,
+                    "skip": search_data.skip,
+                    "limit": search_data.limit,
+                },
+            )
+
+        else:
+            # Use PostgreSQL search service
+            search_service = get_search_service(db)
+
+            # Build SearchFilters from request data
+            filters = None
+            if search_data.filters:
+                filters = SearchFilters(
+                    skills=search_data.filters.get("skills"),
+                    min_experience_years=search_data.filters.get("min_experience_years"),
+                    max_experience_years=search_data.filters.get("max_experience_years"),
+                    location=search_data.filters.get("location"),
+                    education_level=search_data.filters.get("education_level"),
+                    languages=search_data.filters.get("languages"),
+                    min_match_score=search_data.filters.get("min_match_score"),
+                    max_match_score=search_data.filters.get("max_match_score"),
+                    date_from=search_data.filters.get("date_from"),
+                    date_to=search_data.filters.get("date_to"),
+                    vacancy_id=search_data.filters.get("vacancy_id"),
+                    stage_id=search_data.filters.get("stage_id"),
+                    tag_ids=search_data.filters.get("tag_ids"),
+                )
+
+            # Execute search
+            result = await search_service.search_candidates(
+                query=search_data.query,
+                filters=filters,
+                skip=search_data.skip,
+                limit=search_data.limit,
+                sort_by=search_data.sort_by,
+            )
+
+            logger.info(
+                f"PostgreSQL search completed: {result.total} total candidates, "
+                f"returned {len(result.candidates)} results in "
+                f"{result.execution_time_seconds:.3f}s"
+            )
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "total": result.total,
+                    "candidates": result.candidates,
+                    "query": result.query,
+                    "filters_applied": result.filters_applied,
+                    "execution_time_seconds": result.execution_time_seconds,
+                    "skip": search_data.skip,
+                    "limit": search_data.limit,
+                },
+            )
 
     except ValueError as e:
         logger.error(f"Invalid search parameters: {e}", exc_info=True)

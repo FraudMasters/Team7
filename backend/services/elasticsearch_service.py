@@ -11,6 +11,7 @@ Features:
 - Bulk indexing for efficient batch operations
 - Index management (create, delete, refresh)
 - Query DSL generation for complex searches
+- Boolean query parsing with AND/OR/NOT operators
 - Error handling with graceful fallbacks
 
 The service integrates with the existing resume_analyses table and provides
@@ -31,6 +32,8 @@ from uuid import UUID
 
 from elasticsearch import AsyncElasticsearch, NotFoundError, RequestError
 from elasticsearch.helpers import async_bulk
+
+from services.query_parser import QueryParser
 
 logger = logging.getLogger(__name__)
 
@@ -456,6 +459,8 @@ class ElasticsearchService:
         """
         Build Elasticsearch query DSL from SearchQuery.
 
+        Uses the QueryParser for boolean query syntax support (AND/OR/NOT).
+
         Args:
             query: SearchQuery object
 
@@ -465,23 +470,55 @@ class ElasticsearchService:
         must_clauses = []
         filter_clauses = []
 
-        # Full-text search on raw_text field
+        # Full-text search with boolean query parser
         if query.query_string:
-            must_clauses.append(
-                {
-                    "multi_match": {
-                        "query": query.query_string,
-                        "fields": [
-                            "raw_text^2",  # Boost raw text
-                            "skills^3",  # Boost skills more
-                            "education",
-                            "location",
-                        ],
-                        "type": "best_fields",
-                        "operator": "or",
+            try:
+                # Parse boolean query syntax
+                parser = QueryParser()
+                parsed_query = parser.parse(query.query_string)
+
+                if parsed_query and "query" in parsed_query:
+                    # Extract the query portion from the parsed result
+                    must_clauses.append(parsed_query["query"])
+                    logger.debug(f"Parsed boolean query: {query.query_string}")
+                else:
+                    # Fallback to simple multi_match if parsing returns None
+                    must_clauses.append(
+                        {
+                            "multi_match": {
+                                "query": query.query_string,
+                                "fields": [
+                                    "raw_text^2",  # Boost raw text
+                                    "skills^3",  # Boost skills more
+                                    "education",
+                                    "location",
+                                ],
+                                "type": "best_fields",
+                                "operator": "or",
+                            }
+                        }
+                    )
+            except ValueError as e:
+                # If query parsing fails, log error and fallback to simple search
+                logger.warning(
+                    f"Failed to parse boolean query '{query.query_string}': {e}. "
+                    f"Falling back to simple search."
+                )
+                must_clauses.append(
+                    {
+                        "multi_match": {
+                            "query": query.query_string,
+                            "fields": [
+                                "raw_text^2",
+                                "skills^3",
+                                "education",
+                                "location",
+                            ],
+                            "type": "best_fields",
+                            "operator": "or",
+                        }
                     }
-                }
-            )
+                )
 
         # Skills filter (OR logic)
         if query.skills:
