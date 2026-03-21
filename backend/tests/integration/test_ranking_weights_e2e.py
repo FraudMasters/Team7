@@ -506,6 +506,299 @@ class TestRankingWeightsE2E:
             delete_response = await client.delete(f"/api/ranking-weights/profiles/{vacancy_profile_id}")
             assert delete_response.status_code in [204, 404], "Vacancy profile cleanup failed"
 
+    async def test_e2e_vacancy_specific_weights_override_org_defaults(
+        self,
+        test_db: AsyncSession,
+        test_organization_id: str,
+        test_vacancy_data: dict,
+        test_candidates_data: List[dict],
+        default_ranking_profile_data: dict,
+        skills_focused_profile_data: dict,
+    ) -> None:
+        """
+        Test that vacancy-specific weights override organization defaults.
+
+        This test verifies:
+        1. Set organization default ranking weights
+        2. Create vacancy A (uses org defaults) and rank candidates
+        3. Create vacancy B with custom weights
+        4. Verify vacancy B uses custom weights, vacancy A uses org defaults
+        5. Verify rankings differ between vacancies
+        """
+        # Use ASGI transport for direct app testing (no server needed)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # ================================================================
+            # Step 1: Create organization default ranking weight profile
+            # ================================================================
+            response = await client.post(
+                "/api/ranking-weights/profiles",
+                json=default_ranking_profile_data
+            )
+
+            assert response.status_code == 201, f"Default profile creation failed: {response.text}"
+            org_default_profile = response.json()
+            org_default_profile_id = org_default_profile["id"]
+
+            # Verify organization default profile created in database
+            result = await test_db.execute(
+                select(RankingWeightProfile).where(RankingWeightProfile.id == org_default_profile_id)
+            )
+            db_profile = result.scalar_one_or_none()
+            assert db_profile is not None, "Organization default profile not found in database"
+            assert db_profile.skills_match_ratio_weight == 0.20  # Default balanced weight
+            assert db_profile.organization_id == test_organization_id
+            assert db_profile.vacancy_id is None, "Organization default should not be vacancy-specific"
+
+            # ================================================================
+            # Step 2: Create two vacancies and candidates
+            # ================================================================
+            # Vacancy A - uses org defaults
+            vacancy_a_data = test_vacancy_data.copy()
+            vacancy_a_data["title"] = "Senior Python Developer - Team A"
+            vacancy_a = await create_vacancy(test_db, vacancy_a_data)
+            vacancy_a_id = str(vacancy_a.id)
+
+            # Vacancy B - will have custom weights
+            vacancy_b_data = test_vacancy_data.copy()
+            vacancy_b_data["title"] = "Senior Python Developer - Team B"
+            vacancy_b = await create_vacancy(test_db, vacancy_b_data)
+            vacancy_b_id = str(vacancy_b.id)
+
+            # Create shared candidate pool
+            resumes = []
+            for candidate_data in test_candidates_data:
+                resume = await create_resume_with_analysis(test_db, candidate_data)
+                resumes.append(resume)
+
+                # Create mock match results for vacancy A
+                if "high_skills" in candidate_data["filename"]:
+                    overall_score_a = 0.90
+                elif "medium_skills" in candidate_data["filename"]:
+                    overall_score_a = 0.75
+                elif "high_experience" in candidate_data["filename"]:
+                    overall_score_a = 0.85
+                else:
+                    overall_score_a = 0.60
+
+                await create_mock_match_result(
+                    test_db,
+                    str(resume.id),
+                    vacancy_a_id,
+                    overall_score_a
+                )
+
+                # Create mock match results for vacancy B (same scores)
+                await create_mock_match_result(
+                    test_db,
+                    str(resume.id),
+                    vacancy_b_id,
+                    overall_score_a
+                )
+
+            # ================================================================
+            # Step 3: Rank candidates for vacancy A (uses org defaults)
+            # ================================================================
+            vacancy_a_rankings = []
+            for resume in resumes:
+                response = await client.post(
+                    "/api/ranking/rank",
+                    json={
+                        "resume_id": str(resume.id),
+                        "vacancy_id": vacancy_a_id,
+                        "use_experiment": False,
+                    }
+                )
+
+                if response.status_code == 200:
+                    ranking = response.json()
+                    vacancy_a_rankings.append({
+                        "resume_id": str(resume.id),
+                        "filename": resume.filename,
+                        "rank_score": ranking.get("rank_score", 0.0),
+                    })
+
+            # Sort by rank score (descending)
+            vacancy_a_rankings.sort(key=lambda x: x["rank_score"], reverse=True)
+
+            assert len(vacancy_a_rankings) > 0, "No rankings generated for vacancy A"
+
+            # ================================================================
+            # Step 4: Create vacancy-specific custom profile for vacancy B
+            # ================================================================
+            # Create skills-focused profile specifically for vacancy B
+            vacancy_b_profile_data = skills_focused_profile_data.copy()
+            vacancy_b_profile_data["vacancy_id"] = vacancy_b_id
+            vacancy_b_profile_data["name"] = "Skills-Focused for Vacancy B"
+            vacancy_b_profile_data["change_reason"] = "Custom weights for technical role vacancy B"
+
+            response = await client.post(
+                "/api/ranking-weights/profiles",
+                json=vacancy_b_profile_data
+            )
+
+            assert response.status_code == 201, f"Vacancy B profile creation failed: {response.text}"
+            vacancy_b_profile = response.json()
+            vacancy_b_profile_id = vacancy_b_profile["id"]
+
+            # Verify vacancy B profile has high skills_match_ratio_weight
+            assert vacancy_b_profile["skills_match_ratio_weight"] == 0.45, "Skills weight not set correctly for vacancy B"
+            assert vacancy_b_profile["vacancy_id"] == vacancy_b_id, "Vacancy B profile not associated with correct vacancy"
+
+            # ================================================================
+            # Step 5: Rank candidates for vacancy B (uses custom weights)
+            # ================================================================
+            vacancy_b_rankings = []
+            for resume in resumes:
+                response = await client.post(
+                    "/api/ranking/rank",
+                    json={
+                        "resume_id": str(resume.id),
+                        "vacancy_id": vacancy_b_id,
+                        "use_experiment": False,
+                    }
+                )
+
+                if response.status_code == 200:
+                    ranking = response.json()
+                    vacancy_b_rankings.append({
+                        "resume_id": str(resume.id),
+                        "filename": resume.filename,
+                        "rank_score": ranking.get("rank_score", 0.0),
+                    })
+
+            # Sort by rank score (descending)
+            vacancy_b_rankings.sort(key=lambda x: x["rank_score"], reverse=True)
+
+            assert len(vacancy_b_rankings) > 0, "No rankings generated for vacancy B"
+
+            # ================================================================
+            # Step 6: Verify vacancy A still uses org defaults
+            # ================================================================
+            # Query database to verify vacancy A doesn't have a specific profile
+            result = await test_db.execute(
+                select(RankingWeightProfile).where(
+                    RankingWeightProfile.vacancy_id == vacancy_a_id
+                )
+            )
+            vacancy_a_specific_profile = result.scalar_one_or_none()
+            assert vacancy_a_specific_profile is None, "Vacancy A should not have a specific profile"
+
+            # Verify org default profile is still active and unchanged
+            result = await test_db.execute(
+                select(RankingWeightProfile).where(RankingWeightProfile.id == org_default_profile_id)
+            )
+            org_profile = result.scalar_one_or_none()
+            assert org_profile is not None, "Organization default profile disappeared"
+            assert org_profile.skills_match_ratio_weight == 0.20, "Organization default weights changed"
+
+            # ================================================================
+            # Step 7: Verify vacancy B uses custom weights
+            # ================================================================
+            result = await test_db.execute(
+                select(RankingWeightProfile).where(RankingWeightProfile.id == vacancy_b_profile_id)
+            )
+            vacancy_b_db_profile = result.scalar_one_or_none()
+            assert vacancy_b_db_profile is not None, "Vacancy B profile not found in database"
+            assert vacancy_b_db_profile.vacancy_id == vacancy_b_id, "Vacancy B profile not associated correctly"
+            assert vacancy_b_db_profile.skills_match_ratio_weight == 0.45, "Vacancy B custom weights not applied"
+
+            # ================================================================
+            # Step 8: Verify rankings differ between vacancies
+            # ================================================================
+            # Compare ranking positions for the same candidates across vacancies
+
+            # Find high_skills candidate in both rankings
+            vacancy_a_high_skills_idx = next(
+                (i for i, r in enumerate(vacancy_a_rankings) if "high_skills" in r["filename"]),
+                None
+            )
+            vacancy_b_high_skills_idx = next(
+                (i for i, r in enumerate(vacancy_b_rankings) if "high_skills" in r["filename"]),
+                None
+            )
+
+            # Find high_experience candidate in both rankings
+            vacancy_a_high_exp_idx = next(
+                (i for i, r in enumerate(vacancy_a_rankings) if "high_experience" in r["filename"]),
+                None
+            )
+            vacancy_b_high_exp_idx = next(
+                (i for i, r in enumerate(vacancy_b_rankings) if "high_experience" in r["filename"]),
+                None
+            )
+
+            # Verify both candidates exist in both rankings
+            assert vacancy_a_high_skills_idx is not None, "High skills candidate not ranked for vacancy A"
+            assert vacancy_b_high_skills_idx is not None, "High skills candidate not ranked for vacancy B"
+            assert vacancy_a_high_exp_idx is not None, "High experience candidate not ranked for vacancy A"
+            assert vacancy_b_high_exp_idx is not None, "High experience candidate not ranked for vacancy B"
+
+            # With skills-focused weights in vacancy B, the high_skills candidate
+            # should rank better (lower index = higher rank) than in vacancy A
+            # OR at least maintain top position if already first
+            if vacancy_a_high_skills_idx > 0:  # If not already first in vacancy A
+                assert vacancy_b_high_skills_idx <= vacancy_a_high_skills_idx, (
+                    f"High skills candidate should rank better in vacancy B (skills-focused) "
+                    f"than vacancy A (balanced): A={vacancy_a_high_skills_idx}, B={vacancy_b_high_skills_idx}"
+                )
+
+            # The rankings should differ in some way - check rank scores
+            high_skills_resume_id = next(
+                r["resume_id"] for r in vacancy_a_rankings if "high_skills" in r["filename"]
+            )
+
+            vacancy_a_score = next(
+                r["rank_score"] for r in vacancy_a_rankings if r["resume_id"] == high_skills_resume_id
+            )
+            vacancy_b_score = next(
+                r["rank_score"] for r in vacancy_b_rankings if r["resume_id"] == high_skills_resume_id
+            )
+
+            # With different weights, scores should differ
+            # (Allow small tolerance for floating point comparison)
+            assert abs(vacancy_a_score - vacancy_b_score) > 0.001 or vacancy_b_high_skills_idx != vacancy_a_high_skills_idx, (
+                "Rankings should differ between vacancy A (org defaults) and vacancy B (custom weights)"
+            )
+
+            # ================================================================
+            # Step 9: Verify history entries
+            # ================================================================
+            # Organization default profile should have history
+            result = await test_db.execute(
+                select(RankingWeightVersion).where(
+                    RankingWeightVersion.profile_id == org_default_profile_id
+                )
+            )
+            org_history = result.scalars().all()
+            assert len(org_history) >= 1, "Organization default profile should have history entry"
+
+            # Vacancy B profile should have history
+            result = await test_db.execute(
+                select(RankingWeightVersion).where(
+                    RankingWeightVersion.profile_id == vacancy_b_profile_id
+                )
+            )
+            vacancy_b_history = result.scalars().all()
+            assert len(vacancy_b_history) >= 1, "Vacancy B profile should have history entry"
+
+            # Verify vacancy B history has correct weights
+            vacancy_b_latest = vacancy_b_history[0]
+            assert vacancy_b_latest.skills_match_ratio_weight == 0.45, (
+                "Vacancy B history doesn't match profile skills weight"
+            )
+            assert vacancy_b_latest.change_reason is not None, "Vacancy B history missing change reason"
+
+            # ================================================================
+            # Cleanup
+            # ================================================================
+            # Delete test profiles (soft delete, returns 204 NO CONTENT)
+            delete_response = await client.delete(f"/api/ranking-weights/profiles/{org_default_profile_id}")
+            assert delete_response.status_code in [204, 404], "Organization default profile cleanup failed"
+
+            delete_response = await client.delete(f"/api/ranking-weights/profiles/{vacancy_b_profile_id}")
+            assert delete_response.status_code in [204, 404], "Vacancy B profile cleanup failed"
+
 
 @pytest.mark.e2e
 @pytest.mark.integration
