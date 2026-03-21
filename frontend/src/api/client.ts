@@ -2,37 +2,32 @@
  * API Client for Resume Analysis Backend
  *
  * This module provides a typed Axios client for communicating with the
- * backend resume analysis service. Handles resume upload, analysis,
- * job matching, and health check endpoints.
+ * backend resume analysis service. Handles job matching, health check,
+ * and other general API endpoints.
+ *
+ * For resume-specific operations (upload, analyze, list, delete), use the
+ * ResumesClient from '@/api/resume' instead.
  *
  * @example
  * ```ts
  * import { apiClient } from '@/api/client';
  *
- * // Upload resume
- * const uploadResult = await apiClient.uploadResume(file);
- *
- * // Analyze resume
- * const analysis = await apiClient.analyzeResume(uploadResult.id);
- *
- * // Compare with job vacancy
+ * // Compare resume with job vacancy
  * const match = await apiClient.compareWithVacancy(resumeId, vacancyData);
+ *
+ * // Check backend health
+ * const health = await apiClient.healthCheck();
  * ```
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import { config } from '@/config';
 import type {
-  ResumeUploadResponse,
-  AnalysisRequest,
-  AnalysisResponse,
   JobVacancy,
   MatchResponse,
   HealthResponse,
-  UploadProgressCallback,
   ApiClientConfig,
   ApiError,
-  LanguagePreferenceUpdate,
   LanguagePreferenceResponse,
 } from '@/types/api';
 
@@ -146,80 +141,6 @@ export class ApiClient {
       detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
       status,
     };
-  }
-
-  /**
-   * Upload a resume file
-   *
-   * @param file - Resume file (PDF or DOCX)
-   * @param onProgress - Optional progress callback (0-100)
-   * @returns Upload response with resume ID
-   * @throws ApiError if upload fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.uploadResume(file, (progress) => {
-   *   console.log(`Upload progress: ${progress}%`);
-   * });
-   * ```
-   */
-  async uploadResume(
-    file: File,
-    onProgress?: UploadProgressCallback
-  ): Promise<ResumeUploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response: AxiosResponse<ResumeUploadResponse> = await this.client.post(
-        '/api/resumes/upload',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total && onProgress) {
-              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              onProgress(progress);
-            }
-          },
-        }
-      );
-
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Analyze a resume
-   *
-   * @param request - Analysis request with resume ID and options
-   * @returns Analysis results with keywords, entities, grammar, and experience
-   * @throws ApiError if analysis fails
-   *
-   * @example
-   * ```ts
-   * const analysis = await apiClient.analyzeResume({
-   *   resume_id: 'abc-123',
-   *   extract_experience: true,
-   *   check_grammar: true,
-   * });
-   * ```
-   */
-  async analyzeResume(request: AnalysisRequest): Promise<AnalysisResponse> {
-    try {
-      const response: AxiosResponse<AnalysisResponse> = await this.client.post(
-        '/api/resumes/analyze',
-        request
-      );
-
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
   }
 
   /**
