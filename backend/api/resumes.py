@@ -22,6 +22,7 @@ from i18n.backend_translations import get_error_message, get_success_message
 from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
+from models.duplicate_review import DuplicateReview, ReviewStatus
 from utils.audit_logger import log_audit_event, get_request_context
 from utils.duplicate_detector import detect_duplicate, compute_content_hash
 from services.resume_cache_service import get_resume_cache
@@ -263,6 +264,34 @@ async def upload_resume(
         await db.commit()
         await db.refresh(new_resume)
 
+        # Add duplicate to review queue if detected
+        if duplicate_match and duplicate_match.is_duplicate:
+            try:
+                from datetime import datetime, timezone
+
+                # Create review queue entry for manual approval
+                duplicate_review = DuplicateReview(
+                    organization_id=organization_id,
+                    original_resume_id=duplicate_match.original_resume_id,
+                    duplicate_resume_id=resume_id,
+                    confidence_score=duplicate_match.similarity_score,
+                    status=ReviewStatus.PENDING,
+                    queue_entered_at=datetime.now(timezone.utc),
+                )
+                db.add(duplicate_review)
+                await db.commit()
+
+                logger.info(
+                    f"Added duplicate to review queue: original={duplicate_match.original_resume_id}, "
+                    f"duplicate={resume_id}, confidence={duplicate_match.similarity_score}"
+                )
+            except Exception as e:
+                # Log error but don't block upload
+                logger.error(f"Failed to add duplicate to review queue: {e}", exc_info=True)
+                # Rollback review queue creation but keep the resume
+                await db.rollback()
+                await db.refresh(new_resume)
+
         # Log audit event
         ip_address, user_agent = get_request_context(request)
         await log_audit_event(
@@ -276,6 +305,7 @@ async def upload_resume(
                 "filename": file.filename or "unknown",
                 "file_size": file_size,
                 "content_type": file.content_type or "application/octet-stream",
+                "duplicate_detected": duplicate_match.is_duplicate if duplicate_match else False,
             },
         )
 
