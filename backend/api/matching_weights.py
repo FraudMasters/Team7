@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.matching_weights_profile import MatchingWeightsProfile
 from models.matching_weights_history import MatchingWeightsHistory
+from models.ranking_features_weights import RankingFeaturesWeights
 
 logger = logging.getLogger(__name__)
 
@@ -487,44 +488,95 @@ async def list_matching_weights_profiles(
             f"is_preset: {is_preset}, preset_type: {preset_type}"
         )
 
-        # Build query
-        query = select(MatchingWeightsProfile)
+        # If querying for preset profiles, use RankingFeaturesWeights table (13 weights)
+        # Otherwise, use MatchingWeightsProfile table (3 weights) for backward compatibility
+        if is_preset is True:
+            # Build query for 13-weight ranking features profiles
+            query = select(RankingFeaturesWeights)
 
-        if organization_id is not None:
-            query = query.where(MatchingWeightsProfile.organization_id == organization_id)
+            if organization_id is not None:
+                query = query.where(RankingFeaturesWeights.organization_id == organization_id)
 
-        if is_default is not None:
-            query = query.where(MatchingWeightsProfile.is_default == is_default)
+            if is_default is not None:
+                query = query.where(RankingFeaturesWeights.is_default == is_default)
 
-        if is_preset is not None:
-            query = query.where(MatchingWeightsProfile.is_preset == is_preset)
+            query = query.where(RankingFeaturesWeights.is_preset == True)
 
-        if preset_type is not None:
-            query = query.where(MatchingWeightsProfile.preset_type == preset_type)
+            if preset_type is not None:
+                query = query.where(RankingFeaturesWeights.preset_type == preset_type)
 
-        query = query.order_by(MatchingWeightsProfile.name)
+            query = query.order_by(RankingFeaturesWeights.name)
 
-        result = await db.execute(query)
-        profiles = result.scalars().all()
+            result = await db.execute(query)
+            profiles = result.scalars().all()
 
-        # Build response
-        profiles_data = []
-        for profile in profiles:
-            profiles_data.append({
-                "id": profile.id,
-                "organization_id": profile.organization_id,
-                "name": profile.name,
-                "description": profile.description,
-                "keyword_weight": profile.keyword_weight,
-                "tfidf_weight": profile.tfidf_weight,
-                "vector_weight": profile.vector_weight,
-                "is_default": profile.is_default,
-                "is_preset": profile.is_preset,
-                "preset_type": profile.preset_type,
-                "created_by": profile.created_by,
-                "created_at": profile.created_at.isoformat(),
-                "updated_at": profile.updated_at.isoformat(),
-            })
+            # Build response with all 13 weight fields
+            profiles_data = []
+            for profile in profiles:
+                profiles_data.append({
+                    "id": str(profile.id),
+                    "organization_id": profile.organization_id,
+                    "name": profile.name,
+                    "description": profile.description,
+                    "skill_match_weight": profile.skill_match_weight,
+                    "experience_weight": profile.experience_weight,
+                    "education_weight": profile.education_weight,
+                    "location_weight": profile.location_weight,
+                    "keyword_weight": profile.keyword_weight,
+                    "tfidf_weight": profile.tfidf_weight,
+                    "vector_weight": profile.vector_weight,
+                    "recency_weight": profile.recency_weight,
+                    "culture_fit_weight": profile.culture_fit_weight,
+                    "salary_match_weight": profile.salary_match_weight,
+                    "availability_weight": profile.availability_weight,
+                    "certifications_weight": profile.certifications_weight,
+                    "industry_experience_weight": profile.industry_experience_weight,
+                    "is_default": profile.is_default,
+                    "is_preset": profile.is_preset,
+                    "preset_type": profile.preset_type,
+                    "created_by": profile.created_by,
+                    "created_at": profile.created_at.isoformat(),
+                    "updated_at": profile.updated_at.isoformat(),
+                })
+        else:
+            # Build query for 3-weight matching profiles
+            query = select(MatchingWeightsProfile)
+
+            if organization_id is not None:
+                query = query.where(MatchingWeightsProfile.organization_id == organization_id)
+
+            if is_default is not None:
+                query = query.where(MatchingWeightsProfile.is_default == is_default)
+
+            if is_preset is not None:
+                query = query.where(MatchingWeightsProfile.is_preset == is_preset)
+
+            if preset_type is not None:
+                query = query.where(MatchingWeightsProfile.preset_type == preset_type)
+
+            query = query.order_by(MatchingWeightsProfile.name)
+
+            result = await db.execute(query)
+            profiles = result.scalars().all()
+
+            # Build response with 3 weight fields
+            profiles_data = []
+            for profile in profiles:
+                profiles_data.append({
+                    "id": str(profile.id),
+                    "organization_id": profile.organization_id,
+                    "name": profile.name,
+                    "description": profile.description,
+                    "keyword_weight": profile.keyword_weight,
+                    "tfidf_weight": profile.tfidf_weight,
+                    "vector_weight": profile.vector_weight,
+                    "is_default": profile.is_default,
+                    "is_preset": profile.is_preset,
+                    "preset_type": profile.preset_type,
+                    "created_by": profile.created_by,
+                    "created_at": profile.created_at.isoformat(),
+                    "updated_at": profile.updated_at.isoformat(),
+                })
 
         response_data = {
             "organization_id": organization_id,
