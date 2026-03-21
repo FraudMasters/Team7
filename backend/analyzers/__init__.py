@@ -112,6 +112,12 @@ from .resume_optimizer import (
     generate_resume_optimization,
     format_suggestions_for_display,
 )
+from .resume_comparator import (
+    ResumeComparator,
+    ComparisonResult,
+    ComparisonMetric,
+    get_resume_comparator,
+)
 
 __all__ = [
     "extract_keywords",
@@ -177,6 +183,10 @@ __all__ = [
     "get_llm_matcher",
     "generate_resume_optimization",
     "format_suggestions_for_display",
+    "ResumeComparator",
+    "ComparisonResult",
+    "ComparisonMetric",
+    "get_resume_comparator",
     "save_resume_analysis",
     "get_resume_analysis",
     "delete_resume_analysis",
