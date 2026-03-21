@@ -843,3 +843,166 @@ async def get_source_effectiveness(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Не удалось получить метрики эффективности источников: {str(e)}",
         ) from e
+
+
+class FunnelStage(BaseModel):
+    """Этап воронки найма с метриками конверсии."""
+
+    stage_name: str = Field(..., description="Название этапа воронки")
+    total_candidates: int = Field(..., description="Общее количество кандидатов на этом этапе")
+    conversion_rate: float = Field(..., description="Коэффициент конверсии на следующий этап (0-1)")
+    dropout_rate: float = Field(..., description="Коэффициент отсева на этом этапе (0-1)")
+    average_time_days: float = Field(..., description="Среднее время на этом этапе в днях")
+
+
+class FunnelConversionResponse(BaseModel):
+    """Метрики конверсии воронки найма."""
+
+    stages: list[FunnelStage] = Field(..., description="Список этапов воронки с метриками")
+    overall_conversion_rate: float = Field(..., description="Общий коэффициент конверсии от применения до найма (0-1)")
+    total_applicants: int = Field(..., description="Общее количество кандидатов, вошедших в воронку")
+    total_hires: int = Field(..., description="Общее количество успешных наймов")
+    average_funnel_time_days: float = Field(..., description="Среднее время прохождения всей воронки в днях")
+    biggest_bottleneck: str = Field(..., description="Этап с наибольшим процентом отсева")
+
+
+@router.get(
+    "/funnel-conversion",
+    response_model=FunnelConversionResponse,
+    tags=["Analytics"],
+)
+async def get_funnel_conversion(
+    start_date: Optional[str] = Query(None, description="Фильтр начальной даты (формат ISO 8601)"),
+    end_date: Optional[str] = Query(None, description="Фильтр конечной даты (формат ISO 8601)"),
+) -> JSONResponse:
+    """
+    Получить метрики конверсии воронки найма.
+
+    Этот эндпоинт предоставляет детальный анализ конверсии кандидатов через различные этапы
+    процесса найма, от первоначального применения до окончательного найма. Помогает выявить
+    узкие места в процессе рекрутинга и оптимизировать эффективность найма.
+
+    Args:
+        start_date: Опциональная начальная дата для фильтрации метрик (формат ISO 8601)
+        end_date: Опциональная конечная дата для фильтрации метрик (формат ISO 8601)
+
+    Returns:
+        JSON ответ с метриками конверсии по каждому этапу воронки и общей статистикой
+
+    Raises:
+        HTTPException(500): Если не удалось получить данные
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8006/api/analytics/funnel-conversion")
+        >>> response.json()
+        {
+            "stages": [
+                {
+                    "stage_name": "Applied",
+                    "total_candidates": 1000,
+                    "conversion_rate": 0.60,
+                    "dropout_rate": 0.40,
+                    "average_time_days": 2.5
+                },
+                {
+                    "stage_name": "Screened",
+                    "total_candidates": 600,
+                    "conversion_rate": 0.50,
+                    "dropout_rate": 0.50,
+                    "average_time_days": 5.2
+                },
+                {
+                    "stage_name": "Interviewed",
+                    "total_candidates": 300,
+                    "conversion_rate": 0.40,
+                    "dropout_rate": 0.60,
+                    "average_time_days": 8.7
+                },
+                {
+                    "stage_name": "Offered",
+                    "total_candidates": 120,
+                    "conversion_rate": 0.75,
+                    "dropout_rate": 0.25,
+                    "average_time_days": 3.1
+                },
+                {
+                    "stage_name": "Hired",
+                    "total_candidates": 90,
+                    "conversion_rate": 1.0,
+                    "dropout_rate": 0.0,
+                    "average_time_days": 0.0
+                }
+            ],
+            "overall_conversion_rate": 0.09,
+            "total_applicants": 1000,
+            "total_hires": 90,
+            "average_funnel_time_days": 32.5,
+            "biggest_bottleneck": "Interviewed"
+        }
+    """
+    try:
+        logger.info(
+            f"Получение метрик конверсии воронки - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # Возвращаем placeholder ответ
+        # Интеграция с базой данных будет добавлена в последующем подзадаче
+        response_data = {
+            "stages": [
+                {
+                    "stage_name": "Applied",
+                    "total_candidates": 1000,
+                    "conversion_rate": 0.60,
+                    "dropout_rate": 0.40,
+                    "average_time_days": 2.5,
+                },
+                {
+                    "stage_name": "Screened",
+                    "total_candidates": 600,
+                    "conversion_rate": 0.50,
+                    "dropout_rate": 0.50,
+                    "average_time_days": 5.2,
+                },
+                {
+                    "stage_name": "Interviewed",
+                    "total_candidates": 300,
+                    "conversion_rate": 0.40,
+                    "dropout_rate": 0.60,
+                    "average_time_days": 8.7,
+                },
+                {
+                    "stage_name": "Offered",
+                    "total_candidates": 120,
+                    "conversion_rate": 0.75,
+                    "dropout_rate": 0.25,
+                    "average_time_days": 3.1,
+                },
+                {
+                    "stage_name": "Hired",
+                    "total_candidates": 90,
+                    "conversion_rate": 1.0,
+                    "dropout_rate": 0.0,
+                    "average_time_days": 0.0,
+                },
+            ],
+            "overall_conversion_rate": 0.09,
+            "total_applicants": 1000,
+            "total_hires": 90,
+            "average_funnel_time_days": 32.5,
+            "biggest_bottleneck": "Interviewed",
+        }
+
+        logger.info("Метрики конверсии воронки успешно получены")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка получения метрик конверсии воронки: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось получить метрики конверсии воронки: {str(e)}",
+        ) from e
