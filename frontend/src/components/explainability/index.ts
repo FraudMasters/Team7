@@ -4,6 +4,8 @@ export type { FeatureImportanceItem, FeatureImportanceChartProps } from './Featu
 export { default as CandidateComparisonView } from './CandidateComparisonView';
 export type { CandidateComparisonViewProps } from './CandidateComparisonView';
 
+export { default as ComparisonExplanationView } from './ComparisonExplanationView';
+
 export { default as WhatIfAnalysisPanel } from './WhatIfAnalysisPanel';
 export type { WhatIfAnalysisPanelProps } from './WhatIfAnalysisPanel';
 

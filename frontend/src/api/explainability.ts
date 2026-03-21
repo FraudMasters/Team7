@@ -214,6 +214,67 @@ export interface CompareCandidatesResponse {
 }
 
 /**
+ * Candidate info in detailed comparison
+ */
+export interface CandidateInfo {
+  resume_id: string;
+  candidate_name: string;
+  rank_score: number;
+  rank_position: number | null;
+  confidence: number;
+}
+
+/**
+ * Factor-by-factor comparison detail
+ */
+export interface FactorComparison {
+  factor_name: string;
+  candidate_a_score: number;
+  candidate_b_score: number;
+  difference: number;
+  winner: 'A' | 'B' | 'tie';
+  explanation: string;
+}
+
+/**
+ * Score differential analysis
+ */
+export interface ScoreDifferential {
+  score_difference: number;
+  score_difference_percent: number;
+  higher_candidate: 'A' | 'B';
+  margin_category: 'significant' | 'moderate' | 'slight';
+}
+
+/**
+ * Strengths and weaknesses comparison table
+ */
+export interface StrengthsWeaknessesTable {
+  candidate_a_strengths: string[];
+  candidate_b_strengths: string[];
+  candidate_a_weaknesses: string[];
+  candidate_b_weaknesses: string[];
+}
+
+/**
+ * Detailed comparison response
+ */
+export interface DetailedCompareResponse {
+  vacancy_id: string;
+  candidate_a_info: CandidateInfo;
+  candidate_b_info: CandidateInfo;
+  score_differential: ScoreDifferential;
+  factor_by_factor_comparison: FactorComparison[];
+  winner_narrative: string;
+  key_differences: string[];
+  strengths_weaknesses_table: StrengthsWeaknessesTable;
+  recommendation: string;
+  provider: string;
+  model: string;
+  generated_at: string;
+}
+
+/**
  * Confidence interval response
  */
 export interface ConfidenceIntervalResponse {
@@ -471,6 +532,51 @@ export class ExplainabilityClient {
         {
           resume_a_id: request.resume_a_id,
           resume_b_id: request.resume_b_id,
+          vacancy_id: request.vacancy_id,
+          use_llm: request.use_llm ?? true,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
+  }
+
+  /**
+   * Get detailed side-by-side comparison of two candidates
+   *
+   * Provides comprehensive comparison analysis with:
+   * - Score differential breakdown
+   * - Factor-by-factor comparison
+   * - Natural language winner narrative
+   * - Strengths and weaknesses comparison
+   * - Hiring recommendations
+   *
+   * @param request - Comparison request with candidate and vacancy IDs
+   * @returns Detailed comparison analysis
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const comparison = await explainability.getDetailedComparison({
+   *   resume_a_id: 'resume-1',
+   *   resume_b_id: 'resume-2',
+   *   vacancy_id: 'vacancy-123',
+   *   use_llm: true,
+   * });
+   * console.log(comparison.winner_narrative);
+   * console.log(comparison.factor_by_factor_comparison);
+   * ```
+   */
+  async getDetailedComparison(
+    request: CompareCandidatesRequest
+  ): Promise<DetailedCompareResponse> {
+    try {
+      const response = await this.client.post<DetailedCompareResponse>(
+        '/api/explainability/compare',
+        {
+          resume_id_a: request.resume_a_id,
+          resume_id_b: request.resume_b_id,
           vacancy_id: request.vacancy_id,
           use_llm: request.use_llm ?? true,
         }
