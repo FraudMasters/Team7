@@ -1208,3 +1208,129 @@ async def get_diversity_metrics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Не удалось получить метрики разнообразия: {str(e)}",
         ) from e
+
+
+class BenchmarkComparisonResponse(BaseModel):
+    """Метрики сравнения с отраслевыми эталонами."""
+
+    # Время найма
+    company_time_to_hire_avg: float = Field(..., description="Среднее время найма компании (дни)")
+    industry_time_to_hire_avg: float = Field(..., description="Среднее время найма по отрасли (дни)")
+    time_to_hire_percentile: float = Field(..., description="Перцентиль компании по времени найма (0-100)")
+
+    # Скорость обработки резюме
+    company_resume_processing_rate: float = Field(..., description="Скорость обработки резюме компании (резюме/день)")
+    industry_resume_processing_rate: float = Field(..., description="Скорость обработки резюме по отрасли (резюме/день)")
+    processing_rate_percentile: float = Field(..., description="Перцентиль скорости обработки (0-100)")
+
+    # Качество совпадений
+    company_match_rate: float = Field(..., description="Показатель совпадений компании (0-1)")
+    industry_match_rate: float = Field(..., description="Показатель совпадений по отрасли (0-1)")
+    match_rate_percentile: float = Field(..., description="Перцентиль качества совпадений (0-100)")
+
+    # Коэффициенты конверсии
+    company_offer_acceptance_rate: float = Field(..., description="Коэффициент принятия предложений компании (0-1)")
+    industry_offer_acceptance_rate: float = Field(..., description="Коэффициент принятия предложений по отрасли (0-1)")
+    acceptance_rate_percentile: float = Field(..., description="Перцентиль принятия предложений (0-100)")
+
+    # Общая производительность
+    overall_performance_score: float = Field(..., description="Общий показатель производительности (0-100)")
+    industry_position: str = Field(..., description="Позиция в отрасли (Top 10%, Top 25%, Above Average, Below Average)")
+    recommendations: list = Field(..., description="Список рекомендаций по улучшению")
+
+
+@router.get(
+    "/benchmarks",
+    response_model=BenchmarkComparisonResponse,
+    tags=["Analytics"],
+)
+async def get_benchmark_comparison(
+    industry: Optional[str] = Query(None, description="Фильтр по отрасли"),
+    company_size: Optional[str] = Query(None, description="Фильтр по размеру компании (small, medium, large)"),
+) -> JSONResponse:
+    """
+    Получить сравнение метрик с отраслевыми эталонами.
+
+    Этот эндпоинт предоставляет сравнительные метрики производительности рекрутинга компании
+    с отраслевыми эталонами. Включает сравнение времени найма, скорости обработки резюме,
+    качества совпадений и коэффициентов конверсии. Помогает компаниям понять свою позицию
+    на рынке и определить области для улучшения.
+
+    Args:
+        industry: Опциональный фильтр по отрасли для более точного сравнения
+        company_size: Опциональный фильтр по размеру компании (small, medium, large)
+
+    Returns:
+        JSON ответ со сравнительными метриками, перцентилями и рекомендациями
+
+    Raises:
+        HTTPException(500): Если не удалось получить данные
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8006/api/analytics/benchmarks")
+        >>> response.json()
+        {
+            "company_time_to_hire_avg": 28.5,
+            "industry_time_to_hire_avg": 35.2,
+            "time_to_hire_percentile": 72.5,
+            "company_resume_processing_rate": 12.5,
+            "industry_resume_processing_rate": 8.3,
+            "processing_rate_percentile": 68.0,
+            "company_match_rate": 0.82,
+            "industry_match_rate": 0.75,
+            "match_rate_percentile": 65.0,
+            "company_offer_acceptance_rate": 0.78,
+            "industry_offer_acceptance_rate": 0.72,
+            "acceptance_rate_percentile": 62.0,
+            "overall_performance_score": 73.5,
+            "industry_position": "Top 25%",
+            "recommendations": [
+                "Продолжайте оптимизировать время найма - вы на 19% быстрее среднего",
+                "Рассмотрите улучшение процесса обработки резюме для достижения топ 10%",
+                "Качество совпадений выше среднего - поддерживайте текущие стандарты"
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Получение сравнения с эталонами - industry: {industry}, company_size: {company_size}"
+        )
+
+        # Возвращаем placeholder ответ
+        # Интеграция с базой данных будет добавлена в последующем подзадаче
+        response_data = {
+            "company_time_to_hire_avg": 28.5,
+            "industry_time_to_hire_avg": 35.2,
+            "time_to_hire_percentile": 72.5,
+            "company_resume_processing_rate": 12.5,
+            "industry_resume_processing_rate": 8.3,
+            "processing_rate_percentile": 68.0,
+            "company_match_rate": 0.82,
+            "industry_match_rate": 0.75,
+            "match_rate_percentile": 65.0,
+            "company_offer_acceptance_rate": 0.78,
+            "industry_offer_acceptance_rate": 0.72,
+            "acceptance_rate_percentile": 62.0,
+            "overall_performance_score": 73.5,
+            "industry_position": "Top 25%",
+            "recommendations": [
+                "Продолжайте оптимизировать время найма - вы на 19% быстрее среднего",
+                "Рассмотрите улучшение процесса обработки резюме для достижения топ 10%",
+                "Качество совпадений выше среднего - поддерживайте текущие стандарты",
+            ],
+        }
+
+        logger.info("Сравнение с эталонами успешно получено")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка получения сравнения с эталонами: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось получить сравнение с эталонами: {str(e)}",
+        ) from e
