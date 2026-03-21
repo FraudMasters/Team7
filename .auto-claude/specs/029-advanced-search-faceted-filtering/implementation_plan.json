@@ -595,8 +595,9 @@
             "command": "cd frontend && npm run test:e2e -- query-builder.spec.ts search-analytics.spec.ts",
             "expected": "All E2E tests pass"
           },
-          "status": "pending",
-          "notes": "Test visual query builder, recent searches, analytics dashboard, relevance tuning"
+          "status": "completed",
+          "notes": "Created comprehensive E2E test suites: query-builder.spec.ts (33 tests) covering filter management, operators, field selection, query generation, and copy/reset functionality; search-analytics.spec.ts (64 tests) covering page rendering, charts, popular/zero-result queries, relevance tuning, field weights, test queries, save functionality, data visualization, and responsive design. Tests follow existing patterns from advanced-search.spec.ts.",
+          "updated_at": "2026-03-21T19:25:25.172142+00:00"
         },
         {
           "id": "subtask-6-4",
@@ -789,6 +790,6 @@
   "planStatus": "in_progress",
   "xstateState": "backlog",
   "executionPhase": "coding",
-  "updated_at": "2026-03-21T19:15:28.447Z",
-  "last_updated": "2026-03-21T19:19:10.410366+00:00"
+  "updated_at": "2026-03-21T19:21:04.750Z",
+  "last_updated": "2026-03-21T19:25:25.172151+00:00"
 }
