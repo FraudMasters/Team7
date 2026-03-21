@@ -26,6 +26,7 @@ from services.notification_service import get_notification_service
 from models.notification import NotificationType
 
 from config import get_settings
+from tasks.notification_tasks import send_application_status_notification
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -66,6 +67,27 @@ class JobApplicationsListResponse(BaseModel):
     total: int = Field(..., description="Total count of applications")
     limit: int = Field(..., description="Page size")
     skip: int = Field(..., description="Number of records skipped")
+
+
+class UpdateApplicationStatusRequest(BaseModel):
+    """Request model for updating application status."""
+
+    status: str = Field(..., description="New application status")
+    notes: Optional[str] = Field(None, max_length=1000, description="Optional notes about the status change")
+
+
+class UpdateApplicationStatusResponse(BaseModel):
+    """Response model for updating application status."""
+
+    id: str = Field(..., description="Application ID")
+    vacancy_id: str = Field(..., description="ID of the vacancy")
+    vacancy_title: Optional[str] = Field(None, description="Title of the vacancy")
+    email: str = Field(..., description="Contact email")
+    status: str = Field(..., description="New application status")
+    old_status: str = Field(..., description="Previous application status")
+    notification_queued: bool = Field(..., description="Whether notification was queued")
+    updated_at: str = Field(..., description="Update timestamp")
+    message: str = Field(..., description="Success message")
 
 
 def _application_to_response(application: JobApplication, vacancy_title: Optional[str] = None) -> dict:
@@ -454,4 +476,169 @@ async def get_application(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get application: {str(e)}",
+        ) from e
+
+
+@router.patch(
+    "/{application_id}/status",
+    response_model=UpdateApplicationStatusResponse,
+    tags=["Job Applications"],
+)
+async def update_application_status(
+    request: Request,
+    application_id: str,
+    status_data: UpdateApplicationStatusRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> JSONResponse:
+    """
+    Update a job application status.
+
+    This endpoint allows updating the status of a job application and triggers
+    an email notification to the candidate about the status change.
+
+    Args:
+        request: FastAPI request object
+        application_id: UUID of the application
+        status_data: New status data from request body
+        db: Database session
+        current_user: Authenticated user (optional, for audit)
+
+    Returns:
+        JSON response with updated application details
+
+    Raises:
+        HTTPException(400): If application ID or status format is invalid
+        HTTPException(404): If application not found
+        HTTPException(500): If update fails
+
+    Example:
+        >>> status_data = {
+        ...     "status": "UNDER_REVIEW",
+        ...     "notes": "Application moved to review queue"
+        ... }
+        >>> response = requests.patch("/api/job-applications/123/status", json=status_data)
+    """
+    try:
+        # Parse application_id
+        try:
+            application_uuid = UUID(application_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid application ID format",
+            )
+
+        # Validate status
+        try:
+            new_status = ApplicationStatus(status_data.status.upper())
+        except ValueError:
+            valid_statuses = [s.value for s in ApplicationStatus]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
+            )
+
+        # Query application from database
+        query = select(JobApplication).where(JobApplication.id == application_uuid)
+        result = await db.execute(query)
+        application = result.scalar_one_or_none()
+
+        if not application:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+
+        # Store old status for comparison and notification
+        old_status = application.status
+
+        # Update status
+        application.status = new_status
+        await db.commit()
+        await db.refresh(application)
+
+        # Get vacancy details for notification
+        vacancy_query = select(JobVacancy).where(JobVacancy.id == application.vacancy_id)
+        vacancy_result = await db.execute(vacancy_query)
+        vacancy = vacancy_result.scalar_one_or_none()
+        vacancy_title = vacancy.title if vacancy else "Position"
+
+        # Get user details for notification
+        user_query = select(User).where(User.id == application.user_id)
+        user_result = await db.execute(user_query)
+        user = user_result.scalar_one_or_none()
+
+        notification_queued = False
+
+        # Queue notification task if status changed and user exists
+        if old_status != new_status and user:
+            try:
+                # Queue Celery task to send notification
+                send_application_status_notification.delay(
+                    application_id=str(application.id),
+                    user_id=str(user.id),
+                    user_email=user.email,
+                    user_name=user.full_name if hasattr(user, 'full_name') else user.email,
+                    vacancy_id=str(application.vacancy_id),
+                    vacancy_title=vacancy_title,
+                    old_status=old_status.value,
+                    new_status=new_status.value,
+                    additional_notes=status_data.notes,
+                )
+                notification_queued = True
+                logger.info(
+                    f"Queued notification for application {application.id}: "
+                    f"{old_status.value} -> {new_status.value}"
+                )
+            except Exception as notification_error:
+                # Don't fail the status update if notification queueing fails
+                logger.error(
+                    f"Failed to queue notification for application {application.id}: "
+                    f"{notification_error}",
+                    exc_info=True,
+                )
+
+        # Log audit event
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.MATCH_CREATED,  # Using existing type for now
+            entity_type="job_application_status_change",
+            entity_id=application.id,
+            user_id=current_user.id if current_user else None,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            before_value={"status": old_status.value},
+            after_value={"status": new_status.value, "notes": status_data.notes},
+        )
+
+        logger.info(
+            f"Updated application {application.id} status: "
+            f"{old_status.value} -> {new_status.value}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(application.id),
+                "vacancy_id": str(application.vacancy_id),
+                "vacancy_title": vacancy_title,
+                "email": application.email or "",
+                "status": new_status.value,
+                "old_status": old_status.value,
+                "notification_queued": notification_queued,
+                "updated_at": application.updated_at.isoformat() if application.updated_at else None,
+                "message": f"Application status updated to {new_status.value}",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating application status: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update application status: {str(e)}",
         ) from e
