@@ -9,9 +9,7 @@ import asyncio
 import logging
 import time
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
+from email.message import EmailMessage
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -385,6 +383,86 @@ def format_report_as_csv(
         return None
 
 
+def _send_email_with_attachments(
+    recipients: List[str],
+    subject: str,
+    body: str,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """
+    Internal helper function to send email with attachments via SMTP.
+
+    Внутренняя вспомогательная функция для отправки email с вложениями через SMTP.
+
+    Args:
+        recipients: Список email адресов получателей / List of recipient email addresses
+        subject: Тема письма / Email subject
+        body: Текстовое содержимое / Plain text body
+        attachments: Список вложений (опционально) / List of attachments (optional):
+            [
+                {"filename": "report.pdf", "content": b"...", "content_type": "application/pdf"},
+                {"filename": "data.csv", "content": b"...", "content_type": "text/csv"}
+            ]
+
+    Raises:
+        smtplib.SMTPException: Для ошибок SMTP / For SMTP errors
+        Exception: Для других ошибок отправки / For other sending errors
+    """
+    # Check if SMTP is configured
+    if not settings.smtp_username or not settings.smtp_password:
+        logger.warning("SMTP not configured, logging email instead of sending")
+        logger.info(f"Would send email to: {', '.join(recipients)}")
+        logger.info(f"Subject: {subject}")
+        logger.info(f"Body: {body[:200]}...")
+        if attachments:
+            logger.info(f"Attachments: {', '.join(a.get('filename', 'unknown') for a in attachments)}")
+        return
+
+    # Create email message
+    msg = EmailMessage()
+    msg["From"] = settings.smtp_default_from
+    msg["To"] = ", ".join(recipients)
+    msg["Subject"] = subject
+
+    msg.set_content(body)
+
+    # Add attachments if provided
+    if attachments:
+        for attachment in attachments:
+            filename = attachment.get('filename')
+            content = attachment.get('content')
+            content_type = attachment.get('content_type', 'application/octet-stream')
+
+            if filename and content:
+                # Parse content type
+                maintype, subtype = content_type.split('/', 1) if '/' in content_type else ('application', 'octet-stream')
+                msg.add_attachment(
+                    content,
+                    maintype=maintype,
+                    subtype=subtype,
+                    filename=filename
+                )
+                logger.debug(f"Attached file: {filename} ({len(content)} bytes)")
+
+    # Send via SMTP
+    try:
+        if settings.smtp_use_tls:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                server.starttls()
+                server.login(settings.smtp_username, settings.smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                server.login(settings.smtp_username, settings.smtp_password)
+                server.send_message(msg)
+
+        logger.info(f"Email successfully sent to {', '.join(recipients)}")
+
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP error sending email to {', '.join(recipients)}: {e}")
+        raise
+
+
 def send_report_via_email(
     recipients: List[str],
     report_name: str,
@@ -395,7 +473,7 @@ def send_report_via_email(
     Send report via email to specified recipients.
 
     This function handles sending generated reports via email with optional
-    attachments (PDF, CSV, etc.) using Python's smtplib or SendGrid.
+    attachments (PDF, CSV, etc.) using the notification service pattern.
 
     The email is composed with report summary and key metrics in the body,
     with formatted report files attached.
@@ -426,7 +504,6 @@ def send_report_via_email(
         >>> result['success']
         True
     """
-    import time
     start_time = time.time()
 
     logger.info(
@@ -434,32 +511,6 @@ def send_report_via_email(
     )
 
     try:
-        # Get email configuration from settings
-        smtp_host = getattr(settings, 'smtp_host', None)
-        smtp_port = getattr(settings, 'smtp_port', 587)
-        smtp_use_tls = getattr(settings, 'smtp_use_tls', True)
-        smtp_username = getattr(settings, 'smtp_username', None)
-        smtp_password = getattr(settings, 'smtp_password', None)
-        from_email = getattr(settings, 'smtp_default_from', 'noreply@agenthr.com')
-
-        # Check if SMTP is configured
-        if not smtp_host:
-            logger.warning(
-                "SMTP not configured, skipping actual email sending. "
-                "Set smtp_host in settings to enable email delivery."
-            )
-            processing_time = int((time.time() - start_time) * 1000)
-
-            return {
-                "success": True,
-                "method": "email",
-                "recipients_count": len(recipients),
-                "attachments_count": len(attachments) if attachments else 0,
-                "sent_at": time.time(),
-                "processing_time_ms": processing_time,
-                "note": "Email not sent (SMTP not configured)",
-            }
-
         # Compose email subject
         subject = f"Report: {report_name}"
 
@@ -488,48 +539,8 @@ def send_report_via_email(
 
         body = "\n".join(body_lines)
 
-        # Create MIME multipart message
-        msg = MIMEMultipart()
-        msg['From'] = from_email
-        msg['To'] = ', '.join(recipients)
-        msg['Subject'] = subject
-
-        # Attach body
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Attach files if provided
-        if attachments:
-            for attachment in attachments:
-                filename = attachment.get('filename')
-                content = attachment.get('content')
-                content_type = attachment.get('content_type', 'application/octet-stream')
-
-                if filename and content:
-                    part = MIMEApplication(content)
-                    part.add_header('Content-Disposition', 'attachment', filename=filename)
-                    msg.attach(part)
-                    logger.debug(f"Attached file: {filename} ({len(content)} bytes)")
-
-        # Log email details
-        logger.info(f"Email composed: subject='{subject}', to={', '.join(recipients)}")
-        logger.info(f"Email body length: {len(body)} characters")
-        if attachments:
-            logger.info(f"Attachments: {', '.join(a.get('filename', 'unknown') for a in attachments)}")
-
-        # Send email using SMTP
-        logger.info(f"Connecting to SMTP server: {smtp_host}:{smtp_port}")
-
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-            if smtp_use_tls:
-                server.starttls()
-                logger.debug("TLS enabled")
-
-            if smtp_username and smtp_password:
-                server.login(smtp_username, smtp_password)
-                logger.debug("Authenticated with SMTP server")
-
-            server.sendmail(from_email, recipients, msg.as_string())
-            logger.info(f"Email sent successfully to {len(recipients)} recipients")
+        # Send email using helper function
+        _send_email_with_attachments(recipients, subject, body, attachments)
 
         processing_time = int((time.time() - start_time) * 1000)
 
@@ -547,26 +558,10 @@ def send_report_via_email(
             "processing_time_ms": processing_time,
         }
 
-    except smtplib.SMTPAuthenticationError as e:
-        processing_time = int((time.time() - start_time) * 1000)
-        logger.error(
-            f"SMTP authentication failed: {e}",
-            exc_info=True
-        )
-
-        return {
-            "success": False,
-            "method": "email",
-            "recipients_count": len(recipients),
-            "attachments_count": len(attachments) if attachments else 0,
-            "error": f"SMTP authentication failed: {str(e)}",
-            "processing_time_ms": processing_time,
-        }
-
     except smtplib.SMTPException as e:
         processing_time = int((time.time() - start_time) * 1000)
         logger.error(
-            f"SMTP error occurred: {e}",
+            f"SMTP error sending report email: {e}",
             exc_info=True
         )
 
