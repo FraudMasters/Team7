@@ -3,7 +3,7 @@
  *
  * This module provides a typed Axios client for communicating with the
  * backend resume analysis service. Handles resume upload, analysis,
- * job matching, skill taxonomies, custom synonyms, feedback, model versions,
+ * job matching, skill taxonomies, feedback, model versions,
  * resume comparisons, and health check endpoints.
  *
  * @example
@@ -23,12 +23,6 @@
  * const comparison = await apiClient.compareMultipleResumes({
  *   vacancy_id: 'vacancy-123',
  *   resume_ids: ['resume1', 'resume2', 'resume3'],
- * });
- *
- * // Create custom synonyms
- * const synonyms = await apiClient.createCustomSynonyms({
- *   organization_id: 'org123',
- *   synonyms: [{ canonical_skill: 'React', custom_synonyms: ['ReactJS'], is_active: true }],
  * });
  *
  * // Submit feedback
@@ -58,10 +52,6 @@ import type {
   UploadProgressCallback,
   ApiClientConfig,
   ApiError,
-  CustomSynonymCreate,
-  CustomSynonymUpdate,
-  CustomSynonymResponse,
-  CustomSynonymListResponse,
   FeedbackCreate,
   FeedbackUpdate,
   FeedbackResponse,
@@ -451,143 +441,6 @@ export class ApiClient {
   async post<T = unknown>(url: string, data?: unknown): Promise<AxiosResponse<T>> {
     try {
       return await this.client.post<T>(url, data);
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-
-  // ==================== Custom Synonyms ====================
-
-  /**
-   * Create custom synonym entries for an organization
-   *
-   * @param request - Create request with organization_id and list of synonyms
-   * @returns Created synonym entries
-   * @throws ApiError if creation fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.createCustomSynonyms({
-   *   organization_id: 'org123',
-   *   created_by: 'user456',
-   *   synonyms: [
-   *     {
-   *       canonical_skill: 'React',
-   *       custom_synonyms: ['ReactJS', 'React.js', 'React Framework'],
-   *       context: 'web_framework',
-   *       is_active: true,
-   *     },
-   *   ],
-   * });
-   * ```
-   */
-  async createCustomSynonyms(
-    request: CustomSynonymCreate
-  ): Promise<CustomSynonymListResponse> {
-    try {
-      const response: AxiosResponse<CustomSynonymListResponse> = await this.client.post(
-        '/api/custom-synonyms/',
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * List custom synonyms with optional filters
-   *
-   * @param organizationId - Optional organization ID filter
-   * @param canonicalSkill - Optional canonical skill filter
-   * @param isActive - Optional active status filter
-   * @returns List of custom synonym entries
-   * @throws ApiError if listing fails
-   */
-  async listCustomSynonyms(
-    organizationId?: string,
-    canonicalSkill?: string,
-    isActive?: boolean
-  ): Promise<CustomSynonymListResponse[]> {
-    try {
-      const params: Record<string, string | boolean> = {};
-      if (organizationId) params.organization_id = organizationId;
-      if (canonicalSkill) params.canonical_skill = canonicalSkill;
-      if (isActive !== undefined) params.is_active = isActive;
-
-      const response: AxiosResponse<CustomSynonymListResponse[]> =
-        await this.client.get('/api/custom-synonyms/', { params });
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Get a specific custom synonym entry by ID
-   *
-   * @param id - Synonym entry ID
-   * @returns Custom synonym entry
-   * @throws ApiError if not found
-   */
-  async getCustomSynonym(id: string): Promise<CustomSynonymResponse> {
-    try {
-      const response: AxiosResponse<CustomSynonymResponse> = await this.client.get(
-        `/api/custom-synonyms/${id}`
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Update a custom synonym entry
-   *
-   * @param id - Synonym entry ID
-   * @param request - Update request
-   * @returns Updated synonym entry
-   * @throws ApiError if update fails
-   */
-  async updateCustomSynonym(
-    id: string,
-    request: CustomSynonymUpdate
-  ): Promise<CustomSynonymResponse> {
-    try {
-      const response: AxiosResponse<CustomSynonymResponse> = await this.client.put(
-        `/api/custom-synonyms/${id}`,
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Delete a specific custom synonym entry
-   *
-   * @param id - Synonym entry ID
-   * @throws ApiError if deletion fails
-   */
-  async deleteCustomSynonym(id: string): Promise<void> {
-    try {
-      await this.client.delete(`/api/custom-synonyms/${id}`);
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Delete all custom synonyms for an organization
-   *
-   * @param organizationId - Organization ID
-   * @throws ApiError if deletion fails
-   */
-  async deleteCustomSynonymsByOrganization(organizationId: string): Promise<void> {
-    try {
-      await this.client.delete(`/api/custom-synonyms/organization/${organizationId}`);
     } catch (error) {
       throw this.transformError(error);
     }
