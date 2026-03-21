@@ -264,6 +264,7 @@ from api import (
     skill_taxonomies,
     skill_relationships,
     custom_synonyms,
+    duplicates,
     fairness,
     feedback,
     model_versions,
@@ -311,6 +312,7 @@ app.include_router(matching_weights.router, prefix="/api/matching-weights", tags
 app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags=["Skill Taxonomies"])
 app.include_router(skill_relationships.router, prefix="/api/skill-relationships", tags=["Skill Relationships"])
 app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=["Custom Synonyms"])
+app.include_router(duplicates.router, prefix="/api/duplicates", tags=["Duplicates"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
