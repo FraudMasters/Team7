@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import get_settings
 from database import async_session_maker
 from models import Report, ScheduledReport
+from models.audit_log import AuditLog, AuditActionType
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -741,6 +742,61 @@ async def _update_scheduled_report_timestamps(
             return False, f"Database error: {str(e)}"
 
 
+async def _create_audit_log_entry(
+    scheduled_report_id: str,
+    action_data: Dict[str, Any],
+    organization_id: Optional[str] = None,
+) -> Tuple[bool, Optional[str]]:
+    """
+    Create an audit log entry for report generation (async).
+
+    This function creates an audit log entry to track when a scheduled report
+    was generated and delivered, including details about formats, recipients,
+    and delivery status.
+
+    Args:
+        scheduled_report_id: UUID of the scheduled report
+        action_data: Dictionary containing report generation details:
+            - formats_generated: List of formats (pdf, csv)
+            - delivery_method: Delivery method used (email)
+            - recipients_count: Number of recipients
+            - delivery_successful: Whether delivery was successful
+            - processing_time_ms: Processing time in milliseconds
+        organization_id: Optional UUID of the organization (if available)
+
+    Returns:
+        Tuple of (success, error_message)
+        If successful, error_message is None
+    """
+    async with async_session_maker() as db:
+        try:
+            # Create audit log entry
+            audit_log = AuditLog(
+                action_type=AuditActionType.REPORT_GENERATED,
+                entity_type="scheduled_report",
+                entity_id=scheduled_report_id,
+                organization_id=organization_id,
+                action_data=action_data,
+            )
+
+            db.add(audit_log)
+            await db.commit()
+
+            logger.info(
+                f"Audit log created for scheduled report {scheduled_report_id}: "
+                f"formats={action_data.get('formats_generated')}, "
+                f"recipients={action_data.get('recipients_count')}, "
+                f"delivery_successful={action_data.get('delivery_successful')}"
+            )
+
+            return True, None
+
+        except Exception as e:
+            logger.error(f"Database error creating audit log: {e}", exc_info=True)
+            await db.rollback()
+            return False, f"Database error: {str(e)}"
+
+
 @shared_task(
     name="tasks.report_generation.generate_scheduled_report",
     bind=True,
@@ -1040,6 +1096,42 @@ def generate_scheduled_report(
             f"delivered to {len(recipients)} recipients, "
             f"time: {processing_time_ms}ms"
         )
+
+        # Create audit log entry for report generation
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # Extract organization_id from scheduled_report if available
+                organization_id = scheduled_report.get("organization_id")
+
+                # Prepare audit log action data
+                audit_action_data = {
+                    "report_name": scheduled_report['name'],
+                    "formats_generated": result['formats_generated'],
+                    "delivery_method": delivery_method,
+                    "recipients_count": len(recipients),
+                    "delivery_successful": delivery_successful,
+                    "processing_time_ms": processing_time_ms,
+                }
+
+                audit_success, audit_error = loop.run_until_complete(
+                    _create_audit_log_entry(
+                        scheduled_report_id,
+                        audit_action_data,
+                        organization_id,
+                    )
+                )
+            finally:
+                loop.close()
+
+            if not audit_success:
+                logger.warning(f"Failed to create audit log: {audit_error}")
+                # Continue anyway - the report was still generated successfully
+
+        except Exception as e:
+            logger.error(f"Error creating audit log: {e}", exc_info=True)
+            # Continue anyway - don't let audit log failure prevent task completion
 
         return result
 
