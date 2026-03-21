@@ -8,13 +8,15 @@ Supports:
 - Direct file uploads (PDF, DOCX)
 - ZIP archive uploads with automatic extraction
 """
+import csv
+import io
 import logging
 from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -793,6 +795,181 @@ async def get_batch_results(
             "files": files,
         }
     )
+
+
+@router.get(
+    "/{batch_id}/export",
+    tags=["Batch"],
+)
+async def export_batch_results(
+    request: Request,
+    batch_id: str,
+    format: str = Query("csv", description="Export format (csv or json)"),
+    db: AsyncSession = Depends(get_db)
+) -> StreamingResponse:
+    """
+    Export batch results in CSV or JSON format.
+
+    This endpoint provides batch processing results in a downloadable format,
+    useful for reporting and analysis.
+
+    Args:
+        request: FastAPI request object
+        batch_id: Unique identifier of the batch job
+        format: Export format - "csv" or "json" (default: "csv")
+        db: Database session
+
+    Returns:
+        StreamingResponse with CSV file download or JSON response
+
+    Raises:
+        HTTPException(404): If batch job not found
+        HTTPException(422): If invalid batch_id or format
+        HTTPException(500): If export generation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/batch/123e4567-e89b-12d3-a456-426614174000/export?format=csv"
+        ... )
+        >>> # Returns CSV file for download
+    """
+    locale = _extract_locale(request)
+
+    try:
+        # Validate batch_id format
+        try:
+            batch_uuid = UUID(batch_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid batch ID format: {batch_id}",
+            )
+
+        # Validate export format
+        valid_formats = ["csv", "json"]
+        if format not in valid_formats:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid export format: {format}. Must be one of: {', '.join(valid_formats)}",
+            )
+
+        # Get the batch job
+        query = select(BatchJob).where(BatchJob.id == batch_uuid)
+        result = await db.execute(query)
+        batch = result.scalar_one_or_none()
+
+        if not batch:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Batch job not found: {batch_id}",
+            )
+
+        # Get all resumes for this batch
+        from datetime import datetime, timedelta
+        from models.resume_analysis import ResumeAnalysis
+
+        time_threshold = batch.created_at + timedelta(seconds=5)
+        resume_query = select(Resume).where(
+            Resume.created_at <= time_threshold
+        ).order_by(Resume.created_at.desc()).limit(batch.total_files)
+
+        resume_result = await db.execute(resume_query)
+        resumes = resume_result.scalars().all()
+
+        # Collect file details
+        files = []
+        successful = 0
+        failed = 0
+
+        for resume in resumes:
+            # Check if analysis exists
+            analysis_query = select(ResumeAnalysis).where(ResumeAnalysis.resume_id == resume.id)
+            analysis_result = await db.execute(analysis_query)
+            analysis = analysis_result.scalar_one_or_none()
+
+            file_status = "completed" if analysis else resume.status.value
+            if file_status == "completed":
+                successful += 1
+            else:
+                failed += 1
+
+            files.append({
+                "resume_id": str(resume.id),
+                "filename": resume.filename,
+                "status": file_status,
+                "error": None,
+            })
+
+        # Export as CSV
+        if format == "csv":
+            # Create CSV in memory
+            output = io.StringIO()
+            writer = csv.writer(output)
+
+            # Write header section
+            writer.writerow(["Batch Export"])
+            writer.writerow(["Batch ID", batch_id])
+            writer.writerow(["Status", batch.status.value])
+            writer.writerow(["Total Files", batch.total_files])
+            writer.writerow(["Successful", successful])
+            writer.writerow(["Failed", failed])
+            writer.writerow(["Created At", batch.created_at.isoformat() if batch.created_at else "N/A"])
+            writer.writerow(["Completed At", batch.completed_at.isoformat() if batch.completed_at else "N/A"])
+            writer.writerow([])
+
+            # Write file details section
+            writer.writerow(["FILES"])
+            writer.writerow(["Resume ID", "Filename", "Status", "Error"])
+            for file in files:
+                writer.writerow([
+                    file["resume_id"],
+                    file["filename"],
+                    file["status"],
+                    file["error"] or "",
+                ])
+
+            # Prepare response
+            csv_content = output.getvalue()
+            output.close()
+
+            logger.info(f"CSV export generated for batch {batch_id}")
+
+            return StreamingResponse(
+                io.StringIO(csv_content),
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f"attachment; filename=batch_{batch_id}_export.csv"
+                }
+            )
+        else:
+            # Return JSON format
+            export_data = {
+                "batch_id": str(batch.id),
+                "status": batch.status.value,
+                "total_files": batch.total_files,
+                "successful": successful,
+                "failed": failed,
+                "created_at": batch.created_at.isoformat() if batch.created_at else None,
+                "completed_at": batch.completed_at.isoformat() if batch.completed_at else None,
+                "files": files,
+            }
+
+            logger.info(f"JSON export generated for batch {batch_id}")
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=export_data,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting batch results for {batch_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export batch results: {str(e)}",
+        ) from e
 
 
 @router.get(
