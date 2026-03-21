@@ -11,9 +11,19 @@ from .source_effectiveness import (
     SourceEffectivenessMetrics,
     SourceMetrics,
 )
+from .diversity_metrics import (
+    DiversityMetricsCalculator,
+    DiversityMetricsResult,
+    DemographicGroupMetrics,
+    CategorySummary,
+)
 
 __all__ = [
     "SourceEffectivenessCalculator",
     "SourceEffectivenessMetrics",
     "SourceMetrics",
+    "DiversityMetricsCalculator",
+    "DiversityMetricsResult",
+    "DemographicGroupMetrics",
+    "CategorySummary",
 ]
