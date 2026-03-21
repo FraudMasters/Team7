@@ -875,18 +875,856 @@ class ReportTemplateService:
 
         Returns:
             ReportGenerationResult with generated report or error
-
-        Note:
-            This is a placeholder implementation. The actual report generation
-            logic will be implemented in subsequent subtasks.
         """
-        logger.info("Generating hiring pipeline report (placeholder)")
+        logger.info("Generating hiring pipeline report")
 
-        # Placeholder implementation
-        # This will be fully implemented in subtask-2-3
+        try:
+            # Collect data if not provided
+            if data is None:
+                data = await self._collect_hiring_pipeline_data(config)
+
+            # Validate required data
+            if not data.get("stages"):
+                raise ValueError("No hiring stage data available for pipeline report")
+
+            # Generate report based on output format
+            if config.output_format == self.FORMAT_PDF:
+                return await self._generate_hiring_pipeline_pdf(config, data)
+            elif config.output_format == self.FORMAT_EXCEL:
+                return await self._generate_hiring_pipeline_excel(config, data)
+            elif config.output_format == self.FORMAT_CSV:
+                return await self._generate_hiring_pipeline_csv(config, data)
+            else:
+                raise ValueError(f"Unsupported output format: {config.output_format}")
+
+        except Exception as e:
+            logger.error(f"Error generating hiring pipeline report: {e}", exc_info=True)
+            return ReportGenerationResult(
+                success=False,
+                error_message=f"Failed to generate hiring pipeline report: {str(e)}",
+            )
+
+    async def _collect_hiring_pipeline_data(
+        self, config: ReportConfig
+    ) -> Dict[str, Any]:
+        """
+        Collect data for hiring pipeline report from database.
+
+        This method aggregates hiring stage data to calculate:
+        - Candidate counts per stage
+        - Average time in each stage
+        - Conversion rates between stages
+        - Overall pipeline metrics
+
+        Args:
+            config: Report configuration with filters and date_range
+
+        Returns:
+            Dictionary with aggregated pipeline data
+
+        Raises:
+            ValueError: If required configuration is missing
+        """
+        from backend.models.hiring_stage import HiringStage, HiringStageName
+        from backend.models.resume import Resume
+        from sqlalchemy import func, and_
+
+        # Build base query
+        query = select(
+            HiringStage.stage_name,
+            func.count(HiringStage.id).label("count"),
+            func.avg(
+                func.extract(
+                    "epoch",
+                    func.coalesce(HiringStage.updated_at, HiringStage.created_at)
+                    - HiringStage.queue_entered_at
+                )
+            ).label("avg_time_seconds"),
+            func.min(HiringStage.created_at).label("first_entry"),
+            func.max(HiringStage.created_at).label("last_entry"),
+        ).group_by(HiringStage.stage_name)
+
+        # Apply filters
+        conditions = []
+
+        # Organization filter
+        if config.organization_id:
+            query = query.join(Resume, HiringStage.resume_id == Resume.id)
+            conditions.append(Resume.organization_id == config.organization_id)
+
+        # Vacancy filter
+        if config.filters.get("vacancy_id"):
+            conditions.append(HiringStage.vacancy_id == config.filters["vacancy_id"])
+
+        # Date range filter
+        if config.date_range:
+            if config.date_range.get("start"):
+                start_date = datetime.fromisoformat(config.date_range["start"].replace("Z", "+00:00"))
+                conditions.append(HiringStage.created_at >= start_date)
+            if config.date_range.get("end"):
+                end_date = datetime.fromisoformat(config.date_range["end"].replace("Z", "+00:00"))
+                conditions.append(HiringStage.created_at <= end_date)
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        # Execute query
+        result = await self.db.execute(query)
+        stage_data = result.all()
+
+        # Process stage data
+        stages = []
+        total_candidates = 0
+        stage_counts = {}
+
+        for row in stage_data:
+            stage_name = row[0].value if hasattr(row[0], "value") else str(row[0])
+            count = int(row[1])
+            avg_time_seconds = float(row[2]) if row[2] else 0
+            first_entry = row[3]
+            last_entry = row[4]
+
+            total_candidates += count
+            stage_counts[stage_name] = count
+
+            # Calculate average time in days
+            avg_time_days = avg_time_seconds / 86400 if avg_time_seconds else 0
+
+            stages.append({
+                "stage_name": stage_name,
+                "count": count,
+                "avg_time_seconds": avg_time_seconds,
+                "avg_time_days": avg_time_days,
+                "avg_time_formatted": self._format_time_duration(avg_time_seconds),
+                "first_entry": first_entry.isoformat() if first_entry else None,
+                "last_entry": last_entry.isoformat() if last_entry else None,
+            })
+
+        # Calculate conversion rates
+        conversion_rates = self._calculate_conversion_rates(stage_counts)
+
+        # Calculate overall metrics
+        total_time_query = select(
+            func.avg(
+                func.extract(
+                    "epoch",
+                    func.coalesce(HiringStage.updated_at, HiringStage.created_at)
+                    - HiringStage.queue_entered_at
+                )
+            )
+        )
+
+        if conditions:
+            if config.organization_id:
+                total_time_query = total_time_query.join(Resume, HiringStage.resume_id == Resume.id)
+            total_time_query = total_time_query.where(and_(*conditions))
+
+        total_time_result = await self.db.execute(total_time_query)
+        avg_total_time = total_time_result.scalar()
+        avg_total_time_seconds = float(avg_total_time) if avg_total_time else 0
+
+        # Build data dictionary
+        data = {
+            "stages": stages,
+            "conversion_rates": conversion_rates,
+            "total_candidates": total_candidates,
+            "avg_time_to_hire_seconds": avg_total_time_seconds,
+            "avg_time_to_hire_days": avg_total_time_seconds / 86400 if avg_total_time_seconds else 0,
+            "avg_time_to_hire_formatted": self._format_time_duration(avg_total_time_seconds),
+            "organization_id": config.organization_id,
+            "vacancy_id": config.filters.get("vacancy_id"),
+            "date_range": config.date_range,
+        }
+
+        # Calculate pipeline health indicators
+        data["pipeline_health"] = self._calculate_pipeline_health(stages, conversion_rates)
+
+        return data
+
+    def _calculate_conversion_rates(self, stage_counts: Dict[str, int]) -> List[Dict[str, Any]]:
+        """
+        Calculate conversion rates between hiring stages.
+
+        Args:
+            stage_counts: Dictionary mapping stage names to candidate counts
+
+        Returns:
+            List of conversion rate data for each stage transition
+        """
+        from backend.models.hiring_stage import HiringStageName
+
+        # Define stage order
+        stage_order = [
+            HiringStageName.APPLIED.value,
+            HiringStageName.SCREENING.value,
+            HiringStageName.INTERVIEW.value,
+            HiringStageName.TECHNICAL.value,
+            HiringStageName.OFFER.value,
+            HiringStageName.HIRED.value,
+        ]
+
+        conversion_rates = []
+
+        for i in range(len(stage_order) - 1):
+            from_stage = stage_order[i]
+            to_stage = stage_order[i + 1]
+
+            from_count = stage_counts.get(from_stage, 0)
+            to_count = stage_counts.get(to_stage, 0)
+
+            if from_count > 0:
+                rate = (to_count / from_count) * 100
+            else:
+                rate = 0
+
+            conversion_rates.append({
+                "from_stage": from_stage,
+                "to_stage": to_stage,
+                "from_count": from_count,
+                "to_count": to_count,
+                "conversion_rate": rate,
+            })
+
+        return conversion_rates
+
+    def _calculate_pipeline_health(
+        self, stages: List[Dict[str, Any]], conversion_rates: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Calculate pipeline health indicators and identify bottlenecks.
+
+        Args:
+            stages: List of stage data
+            conversion_rates: List of conversion rate data
+
+        Returns:
+            Dictionary with pipeline health metrics
+        """
+        # Find bottlenecks (stages with lowest conversion rates)
+        bottlenecks = []
+        if conversion_rates:
+            sorted_rates = sorted(conversion_rates, key=lambda x: x["conversion_rate"])
+            # Consider stages with conversion rate < 50% as bottlenecks
+            bottlenecks = [
+                {
+                    "stage": rate["from_stage"],
+                    "conversion_rate": rate["conversion_rate"],
+                }
+                for rate in sorted_rates
+                if rate["conversion_rate"] < 50 and rate["from_count"] > 0
+            ]
+
+        # Find stages with longest average time
+        slow_stages = []
+        if stages:
+            sorted_stages = sorted(stages, key=lambda x: x["avg_time_days"], reverse=True)
+            # Consider stages with > 7 days average time as slow
+            slow_stages = [
+                {
+                    "stage": stage["stage_name"],
+                    "avg_time_days": stage["avg_time_days"],
+                    "avg_time_formatted": stage["avg_time_formatted"],
+                }
+                for stage in sorted_stages
+                if stage["avg_time_days"] > 7
+            ]
+
+        # Calculate overall health score (0-100)
+        # Based on conversion rates and time metrics
+        health_score = 100
+
+        # Penalize for bottlenecks
+        if bottlenecks:
+            health_score -= len(bottlenecks) * 10
+
+        # Penalize for slow stages
+        if slow_stages:
+            health_score -= len(slow_stages) * 5
+
+        # Ensure score is in valid range
+        health_score = max(0, min(100, health_score))
+
+        return {
+            "score": health_score,
+            "status": self._get_health_status(health_score),
+            "bottlenecks": bottlenecks,
+            "slow_stages": slow_stages,
+        }
+
+    def _get_health_status(self, score: int) -> str:
+        """
+        Get health status label based on score.
+
+        Args:
+            score: Health score (0-100)
+
+        Returns:
+            Status label (excellent, good, fair, poor)
+        """
+        if score >= 80:
+            return "excellent"
+        elif score >= 60:
+            return "good"
+        elif score >= 40:
+            return "fair"
+        else:
+            return "poor"
+
+    def _format_time_duration(self, seconds: float) -> str:
+        """
+        Format time duration in seconds to human-readable format.
+
+        Args:
+            seconds: Duration in seconds
+
+        Returns:
+            Formatted duration string (e.g., "5 days, 3 hours")
+        """
+        if seconds <= 0:
+            return "N/A"
+
+        days = int(seconds // 86400)
+        remaining = seconds % 86400
+        hours = int(remaining // 3600)
+        remaining = remaining % 3600
+        minutes = int(remaining // 60)
+
+        parts = []
+        if days > 0:
+            parts.append(f"{days} day{'s' if days != 1 else ''}")
+        if hours > 0:
+            parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        if minutes > 0 and days == 0:  # Only show minutes if less than a day
+            parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+
+        if not parts:
+            return "< 1 minute"
+
+        return ", ".join(parts)
+
+    async def _generate_hiring_pipeline_pdf(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate hiring pipeline report in PDF format.
+
+        Args:
+            config: Report configuration
+            data: Collected pipeline data
+
+        Returns:
+            ReportGenerationResult with PDF bytes
+        """
+        from reportlab.lib.pagesizes import A4, Letter
+        from reportlab.lib.units import inch
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            PageBreak,
+            Table,
+            TableStyle,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+        # Create PDF buffer
+        buffer = io.BytesIO()
+
+        # Get page size
+        pagesize = A4 if config.page_format == self.PAGE_FORMAT_A4 else Letter
+
+        # Create document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=pagesize,
+            leftMargin=72,
+            rightMargin=72,
+            topMargin=72,
+            bottomMargin=72,
+        )
+
+        # Get styles
+        styles = getSampleStyleSheet()
+
+        # Custom styles
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=24,
+            textColor=colors.HexColor("#2c3e50"),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+        )
+
+        heading_style = ParagraphStyle(
+            "CustomHeading",
+            parent=styles["Heading2"],
+            fontSize=16,
+            textColor=colors.HexColor("#34495e"),
+            spaceAfter=12,
+        )
+
+        subheading_style = ParagraphStyle(
+            "CustomSubHeading",
+            parent=styles["Heading3"],
+            fontSize=14,
+            textColor=colors.HexColor("#34495e"),
+            spaceAfter=10,
+        )
+
+        normal_style = styles["BodyText"]
+        normal_style.fontSize = 11
+
+        # Build story (content elements)
+        story = []
+
+        # Title
+        title = config.title or "Hiring Pipeline Report"
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Summary metrics
+        story.append(Paragraph("Pipeline Summary", heading_style))
+
+        summary_data = [
+            ["Total Candidates:", str(data["total_candidates"])],
+            ["Average Time to Hire:", data["avg_time_to_hire_formatted"]],
+            ["Pipeline Health:", f"{data['pipeline_health']['status'].upper()} ({data['pipeline_health']['score']}/100)"],
+        ]
+
+        if data.get("date_range"):
+            date_range = data["date_range"]
+            date_range_str = f"{date_range.get('start', 'N/A')} to {date_range.get('end', 'N/A')}"
+            summary_data.append(["Date Range:", date_range_str])
+
+        summary_table = Table(summary_data, colWidths=[2.5 * inch, 3.5 * inch])
+        summary_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (1, 0), (1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 11),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#ecf0f1")),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 0.4 * inch))
+
+        # Stage breakdown
+        story.append(Paragraph("Stage Breakdown", heading_style))
+
+        if data["stages"]:
+            stage_table_data = [["Stage", "Candidates", "Avg. Time in Stage"]]
+
+            for stage in data["stages"]:
+                stage_table_data.append([
+                    stage["stage_name"].upper(),
+                    str(stage["count"]),
+                    stage["avg_time_formatted"],
+                ])
+
+            stage_table = Table(stage_table_data, colWidths=[2 * inch, 1.5 * inch, 2.5 * inch])
+            stage_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+                ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#ecf0f1"), colors.white]),
+            ]))
+
+            story.append(stage_table)
+            story.append(Spacer(1, 0.4 * inch))
+
+        # Conversion rates
+        story.append(Paragraph("Conversion Rates", heading_style))
+
+        if data["conversion_rates"]:
+            conv_table_data = [["From Stage", "To Stage", "Candidates", "Conversion Rate"]]
+
+            for rate in data["conversion_rates"]:
+                conv_table_data.append([
+                    rate["from_stage"].upper(),
+                    rate["to_stage"].upper(),
+                    f"{rate['to_count']} / {rate['from_count']}",
+                    f"{rate['conversion_rate']:.1f}%",
+                ])
+
+            conv_table = Table(conv_table_data, colWidths=[1.8 * inch, 1.8 * inch, 1.2 * inch, 1.2 * inch])
+            conv_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+                ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#ecf0f1"), colors.white]),
+            ]))
+
+            story.append(conv_table)
+            story.append(Spacer(1, 0.4 * inch))
+
+        # Pipeline health
+        story.append(Paragraph("Pipeline Health Analysis", heading_style))
+
+        health = data["pipeline_health"]
+        health_text = f"<b>Overall Health Score:</b> {health['score']}/100 ({health['status'].upper()})<br/><br/>"
+
+        if health["bottlenecks"]:
+            health_text += "<b>Identified Bottlenecks:</b><br/>"
+            for bottleneck in health["bottlenecks"]:
+                health_text += f"• {bottleneck['stage'].upper()}: {bottleneck['conversion_rate']:.1f}% conversion rate<br/>"
+            health_text += "<br/>"
+
+        if health["slow_stages"]:
+            health_text += "<b>Slow Stages:</b><br/>"
+            for slow_stage in health["slow_stages"]:
+                health_text += f"• {slow_stage['stage'].upper()}: {slow_stage['avg_time_formatted']} average time<br/>"
+
+        if not health["bottlenecks"] and not health["slow_stages"]:
+            health_text += "No significant issues identified. Pipeline is performing well."
+
+        story.append(Paragraph(health_text, normal_style))
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Footer
+        story.append(Spacer(1, 0.5 * inch))
+        footer_style = ParagraphStyle(
+            "Footer",
+            parent=normal_style,
+            fontSize=9,
+            textColor=colors.HexColor("#7f8c8d"),
+            alignment=TA_CENTER,
+        )
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        footer_text = f"Generated: {timestamp}"
+        if data.get("organization_id"):
+            footer_text += f" | Organization: {data['organization_id']}"
+        if data.get("vacancy_id"):
+            footer_text += f" | Vacancy: {data['vacancy_id']}"
+        story.append(Paragraph(footer_text, footer_style))
+
+        # Build PDF
+        doc.build(story)
+
+        # Get PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_HIRING_PIPELINE,
+            self.FORMAT_PDF
+        )
+
         return ReportGenerationResult(
-            success=False,
-            error_message="Hiring pipeline report not yet implemented",
+            success=True,
+            report_bytes=pdf_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_PDF],
+            file_size=len(pdf_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "pipeline_health_score": data["pipeline_health"]["score"],
+                "organization_id": data.get("organization_id"),
+                "vacancy_id": data.get("vacancy_id"),
+            },
+        )
+
+    async def _generate_hiring_pipeline_excel(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate hiring pipeline report in Excel format.
+
+        Args:
+            config: Report configuration
+            data: Collected pipeline data
+
+        Returns:
+            ReportGenerationResult with Excel bytes
+        """
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        # Create workbook
+        wb = Workbook()
+
+        # Remove default sheet
+        wb.remove(wb.active)
+
+        # Create Summary sheet
+        ws_summary = wb.create_sheet("Summary")
+        ws_summary.append(["Hiring Pipeline Report"])
+        ws_summary.append([])
+        ws_summary.append(["Metric", "Value"])
+        ws_summary.append(["Total Candidates", data["total_candidates"]])
+        ws_summary.append(["Average Time to Hire", data["avg_time_to_hire_formatted"]])
+        ws_summary.append(["Pipeline Health Score", f"{data['pipeline_health']['score']}/100"])
+        ws_summary.append(["Pipeline Health Status", data["pipeline_health"]["status"].upper()])
+
+        if data.get("date_range"):
+            ws_summary.append(["Date Range Start", data["date_range"].get("start", "N/A")])
+            ws_summary.append(["Date Range End", data["date_range"].get("end", "N/A")])
+
+        # Style summary sheet
+        ws_summary["A1"].font = Font(size=16, bold=True)
+        ws_summary["A3"].font = Font(bold=True)
+        ws_summary["B3"].font = Font(bold=True)
+        ws_summary["A3"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws_summary["B3"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws_summary["A3"].font = Font(color="FFFFFF", bold=True)
+        ws_summary["B3"].font = Font(color="FFFFFF", bold=True)
+
+        # Adjust column widths
+        ws_summary.column_dimensions["A"].width = 30
+        ws_summary.column_dimensions["B"].width = 40
+
+        # Create Stage Breakdown sheet
+        ws_stages = wb.create_sheet("Stage Breakdown")
+        ws_stages.append(["Stage", "Candidate Count", "Avg Time (Days)", "Avg Time (Formatted)", "First Entry", "Last Entry"])
+
+        for stage in data["stages"]:
+            ws_stages.append([
+                stage["stage_name"].upper(),
+                stage["count"],
+                round(stage["avg_time_days"], 2),
+                stage["avg_time_formatted"],
+                stage["first_entry"],
+                stage["last_entry"],
+            ])
+
+        # Style stages sheet
+        for cell in ws_stages[1]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        # Adjust column widths
+        ws_stages.column_dimensions["A"].width = 20
+        ws_stages.column_dimensions["B"].width = 18
+        ws_stages.column_dimensions["C"].width = 18
+        ws_stages.column_dimensions["D"].width = 25
+        ws_stages.column_dimensions["E"].width = 22
+        ws_stages.column_dimensions["F"].width = 22
+
+        # Create Conversion Rates sheet
+        ws_conversion = wb.create_sheet("Conversion Rates")
+        ws_conversion.append(["From Stage", "To Stage", "From Count", "To Count", "Conversion Rate (%)"])
+
+        for rate in data["conversion_rates"]:
+            ws_conversion.append([
+                rate["from_stage"].upper(),
+                rate["to_stage"].upper(),
+                rate["from_count"],
+                rate["to_count"],
+                round(rate["conversion_rate"], 2),
+            ])
+
+        # Style conversion sheet
+        for cell in ws_conversion[1]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        # Adjust column widths
+        ws_conversion.column_dimensions["A"].width = 20
+        ws_conversion.column_dimensions["B"].width = 20
+        ws_conversion.column_dimensions["C"].width = 15
+        ws_conversion.column_dimensions["D"].width = 15
+        ws_conversion.column_dimensions["E"].width = 22
+
+        # Create Pipeline Health sheet
+        ws_health = wb.create_sheet("Pipeline Health")
+        ws_health.append(["Pipeline Health Analysis"])
+        ws_health.append([])
+        ws_health.append(["Health Score", data["pipeline_health"]["score"]])
+        ws_health.append(["Health Status", data["pipeline_health"]["status"].upper()])
+        ws_health.append([])
+
+        if data["pipeline_health"]["bottlenecks"]:
+            ws_health.append(["Bottlenecks"])
+            ws_health.append(["Stage", "Conversion Rate (%)"])
+            for bottleneck in data["pipeline_health"]["bottlenecks"]:
+                ws_health.append([
+                    bottleneck["stage"].upper(),
+                    round(bottleneck["conversion_rate"], 2),
+                ])
+            ws_health.append([])
+
+        if data["pipeline_health"]["slow_stages"]:
+            ws_health.append(["Slow Stages"])
+            ws_health.append(["Stage", "Avg Time (Days)", "Avg Time (Formatted)"])
+            for slow_stage in data["pipeline_health"]["slow_stages"]:
+                ws_health.append([
+                    slow_stage["stage"].upper(),
+                    round(slow_stage["avg_time_days"], 2),
+                    slow_stage["avg_time_formatted"],
+                ])
+
+        # Style health sheet
+        ws_health["A1"].font = Font(size=14, bold=True)
+        ws_health.column_dimensions["A"].width = 25
+        ws_health.column_dimensions["B"].width = 25
+        ws_health.column_dimensions["C"].width = 25
+
+        # Save to buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        excel_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_HIRING_PIPELINE,
+            self.FORMAT_EXCEL
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=excel_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_EXCEL],
+            file_size=len(excel_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "pipeline_health_score": data["pipeline_health"]["score"],
+                "organization_id": data.get("organization_id"),
+                "vacancy_id": data.get("vacancy_id"),
+            },
+        )
+
+    async def _generate_hiring_pipeline_csv(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate hiring pipeline report in CSV format.
+
+        Args:
+            config: Report configuration
+            data: Collected pipeline data
+
+        Returns:
+            ReportGenerationResult with CSV bytes
+        """
+        import csv
+
+        # Create CSV buffer
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+
+        # Write summary section
+        writer.writerow(["Hiring Pipeline Report"])
+        writer.writerow([])
+        writer.writerow(["Summary Metrics"])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Candidates", data["total_candidates"]])
+        writer.writerow(["Average Time to Hire", data["avg_time_to_hire_formatted"]])
+        writer.writerow(["Pipeline Health Score", f"{data['pipeline_health']['score']}/100"])
+        writer.writerow(["Pipeline Health Status", data["pipeline_health"]["status"].upper()])
+
+        if data.get("date_range"):
+            writer.writerow(["Date Range Start", data["date_range"].get("start", "N/A")])
+            writer.writerow(["Date Range End", data["date_range"].get("end", "N/A")])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Write stage breakdown section
+        writer.writerow(["Stage Breakdown"])
+        writer.writerow(["Stage", "Candidate Count", "Avg Time (Days)", "Avg Time (Formatted)", "First Entry", "Last Entry"])
+
+        for stage in data["stages"]:
+            writer.writerow([
+                stage["stage_name"].upper(),
+                stage["count"],
+                round(stage["avg_time_days"], 2),
+                stage["avg_time_formatted"],
+                stage["first_entry"],
+                stage["last_entry"],
+            ])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Write conversion rates section
+        writer.writerow(["Conversion Rates"])
+        writer.writerow(["From Stage", "To Stage", "From Count", "To Count", "Conversion Rate (%)"])
+
+        for rate in data["conversion_rates"]:
+            writer.writerow([
+                rate["from_stage"].upper(),
+                rate["to_stage"].upper(),
+                rate["from_count"],
+                rate["to_count"],
+                round(rate["conversion_rate"], 2),
+            ])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Write pipeline health section
+        writer.writerow(["Pipeline Health Analysis"])
+        writer.writerow(["Health Score", data["pipeline_health"]["score"]])
+        writer.writerow(["Health Status", data["pipeline_health"]["status"].upper()])
+        writer.writerow([])
+
+        if data["pipeline_health"]["bottlenecks"]:
+            writer.writerow(["Bottlenecks"])
+            writer.writerow(["Stage", "Conversion Rate (%)"])
+            for bottleneck in data["pipeline_health"]["bottlenecks"]:
+                writer.writerow([
+                    bottleneck["stage"].upper(),
+                    round(bottleneck["conversion_rate"], 2),
+                ])
+            writer.writerow([])
+
+        if data["pipeline_health"]["slow_stages"]:
+            writer.writerow(["Slow Stages"])
+            writer.writerow(["Stage", "Avg Time (Days)", "Avg Time (Formatted)"])
+            for slow_stage in data["pipeline_health"]["slow_stages"]:
+                writer.writerow([
+                    slow_stage["stage"].upper(),
+                    round(slow_stage["avg_time_days"], 2),
+                    slow_stage["avg_time_formatted"],
+                ])
+
+        # Get CSV content
+        csv_content = buffer.getvalue()
+        buffer.close()
+
+        # Convert to bytes
+        csv_bytes = csv_content.encode("utf-8")
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_HIRING_PIPELINE,
+            self.FORMAT_CSV
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=csv_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_CSV],
+            file_size=len(csv_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "pipeline_health_score": data["pipeline_health"]["score"],
+                "organization_id": data.get("organization_id"),
+                "vacancy_id": data.get("vacancy_id"),
+            },
         )
 
     async def _generate_eeoc_compliance(
