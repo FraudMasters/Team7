@@ -39,6 +39,14 @@ from services.report_generator import (
     ReportData,
     get_report_generator,
 )
+from schemas.comparison_explanation import (
+    CompareRequest,
+    CompareResponse,
+    CandidateInfo,
+    FactorComparison,
+    ScoreDifferential,
+    StrengthsWeaknessesTable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -868,6 +876,263 @@ async def explain_comparison(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Comparison explanation failed: {str(e)}",
+        )
+
+
+@router.post(
+    "/compare",
+    response_model=CompareResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Explainability"],
+)
+async def compare_candidates(
+    request: CompareRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Compare two candidates side-by-side with comprehensive analysis.
+
+    This endpoint provides detailed side-by-side comparison of two candidates,
+    including:
+    - Overall score differential analysis
+    - Factor-by-factor breakdown showing which candidate is stronger in each area
+    - Natural language winner narrative explaining key differences
+    - Strengths and weaknesses comparison table
+    - Hiring recommendation
+
+    Args:
+        request: Comparison request with two resume IDs and vacancy ID
+        db: Database session
+
+    Returns:
+        Comprehensive comparison analysis
+
+    Raises:
+        HTTPException(404): If resume, vacancy, or ranking not found
+        HTTPException(422): If UUID format is invalid
+        HTTPException(500): If comparison generation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "resume_id_a": "abc-123",
+        ...     "resume_id_b": "def-456",
+        ...     "vacancy_id": "vac-789",
+        ...     "use_llm": True
+        ... }
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/explainability/compare",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "vacancy_id": "vac-789",
+            "candidate_a_info": {...},
+            "candidate_b_info": {...},
+            "score_differential": {...},
+            "factor_by_factor_comparison": [...],
+            "winner_narrative": "Candidate A ranks higher due to...",
+            "key_differences": [...],
+            "strengths_weaknesses_table": {...}
+        }
+    """
+    try:
+        logger.info(
+            f"Comparing candidates: resume_a={request.resume_id_a}, "
+            f"resume_b={request.resume_id_b}, vacancy={request.vacancy_id}"
+        )
+
+        # Parse UUIDs
+        try:
+            resume_a_uuid = UUID(request.resume_id_a)
+            resume_b_uuid = UUID(request.resume_id_b)
+            vacancy_uuid = UUID(request.vacancy_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid UUID format: {e}",
+            )
+
+        # Fetch rankings for both candidates
+        rank_a_query = select(CandidateRank).where(
+            CandidateRank.resume_id == resume_a_uuid,
+            CandidateRank.vacancy_id == vacancy_uuid,
+        )
+        rank_a_result = await db.execute(rank_a_query)
+        ranking_a = rank_a_result.scalar_one_or_none()
+
+        rank_b_query = select(CandidateRank).where(
+            CandidateRank.resume_id == resume_b_uuid,
+            CandidateRank.vacancy_id == vacancy_uuid,
+        )
+        rank_b_result = await db.execute(rank_b_query)
+        ranking_b = rank_b_result.scalar_one_or_none()
+
+        if not ranking_a or not ranking_b:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="One or both rankings not found",
+            )
+
+        # Fetch resumes
+        resume_a_query = select(Resume).where(Resume.id == resume_a_uuid)
+        resume_a_result = await db.execute(resume_a_query)
+        resume_a = resume_a_result.scalar_one_or_none()
+
+        resume_b_query = select(Resume).where(Resume.id == resume_b_uuid)
+        resume_b_result = await db.execute(resume_b_query)
+        resume_b = resume_b_result.scalar_one_or_none()
+
+        if not resume_a or not resume_b:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="One or both resumes not found",
+            )
+
+        # Fetch vacancy
+        vacancy_query = select(JobVacancy).where(JobVacancy.id == vacancy_uuid)
+        vacancy_result = await db.execute(vacancy_query)
+        vacancy = vacancy_result.scalar_one_or_none()
+
+        if not vacancy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vacancy not found",
+            )
+
+        # Get explanation generator
+        generator = get_explanation_generator()
+        if not generator:
+            generator = ExplanationGenerator()
+            use_llm = False
+        else:
+            use_llm = request.use_llm
+
+        # Extract ranking factors
+        factors_a = ranking_a.ranking_factors or {}
+        factors_b = ranking_b.ranking_factors or {}
+
+        # Generate comparison explanation using existing generator
+        comparison = await generator.generate_comparison_explanation(
+            candidate_a_name=resume_a.filename or request.resume_id_a,
+            candidate_b_name=resume_b.filename or request.resume_id_b,
+            candidate_a_score=float(ranking_a.rank_score),
+            candidate_b_score=float(ranking_b.rank_score),
+            candidate_a_factors=factors_a,
+            candidate_b_factors=factors_b,
+            job_title=vacancy.title,
+            use_llm=use_llm,
+        )
+
+        # Build candidate info objects
+        candidate_a_info = CandidateInfo(
+            resume_id=request.resume_id_a,
+            candidate_name=resume_a.filename or request.resume_id_a,
+            rank_score=float(ranking_a.rank_score),
+            rank_position=ranking_a.rank_position,
+            confidence=float(ranking_a.confidence_score) if ranking_a.confidence_score else 0.0,
+        )
+
+        candidate_b_info = CandidateInfo(
+            resume_id=request.resume_id_b,
+            candidate_name=resume_b.filename or request.resume_id_b,
+            rank_score=float(ranking_b.rank_score),
+            rank_position=ranking_b.rank_position,
+            confidence=float(ranking_b.confidence_score) if ranking_b.confidence_score else 0.0,
+        )
+
+        # Calculate score differential
+        score_diff = abs(ranking_a.rank_score - ranking_b.rank_score)
+        score_diff_percent = (score_diff / max(ranking_a.rank_score, ranking_b.rank_score)) * 100 if max(ranking_a.rank_score, ranking_b.rank_score) > 0 else 0
+        higher_candidate = "A" if ranking_a.rank_score >= ranking_b.rank_score else "B"
+
+        # Determine margin category
+        if score_diff_percent >= 20:
+            margin_category = "significant"
+        elif score_diff_percent >= 10:
+            margin_category = "moderate"
+        else:
+            margin_category = "slight"
+
+        score_differential = ScoreDifferential(
+            score_difference=float(score_diff),
+            score_difference_percent=float(score_diff_percent),
+            higher_candidate=higher_candidate,
+            margin_category=margin_category,
+        )
+
+        # Build factor-by-factor comparison
+        factor_comparisons = []
+        all_factor_names = set(factors_a.keys()) | set(factors_b.keys())
+
+        for factor_name in sorted(all_factor_names):
+            score_a = factors_a.get(factor_name, 0.0)
+            score_b = factors_b.get(factor_name, 0.0)
+            difference = score_a - score_b
+
+            if abs(difference) < 0.01:
+                winner = "tie"
+            elif difference > 0:
+                winner = "A"
+            else:
+                winner = "B"
+
+            # Generate brief explanation
+            if winner == "tie":
+                explanation = f"Both candidates are equally matched in {factor_name}"
+            elif winner == "A":
+                explanation = f"Candidate A has stronger {factor_name} (+{abs(difference):.2f})"
+            else:
+                explanation = f"Candidate B has stronger {factor_name} (+{abs(difference):.2f})"
+
+            factor_comparisons.append(FactorComparison(
+                factor_name=factor_name,
+                candidate_a_score=float(score_a),
+                candidate_b_score=float(score_b),
+                difference=float(difference),
+                winner=winner,
+                explanation=explanation,
+            ))
+
+        # Build strengths/weaknesses table
+        # Extract from comparison object or generate defaults
+        strengths_weaknesses_table = StrengthsWeaknessesTable(
+            candidate_a_strengths=comparison.winning_factors if higher_candidate == "A" else comparison.losing_factors,
+            candidate_b_strengths=comparison.winning_factors if higher_candidate == "B" else comparison.losing_factors,
+            candidate_a_weaknesses=comparison.losing_factors if higher_candidate == "A" else comparison.winning_factors,
+            candidate_b_weaknesses=comparison.losing_factors if higher_candidate == "B" else comparison.winning_factors,
+        )
+
+        # Build response
+        response_data = CompareResponse(
+            vacancy_id=request.vacancy_id,
+            candidate_a_info=candidate_a_info,
+            candidate_b_info=candidate_b_info,
+            score_differential=score_differential,
+            factor_by_factor_comparison=factor_comparisons,
+            winner_narrative=comparison.narrative,
+            key_differences=comparison.key_differences,
+            strengths_weaknesses_table=strengths_weaknesses_table,
+            recommendation=comparison.recommendation,
+            provider=comparison.provider,
+            model=comparison.model,
+            generated_at=comparison.generated_at,
+        )
+
+        logger.info("Candidate comparison generated successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.dict(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing candidates: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Candidate comparison failed: {str(e)}",
         )
 
 
