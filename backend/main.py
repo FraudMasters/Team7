@@ -308,6 +308,8 @@ from api import (
     hiring_manager,
     parsing_corrections,
     filter_suggestions,
+    api_keys,
+    api_usage,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -355,6 +357,8 @@ app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
+app.include_router(api_keys.router, prefix="/api/api-keys", tags=["API Keys"])
+app.include_router(api_usage.router, prefix="/api/api-usage", tags=["API Usage"])
 
 
 if __name__ == "__main__":
