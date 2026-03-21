@@ -1736,11 +1736,11 @@ class ReportTemplateService:
         Generate EEOC compliance report.
 
         This report includes:
-        - Diversity metrics by demographic category
+        - Diversity metrics by demographic category (gender, age, ethnicity)
         - Hiring statistics by protected class
-        - Adverse impact analysis
-        - Compliance status indicators
-        - Year-over-year trends
+        - Demographic breakdowns with counts and percentages
+        - Sample sizes and confidence indicators
+        - Date range and filtering details
 
         Args:
             config: Report configuration
@@ -1748,19 +1748,34 @@ class ReportTemplateService:
 
         Returns:
             ReportGenerationResult with generated report or error
-
-        Note:
-            This is a placeholder implementation. The actual report generation
-            logic will be implemented in subsequent subtasks.
         """
-        logger.info("Generating EEOC compliance report (placeholder)")
+        logger.info("Generating EEOC compliance report")
 
-        # Placeholder implementation
-        # This will be fully implemented in subtask-2-4
-        return ReportGenerationResult(
-            success=False,
-            error_message="EEOC compliance report not yet implemented",
-        )
+        try:
+            # Collect data if not provided
+            if data is None:
+                data = await self._collect_eeoc_compliance_data(config)
+
+            # Validate required data
+            if not data.get("total_candidates"):
+                raise ValueError("No candidate data available for EEOC compliance report")
+
+            # Generate report based on output format
+            if config.output_format == self.FORMAT_PDF:
+                return await self._generate_eeoc_compliance_pdf(config, data)
+            elif config.output_format == self.FORMAT_EXCEL:
+                return await self._generate_eeoc_compliance_excel(config, data)
+            elif config.output_format == self.FORMAT_CSV:
+                return await self._generate_eeoc_compliance_csv(config, data)
+            else:
+                raise ValueError(f"Unsupported output format: {config.output_format}")
+
+        except Exception as e:
+            logger.error(f"Error generating EEOC compliance report: {e}", exc_info=True)
+            return ReportGenerationResult(
+                success=False,
+                error_message=f"Failed to generate EEOC compliance report: {str(e)}",
+            )
 
     async def _generate_custom_analytics(
         self,
@@ -1795,6 +1810,818 @@ class ReportTemplateService:
         return ReportGenerationResult(
             success=False,
             error_message="Custom analytics report not yet implemented",
+        )
+
+    async def _collect_eeoc_compliance_data(
+        self, config: ReportConfig
+    ) -> Dict[str, Any]:
+        """
+        Collect data for EEOC compliance report from database.
+
+        This method aggregates demographic data to calculate:
+        - Diversity metrics by gender, age group, ethnicity
+        - Hiring statistics by protected class
+        - Sample sizes and percentages
+        - Confidence indicators for inferred data
+
+        Args:
+            config: Report configuration with filters and date_range
+
+        Returns:
+            Dictionary with aggregated EEOC compliance data
+
+        Raises:
+            ValueError: If required configuration is missing
+        """
+        from backend.models.demographic_inference import DemographicInference
+        from backend.models.resume import Resume
+        from backend.models.hiring_stage import HiringStage
+        from sqlalchemy import func, and_, or_
+
+        # Initialize data structure
+        eeoc_data: Dict[str, Any] = {
+            "total_candidates": 0,
+            "gender_breakdown": {},
+            "age_breakdown": {},
+            "ethnicity_breakdown": {},
+            "geographic_breakdown": {},
+            "career_stage_breakdown": {},
+            "education_level_breakdown": {},
+            "hiring_statistics": {},
+            "confidence_metrics": {},
+            "date_range": config.date_range,
+            "organization_id": config.organization_id,
+        }
+
+        # Build base query for resumes with demographic inferences
+        query = select(
+            Resume.id,
+            Resume.created_at,
+            DemographicInference.inferred_gender,
+            DemographicInference.gender_confidence,
+            DemographicInference.inferred_age_group,
+            DemographicInference.age_confidence,
+            DemographicInference.inferred_ethnicity,
+            DemographicInference.ethnicity_confidence,
+            DemographicInference.inferred_geographic_region,
+            DemographicInference.geographic_confidence,
+            DemographicInference.inferred_career_stage,
+            DemographicInference.career_stage_confidence,
+            DemographicInference.inferred_education_level,
+            DemographicInference.education_confidence,
+        ).select_from(Resume).outerjoin(
+            DemographicInference,
+            Resume.id == DemographicInference.resume_id
+        )
+
+        # Apply filters
+        conditions = []
+
+        # Organization filter
+        if config.organization_id:
+            conditions.append(Resume.organization_id == config.organization_id)
+
+        # Date range filter
+        if config.date_range:
+            if config.date_range.get("start"):
+                conditions.append(Resume.created_at >= config.date_range["start"])
+            if config.date_range.get("end"):
+                conditions.append(Resume.created_at <= config.date_range["end"])
+
+        # Additional filters from config
+        if config.filters:
+            # Add custom filters here if needed
+            pass
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        # Execute query
+        result = await self.db.execute(query)
+        rows = result.all()
+
+        # Process results
+        eeoc_data["total_candidates"] = len(rows)
+
+        # Initialize breakdown dictionaries
+        gender_counts = {}
+        age_counts = {}
+        ethnicity_counts = {}
+        geographic_counts = {}
+        career_stage_counts = {}
+        education_level_counts = {}
+
+        # Track confidence scores
+        gender_confidences = []
+        age_confidences = []
+        ethnicity_confidences = []
+
+        for row in rows:
+            # Gender breakdown
+            gender = row.inferred_gender or "Unknown"
+            gender_counts[gender] = gender_counts.get(gender, 0) + 1
+            if row.gender_confidence:
+                gender_confidences.append(row.gender_confidence)
+
+            # Age breakdown
+            age_group = row.inferred_age_group or "Unknown"
+            age_counts[age_group] = age_counts.get(age_group, 0) + 1
+            if row.age_confidence:
+                age_confidences.append(row.age_confidence)
+
+            # Ethnicity breakdown
+            ethnicity = row.inferred_ethnicity or "Unknown"
+            ethnicity_counts[ethnicity] = ethnicity_counts.get(ethnicity, 0) + 1
+            if row.ethnicity_confidence:
+                ethnicity_confidences.append(row.ethnicity_confidence)
+
+            # Geographic breakdown
+            region = row.inferred_geographic_region or "Unknown"
+            geographic_counts[region] = geographic_counts.get(region, 0) + 1
+
+            # Career stage breakdown
+            career_stage = row.inferred_career_stage or "Unknown"
+            career_stage_counts[career_stage] = career_stage_counts.get(career_stage, 0) + 1
+
+            # Education level breakdown
+            education_level = row.inferred_education_level or "Unknown"
+            education_level_counts[education_level] = education_level_counts.get(education_level, 0) + 1
+
+        # Calculate percentages and format breakdowns
+        total = eeoc_data["total_candidates"]
+
+        # Gender breakdown with percentages
+        eeoc_data["gender_breakdown"] = {
+            gender: {
+                "count": count,
+                "percentage": round((count / total * 100), 2) if total > 0 else 0,
+            }
+            for gender, count in sorted(gender_counts.items())
+        }
+
+        # Age breakdown with percentages
+        eeoc_data["age_breakdown"] = {
+            age_group: {
+                "count": count,
+                "percentage": round((count / total * 100), 2) if total > 0 else 0,
+            }
+            for age_group, count in sorted(age_counts.items())
+        }
+
+        # Ethnicity breakdown with percentages
+        eeoc_data["ethnicity_breakdown"] = {
+            ethnicity: {
+                "count": count,
+                "percentage": round((count / total * 100), 2) if total > 0 else 0,
+            }
+            for ethnicity, count in sorted(ethnicity_counts.items())
+        }
+
+        # Geographic breakdown with percentages
+        eeoc_data["geographic_breakdown"] = {
+            region: {
+                "count": count,
+                "percentage": round((count / total * 100), 2) if total > 0 else 0,
+            }
+            for region, count in sorted(geographic_counts.items())
+        }
+
+        # Career stage breakdown with percentages
+        eeoc_data["career_stage_breakdown"] = {
+            stage: {
+                "count": count,
+                "percentage": round((count / total * 100), 2) if total > 0 else 0,
+            }
+            for stage, count in sorted(career_stage_counts.items())
+        }
+
+        # Education level breakdown with percentages
+        eeoc_data["education_level_breakdown"] = {
+            level: {
+                "count": count,
+                "percentage": round((count / total * 100), 2) if total > 0 else 0,
+            }
+            for level, count in sorted(education_level_counts.items())
+        }
+
+        # Calculate confidence metrics
+        eeoc_data["confidence_metrics"] = {
+            "gender_avg_confidence": round(sum(gender_confidences) / len(gender_confidences), 3) if gender_confidences else 0.0,
+            "age_avg_confidence": round(sum(age_confidences) / len(age_confidences), 3) if age_confidences else 0.0,
+            "ethnicity_avg_confidence": round(sum(ethnicity_confidences) / len(ethnicity_confidences), 3) if ethnicity_confidences else 0.0,
+            "gender_inferred_count": len(gender_confidences),
+            "age_inferred_count": len(age_confidences),
+            "ethnicity_inferred_count": len(ethnicity_confidences),
+        }
+
+        # Get hiring statistics (hired candidates)
+        hired_query = select(func.count(HiringStage.id)).where(
+            HiringStage.stage_name == "hired"
+        )
+        if conditions:
+            # Join with Resume to apply filters
+            hired_query = hired_query.select_from(HiringStage).join(
+                Resume, HiringStage.resume_id == Resume.id
+            ).where(and_(*conditions))
+
+        hired_result = await self.db.execute(hired_query)
+        hired_count = hired_result.scalar() or 0
+
+        eeoc_data["hiring_statistics"] = {
+            "total_hired": hired_count,
+            "hiring_rate": round((hired_count / total * 100), 2) if total > 0 else 0,
+        }
+
+        logger.info(
+            f"Collected EEOC compliance data: {total} candidates, "
+            f"{hired_count} hired, "
+            f"{len(gender_counts)} gender categories, "
+            f"{len(ethnicity_counts)} ethnicity categories"
+        )
+
+        return eeoc_data
+
+    async def _generate_eeoc_compliance_pdf(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate EEOC compliance report in PDF format.
+
+        Args:
+            config: Report configuration
+            data: Collected EEOC compliance data
+
+        Returns:
+            ReportGenerationResult with PDF bytes
+        """
+        if not self._reportlab_available:
+            return ReportGenerationResult(
+                success=False,
+                error_message="PDF generation requires reportlab library",
+            )
+
+        from reportlab.lib.pagesizes import A4, letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+        from reportlab.pdfgen import canvas
+
+        # Create PDF buffer
+        buffer = io.BytesIO()
+
+        # Determine page size
+        pagesize = letter if config.page_format == self.PAGE_FORMAT_LETTER else A4
+
+        # Create document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=pagesize,
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=0.75 * inch,
+            bottomMargin=0.75 * inch,
+        )
+
+        # Get styles
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Create custom styles
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=24,
+            textColor=colors.HexColor("#2c3e50"),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+        )
+
+        heading_style = ParagraphStyle(
+            "CustomHeading",
+            parent=styles["Heading2"],
+            fontSize=16,
+            textColor=colors.HexColor("#34495e"),
+            spaceAfter=12,
+            spaceBefore=12,
+        )
+
+        normal_style = ParagraphStyle(
+            "CustomNormal",
+            parent=styles["Normal"],
+            fontSize=11,
+            textColor=colors.HexColor("#2c3e50"),
+            spaceAfter=12,
+        )
+
+        # Title
+        title = config.title or "EEOC Compliance Report"
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.2 * inch))
+
+        # Summary Section
+        story.append(Paragraph("Executive Summary", heading_style))
+        summary_data = [
+            ["Total Candidates", str(data["total_candidates"])],
+            ["Total Hired", str(data["hiring_statistics"]["total_hired"])],
+            ["Hiring Rate", f"{data['hiring_statistics']['hiring_rate']}%"],
+        ]
+
+        if data.get("date_range"):
+            if data["date_range"].get("start"):
+                summary_data.append(["Date Range Start", data["date_range"]["start"]])
+            if data["date_range"].get("end"):
+                summary_data.append(["Date Range End", data["date_range"]["end"]])
+
+        summary_table = Table(summary_data, colWidths=[3 * inch, 3 * inch])
+        summary_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#34495e")),
+            ("TEXTCOLOR", (0, 0), (0, -1), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 11),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("BACKGROUND", (1, 0), (1, -1), colors.HexColor("#ecf0f1")),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Gender Diversity Section
+        story.append(Paragraph("Gender Diversity Metrics", heading_style))
+        story.append(Paragraph(
+            f"Average Confidence Score: {data['confidence_metrics']['gender_avg_confidence']:.1%}",
+            normal_style
+        ))
+
+        gender_data = [["Gender", "Count", "Percentage"]]
+        for gender, stats in data["gender_breakdown"].items():
+            gender_data.append([
+                gender.replace("_", " ").title(),
+                str(stats["count"]),
+                f"{stats['percentage']}%",
+            ])
+
+        gender_table = Table(gender_data, colWidths=[2.5 * inch, 1.5 * inch, 1.5 * inch])
+        gender_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+        ]))
+        story.append(gender_table)
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Age Distribution Section
+        story.append(Paragraph("Age Distribution", heading_style))
+        story.append(Paragraph(
+            f"Average Confidence Score: {data['confidence_metrics']['age_avg_confidence']:.1%}",
+            normal_style
+        ))
+
+        age_data = [["Age Group", "Count", "Percentage"]]
+        for age_group, stats in data["age_breakdown"].items():
+            age_data.append([
+                age_group.replace("_", " ").title(),
+                str(stats["count"]),
+                f"{stats['percentage']}%",
+            ])
+
+        age_table = Table(age_data, colWidths=[2.5 * inch, 1.5 * inch, 1.5 * inch])
+        age_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+        ]))
+        story.append(age_table)
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Ethnicity Diversity Section
+        story.append(Paragraph("Ethnicity Diversity Metrics", heading_style))
+        story.append(Paragraph(
+            f"Average Confidence Score: {data['confidence_metrics']['ethnicity_avg_confidence']:.1%}",
+            normal_style
+        ))
+
+        ethnicity_data = [["Ethnicity", "Count", "Percentage"]]
+        for ethnicity, stats in data["ethnicity_breakdown"].items():
+            ethnicity_data.append([
+                ethnicity.replace("_", " ").title(),
+                str(stats["count"]),
+                f"{stats['percentage']}%",
+            ])
+
+        ethnicity_table = Table(ethnicity_data, colWidths=[2.5 * inch, 1.5 * inch, 1.5 * inch])
+        ethnicity_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+        ]))
+        story.append(ethnicity_table)
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Geographic Distribution Section (if data available)
+        if data["geographic_breakdown"]:
+            story.append(Paragraph("Geographic Distribution", heading_style))
+
+            geographic_data = [["Region", "Count", "Percentage"]]
+            for region, stats in data["geographic_breakdown"].items():
+                geographic_data.append([
+                    region.replace("_", " ").title(),
+                    str(stats["count"]),
+                    f"{stats['percentage']}%",
+                ])
+
+            geographic_table = Table(geographic_data, colWidths=[2.5 * inch, 1.5 * inch, 1.5 * inch])
+            geographic_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+                ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+            ]))
+            story.append(geographic_table)
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Footer with generation timestamp
+        footer_style = ParagraphStyle(
+            "Footer",
+            parent=normal_style,
+            fontSize=9,
+            textColor=colors.HexColor("#7f8c8d"),
+            alignment=TA_CENTER,
+        )
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        footer_text = f"Generated: {timestamp}"
+        if data.get("organization_id"):
+            footer_text += f" | Organization: {data['organization_id']}"
+        footer_text += "<br/>Note: Demographic data is AI-inferred and used for compliance monitoring only."
+        story.append(Spacer(1, 0.5 * inch))
+        story.append(Paragraph(footer_text, footer_style))
+
+        # Build PDF
+        doc.build(story)
+
+        # Get PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_EEOC_COMPLIANCE,
+            self.FORMAT_PDF
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=pdf_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_PDF],
+            file_size=len(pdf_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "total_hired": data["hiring_statistics"]["total_hired"],
+                "organization_id": data.get("organization_id"),
+                "date_range": data.get("date_range"),
+            },
+        )
+
+    async def _generate_eeoc_compliance_excel(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate EEOC compliance report in Excel format.
+
+        Args:
+            config: Report configuration
+            data: Collected EEOC compliance data
+
+        Returns:
+            ReportGenerationResult with Excel bytes
+        """
+        if not self._openpyxl_available:
+            return ReportGenerationResult(
+                success=False,
+                error_message="Excel generation requires openpyxl library",
+            )
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        # Create workbook
+        wb = Workbook()
+
+        # Remove default sheet
+        wb.remove(wb.active)
+
+        # Create Summary sheet
+        ws_summary = wb.create_sheet("Summary")
+        ws_summary.append(["EEOC Compliance Report"])
+        ws_summary.append([])
+        ws_summary.append(["Metric", "Value"])
+        ws_summary.append(["Total Candidates", data["total_candidates"]])
+        ws_summary.append(["Total Hired", data["hiring_statistics"]["total_hired"]])
+        ws_summary.append(["Hiring Rate", f"{data['hiring_statistics']['hiring_rate']}%"])
+
+        if data.get("date_range"):
+            if data["date_range"].get("start"):
+                ws_summary.append(["Date Range Start", data["date_range"]["start"]])
+            if data["date_range"].get("end"):
+                ws_summary.append(["Date Range End", data["date_range"]["end"]])
+
+        # Style summary sheet
+        ws_summary["A1"].font = Font(size=16, bold=True)
+        ws_summary["A3"].font = Font(bold=True)
+        ws_summary["B3"].font = Font(bold=True)
+        ws_summary["A3"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws_summary["B3"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws_summary["A3"].font = Font(color="FFFFFF", bold=True)
+        ws_summary["B3"].font = Font(color="FFFFFF", bold=True)
+
+        # Adjust column widths
+        ws_summary.column_dimensions["A"].width = 30
+        ws_summary.column_dimensions["B"].width = 40
+
+        # Create Gender Diversity sheet
+        ws_gender = wb.create_sheet("Gender Diversity")
+        ws_gender.append(["Gender", "Count", "Percentage"])
+
+        for gender, stats in data["gender_breakdown"].items():
+            ws_gender.append([
+                gender.replace("_", " ").title(),
+                stats["count"],
+                f"{stats['percentage']}%",
+            ])
+
+        # Add confidence metric
+        ws_gender.append([])
+        ws_gender.append(["Average Confidence Score", f"{data['confidence_metrics']['gender_avg_confidence']:.1%}"])
+
+        # Style gender sheet
+        for cell in ws_gender[1]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        ws_gender.column_dimensions["A"].width = 20
+        ws_gender.column_dimensions["B"].width = 15
+        ws_gender.column_dimensions["C"].width = 15
+
+        # Create Age Distribution sheet
+        ws_age = wb.create_sheet("Age Distribution")
+        ws_age.append(["Age Group", "Count", "Percentage"])
+
+        for age_group, stats in data["age_breakdown"].items():
+            ws_age.append([
+                age_group.replace("_", " ").title(),
+                stats["count"],
+                f"{stats['percentage']}%",
+            ])
+
+        # Add confidence metric
+        ws_age.append([])
+        ws_age.append(["Average Confidence Score", f"{data['confidence_metrics']['age_avg_confidence']:.1%}"])
+
+        # Style age sheet
+        for cell in ws_age[1]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        ws_age.column_dimensions["A"].width = 20
+        ws_age.column_dimensions["B"].width = 15
+        ws_age.column_dimensions["C"].width = 15
+
+        # Create Ethnicity Diversity sheet
+        ws_ethnicity = wb.create_sheet("Ethnicity Diversity")
+        ws_ethnicity.append(["Ethnicity", "Count", "Percentage"])
+
+        for ethnicity, stats in data["ethnicity_breakdown"].items():
+            ws_ethnicity.append([
+                ethnicity.replace("_", " ").title(),
+                stats["count"],
+                f"{stats['percentage']}%",
+            ])
+
+        # Add confidence metric
+        ws_ethnicity.append([])
+        ws_ethnicity.append(["Average Confidence Score", f"{data['confidence_metrics']['ethnicity_avg_confidence']:.1%}"])
+
+        # Style ethnicity sheet
+        for cell in ws_ethnicity[1]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        ws_ethnicity.column_dimensions["A"].width = 25
+        ws_ethnicity.column_dimensions["B"].width = 15
+        ws_ethnicity.column_dimensions["C"].width = 15
+
+        # Create Geographic Distribution sheet (if data available)
+        if data["geographic_breakdown"]:
+            ws_geographic = wb.create_sheet("Geographic Distribution")
+            ws_geographic.append(["Region", "Count", "Percentage"])
+
+            for region, stats in data["geographic_breakdown"].items():
+                ws_geographic.append([
+                    region.replace("_", " ").title(),
+                    stats["count"],
+                    f"{stats['percentage']}%",
+                ])
+
+            # Style geographic sheet
+            for cell in ws_geographic[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(horizontal="center")
+
+            ws_geographic.column_dimensions["A"].width = 25
+            ws_geographic.column_dimensions["B"].width = 15
+            ws_geographic.column_dimensions["C"].width = 15
+
+        # Save to buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        excel_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_EEOC_COMPLIANCE,
+            self.FORMAT_EXCEL
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=excel_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_EXCEL],
+            file_size=len(excel_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "total_hired": data["hiring_statistics"]["total_hired"],
+                "organization_id": data.get("organization_id"),
+                "date_range": data.get("date_range"),
+            },
+        )
+
+    async def _generate_eeoc_compliance_csv(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate EEOC compliance report in CSV format.
+
+        Args:
+            config: Report configuration
+            data: Collected EEOC compliance data
+
+        Returns:
+            ReportGenerationResult with CSV bytes
+        """
+        import csv
+
+        # Create CSV buffer
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+
+        # Write title and summary
+        writer.writerow(["EEOC Compliance Report"])
+        writer.writerow([])
+        writer.writerow(["Summary Metrics"])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Candidates", data["total_candidates"]])
+        writer.writerow(["Total Hired", data["hiring_statistics"]["total_hired"]])
+        writer.writerow(["Hiring Rate", f"{data['hiring_statistics']['hiring_rate']}%"])
+
+        if data.get("date_range"):
+            if data["date_range"].get("start"):
+                writer.writerow(["Date Range Start", data["date_range"]["start"]])
+            if data["date_range"].get("end"):
+                writer.writerow(["Date Range End", data["date_range"]["end"]])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Gender Diversity section
+        writer.writerow(["Gender Diversity Metrics"])
+        writer.writerow(["Average Confidence Score", f"{data['confidence_metrics']['gender_avg_confidence']:.1%}"])
+        writer.writerow(["Gender", "Count", "Percentage"])
+
+        for gender, stats in data["gender_breakdown"].items():
+            writer.writerow([
+                gender.replace("_", " ").title(),
+                stats["count"],
+                f"{stats['percentage']}%",
+            ])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Age Distribution section
+        writer.writerow(["Age Distribution"])
+        writer.writerow(["Average Confidence Score", f"{data['confidence_metrics']['age_avg_confidence']:.1%}"])
+        writer.writerow(["Age Group", "Count", "Percentage"])
+
+        for age_group, stats in data["age_breakdown"].items():
+            writer.writerow([
+                age_group.replace("_", " ").title(),
+                stats["count"],
+                f"{stats['percentage']}%",
+            ])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Ethnicity Diversity section
+        writer.writerow(["Ethnicity Diversity Metrics"])
+        writer.writerow(["Average Confidence Score", f"{data['confidence_metrics']['ethnicity_avg_confidence']:.1%}"])
+        writer.writerow(["Ethnicity", "Count", "Percentage"])
+
+        for ethnicity, stats in data["ethnicity_breakdown"].items():
+            writer.writerow([
+                ethnicity.replace("_", " ").title(),
+                stats["count"],
+                f"{stats['percentage']}%",
+            ])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        # Geographic Distribution section (if data available)
+        if data["geographic_breakdown"]:
+            writer.writerow(["Geographic Distribution"])
+            writer.writerow(["Region", "Count", "Percentage"])
+
+            for region, stats in data["geographic_breakdown"].items():
+                writer.writerow([
+                    region.replace("_", " ").title(),
+                    stats["count"],
+                    f"{stats['percentage']}%",
+                ])
+
+            writer.writerow([])
+            writer.writerow([])
+
+        # Footer
+        writer.writerow(["Note: Demographic data is AI-inferred and used for compliance monitoring only."])
+        writer.writerow(["Generated:", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")])
+
+        # Get CSV content
+        csv_content = buffer.getvalue()
+        buffer.close()
+
+        # Convert to bytes
+        csv_bytes = csv_content.encode("utf-8")
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_EEOC_COMPLIANCE,
+            self.FORMAT_CSV
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=csv_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_CSV],
+            file_size=len(csv_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "total_hired": data["hiring_statistics"]["total_hired"],
+                "organization_id": data.get("organization_id"),
+                "date_range": data.get("date_range"),
+            },
         )
 
     def _generate_filename(
