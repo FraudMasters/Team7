@@ -1596,6 +1596,43 @@ async def export_explainability_pdf(
         ) from e
 
 
+@router.post(
+    "/export-pdf",
+    response_model=PDFExportResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Explainability"],
+)
+async def export_explainability_pdf_alias(
+    request: PDFExportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Export explainability report as PDF (alternative endpoint).
+
+    This is an alias endpoint for /export/pdf providing the same functionality.
+    Generates a professional PDF report containing:
+    - Candidate ranking explanation
+    - Feature contribution breakdowns with charts
+    - Confidence intervals visualization
+    - Strengths and weaknesses
+    - Resume section highlights
+
+    Args:
+        request: PDF export request with resume_id and vacancy_id
+        db: Database session
+
+    Returns:
+        PDF export response with download URL
+
+    Raises:
+        HTTPException(404): If resume, vacancy, or ranking not found
+        HTTPException(422): If UUID format is invalid
+        HTTPException(500): If PDF generation fails
+    """
+    # Delegate to the main implementation
+    return await export_explainability_pdf(request, db)
+
+
 @router.get(
     "/preferences/{organization_id}",
     response_model=ExplanationPreferencesResponse,
