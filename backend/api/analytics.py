@@ -8,12 +8,19 @@ and other key performance indicators for the recruitment process.
 import csv
 import io
 import logging
+from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func, and_, case
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.resume import Resume, ResumeStatus
+from models.hiring_stage import HiringStage, HiringStageName
+from models.candidate_rank import CandidateRank
 
 from schemas.ranking_metrics import (
     FeedbackConversionMetrics,
@@ -71,6 +78,7 @@ class KeyMetricsResponse(BaseModel):
     tags=["Analytics"],
 )
 async def get_key_metrics(
+    db: AsyncSession = Depends(get_db),
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
 ) -> JSONResponse:
@@ -83,6 +91,7 @@ async def get_key_metrics(
     areas for improvement.
 
     Args:
+        db: Database session (injected by FastAPI)
         start_date: Optional start date for filtering metrics (ISO 8601 format)
         end_date: Optional end date for filtering metrics (ISO 8601 format)
 
@@ -124,29 +133,46 @@ async def get_key_metrics(
             f"Fetching key metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Parse date filters
+        date_filter_start = None
+        date_filter_end = None
+        if start_date:
+            try:
+                date_filter_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {str(e)}",
+                ) from e
+
+        if end_date:
+            try:
+                date_filter_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {str(e)}",
+                ) from e
+
+        # Calculate time-to-hire metrics
+        time_to_hire_metrics = await _calculate_time_to_hire_metrics(
+            db, date_filter_start, date_filter_end
+        )
+
+        # Calculate resume processing metrics
+        resume_metrics = await _calculate_resume_metrics(
+            db, date_filter_start, date_filter_end
+        )
+
+        # Calculate match rate metrics
+        match_rate_metrics = await _calculate_match_rate_metrics(
+            db, date_filter_start, date_filter_end
+        )
+
         response_data = {
-            "time_to_hire": {
-                "average_days": 32.5,
-                "median_days": 28.0,
-                "min_days": 7,
-                "max_days": 90,
-                "percentile_25": 21.0,
-                "percentile_75": 45.0,
-            },
-            "resumes": {
-                "total_processed": 1250,
-                "processed_this_month": 180,
-                "processed_this_week": 42,
-                "processing_rate_avg": 8.5,
-            },
-            "match_rates": {
-                "overall_match_rate": 0.78,
-                "high_confidence_matches": 890,
-                "low_confidence_matches": 156,
-                "average_confidence": 0.72,
-            },
+            "time_to_hire": time_to_hire_metrics,
+            "resumes": resume_metrics,
+            "match_rates": match_rate_metrics,
         }
 
         logger.info("Key metrics retrieved successfully")
@@ -156,12 +182,295 @@ async def get_key_metrics(
             content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving key metrics: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve key metrics: {str(e)}",
         ) from e
+
+
+async def _calculate_time_to_hire_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate time-to-hire performance metrics.
+
+    Time-to-hire is measured as the time from when a resume enters the 'APPLIED' stage
+    to when it reaches the 'HIRED' stage.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with time-to-hire metrics
+    """
+    try:
+        # Build subquery to get hired candidates with their applied and hired timestamps
+        hired_subquery = (
+            select(
+                HiringStage.resume_id,
+                HiringStage.created_at.label("hired_at"),
+            )
+            .where(HiringStage.stage_name == HiringStageName.HIRED)
+        )
+
+        if start_date:
+            hired_subquery = hired_subquery.where(HiringStage.created_at >= start_date)
+        if end_date:
+            hired_subquery = hired_subquery.where(HiringStage.created_at <= end_date)
+
+        hired_subquery = hired_subquery.subquery()
+
+        # Get applied timestamps for hired candidates
+        applied_subquery = (
+            select(
+                HiringStage.resume_id,
+                func.min(HiringStage.created_at).label("applied_at"),
+            )
+            .where(HiringStage.stage_name == HiringStageName.APPLIED)
+            .group_by(HiringStage.resume_id)
+            .subquery()
+        )
+
+        # Calculate time differences in days
+        query = select(
+            func.extract("epoch", hired_subquery.c.hired_at - applied_subquery.c.applied_at) / 86400.0
+        ).select_from(hired_subquery).join(
+            applied_subquery,
+            hired_subquery.c.resume_id == applied_subquery.c.resume_id
+        )
+
+        result = await db.execute(query)
+        time_to_hire_days = [float(row[0]) for row in result.fetchall() if row[0] is not None]
+
+        if not time_to_hire_days:
+            # Return default values if no data
+            return {
+                "average_days": 0.0,
+                "median_days": 0.0,
+                "min_days": 0,
+                "max_days": 0,
+                "percentile_25": 0.0,
+                "percentile_75": 0.0,
+            }
+
+        # Calculate statistics
+        time_to_hire_days.sort()
+        n = len(time_to_hire_days)
+
+        average_days = sum(time_to_hire_days) / n
+        median_days = (
+            time_to_hire_days[n // 2]
+            if n % 2 == 1
+            else (time_to_hire_days[n // 2 - 1] + time_to_hire_days[n // 2]) / 2
+        )
+        min_days = int(min(time_to_hire_days))
+        max_days = int(max(time_to_hire_days))
+
+        # Calculate percentiles
+        idx_25 = int(n * 0.25)
+        idx_75 = int(n * 0.75)
+        percentile_25 = time_to_hire_days[idx_25]
+        percentile_75 = time_to_hire_days[idx_75]
+
+        return {
+            "average_days": round(average_days, 1),
+            "median_days": round(median_days, 1),
+            "min_days": min_days,
+            "max_days": max_days,
+            "percentile_25": round(percentile_25, 1),
+            "percentile_75": round(percentile_75, 1),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating time-to-hire metrics: {e}", exc_info=True)
+        # Return default values on error
+        return {
+            "average_days": 0.0,
+            "median_days": 0.0,
+            "min_days": 0,
+            "max_days": 0,
+            "percentile_25": 0.0,
+            "percentile_75": 0.0,
+        }
+
+
+async def _calculate_resume_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate resume processing metrics.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with resume processing metrics
+    """
+    try:
+        # Get total processed resumes
+        total_query = select(func.count(Resume.id)).where(
+            Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED])
+        )
+
+        if start_date:
+            total_query = total_query.where(Resume.created_at >= start_date)
+        if end_date:
+            total_query = total_query.where(Resume.created_at <= end_date)
+
+        result = await db.execute(total_query)
+        total_processed = result.scalar() or 0
+
+        # Get resumes processed this month
+        now = datetime.utcnow()
+        first_day_of_month = datetime(now.year, now.month, 1)
+
+        month_query = select(func.count(Resume.id)).where(
+            and_(
+                Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED]),
+                Resume.created_at >= first_day_of_month,
+            )
+        )
+        result = await db.execute(month_query)
+        processed_this_month = result.scalar() or 0
+
+        # Get resumes processed this week
+        first_day_of_week = now - timedelta(days=now.weekday())
+        first_day_of_week = datetime(
+            first_day_of_week.year, first_day_of_week.month, first_day_of_week.day
+        )
+
+        week_query = select(func.count(Resume.id)).where(
+            and_(
+                Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED]),
+                Resume.created_at >= first_day_of_week,
+            )
+        )
+        result = await db.execute(week_query)
+        processed_this_week = result.scalar() or 0
+
+        # Calculate processing rate (resumes per day)
+        # Get earliest resume date to calculate rate
+        earliest_query = select(func.min(Resume.created_at)).where(
+            Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED])
+        )
+        result = await db.execute(earliest_query)
+        earliest_date = result.scalar()
+
+        if earliest_date and total_processed > 0:
+            days_diff = (now - earliest_date).days
+            if days_diff > 0:
+                processing_rate_avg = total_processed / days_diff
+            else:
+                processing_rate_avg = float(total_processed)
+        else:
+            processing_rate_avg = 0.0
+
+        return {
+            "total_processed": total_processed,
+            "processed_this_month": processed_this_month,
+            "processed_this_week": processed_this_week,
+            "processing_rate_avg": round(processing_rate_avg, 1),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating resume metrics: {e}", exc_info=True)
+        # Return default values on error
+        return {
+            "total_processed": 0,
+            "processed_this_month": 0,
+            "processed_this_week": 0,
+            "processing_rate_avg": 0.0,
+        }
+
+
+async def _calculate_match_rate_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate skill matching performance metrics.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with match rate metrics
+    """
+    try:
+        # Build base query
+        base_query = select(CandidateRank)
+
+        if start_date:
+            base_query = base_query.where(CandidateRank.created_at >= start_date)
+        if end_date:
+            base_query = base_query.where(CandidateRank.created_at <= end_date)
+
+        # Get all candidate ranks for analysis
+        result = await db.execute(base_query)
+        ranks = result.scalars().all()
+
+        if not ranks:
+            # Return default values if no data
+            return {
+                "overall_match_rate": 0.0,
+                "high_confidence_matches": 0,
+                "low_confidence_matches": 0,
+                "average_confidence": 0.0,
+            }
+
+        # Calculate metrics
+        total_ranks = len(ranks)
+
+        # Count high confidence matches (rank_score > 0.8)
+        high_confidence_matches = sum(
+            1 for rank in ranks if rank.rank_score > 0.8
+        )
+
+        # Count low confidence matches (rank_score < 0.5)
+        low_confidence_matches = sum(
+            1 for rank in ranks if rank.rank_score < 0.5
+        )
+
+        # Calculate average confidence (using rank_score as confidence proxy)
+        average_confidence = sum(rank.rank_score for rank in ranks) / total_ranks
+
+        # Calculate overall match rate (percentage of candidates with score > 0.6)
+        matches_above_threshold = sum(
+            1 for rank in ranks if rank.rank_score > 0.6
+        )
+        overall_match_rate = matches_above_threshold / total_ranks
+
+        return {
+            "overall_match_rate": round(overall_match_rate, 2),
+            "high_confidence_matches": high_confidence_matches,
+            "low_confidence_matches": low_confidence_matches,
+            "average_confidence": round(average_confidence, 2),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating match rate metrics: {e}", exc_info=True)
+        # Return default values on error
+        return {
+            "overall_match_rate": 0.0,
+            "high_confidence_matches": 0,
+            "low_confidence_matches": 0,
+            "average_confidence": 0.0,
+        }
 
 
 class QualityMetricsResponse(BaseModel):
