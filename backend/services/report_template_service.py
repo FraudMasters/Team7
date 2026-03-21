@@ -385,13 +385,473 @@ class ReportTemplateService:
             This is a placeholder implementation. The actual report generation
             logic will be implemented in subsequent subtasks.
         """
-        logger.info("Generating candidate summary report (placeholder)")
+        logger.info("Generating candidate summary report")
 
-        # Placeholder implementation
-        # This will be fully implemented in subtask-2-2
+        try:
+            # Collect data if not provided
+            if data is None:
+                data = await self._collect_candidate_summary_data(config)
+
+            # Validate required data
+            if not data.get("resume_id"):
+                raise ValueError("resume_id is required for candidate summary report")
+
+            # Generate report based on output format
+            if config.output_format == self.FORMAT_PDF:
+                return await self._generate_candidate_summary_pdf(config, data)
+            elif config.output_format == self.FORMAT_EXCEL:
+                return await self._generate_candidate_summary_excel(config, data)
+            elif config.output_format == self.FORMAT_CSV:
+                return await self._generate_candidate_summary_csv(config, data)
+            else:
+                raise ValueError(f"Unsupported output format: {config.output_format}")
+
+        except Exception as e:
+            logger.error(f"Error generating candidate summary report: {e}", exc_info=True)
+            return ReportGenerationResult(
+                success=False,
+                error_message=f"Failed to generate candidate summary report: {str(e)}",
+            )
+
+    async def _collect_candidate_summary_data(
+        self, config: ReportConfig
+    ) -> Dict[str, Any]:
+        """
+        Collect data for candidate summary report from database.
+
+        Args:
+            config: Report configuration with filters
+
+        Returns:
+            Dictionary with collected candidate data
+
+        Raises:
+            ValueError: If required filters are missing
+        """
+        from backend.models.resume import Resume
+        from backend.models.candidate_rank import CandidateRank
+        from backend.models.hiring_stage import HiringStage
+        from backend.models.analysis_result import AnalysisResult
+
+        # Extract resume_id from filters
+        resume_id = config.filters.get("resume_id")
+        if not resume_id:
+            raise ValueError("resume_id is required in filters for candidate summary report")
+
+        # Query resume data
+        resume_stmt = select(Resume).where(Resume.id == resume_id)
+        resume_result = await self.db.execute(resume_stmt)
+        resume = resume_result.scalar_one_or_none()
+
+        if not resume:
+            raise ValueError(f"Resume not found: {resume_id}")
+
+        # Query candidate rank data
+        rank_stmt = select(CandidateRank).where(CandidateRank.resume_id == resume_id)
+        if config.filters.get("vacancy_id"):
+            rank_stmt = rank_stmt.where(CandidateRank.vacancy_id == config.filters["vacancy_id"])
+        rank_result = await self.db.execute(rank_stmt)
+        candidate_rank = rank_result.scalar_one_or_none()
+
+        # Query hiring stage data
+        stage_stmt = (
+            select(HiringStage)
+            .where(HiringStage.resume_id == resume_id)
+            .order_by(HiringStage.created_at.desc())
+        )
+        stage_result = await self.db.execute(stage_stmt)
+        hiring_stage = stage_result.scalar_one_or_none()
+
+        # Query analysis result data
+        analysis_stmt = select(AnalysisResult).where(AnalysisResult.resume_id == resume_id)
+        analysis_result = await self.db.execute(analysis_stmt)
+        analysis = analysis_result.scalar_one_or_none()
+
+        # Build data dictionary
+        data = {
+            "resume_id": str(resume.id),
+            "organization_id": resume.organization_id,
+            "vacancy_id": str(resume.vacancy_id) if resume.vacancy_id else None,
+            "filename": resume.filename,
+            "status": resume.status.value if resume.status else None,
+            "language": resume.language,
+            "uploaded_at": resume.created_at.isoformat() if hasattr(resume, "created_at") else None,
+        }
+
+        # Add candidate rank data if available
+        if candidate_rank:
+            data["rank_score"] = float(candidate_rank.rank_score)
+            data["rank_position"] = int(candidate_rank.rank_position) if candidate_rank.rank_position else None
+            data["model_version"] = candidate_rank.model_version
+            data["prediction_confidence"] = float(candidate_rank.prediction_confidence) if candidate_rank.prediction_confidence else None
+            data["explanation_narrative"] = candidate_rank.explanation_narrative
+            data["recommendation"] = candidate_rank.recommendation
+            data["feature_contributions"] = candidate_rank.feature_contributions
+            data["ranking_factors"] = candidate_rank.ranking_factors
+            data["confidence_interval"] = candidate_rank.confidence_interval
+
+        # Add hiring stage data if available
+        if hiring_stage:
+            data["hiring_stage"] = hiring_stage.stage_name.value if hiring_stage.stage_name else None
+            data["stage_notes"] = hiring_stage.notes
+            data["priority"] = hiring_stage.priority
+            data["queue_entered_at"] = hiring_stage.queue_entered_at.isoformat() if hiring_stage.queue_entered_at else None
+
+        # Add analysis result data if available
+        if analysis:
+            data["skills"] = analysis.skills or []
+            data["experience_summary"] = analysis.experience_summary or {}
+            data["keywords"] = analysis.keywords or []
+            data["entities"] = analysis.entities or {}
+
+        return data
+
+    async def _generate_candidate_summary_pdf(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate candidate summary report in PDF format.
+
+        Args:
+            config: Report configuration
+            data: Collected candidate data
+
+        Returns:
+            ReportGenerationResult with PDF bytes
+        """
+        from reportlab.lib.pagesizes import A4, Letter
+        from reportlab.lib.units import inch
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            PageBreak,
+            Table,
+            TableStyle,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+        # Create PDF buffer
+        buffer = io.BytesIO()
+
+        # Get page size
+        pagesize = A4 if config.page_format == self.PAGE_FORMAT_A4 else Letter
+
+        # Create document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=pagesize,
+            leftMargin=72,
+            rightMargin=72,
+            topMargin=72,
+            bottomMargin=72,
+        )
+
+        # Get styles
+        styles = getSampleStyleSheet()
+
+        # Custom styles
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=24,
+            textColor=colors.HexColor("#2c3e50"),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+        )
+
+        heading_style = ParagraphStyle(
+            "CustomHeading",
+            parent=styles["Heading2"],
+            fontSize=16,
+            textColor=colors.HexColor("#34495e"),
+            spaceAfter=12,
+        )
+
+        normal_style = styles["BodyText"]
+        normal_style.fontSize = 11
+
+        # Build story (content elements)
+        story = []
+
+        # Title
+        title = config.title or "Candidate Summary Report"
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Resume metadata
+        story.append(Paragraph("Resume Information", heading_style))
+
+        metadata_data = [
+            ["Resume ID:", data.get("resume_id", "N/A")],
+            ["Filename:", data.get("filename", "N/A")],
+            ["Status:", data.get("status", "N/A")],
+            ["Language:", data.get("language", "N/A")],
+        ]
+
+        if data.get("uploaded_at"):
+            metadata_data.append(["Uploaded:", data["uploaded_at"]])
+
+        metadata_table = Table(metadata_data, colWidths=[2 * inch, 4 * inch])
+        metadata_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (1, 0), (1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 11),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(metadata_table)
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Match scores and ranking
+        if data.get("rank_score") is not None:
+            story.append(Paragraph("Match Score & Ranking", heading_style))
+
+            score_data = [
+                ["Overall Match Score:", f"{data['rank_score']:.1%}"],
+            ]
+
+            if data.get("rank_position"):
+                score_data.append(["Rank Position:", f"#{data['rank_position']}"])
+
+            if data.get("prediction_confidence"):
+                score_data.append(["Confidence:", f"{data['prediction_confidence']:.1%}"])
+
+            if data.get("recommendation"):
+                score_data.append(["Recommendation:", data["recommendation"].upper()])
+
+            score_table = Table(score_data, colWidths=[2 * inch, 4 * inch])
+            score_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ]))
+            story.append(score_table)
+            story.append(Spacer(1, 0.2 * inch))
+
+            # Explanation narrative
+            if data.get("explanation_narrative"):
+                story.append(Paragraph("Explanation", heading_style))
+                story.append(Paragraph(data["explanation_narrative"], normal_style))
+                story.append(Spacer(1, 0.2 * inch))
+
+        # Hiring stage
+        if data.get("hiring_stage"):
+            story.append(Paragraph("Hiring Stage", heading_style))
+
+            stage_data = [
+                ["Current Stage:", data["hiring_stage"].upper()],
+            ]
+
+            if data.get("priority"):
+                stage_data.append(["Priority:", str(data["priority"])])
+
+            if data.get("queue_entered_at"):
+                stage_data.append(["Queue Entry:", data["queue_entered_at"]])
+
+            stage_table = Table(stage_data, colWidths=[2 * inch, 4 * inch])
+            stage_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ]))
+            story.append(stage_table)
+
+            if data.get("stage_notes"):
+                story.append(Spacer(1, 0.1 * inch))
+                story.append(Paragraph(f"<b>Notes:</b> {data['stage_notes']}", normal_style))
+
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Skills
+        if data.get("skills"):
+            story.append(Paragraph("Skills", heading_style))
+
+            skills_list = []
+            for skill in data["skills"]:
+                if isinstance(skill, dict):
+                    skill_name = skill.get("name", str(skill))
+                else:
+                    skill_name = str(skill)
+                skills_list.append(skill_name)
+
+            if skills_list:
+                # Group skills into columns for better layout
+                skills_text = ", ".join(skills_list)
+                story.append(Paragraph(skills_text, normal_style))
+                story.append(Spacer(1, 0.2 * inch))
+
+        # Experience summary
+        if data.get("experience_summary"):
+            story.append(Paragraph("Experience Summary", heading_style))
+
+            exp_summary = data["experience_summary"]
+            exp_text = ""
+
+            if "total_years_formatted" in exp_summary:
+                exp_text += f"<b>Total Experience:</b> {exp_summary['total_years_formatted']}<br/>"
+            elif "total_years" in exp_summary:
+                exp_text += f"<b>Total Experience:</b> {exp_summary['total_years']:.1f} years<br/>"
+
+            if "framework_specific" in exp_summary:
+                exp_text += "<br/><b>Framework-Specific Experience:</b><br/>"
+                for framework, experience in exp_summary["framework_specific"].items():
+                    exp_text += f"• {framework}: {experience}<br/>"
+
+            if exp_text:
+                story.append(Paragraph(exp_text, normal_style))
+                story.append(Spacer(1, 0.2 * inch))
+
+        # Feature contributions (if available)
+        if data.get("feature_contributions"):
+            story.append(PageBreak())
+            story.append(Paragraph("Feature Contribution Breakdown", heading_style))
+
+            contributions = data["feature_contributions"]
+            if isinstance(contributions, dict):
+                # Convert dict to list format
+                contrib_list = [
+                    {"name": key, "contribution": value}
+                    for key, value in contributions.items()
+                ]
+            else:
+                contrib_list = contributions
+
+            if contrib_list:
+                table_data = [["Feature", "Contribution"]]
+
+                for contrib in contrib_list[:10]:  # Limit to top 10
+                    name = contrib.get("name", "N/A")
+                    value = contrib.get("contribution", contrib.get("value", 0))
+
+                    if isinstance(value, (int, float)):
+                        value_str = f"{value:.3f}"
+                    else:
+                        value_str = str(value)
+
+                    table_data.append([name, value_str])
+
+                contrib_table = Table(table_data, colWidths=[3 * inch, 2 * inch])
+                contrib_table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 12),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#ecf0f1")),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#bdc3c7")),
+                ]))
+
+                story.append(contrib_table)
+                story.append(Spacer(1, 0.2 * inch))
+
+        # Confidence interval (if available)
+        if data.get("confidence_interval"):
+            story.append(Paragraph("Confidence Interval", heading_style))
+
+            ci = data["confidence_interval"]
+            ci_text = (
+                f"<b>Lower Bound:</b> {ci.get('lower', 0):.1%}<br/>"
+                f"<b>Upper Bound:</b> {ci.get('upper', 0):.1%}<br/>"
+            )
+
+            if "confidence_level" in ci:
+                ci_text += f"<b>Confidence Level:</b> {ci.get('confidence_level', 0):.0%}<br/>"
+
+            if "explanation" in ci:
+                ci_text += f"<br/>{ci['explanation']}"
+
+            story.append(Paragraph(ci_text, normal_style))
+            story.append(Spacer(1, 0.2 * inch))
+
+        # Footer
+        story.append(Spacer(1, 0.5 * inch))
+        footer_style = ParagraphStyle(
+            "Footer",
+            parent=normal_style,
+            fontSize=9,
+            textColor=colors.HexColor("#7f8c8d"),
+            alignment=TA_CENTER,
+        )
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        footer_text = f"Generated: {timestamp} | Resume ID: {data['resume_id']}"
+        if data.get("vacancy_id"):
+            footer_text += f" | Vacancy ID: {data['vacancy_id']}"
+        story.append(Paragraph(footer_text, footer_style))
+
+        # Build PDF
+        doc.build(story)
+
+        # Get PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_CANDIDATE_SUMMARY,
+            self.FORMAT_PDF
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=pdf_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_PDF],
+            file_size=len(pdf_bytes),
+            metadata={
+                "resume_id": data["resume_id"],
+                "vacancy_id": data.get("vacancy_id"),
+            },
+        )
+
+    async def _generate_candidate_summary_excel(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate candidate summary report in Excel format.
+
+        Args:
+            config: Report configuration
+            data: Collected candidate data
+
+        Returns:
+            ReportGenerationResult with Excel bytes
+        """
+        # Placeholder for Excel generation
+        # This would use openpyxl to create an Excel workbook
         return ReportGenerationResult(
             success=False,
-            error_message="Candidate summary report not yet implemented",
+            error_message="Excel format not yet implemented for candidate summary report",
+        )
+
+    async def _generate_candidate_summary_csv(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate candidate summary report in CSV format.
+
+        Args:
+            config: Report configuration
+            data: Collected candidate data
+
+        Returns:
+            ReportGenerationResult with CSV bytes
+        """
+        # Placeholder for CSV generation
+        # This would use csv module to create a CSV file
+        return ReportGenerationResult(
+            success=False,
+            error_message="CSV format not yet implemented for candidate summary report",
         )
 
     async def _generate_hiring_pipeline(
