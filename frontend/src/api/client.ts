@@ -1,22 +1,26 @@
 /**
- * API Client for Resume Analysis Backend
+ * Base API Client
  *
- * This module provides a typed Axios client for communicating with the
- * backend resume analysis service. Handles job matching, health check,
- * and other general API endpoints.
+ * This module provides the foundational Axios client with error handling,
+ * request/response interceptors, and a few core endpoints (health checks,
+ * job matching comparison).
  *
- * For resume-specific operations (upload, analyze, list, delete), use the
- * ResumesClient from '@/api/resume' instead.
+ * For domain-specific operations, use the specialized clients:
+ * - Resumes: '@/api/resume' (upload, analyze, list, delete)
+ * - Feedback: '@/api/feedback' (create, list, update, delete feedback)
+ * - Comparisons: '@/api/comparisons' (resume comparisons, comparison matrix)
+ * - Analytics: '@/api/analytics' (metrics, funnel, skill demand)
+ * - And many more in '@/api/*'
  *
  * @example
  * ```ts
  * import { apiClient } from '@/api/client';
  *
- * // Compare resume with job vacancy
- * const match = await apiClient.compareWithVacancy(resumeId, vacancyData);
- *
  * // Check backend health
  * const health = await apiClient.healthCheck();
+ *
+ * // Use getAxiosInstance() for custom requests
+ * const instance = apiClient.getAxiosInstance();
  * ```
  */
 
@@ -44,18 +48,22 @@ const DEFAULT_CONFIG: ApiClientConfig = {
 };
 
 /**
- * API Client class
+ * Base API Client class
  *
- * Provides methods for all backend API endpoints with proper error handling,
- * type safety, and progress tracking for file uploads.
+ * Provides foundational HTTP client with standardized error handling,
+ * request/response interceptors for debugging, and core utility endpoints.
+ * Domain-specific operations are handled by specialized client modules.
  */
 export class ApiClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new API client instance
+   * Create a new base API client instance
    *
-   * @param config - Optional configuration overrides
+   * Sets up Axios with default configuration, request/response interceptors
+   * for timing metadata, and standardized error transformation.
+   *
+   * @param config - Optional configuration overrides for baseURL, timeout, headers
    */
   constructor(config: ApiClientConfig = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
@@ -247,11 +255,15 @@ declare module 'axios' {
 /**
  * Default API client instance
  *
- * Use this singleton instance for all API calls.
+ * Pre-configured singleton instance for core API operations.
+ * For domain-specific operations, prefer specialized clients from '@/api/*'.
  */
 export const apiClient = new ApiClient();
 
 /**
- * Export API client class for custom instances
+ * Export base API client class
+ *
+ * Use this to create custom client instances with different configurations.
+ * Most use cases should use the pre-configured singleton `apiClient` instead.
  */
 export default ApiClient;
