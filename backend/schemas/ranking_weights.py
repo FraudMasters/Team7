@@ -259,3 +259,71 @@ class NormalizeWeightsResponse(BaseModel):
     completeness_score_weight: float = Field(..., description="Normalized completeness score weight")
 
     total: float = Field(..., description="Sum of all weights (should be 1.0)")
+
+
+class PreviewImpactRequest(BaseModel):
+    """Request model for previewing ranking weight impact."""
+
+    vacancy_id: str = Field(..., description="Vacancy ID to preview rankings for")
+
+    # 13 ranking feature weights (all optional, only provided weights will be used)
+    overall_match_score_weight: Optional[float] = Field(None, description="Weight for overall composite match score", ge=0.0, le=1.0)
+    keyword_score_weight: Optional[float] = Field(None, description="Weight for keyword-based matching score", ge=0.0, le=1.0)
+    tfidf_score_weight: Optional[float] = Field(None, description="Weight for TF-IDF matching score", ge=0.0, le=1.0)
+    vector_score_weight: Optional[float] = Field(None, description="Weight for vector similarity score", ge=0.0, le=1.0)
+    skills_match_ratio_weight: Optional[float] = Field(None, description="Weight for skills match ratio", ge=0.0, le=1.0)
+    experience_months_weight: Optional[float] = Field(None, description="Weight for total experience duration", ge=0.0, le=1.0)
+    experience_relevance_weight: Optional[float] = Field(None, description="Weight for experience relevance", ge=0.0, le=1.0)
+    education_level_weight: Optional[float] = Field(None, description="Weight for education level", ge=0.0, le=1.0)
+    recent_experience_weight: Optional[float] = Field(None, description="Weight for recent experience", ge=0.0, le=1.0)
+    skill_rarity_weight: Optional[float] = Field(None, description="Weight for skill rarity/uniqueness", ge=0.0, le=1.0)
+    title_similarity_weight: Optional[float] = Field(None, description="Weight for job title similarity", ge=0.0, le=1.0)
+    freshness_score_weight: Optional[float] = Field(None, description="Weight for profile/resume freshness", ge=0.0, le=1.0)
+    completeness_score_weight: Optional[float] = Field(None, description="Weight for profile completeness", ge=0.0, le=1.0)
+
+
+class CandidateRankingChange(BaseModel):
+    """Model showing how a single candidate's ranking changed."""
+
+    resume_id: str = Field(..., description="Resume/candidate identifier")
+    candidate_name: Optional[str] = Field(None, description="Candidate name if available")
+
+    # Current (baseline) ranking
+    current_position: int = Field(..., description="Current rank position (1-based)")
+    current_score: float = Field(..., description="Current ranking score")
+
+    # New (preview) ranking
+    new_position: int = Field(..., description="New rank position with proposed weights")
+    new_score: float = Field(..., description="New ranking score with proposed weights")
+
+    # Change metrics
+    position_change: int = Field(..., description="Change in position (positive = moved up, negative = moved down)")
+    score_change: float = Field(..., description="Change in score (new - current)")
+
+
+class PreviewImpactResponse(BaseModel):
+    """Response model for ranking weight impact preview."""
+
+    vacancy_id: str = Field(..., description="Vacancy ID that was analyzed")
+    vacancy_title: Optional[str] = Field(None, description="Vacancy title")
+
+    # Weight information
+    current_weights_profile: Optional[str] = Field(None, description="Name of current active weight profile, if any")
+    preview_weights_source: str = Field(..., description="Source of preview weights (e.g., 'custom', 'default', 'normalized')")
+
+    # Ranking changes
+    total_candidates: int = Field(..., description="Total number of candidates analyzed")
+    candidates_moved: int = Field(..., description="Number of candidates with position changes")
+    candidates_unchanged: int = Field(..., description="Number of candidates with same position")
+
+    # Top changes
+    biggest_movers_up: List[CandidateRankingChange] = Field(..., description="Top candidates that moved up the most")
+    biggest_movers_down: List[CandidateRankingChange] = Field(..., description="Top candidates that moved down the most")
+
+    # All rankings (limited)
+    all_changes: List[CandidateRankingChange] = Field(..., description="All candidate ranking changes (limited to first 50)")
+
+    # Summary statistics
+    avg_score_change: float = Field(..., description="Average score change across all candidates")
+    max_position_change: int = Field(..., description="Maximum position change (absolute value)")
+

@@ -7,7 +7,9 @@ when ranking candidates for job vacancies.
 """
 import logging
 from typing import List, Optional
+from uuid import UUID
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, delete
@@ -16,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.ranking_weights_profile import RankingWeightProfile
 from models.ranking_weights_history import RankingWeightVersion
+from models import JobVacancy, Resume, ResumeAnalysis, MatchResult
+from analyzers.ranking_service import RankingFeatures
 from schemas.ranking_weights import (
     RankingWeightProfileCreate,
     RankingWeightProfileUpdate,
@@ -24,6 +28,9 @@ from schemas.ranking_weights import (
     RankingWeightVersionResponse,
     NormalizeWeightsRequest,
     NormalizeWeightsResponse,
+    PreviewImpactRequest,
+    PreviewImpactResponse,
+    CandidateRankingChange,
 )
 
 logger = logging.getLogger(__name__)
@@ -1006,4 +1013,296 @@ async def normalize_ranking_weights(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to normalize weights: {str(e)}"
+        )
+
+
+@router.post(
+    "/preview-impact",
+    response_model=PreviewImpactResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Ranking Weights"],
+)
+async def preview_ranking_weight_impact(
+    request: PreviewImpactRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Preview the impact of weight changes on candidate rankings.
+
+    This endpoint computes how changing ranking weights would affect the relative
+    ranking of candidates for a given vacancy. It compares:
+    - Current rankings (using active profile or default weights)
+    - Preview rankings (using the provided custom weights)
+
+    The response shows which candidates would move up or down in ranking, by how much,
+    and provides detailed statistics about the impact.
+
+    Args:
+        request: Request with vacancy_id and optional custom weights to preview
+        db: Database session
+
+    Returns:
+        JSON response with ranking changes and impact statistics
+
+    Raises:
+        HTTPException(404): If vacancy not found
+        HTTPException(400): If no candidates found or invalid weights
+        HTTPException(500): If preview computation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "vacancy_id": "test-vacancy",
+        ...     "skills_match_ratio_weight": 0.5,
+        ...     "experience_relevance_weight": 0.3
+        ... }
+        >>> response = requests.post("http://localhost:8000/api/ranking-weights/preview-impact", json=data)
+        >>> changes = response.json()
+    """
+    try:
+        # 1. Fetch vacancy
+        vacancy_query = select(JobVacancy).where(JobVacancy.id == UUID(request.vacancy_id))
+        vacancy_result = await db.execute(vacancy_query)
+        vacancy = vacancy_result.scalar_one_or_none()
+
+        if not vacancy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Vacancy not found: {request.vacancy_id}"
+            )
+
+        # 2. Get current active weight profile (if any)
+        current_profile_name = None
+        current_weights = None
+
+        # Try vacancy-specific profile first
+        profile_query = select(RankingWeightProfile).where(
+            RankingWeightProfile.vacancy_id == UUID(request.vacancy_id),
+            RankingWeightProfile.is_active == True,
+        )
+        profile_result = await db.execute(profile_query)
+        profile = profile_result.scalar_one_or_none()
+
+        if profile:
+            current_profile_name = profile.name
+            current_weights = np.array(profile.get_weights_as_list(), dtype=np.float64)
+            logger.info(f"Using vacancy-specific profile: {profile.name}")
+        else:
+            # Try organization-level profile
+            if vacancy.organization_id:
+                org_profile_query = select(RankingWeightProfile).where(
+                    RankingWeightProfile.organization_id == vacancy.organization_id,
+                    RankingWeightProfile.is_active == True,
+                    RankingWeightProfile.vacancy_id.is_(None),
+                )
+                org_profile_result = await db.execute(org_profile_query)
+                org_profile = org_profile_result.scalar_one_or_none()
+
+                if org_profile:
+                    current_profile_name = org_profile.name
+                    current_weights = np.array(org_profile.get_weights_as_list(), dtype=np.float64)
+                    logger.info(f"Using organization profile: {org_profile.name}")
+
+        # If no custom profile, use balanced defaults
+        if current_weights is None:
+            current_profile_name = "Default (Balanced)"
+            current_weights = np.array([0.077] * 12 + [0.076], dtype=np.float64)
+            logger.info("Using default balanced weights")
+
+        # 3. Build preview weights from request (normalize them)
+        # Extract provided weights, fill missing with 0
+        preview_weights_dict = {
+            "overall_match_score_weight": request.overall_match_score_weight or 0.0,
+            "keyword_score_weight": request.keyword_score_weight or 0.0,
+            "tfidf_score_weight": request.tfidf_score_weight or 0.0,
+            "vector_score_weight": request.vector_score_weight or 0.0,
+            "skills_match_ratio_weight": request.skills_match_ratio_weight or 0.0,
+            "experience_months_weight": request.experience_months_weight or 0.0,
+            "experience_relevance_weight": request.experience_relevance_weight or 0.0,
+            "education_level_weight": request.education_level_weight or 0.0,
+            "recent_experience_weight": request.recent_experience_weight or 0.0,
+            "skill_rarity_weight": request.skill_rarity_weight or 0.0,
+            "title_similarity_weight": request.title_similarity_weight or 0.0,
+            "freshness_score_weight": request.freshness_score_weight or 0.0,
+            "completeness_score_weight": request.completeness_score_weight or 0.0,
+        }
+
+        # Normalize preview weights
+        preview_weights_tuple = normalize_weights(**preview_weights_dict)
+        preview_weights = np.array(preview_weights_tuple, dtype=np.float64)
+
+        logger.info(f"Preview weights: {preview_weights}")
+
+        # 4. Fetch candidate resumes (limited to 50 for performance)
+        resume_query = select(Resume).where(Resume.status == "COMPLETED").limit(50)
+        resume_result = await db.execute(resume_query)
+        resumes = resume_result.scalars().all()
+
+        if not resumes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No completed resumes found for ranking"
+            )
+
+        # 5. Prepare vacancy data
+        vacancy_data = {
+            "id": str(vacancy.id),
+            "title": vacancy.title,
+            "required_skills": vacancy.required_skills or [],
+            "description": vacancy.description or "",
+        }
+
+        # 6. Compute rankings with both current and preview weights
+        current_rankings = []
+        preview_rankings = []
+
+        for resume in resumes:
+            try:
+                # Get match result if available
+                match_query = select(MatchResult).where(
+                    MatchResult.resume_id == resume.id,
+                    MatchResult.vacancy_id == UUID(request.vacancy_id),
+                )
+                match_result_obj = await db.execute(match_query)
+                match_record = match_result_obj.scalar_one_or_none()
+
+                match_result = None
+                if match_record:
+                    match_result = {
+                        "overall_score": float(match_record.overall_score or 0),
+                        "keyword_score": float(match_record.keyword_score or 0),
+                        "tfidf_score": float(match_record.tfidf_score or 0),
+                        "vector_score": float(match_record.vector_score or 0),
+                    }
+
+                # Prepare resume data
+                resume_data = {
+                    "id": str(resume.id),
+                    "title": resume.raw_text[:100] if resume.raw_text else "",
+                    "skills": [],
+                    "experience": {},
+                    "education": {},
+                    "updated_at": resume.updated_at.isoformat() if resume.updated_at else None,
+                }
+
+                # Try to get skills from ResumeAnalysis
+                analysis_query = select(ResumeAnalysis).where(ResumeAnalysis.resume_id == resume.id)
+                analysis_result = await db.execute(analysis_query)
+                analysis = analysis_result.scalar_one_or_none()
+
+                if analysis and analysis.skills:
+                    resume_data["skills"] = analysis.skills
+
+                # Extract features
+                features = RankingFeatures.extract_features(resume_data, vacancy_data, match_result)
+
+                # Compute scores with both weight sets
+                current_score = float(np.dot(features, current_weights))
+                current_score = np.clip(current_score, 0.0, 1.0)
+
+                preview_score = float(np.dot(features, preview_weights))
+                preview_score = np.clip(preview_score, 0.0, 1.0)
+
+                current_rankings.append({
+                    "resume_id": str(resume.id),
+                    "score": current_score,
+                    "candidate_name": None,  # Could extract from resume if available
+                })
+
+                preview_rankings.append({
+                    "resume_id": str(resume.id),
+                    "score": preview_score,
+                    "candidate_name": None,
+                })
+
+            except Exception as e:
+                logger.warning(f"Failed to rank candidate {resume.id}: {e}")
+                continue
+
+        if not current_rankings:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to compute rankings for any candidates"
+            )
+
+        # 7. Sort rankings and assign positions
+        current_rankings.sort(key=lambda x: x["score"], reverse=True)
+        preview_rankings.sort(key=lambda x: x["score"], reverse=True)
+
+        for i, ranking in enumerate(current_rankings):
+            ranking["position"] = i + 1
+
+        for i, ranking in enumerate(preview_rankings):
+            ranking["position"] = i + 1
+
+        # 8. Compare rankings and build changes
+        changes = []
+        current_by_id = {r["resume_id"]: r for r in current_rankings}
+        preview_by_id = {r["resume_id"]: r for r in preview_rankings}
+
+        for resume_id in current_by_id.keys():
+            current = current_by_id[resume_id]
+            preview = preview_by_id[resume_id]
+
+            position_change = current["position"] - preview["position"]  # Positive = moved up
+            score_change = preview["score"] - current["score"]
+
+            changes.append(CandidateRankingChange(
+                resume_id=resume_id,
+                candidate_name=current.get("candidate_name"),
+                current_position=current["position"],
+                current_score=current["score"],
+                new_position=preview["position"],
+                new_score=preview["score"],
+                position_change=position_change,
+                score_change=score_change,
+            ))
+
+        # 9. Calculate statistics
+        candidates_moved = sum(1 for c in changes if c.position_change \!= 0)
+        candidates_unchanged = len(changes) - candidates_moved
+
+        avg_score_change = sum(c.score_change for c in changes) / len(changes) if changes else 0.0
+        max_position_change = max((abs(c.position_change) for c in changes), default=0)
+
+        # Get biggest movers
+        changes_sorted_by_up = sorted(changes, key=lambda x: x.position_change, reverse=True)
+        changes_sorted_by_down = sorted(changes, key=lambda x: x.position_change)
+
+        biggest_movers_up = changes_sorted_by_up[:5]
+        biggest_movers_down = [c for c in changes_sorted_by_down[:5] if c.position_change < 0]
+
+        # 10. Build response
+        response = PreviewImpactResponse(
+            vacancy_id=request.vacancy_id,
+            vacancy_title=vacancy.title,
+            current_weights_profile=current_profile_name,
+            preview_weights_source="custom",
+            total_candidates=len(changes),
+            candidates_moved=candidates_moved,
+            candidates_unchanged=candidates_unchanged,
+            biggest_movers_up=biggest_movers_up,
+            biggest_movers_down=biggest_movers_down,
+            all_changes=changes[:50],  # Limit to first 50
+            avg_score_change=avg_score_change,
+            max_position_change=max_position_change,
+        )
+
+        logger.info(
+            f"Preview complete for vacancy {request.vacancy_id}: "
+            f"{len(changes)} candidates, {candidates_moved} moved"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response.model_dump()
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing weight impact: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to preview weight impact: {str(e)}"
         )
