@@ -349,9 +349,16 @@ class QueryParser:
             # Check for unexpected tokens
             if not self._is_at_end():
                 token = self._current_token()
-                raise ValueError(
-                    f"Unexpected token '{token.value}' at position {token.position}"
-                )
+                if token.type == TokenType.RPAREN:
+                    raise ValueError(
+                        f"Unexpected closing parenthesis ')' at position {token.position}. "
+                        f"Check that all parentheses are balanced and properly matched."
+                    )
+                else:
+                    raise ValueError(
+                        f"Unexpected token '{token.value}' at position {token.position}. "
+                        f"This may be caused by an invalid query structure or missing operator."
+                    )
 
             # Convert AST to Elasticsearch query DSL
             if ast is None:
@@ -363,9 +370,16 @@ class QueryParser:
 
             return {"query": query_dsl}
 
+        except ValueError:
+            # Re-raise ValueError with original message
+            raise
         except Exception as e:
             logger.error(f"Failed to parse query '{query}': {e}")
-            raise ValueError(f"Query parsing failed: {str(e)}") from e
+            raise ValueError(
+                f"Invalid query syntax: {str(e)}. "
+                f"Please check your query for balanced parentheses, valid operators (AND, OR, NOT), "
+                f"and proper term formatting."
+            ) from e
 
     def _parse_expression(self) -> Optional[ASTNode]:
         """Parse an expression (top level)."""
@@ -383,7 +397,10 @@ class QueryParser:
         while self._match(TokenType.OR):
             right = self._parse_and_expr()
             if right is None:
-                raise ValueError("Expected expression after OR operator")
+                raise ValueError(
+                    "Expected search term or expression after OR operator. "
+                    "Example: 'Python OR Django' or 'Python OR (Django AND Flask)'"
+                )
             or_operands.append(right)
 
         if len(or_operands) == 1:
@@ -404,7 +421,10 @@ class QueryParser:
         while self._match(TokenType.AND):
             right = self._parse_not_expr()
             if right is None:
-                raise ValueError("Expected expression after AND operator")
+                raise ValueError(
+                    "Expected search term or expression after AND operator. "
+                    "Example: 'Python AND Django' or 'Python AND (Django OR Flask)'"
+                )
             and_operands.append(right)
 
         # Handle implicit AND (consecutive terms without operator)
@@ -430,7 +450,10 @@ class QueryParser:
         if self._match(TokenType.NOT):
             operand = self._parse_not_expr()
             if operand is None:
-                raise ValueError("Expected expression after NOT operator")
+                raise ValueError(
+                    "Expected search term or expression after NOT operator. "
+                    "Example: 'Python NOT Java' or 'Python NOT (Java OR Ruby)'"
+                )
             return BoolNode("NOT", [operand])
 
         return self._parse_primary()
@@ -441,9 +464,20 @@ class QueryParser:
         if self._match(TokenType.LPAREN):
             expr = self._parse_expression()
             if expr is None:
-                raise ValueError("Empty parenthesized expression")
+                raise ValueError(
+                    "Empty parenthesized expression - expected search term or expression inside parentheses"
+                )
             if not self._match(TokenType.RPAREN):
-                raise ValueError("Expected closing parenthesis ')'")
+                current = self._current_token()
+                if current.type == TokenType.EOF:
+                    raise ValueError(
+                        f"Unclosed parenthesis - missing closing ')' in query. "
+                        f"Check that all opening parentheses have matching closing parentheses."
+                    )
+                else:
+                    raise ValueError(
+                        f"Expected closing parenthesis ')' but found '{current.value}' at position {current.position}"
+                    )
             return expr
 
         # Quoted term
@@ -454,7 +488,17 @@ class QueryParser:
         # Field-specific term
         if self._check(TokenType.FIELD):
             token = self._advance()
+            if ':' not in token.value:
+                raise ValueError(
+                    f"Invalid field query format: '{token.value}'. "
+                    f"Expected format: 'field:value' (e.g., 'skills:Python', 'location:Remote')"
+                )
             field, term = token.value.split(':', 1)
+            if not term.strip():
+                raise ValueError(
+                    f"Empty search term after field '{field}:'. "
+                    f"Expected format: 'field:value' (e.g., '{field}:Python')"
+                )
             return TermNode(term, field=field)
 
         # Regular word
