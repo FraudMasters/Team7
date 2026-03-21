@@ -804,15 +804,20 @@ async def export_report_pdf(
 
 
 @router.post("/export/csv", tags=["Reports"])
-async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
+async def export_report_csv(
+    request: CSVExportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
     """
     Export analytics data to CSV format.
 
     This endpoint generates a CSV file from analytics metrics and filters,
-    returning the file directly for download.
+    using the ReportTemplateService to collect and format actual data from
+    the database.
 
     Args:
         request: CSV export request with metrics and filters
+        db: Database session
 
     Returns:
         StreamingResponse with CSV file content
@@ -844,45 +849,39 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
                 detail="At least one metric must be provided",
             )
 
-        # Generate CSV content
-        # For now, generate a placeholder CSV with sample data
-        # Actual data fetching will be added in a later subtask when database is integrated
-        import io
-        csv_buffer = io.StringIO()
+        # Initialize report template service
+        report_service = ReportTemplateService(db)
 
-        # Write CSV header
-        header = ["metric", "value", "date"]
-        csv_buffer.write(",".join(header) + "\n")
+        # Create report configuration for custom analytics report
+        config = ReportConfig(
+            report_type="custom_analytics",
+            output_format="csv",
+            metrics=request.metrics,
+            filters=request.filters or {},
+        )
 
-        # Write sample data rows based on requested metrics
-        from datetime import datetime, timedelta
-        sample_data = {
-            "time_to_hire": {"value": "15 days", "unit": "days"},
-            "resumes_processed": {"value": "150", "unit": "count"},
-            "match_rates": {"value": "85%", "unit": "percentage"},
-            "interviews_scheduled": {"value": "25", "unit": "count"},
-            "offers_extended": {"value": "10", "unit": "count"},
-            "offers_accepted": {"value": "8", "unit": "count"},
+        # Prepare data for report generation
+        data = {
+            "title": "Analytics Export",
+            "metrics": request.metrics,
+            "filters": request.filters or {},
         }
 
-        # Generate a row for each metric with today's date
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-        for metric in request.metrics:
-            if metric in sample_data:
-                row = [metric, sample_data[metric]["value"], today]
-                csv_buffer.write(",".join(row) + "\n")
-            else:
-                row = [metric, "N/A", today]
-                csv_buffer.write(",".join(row) + "\n")
+        # Generate CSV using ReportTemplateService
+        logger.info(f"Generating CSV with ReportTemplateService for metrics: {request.metrics}")
+        result: ReportGenerationResult = await report_service.generate_report(config, data)
 
-        csv_content = csv_buffer.getvalue()
-        csv_buffer.close()
+        if not result.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"CSV generation failed: {result.error}",
+            )
 
         logger.info(f"CSV generated successfully for metrics: {request.metrics}")
 
         # Return as downloadable CSV file
         return StreamingResponse(
-            io.BytesIO(csv_content.encode("utf-8")),
+            io.BytesIO(result.content),
             media_type="text/csv",
             headers={
                 "Content-Disposition": "attachment; filename=analytics_export.csv",
