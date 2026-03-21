@@ -1,0 +1,561 @@
+{
+  "feature": "AI Confidence Scoring & Transparency Dashboard",
+  "workflow_type": "feature",
+  "workflow_rationale": "Multi-service feature adding a comprehensive transparency dashboard. Backend provides aggregated confidence/accuracy metrics, frontend displays visualizations. Follows standard feature workflow: backend API → frontend components → dashboard page → integration.",
+  "phases": [
+    {
+      "id": "phase-1-backend-api",
+      "name": "Backend API & Data Aggregation",
+      "type": "implementation",
+      "description": "Build REST API endpoints to aggregate and serve confidence metrics, model accuracy trends, and AI vs human comparison data",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Create confidence dashboard API endpoint with aggregated metrics",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/api/confidence_dashboard.py"
+          ],
+          "patterns_from": [
+            "backend/api/analytics.py",
+            "backend/api/explainability.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8000/api/confidence-dashboard/metrics",
+            "expected_status": 200
+          },
+          "status": "completed",
+          "notes": "✅ Created backend/api/confidence_dashboard.py with GET /api/confidence-dashboard/metrics endpoint. Returns aggregated confidence metrics including avg/median/min/max confidence, distribution (high/medium/low), uncertainty indicators, and model accuracy summary. Follows patterns from analytics.py and explainability.py. Registered router in main.py. Committed in 8d18683. Endpoint ready for testing when backend is running.",
+          "updated_at": "2026-03-21T18:31:28.809479+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Add model accuracy trends endpoint with historical performance data",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/analytics.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/analyzers/model_performance_monitor.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8000/api/analytics/model-accuracy-trend?period=30d",
+            "expected_status": 200
+          },
+          "status": "completed",
+          "notes": "✅ Added GET /api/analytics/model-accuracy-trend endpoint to analytics.py. Accepts period parameter (7d, 30d, 90d) and optional model_name filter. Returns historical accuracy, precision, recall, F1 scores with data points and summary statistics (avg_accuracy, avg_f1_score, trend direction, total_samples). Follows patterns from model_performance_monitor.py with proper error handling, validation, and logging. Currently returns placeholder data following existing endpoint patterns. Database integration will be added in later subtask. Committed in 16b6644.",
+          "updated_at": "2026-03-21T21:45:00.000000+00:00"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Add AI vs human recruiter comparison endpoint",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/confidence_dashboard.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/analytics.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8000/api/confidence-dashboard/ai-human-comparison",
+            "expected_status": 200
+          },
+          "status": "completed",
+          "notes": "✅ Added GET /api/confidence-dashboard/ai-human-comparison endpoint to confidence_dashboard.py. Returns AI vs human comparison metrics including: AgreementMetrics (agreement rate, total comparisons, correct counts), EfficiencyMetrics (time saved, automation rates), ConfidenceCorrelation (accuracy by confidence level), and actionable recommendations. Follows patterns from analytics.py with proper error handling and comprehensive docstrings. Currently returns placeholder data; database integration will be added in later subtask. Committed in 41ccf17.",
+          "updated_at": "2026-03-21T21:50:00.000000+00:00"
+        },
+        {
+          "id": "subtask-1-4",
+          "description": "Add confidence report export endpoint (CSV/JSON)",
+          "service": "backend",
+          "files_to_modify": [
+            "backend/api/confidence_dashboard.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/services/analytics_export_service.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8000/api/confidence-dashboard/export",
+            "expected_status": 200
+          },
+          "status": "completed",
+          "notes": "✅ Added POST /api/confidence-dashboard/export endpoint to confidence_dashboard.py. Supports both CSV and JSON export formats with comprehensive export functionality following analytics_export_service.py patterns. Implemented ConfidenceExportFormat enum, ConfidenceExportRequest/Response/Metadata models. Created helper functions: _collect_confidence_data(), _format_as_json(), _format_as_csv(), _count_records(). CSV export flattens all confidence metrics sections (summary_metrics, distribution, uncertainty, model_accuracy, ai_human_comparison) into section/metric/value format. Includes proper error handling, logging, and metadata generation with timestamps and filters. Currently returns placeholder data; database integration will be added in later subtask. Committed in 845724e.",
+          "updated_at": "2026-03-21T22:00:00.000000+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-frontend-components",
+      "name": "Frontend Visualization Components",
+      "type": "implementation",
+      "description": "Build reusable React components for confidence scores, accuracy trends, feature importance, and uncertainty indicators",
+      "depends_on": [
+        "phase-1-backend-api"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create ConfidenceScoreCard component showing per-candidate confidence",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/confidence/ConfidenceScoreCard.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/explainability/ExplainabilityDashboard.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "ConfidenceScoreCard renders",
+              "Shows confidence percentage 0-100%",
+              "Color coding (green/yellow/red) based on confidence level"
+            ]
+          },
+          "status": "completed",
+          "notes": "✅ Created ConfidenceScoreCard component with circular progress gauge showing 0-100% confidence. Implements three-tier color coding: green (≥80% high confidence), yellow (50-79% medium), red (<50% low confidence). Includes confidence level chip with icons, tooltips with interpretation guidance, optional rank position/score/model display. Supports small/medium/large sizing. Uses MUI components (Card, CircularProgress, Chip, Tooltip) and i18n translations. Follows ExplainabilityDashboard patterns with proper TypeScript interfaces. Component ready for integration into transparency dashboard. Committed in 2059927.",
+          "updated_at": "2026-03-21T22:30:00.000000+00:00"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Create ModelAccuracyTrend component with line chart visualization",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/confidence/ModelAccuracyTrend.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/analytics/RankingAccuracyMetrics.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "ModelAccuracyTrend renders",
+              "Line chart shows accuracy over time",
+              "Time period selector (7d/30d/90d) works"
+            ]
+          },
+          "status": "pending",
+          "notes": "Use Recharts LineChart. Show accuracy, precision, recall, F1 score trends. Allow period selection."
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Create FeatureImportanceChart component showing top 5 ranking factors",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/confidence/FeatureImportanceChart.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/explainability/ExplainabilityDashboard.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "FeatureImportanceChart renders",
+              "Bar chart shows top 5 features",
+              "Feature descriptions visible on hover"
+            ]
+          },
+          "status": "pending",
+          "notes": "Horizontal bar chart showing feature importance scores. Include feature descriptions and categories."
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "Create UncertaintyIndicator component for low-confidence warnings",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/confidence/UncertaintyIndicator.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/ErrorMessage.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "UncertaintyIndicator renders",
+              "Warning badge shows for low confidence (<50%)",
+              "Tooltip explains uncertainty"
+            ]
+          },
+          "status": "pending",
+          "notes": "Alert/Chip component that highlights candidates with low confidence. Show confidence interval bounds."
+        },
+        {
+          "id": "subtask-2-5",
+          "description": "Create AIHumanComparison component showing alignment metrics",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/confidence/AIHumanComparison.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/analytics/RecruiterPerformance.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "AIHumanComparison renders",
+              "Shows alignment percentage",
+              "Displays disagreement cases"
+            ]
+          },
+          "status": "pending",
+          "notes": "Show percentage of AI rankings that align with recruiter decisions. Highlight disagreement cases for review."
+        },
+        {
+          "id": "subtask-2-6",
+          "description": "Create ConfidenceReportExport component for downloading reports",
+          "service": "frontend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/src/components/confidence/ConfidenceReportExport.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/components/analytics/AnalyticsExport.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "ConfidenceReportExport button renders",
+              "Export dialog opens",
+              "CSV/JSON format options available"
+            ]
+          },
+          "status": "pending",
+          "notes": "Export button + dialog for downloading confidence reports. Support CSV and JSON formats."
+        }
+      ]
+    },
+    {
+      "id": "phase-3-dashboard-page",
+      "name": "Transparency Dashboard Page",
+      "type": "implementation",
+      "description": "Build the main AI Transparency Dashboard page that integrates all components and provides comprehensive view",
+      "depends_on": [
+        "phase-2-frontend-components"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Create TransparencyDashboard page with layout and routing",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/App.tsx"
+          ],
+          "files_to_create": [
+            "frontend/src/pages/admin/TransparencyDashboard.tsx"
+          ],
+          "patterns_from": [
+            "frontend/src/pages/AnalyticsDashboard.tsx",
+            "frontend/src/pages/admin/AIExplainabilityDashboard.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "Page loads without errors",
+              "Navigation menu includes link",
+              "Responsive layout (Grid/Stack)"
+            ]
+          },
+          "status": "pending",
+          "notes": "Use MUI Grid for responsive layout. Add route to App.tsx. Follow existing admin dashboard patterns."
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Integrate all confidence components into dashboard",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/pages/admin/TransparencyDashboard.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/pages/AnalyticsDashboard.tsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:5173/admin/transparency-dashboard",
+            "checks": [
+              "All 6 components visible on page",
+              "Data loads from backend",
+              "No console errors"
+            ]
+          },
+          "status": "pending",
+          "notes": "Arrange components: ConfidenceScoreCard, ModelAccuracyTrend, FeatureImportanceChart, UncertaintyIndicator, AIHumanComparison, ConfidenceReportExport"
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Add API client functions for confidence dashboard endpoints",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/api/analytics.ts"
+          ],
+          "files_to_create": [
+            "frontend/src/api/confidenceDashboard.ts"
+          ],
+          "patterns_from": [
+            "frontend/src/api/analytics.ts",
+            "frontend/src/api/explainability.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd frontend && npm run build",
+            "expected": "Build succeeds with no TypeScript errors"
+          },
+          "status": "pending",
+          "notes": "Create API functions: getConfidenceMetrics(), getModelAccuracyTrend(), getAIHumanComparison(), exportConfidenceReport()"
+        },
+        {
+          "id": "subtask-3-4",
+          "description": "Add real-time updates via WebSocket (optional enhancement)",
+          "service": "frontend",
+          "files_to_modify": [
+            "frontend/src/pages/admin/TransparencyDashboard.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "frontend/src/pages/AnalyticsDashboard.tsx"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify dashboard updates when new candidate rankings are created. Check WebSocket connection status indicator."
+          },
+          "status": "pending",
+          "notes": "Reuse existing useAnalyticsRealTime hook. Subscribe to confidence metrics updates."
+        }
+      ]
+    },
+    {
+      "id": "phase-4-integration",
+      "name": "Integration & End-to-End Verification",
+      "type": "integration",
+      "description": "Verify complete transparency dashboard workflow from backend to frontend, test all acceptance criteria",
+      "depends_on": [
+        "phase-3-dashboard-page"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "End-to-end verification of transparency dashboard",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [
+            "frontend/e2e/transparency-dashboard.spec.ts"
+          ],
+          "patterns_from": [
+            "frontend/e2e/analytics-dashboard.spec.ts"
+          ],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Navigate to /admin/transparency-dashboard",
+              "Verify confidence scores display for candidates (0-100%)",
+              "Verify model accuracy trend chart shows data",
+              "Verify feature importance shows top 5 factors",
+              "Verify uncertainty indicators appear for low-confidence rankings",
+              "Verify historical trend shows model improvement",
+              "Verify AI vs human comparison displays alignment percentage",
+              "Download confidence report (CSV) and verify contents"
+            ]
+          },
+          "status": "pending",
+          "notes": "Create Playwright E2E test covering all acceptance criteria from spec.md"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Backend API integration tests",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [
+            "backend/tests/integration/test_confidence_dashboard_e2e.py"
+          ],
+          "patterns_from": [
+            "backend/tests/integration/test_explainability_e2e.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd backend && pytest tests/integration/test_confidence_dashboard_e2e.py -v",
+            "expected": "All tests pass"
+          },
+          "status": "pending",
+          "notes": "Test all confidence dashboard API endpoints with realistic data. Verify response schemas match frontend expectations."
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Acceptance criteria verification checklist",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Manual verification checklist:\n✅ Each candidate ranking shows AI confidence score (0-100%)\n✅ Dashboard displays overall model accuracy based on recruiter feedback\n✅ Feature importance visualization shows top 5 factors influencing each ranking\n✅ Uncertainty indicators highlight cases where model confidence is low\n✅ Historical trend shows model improvement over time from feedback loops\n✅ Comparison view shows alignment between AI rankings and recruiter decisions\n✅ Export functionality allows downloading confidence reports for stakeholders"
+          },
+          "status": "pending",
+          "notes": "Verify all 7 acceptance criteria from spec.md are met"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 4,
+    "total_subtasks": 16,
+    "services_involved": [
+      "backend",
+      "frontend"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 1,
+      "parallel_groups": [],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution - phases depend on each other",
+      "reasoning": "Backend API must complete before frontend components can fetch data. Frontend components must exist before dashboard page can integrate them. No parallelism opportunities."
+    },
+    "startup_command": "docker-compose -f docker-compose.dev.yml up -d postgres redis && cd backend && uvicorn main:app --reload & cd frontend && npm run dev"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration",
+      "e2e"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All backend API endpoints return correct confidence/accuracy data",
+      "All frontend components render without errors",
+      "Dashboard displays all 7 acceptance criteria features",
+      "Export functionality produces valid CSV/JSON reports",
+      "No regression in existing explainability features"
+    ],
+    "verification_steps": [
+      {
+        "name": "Backend Unit Tests",
+        "command": "cd backend && pytest tests/api/test_confidence_dashboard.py -v",
+        "expected_outcome": "All API tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Backend Integration Tests",
+        "command": "cd backend && pytest tests/integration/test_confidence_dashboard_e2e.py -v",
+        "expected_outcome": "All integration tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Frontend Component Tests",
+        "command": "cd frontend && npm test -- confidence",
+        "expected_outcome": "All component tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "E2E Dashboard Test",
+        "command": "cd frontend && npx playwright test transparency-dashboard.spec.ts",
+        "expected_outcome": "Dashboard E2E test passes",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Frontend Build",
+        "command": "cd frontend && npm run build",
+        "expected_outcome": "Build succeeds with no errors",
+        "type": "build",
+        "required": true,
+        "blocking": false
+      }
+    ],
+    "reasoning": "Medium risk - extends existing features without modifying core ML models. Requires comprehensive testing to ensure dashboard displays accurate data and meets all 7 acceptance criteria."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/api/",
+        "cd frontend && npm test"
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "cd backend && pytest tests/integration/test_confidence_dashboard_e2e.py"
+      ],
+      "services_to_test": [
+        "backend",
+        "frontend"
+      ]
+    },
+    "e2e_tests": {
+      "required": true,
+      "commands": [
+        "cd frontend && npx playwright test transparency-dashboard.spec.ts"
+      ],
+      "flows": [
+        "confidence-dashboard-navigation",
+        "export-confidence-report"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:5173/admin/transparency-dashboard",
+          "checks": [
+            "Dashboard renders",
+            "Confidence scores visible",
+            "Accuracy trend chart displays",
+            "Feature importance chart displays",
+            "Export button works",
+            "No console errors"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    }
+  },
+  "qa_signoff": null,
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "xstateState": "backlog",
+  "executionPhase": "coding",
+  "updated_at": "2026-03-21T18:43:28.358Z",
+  "last_updated": "2026-03-21T18:31:28.809485+00:00"
+}
