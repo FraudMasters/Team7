@@ -39,6 +39,14 @@ from services.report_generator import (
     ReportData,
     get_report_generator,
 )
+from schemas.explainability import (
+    ExplainRankingResponse,
+    FeatureCategoryData,
+    PercentileData,
+    RelativeComparisonData,
+    RankingFactorDetail,
+    SkillsMatchDetail,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +66,12 @@ class ExplainRequest(BaseModel):
 
 
 class ExplainResponse(BaseModel):
-    """Response containing ranking explanation."""
+    """
+    DEPRECATED: Use ExplainRankingResponse from schemas.explainability instead.
+
+    Legacy response containing ranking explanation.
+    Kept for backward compatibility only.
+    """
 
     resume_id: str = Field(..., description="Resume UUID")
     vacancy_id: str = Field(..., description="Vacancy UUID")
@@ -180,9 +193,158 @@ class CompareExplainResponse(BaseModel):
     generated_at: str = Field(..., description="Timestamp of generation")
 
 
+# =============================================================================
+# Helper Functions for Enhanced Data Structures
+# =============================================================================
+
+
+def _build_feature_categories(
+    feature_contributions: Dict[str, float],
+    ranking_factors: Dict[str, Any],
+    all_candidate_scores: List[float],
+) -> List[FeatureCategoryData]:
+    """
+    Build feature category data for visualization.
+
+    Groups features into logical categories (Skills Match, Experience, Education, etc.)
+    and calculates aggregate scores and percentiles for each category.
+    """
+    # Define feature category mappings
+    category_mapping = {
+        "Skills Match": ["skills_match_ratio", "keyword_score", "tfidf_score", "vector_score"],
+        "Experience": ["experience_months", "experience_relevance", "title_similarity"],
+        "Education": ["education_level", "education_score"],
+        "Profile Quality": ["resume_completeness", "profile_freshness"],
+    }
+
+    categories = []
+    for category_name, feature_names in category_mapping.items():
+        # Calculate category score as average of constituent features
+        category_features = []
+        category_score_sum = 0.0
+        feature_count = 0
+
+        for feature_name in feature_names:
+            if feature_name in feature_contributions:
+                category_features.append(feature_name)
+                category_score_sum += feature_contributions.get(feature_name, 0.0)
+                feature_count += 1
+
+        if feature_count > 0:
+            category_score = category_score_sum / feature_count
+
+            # Calculate percentile for this category (simplified - use overall percentile)
+            percentile = None
+            if all_candidate_scores and len(all_candidate_scores) > 1:
+                sorted_scores = sorted(all_candidate_scores)
+                percentile = (sorted_scores.index(max(sorted_scores, key=lambda x: abs(x - category_score))) / len(sorted_scores)) * 100
+
+            categories.append(FeatureCategoryData(
+                category_name=category_name,
+                category_score=category_score,
+                weight=1.0 / len(category_mapping),  # Equal weighting for simplicity
+                features_in_category=category_features,
+                percentile=percentile,
+            ))
+
+    return categories
+
+
+def _build_percentile_data(
+    rank_score: float,
+    rank_position: Optional[int],
+    all_candidate_scores: List[float],
+    feature_contributions: Dict[str, float],
+) -> PercentileData:
+    """
+    Build percentile data structure for candidate comparison.
+
+    Calculates overall percentile and category-level percentiles.
+    """
+    # Calculate overall percentile
+    overall_percentile = 0.0
+    if all_candidate_scores and len(all_candidate_scores) > 1:
+        sorted_scores = sorted(all_candidate_scores)
+        rank = sorted_scores.index(min(sorted_scores, key=lambda x: abs(x - rank_score)))
+        overall_percentile = (rank / len(sorted_scores)) * 100
+
+    # Calculate category percentiles (simplified - using feature contributions)
+    category_percentiles = {}
+    for feature_name, contribution in feature_contributions.items():
+        # Determine category
+        if feature_name in ["skills_match_ratio", "keyword_score", "tfidf_score", "vector_score"]:
+            category_percentiles["Skills Match"] = overall_percentile  # Simplified
+        elif feature_name in ["experience_months", "experience_relevance", "title_similarity"]:
+            category_percentiles["Experience"] = overall_percentile  # Simplified
+        elif feature_name in ["education_level", "education_score"]:
+            category_percentiles["Education"] = overall_percentile  # Simplified
+
+    return PercentileData(
+        overall_percentile=overall_percentile,
+        category_percentiles=category_percentiles,
+        rank_position=rank_position or 0,
+        total_candidates=len(all_candidate_scores),
+        score_distribution=all_candidate_scores if len(all_candidate_scores) <= 100 else None,
+    )
+
+
+def _build_skills_match_detail(
+    ranking_factors: Dict[str, Any],
+    resume: Optional[Resume] = None,
+    vacancy: Optional[JobVacancy] = None,
+) -> SkillsMatchDetail:
+    """
+    Build detailed skills match information.
+
+    Extracts matched, missing, and additional skills from ranking factors.
+    """
+    # Extract skills data from ranking_factors if available
+    skills_data = ranking_factors.get("skills_match", {})
+
+    matched_skills = skills_data.get("matched", [])
+    missing_skills = skills_data.get("missing", [])
+    additional_skills = skills_data.get("additional", [])
+    match_percentage = skills_data.get("match_percentage", 0.0)
+
+    # Fallback: calculate from feature contributions if skills_data is empty
+    if not matched_skills and ranking_factors.get("skills_match_ratio"):
+        match_percentage = float(ranking_factors.get("skills_match_ratio", 0.0)) * 100
+
+    return SkillsMatchDetail(
+        matched_skills=matched_skills if matched_skills else [],
+        missing_skills=missing_skills if missing_skills else [],
+        additional_skills=additional_skills if additional_skills else [],
+        match_percentage=match_percentage,
+    )
+
+
+def _convert_to_ranking_factors(
+    feature_explanations: List[Any],
+) -> List[RankingFactorDetail]:
+    """
+    Convert feature explanations to ranking factor details.
+
+    Transforms FeatureExplanation objects into RankingFactorDetail schema format.
+    """
+    factors = []
+    for feat in feature_explanations:
+        feat_dict = feat.to_dict() if hasattr(feat, "to_dict") else feat
+
+        factors.append(RankingFactorDetail(
+            factor_name=feat_dict.get("feature_name", ""),
+            score=feat_dict.get("contribution_score", 0.0),
+            weight=feat_dict.get("importance", 1.0),
+            contribution=feat_dict.get("contribution_score", 0.0),
+            description=feat_dict.get("explanation", ""),
+            raw_value=feat_dict.get("value", None),
+        ))
+
+    return factors
+
+
 @router.post(
     "/explain",
-    response_model=ExplainResponse,
+    response_model=ExplainRankingResponse,
     status_code=status.HTTP_200_OK,
     tags=["Explainability"],
 )
@@ -319,36 +481,50 @@ async def explain_ranking(
             use_llm=use_llm,
         )
 
-        # Build response
-        response_data = {
-            "resume_id": request.resume_id,
-            "vacancy_id": request.vacancy_id,
-            "candidate_name": explanation.candidate_name,
-            "rank_score": explanation.rank_score,
-            "rank_position": explanation.rank_position,
-            "narrative": explanation.narrative,
-            "feature_explanations": [f.to_dict() for f in explanation.feature_explanations],
-            "confidence_interval": (
-                explanation.confidence_interval.to_dict()
-                if explanation.confidence_interval
-                else None
-            ),
-            "strengths": explanation.strengths,
-            "weaknesses": explanation.weaknesses,
-            "recommendation": explanation.recommendation,
-            "highlight_sections": explanation.highlight_sections,
-            "percentile_rank": explanation.percentile_rank,
-            "percentile_explanation": explanation.percentile_explanation,
-            "provider": explanation.provider,
-            "model": explanation.model,
-            "generated_at": explanation.generated_at,
-        }
+        # Build enhanced response with visualization data
+        feature_categories = _build_feature_categories(
+            ranking.feature_contributions or {},
+            ranking.ranking_factors or {},
+            all_candidate_scores,
+        )
+
+        percentile_data = _build_percentile_data(
+            float(ranking.rank_score),
+            ranking.rank_position,
+            all_candidate_scores,
+            ranking.feature_contributions or {},
+        )
+
+        skills_match = _build_skills_match_detail(
+            ranking.ranking_factors or {},
+            resume,
+            vacancy,
+        )
+
+        factors = _convert_to_ranking_factors(explanation.feature_explanations)
+
+        # Build response matching ExplainRankingResponse schema
+        response = ExplainRankingResponse(
+            candidate_id=request.resume_id,
+            vacancy_id=request.vacancy_id,
+            rank_score=explanation.rank_score,
+            rank_position=explanation.rank_position or 0,
+            confidence=float(ranking.confidence) if ranking.confidence else 0.0,
+            narrative=explanation.narrative,
+            factors=factors,
+            feature_categories=feature_categories,
+            percentile_data=percentile_data,
+            relative_comparisons=None,  # Optional, can be added in future enhancement
+            strengths=explanation.strengths,
+            weaknesses=explanation.weaknesses,
+            skills_match=skills_match,
+        )
 
         logger.info(f"Explanation generated for resume {request.resume_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content=response.model_dump(),
         )
 
     except HTTPException:
