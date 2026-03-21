@@ -45,6 +45,7 @@ import type {
   WhatIfAnalysisResponse,
   FeaturePerturbation,
 } from '@/api/explainability';
+import { ImpactVisualization } from './ImpactVisualization';
 
 /**
  * Feature adjustment configuration
@@ -919,6 +920,16 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
             <AlertTitle>{result.scenario_description || t('whatIfAnalysis.results.scenarioAnalysis')}</AlertTitle>
             <Typography variant="body2">{result.explanation}</Typography>
           </Alert>
+
+          {/* Impact Visualization */}
+          <Box sx={{ mb: 3 }}>
+            <ImpactVisualization
+              originalScore={originalScore || 0}
+              result={result}
+              originalRecommendation={originalRecommendation}
+              showDetails={true}
+            />
+          </Box>
 
           {/* Feature Perturbations */}
           {result.perturbations && result.perturbations.length > 0 && (
