@@ -21,6 +21,7 @@ from models.duplicate_resume import DuplicateResume
 from models.duplicate_review import DuplicateReview, ReviewStatus
 from models.resume import Resume
 from models.merge_history import MergeHistory
+from services.candidate_merger import get_candidate_merger, MergeStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,10 @@ class MergeCandidatesRequest(BaseModel):
     duplicate_id: str = Field(..., description="UUID of the duplicate resume to merge from")
     reason: Optional[str] = Field(None, description="Optional reason for merging")
     merged_by_user_id: Optional[str] = Field(None, description="ID of user performing the merge")
+    strategy: Optional[str] = Field(
+        "most_complete",
+        description="Merge strategy: most_recent, most_complete, prefer_primary"
+    )
 
 
 class MergeCandidatesResponse(BaseModel):
@@ -67,6 +72,8 @@ class MergeCandidatesResponse(BaseModel):
     merge_timestamp: str = Field(..., description="When the merge was performed")
     message: str = Field(..., description="Success message")
     can_undo: bool = Field(..., description="Whether this merge can be undone")
+    conflicts_resolved: int = Field(0, description="Number of conflicts resolved")
+    conflicts_detected: List[str] = Field(default_factory=list, description="List of fields with conflicts")
 
 
 # Review queue models
@@ -556,49 +563,75 @@ async def merge_candidates(
                 detail="Cannot merge resumes from different organizations",
             )
 
-        # Create merge history record
-        merge_timestamp = datetime.utcnow()
-        merge_history = MergeHistory(
-            organization_id=primary_resume.organization_id,
-            source_resume_id=request.duplicate_id,
-            target_resume_id=request.primary_id,
-            merged_by_user_id=request.merged_by_user_id,
-            merge_timestamp=merge_timestamp,
-            merge_data={
-                "primary_filename": primary_resume.filename,
-                "duplicate_filename": duplicate_resume.filename,
-                "primary_status": primary_resume.status.value,
-                "duplicate_status": duplicate_resume.status.value,
-            },
-            undo_data={
-                "duplicate_resume_id": request.duplicate_id,
-                "duplicate_organization_id": duplicate_resume.organization_id,
-                "duplicate_vacancy_id": duplicate_resume.vacancy_id,
-            },
-            reason=request.reason,
-            can_undo=True,
-        )
+        # Use CandidateMerger service to perform actual data merge
+        merger = get_candidate_merger(db)
 
-        db.add(merge_history)
+        try:
+            # Perform the merge using CandidateMerger service
+            merge_result = await merger.merge_candidates(
+                primary_resume_id=str(request.primary_id),
+                duplicate_resume_id=str(request.duplicate_id),
+                strategy=request.strategy or MergeStrategy.MOST_COMPLETE,
+            )
 
-        # TODO: In phase 3, implement actual data merging logic via CandidateMerger service
-        # For now, we just create the merge history record
+            logger.info(
+                f"Merge result: {merge_result.conflicts_resolved} conflicts resolved, "
+                f"{len(merge_result.conflicts_detected)} conflicts detected"
+            )
+
+            # Apply merged data to primary resume
+            # Note: merge_result.merged_data contains the merged Resume fields
+            for field, value in merge_result.merged_data.get("resume", {}).items():
+                if hasattr(primary_resume, field) and field not in ["id", "created_at"]:
+                    setattr(primary_resume, field, value)
+
+            # Apply merged analysis data if ResumeAnalysis exists
+            # This is handled by CandidateMerger.merge_candidates internally
+
+            # Save merge history using the service (includes undo data)
+            merge_history = await merger.save_merge_history(
+                source_resume_id=str(request.duplicate_id),
+                target_resume_id=str(request.primary_id),
+                organization_id=str(primary_resume.organization_id),
+                merge_result=merge_result,
+                merged_by_user_id=request.merged_by_user_id,
+                reason=request.reason,
+                can_undo=True,
+            )
+
+        except ValueError as e:
+            logger.error(f"Merge validation error: {e}")
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid merge request: {str(e)}",
+            )
+        except Exception as e:
+            logger.error(f"Merge operation failed: {e}", exc_info=True)
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to merge candidates: {str(e)}",
+            )
 
         await db.commit()
         await db.refresh(merge_history)
 
         logger.info(
             f"Successfully merged candidates: merge_id={merge_history.id}, "
-            f"primary={request.primary_id}, duplicate={request.duplicate_id}"
+            f"primary={request.primary_id}, duplicate={request.duplicate_id}, "
+            f"conflicts_resolved={merge_result.conflicts_resolved}"
         )
 
         response_data = MergeCandidatesResponse(
             merge_id=str(merge_history.id),
             primary_resume_id=str(request.primary_id),
             duplicate_resume_id=str(request.duplicate_id),
-            merge_timestamp=merge_timestamp.isoformat(),
-            message="Successfully merged candidates",
+            merge_timestamp=merge_history.merge_timestamp.isoformat(),
+            message=f"Successfully merged candidates ({merge_result.conflicts_resolved} conflicts resolved)",
             can_undo=merge_history.can_undo,
+            conflicts_resolved=merge_result.conflicts_resolved,
+            conflicts_detected=merge_result.conflicts_detected,
         )
 
         return JSONResponse(
