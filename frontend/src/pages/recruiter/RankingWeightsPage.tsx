@@ -59,6 +59,9 @@ import type {
 // Импорт компонентов для слайдеров весов
 import { RankingWeightSliderCardStack } from '@/components/RankingWeightSliderCard';
 
+// Импорт компонента превью влияния весов
+import RankingWeightImpactPreview from '@/components/RankingWeightImpactPreview';
+
 // Импорт MUI компонента анимации переходов
 import { PageTransition } from '@components/mui/PageTransition';
 
@@ -196,6 +199,11 @@ function RankingWeightsPage() {
   const [success, setSuccess] = useState(false);
   const [tabValue, setTabValue] = useState(0);
 
+  // Состояние для превью влияния весов
+  const [showImpactPreview, setShowImpactPreview] = useState(false);
+  const [previewVacancyId, setPreviewVacancyId] = useState<string>('');
+  const [savedWeights, setSavedWeights] = useState<RankingWeightState | null>(null);
+
   // Состояние кастомного профиля
   const [profileName, setProfileName] = useState('');
   const [profileDescription, setProfileDescription] = useState('');
@@ -257,8 +265,13 @@ function RankingWeightsPage() {
         [type]: value,
       }));
       setSuccess(false);
+
+      // Enable impact preview when weights change
+      if (!savedWeights) {
+        setSavedWeights(weights);
+      }
     },
-    []
+    [weights, savedWeights]
   );
 
   /**
@@ -267,10 +280,13 @@ function RankingWeightsPage() {
   const applyPreset = useCallback((presetKey: string) => {
     const preset = PRESETS[presetKey];
     if (preset) {
+      if (!savedWeights) {
+        setSavedWeights(weights);
+      }
       setWeights(preset);
       setSuccess(false);
     }
-  }, []);
+  }, [weights, savedWeights]);
 
   /**
    * Нормализовать веса, чтобы сумма была равна 100
@@ -423,6 +439,9 @@ function RankingWeightsPage() {
    * Загрузить профиль
    */
   const loadProfile = useCallback((profile: RankingWeightProfile) => {
+    if (!savedWeights) {
+      setSavedWeights(weights);
+    }
     setWeights({
       overall_match_score: profile.overall_match_score_weight * 100,
       keyword_score: profile.keyword_score_weight * 100,
@@ -440,12 +459,15 @@ function RankingWeightsPage() {
     });
     setSelectedProfile(profile.id);
     setSuccess(false);
-  }, []);
+  }, [weights, savedWeights]);
 
   /**
    * Загрузить пресет
    */
   const loadPresetProfile = useCallback((preset: RankingWeightPreset) => {
+    if (!savedWeights) {
+      setSavedWeights(weights);
+    }
     setWeights({
       overall_match_score: preset.weights.overall_match_score_weight * 100,
       keyword_score: preset.weights.keyword_score_weight * 100,
@@ -462,14 +484,41 @@ function RankingWeightsPage() {
       completeness_score: preset.weights.completeness_score_weight * 100,
     });
     setSuccess(false);
-  }, []);
+  }, [weights, savedWeights]);
 
   /**
    * Загрузить данные при монтировании компонента
    */
   useEffect(() => {
     loadProfiles();
+
+    // Check if vacancy_id is provided in URL params for preview
+    const urlParams = new URLSearchParams(window.location.search);
+    const vacancyId = urlParams.get('vacancy_id');
+    if (vacancyId) {
+      setPreviewVacancyId(vacancyId);
+      setShowImpactPreview(true);
+    }
   }, [loadProfiles]);
+
+  /**
+   * Convert weights from percentage (0-100) to decimal (0-1)
+   */
+  const weightsToDecimal = (w: RankingWeightState): Record<string, number> => ({
+    overall_match_score_weight: w.overall_match_score / 100,
+    keyword_score_weight: w.keyword_score / 100,
+    tfidf_score_weight: w.tfidf_score / 100,
+    vector_score_weight: w.vector_score / 100,
+    skills_match_ratio_weight: w.skills_match_ratio / 100,
+    experience_months_weight: w.experience_months / 100,
+    experience_relevance_weight: w.experience_relevance / 100,
+    education_level_weight: w.education_level / 100,
+    recent_experience_weight: w.recent_experience / 100,
+    skill_rarity_weight: w.skill_rarity / 100,
+    title_similarity_weight: w.title_similarity / 100,
+    freshness_score_weight: w.freshness_score / 100,
+    completeness_score_weight: w.completeness_score / 100,
+  });
 
   return (
     <PageTransition>
@@ -598,6 +647,11 @@ function RankingWeightsPage() {
                 <Tab
                   label={t('rankingWeights.tabs.customProfiles', { defaultValue: 'Custom Profiles' })}
                 />
+                {showImpactPreview && (
+                  <Tab
+                    label={t('rankingWeights.tabs.impactPreview', { defaultValue: 'Impact Preview' })}
+                  />
+                )}
               </Tabs>
 
               {/* Панель 1: Текущие веса */}
@@ -745,6 +799,44 @@ function RankingWeightsPage() {
                   </Grid>
                 )}
               </TabPanel>
+
+              {/* Панель 4: Превью влияния весов */}
+              {showImpactPreview && (
+                <TabPanel value={tabValue} index={3}>
+                  <Stack spacing={3}>
+                    {/* Vacancy ID input */}
+                    {!previewVacancyId && (
+                      <TextField
+                        label={t('rankingWeights.vacancyId', { defaultValue: 'Vacancy ID' })}
+                        value={previewVacancyId}
+                        onChange={(e) => setPreviewVacancyId(e.target.value)}
+                        fullWidth
+                        helperText={t('rankingWeights.vacancyIdHelp', {
+                          defaultValue: 'Enter a vacancy ID to preview ranking changes',
+                        })}
+                      />
+                    )}
+
+                    {/* Impact Preview Component */}
+                    {previewVacancyId && savedWeights && (
+                      <RankingWeightImpactPreview
+                        vacancyId={previewVacancyId}
+                        beforeWeights={weightsToDecimal(savedWeights)}
+                        afterWeights={weightsToDecimal(weights)}
+                      />
+                    )}
+
+                    {!savedWeights && (
+                      <Alert severity="info">
+                        {t('rankingWeights.noChangesYet', {
+                          defaultValue:
+                            'Adjust weights on the "Current Weights" tab to see impact preview',
+                        })}
+                      </Alert>
+                    )}
+                  </Stack>
+                </TabPanel>
+              )}
             </Paper>
           </>
         )}
