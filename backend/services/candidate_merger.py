@@ -43,6 +43,7 @@ from sqlalchemy.orm import selectinload
 
 from models.resume import Resume
 from models.resume_analysis import ResumeAnalysis
+from models.merge_history import MergeHistory
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +266,265 @@ class CandidateMerger:
         )
 
         return result
+
+    async def save_merge_history(
+        self,
+        source_resume_id: str,
+        target_resume_id: str,
+        organization_id: str,
+        merge_result: MergeResult,
+        merged_by_user_id: Optional[str] = None,
+        reason: Optional[str] = None,
+        can_undo: bool = True,
+    ) -> MergeHistory:
+        """
+        Save merge history to database for audit trail and undo capability.
+
+        This method creates a permanent record of the merge operation, storing
+        all necessary data to support undo operations and audit requirements.
+
+        Args:
+            source_resume_id: UUID of the resume that was merged FROM (duplicate)
+            target_resume_id: UUID of the resume that was merged INTO (primary)
+            organization_id: UUID of the organization
+            merge_result: MergeResult from the merge operation
+            merged_by_user_id: Optional UUID of user who performed the merge
+            reason: Optional text explanation for the merge
+            can_undo: Whether this merge can be undone (defaults to True)
+
+        Returns:
+            MergeHistory instance that was created
+
+        Raises:
+            RuntimeError: If saving merge history fails
+
+        Example:
+            >>> merge_result = await merger.merge_candidates(...)
+            >>> history = await merger.save_merge_history(
+            ...     source_resume_id="duplicate-uuid",
+            ...     target_resume_id="primary-uuid",
+            ...     organization_id="org-uuid",
+            ...     merge_result=merge_result,
+            ...     merged_by_user_id="user-uuid",
+            ...     reason="Duplicate candidate detected"
+            ... )
+            >>> print(history.id)
+        """
+        try:
+            merge_history = MergeHistory(
+                organization_id=organization_id,
+                source_resume_id=source_resume_id,
+                target_resume_id=target_resume_id,
+                merged_by_user_id=merged_by_user_id,
+                merge_timestamp=datetime.utcnow(),
+                merge_data=merge_result.merged_data,
+                undo_data=merge_result.undo_data,
+                reason=reason,
+                can_undo=can_undo,
+            )
+
+            self.db.add(merge_history)
+            await self.db.commit()
+            await self.db.refresh(merge_history)
+
+            logger.info(
+                f"Merge history saved: id={merge_history.id}, "
+                f"source={source_resume_id}, target={target_resume_id}"
+            )
+
+            return merge_history
+
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to save merge history: {e}")
+            raise RuntimeError(f"Failed to save merge history: {e}")
+
+    async def undo_merge(
+        self,
+        merge_history_id: str,
+        undone_by_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Undo a previously performed merge operation.
+
+        This method reverses a merge by restoring the original state of both
+        resumes using the undo data stored in the merge history record.
+
+        Args:
+            merge_history_id: UUID of the merge history record to undo
+            undone_by_user_id: Optional UUID of user performing the undo
+
+        Returns:
+            Dictionary containing undo operation details and restored data
+
+        Raises:
+            LookupError: If merge history record is not found
+            ValueError: If merge cannot be undone (can_undo=False)
+            RuntimeError: If undo operation fails
+
+        Example:
+            >>> result = await merger.undo_merge(
+            ...     merge_history_id="history-uuid",
+            ...     undone_by_user_id="user-uuid"
+            ... )
+            >>> print(result["status"])
+            "undone"
+        """
+        # Load merge history record
+        try:
+            stmt = select(MergeHistory).where(MergeHistory.id == merge_history_id)
+            result = await self.db.execute(stmt)
+            merge_history = result.scalar_one_or_none()
+
+            if not merge_history:
+                raise LookupError(f"Merge history not found: {merge_history_id}")
+
+            if not merge_history.can_undo:
+                raise ValueError(
+                    f"Merge cannot be undone: {merge_history_id}. "
+                    "This merge was marked as non-reversible."
+                )
+
+            logger.info(
+                f"Starting undo for merge: {merge_history_id}, "
+                f"source={merge_history.source_resume_id}, "
+                f"target={merge_history.target_resume_id}"
+            )
+
+            # Extract undo data
+            undo_data = merge_history.undo_data or {}
+            primary_resume_data = undo_data.get("primary_resume", {})
+            duplicate_resume_data = undo_data.get("duplicate_resume", {})
+            primary_analysis_data = undo_data.get("primary_analysis", {})
+            duplicate_analysis_data = undo_data.get("duplicate_analysis", {})
+
+            # Load resumes
+            primary_resume, primary_analysis = await self._load_resume_with_analysis(
+                merge_history.target_resume_id
+            )
+            duplicate_resume, duplicate_analysis = await self._load_resume_with_analysis(
+                merge_history.source_resume_id
+            )
+
+            if not primary_resume:
+                raise LookupError(
+                    f"Target resume not found: {merge_history.target_resume_id}"
+                )
+
+            # Restore primary resume fields
+            for field, value in primary_resume_data.items():
+                if hasattr(primary_resume, field) and field not in ["id", "created_at"]:
+                    setattr(primary_resume, field, value)
+
+            # Restore primary analysis if exists
+            if primary_analysis and primary_analysis_data:
+                for field, value in primary_analysis_data.items():
+                    if hasattr(primary_analysis, field) and field not in ["id", "resume_id", "created_at"]:
+                        setattr(primary_analysis, field, value)
+
+            # Restore duplicate resume if it still exists
+            if duplicate_resume and duplicate_resume_data:
+                for field, value in duplicate_resume_data.items():
+                    if hasattr(duplicate_resume, field) and field not in ["id", "created_at"]:
+                        setattr(duplicate_resume, field, value)
+
+            # Restore duplicate analysis if exists
+            if duplicate_analysis and duplicate_analysis_data:
+                for field, value in duplicate_analysis_data.items():
+                    if hasattr(duplicate_analysis, field) and field not in ["id", "resume_id", "created_at"]:
+                        setattr(duplicate_analysis, field, value)
+
+            # Mark merge history as undone by setting can_undo to False
+            merge_history.can_undo = False
+            merge_history.reason = (
+                f"{merge_history.reason or ''}\n\n"
+                f"[UNDONE at {datetime.utcnow().isoformat()} by user {undone_by_user_id or 'system'}]"
+            ).strip()
+
+            # Commit all changes
+            await self.db.commit()
+
+            logger.info(
+                f"Merge undo completed successfully: {merge_history_id}"
+            )
+
+            return {
+                "status": "undone",
+                "merge_history_id": str(merge_history_id),
+                "target_resume_id": str(merge_history.target_resume_id),
+                "source_resume_id": str(merge_history.source_resume_id),
+                "undone_by_user_id": undone_by_user_id,
+                "undone_at": datetime.utcnow().isoformat(),
+                "primary_resume_restored": bool(primary_resume),
+                "duplicate_resume_restored": bool(duplicate_resume),
+            }
+
+        except (LookupError, ValueError):
+            # Re-raise validation errors as-is
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to undo merge {merge_history_id}: {e}")
+            raise RuntimeError(f"Failed to undo merge: {e}")
+
+    async def get_merge_history(
+        self,
+        organization_id: str,
+        resume_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[MergeHistory]:
+        """
+        Retrieve merge history records for an organization or specific resume.
+
+        Args:
+            organization_id: UUID of the organization
+            resume_id: Optional UUID to filter by resume (either source or target)
+            limit: Maximum number of records to return (default 50)
+            offset: Number of records to skip (default 0)
+
+        Returns:
+            List of MergeHistory records
+
+        Example:
+            >>> history = await merger.get_merge_history(
+            ...     organization_id="org-uuid",
+            ...     resume_id="resume-uuid",
+            ...     limit=10
+            ... )
+            >>> for record in history:
+            ...     print(record.merge_timestamp)
+        """
+        try:
+            stmt = select(MergeHistory).where(
+                MergeHistory.organization_id == organization_id
+            )
+
+            if resume_id:
+                from sqlalchemy import or_
+                stmt = stmt.where(
+                    or_(
+                        MergeHistory.source_resume_id == resume_id,
+                        MergeHistory.target_resume_id == resume_id,
+                    )
+                )
+
+            stmt = stmt.order_by(MergeHistory.merge_timestamp.desc())
+            stmt = stmt.limit(limit).offset(offset)
+
+            result = await self.db.execute(stmt)
+            history_records = result.scalars().all()
+
+            logger.debug(
+                f"Retrieved {len(history_records)} merge history records "
+                f"for organization {organization_id}"
+            )
+
+            return list(history_records)
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve merge history: {e}")
+            raise RuntimeError(f"Failed to retrieve merge history: {e}")
 
     async def _load_resume_with_analysis(
         self, resume_id: str
