@@ -755,3 +755,49 @@ Next Steps:
 - Subtask 5-2: Add relevance tuning controls
 - Continue with Phase 5 (Search Analytics Dashboard)
 
+
+
+## Subtask 5-3: Create backend API for relevance tuning - COMPLETED 2026-03-21
+
+### Implementation:
+1. Created SearchRelevanceConfig model (backend/models/search_relevance_config.py)
+   - Stores boost values for skills, experience, education, location fields
+   - Includes is_active flag for managing active configuration
+   - Follows pattern from SavedSearch model
+
+2. Added API endpoints (backend/api/search_analytics.py)
+   - GET /api/search/analytics/relevance-config - Get active configuration
+   - PUT /api/search/analytics/relevance-config - Update configuration
+   - Auto-creates default config if none exists
+   - All boost values validated (0.1 to 10.0 range)
+
+3. Updated Elasticsearch service (backend/services/elasticsearch_service.py)
+   - Extended SearchQuery dataclass with boost fields
+   - Modified _build_query to use dynamic boost values
+   - Replaces hardcoded field boosts with configurable values
+
+4. Created database migration
+   - Migration: 20260321_add_search_relevance_config.py
+   - Creates search_relevance_configs table
+   - Includes proper indexes on name and is_active fields
+
+### Files Created:
+- backend/models/search_relevance_config.py
+- backend/alembic/versions/20260321_add_search_relevance_config.py
+- backend/test_relevance_config.md
+
+### Files Modified:
+- backend/models/__init__.py
+- backend/api/search_analytics.py
+- backend/services/elasticsearch_service.py
+
+### Testing:
+See backend/test_relevance_config.md for complete testing documentation.
+
+Verification command:
+curl -X PUT http://localhost:8000/api/search/analytics/relevance-config \
+  -H "Content-Type: application/json" \
+  -d '{"skills_boost": 2, "experience_boost": 1.5, "education_boost": 1}'
+
+Expected: HTTP 200 with updated configuration in response
+

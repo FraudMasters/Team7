@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.search_analytics import SearchQuery, PopularSearch
+from models.search_relevance_config import SearchRelevanceConfig
 
 logger = logging.getLogger(__name__)
 
@@ -330,4 +331,210 @@ async def get_zero_result_searches(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch zero-result searches: {str(e)}",
+        ) from e
+
+
+# Request/Response Models for Relevance Config
+class RelevanceConfigRequest(BaseModel):
+    """Request model for updating relevance configuration."""
+
+    name: Optional[str] = Field(None, description="Name/description of configuration")
+    skills_boost: float = Field(1.0, ge=0.1, le=10.0, description="Skills field boost value")
+    experience_boost: float = Field(1.0, ge=0.1, le=10.0, description="Experience field boost value")
+    education_boost: float = Field(1.0, ge=0.1, le=10.0, description="Education field boost value")
+    location_boost: Optional[float] = Field(1.0, ge=0.1, le=10.0, description="Location field boost value")
+
+
+class RelevanceConfigResponse(BaseModel):
+    """Response model for relevance configuration."""
+
+    id: str = Field(..., description="Configuration UUID")
+    name: str = Field(..., description="Name/description of configuration")
+    skills_boost: float = Field(..., description="Skills field boost value")
+    experience_boost: float = Field(..., description="Experience field boost value")
+    education_boost: float = Field(..., description="Education field boost value")
+    location_boost: float = Field(..., description="Location field boost value")
+    is_active: bool = Field(..., description="Whether this configuration is active")
+    created_at: str = Field(..., description="Timestamp when configuration was created")
+    updated_at: str = Field(..., description="Timestamp when configuration was last updated")
+
+
+@router.get(
+    "/relevance-config",
+    response_model=RelevanceConfigResponse,
+    tags=["Search Analytics"],
+)
+async def get_relevance_config(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get the active search relevance configuration.
+
+    Returns the currently active relevance boost configuration that determines
+    how different fields are weighted in search result scoring.
+
+    Args:
+        request: FastAPI request object
+        db: Database session
+
+    Returns:
+        JSON response with active relevance configuration
+
+    Raises:
+        HTTPException(404): If no active configuration is found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "/api/search/analytics/relevance-config"
+        ... )
+    """
+    try:
+        logger.info("Fetching active relevance configuration")
+
+        # Query for active configuration
+        stmt = select(SearchRelevanceConfig).where(
+            SearchRelevanceConfig.is_active == True
+        ).limit(1)
+        result = await db.execute(stmt)
+        config = result.scalar_one_or_none()
+
+        if not config:
+            # Create default configuration if none exists
+            logger.info("No active configuration found, creating default")
+            config = SearchRelevanceConfig(
+                name="Default",
+                skills_boost=1.0,
+                experience_boost=1.0,
+                education_boost=1.0,
+                location_boost=1.0,
+                is_active=True,
+            )
+            db.add(config)
+            await db.commit()
+            await db.refresh(config)
+
+        logger.info(f"Found active configuration: {config.name}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(config.id),
+                "name": config.name,
+                "skills_boost": config.skills_boost,
+                "experience_boost": config.experience_boost,
+                "education_boost": config.education_boost,
+                "location_boost": config.location_boost,
+                "is_active": config.is_active,
+                "created_at": config.created_at.isoformat() if config.created_at else None,
+                "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching relevance configuration: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch relevance configuration: {str(e)}",
+        ) from e
+
+
+@router.put(
+    "/relevance-config",
+    response_model=RelevanceConfigResponse,
+    tags=["Search Analytics"],
+)
+async def update_relevance_config(
+    request: Request,
+    config_request: RelevanceConfigRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update the active search relevance configuration.
+
+    Updates the boost values for different fields in search result scoring.
+    Higher boost values give more weight to that field in relevance calculations.
+
+    Args:
+        request: FastAPI request object
+        config_request: New configuration values
+        db: Database session
+
+    Returns:
+        JSON response with updated relevance configuration
+
+    Raises:
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.put(
+        ...     "/api/search/analytics/relevance-config",
+        ...     json={
+        ...         "skills_boost": 2.0,
+        ...         "experience_boost": 1.5,
+        ...         "education_boost": 1.0
+        ...     }
+        ... )
+    """
+    try:
+        logger.info(f"Updating relevance configuration: {config_request.dict()}")
+
+        # Get or create active configuration
+        stmt = select(SearchRelevanceConfig).where(
+            SearchRelevanceConfig.is_active == True
+        ).limit(1)
+        result = await db.execute(stmt)
+        config = result.scalar_one_or_none()
+
+        if not config:
+            # Create new configuration if none exists
+            logger.info("No active configuration found, creating new")
+            config = SearchRelevanceConfig(
+                name=config_request.name or "Default",
+                skills_boost=config_request.skills_boost,
+                experience_boost=config_request.experience_boost,
+                education_boost=config_request.education_boost,
+                location_boost=config_request.location_boost or 1.0,
+                is_active=True,
+            )
+            db.add(config)
+        else:
+            # Update existing configuration
+            logger.info(f"Updating existing configuration: {config.name}")
+            if config_request.name:
+                config.name = config_request.name
+            config.skills_boost = config_request.skills_boost
+            config.experience_boost = config_request.experience_boost
+            config.education_boost = config_request.education_boost
+            if config_request.location_boost:
+                config.location_boost = config_request.location_boost
+
+        await db.commit()
+        await db.refresh(config)
+
+        logger.info(f"Successfully updated relevance configuration: {config.name}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "id": str(config.id),
+                "name": config.name,
+                "skills_boost": config.skills_boost,
+                "experience_boost": config.experience_boost,
+                "education_boost": config.education_boost,
+                "location_boost": config.location_boost,
+                "is_active": config.is_active,
+                "created_at": config.created_at.isoformat() if config.created_at else None,
+                "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error updating relevance configuration: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update relevance configuration: {str(e)}",
         ) from e
