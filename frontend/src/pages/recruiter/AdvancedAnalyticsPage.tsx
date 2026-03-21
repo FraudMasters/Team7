@@ -66,6 +66,16 @@ interface SourceMetrics {
   conversion_rate: number;
 }
 
+// Интерфейс для метрик производительности рекрутера
+interface RecruiterPerformanceMetrics {
+  total_candidates_processed: number;
+  total_interviews_conducted: number;
+  successful_hires: number;
+  success_rate: number;
+  avg_time_per_candidate: number;
+  interview_completion_rate: number;
+}
+
 /**
  * Компонент панели вкладок
  */
@@ -111,6 +121,16 @@ export function AdvancedAnalyticsPage() {
     { vacancy_id: '2', vacancy_title: 'Product Manager', days: 35 },
     { vacancy_id: '3', vacancy_title: 'DevOps Engineer', days: 21 },
   ];
+
+  // Тестовые данные для производительности рекрутера (не реализовано в этом подзадании)
+  const recruiterPerformanceData: RecruiterPerformanceMetrics = {
+    total_candidates_processed: 156,
+    total_interviews_conducted: 48,
+    successful_hires: 12,
+    success_rate: 7.7,
+    avg_time_per_candidate: 4.2,
+    interview_completion_rate: 92.5,
+  };
 
   // Загрузка данных при монтировании и изменении периода
   useEffect(() => {
@@ -256,6 +276,7 @@ export function AdvancedAnalyticsPage() {
                 <Tab label="Time to Fill" />
                 <Tab label="Source Effectiveness" />
                 <Tab label="Quality Metrics" />
+                <Tab label="Recruiter Performance" />
               </Tabs>
 
               {/* Вкладка "Воронка найма" */}
@@ -424,6 +445,114 @@ export function AdvancedAnalyticsPage() {
                           </Box>
                           <Typography variant="body2" color="text.secondary">
                             Avg. Time to Productivity
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </TabPanel>
+
+              {/* Вкладка "Производительность рекрутера" */}
+              <TabPanel value={activeTab} index={4}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <PeopleIcon color="primary" />
+                            <Typography variant="caption" color="text.secondary">
+                              Total Candidates Processed
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {recruiterPerformanceData.total_candidates_processed}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AssessmentIcon color="info" />
+                            <Typography variant="caption" color="text.secondary">
+                              Interviews Conducted
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {recruiterPerformanceData.total_interviews_conducted}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TrendingUpIcon color="success" />
+                            <Typography variant="caption" color="text.secondary">
+                              Successful Hires
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {recruiterPerformanceData.successful_hires}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TrendingUpIcon color="success" />
+                            <Typography variant="caption" color="text.secondary">
+                              Success Rate
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {recruiterPerformanceData.success_rate.toFixed(1)}%
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <ScheduleIcon color="action" />
+                            <Typography variant="caption" color="text.secondary">
+                              Avg. Time per Candidate
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {recruiterPerformanceData.avg_time_per_candidate.toFixed(1)} days
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AssessmentIcon color="primary" />
+                            <Typography variant="caption" color="text.secondary">
+                              Interview Completion Rate
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {recruiterPerformanceData.interview_completion_rate.toFixed(1)}%
                           </Typography>
                         </Stack>
                       </CardContent>
