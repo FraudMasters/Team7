@@ -298,7 +298,7 @@ const TransparencyDashboard: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6} md={3}>
                 <ConfidenceScoreCard
-                  score={{
+                  confidence={{
                     candidateId: 'sample-1',
                     candidateName: 'Jane Doe',
                     confidence: 89,
@@ -311,7 +311,7 @@ const TransparencyDashboard: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                 <ConfidenceScoreCard
-                  score={{
+                  confidence={{
                     candidateId: 'sample-2',
                     candidateName: 'John Smith',
                     confidence: 72,
@@ -324,7 +324,7 @@ const TransparencyDashboard: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                 <ConfidenceScoreCard
-                  score={{
+                  confidence={{
                     candidateId: 'sample-3',
                     candidateName: 'Alice Johnson',
                     confidence: 45,
@@ -338,7 +338,7 @@ const TransparencyDashboard: React.FC = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <Box>
                   <ConfidenceScoreCard
-                    score={{
+                    confidence={{
                       candidateId: 'sample-4',
                       candidateName: 'Bob Williams',
                       confidence: 28,

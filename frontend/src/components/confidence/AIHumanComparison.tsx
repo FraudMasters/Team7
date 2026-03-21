@@ -91,6 +91,8 @@ interface AIHumanComparisonProps {
   endDate?: string;
   /** ID вакансии для фильтрации */
   vacancyId?: string;
+  /** Включить автоматическое обновление данных */
+  autoRefresh?: boolean;
 }
 
 /**
