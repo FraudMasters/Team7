@@ -7,6 +7,8 @@ saved reports with metrics and filters.
 """
 import io
 import logging
+import re
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -18,7 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models.report import Report
+from models.report import Report, ScheduledReport
 from services.report_template_service import (
     ReportConfig,
     ReportGenerationResult,
@@ -900,7 +902,10 @@ async def export_report_csv(
 
 
 @router.post("/schedule", tags=["Reports"], response_model=ScheduleReportResponse)
-async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
+async def schedule_report(
+    request: ScheduleReportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Schedule an automated report with email delivery.
 
@@ -972,7 +977,6 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
             )
 
         # Validate email format for recipients
-        import re
         email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         for email in request.recipients:
             if not re.match(email_pattern, email):
@@ -1029,16 +1033,8 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
                 detail="Format must be one of: pdf, csv, both",
             )
 
-        # For now, generate a placeholder response
-        # Database integration and Celery task scheduling will be added in later subtasks
-        from datetime import datetime, timedelta
-        import uuid
-
-        schedule_id = str(uuid.uuid4())
-        now = datetime.utcnow()
-        created_at = now.isoformat() + "Z"
-
         # Calculate next_run_at based on schedule configuration
+        now = datetime.utcnow()
         if freq == "daily":
             next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
             if next_run <= now:
@@ -1060,17 +1056,66 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
                 else:
                     next_run = next_run.replace(month=now.month + 1)
 
-        next_run_at = next_run.isoformat() + "Z"
+        # Handle report creation or validation
+        report_id_to_use = request.report_id
+
+        if report_id_to_use:
+            # Validate that the report exists
+            stmt = select(Report).where(Report.id == report_id_to_use)
+            result = await db.execute(stmt)
+            existing_report = result.scalar_one_or_none()
+
+            if not existing_report:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Report with ID {report_id_to_use} not found",
+                )
+
+            logger.info(f"Using existing report ID: {report_id_to_use}")
+        else:
+            # Create a new report from the configuration
+            new_report = Report(
+                organization_id=request.organization_id or "default",
+                name=f"{request.name} - Report Configuration",
+                description=f"Auto-generated report configuration for scheduled report: {request.name}",
+                report_type="scheduled",
+                configuration=request.configuration,
+                created_by=None,
+                is_active=True,
+            )
+            db.add(new_report)
+            await db.flush()
+            report_id_to_use = str(new_report.id)
+
+            logger.info(f"Created new report with ID: {report_id_to_use}")
+
+        # Create the scheduled report
+        new_scheduled_report = ScheduledReport(
+            organization_id=request.organization_id or "default",
+            report_id=report_id_to_use,
+            name=request.name,
+            schedule_config=request.schedule_config,
+            delivery_config=request.delivery_config,
+            recipients=request.recipients,
+            created_by=None,
+            is_active=request.is_active,
+            next_run_at=next_run,
+            last_run_at=None,
+        )
+        db.add(new_scheduled_report)
+        await db.flush()
 
         response_data = {
-            "id": schedule_id,
-            "name": request.name,
-            "report_id": request.report_id,
-            "next_run_at": next_run_at,
-            "created_at": created_at,
+            "id": str(new_scheduled_report.id),
+            "name": new_scheduled_report.name,
+            "report_id": new_scheduled_report.report_id,
+            "next_run_at": new_scheduled_report.next_run_at.isoformat() + "Z",
+            "created_at": new_scheduled_report.created_at.isoformat() + "Z",
         }
 
-        logger.info(f"Scheduled report '{request.name}' created with ID: {schedule_id}, next run: {next_run_at}")
+        await db.commit()
+
+        logger.info(f"Scheduled report '{request.name}' created with ID: {new_scheduled_report.id}, next run: {next_run}")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
