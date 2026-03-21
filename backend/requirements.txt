@@ -11,6 +11,9 @@ psycopg2-binary==2.9.9
 asyncpg==0.29.0
 alembic==1.13.2
 
+# Search
+elasticsearch==8.15.1
+
 # ML/NLP Libraries
 # Using PyTorch-based models (no TensorFlow/Keras needed)
 sentence-transformers==3.0.1
