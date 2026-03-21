@@ -43,6 +43,7 @@ import { ResumeBuilderPage } from './pages/jobs/ResumeBuilderPage';
 
 // Candidate Portal Pages
 import { CandidatePortalDashboard } from './pages/jobs/CandidatePortalDashboard';
+import { DocumentsPage } from './pages/jobs/DocumentsPage';
 
 // Recruiter Pages
 import { DashboardPage } from './pages/recruiter/DashboardPage';
@@ -192,6 +193,7 @@ function App() {
         {/* Candidate Portal */}
         <Route path="/candidate" element={<JobSeekerLayout />}>
           <Route path="dashboard" element={<CandidatePortalDashboard />} />
+          <Route path="documents" element={<DocumentsPage />} />
         </Route>
 
         {/* Recruiter Flow - Protected with role-based access control */}
