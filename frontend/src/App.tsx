@@ -78,6 +78,9 @@ import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
   () => import('./pages/admin/AIExplainabilityDashboard')
 );
+const TransparencyDashboard = lazy(
+  () => import('./pages/admin/TransparencyDashboard')
+);
 
 /**
  * Protected Recruiter Layout Wrapper
@@ -233,6 +236,16 @@ function App() {
           element={
             <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography>Loading...</Typography></Box>}>
               <AIExplainabilityDashboard />
+            </Suspense>
+          }
+        />
+
+        {/* Admin Routes - Transparency Dashboard */}
+        <Route
+          path="/admin/transparency-dashboard"
+          element={
+            <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography>Loading...</Typography></Box>}>
+              <TransparencyDashboard />
             </Suspense>
           }
         />
