@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from analyzers.resume_optimizer import generate_resume_optimization
+from analyzers.resume_optimizer import generate_resume_optimization, predict_ranking_improvement
 from database import get_db
 from i18n.backend_translations import get_error_message
 from models.resume import Resume
@@ -35,6 +35,14 @@ class OptimizationRequest(BaseModel):
     check_keywords: bool = Field(True, description="Whether to perform keyword analysis")
     check_formatting: bool = Field(True, description="Whether to provide formatting recommendations")
     check_content: bool = Field(True, description="Whether to provide content improvement suggestions")
+    include_ranking_prediction: bool = Field(
+        False,
+        description="Whether to include before/after ranking prediction (requires vacancy_id)"
+    )
+    vacancy_id: Optional[str] = Field(
+        None,
+        description="Optional vacancy ID for ranking prediction and comparison"
+    )
 
 
 class OptimizationSuggestion(BaseModel):
@@ -49,6 +57,17 @@ class OptimizationSuggestion(BaseModel):
     suggested_value: Optional[str] = Field(None, description="Suggested change")
 
 
+class RankingPrediction(BaseModel):
+    """Before/after ranking prediction for optimization impact."""
+
+    before_score: Optional[float] = Field(None, description="Current ranking score (0-1)")
+    after_score: Optional[float] = Field(None, description="Predicted ranking score after optimizations (0-1)")
+    improvement_delta: Optional[float] = Field(None, description="Expected improvement in score")
+    improvement_percentage: Optional[float] = Field(None, description="Expected improvement percentage")
+    before_recommendation: Optional[str] = Field(None, description="Current recommendation category")
+    after_recommendation: Optional[str] = Field(None, description="Predicted recommendation after optimizations")
+
+
 class OptimizationResponse(BaseModel):
     """Response model for resume optimization."""
 
@@ -59,6 +78,7 @@ class OptimizationResponse(BaseModel):
     missing_keywords: list[str] = []
     formatting_recommendations: list[str] = []
     overall_score: int = 0
+    ranking_prediction: Optional[RankingPrediction] = None
     processing_time_seconds: Optional[float] = None
     error: Optional[str] = None
 
@@ -141,11 +161,18 @@ async def optimize_resume(
     - Formatting recommendations
     - Content improvement suggestions
     - Overall optimization score
+    - Before/after ranking prediction (when vacancy_id is provided)
 
     Args:
         request: FastAPI request object (for Accept-Language header)
         resume_id: Resume ID to optimize
-        optimization_request: Optional optimization parameters
+        optimization_request: Optional optimization parameters including:
+            - target_job_description: Job description for targeted matching
+            - check_keywords: Whether to perform keyword analysis
+            - check_formatting: Whether to provide formatting recommendations
+            - check_content: Whether to provide content suggestions
+            - include_ranking_prediction: Whether to include ranking prediction
+            - vacancy_id: Vacancy ID for ranking prediction (required if include_ranking_prediction=True)
         db: Database session
 
     Returns:
@@ -157,6 +184,7 @@ async def optimize_resume(
 
     Examples:
         >>> import requests
+        >>> # Basic optimization
         >>> response = requests.post("http://localhost:8000/api/resumes/abc123/optimize")
         >>> response.json()
         {
@@ -165,6 +193,28 @@ async def optimize_resume(
             "suggestions": [...],
             "missing_keywords": ["python", "django"],
             "overall_score": 75
+        }
+
+        >>> # With ranking prediction
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/resumes/abc123/optimize",
+        ...     json={
+        ...         "target_job_description": "Python developer",
+        ...         "include_ranking_prediction": True,
+        ...         "vacancy_id": "vacancy-123"
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "resume_id": "abc123",
+            "status": "completed",
+            "suggestions": [...],
+            "ranking_prediction": {
+                "before_score": 0.65,
+                "after_score": 0.82,
+                "improvement_delta": 0.17,
+                "improvement_percentage": 26.15
+            }
         }
     """
     locale = _extract_locale(request)
@@ -238,6 +288,37 @@ async def optimize_resume(
         # Convert to frontend format
         suggestions = _convert_to_frontend_format(optimization_result)
         missing_keywords = optimization_result.get("missing_keywords") or []
+
+        # Generate ranking prediction if requested
+        ranking_prediction_data = None
+        if optimization_request.include_ranking_prediction and optimization_request.vacancy_id:
+            try:
+                # Call predict_ranking_improvement with resume text and vacancy_id
+                ranking_improvement = predict_ranking_improvement(
+                    resume_data=resume.raw_text,
+                    vacancy_id=optimization_request.vacancy_id,
+                    optimization_suggestions=optimization_result.get("suggestions", [])
+                )
+
+                # Format the ranking prediction for the response
+                if ranking_improvement:
+                    ranking_prediction_data = {
+                        "before_score": ranking_improvement.get("before_score"),
+                        "after_score": ranking_improvement.get("after_score"),
+                        "improvement_delta": ranking_improvement.get("improvement_delta"),
+                        "improvement_percentage": ranking_improvement.get("improvement_percentage"),
+                        "before_recommendation": ranking_improvement.get("before_recommendation"),
+                        "after_recommendation": ranking_improvement.get("after_recommendation"),
+                    }
+                    logger.info(
+                        f"Ranking prediction generated for resume {resume_id}: "
+                        f"before={ranking_improvement.get('before_score', 0):.2f}, "
+                        f"after={ranking_improvement.get('after_score', 0):.2f}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to generate ranking prediction for resume {resume_id}: {e}")
+                # Continue without ranking prediction - it's an optional feature
+
         processing_time = time.time() - start_time
 
         response_data = {
@@ -251,6 +332,7 @@ async def optimize_resume(
                 if s["category"] == "formatting"
             ],
             "overall_score": optimization_result.get("score", 0),
+            "ranking_prediction": ranking_prediction_data,
             "processing_time_seconds": round(processing_time, 2),
             "error": None,
         }
