@@ -109,3 +109,6 @@ testdata/
 
 # Auto Claude generated files
 logs/security/
+
+# Python virtual environments (both naming conventions)
+.venv/
