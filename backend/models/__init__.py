@@ -14,7 +14,7 @@ from .skill_taxonomy import SkillTaxonomy
 from .skill_relationship import SkillRelationship, RelationshipType
 from .custom_synonyms import CustomSynonym
 from .skill_feedback import SkillFeedback
-from .ml_model_version import MLModelVersion, ModelRole
+from .ml_model_version import MLModelVersion
 from .model_performance_history import ModelPerformanceHistory
 from .model_training_event import ModelTrainingEvent
 from .user_preferences import UserPreferences
@@ -37,12 +37,12 @@ from .saved_job import SavedJob
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .audit_log import AuditLog, AuditActionType
-from .audit_alert_config import AuditAlertConfig, AlertType, AlertSeverity
 from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
-from .model_approval import ModelApprovalRequest, ApprovalStatus
+from .search_analytics import SearchQuery, PopularSearch
+from .recent_search import RecentSearch
 
 __all__ = [
     "Base",
@@ -61,7 +61,6 @@ __all__ = [
     "CustomSynonym",
     "SkillFeedback",
     "MLModelVersion",
-    "ModelRole",
     "ModelPerformanceHistory",
     "ModelTrainingEvent",
     "UserPreferences",
@@ -94,14 +93,12 @@ __all__ = [
     "SearchHistory",
     "AuditLog",
     "AuditActionType",
-    "AuditAlertConfig",
-    "AlertType",
-    "AlertSeverity",
     "ConfigChange",
     "ConfigChangeAction",
     "OrganizationExplanationPreferences",
     "ResumeFeedback",
     "BuiltResume",
-    "ModelApprovalRequest",
-    "ApprovalStatus",
+    "SearchQuery",
+    "PopularSearch",
+    "RecentSearch",
 ]
