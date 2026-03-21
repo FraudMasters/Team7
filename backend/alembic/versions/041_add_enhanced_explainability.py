@@ -37,14 +37,14 @@ def upgrade() -> None:
         sa.Column("appeal_type", sa.String(50), nullable=False),
         sa.Column("appeal_text", sa.Text(), nullable=False),
         sa.Column("supporting_documents", postgresql.JSON(), nullable=True),
-        sa.Column("status", sa.String(50), nullable=False, server_default="pending"),
+        sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
         sa.Column(
             "reviewer_id",
             postgresql.UUID(as_uuid=True),
             nullable=True,
         ),
         sa.Column("review_notes", sa.Text(), nullable=True),
-        sa.Column("resolution_outcome", sa.String(50), nullable=True),
+        sa.Column("resolution_outcome", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
