@@ -72,10 +72,9 @@ class JobApplication(Base, UUIDMixin, TimestampMixin):
         "Resume",
         back_populates="job_applications"
     )
-    source: Mapped[Optional["ApplicationSource"]] = relationship(
-        "ApplicationSource",
-        back_populates="application",
-        uselist=False
+    candidate_documents: Mapped[list["CandidateDocument"]] = relationship(
+        "CandidateDocument",
+        back_populates="application"
     )
 
     def __repr__(self) -> str:

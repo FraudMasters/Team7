@@ -9,6 +9,7 @@ from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
 from .job_vacancy import JobVacancy
 from .job_application import JobApplication, ApplicationStatus
+from .candidate_document import CandidateDocument, DocumentType
 from .match_result import MatchResult
 from .skill_taxonomy import SkillTaxonomy
 from .skill_relationship import SkillRelationship, RelationshipType
@@ -53,6 +54,8 @@ __all__ = [
     "JobVacancy",
     "JobApplication",
     "ApplicationStatus",
+    "CandidateDocument",
+    "DocumentType",
     "MatchResult",
     "SkillTaxonomy",
     "SkillRelationship",
