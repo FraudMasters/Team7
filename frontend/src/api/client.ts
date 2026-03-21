@@ -3,7 +3,7 @@
  *
  * This module provides a typed Axios client for communicating with the
  * backend resume analysis service. Handles resume upload, analysis,
- * job matching, skill taxonomies, model versions,
+ * job matching, skill taxonomies,
  * resume comparisons, and health check endpoints.
  *
  * @example
@@ -45,10 +45,6 @@ import type {
   UploadProgressCallback,
   ApiClientConfig,
   ApiError,
-  ModelVersionCreate,
-  ModelVersionUpdate,
-  ModelVersionResponse,
-  ModelVersionListResponse,
   ComparisonCreate,
   ComparisonUpdate,
   ComparisonResponse,
@@ -436,189 +432,6 @@ export class ApiClient {
 
 
 
-
-
-
-  // ==================== Model Versions ====================
-
-  /**
-   * Create model version entries
-   *
-   * @param request - Create request with list of model versions
-   * @returns Created model version entries
-   * @throws ApiError if creation fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.createModelVersions({
-   *   models: [
-   *     {
-   *       model_name: 'skill_matching',
-   *       version: 'v2.0.0',
-   *       is_active: false,
-   *       is_experiment: true,
-   *       experiment_config: { traffic_percentage: 20 },
-   *       performance_score: 92.5,
-   *     },
-   *   ],
-   * });
-   * ```
-   */
-  async createModelVersions(
-    request: ModelVersionCreate
-  ): Promise<ModelVersionListResponse> {
-    try {
-      const response: AxiosResponse<ModelVersionListResponse> = await this.client.post(
-        '/api/model-versions/',
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * List model versions with optional filters
-   *
-   * @param modelName - Optional model name filter
-   * @param isActive - Optional active status filter
-   * @param isExperiment - Optional experiment status filter
-   * @returns List of model version entries
-   * @throws ApiError if listing fails
-   */
-  async listModelVersions(
-    modelName?: string,
-    isActive?: boolean,
-    isExperiment?: boolean
-  ): Promise<ModelVersionListResponse> {
-    try {
-      const params: Record<string, string | boolean> = {};
-      if (modelName) params.model_name = modelName;
-      if (isActive !== undefined) params.is_active = isActive;
-      if (isExperiment !== undefined) params.is_experiment = isExperiment;
-
-      const response: AxiosResponse<ModelVersionListResponse> = await this.client.get(
-        '/api/model-versions/',
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Get the active model by name
-   *
-   * @param modelName - Model name
-   * @returns Active model version
-   * @throws ApiError if not found
-   */
-  async getActiveModel(modelName: string): Promise<ModelVersionResponse> {
-    try {
-      const response: AxiosResponse<ModelVersionResponse> = await this.client.get(
-        `/api/model-versions/active`,
-        { params: { model_name: modelName } }
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Get a specific model version by ID
-   *
-   * @param id - Model version ID
-   * @returns Model version entry
-   * @throws ApiError if not found
-   */
-  async getModelVersion(id: string): Promise<ModelVersionResponse> {
-    try {
-      const response: AxiosResponse<ModelVersionResponse> = await this.client.get(
-        `/api/model-versions/${id}`
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Update a model version
-   *
-   * @param id - Model version ID
-   * @param request - Update request
-   * @returns Updated model version
-   * @throws ApiError if update fails
-   */
-  async updateModelVersion(
-    id: string,
-    request: ModelVersionUpdate
-  ): Promise<ModelVersionResponse> {
-    try {
-      const response: AxiosResponse<ModelVersionResponse> = await this.client.put(
-        `/api/model-versions/${id}`,
-        request
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Delete a specific model version
-   *
-   * @param id - Model version ID
-   * @throws ApiError if deletion fails
-   */
-  async deleteModelVersion(id: string): Promise<void> {
-    try {
-      await this.client.delete(`/api/model-versions/${id}`);
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Activate a model version
-   *
-   * @param id - Model version ID
-   * @returns Updated model version
-   * @throws ApiError if activation fails
-   */
-  async activateModelVersion(id: string): Promise<ModelVersionResponse> {
-    try {
-      const response: AxiosResponse<ModelVersionResponse> = await this.client.post(
-        `/api/model-versions/${id}/activate`,
-        {}
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Deactivate a model version
-   *
-   * @param id - Model version ID
-   * @returns Updated model version
-   * @throws ApiError if deactivation fails
-   */
-  async deactivateModelVersion(id: string): Promise<ModelVersionResponse> {
-    try {
-      const response: AxiosResponse<ModelVersionResponse> = await this.client.post(
-        `/api/model-versions/${id}/deactivate`,
-        {}
-      );
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
 
 
   // ==================== Comparisons ====================
