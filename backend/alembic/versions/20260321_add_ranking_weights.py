@@ -49,6 +49,7 @@ def upgrade() -> None:
         # Profile flags
         sa.Column('is_preset', sa.Boolean(), nullable=False, default=False),
         sa.Column('is_active', sa.Boolean(), nullable=False, default=True),
+        sa.Column('preset_type', sa.String(50), nullable=True),
         # Ranking feature weights (13 features, should sum to 1.0)
         sa.Column('overall_match_score_weight', sa.Float(), nullable=False, default=0.15),
         sa.Column('keyword_score_weight', sa.Float(), nullable=False, default=0.10),
@@ -111,6 +112,11 @@ def upgrade() -> None:
         'ix_ranking_weight_profiles_is_active',
         'ranking_weight_profiles',
         ['is_active'],
+    )
+    op.create_index(
+        'ix_ranking_weight_profiles_preset_type',
+        'ranking_weight_profiles',
+        ['preset_type'],
     )
 
     # Create unique constraints
@@ -190,6 +196,7 @@ def upgrade() -> None:
             description,
             is_preset,
             is_active,
+            preset_type,
             overall_match_score_weight,
             keyword_score_weight,
             tfidf_score_weight,
@@ -212,6 +219,7 @@ def upgrade() -> None:
                 'Equal consideration of all ranking factors for general-purpose hiring',
                 true,
                 true,
+                'balanced',
                 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.076,
                 'v1.0'
             ),
@@ -221,6 +229,7 @@ def upgrade() -> None:
                 'Optimized for technical roles - prioritizes skills match, keyword matching, and education',
                 true,
                 true,
+                'technical',
                 0.15, 0.15, 0.10, 0.08, 0.25, 0.05, 0.10, 0.08, 0.02, 0.01, 0.01, 0.00, 0.00,
                 'v1.0'
             ),
@@ -230,6 +239,7 @@ def upgrade() -> None:
                 'Optimized for sales roles - prioritizes title similarity, experience relevance, and recent activity',
                 true,
                 true,
+                'sales',
                 0.12, 0.08, 0.06, 0.05, 0.10, 0.12, 0.20, 0.05, 0.10, 0.02, 0.08, 0.01, 0.01,
                 'v1.0'
             ),
@@ -239,6 +249,7 @@ def upgrade() -> None:
                 'Optimized for executive/leadership roles - prioritizes experience, education, and title similarity',
                 true,
                 true,
+                'executive',
                 0.10, 0.05, 0.05, 0.05, 0.08, 0.20, 0.22, 0.12, 0.05, 0.01, 0.06, 0.00, 0.01,
                 'v1.0'
             )
@@ -265,6 +276,10 @@ def downgrade() -> None:
         'uq_ranking_weight_profile_org_name',
         'ranking_weight_profiles',
         type_='unique',
+    )
+    op.drop_index(
+        'ix_ranking_weight_profiles_preset_type',
+        table_name='ranking_weight_profiles',
     )
     op.drop_index(
         'ix_ranking_weight_profiles_is_active',
