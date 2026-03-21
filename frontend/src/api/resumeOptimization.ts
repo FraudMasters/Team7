@@ -202,6 +202,40 @@ export class ResumeOptimizationClient {
   }
 
   /**
+   * Экспорт отчета оптимизации в различных форматах
+   *
+   * Генерирует файл экспорта оптимизации в выбранном формате (PDF или DOCX).
+   *
+   * @param resumeId - ID резюме
+   * @param format - Формат экспорта ('pdf' или 'docx')
+   * @returns Blob с данными файла для скачивания
+   * @throws ApiError если экспорт не удался
+   *
+   * @example
+   * ```ts
+   * const blob = await resumeOptimizationClient.exportOptimization('resume-123', 'pdf');
+   * // Используйте blob для скачивания файла
+   * ```
+   */
+  async exportOptimization(
+    resumeId: string,
+    format: 'pdf' | 'docx'
+  ): Promise<Blob> {
+    try {
+      const response: AxiosResponse<Blob> = await this.client.get(
+        `/api/resumes/${resumeId}/optimize/export`,
+        {
+          params: { format },
+          responseType: 'blob',
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
    * Получение базового экземпляра Axios
    *
    * Полезно для выполнения кастомных запросов, не покрытых методами клиента.
