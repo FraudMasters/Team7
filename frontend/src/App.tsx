@@ -72,6 +72,7 @@ import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
+import ReportBuilderPage from './pages/recruiter/ReportBuilderPage';
 
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
@@ -210,6 +211,7 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="analytics/reports/builder" element={<ReportBuilderPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
         </Route>
