@@ -164,6 +164,113 @@ class CompareWeightsResponse(BaseModel):
     differences: List[dict] = Field(..., description="List of candidate score differences between profiles")
 
 
+# Ranking Features Profile Schemas (13 weight fields)
+
+
+class RankingFeaturesProfileCreate(BaseModel):
+    """Request model for creating a ranking features profile with 13 weight fields."""
+
+    organization_id: str = Field(..., description="Organization identifier")
+    name: str = Field(..., description="Human-readable name for this profile", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Description of when to use this profile", max_length=1000)
+    skill_match_weight: float = Field(..., description="Weight for skill matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    experience_weight: float = Field(..., description="Weight for experience matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    education_weight: float = Field(..., description="Weight for education matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    location_weight: float = Field(..., description="Weight for location matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    keyword_weight: float = Field(..., description="Weight for keyword matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    tfidf_weight: float = Field(..., description="Weight for TF-IDF matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    vector_weight: float = Field(..., description="Weight for vector similarity matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    recency_weight: float = Field(..., description="Weight for recency (0.0 to 1.0)", ge=0.0, le=1.0)
+    culture_fit_weight: float = Field(..., description="Weight for culture fit (0.0 to 1.0)", ge=0.0, le=1.0)
+    salary_match_weight: float = Field(..., description="Weight for salary matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    availability_weight: float = Field(..., description="Weight for availability (0.0 to 1.0)", ge=0.0, le=1.0)
+    certifications_weight: float = Field(..., description="Weight for certifications (0.0 to 1.0)", ge=0.0, le=1.0)
+    industry_experience_weight: float = Field(..., description="Weight for industry experience (0.0 to 1.0)", ge=0.0, le=1.0)
+    is_default: bool = Field(False, description="Whether this is the default profile for the organization")
+    is_preset: bool = Field(False, description="Whether this is a system preset profile")
+    preset_type: Optional[PresetType] = Field(None, description="Type of preset if applicable")
+    created_by: Optional[str] = Field(None, description="User ID who is creating this profile")
+
+    @field_validator(
+        "skill_match_weight",
+        "experience_weight",
+        "education_weight",
+        "location_weight",
+        "keyword_weight",
+        "tfidf_weight",
+        "vector_weight",
+        "recency_weight",
+        "culture_fit_weight",
+        "salary_match_weight",
+        "availability_weight",
+        "certifications_weight",
+        "industry_experience_weight",
+    )
+    @classmethod
+    def validate_weights(cls, v: float, info) -> float:
+        """Validate that weights are within valid range."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("Weight must be between 0.0 and 1.0")
+        return v
+
+    @field_validator("preset_type")
+    @classmethod
+    def validate_preset_type(cls, v: Optional[str], info) -> Optional[str]:
+        """Validate that preset_type is only set if is_preset is True."""
+        if v is not None and not info.data.get("is_preset", False):
+            raise ValueError("preset_type can only be set for preset profiles")
+        return v
+
+
+class RankingFeaturesProfileUpdate(BaseModel):
+    """Request model for updating a ranking features profile."""
+
+    name: Optional[str] = Field(None, description="Human-readable name for this profile", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Description of when to use this profile", max_length=1000)
+    skill_match_weight: Optional[float] = Field(None, description="Weight for skill matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    experience_weight: Optional[float] = Field(None, description="Weight for experience matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    education_weight: Optional[float] = Field(None, description="Weight for education matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    location_weight: Optional[float] = Field(None, description="Weight for location matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    keyword_weight: Optional[float] = Field(None, description="Weight for keyword matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    tfidf_weight: Optional[float] = Field(None, description="Weight for TF-IDF matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    vector_weight: Optional[float] = Field(None, description="Weight for vector similarity matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    recency_weight: Optional[float] = Field(None, description="Weight for recency (0.0 to 1.0)", ge=0.0, le=1.0)
+    culture_fit_weight: Optional[float] = Field(None, description="Weight for culture fit (0.0 to 1.0)", ge=0.0, le=1.0)
+    salary_match_weight: Optional[float] = Field(None, description="Weight for salary matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    availability_weight: Optional[float] = Field(None, description="Weight for availability (0.0 to 1.0)", ge=0.0, le=1.0)
+    certifications_weight: Optional[float] = Field(None, description="Weight for certifications (0.0 to 1.0)", ge=0.0, le=1.0)
+    industry_experience_weight: Optional[float] = Field(None, description="Weight for industry experience (0.0 to 1.0)", ge=0.0, le=1.0)
+    is_default: Optional[bool] = Field(None, description="Whether this is the default profile for the organization")
+
+
+class RankingFeaturesProfileResponse(BaseModel):
+    """Response model for a single ranking features profile."""
+
+    id: str = Field(..., description="Unique identifier for the profile")
+    organization_id: str = Field(..., description="Organization identifier")
+    name: str = Field(..., description="Human-readable name for this profile")
+    description: Optional[str] = Field(None, description="Description of when to use this profile")
+    skill_match_weight: float = Field(..., description="Weight for skill matching")
+    experience_weight: float = Field(..., description="Weight for experience matching")
+    education_weight: float = Field(..., description="Weight for education matching")
+    location_weight: float = Field(..., description="Weight for location matching")
+    keyword_weight: float = Field(..., description="Weight for keyword matching")
+    tfidf_weight: float = Field(..., description="Weight for TF-IDF matching")
+    vector_weight: float = Field(..., description="Weight for vector similarity matching")
+    recency_weight: float = Field(..., description="Weight for recency")
+    culture_fit_weight: float = Field(..., description="Weight for culture fit")
+    salary_match_weight: float = Field(..., description="Weight for salary matching")
+    availability_weight: float = Field(..., description="Weight for availability")
+    certifications_weight: float = Field(..., description="Weight for certifications")
+    industry_experience_weight: float = Field(..., description="Weight for industry experience")
+    is_default: bool = Field(..., description="Whether this is the default profile")
+    is_preset: bool = Field(..., description="Whether this is a system preset")
+    preset_type: Optional[str] = Field(None, description="Type of preset if applicable")
+    created_by: Optional[str] = Field(None, description="User ID who created this profile")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
 @router.post(
     "/",
     response_model=MatchingWeightsProfileResponse,
