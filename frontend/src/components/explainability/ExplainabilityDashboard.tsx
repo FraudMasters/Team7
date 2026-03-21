@@ -36,10 +36,8 @@ import {
   Refresh as RefreshIcon,
   Warning as WarningIcon,
   Lightbulb as BulbIcon,
-  History as HistoryIcon,
-  Feedback as FeedbackIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api';
+import { apiClient } from '@/api/client';
 
 /**
  * Feature explanation from backend API
@@ -82,26 +80,11 @@ interface ExplainabilityResponse {
   provider: string;
   model: string;
   generated_at: string;
-}
-
-/**
- * Feedback entry from backend API
- */
-interface FeedbackEntry {
-  id: string;
-  resume_id: string;
-  vacancy_id: string;
-  match_result_id?: string;
-  skill: string;
-  was_correct: boolean;
-  confidence_score?: number;
-  recruiter_correction?: string;
-  actual_skill?: string;
-  feedback_source: string;
-  processed: boolean;
-  metadata?: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  // Enhanced detailed narratives (optional)
+  ranking_rationale?: string;
+  strengths_analysis?: string[];
+  improvement_areas?: string[];
+  overall_assessment?: string;
 }
 
 /**
@@ -151,9 +134,10 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [strengthsOpen, setStrengthsOpen] = useState(true);
   const [weaknessesOpen, setWeaknessesOpen] = useState(true);
-  const [feedbackHistory, setFeedbackHistory] = useState<FeedbackEntry[]>([]);
-  const [feedbackHistoryOpen, setFeedbackHistoryOpen] = useState(true);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [rankingRationaleOpen, setRankingRationaleOpen] = useState(true);
+  const [strengthsAnalysisOpen, setStrengthsAnalysisOpen] = useState(true);
+  const [improvementAreasOpen, setImprovementAreasOpen] = useState(true);
+  const [overallAssessmentOpen, setOverallAssessmentOpen] = useState(true);
 
   /**
    * Fetch explainability data from backend
@@ -167,6 +151,7 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
         resume_id: resumeId,
         vacancy_id: vacancyId,
         use_llm: useLLM,
+        detailed: true, // Request detailed narratives
       });
 
       setData(response.data);
@@ -179,37 +164,9 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
     }
   };
 
-  /**
-   * Fetch feedback history from backend
-   */
-  const fetchFeedbackHistory = async () => {
-    if (!resumeId || !vacancyId) return;
-
-    setFeedbackLoading(true);
-
-    try {
-      const queryParams = new URLSearchParams({
-        resume_id: resumeId,
-        vacancy_id: vacancyId,
-      });
-
-      const response = await apiClient.get<{ feedback: FeedbackEntry[]; total_count: number }>(
-        `/api/feedback/?${queryParams.toString()}`
-      );
-
-      setFeedbackHistory(response.data.feedback || []);
-    } catch (err) {
-      // Silently handle feedback loading errors - it's supplementary data
-      setFeedbackHistory([]);
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (resumeId && vacancyId) {
       fetchExplanation();
-      fetchFeedbackHistory();
     }
   }, [resumeId, vacancyId, useLLM]);
 
@@ -477,6 +434,139 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
         </Paper>
       )}
 
+      {/* Ranking Rationale - Detailed Narrative */}
+      {data.ranking_rationale && (
+        <Paper elevation={2} sx={{ p: 2 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            onClick={() => setRankingRationaleOpen(!rankingRationaleOpen)}
+          >
+            <AIIcon color="primary" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1" fontWeight={600}>
+              {t('explainability.rankingRationale.title', { defaultValue: 'Ranking Rationale' })}
+            </Typography>
+            <Tooltip title={t('explainability.rankingRationale.tooltip', { defaultValue: 'Detailed explanation of why this candidate ranked at this position' })}>
+              <InfoIcon fontSize="small" color="info" sx={{ ml: 1 }} />
+            </Tooltip>
+            <IconButton size="small" sx={{ ml: 'auto' }}>
+              {rankingRationaleOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+          <Collapse in={rankingRationaleOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ mt: 2, pl: 1 }}>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                {data.ranking_rationale}
+              </Typography>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
+
+      {/* Strengths Analysis - Detailed */}
+      {data.strengths_analysis && data.strengths_analysis.length > 0 && (
+        <Paper elevation={2} sx={{ p: 2, bgcolor: 'success.50', borderLeft: 4, borderColor: 'success.main' }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            onClick={() => setStrengthsAnalysisOpen(!strengthsAnalysisOpen)}
+          >
+            <BulbIcon color="success" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1" fontWeight={600} color="success.main">
+              {t('explainability.strengthsAnalysis.title', { defaultValue: 'Strengths Analysis' })}
+            </Typography>
+            <Chip
+              label={data.strengths_analysis.length}
+              size="small"
+              color="success"
+              sx={{ ml: 1, fontWeight: 700 }}
+            />
+            <IconButton size="small" sx={{ ml: 'auto' }}>
+              {strengthsAnalysisOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+          <Collapse in={strengthsAnalysisOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ mt: 2 }}>
+              <Stack spacing={1.5}>
+                {data.strengths_analysis.map((strength, index) => (
+                  <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <CheckIcon
+                      fontSize="small"
+                      color="success"
+                      sx={{ mt: 0.3, flexShrink: 0 }}
+                    />
+                    <Typography variant="body2">{strength}</Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
+
+      {/* Improvement Areas - Detailed */}
+      {data.improvement_areas && data.improvement_areas.length > 0 && (
+        <Paper elevation={2} sx={{ p: 2, bgcolor: 'warning.50', borderLeft: 4, borderColor: 'warning.main' }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            onClick={() => setImprovementAreasOpen(!improvementAreasOpen)}
+          >
+            <WarningIcon color="warning" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1" fontWeight={600} color="warning.main">
+              {t('explainability.improvementAreas.title', { defaultValue: 'Improvement Areas' })}
+            </Typography>
+            <Chip
+              label={data.improvement_areas.length}
+              size="small"
+              color="warning"
+              sx={{ ml: 1, fontWeight: 700 }}
+            />
+            <IconButton size="small" sx={{ ml: 'auto' }}>
+              {improvementAreasOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+          <Collapse in={improvementAreasOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ mt: 2 }}>
+              <Stack spacing={1.5}>
+                {data.improvement_areas.map((area, index) => (
+                  <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <BulbIcon
+                      fontSize="small"
+                      color="warning"
+                      sx={{ mt: 0.3, flexShrink: 0 }}
+                    />
+                    <Typography variant="body2">{area}</Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
+
+      {/* Overall Assessment - Detailed */}
+      {data.overall_assessment && (
+        <Paper elevation={2} sx={{ p: 2, bgcolor: 'info.50', borderLeft: 4, borderColor: 'info.main' }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            onClick={() => setOverallAssessmentOpen(!overallAssessmentOpen)}
+          >
+            <InfoIcon color="info" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1" fontWeight={600} color="info.main">
+              {t('explainability.overallAssessment.title', { defaultValue: 'Overall Assessment' })}
+            </Typography>
+            <IconButton size="small" sx={{ ml: 'auto' }}>
+              {overallAssessmentOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+          <Collapse in={overallAssessmentOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ mt: 2, pl: 1 }}>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                {data.overall_assessment}
+              </Typography>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
+
       {/* Feature Contributions Grid */}
       <Grid container spacing={2}>
         {/* Positive Factors */}
@@ -635,109 +725,6 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
                     />
                     <Typography variant="body2">{weakness}</Typography>
                   </Box>
-                ))}
-              </Stack>
-            </Box>
-          </Collapse>
-        </Paper>
-      )}
-
-      {/* Feedback History Section */}
-      {feedbackHistory.length > 0 && (
-        <Paper elevation={2} sx={{ p: 2 }}>
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-            onClick={() => setFeedbackHistoryOpen(!feedbackHistoryOpen)}
-          >
-            <HistoryIcon color="info" sx={{ mr: 1 }} />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t('explainability.feedbackHistory.title')}
-            </Typography>
-            <Chip
-              label={feedbackHistory.length}
-              size="small"
-              color="info"
-              sx={{ ml: 1, fontWeight: 700 }}
-            />
-            {feedbackLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
-            <IconButton size="small" sx={{ ml: 'auto' }}>
-              {feedbackHistoryOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-          </Box>
-          <Collapse in={feedbackHistoryOpen} timeout="auto" unmountOnExit>
-            <Box sx={{ mt: 2 }}>
-              <Stack spacing={2}>
-                {feedbackHistory.map((feedback) => (
-                  <Paper
-                    key={feedback.id}
-                    variant="outlined"
-                    sx={{
-                      p: 2,
-                      bgcolor: feedback.was_correct ? 'success.50' : 'warning.50',
-                      borderLeft: 4,
-                      borderColor: feedback.was_correct ? 'success.main' : 'warning.main',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FeedbackIcon
-                          fontSize="small"
-                          color={feedback.was_correct ? 'success' : 'warning'}
-                        />
-                        <Typography variant="subtitle2" fontWeight={600}>
-                          {feedback.skill}
-                        </Typography>
-                        <Chip
-                          label={feedback.was_correct ? t('explainability.feedbackHistory.correct') : t('explainability.feedbackHistory.incorrect')}
-                          size="small"
-                          color={feedback.was_correct ? 'success' : 'warning'}
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(feedback.created_at).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Typography>
-                    </Box>
-                    {feedback.recruiter_correction && (
-                      <Box sx={{ mt: 1 }}>
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {t('explainability.feedbackHistory.correction')}:
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                          {feedback.recruiter_correction}
-                        </Typography>
-                      </Box>
-                    )}
-                    {feedback.actual_skill && (
-                      <Box sx={{ mt: 1 }}>
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {t('explainability.feedbackHistory.actualSkill')}:
-                        </Typography>
-                        <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>
-                          {feedback.actual_skill}
-                        </Typography>
-                      </Box>
-                    )}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {t('explainability.feedbackHistory.source')}: {feedback.feedback_source}
-                      </Typography>
-                      {feedback.confidence_score !== undefined && (
-                        <>
-                          <Typography variant="caption" color="text.secondary">•</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {t('explainability.feedbackHistory.confidence')}: {Math.round(feedback.confidence_score * 100)}%
-                          </Typography>
-                        </>
-                      )}
-                    </Box>
-                  </Paper>
                 ))}
               </Stack>
             </Box>
