@@ -13,11 +13,44 @@ from datetime import datetime, timedelta
 
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
+from celery.schedules import crontab
 
 from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def get_scheduled_report_config() -> Dict[str, Any]:
+    """
+    Get scheduled report delivery configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether scheduled reports are enabled (default: True)
+    - check_interval_minutes: How often to check for pending reports (default: 60)
+    - batch_size: Number of reports to process in one batch (default: 10)
+    - retry_failed_reports: Whether to retry failed reports (default: True)
+    - max_retries: Maximum number of retries for failed reports (default: 3)
+    - retry_delay_minutes: Delay between retries in minutes (default: 30)
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_scheduled_report_config()
+        >>> print(config['check_interval_minutes'])
+        60
+        >>> print(config['batch_size'])
+        10
+    """
+    return {
+        "enabled": getattr(settings, "scheduled_reports_enabled", True),
+        "check_interval_minutes": getattr(settings, "scheduled_reports_check_interval", 60),
+        "batch_size": getattr(settings, "scheduled_reports_batch_size", 10),
+        "retry_failed_reports": getattr(settings, "scheduled_reports_retry_failed", True),
+        "max_retries": getattr(settings, "scheduled_reports_max_retries", 3),
+        "retry_delay_minutes": getattr(settings, "scheduled_reports_retry_delay", 30),
+    }
 
 
 def get_report_data(
@@ -725,3 +758,22 @@ def process_all_pending_reports(
             "status": "failed",
             "error": str(e),
         }
+
+
+# Celery Beat schedule for scheduled report delivery
+# This schedule can be imported and merged into the main Celery configuration
+beat_schedule: Dict[str, Dict[str, Any]] = {
+    # ==============================================
+    # Scheduled Report Delivery Schedule
+    # ==============================================
+    "process-all-pending-reports": {
+        "task": "tasks.report_generation.process_all_pending_reports",
+        "schedule": crontab(
+            minute=f"*/{get_scheduled_report_config()['check_interval_minutes']}",
+        ),
+        "options": {
+            "expires": get_scheduled_report_config()["check_interval_minutes"] * 60,
+            "queue": "analytics_reports",
+        },
+    },
+}
