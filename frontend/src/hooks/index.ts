@@ -63,3 +63,24 @@ export {
   type UseAnalyticsRealTimeOptions,
   type UseAnalyticsRealTimeReturn,
 } from './useAnalyticsRealTime';
+
+export {
+  useKeyMetrics,
+  useQualityMetrics,
+  useFunnelMetrics,
+  useStageDuration,
+  useSourceTracking,
+  useRecruiterPerformance,
+  useSkillDemand,
+  useRankingAccuracy,
+  useTaxonomyUsage,
+  useAIConfidence,
+  useFeatureImportance,
+  useRankingRationale,
+  usePerformanceTrends,
+  type AnalyticsDateParams,
+  type SourceTrackingParams,
+  type RecruiterPerformanceParams,
+  type StageDurationParams,
+  type RankingAccuracyParams,
+} from './useAnalytics';
