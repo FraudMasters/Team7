@@ -26,6 +26,9 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '@/api/client';
+import { duplicatesClient } from '@/api/duplicates';
+import type { DuplicateMatch } from '@/api/duplicates';
+import DuplicateWarningDialog from './DuplicateWarningDialog';
 
 /**
  * File status in the upload queue
@@ -154,8 +157,26 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // State for duplicate warning dialog
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    filename: string;
+    matches: DuplicateMatch[];
+    pendingFiles: File[];
+  } | null>(null);
+
   // Polling interval reference for cleanup
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Calculate SHA-256 hash of file content
+   */
+  const calculateFileHash = useCallback(async (file: File): Promise<string> => {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+  }, []);
 
   /**
    * Validate file extension
@@ -180,10 +201,10 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
   );
 
   /**
-   * Add files to queue
+   * Add files to queue with duplicate checking
    */
   const addFilesToQueue = useCallback(
-    (files: File[]) => {
+    async (files: File[]) => {
       if (disabled || isUploading) {
         return;
       }
@@ -197,8 +218,8 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
         return;
       }
 
-      // Validate and add files
-      const validFiles: FileQueueItem[] = [];
+      // Validate files
+      const validFiles: File[] = [];
       const invalidFiles: string[] = [];
 
       files.forEach((file) => {
@@ -207,11 +228,7 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
         } else if (!isValidFileSize(file)) {
           invalidFiles.push(`${file.name} (${t('bulkUpload.tooLarge', { max: maxFileSize })})`);
         } else {
-          validFiles.push({
-            file,
-            id: `${file.name}-${Date.now()}-${Math.random()}`,
-            status: 'pending',
-          });
+          validFiles.push(file);
         }
       });
 
@@ -224,9 +241,41 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
         );
       }
 
-      if (validFiles.length > 0) {
-        setFileQueue((prev) => [...prev, ...validFiles]);
+      if (validFiles.length === 0) {
+        return;
       }
+
+      // Check for duplicates if we have a vacancy ID (used as organization ID)
+      if (vacancyId) {
+        try {
+          // Check first file for duplicates
+          const firstFile = validFiles[0];
+          const hash = await calculateFileHash(firstFile);
+          const duplicateCheck = await duplicatesClient.checkDuplicate(hash, vacancyId, firstFile.name);
+
+          if (duplicateCheck.is_duplicate && duplicateCheck.matches.length > 0) {
+            // Show duplicate warning dialog
+            setDuplicateWarning({
+              filename: firstFile.name,
+              matches: duplicateCheck.matches,
+              pendingFiles: validFiles,
+            });
+            return;
+          }
+        } catch (err) {
+          // If duplicate check fails, log error but continue with upload
+          console.warn('Duplicate check failed:', err);
+        }
+      }
+
+      // No duplicates or duplicate check skipped - add files to queue
+      const queueItems: FileQueueItem[] = validFiles.map((file) => ({
+        file,
+        id: `${file.name}-${Date.now()}-${Math.random()}`,
+        status: 'pending',
+      }));
+
+      setFileQueue((prev) => [...prev, ...queueItems]);
     },
     [
       disabled,
@@ -235,9 +284,37 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
       maxFiles,
       isValidFileType,
       isValidFileSize,
+      calculateFileHash,
+      vacancyId,
       t,
     ]
   );
+
+  /**
+   * Handle proceeding with upload despite duplicates
+   */
+  const handleDuplicateProceed = useCallback(() => {
+    if (!duplicateWarning) {
+      return;
+    }
+
+    // Add files to queue without duplicate check
+    const queueItems: FileQueueItem[] = duplicateWarning.pendingFiles.map((file) => ({
+      file,
+      id: `${file.name}-${Date.now()}-${Math.random()}`,
+      status: 'pending',
+    }));
+
+    setFileQueue((prev) => [...prev, ...queueItems]);
+    setDuplicateWarning(null);
+  }, [duplicateWarning]);
+
+  /**
+   * Handle canceling upload due to duplicates
+   */
+  const handleDuplicateCancel = useCallback(() => {
+    setDuplicateWarning(null);
+  }, []);
 
   /**
    * Handle file input change
@@ -727,6 +804,18 @@ const BulkResumeUpload: React.FC<BulkResumeUploadProps> = ({
           </Typography>
         </Alert>
       </Collapse>
+
+      {/* Duplicate Warning Dialog */}
+      {duplicateWarning && (
+        <DuplicateWarningDialog
+          open={!!duplicateWarning}
+          onClose={() => setDuplicateWarning(null)}
+          filename={duplicateWarning.filename}
+          matches={duplicateWarning.matches}
+          onProceed={handleDuplicateProceed}
+          onCancel={handleDuplicateCancel}
+        />
+      )}
     </Stack>
   );
 };

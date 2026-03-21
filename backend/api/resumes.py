@@ -22,7 +22,9 @@ from i18n.backend_translations import get_error_message, get_success_message
 from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
+from models.duplicate_review import DuplicateReview, ReviewStatus
 from utils.audit_logger import log_audit_event, get_request_context
+from utils.duplicate_detector import detect_duplicate, compute_content_hash
 from services.resume_cache_service import get_resume_cache
 
 logger = logging.getLogger(__name__)
@@ -59,6 +61,9 @@ class ResumeUploadResponse(BaseModel):
     filename: str = Field(..., description="Original filename of the uploaded resume")
     status: str = Field(..., description="Processing status of the resume")
     message: str = Field(..., description="Success message")
+    duplicate_detected: Optional[bool] = Field(None, description="Whether a duplicate was detected")
+    original_resume_id: Optional[str] = Field(None, description="ID of the original resume if duplicate")
+    content_hash: Optional[str] = Field(None, description="SHA-256 hash of file content")
 
 
 class ResumeListItem(BaseModel):
@@ -208,6 +213,27 @@ async def upload_resume(
         # Validate file size
         validate_file_size(file_size, locale)
 
+        # Get organization_id from header or use default test organization
+        # In production, this should come from authenticated user context
+        organization_id = request.headers.get("X-Organization-ID", "default-org-id")
+
+        # Run duplicate detection
+        duplicate_match = None
+        try:
+            duplicate_match = await detect_duplicate(
+                file_content=file_content,
+                organization_id=organization_id,
+                db_session=db,
+                check_file_system=True,
+            )
+            if duplicate_match.is_duplicate:
+                logger.info(
+                    f"Duplicate detected: {file.filename} matches resume {duplicate_match.original_resume_id}"
+                )
+        except Exception as e:
+            # Log error but don't block upload
+            logger.warning(f"Duplicate detection failed: {e}", exc_info=True)
+
         # Generate UUID for the resume
         resume_id = uuid4()
         safe_filename = Path(file.filename or "resume").name
@@ -220,18 +246,51 @@ async def upload_resume(
         with open(file_path, "wb") as f:
             f.write(file_content)
 
+        # Compute content hash for duplicate detection
+        content_hash = compute_content_hash(file_content)
+
         # Create database record
         new_resume = Resume(
             id=resume_id,
+            organization_id=organization_id,
             filename=file.filename or "unknown",
             file_path=str(file_path),
             content_type=file.content_type or "application/octet-stream",
             status=ResumeStatus.PENDING,
+            content_hash=content_hash,
         )
 
         db.add(new_resume)
         await db.commit()
         await db.refresh(new_resume)
+
+        # Add duplicate to review queue if detected
+        if duplicate_match and duplicate_match.is_duplicate:
+            try:
+                from datetime import datetime, timezone
+
+                # Create review queue entry for manual approval
+                duplicate_review = DuplicateReview(
+                    organization_id=organization_id,
+                    original_resume_id=duplicate_match.original_resume_id,
+                    duplicate_resume_id=resume_id,
+                    confidence_score=duplicate_match.similarity_score,
+                    status=ReviewStatus.PENDING,
+                    queue_entered_at=datetime.now(timezone.utc),
+                )
+                db.add(duplicate_review)
+                await db.commit()
+
+                logger.info(
+                    f"Added duplicate to review queue: original={duplicate_match.original_resume_id}, "
+                    f"duplicate={resume_id}, confidence={duplicate_match.similarity_score}"
+                )
+            except Exception as e:
+                # Log error but don't block upload
+                logger.error(f"Failed to add duplicate to review queue: {e}", exc_info=True)
+                # Rollback review queue creation but keep the resume
+                await db.rollback()
+                await db.refresh(new_resume)
 
         # Log audit event
         ip_address, user_agent = get_request_context(request)
@@ -246,6 +305,7 @@ async def upload_resume(
                 "filename": file.filename or "unknown",
                 "file_size": file_size,
                 "content_type": file.content_type or "application/octet-stream",
+                "duplicate_detected": duplicate_match.is_duplicate if duplicate_match else False,
             },
         )
 
@@ -257,7 +317,16 @@ async def upload_resume(
             "filename": file.filename or "unknown",
             "status": ResumeStatus.PENDING.value,
             "message": success_message,
+            "content_hash": content_hash,
         }
+
+        # Add duplicate detection info if applicable
+        if duplicate_match and duplicate_match.is_duplicate:
+            response_data["duplicate_detected"] = True
+            response_data["original_resume_id"] = duplicate_match.original_resume_id
+            logger.info(f"Duplicate detected during upload: {resume_id} -> {duplicate_match.original_resume_id}")
+        else:
+            response_data["duplicate_detected"] = False
 
         logger.info(f"Resume uploaded successfully: {resume_id}")
 
