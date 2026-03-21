@@ -473,6 +473,155 @@ async def _calculate_match_rate_metrics(
         }
 
 
+async def _calculate_funnel_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate hiring funnel metrics.
+
+    This function queries the hiring_stages table to get the current stage
+    for each resume and calculates conversion rates between stages.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with funnel metrics including stages and total_candidates
+    """
+    try:
+        # Define funnel stages in order (using actual HiringStageName values)
+        funnel_stage_order = [
+            HiringStageName.APPLIED.value,
+            HiringStageName.SCREENING.value,
+            HiringStageName.INTERVIEW.value,
+            HiringStageName.TECHNICAL.value,
+            HiringStageName.OFFER.value,
+            HiringStageName.HIRED.value,
+        ]
+
+        # Build subquery to get the latest stage for each resume
+        # Using row_number() window function to get most recent stage per resume
+        from sqlalchemy import desc
+
+        subquery = (
+            select(
+                HiringStage.resume_id,
+                HiringStage.stage_name,
+                func.row_number().over(
+                    partition_by=HiringStage.resume_id,
+                    order_by=desc(HiringStage.created_at)
+                ).label('rn')
+            )
+        )
+
+        # Apply date filters if provided
+        if start_date:
+            subquery = subquery.where(HiringStage.created_at >= start_date)
+        if end_date:
+            subquery = subquery.where(HiringStage.created_at <= end_date)
+
+        subquery = subquery.subquery()
+
+        # Query to count resumes by their latest stage
+        stage_count_query = (
+            select(
+                subquery.c.stage_name,
+                func.count().label('count')
+            )
+            .where(subquery.c.rn == 1)
+            .group_by(subquery.c.stage_name)
+        )
+
+        result = await db.execute(stage_count_query)
+        stage_counts = {str(row[0]): int(row[1]) for row in result.fetchall()}
+
+        # Calculate total candidates (sum of all stages)
+        total_candidates = sum(stage_counts.values())
+
+        if total_candidates == 0:
+            # Return empty funnel if no data
+            return {
+                "stages": [
+                    {
+                        "stage_name": stage,
+                        "count": 0,
+                        "conversion_rate_from_previous": None if i == 0 else 0.0,
+                        "conversion_rate_from_start": 1.0 if i == 0 else 0.0,
+                    }
+                    for i, stage in enumerate(funnel_stage_order)
+                ],
+                "total_candidates": 0,
+            }
+
+        # Build ordered funnel stages with conversion rates
+        funnel_stages = []
+        previous_count = None
+
+        for stage_name in funnel_stage_order:
+            count = stage_counts.get(stage_name, 0)
+
+            # Calculate conversion rates
+            if previous_count is None:
+                # First stage - no previous stage
+                conversion_from_previous = None
+                # For the first stage, conversion from start is always 1.0 if there are candidates
+                conversion_from_start = 1.0 if total_candidates > 0 else 0.0
+            else:
+                # Calculate conversion from previous stage
+                conversion_from_previous = (
+                    round(count / previous_count, 3) if previous_count > 0 else 0.0
+                )
+                # Calculate conversion from total candidates
+                conversion_from_start = (
+                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
+                )
+
+            funnel_stages.append({
+                "stage_name": stage_name,
+                "count": count,
+                "conversion_rate_from_previous": conversion_from_previous,
+                "conversion_rate_from_start": conversion_from_start,
+            })
+
+            previous_count = count
+
+        # Include any additional stages not in the standard list
+        # (e.g., REJECTED, WITHDRAWN)
+        for stage_name, count in stage_counts.items():
+            if stage_name not in funnel_stage_order:
+                conversion_from_previous = (
+                    round(count / previous_count, 3) if previous_count and previous_count > 0 else 0.0
+                )
+                conversion_from_start = (
+                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
+                )
+
+                funnel_stages.append({
+                    "stage_name": stage_name,
+                    "count": count,
+                    "conversion_rate_from_previous": conversion_from_previous,
+                    "conversion_rate_from_start": conversion_from_start,
+                })
+                previous_count = count
+
+        return {
+            "stages": funnel_stages,
+            "total_candidates": total_candidates,
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating funnel metrics: {e}", exc_info=True)
+        # Return empty funnel on error
+        return {
+            "stages": [],
+            "total_candidates": 0,
+        }
+
+
 class QualityMetricsResponse(BaseModel):
     """ML/NLP model quality metrics."""
 
@@ -1049,6 +1198,7 @@ class FunnelMetricsResponse(BaseModel):
     tags=["Analytics"],
 )
 async def get_funnel_metrics(
+    db: AsyncSession = Depends(get_db),
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
 ) -> JSONResponse:
@@ -1060,9 +1210,8 @@ async def get_funnel_metrics(
     This helps identify bottlenecks in the recruitment process and optimize
     conversion strategies.
 
-    The funnel stages include:
-    - uploaded: Resumes uploaded to the system
-    - analyzed: Resumes processed through NLP analysis
+    The funnel stages are based on the HiringStageName enum:
+    - applied: Candidates who have applied
     - screening: Candidates in initial screening
     - interview: Candidates scheduled for interviews
     - technical: Candidates in technical assessment
@@ -1070,6 +1219,7 @@ async def get_funnel_metrics(
     - hired: Candidates successfully hired
 
     Args:
+        db: Database session (injected by FastAPI)
         start_date: Optional start date for filtering metrics (ISO 8601 format)
         end_date: Optional end date for filtering metrics (ISO 8601 format)
 
@@ -1077,6 +1227,7 @@ async def get_funnel_metrics(
         JSON response with funnel metrics including stage counts and conversion rates
 
     Raises:
+        HTTPException(400): If date format is invalid
         HTTPException(500): If data retrieval fails
 
     Examples:
@@ -1086,21 +1237,15 @@ async def get_funnel_metrics(
         {
             "stages": [
                 {
-                    "stage_name": "uploaded",
+                    "stage_name": "applied",
                     "count": 500,
                     "conversion_rate_from_previous": null,
                     "conversion_rate_from_start": 1.0
                 },
                 {
-                    "stage_name": "analyzed",
-                    "count": 450,
-                    "conversion_rate_from_previous": 0.9,
-                    "conversion_rate_from_start": 0.9
-                },
-                {
                     "stage_name": "screening",
                     "count": 300,
-                    "conversion_rate_from_previous": 0.67,
+                    "conversion_rate_from_previous": 0.6,
                     "conversion_rate_from_start": 0.6
                 },
                 {
@@ -1124,199 +1269,40 @@ async def get_funnel_metrics(
             f"Fetching funnel metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
-        from sqlalchemy import func, desc
-        from models import HiringStage, Resume, AnalyticsEvent
-        from database import get_db
+        # Parse date filters
+        date_filter_start = None
+        date_filter_end = None
+        if start_date:
+            try:
+                date_filter_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {str(e)}",
+                ) from e
 
-        # Define standard funnel stages in order
-        funnel_stage_order = [
-            "uploaded",
-            "analyzed",
-            "screening",
-            "interview",
-            "technical",
-            "offer",
-            "hired",
-        ]
+        if end_date:
+            try:
+                date_filter_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {str(e)}",
+                ) from e
 
-        stage_metrics = {}
-
-        async for db in get_db():
-            # Build query for HiringStage with date filters
-            hiring_query = select(HiringStage)
-
-            if start_date:
-                from datetime import datetime
-                try:
-                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                    hiring_query = hiring_query.where(HiringStage.created_at >= start_dt)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
-                    )
-
-            if end_date:
-                from datetime import datetime
-                try:
-                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                    hiring_query = hiring_query.where(HiringStage.created_at <= end_dt)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
-                    )
-
-            # Get the most recent stage for each resume
-            # We need to find the latest HiringStage record for each resume_id
-            from sqlalchemy import literal_column
-            subquery = (
-                select(
-                    HiringStage.resume_id,
-                    HiringStage.stage_name,
-                    func.row_number().over(
-                        partition_by=HiringStage.resume_id,
-                        order_by=desc(HiringStage.created_at)
-                    ).label('rn')
-                )
-            )
-
-            if start_date:
-                from datetime import datetime
-                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                subquery = subquery.where(HiringStage.created_at >= start_dt)
-
-            if end_date:
-                from datetime import datetime
-                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                subquery = subquery.where(HiringStage.created_at <= end_dt)
-
-            # Wrap subquery to filter by row_number
-            from sqlalchemy import alias
-            stage_cte = alias(subquery)
-
-            # Count resumes by their latest stage
-            stage_counts = {}
-            result = await db.execute(
-                select(stage_cte.c.stage_name, func.count().label('count'))
-                .where(stage_cte.c.rn == 1)
-                .group_by(stage_cte.c.stage_name)
-            )
-
-            for row in result:
-                stage_counts[row[0]] = row[1]
-
-            # Get uploaded count from AnalyticsEvent (resume_uploaded events)
-            uploaded_query = select(func.count(AnalyticsEvent.id)).where(
-                AnalyticsEvent.event_type == "resume_uploaded"
-            )
-
-            if start_date:
-                from datetime import datetime
-                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                uploaded_query = uploaded_query.where(AnalyticsEvent.created_at >= start_dt)
-
-            if end_date:
-                from datetime import datetime
-                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                uploaded_query = uploaded_query.where(AnalyticsEvent.created_at <= end_dt)
-
-            uploaded_result = await db.execute(uploaded_query)
-            uploaded_count = uploaded_result.scalar() or 0
-
-            # Get analyzed count from Resume table (resumes with analysis)
-            analyzed_query = select(func.count(Resume.id)).where(
-                Resume.status == "analyzed"
-            )
-
-            if start_date:
-                from datetime import datetime
-                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                analyzed_query = analyzed_query.where(Resume.created_at >= start_dt)
-
-            if end_date:
-                from datetime import datetime
-                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                analyzed_query = analyzed_query.where(Resume.created_at <= end_dt)
-
-            analyzed_result = await db.execute(analyzed_query)
-            analyzed_count = analyzed_result.scalar() or 0
-
-            # Build stage metrics dictionary
-            stage_metrics = {
-                "uploaded": uploaded_count,
-                "analyzed": analyzed_count,
-            }
-
-            # Add counts from HiringStage for other stages
-            for stage_name, count in stage_counts.items():
-                if stage_name not in stage_metrics:
-                    stage_metrics[stage_name] = count
-
-            break
-
-        # Build ordered funnel stages
-        funnel_stages = []
-        total_candidates = stage_metrics.get("uploaded", 0)
-
-        previous_count = None
-        for stage_name in funnel_stage_order:
-            count = stage_metrics.get(stage_name, 0)
-
-            # Calculate conversion rates
-            if previous_count is None:
-                # First stage - no previous stage
-                conversion_from_previous = None
-                conversion_from_start = 1.0 if count > 0 else 0.0
-            else:
-                # Calculate conversion from previous stage
-                conversion_from_previous = (
-                    round(count / previous_count, 3) if previous_count > 0 else 0.0
-                )
-                conversion_from_start = (
-                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
-                )
-
-            funnel_stages.append({
-                "stage_name": stage_name,
-                "count": count,
-                "conversion_rate_from_previous": conversion_from_previous,
-                "conversion_rate_from_start": conversion_from_start,
-            })
-
-            previous_count = count
-
-        # Include any additional stages not in the standard list
-        for stage_name, count in stage_metrics.items():
-            if stage_name not in funnel_stage_order:
-                conversion_from_previous = (
-                    round(count / previous_count, 3) if previous_count and previous_count > 0 else 0.0
-                )
-                conversion_from_start = (
-                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
-                )
-
-                funnel_stages.append({
-                    "stage_name": stage_name,
-                    "count": count,
-                    "conversion_rate_from_previous": conversion_from_previous,
-                    "conversion_rate_from_start": conversion_from_start,
-                })
-                previous_count = count
-
-        response_data = {
-            "stages": funnel_stages,
-            "total_candidates": total_candidates,
-        }
+        # Calculate funnel metrics using helper function
+        funnel_data = await _calculate_funnel_metrics(
+            db, date_filter_start, date_filter_end
+        )
 
         logger.info(
-            f"Funnel metrics retrieved successfully - {len(funnel_stages)} stages, "
-            f"{total_candidates} total candidates"
+            f"Funnel metrics retrieved successfully - {len(funnel_data['stages'])} stages, "
+            f"{funnel_data['total_candidates']} total candidates"
         )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content=funnel_data,
         )
 
     except HTTPException:
