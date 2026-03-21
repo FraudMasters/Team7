@@ -24,6 +24,12 @@ import {
   Shield as ShieldIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
+import ConfidenceScoreCard from '@components/confidence/ConfidenceScoreCard';
+import ModelAccuracyTrend from '@components/confidence/ModelAccuracyTrend';
+import FeatureImportanceChart from '@components/confidence/FeatureImportanceChart';
+import UncertaintyIndicator from '@components/confidence/UncertaintyIndicator';
+import AIHumanComparison from '@components/confidence/AIHumanComparison';
+import ConfidenceReportExport from '@components/confidence/ConfidenceReportExport';
 
 /**
  * Date range preset type
@@ -207,68 +213,150 @@ const TransparencyDashboard: React.FC = () => {
       {/* Main Content */}
       {!globalLoading && (
         <Grid container spacing={3}>
-          {/* Overview Section */}
+          {/* Export and Actions Bar */}
           <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                <AnalyticsIcon color="primary" />
-                <Typography variant="h6" component="h2" fontWeight={600}>
-                  Overview
-                </Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                Dashboard components will be displayed here
-              </Typography>
-            </Paper>
+            <Stack direction="row" justifyContent="flex-end" spacing={2}>
+              <ConfidenceReportExport
+                startDate={startDate}
+                endDate={endDate}
+                compact={false}
+                onExportComplete={() => {
+                  // Export completed successfully
+                }}
+              />
+            </Stack>
           </Grid>
 
-          {/* Confidence Metrics Section */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                  <VisibilityIcon color="primary" />
-                  <Typography variant="h6" component="h3" fontWeight={600}>
-                    Confidence Metrics
-                  </Typography>
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  AI confidence scoring metrics will be displayed here
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Transparency Insights Section */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                  <InfoIcon color="primary" />
-                  <Typography variant="h6" component="h3" fontWeight={600}>
-                    Transparency Insights
-                  </Typography>
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  Model transparency insights will be displayed here
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Detailed Analytics Section */}
+          {/* Sample Confidence Score Cards - Top Candidates */}
           <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                <ShieldIcon color="primary" />
-                <Typography variant="h6" component="h2" fontWeight={600}>
-                  Detailed Analytics
-                </Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                Detailed analytics and charts will be displayed here
-              </Typography>
-            </Paper>
+            <Typography variant="h6" component="h2" fontWeight={600} gutterBottom>
+              Sample Confidence Scores
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <ConfidenceScoreCard
+                  score={{
+                    candidateId: 'sample-1',
+                    candidateName: 'Jane Doe',
+                    confidence: 89,
+                    rankScore: 0.92,
+                    rankPosition: 1,
+                    model: 'ML Ranking v3.2',
+                  }}
+                  size="medium"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <ConfidenceScoreCard
+                  score={{
+                    candidateId: 'sample-2',
+                    candidateName: 'John Smith',
+                    confidence: 72,
+                    rankScore: 0.78,
+                    rankPosition: 2,
+                    model: 'ML Ranking v3.2',
+                  }}
+                  size="medium"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <ConfidenceScoreCard
+                  score={{
+                    candidateId: 'sample-3',
+                    candidateName: 'Alice Johnson',
+                    confidence: 45,
+                    rankScore: 0.52,
+                    rankPosition: 3,
+                    model: 'ML Ranking v3.2',
+                  }}
+                  size="medium"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Box>
+                  <ConfidenceScoreCard
+                    score={{
+                      candidateId: 'sample-4',
+                      candidateName: 'Bob Williams',
+                      confidence: 28,
+                      rankScore: 0.35,
+                      rankPosition: 4,
+                      model: 'ML Ranking v3.2',
+                    }}
+                    size="medium"
+                  />
+                  {/* Uncertainty Indicator for low confidence */}
+                  <Box sx={{ mt: 1 }}>
+                    <UncertaintyIndicator
+                      confidence={28}
+                      mode="alert"
+                      candidateName="Bob Williams"
+                      showDetails={true}
+                    />
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </Grid>
+
+          {/* Model Accuracy Trend - Full width */}
+          <Grid item xs={12}>
+            <ModelAccuracyTrend />
+          </Grid>
+
+          {/* Feature Importance Chart and AI vs Human Comparison */}
+          <Grid item xs={12} md={6}>
+            <FeatureImportanceChart
+              features={[
+                {
+                  feature_name: 'Years of Experience',
+                  importance: 0.85,
+                  direction: 'positive',
+                  description: 'Total years of relevant work experience',
+                  category: 'Experience',
+                },
+                {
+                  feature_name: 'Technical Skills Match',
+                  importance: 0.78,
+                  direction: 'positive',
+                  description: 'Alignment with required technical skills',
+                  category: 'Skills',
+                },
+                {
+                  feature_name: 'Education Level',
+                  importance: 0.65,
+                  direction: 'positive',
+                  description: 'Highest degree obtained',
+                  category: 'Education',
+                },
+                {
+                  feature_name: 'Industry Experience',
+                  importance: 0.52,
+                  direction: 'positive',
+                  description: 'Experience in relevant industry',
+                  category: 'Experience',
+                },
+                {
+                  feature_name: 'Location Proximity',
+                  importance: 0.38,
+                  direction: 'neutral',
+                  description: 'Distance from office location',
+                  category: 'Logistics',
+                },
+              ]}
+              title="Top Ranking Factors"
+              description="Key features influencing AI candidate rankings"
+              maxFeatures={5}
+              showTooltips={true}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <AIHumanComparison
+              startDate={startDate}
+              endDate={endDate}
+              autoRefresh={autoRefreshEnabled}
+            />
           </Grid>
         </Grid>
       )}
