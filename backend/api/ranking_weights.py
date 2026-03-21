@@ -114,6 +114,96 @@ def normalize_weights(
         return (0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.077, 0.076)
 
 
+@router.post(
+    "/normalize",
+    response_model=NormalizeWeightsResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Ranking Weights"],
+)
+async def normalize_ranking_weights(
+    request: NormalizeWeightsRequest,
+) -> JSONResponse:
+    """
+    Normalize ranking weights so they sum to 1.0.
+
+    This utility endpoint accepts a set of ranking weights (any subset can be provided)
+    and returns the normalized weights that sum to 1.0. Weights are scaled proportionally.
+
+    If no weights are provided, returns balanced defaults. If weights already sum to 1.0,
+    they are returned as-is.
+
+    Args:
+        request: Request with optional ranking weights to normalize
+
+    Returns:
+        JSON response with normalized weights and their sum
+
+    Raises:
+        HTTPException(422): If validation fails (negative weights)
+        HTTPException(500): If normalization fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "overall_match_score_weight": 0.5,
+        ...     "skills_match_ratio_weight": 0.3,
+        ...     "keyword_score_weight": 0.2
+        ... }
+        >>> response = requests.post("http://localhost:8000/api/ranking-weights/normalize", json=data)
+        >>> normalized = response.json()
+    """
+    try:
+        # Extract weights from request, using 0.0 for unprovided weights
+        normalized = normalize_weights(
+            overall_match_score_weight=request.overall_match_score_weight or 0.0,
+            keyword_score_weight=request.keyword_score_weight or 0.0,
+            tfidf_score_weight=request.tfidf_score_weight or 0.0,
+            vector_score_weight=request.vector_score_weight or 0.0,
+            skills_match_ratio_weight=request.skills_match_ratio_weight or 0.0,
+            experience_months_weight=request.experience_months_weight or 0.0,
+            experience_relevance_weight=request.experience_relevance_weight or 0.0,
+            education_level_weight=request.education_level_weight or 0.0,
+            recent_experience_weight=request.recent_experience_weight or 0.0,
+            skill_rarity_weight=request.skill_rarity_weight or 0.0,
+            title_similarity_weight=request.title_similarity_weight or 0.0,
+            freshness_score_weight=request.freshness_score_weight or 0.0,
+            completeness_score_weight=request.completeness_score_weight or 0.0,
+        )
+
+        # Calculate total (should be 1.0 after normalization)
+        total = sum(normalized)
+
+        response = NormalizeWeightsResponse(
+            overall_match_score_weight=normalized[0],
+            keyword_score_weight=normalized[1],
+            tfidf_score_weight=normalized[2],
+            vector_score_weight=normalized[3],
+            skills_match_ratio_weight=normalized[4],
+            experience_months_weight=normalized[5],
+            experience_relevance_weight=normalized[6],
+            education_level_weight=normalized[7],
+            recent_experience_weight=normalized[8],
+            skill_rarity_weight=normalized[9],
+            title_similarity_weight=normalized[10],
+            freshness_score_weight=normalized[11],
+            completeness_score_weight=normalized[12],
+            total=total,
+        )
+
+        logger.info(f"Normalized ranking weights (total: {total})")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response.model_dump()
+        )
+    except Exception as e:
+        logger.error(f"Error normalizing weights: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to normalize weights: {str(e)}"
+        )
+
+
 @router.get(
     "/profiles/presets",
     response_model=RankingWeightProfileListResponse,
