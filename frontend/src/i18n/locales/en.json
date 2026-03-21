@@ -951,6 +951,18 @@
       "better": "Better than reference",
       "worse": "Worse than reference",
       "equal": "Equal to reference"
+    },
+    "skill": "Skill",
+    "candidate": "Candidate",
+    "viewMode": "View mode",
+    "cardView": "Card view",
+    "tableView": "Skills comparison table",
+    "chartView": "Score comparison chart",
+    "scoreComparison": "Score Comparison",
+    "scoreComparisonDescription": "Visual comparison of all scoring components across candidates",
+    "skillsLegend": {
+      "has": "Has skill",
+      "missing": "Missing skill"
     }
   },
   "whatIfAnalysis": {
