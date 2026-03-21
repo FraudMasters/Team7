@@ -13,7 +13,7 @@ import {
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import type {
   LinkedInAuthUrlResponse,
   LinkedInCallbackResponse,

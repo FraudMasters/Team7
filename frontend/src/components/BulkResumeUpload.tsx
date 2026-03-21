@@ -25,7 +25,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 
 /**
  * File status in the upload queue

@@ -33,7 +33,7 @@ import {
   Cancel as WorseIcon,
   Remove as EqualIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 
 /**
  * Individual candidate score breakdown from backend
