@@ -432,16 +432,27 @@ async def get_report(
         ) from e
 
 
-@router.put("/{report_id}", tags=["Reports"])
+@router.put(
+    "/{report_id}",
+    response_model=ReportResponse,
+    tags=["Reports"],
+)
 async def update_report(
-    report_id: str, request: ReportUpdate
+    report_id: str,
+    request: ReportUpdate,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Update a custom report.
 
+    This endpoint updates an existing custom report with new values for name,
+    description, metrics, filters, or visibility settings. Only provided fields
+    will be updated; omitted fields retain their current values.
+
     Args:
         report_id: Unique identifier of the report
         request: Update request with fields to modify
+        db: Database session
 
     Returns:
         JSON response with updated report entry
@@ -455,35 +466,98 @@ async def update_report(
         >>> import requests
         >>> data = {"name": "Updated Report Name", "metrics": ["time_to_hire", "match_rates"]}
         >>> response = requests.put(
-        ...     "/api/reports/123",
+        ...     "/api/reports/123e4567-e89b-12d3-a456-426614174000",
         ...     json=data
         ... )
         >>> response.json()
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "organization_id": "org123",
+            "name": "Updated Report Name",
+            "description": "Overview of hiring metrics",
+            "created_by": "user456",
+            "metrics": ["time_to_hire", "match_rates"],
+            "filters": {"start_date": "2024-01-01"},
+            "is_public": True,
+            "created_at": "2024-01-25T00:00:00Z",
+            "updated_at": "2024-01-26T10:30:00Z"
+        }
     """
     try:
         logger.info(f"Updating report: {report_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        from datetime import datetime
-        now = datetime.utcnow().isoformat() + "Z"
+        # Query report by ID
+        query = select(Report).where(Report.id == report_id, Report.is_active == True)
+        result = await db.execute(query)
+        report = result.scalar_one_or_none()
+
+        if not report:
+            logger.warning(f"Report not found: {report_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report not found: {report_id}",
+            )
+
+        # Validate name if provided
+        if request.name is not None:
+            if len(request.name.strip()) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Report name cannot be empty",
+                )
+            report.name = request.name
+
+        # Update description if provided
+        if request.description is not None:
+            report.description = request.description
+
+        # Update configuration with new metrics, filters, or is_public if provided
+        configuration = report.configuration.copy() if report.configuration else {}
+
+        if request.metrics is not None:
+            if len(request.metrics) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="At least one metric must be provided",
+                )
+            configuration["metrics"] = request.metrics
+
+        if request.filters is not None:
+            configuration["filters"] = request.filters
+
+        if request.is_public is not None:
+            configuration["is_public"] = request.is_public
+
+        report.configuration = configuration
+
+        # Commit changes
+        await db.flush()
+
+        # Build response data
+        response_data = {
+            "id": str(report.id),
+            "organization_id": report.organization_id,
+            "name": report.name,
+            "description": report.description,
+            "created_by": report.created_by,
+            "metrics": report.configuration.get("metrics", []),
+            "filters": report.configuration.get("filters", {}),
+            "is_public": report.configuration.get("is_public", False),
+            "created_at": report.created_at.isoformat(),
+            "updated_at": report.updated_at.isoformat(),
+        }
+
+        await db.commit()
+
+        logger.info(f"Updated report: {report_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": report_id,
-                "organization_id": "org123",
-                "name": request.name or "Sample Report",
-                "description": request.description,
-                "created_by": "user456",
-                "metrics": request.metrics or ["time_to_hire"],
-                "filters": request.filters or {},
-                "is_public": request.is_public if request.is_public is not None else True,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": now,
-            },
+            content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating report: {e}", exc_info=True)
         raise HTTPException(
@@ -492,13 +566,24 @@ async def update_report(
         ) from e
 
 
-@router.delete("/{report_id}", tags=["Reports"])
-async def delete_report(report_id: str) -> JSONResponse:
+@router.delete(
+    "/{report_id}",
+    tags=["Reports"],
+)
+async def delete_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Delete a custom report.
 
+    This endpoint performs a soft delete by marking the report as inactive.
+    The report data is preserved in the database but will not appear in
+    queries or list endpoints. This allows for data recovery if needed.
+
     Args:
         report_id: Unique identifier of the report
+        db: Database session
 
     Returns:
         JSON response confirming deletion
@@ -509,20 +594,42 @@ async def delete_report(report_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("/api/reports/123")
+        >>> response = requests.delete("/api/reports/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
-        {"message": "Report deleted successfully"}
+        {"message": "Report deleted successfully", "report_id": "123e4567-e89b-12d3-a456-426614174000"}
     """
     try:
         logger.info(f"Deleting report: {report_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Query report by ID
+        query = select(Report).where(Report.id == report_id, Report.is_active == True)
+        result = await db.execute(query)
+        report = result.scalar_one_or_none()
+
+        if not report:
+            logger.warning(f"Report not found: {report_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report not found: {report_id}",
+            )
+
+        # Soft delete by marking as inactive
+        report.is_active = False
+        await db.flush()
+        await db.commit()
+
+        logger.info(f"Deleted report: {report_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"message": f"Report {report_id} deleted successfully"},
+            content={
+                "message": "Report deleted successfully",
+                "report_id": str(report.id),
+            },
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting report: {e}", exc_info=True)
         raise HTTPException(
