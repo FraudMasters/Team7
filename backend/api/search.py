@@ -241,6 +241,24 @@ async def search_candidates(
                 f"returned {len(candidates)} results in {execution_time:.3f}s"
             )
 
+            # Track search in analytics
+            search_history = SearchHistory(
+                query=search_data.query,
+                filters=search_data.filters or {},
+                results_count=es_result.total,
+                execution_time_seconds=execution_time,
+                search_metadata={
+                    "use_elasticsearch": True,
+                    "sort_by": search_data.sort_by,
+                    "skip": search_data.skip,
+                    "limit": search_data.limit,
+                    "user_agent": request.headers.get("user-agent"),
+                    "client_ip": request.client.host if request.client else None,
+                },
+            )
+            db.add(search_history)
+            await db.commit()
+
             # Close Elasticsearch client
             await es_service.close()
 
@@ -294,6 +312,24 @@ async def search_candidates(
                 f"returned {len(result.candidates)} results in "
                 f"{result.execution_time_seconds:.3f}s"
             )
+
+            # Track search in analytics
+            search_history = SearchHistory(
+                query=search_data.query,
+                filters=search_data.filters or {},
+                results_count=result.total,
+                execution_time_seconds=result.execution_time_seconds,
+                search_metadata={
+                    "use_elasticsearch": False,
+                    "sort_by": search_data.sort_by,
+                    "skip": search_data.skip,
+                    "limit": search_data.limit,
+                    "user_agent": request.headers.get("user-agent"),
+                    "client_ip": request.client.host if request.client else None,
+                },
+            )
+            db.add(search_history)
+            await db.commit()
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
@@ -469,6 +505,25 @@ async def search_candidates_get(
             f"GET search completed: {result.total} total, "
             f"returned {len(result.candidates)} results"
         )
+
+        # Track search in analytics
+        search_history = SearchHistory(
+            query=query,
+            filters=filters_dict,
+            results_count=result.total,
+            execution_time_seconds=result.execution_time_seconds,
+            search_metadata={
+                "use_elasticsearch": False,
+                "sort_by": sort_by,
+                "skip": skip,
+                "limit": limit,
+                "method": "GET",
+                "user_agent": request.headers.get("user-agent"),
+                "client_ip": request.client.host if request.client else None,
+            },
+        )
+        db.add(search_history)
+        await db.commit()
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
