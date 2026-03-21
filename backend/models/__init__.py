@@ -43,6 +43,7 @@ from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
 from .search_analytics import SearchQuery, PopularSearch
 from .recent_search import RecentSearch
+from .search_relevance_config import SearchRelevanceConfig
 
 __all__ = [
     "Base",
@@ -101,4 +102,5 @@ __all__ = [
     "SearchQuery",
     "PopularSearch",
     "RecentSearch",
+    "SearchRelevanceConfig",
 ]

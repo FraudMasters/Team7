@@ -59,6 +59,10 @@ class SearchQuery:
         from_: Offset for pagination (default 0)
         size: Number of results to return (default 100)
         sort_by: Sort field (relevance, experience_years, etc.)
+        skills_boost: Boost value for skills field (default 1.0)
+        experience_boost: Boost value for experience field (default 1.0)
+        education_boost: Boost value for education field (default 1.0)
+        location_boost: Boost value for location field (default 1.0)
     """
 
     query_string: Optional[str] = None
@@ -72,6 +76,10 @@ class SearchQuery:
     from_: int = 0
     size: int = 100
     sort_by: str = "relevance"
+    skills_boost: float = 1.0
+    experience_boost: float = 1.0
+    education_boost: float = 1.0
+    location_boost: float = 1.0
 
 
 @dataclass
@@ -481,17 +489,21 @@ class ElasticsearchService:
                 must_clauses.append(parsed_query["query"])
                 logger.debug(f"Parsed boolean query: {query.query_string}")
             else:
-                # Empty query or None - use simple multi_match
+                # Empty query or None - use simple multi_match with dynamic boost values
+                # Build fields list with boost values from configuration
+                fields = ["raw_text^2"]  # Base boost for raw text
+                if query.skills_boost > 0:
+                    fields.append(f"skills^{query.skills_boost}")
+                if query.education_boost > 0:
+                    fields.append(f"education^{query.education_boost}")
+                if query.location_boost > 0:
+                    fields.append(f"location^{query.location_boost}")
+
                 must_clauses.append(
                     {
                         "multi_match": {
                             "query": query.query_string,
-                            "fields": [
-                                "raw_text^2",  # Boost raw text
-                                "skills^3",  # Boost skills more
-                                "education",
-                                "location",
-                            ],
+                            "fields": fields,
                             "type": "best_fields",
                             "operator": "or",
                         }
