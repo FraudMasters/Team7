@@ -403,3 +403,202 @@ SUBTASK 4-2: Add search syntax auto-complete and helper ✓ COMPLETED
   * Responsive design with proper spacing and elevation
 - Committed changes: git commit a5ba17e (1 file changed, 451 insertions)
 - Updated implementation_plan.json: subtask-4-2 marked as completed
+
+=== Subtask 4-3: Create Recent Searches Component ===
+Status: ✅ COMPLETED
+Started: 2026-03-21T19:00:00
+Completed: 2026-03-21T19:15:00
+Service: frontend
+
+Files Created:
+1. frontend/src/api/searchAnalytics.ts (238 lines)
+   - SearchAnalyticsClient class with full error handling
+   - Methods: getRecentSearches(), getPopularSearches(), getZeroResultSearches()
+   - Axios-based HTTP client with response/error interceptors
+   - Proper error transformation to ApiError interface
+   - Follows savedSearches.ts pattern exactly
+   - Comprehensive JSDoc documentation
+
+2. frontend/src/components/RecentSearches.tsx (323 lines)
+   - Displays list of recent searches ordered by timestamp
+   - Click handler to re-run previous searches
+   - Relative timestamp formatting ("2 hours ago", "3 days ago")
+   - Shows: query text, filter count, result count, execution time
+   - Loading state with CircularProgress
+   - Error state with Alert component
+   - Empty state with helpful message
+   - Refresh button functionality
+   - Truncates long queries for display
+   - Material-UI components (Paper, List, ListItem, Chip, etc.)
+   - Follows SavedSearchManager.tsx pattern exactly
+   - useTranslation for i18n support
+
+Files Modified:
+1. frontend/src/types/api.ts (+63 lines)
+   - Added Search Analytics Types section
+   - SearchQueryResponse interface
+   - RecentSearchesResponse interface  
+   - PopularSearchResponse interface
+   - PopularSearchesResponse interface
+   - ZeroResultSearchResponse interface
+   - ZeroResultSearchesResponse interface
+
+2. frontend/src/pages/recruiter/SearchPage.tsx (refactored)
+   - Integrated RecentSearches component in right sidebar
+   - Added Grid2 container layout (8/4 columns on desktop)
+   - Sticky positioning for sidebar on desktop
+   - handleRecentSearchSelect callback:
+     * Applies query from recent search
+     * Applies filters (skills, min_match_score)
+     * Auto-triggers search refetch
+   - Responsive design (full-width on mobile, sidebar on desktop)
+   - Adjusted candidate card grid sizing for new layout
+
+3. implementation_plan.json
+   - Updated subtask-4-3 status to "completed"
+   - Added comprehensive notes documenting implementation
+   - Updated timestamp
+
+Implementation Details:
+- API client connects to /api/search/analytics/recent endpoint
+- Uses backend search analytics tables (SearchQuery, PopularSearch)
+- Component fetches up to 10 recent searches by default (configurable)
+- Searches are ordered by created_at descending (most recent first)
+- Timestamp formatting logic:
+  * < 1 minute: "Just now"
+  * < 60 minutes: "X minutes ago"
+  * < 24 hours: "X hours ago"
+  * < 7 days: "X days ago"
+  * >= 7 days: formatted date (e.g., "Mar 15, 2026")
+- Filter count calculated by counting non-empty filter values
+- Query truncation at 60 characters with "..." suffix
+
+Integration:
+- Added to SearchPage (/recruiter/search route)
+- Sidebar visible on desktop (lg breakpoint), full-width on mobile
+- Clicking recent search populates search form and triggers search
+- Seamless UX with existing search functionality
+
+Verification Completed:
+✅ Recent searches list appears in SearchPage sidebar
+✅ Can click recent search to re-run it (applies query + filters)
+✅ Shows timestamp of each search (relative time format)
+✅ Shows additional context: result count, filter count, execution time
+✅ Proper loading state during fetch
+✅ Error handling with user-friendly message
+✅ Empty state with helpful guidance
+✅ Refresh functionality works
+✅ Responsive layout (desktop sidebar, mobile full-width)
+✅ Clean TypeScript types with no errors
+✅ No console.log debugging statements
+✅ Follows project patterns exactly
+
+Code Quality:
+- TypeScript strict mode compliance
+- Comprehensive prop types and interfaces
+- JSDoc comments for all public APIs
+- i18n ready with useTranslation hooks
+- Material-UI theming and responsive design
+- Error boundaries and loading states
+- Clean component architecture with React hooks
+- Follows existing code patterns from SavedSearchManager
+
+Commit: git commit 69b6ac1
+- 5 files changed, 754 insertions(+), 123 deletions(-)
+- 2 new files created
+- 3 files modified
+- Clean commit message with full context
+
+Next Steps:
+- Subtask 4-4: Create popular searches widget
+- Continue with Query Builder UI phase
+
+=== Subtask 4-4: Integrate Query Builder with AdvancedSearchFilters ===
+Status: ✅ COMPLETED
+Started: 2026-03-21T19:30:00
+Completed: 2026-03-21T19:45:00
+Service: frontend
+
+Files Modified:
+1. frontend/src/components/AdvancedSearchFilters.tsx (+80 lines, -24 lines)
+   - Imported QueryBuilder component
+   - Added ToggleButtonGroup and ToggleButton to Material-UI imports
+   - Added TextFieldsIcon and VisualBuilderIcon icons
+   - Added queryMode state: 'text' | 'visual' (default: 'text')
+   - Added handleQueryBuilderChange callback to sync query from visual builder
+   - Created Query Mode Toggle UI:
+     * Toggle button group with two modes: "Text Query" and "Visual Builder"
+     * Icon-based buttons for clear visual distinction
+     * Exclusive selection (one mode at a time)
+     * Positioned above search query input area
+   - Conditional rendering based on queryMode:
+     * Text mode: Shows traditional TextField for manual query input
+     * Visual mode: Shows QueryBuilder component
+   - Both modes share searchQuery state for seamless synchronization:
+     * Text input directly updates searchQuery via onChange
+     * Visual builder updates searchQuery via onQueryChange callback
+     * Switching modes preserves query value
+     * QueryBuilder receives searchQuery as initialQuery prop
+   - Visual builder integration:
+     * onQueryChange prop connected to handleQueryBuilderChange
+     * initialQuery prop set to current searchQuery
+     * disabled prop connected to loading state
+     * Full QueryBuilder functionality available (add/remove rows, operators, fields)
+
+Implementation Details:
+- Toggle mode switch does not clear the query (preserves user input)
+- Visual builder automatically generates query string from filter rows
+- Text input allows manual editing with full syntax control
+- Both modes support Enter key to trigger search (text mode only)
+- Clear button in text mode only clears query, not other filters
+- Visual builder has its own reset button for clearing filters
+- Loading state disables both text input and visual builder
+
+User Experience:
+- Non-technical users can use visual builder to construct complex boolean queries
+- Power users can use text mode for direct query syntax input
+- Seamless switching between modes without losing query content
+- Visual representation helps users understand query structure
+- Generated query is always visible in visual builder preview
+
+Integration Points:
+- QueryBuilder component (frontend/src/components/QueryBuilder.tsx)
+- AdvancedSearchFilters component (frontend/src/components/AdvancedSearchFilters.tsx)
+- CandidateSearch page (frontend/src/pages/CandidateSearch.tsx) - uses AdvancedSearchFilters
+
+Verification Completed:
+✅ Toggle between text query and visual builder modes works
+✅ Query builder updates text input (via shared state)
+✅ Text input updates work (direct state management)
+✅ Both modes work seamlessly without conflicts
+✅ Switching modes preserves query value
+✅ Visual builder generates correct query syntax
+✅ Text input allows manual query editing
+✅ Loading state disables both modes appropriately
+✅ No console.log debugging statements
+✅ Follows QueryBuilder and AdvancedSearchFilters patterns
+
+Code Quality:
+- TypeScript strict mode compliance
+- Proper state management with React hooks
+- Clean conditional rendering with React fragments
+- Material-UI components used consistently
+- i18n ready with useTranslation hooks
+- Comprehensive JSDoc comments maintained
+- Follows existing component patterns
+- Clean separation of concerns (query mode vs. filter state)
+
+Commit: git commit 7ec0efc
+- 1 file changed, 80 insertions(+), 24 deletions(-)
+- Clean commit message with full context
+- Co-authored by Claude
+
+Phase 4 (Query Builder UI) Status: COMPLETE ✓
+- All 4 subtasks completed successfully:
+  * subtask-4-1: Visual query builder component ✓
+  * subtask-4-2: Search syntax auto-complete ✓
+  * subtask-4-3: Recent searches component ✓
+  * subtask-4-4: Query builder integration ✓
+
+Next: Phase 5 (Search Analytics Dashboard) - Analytics UI implementation
+
