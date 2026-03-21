@@ -20,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from models.audit_log import AuditLog, AuditActionType
 from models.report import Report, ScheduledReport
 from services.report_template_service import (
     ReportConfig,
@@ -786,6 +787,43 @@ async def export_report_pdf(
         pdf_bytes = result.report_bytes
         filename = result.filename or f"report_{request.report_id}.pdf"
 
+        # Create audit log entry for the export
+        try:
+            # Extract organization_id and user_id from report data if available
+            organization_id = request.data.get("organization_id")
+            user_id = request.data.get("user_id") or request.data.get("created_by")
+
+            # Convert string IDs to UUID if present
+            org_uuid = UUID(organization_id) if organization_id else None
+            user_uuid = UUID(user_id) if user_id else None
+            report_uuid = None
+            try:
+                report_uuid = UUID(request.report_id)
+            except (ValueError, AttributeError):
+                pass
+
+            audit_log = AuditLog(
+                action_type=AuditActionType.REPORT_GENERATED,
+                entity_type="report",
+                entity_id=report_uuid,
+                user_id=user_uuid,
+                organization_id=org_uuid,
+                action_data={
+                    "export_format": "pdf",
+                    "page_format": request.format or "A4",
+                    "report_title": title,
+                    "metrics": metrics,
+                    "file_size": result.file_size,
+                    "filename": filename,
+                },
+            )
+            db.add(audit_log)
+            await db.commit()
+            logger.info(f"Audit log created for PDF export of report: {request.report_id}")
+        except Exception as audit_error:
+            logger.error(f"Failed to create audit log for PDF export: {audit_error}", exc_info=True)
+            # Don't fail the export if audit logging fails
+
         return StreamingResponse(
             io.BytesIO(pdf_bytes),
             media_type=result.content_type,
@@ -880,6 +918,38 @@ async def export_report_csv(
             )
 
         logger.info(f"CSV generated successfully for metrics: {request.metrics}")
+
+        # Create audit log entry for the export
+        try:
+            # Extract organization_id from filters if available
+            filters = request.filters or {}
+            organization_id = filters.get("organization_id")
+            user_id = filters.get("user_id")
+
+            # Convert string IDs to UUID if present
+            org_uuid = UUID(organization_id) if organization_id else None
+            user_uuid = UUID(user_id) if user_id else None
+
+            audit_log = AuditLog(
+                action_type=AuditActionType.DATA_EXPORTED,
+                entity_type="analytics",
+                entity_id=None,
+                user_id=user_uuid,
+                organization_id=org_uuid,
+                action_data={
+                    "export_format": "csv",
+                    "metrics": request.metrics,
+                    "filters": filters,
+                    "file_size": len(result.content),
+                    "filename": "analytics_export.csv",
+                },
+            )
+            db.add(audit_log)
+            await db.commit()
+            logger.info(f"Audit log created for CSV export of metrics: {request.metrics}")
+        except Exception as audit_error:
+            logger.error(f"Failed to create audit log for CSV export: {audit_error}", exc_info=True)
+            # Don't fail the export if audit logging fails
 
         # Return as downloadable CSV file
         return StreamingResponse(
