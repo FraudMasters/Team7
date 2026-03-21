@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { candidatesClient, vacanciesClient, analyticsClient, apiClient } from '../api';
 
 export interface Candidate {
   id: string;
@@ -103,7 +103,7 @@ export function useCandidates(params?: { stage?: string; vacancy_id?: string }) 
   return useQuery({
     queryKey: ['candidates', params],
     queryFn: async () => {
-      const response = await apiClient.get<{ candidates: Candidate[] }>('/candidates', { params });
+      const response = await candidatesClient.get<{ candidates: Candidate[] }>('/candidates', { params });
       return response.data;
     },
   });
@@ -113,7 +113,7 @@ export function useCandidateStages() {
   return useQuery({
     queryKey: ['candidate-stages'],
     queryFn: async () => {
-      const response = await apiClient.get('/candidates/stages');
+      const response = await candidatesClient.get('/candidates/stages');
       return response.data;
     },
   });
@@ -123,7 +123,7 @@ export function useUpdateCandidateStage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ candidateId, stage }: { candidateId: string; stage: string }) => {
-      const response = await apiClient.put(`/candidates/${candidateId}/stage`, { stage });
+      const response = await candidatesClient.put(`/candidates/${candidateId}/stage`, { stage });
       return response.data;
     },
     onSuccess: () => {
@@ -136,7 +136,7 @@ export function useRecruiterVacancies() {
   return useQuery({
     queryKey: ['recruiter-vacancies'],
     queryFn: async () => {
-      const response = await apiClient.get('/vacancies');
+      const response = await vacanciesClient.get('/vacancies');
       return response.data;
     },
   });
@@ -146,7 +146,7 @@ export function useRecruiterAnalytics() {
   return useQuery({
     queryKey: ['recruiter-analytics'],
     queryFn: async () => {
-      const response = await apiClient.get<AnalyticsMetrics>('/analytics/key-metrics');
+      const response = await analyticsClient.get<AnalyticsMetrics>('/analytics/key-metrics');
       return response.data;
     },
   });
