@@ -16,6 +16,7 @@ import {
   ToggleButtonGroup,
   Divider,
   Chip,
+  Snackbar,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -30,6 +31,8 @@ import FeatureImportanceChart from '@components/confidence/FeatureImportanceChar
 import UncertaintyIndicator from '@components/confidence/UncertaintyIndicator';
 import AIHumanComparison from '@components/confidence/AIHumanComparison';
 import ConfidenceReportExport from '@components/confidence/ConfidenceReportExport';
+import { useTransparencyRealTime } from '@/hooks';
+import type { TransparencyUpdateType } from '@/types/api';
 
 /**
  * Date range preset type
@@ -61,6 +64,13 @@ const getDateDaysAgo = (days: number): string => {
  * - Model transparency metrics
  * - Decision explainability
  * - Trust and accountability insights
+ * - Real-time updates via WebSocket
+ *
+ * Features:
+ * - Live connection status indicator
+ * - Automatic dashboard updates when new rankings are created
+ * - Update notifications via snackbar
+ * - Date range filtering
  *
  * @example
  * ```tsx
@@ -77,6 +87,45 @@ const TransparencyDashboard: React.FC = () => {
   // Loading and error states
   const [globalLoading, setGlobalLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+
+  // WebSocket update notification states
+  const [showUpdateSnackbar, setShowUpdateSnackbar] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
+
+  /**
+   * Handle transparency updates from WebSocket
+   */
+  const handleTransparencyUpdate = useCallback((updateType: TransparencyUpdateType) => {
+    // Show notification for update
+    const updateTypeLabels: Record<TransparencyUpdateType, string> = {
+      confidence_scores: 'Confidence Scores',
+      model_accuracy: 'Model Accuracy',
+      feature_importance: 'Feature Importance',
+      ai_human_comparison: 'AI vs Human Comparison',
+      ranking_created: 'New Ranking',
+    };
+
+    setUpdateMessage(`${updateTypeLabels[updateType] || updateType} updated`);
+    setShowUpdateSnackbar(true);
+  }, []);
+
+  /**
+   * WebSocket real-time connection for transparency updates
+   */
+  const {
+    isConnected,
+    isConnecting,
+    connectionError,
+    lastUpdate,
+    refreshKey,
+  } = useTransparencyRealTime({
+    onUpdate: handleTransparencyUpdate,
+    onError: (error) => {
+      // Silently handle connection errors - not critical for dashboard
+    },
+    autoReconnect: true,
+    maxReconnectAttempts: 10,
+  });
 
   /**
    * Calculate date range values based on selected preset
@@ -111,13 +160,6 @@ const TransparencyDashboard: React.FC = () => {
   };
 
   /**
-   * Toggle auto-refresh
-   */
-  const toggleAutoRefresh = () => {
-    setAutoRefreshEnabled((prev) => !prev);
-  };
-
-  /**
    * Handle manual refresh
    */
   const handleRefresh = () => {
@@ -144,13 +186,34 @@ const TransparencyDashboard: React.FC = () => {
               Monitor AI confidence scores, model transparency, and decision explainability
             </Typography>
           </Box>
+          {/* WebSocket Connection Status Indicator */}
           <Chip
             size="small"
-            label={autoRefreshEnabled ? 'Auto-refresh: ON' : 'Auto-refresh: OFF'}
-            color={autoRefreshEnabled ? 'success' : 'default'}
-            variant={autoRefreshEnabled ? 'filled' : 'outlined'}
-            onClick={toggleAutoRefresh}
-            sx={{ cursor: 'pointer' }}
+            label={isConnecting ? 'Connecting...' : isConnected ? 'Live' : 'Offline'}
+            color={isConnected ? 'success' : isConnecting ? 'warning' : 'default'}
+            variant={isConnected ? 'filled' : 'outlined'}
+            icon={
+              <Box
+                component="span"
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: isConnected ? 'success.main' : isConnecting ? 'warning.main' : 'text.disabled',
+                  animation: isConnecting ? 'pulse 1.5s infinite' : 'none',
+                  '@keyframes pulse': {
+                    '0%': { opacity: 1 },
+                    '50%': { opacity: 0.4 },
+                    '100%': { opacity: 1 },
+                  },
+                }}
+              />
+            }
+            sx={{
+              '& .MuiChip-icon': {
+                ml: 0.5,
+              },
+            }}
           />
           <Button
             variant="outlined"
@@ -360,6 +423,15 @@ const TransparencyDashboard: React.FC = () => {
           </Grid>
         </Grid>
       )}
+
+      {/* WebSocket Update Notification */}
+      <Snackbar
+        open={showUpdateSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setShowUpdateSnackbar(false)}
+        message={updateMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      />
     </Container>
   );
 };

@@ -63,3 +63,9 @@ export {
   type UseAnalyticsRealTimeOptions,
   type UseAnalyticsRealTimeReturn,
 } from './useAnalyticsRealTime';
+
+export {
+  useTransparencyRealTime,
+  type UseTransparencyRealTimeOptions,
+  type UseTransparencyRealTimeReturn,
+} from './useTransparencyRealTime';

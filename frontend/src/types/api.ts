@@ -3326,6 +3326,34 @@ export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
   data: AnalyticsUpdateData;
 }
 
+/**
+ * Transparency update message type
+ */
+export type TransparencyUpdateType =
+  | 'confidence_scores'
+  | 'model_accuracy'
+  | 'feature_importance'
+  | 'ai_human_comparison'
+  | 'ranking_created';
+
+/**
+ * Transparency update data sent via WebSocket
+ */
+export interface TransparencyUpdateData {
+  update_type: TransparencyUpdateType;
+  computed_at: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * WebSocket transparency update message
+ */
+export interface WebSocketTransparencyUpdateMessage extends WebSocketMessage {
+  type: 'transparency_update';
+  update_type: TransparencyUpdateType;
+  data: TransparencyUpdateData;
+}
+
 // ==================== Parsing Correction Types ====================
 
 // Re-export types from parsingCorrection module for centralized access
