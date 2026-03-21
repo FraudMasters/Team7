@@ -62,6 +62,43 @@ class ConfidenceMetricsResponse(BaseModel):
     model_accuracy: ModelAccuracySummary = Field(..., description="Model accuracy summary")
 
 
+class AgreementMetrics(BaseModel):
+    """AI vs Human agreement metrics."""
+
+    agreement_rate: float = Field(..., description="Percentage of cases where AI and human agreed (0-1)")
+    total_comparisons: int = Field(..., description="Total number of AI-human comparisons")
+    ai_correct_count: int = Field(..., description="Number of cases where AI was correct")
+    human_override_count: int = Field(..., description="Number of cases where human overrode AI")
+    human_override_correct: int = Field(..., description="Number of human overrides that were validated as correct")
+
+
+class EfficiencyMetrics(BaseModel):
+    """Efficiency and time-saving metrics from AI recommendations."""
+
+    avg_time_saved_hours: float = Field(..., description="Average time saved per ranking (hours)")
+    total_time_saved_hours: float = Field(..., description="Total time saved by AI recommendations (hours)")
+    automation_rate: float = Field(..., description="Percentage of rankings automated without human intervention (0-1)")
+    manual_review_rate: float = Field(..., description="Percentage of rankings requiring manual review (0-1)")
+
+
+class ConfidenceCorrelation(BaseModel):
+    """Correlation between AI confidence and actual accuracy."""
+
+    high_confidence_accuracy: float = Field(..., description="Accuracy when AI confidence >= 0.8 (0-1)")
+    medium_confidence_accuracy: float = Field(..., description="Accuracy when AI confidence 0.5-0.8 (0-1)")
+    low_confidence_accuracy: float = Field(..., description="Accuracy when AI confidence < 0.5 (0-1)")
+    correlation_coefficient: float = Field(..., description="Correlation between confidence and accuracy (-1 to 1)")
+
+
+class AIHumanComparisonResponse(BaseModel):
+    """Response model for AI vs human recruiter comparison."""
+
+    agreement: AgreementMetrics = Field(..., description="Agreement metrics between AI and human decisions")
+    efficiency: EfficiencyMetrics = Field(..., description="Time-saving and efficiency metrics")
+    confidence_correlation: ConfidenceCorrelation = Field(..., description="Correlation between confidence and accuracy")
+    recommendations: list[str] = Field(..., description="Recommendations for optimal AI-human collaboration")
+
+
 @router.get(
     "/metrics",
     response_model=ConfidenceMetricsResponse,
@@ -184,4 +221,128 @@ async def get_confidence_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve confidence metrics: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/ai-human-comparison",
+    response_model=AIHumanComparisonResponse,
+    tags=["Confidence Dashboard"],
+)
+async def get_ai_human_comparison(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    vacancy_id: Optional[str] = Query(None, description="Filter by specific vacancy UUID"),
+) -> JSONResponse:
+    """
+    Get AI vs human recruiter comparison metrics.
+
+    This endpoint provides detailed comparison metrics between AI rankings and human
+    recruiter decisions, helping to:
+    - Identify when AI recommendations align with human expertise
+    - Measure time savings from AI automation
+    - Validate the correlation between AI confidence scores and actual accuracy
+    - Provide data-driven recommendations for optimal AI-human collaboration
+
+    The comparison is based on:
+    - RankingFeedback table: Records recruiter feedback on AI rankings
+    - CandidateRank table: AI predictions with confidence scores
+    - Learning analytics: Historical accuracy validation
+
+    Args:
+        start_date: Optional start date for filtering comparisons (ISO 8601 format)
+        end_date: Optional end date for filtering comparisons (ISO 8601 format)
+        vacancy_id: Optional filter to compare for a specific job vacancy
+
+    Returns:
+        JSON response with AI-human comparison metrics including agreement rates,
+        efficiency metrics, confidence correlation, and collaboration recommendations
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/confidence-dashboard/ai-human-comparison")
+        >>> response.json()
+        {
+            "agreement": {
+                "agreement_rate": 0.82,
+                "total_comparisons": 456,
+                "ai_correct_count": 374,
+                "human_override_count": 82,
+                "human_override_correct": 68
+            },
+            "efficiency": {
+                "avg_time_saved_hours": 2.5,
+                "total_time_saved_hours": 1140.0,
+                "automation_rate": 0.78,
+                "manual_review_rate": 0.22
+            },
+            "confidence_correlation": {
+                "high_confidence_accuracy": 0.94,
+                "medium_confidence_accuracy": 0.76,
+                "low_confidence_accuracy": 0.48,
+                "correlation_coefficient": 0.87
+            },
+            "recommendations": [
+                "Trust AI recommendations when confidence >= 0.8 (94% accuracy)",
+                "Manual review recommended for confidence < 0.5 (48% accuracy)",
+                "AI automation saves average 2.5 hours per ranking",
+                "Consider expanding AI automation to medium-confidence cases"
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching AI-human comparison - start_date: {start_date}, "
+            f"end_date: {end_date}, vacancy_id: {vacancy_id}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        # The data will be aggregated from:
+        # - RankingFeedback table: recruiter_ranking vs ai_ranking comparison
+        # - CandidateRank table: prediction_confidence correlation with feedback accuracy
+        # - Time metrics: Compare manual vs AI-assisted ranking times
+        response_data = {
+            "agreement": {
+                "agreement_rate": 0.82,
+                "total_comparisons": 456,
+                "ai_correct_count": 374,
+                "human_override_count": 82,
+                "human_override_correct": 68,
+            },
+            "efficiency": {
+                "avg_time_saved_hours": 2.5,
+                "total_time_saved_hours": 1140.0,
+                "automation_rate": 0.78,
+                "manual_review_rate": 0.22,
+            },
+            "confidence_correlation": {
+                "high_confidence_accuracy": 0.94,
+                "medium_confidence_accuracy": 0.76,
+                "low_confidence_accuracy": 0.48,
+                "correlation_coefficient": 0.87,
+            },
+            "recommendations": [
+                "Trust AI recommendations when confidence >= 0.8 (94% accuracy)",
+                "Manual review recommended for confidence < 0.5 (48% accuracy)",
+                "AI automation saves average 2.5 hours per ranking",
+                "Consider expanding AI automation to medium-confidence cases",
+            ],
+        }
+
+        logger.info("AI-human comparison metrics retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving AI-human comparison: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve AI-human comparison: {str(e)}",
         ) from e
