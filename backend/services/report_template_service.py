@@ -1798,18 +1798,958 @@ class ReportTemplateService:
 
         Returns:
             ReportGenerationResult with generated report or error
-
-        Note:
-            This is a placeholder implementation. The actual report generation
-            logic will be implemented in subsequent subtasks.
         """
-        logger.info("Generating custom analytics report (placeholder)")
+        try:
+            logger.info(f"Generating custom analytics report in {config.output_format} format")
 
-        # Placeholder implementation
-        # This will be fully implemented in subtask-2-5
+            # Collect data if not provided
+            if data is None:
+                data = await self._collect_custom_analytics_data(config)
+
+            # Generate report based on output format
+            if config.output_format == self.FORMAT_PDF:
+                result = await self._generate_custom_analytics_pdf(config, data)
+            elif config.output_format == self.FORMAT_EXCEL:
+                result = await self._generate_custom_analytics_excel(config, data)
+            elif config.output_format == self.FORMAT_CSV:
+                result = await self._generate_custom_analytics_csv(config, data)
+            else:
+                return ReportGenerationResult(
+                    success=False,
+                    error_message=f"Unsupported output format: {config.output_format}",
+                )
+
+            # Add report type and generation timestamp
+            result.report_type = self.REPORT_TYPE_CUSTOM_ANALYTICS
+            result.generated_at = datetime.utcnow().isoformat() + "Z"
+
+            logger.info(f"Custom analytics report generated successfully: {result.filename}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error generating custom analytics report: {e}", exc_info=True)
+            return ReportGenerationResult(
+                success=False,
+                error_message=f"Failed to generate custom analytics report: {str(e)}",
+            )
+
+    async def _collect_custom_analytics_data(
+        self, config: ReportConfig
+    ) -> Dict[str, Any]:
+        """
+        Collect data for custom analytics report from database.
+
+        This method aggregates data based on user-selected metrics:
+        - Candidate counts and distributions
+        - Hiring stage metrics
+        - Time to hire statistics
+        - Conversion rates
+        - Skills and experience distributions
+        - Source/channel metrics
+
+        Args:
+            config: Report configuration with metrics, filters, and date_range
+
+        Returns:
+            Dictionary with aggregated custom analytics data
+
+        Raises:
+            ValueError: If required configuration is missing
+        """
+        from backend.models.resume import Resume
+        from backend.models.hiring_stage import HiringStage, HiringStageName
+        from backend.models.parsed_resume import ParsedResume
+        from sqlalchemy import func, and_
+
+        # Initialize data structure
+        analytics_data: Dict[str, Any] = {
+            "metrics": config.metrics or [],
+            "filters": config.filters,
+            "date_range": config.date_range,
+            "organization_id": config.organization_id,
+            "total_candidates": 0,
+            "summary_statistics": {},
+            "metric_data": {},
+        }
+
+        # Build base query conditions
+        conditions = []
+
+        # Organization filter
+        if config.organization_id:
+            conditions.append(Resume.organization_id == config.organization_id)
+
+        # Date range filter
+        if config.date_range:
+            if config.date_range.get("start"):
+                start_date = datetime.fromisoformat(config.date_range["start"].replace("Z", "+00:00"))
+                conditions.append(Resume.created_at >= start_date)
+            if config.date_range.get("end"):
+                end_date = datetime.fromisoformat(config.date_range["end"].replace("Z", "+00:00"))
+                conditions.append(Resume.created_at <= end_date)
+
+        # Additional custom filters
+        if config.filters:
+            # Status filter
+            if config.filters.get("status"):
+                conditions.append(Resume.status == config.filters["status"])
+
+            # Vacancy filter
+            if config.filters.get("vacancy_id"):
+                # Will be joined with HiringStage later
+                pass
+
+        # Collect total candidates
+        total_query = select(func.count(Resume.id))
+        if conditions:
+            total_query = total_query.where(and_(*conditions))
+
+        total_result = await self.db.execute(total_query)
+        analytics_data["total_candidates"] = total_result.scalar() or 0
+
+        # Collect metric-specific data based on requested metrics
+        metrics = config.metrics if config.metrics else [
+            "candidates_by_stage",
+            "candidates_by_status",
+            "time_to_hire",
+            "conversion_rates",
+            "skills_distribution",
+        ]
+
+        # Metric: Candidates by stage
+        if "candidates_by_stage" in metrics:
+            stage_query = select(
+                HiringStage.stage_name,
+                func.count(HiringStage.id).label("count")
+            ).select_from(HiringStage)
+
+            if conditions:
+                stage_query = stage_query.join(Resume, HiringStage.resume_id == Resume.id).where(and_(*conditions))
+
+            if config.filters.get("vacancy_id"):
+                stage_query = stage_query.where(HiringStage.vacancy_id == config.filters["vacancy_id"])
+
+            stage_query = stage_query.group_by(HiringStage.stage_name)
+
+            stage_result = await self.db.execute(stage_query)
+            stage_data = stage_result.all()
+
+            stage_breakdown = {}
+            for row in stage_data:
+                stage_name = row[0].value if hasattr(row[0], "value") else str(row[0])
+                count = int(row[1])
+                stage_breakdown[stage_name] = {
+                    "count": count,
+                    "percentage": round((count / analytics_data["total_candidates"] * 100), 2) if analytics_data["total_candidates"] > 0 else 0,
+                }
+
+            analytics_data["metric_data"]["candidates_by_stage"] = stage_breakdown
+
+        # Metric: Candidates by status
+        if "candidates_by_status" in metrics:
+            status_query = select(
+                Resume.status,
+                func.count(Resume.id).label("count")
+            ).group_by(Resume.status)
+
+            if conditions:
+                status_query = status_query.where(and_(*conditions))
+
+            status_result = await self.db.execute(status_query)
+            status_data = status_result.all()
+
+            status_breakdown = {}
+            for row in status_data:
+                status = row[0].value if hasattr(row[0], "value") else str(row[0]) if row[0] else "unknown"
+                count = int(row[1])
+                status_breakdown[status] = {
+                    "count": count,
+                    "percentage": round((count / analytics_data["total_candidates"] * 100), 2) if analytics_data["total_candidates"] > 0 else 0,
+                }
+
+            analytics_data["metric_data"]["candidates_by_status"] = status_breakdown
+
+        # Metric: Time to hire
+        if "time_to_hire" in metrics:
+            time_query = select(
+                func.avg(
+                    func.extract(
+                        "epoch",
+                        func.coalesce(HiringStage.updated_at, HiringStage.created_at)
+                        - HiringStage.queue_entered_at
+                    )
+                ).label("avg_time_seconds"),
+                func.min(
+                    func.extract(
+                        "epoch",
+                        func.coalesce(HiringStage.updated_at, HiringStage.created_at)
+                        - HiringStage.queue_entered_at
+                    )
+                ).label("min_time_seconds"),
+                func.max(
+                    func.extract(
+                        "epoch",
+                        func.coalesce(HiringStage.updated_at, HiringStage.created_at)
+                        - HiringStage.queue_entered_at
+                    )
+                ).label("max_time_seconds"),
+            ).select_from(HiringStage)
+
+            if conditions:
+                time_query = time_query.join(Resume, HiringStage.resume_id == Resume.id).where(and_(*conditions))
+
+            if config.filters.get("vacancy_id"):
+                time_query = time_query.where(HiringStage.vacancy_id == config.filters["vacancy_id"])
+
+            time_result = await self.db.execute(time_query)
+            time_data = time_result.one_or_none()
+
+            if time_data:
+                avg_time_seconds = float(time_data[0]) if time_data[0] else 0
+                min_time_seconds = float(time_data[1]) if time_data[1] else 0
+                max_time_seconds = float(time_data[2]) if time_data[2] else 0
+
+                analytics_data["metric_data"]["time_to_hire"] = {
+                    "avg_time_seconds": avg_time_seconds,
+                    "avg_time_days": avg_time_seconds / 86400 if avg_time_seconds else 0,
+                    "avg_time_formatted": self._format_time_duration(avg_time_seconds),
+                    "min_time_seconds": min_time_seconds,
+                    "min_time_days": min_time_seconds / 86400 if min_time_seconds else 0,
+                    "min_time_formatted": self._format_time_duration(min_time_seconds),
+                    "max_time_seconds": max_time_seconds,
+                    "max_time_days": max_time_seconds / 86400 if max_time_seconds else 0,
+                    "max_time_formatted": self._format_time_duration(max_time_seconds),
+                }
+            else:
+                analytics_data["metric_data"]["time_to_hire"] = {
+                    "avg_time_seconds": 0,
+                    "avg_time_days": 0,
+                    "avg_time_formatted": "N/A",
+                    "min_time_seconds": 0,
+                    "min_time_days": 0,
+                    "min_time_formatted": "N/A",
+                    "max_time_seconds": 0,
+                    "max_time_days": 0,
+                    "max_time_formatted": "N/A",
+                }
+
+        # Metric: Conversion rates
+        if "conversion_rates" in metrics:
+            # Collect stage counts for conversion calculation
+            stage_query = select(
+                HiringStage.stage_name,
+                func.count(HiringStage.id).label("count")
+            ).select_from(HiringStage)
+
+            if conditions:
+                stage_query = stage_query.join(Resume, HiringStage.resume_id == Resume.id).where(and_(*conditions))
+
+            if config.filters.get("vacancy_id"):
+                stage_query = stage_query.where(HiringStage.vacancy_id == config.filters["vacancy_id"])
+
+            stage_query = stage_query.group_by(HiringStage.stage_name)
+
+            stage_result = await self.db.execute(stage_query)
+            stage_data = stage_result.all()
+
+            stage_counts = {}
+            for row in stage_data:
+                stage_name = row[0].value if hasattr(row[0], "value") else str(row[0])
+                stage_counts[stage_name] = int(row[1])
+
+            # Calculate conversion rates
+            conversion_rates = self._calculate_conversion_rates(stage_counts)
+            analytics_data["metric_data"]["conversion_rates"] = conversion_rates
+
+        # Metric: Skills distribution
+        if "skills_distribution" in metrics:
+            skills_query = select(
+                ParsedResume.skills,
+                func.count(ParsedResume.id).label("count")
+            ).select_from(ParsedResume)
+
+            if conditions:
+                skills_query = skills_query.join(Resume, ParsedResume.resume_id == Resume.id).where(and_(*conditions))
+
+            skills_query = skills_query.where(ParsedResume.skills.isnot(None))
+
+            skills_result = await self.db.execute(skills_query)
+            skills_data = skills_result.all()
+
+            # Aggregate skills
+            skills_count = {}
+            for row in skills_data:
+                skills_list = row[0] if isinstance(row[0], list) else []
+                for skill in skills_list:
+                    if skill:
+                        skill = str(skill).strip()
+                        skills_count[skill] = skills_count.get(skill, 0) + 1
+
+            # Sort by count and take top 20
+            top_skills = sorted(skills_count.items(), key=lambda x: x[1], reverse=True)[:20]
+
+            analytics_data["metric_data"]["skills_distribution"] = {
+                skill: {
+                    "count": count,
+                    "percentage": round((count / analytics_data["total_candidates"] * 100), 2) if analytics_data["total_candidates"] > 0 else 0,
+                }
+                for skill, count in top_skills
+            }
+
+        # Calculate summary statistics
+        analytics_data["summary_statistics"] = {
+            "total_candidates": analytics_data["total_candidates"],
+            "total_metrics": len(metrics),
+            "report_generated_at": datetime.utcnow().isoformat() + "Z",
+        }
+
+        logger.info(
+            f"Collected custom analytics data: {analytics_data['total_candidates']} candidates, "
+            f"{len(metrics)} metrics"
+        )
+
+        return analytics_data
+
+    async def _generate_custom_analytics_pdf(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate custom analytics report in PDF format.
+
+        Args:
+            config: Report configuration
+            data: Collected custom analytics data
+
+        Returns:
+            ReportGenerationResult with PDF bytes
+        """
+        if not self._reportlab_available:
+            return ReportGenerationResult(
+                success=False,
+                error_message="PDF generation requires reportlab library",
+            )
+
+        from reportlab.lib.pagesizes import A4, letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+        # Create PDF buffer
+        buffer = io.BytesIO()
+
+        # Determine page size
+        pagesize = letter if config.page_format == self.PAGE_FORMAT_LETTER else A4
+
+        # Create document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=pagesize,
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=1.0 * inch,
+            bottomMargin=0.75 * inch,
+        )
+
+        # Container for PDF elements
+        story = []
+
+        # Get styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=24,
+            textColor=colors.HexColor("#2c3e50"),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+        )
+        heading_style = ParagraphStyle(
+            "CustomHeading",
+            parent=styles["Heading2"],
+            fontSize=16,
+            textColor=colors.HexColor("#34495e"),
+            spaceAfter=12,
+            spaceBefore=12,
+        )
+        normal_style = styles["Normal"]
+
+        # Title
+        title = config.title or "Custom Analytics Report"
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Summary section
+        story.append(Paragraph("Summary Statistics", heading_style))
+
+        summary_data = [
+            ["Metric", "Value"],
+            ["Total Candidates", str(data["total_candidates"])],
+            ["Metrics Analyzed", str(len(data["metrics"]))],
+            ["Report Generated", data["summary_statistics"]["report_generated_at"]],
+        ]
+
+        if data.get("date_range"):
+            summary_data.append(["Date Range Start", data["date_range"].get("start", "N/A")])
+            summary_data.append(["Date Range End", data["date_range"].get("end", "N/A")])
+
+        if data.get("organization_id"):
+            summary_data.append(["Organization ID", data["organization_id"]])
+
+        summary_table = Table(summary_data, colWidths=[3 * inch, 4 * inch])
+        summary_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+            ("GRID", (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 0.3 * inch))
+
+        # Metric-specific sections
+        metric_data = data.get("metric_data", {})
+
+        # Candidates by stage
+        if "candidates_by_stage" in metric_data:
+            story.append(Paragraph("Candidates by Hiring Stage", heading_style))
+
+            stage_data = metric_data["candidates_by_stage"]
+            table_data = [["Stage", "Count", "Percentage"]]
+
+            for stage, values in sorted(stage_data.items()):
+                table_data.append([
+                    stage.upper(),
+                    str(values["count"]),
+                    f"{values['percentage']}%",
+                ])
+
+            stage_table = Table(table_data, colWidths=[3 * inch, 2 * inch, 2 * inch])
+            stage_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(stage_table)
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Candidates by status
+        if "candidates_by_status" in metric_data:
+            story.append(Paragraph("Candidates by Status", heading_style))
+
+            status_data = metric_data["candidates_by_status"]
+            table_data = [["Status", "Count", "Percentage"]]
+
+            for status, values in sorted(status_data.items()):
+                table_data.append([
+                    status.upper(),
+                    str(values["count"]),
+                    f"{values['percentage']}%",
+                ])
+
+            status_table = Table(table_data, colWidths=[3 * inch, 2 * inch, 2 * inch])
+            status_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(status_table)
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Time to hire
+        if "time_to_hire" in metric_data:
+            story.append(Paragraph("Time to Hire Metrics", heading_style))
+
+            time_data = metric_data["time_to_hire"]
+            table_data = [
+                ["Metric", "Value"],
+                ["Average Time", time_data["avg_time_formatted"]],
+                ["Minimum Time", time_data["min_time_formatted"]],
+                ["Maximum Time", time_data["max_time_formatted"]],
+            ]
+
+            time_table = Table(table_data, colWidths=[3 * inch, 4 * inch])
+            time_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(time_table)
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Conversion rates
+        if "conversion_rates" in metric_data:
+            story.append(Paragraph("Stage Conversion Rates", heading_style))
+
+            conversion_data = metric_data["conversion_rates"]
+            table_data = [["From Stage", "To Stage", "Conversion Rate"]]
+
+            for conversion in conversion_data:
+                table_data.append([
+                    conversion["from_stage"].upper(),
+                    conversion["to_stage"].upper(),
+                    f"{round(conversion['conversion_rate'], 2)}%",
+                ])
+
+            conversion_table = Table(table_data, colWidths=[2.5 * inch, 2.5 * inch, 2 * inch])
+            conversion_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(conversion_table)
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Skills distribution
+        if "skills_distribution" in metric_data:
+            story.append(Paragraph("Top Skills Distribution", heading_style))
+
+            skills_data = metric_data["skills_distribution"]
+            table_data = [["Skill", "Count", "Percentage"]]
+
+            for skill, values in list(skills_data.items())[:15]:  # Top 15 skills for PDF
+                table_data.append([
+                    skill,
+                    str(values["count"]),
+                    f"{values['percentage']}%",
+                ])
+
+            skills_table = Table(table_data, colWidths=[3 * inch, 2 * inch, 2 * inch])
+            skills_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(skills_table)
+            story.append(Spacer(1, 0.3 * inch))
+
+        # Footer
+        footer_style = ParagraphStyle(
+            "Footer",
+            parent=normal_style,
+            fontSize=9,
+            textColor=colors.HexColor("#7f8c8d"),
+            alignment=TA_CENTER,
+        )
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        footer_text = f"Generated: {timestamp}"
+        if data.get("organization_id"):
+            footer_text += f" | Organization: {data['organization_id']}"
+        story.append(Paragraph(footer_text, footer_style))
+
+        # Build PDF
+        doc.build(story)
+
+        # Get PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_CUSTOM_ANALYTICS,
+            self.FORMAT_PDF
+        )
+
         return ReportGenerationResult(
-            success=False,
-            error_message="Custom analytics report not yet implemented",
+            success=True,
+            report_bytes=pdf_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_PDF],
+            file_size=len(pdf_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "metrics_count": len(data["metrics"]),
+                "organization_id": data.get("organization_id"),
+            },
+        )
+
+    async def _generate_custom_analytics_excel(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate custom analytics report in Excel format.
+
+        Args:
+            config: Report configuration
+            data: Collected custom analytics data
+
+        Returns:
+            ReportGenerationResult with Excel bytes
+        """
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        # Create workbook
+        wb = Workbook()
+
+        # Remove default sheet
+        wb.remove(wb.active)
+
+        # Create Summary sheet
+        ws_summary = wb.create_sheet("Summary")
+        ws_summary.append(["Custom Analytics Report"])
+        ws_summary.append([])
+        ws_summary.append(["Metric", "Value"])
+        ws_summary.append(["Total Candidates", data["total_candidates"]])
+        ws_summary.append(["Metrics Analyzed", len(data["metrics"])])
+        ws_summary.append(["Report Generated", data["summary_statistics"]["report_generated_at"]])
+
+        if data.get("date_range"):
+            ws_summary.append(["Date Range Start", data["date_range"].get("start", "N/A")])
+            ws_summary.append(["Date Range End", data["date_range"].get("end", "N/A")])
+
+        if data.get("organization_id"):
+            ws_summary.append(["Organization ID", data["organization_id"]])
+
+        # Style summary sheet
+        ws_summary["A1"].font = Font(size=16, bold=True)
+        ws_summary["A3"].font = Font(bold=True)
+        ws_summary["B3"].font = Font(bold=True)
+        ws_summary["A3"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws_summary["B3"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws_summary["A3"].font = Font(color="FFFFFF", bold=True)
+        ws_summary["B3"].font = Font(color="FFFFFF", bold=True)
+
+        # Adjust column widths
+        ws_summary.column_dimensions["A"].width = 30
+        ws_summary.column_dimensions["B"].width = 40
+
+        metric_data = data.get("metric_data", {})
+
+        # Candidates by stage sheet
+        if "candidates_by_stage" in metric_data:
+            ws_stages = wb.create_sheet("Candidates by Stage")
+            ws_stages.append(["Stage", "Count", "Percentage (%)"])
+
+            stage_data = metric_data["candidates_by_stage"]
+            for stage, values in sorted(stage_data.items()):
+                ws_stages.append([
+                    stage.upper(),
+                    values["count"],
+                    values["percentage"],
+                ])
+
+            # Style header
+            for cell in ws_stages[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(horizontal="center")
+
+            # Adjust column widths
+            ws_stages.column_dimensions["A"].width = 25
+            ws_stages.column_dimensions["B"].width = 15
+            ws_stages.column_dimensions["C"].width = 18
+
+        # Candidates by status sheet
+        if "candidates_by_status" in metric_data:
+            ws_status = wb.create_sheet("Candidates by Status")
+            ws_status.append(["Status", "Count", "Percentage (%)"])
+
+            status_data = metric_data["candidates_by_status"]
+            for status, values in sorted(status_data.items()):
+                ws_status.append([
+                    status.upper(),
+                    values["count"],
+                    values["percentage"],
+                ])
+
+            # Style header
+            for cell in ws_status[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(horizontal="center")
+
+            # Adjust column widths
+            ws_status.column_dimensions["A"].width = 25
+            ws_status.column_dimensions["B"].width = 15
+            ws_status.column_dimensions["C"].width = 18
+
+        # Time to hire sheet
+        if "time_to_hire" in metric_data:
+            ws_time = wb.create_sheet("Time to Hire")
+            ws_time.append(["Metric", "Value"])
+
+            time_data = metric_data["time_to_hire"]
+            ws_time.append(["Average Time", time_data["avg_time_formatted"]])
+            ws_time.append(["Average Time (Days)", round(time_data["avg_time_days"], 2)])
+            ws_time.append(["Minimum Time", time_data["min_time_formatted"]])
+            ws_time.append(["Minimum Time (Days)", round(time_data["min_time_days"], 2)])
+            ws_time.append(["Maximum Time", time_data["max_time_formatted"]])
+            ws_time.append(["Maximum Time (Days)", round(time_data["max_time_days"], 2)])
+
+            # Style header
+            for cell in ws_time[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+
+            # Adjust column widths
+            ws_time.column_dimensions["A"].width = 30
+            ws_time.column_dimensions["B"].width = 25
+
+        # Conversion rates sheet
+        if "conversion_rates" in metric_data:
+            ws_conversion = wb.create_sheet("Conversion Rates")
+            ws_conversion.append(["From Stage", "To Stage", "From Count", "To Count", "Conversion Rate (%)"])
+
+            conversion_data = metric_data["conversion_rates"]
+            for conversion in conversion_data:
+                ws_conversion.append([
+                    conversion["from_stage"].upper(),
+                    conversion["to_stage"].upper(),
+                    conversion["from_count"],
+                    conversion["to_count"],
+                    round(conversion["conversion_rate"], 2),
+                ])
+
+            # Style header
+            for cell in ws_conversion[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(horizontal="center")
+
+            # Adjust column widths
+            ws_conversion.column_dimensions["A"].width = 20
+            ws_conversion.column_dimensions["B"].width = 20
+            ws_conversion.column_dimensions["C"].width = 15
+            ws_conversion.column_dimensions["D"].width = 15
+            ws_conversion.column_dimensions["E"].width = 22
+
+        # Skills distribution sheet
+        if "skills_distribution" in metric_data:
+            ws_skills = wb.create_sheet("Skills Distribution")
+            ws_skills.append(["Skill", "Count", "Percentage (%)"])
+
+            skills_data = metric_data["skills_distribution"]
+            for skill, values in skills_data.items():
+                ws_skills.append([
+                    skill,
+                    values["count"],
+                    values["percentage"],
+                ])
+
+            # Style header
+            for cell in ws_skills[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(horizontal="center")
+
+            # Adjust column widths
+            ws_skills.column_dimensions["A"].width = 30
+            ws_skills.column_dimensions["B"].width = 15
+            ws_skills.column_dimensions["C"].width = 18
+
+        # Save to buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        excel_bytes = buffer.getvalue()
+        buffer.close()
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_CUSTOM_ANALYTICS,
+            self.FORMAT_EXCEL
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=excel_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_EXCEL],
+            file_size=len(excel_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "metrics_count": len(data["metrics"]),
+                "organization_id": data.get("organization_id"),
+            },
+        )
+
+    async def _generate_custom_analytics_csv(
+        self, config: ReportConfig, data: Dict[str, Any]
+    ) -> ReportGenerationResult:
+        """
+        Generate custom analytics report in CSV format.
+
+        Args:
+            config: Report configuration
+            data: Collected custom analytics data
+
+        Returns:
+            ReportGenerationResult with CSV bytes
+        """
+        import csv
+
+        # Create CSV buffer
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+
+        # Write header
+        writer.writerow(["Custom Analytics Report"])
+        writer.writerow([])
+
+        # Write summary section
+        writer.writerow(["Summary"])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Candidates", data["total_candidates"]])
+        writer.writerow(["Metrics Analyzed", len(data["metrics"])])
+        writer.writerow(["Report Generated", data["summary_statistics"]["report_generated_at"]])
+
+        if data.get("date_range"):
+            writer.writerow(["Date Range Start", data["date_range"].get("start", "N/A")])
+            writer.writerow(["Date Range End", data["date_range"].get("end", "N/A")])
+
+        if data.get("organization_id"):
+            writer.writerow(["Organization ID", data["organization_id"]])
+
+        writer.writerow([])
+        writer.writerow([])
+
+        metric_data = data.get("metric_data", {})
+
+        # Candidates by stage
+        if "candidates_by_stage" in metric_data:
+            writer.writerow(["Candidates by Hiring Stage"])
+            writer.writerow(["Stage", "Count", "Percentage (%)"])
+
+            stage_data = metric_data["candidates_by_stage"]
+            for stage, values in sorted(stage_data.items()):
+                writer.writerow([
+                    stage.upper(),
+                    values["count"],
+                    values["percentage"],
+                ])
+
+            writer.writerow([])
+            writer.writerow([])
+
+        # Candidates by status
+        if "candidates_by_status" in metric_data:
+            writer.writerow(["Candidates by Status"])
+            writer.writerow(["Status", "Count", "Percentage (%)"])
+
+            status_data = metric_data["candidates_by_status"]
+            for status, values in sorted(status_data.items()):
+                writer.writerow([
+                    status.upper(),
+                    values["count"],
+                    values["percentage"],
+                ])
+
+            writer.writerow([])
+            writer.writerow([])
+
+        # Time to hire
+        if "time_to_hire" in metric_data:
+            writer.writerow(["Time to Hire Metrics"])
+            writer.writerow(["Metric", "Value"])
+
+            time_data = metric_data["time_to_hire"]
+            writer.writerow(["Average Time", time_data["avg_time_formatted"]])
+            writer.writerow(["Average Time (Days)", round(time_data["avg_time_days"], 2)])
+            writer.writerow(["Minimum Time", time_data["min_time_formatted"]])
+            writer.writerow(["Minimum Time (Days)", round(time_data["min_time_days"], 2)])
+            writer.writerow(["Maximum Time", time_data["max_time_formatted"]])
+            writer.writerow(["Maximum Time (Days)", round(time_data["max_time_days"], 2)])
+
+            writer.writerow([])
+            writer.writerow([])
+
+        # Conversion rates
+        if "conversion_rates" in metric_data:
+            writer.writerow(["Stage Conversion Rates"])
+            writer.writerow(["From Stage", "To Stage", "From Count", "To Count", "Conversion Rate (%)"])
+
+            conversion_data = metric_data["conversion_rates"]
+            for conversion in conversion_data:
+                writer.writerow([
+                    conversion["from_stage"].upper(),
+                    conversion["to_stage"].upper(),
+                    conversion["from_count"],
+                    conversion["to_count"],
+                    round(conversion["conversion_rate"], 2),
+                ])
+
+            writer.writerow([])
+            writer.writerow([])
+
+        # Skills distribution
+        if "skills_distribution" in metric_data:
+            writer.writerow(["Top Skills Distribution"])
+            writer.writerow(["Skill", "Count", "Percentage (%)"])
+
+            skills_data = metric_data["skills_distribution"]
+            for skill, values in skills_data.items():
+                writer.writerow([
+                    skill,
+                    values["count"],
+                    values["percentage"],
+                ])
+
+            writer.writerow([])
+            writer.writerow([])
+
+        # Get CSV content
+        csv_content = buffer.getvalue()
+        buffer.close()
+
+        # Convert to bytes
+        csv_bytes = csv_content.encode("utf-8")
+
+        # Generate filename
+        filename = self._generate_filename(
+            self.REPORT_TYPE_CUSTOM_ANALYTICS,
+            self.FORMAT_CSV
+        )
+
+        return ReportGenerationResult(
+            success=True,
+            report_bytes=csv_bytes,
+            filename=filename,
+            content_type=self.CONTENT_TYPES[self.FORMAT_CSV],
+            file_size=len(csv_bytes),
+            metadata={
+                "total_candidates": data["total_candidates"],
+                "metrics_count": len(data["metrics"]),
+                "organization_id": data.get("organization_id"),
+            },
         )
 
     async def _collect_eeoc_compliance_data(
