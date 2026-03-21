@@ -69,6 +69,11 @@ def generate_resume_optimization(
             - low_priority_count: Number of low-priority suggestions
             - keywords_found: List of keywords found (if check_keywords=True)
             - missing_keywords: List of recommended missing keywords
+            - completeness: Dictionary with completeness analysis including:
+                - score: Completeness score (0-100)
+                - missing_sections: List of missing section names
+                - present_sections: List of present section names
+                - suggestions: List of completeness-related suggestions
             - score: Overall optimization score (0-100)
             - error: Error message if analysis failed
 
@@ -145,6 +150,18 @@ def generate_resume_optimization(
             suggestions.extend(content_suggestions)
             logger.info(f"Content analysis completed: {len(content_suggestions)} suggestions")
 
+        # 4. Completeness analysis
+        completeness_result = _analyze_completeness(
+            resume_text,
+            resume_data
+        )
+        completeness_suggestions = completeness_result.get("suggestions", [])
+        suggestions.extend(completeness_suggestions)
+        logger.info(
+            f"Completeness analysis completed: {completeness_result.get('score', 0)}% complete, "
+            f"{len(completeness_suggestions)} suggestions"
+        )
+
         # Count by priority
         high_priority = sum(1 for s in suggestions if s.get("priority") == "high")
         medium_priority = sum(1 for s in suggestions if s.get("priority") == "medium")
@@ -171,6 +188,7 @@ def generate_resume_optimization(
             "low_priority_count": low_priority,
             "keywords_found": keywords_found if keywords_found else None,
             "missing_keywords": missing_keywords if missing_keywords else None,
+            "completeness": completeness_result,
             "score": score,
             "error": None,
         }
@@ -188,6 +206,7 @@ def generate_resume_optimization(
             "low_priority_count": 0,
             "keywords_found": None,
             "missing_keywords": None,
+            "completeness": None,
             "score": 0,
             "error": f"Optimization analysis failed: {str(e)}",
         }
@@ -588,6 +607,174 @@ def _analyze_content(
                 })
 
     return suggestions
+
+
+def _analyze_completeness(
+    resume_text: str,
+    resume_data: Optional[Dict[str, Union[str, List, Dict]]],
+) -> Dict[str, Union[int, List[str], List[Dict[str, Union[str, List[str]]]]]]:
+    """
+    Analyze resume completeness by checking for essential sections.
+
+    Args:
+        resume_text: Resume text content
+        resume_data: Optional structured resume data
+
+    Returns:
+        Dictionary containing:
+            - score: Completeness score (0-100)
+            - missing_sections: List of missing section names
+            - present_sections: List of present section names
+            - suggestions: List of completeness-related suggestions
+    """
+    suggestions = []
+    present_sections = []
+    missing_sections = []
+
+    # Define essential sections to check
+    sections_to_check = {
+        "education": {
+            "patterns": [
+                r'\beducation\b',
+                r'\bacademic\s+background\b',
+                r'\bdegree\b',
+                r'\buniversity\b',
+                r'\bcollege\b',
+                r'\bbachelor\b',
+                r'\bmaster\b',
+                r'\bphd\b',
+                r'\bdoctorate\b'
+            ],
+            "data_key": "education",
+            "priority": "high",
+            "title": "Add education section",
+            "description": "An education section is essential for most resumes. "
+                          "It shows your academic qualifications and background.",
+            "recommendation": "Add an education section with your degree(s), institution(s), and graduation date(s)",
+            "examples": [
+                "Bachelor of Science in Computer Science, XYZ University, 2020",
+                "Master of Business Administration, ABC School of Business, 2022",
+                "High School Diploma, Main Street High School, 2016"
+            ]
+        },
+        "certifications": {
+            "patterns": [
+                r'\bcertification\b',
+                r'\bcertified\b',
+                r'\blicense\b',
+                r'\bcredential\b',
+                r'\baccreditation\b'
+            ],
+            "data_key": "certifications",
+            "priority": "medium",
+            "title": "Add certifications section",
+            "description": "Certifications demonstrate your expertise and commitment to "
+                          "professional development. They can set you apart from other candidates.",
+            "recommendation": "Add a certifications section listing relevant professional credentials",
+            "examples": [
+                "AWS Certified Solutions Architect - Associate, 2023",
+                "PMP (Project Management Professional), PMI, 2022",
+                "Google Analytics Certification, 2024"
+            ]
+        },
+        "projects": {
+            "patterns": [
+                r'\bproject\b',
+                r'\bportfolio\b',
+                r'\bside\s+project\b',
+                r'\bpersonal\s+project\b',
+                r'\bopen\s+source\b'
+            ],
+            "data_key": "projects",
+            "priority": "medium",
+            "title": "Add projects section",
+            "description": "A projects section showcases your practical skills and initiative. "
+                          "It's especially valuable for demonstrating hands-on experience.",
+            "recommendation": "Add a projects section highlighting relevant work or personal projects",
+            "examples": [
+                "E-commerce Platform - Built a full-stack online store using React and Node.js",
+                "Data Analysis Dashboard - Created interactive visualizations using Python and Tableau",
+                "Mobile Weather App - Developed iOS app with real-time weather data integration"
+            ]
+        },
+        "contact": {
+            "patterns": [
+                r'\bemail\b',
+                r'\bphone\b',
+                r'\blinkedin\b',
+                r'\bgithub\b',
+                r'\bcontact\b',
+                r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b',  # Phone pattern
+                r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'  # Email pattern
+            ],
+            "data_key": "contact",
+            "priority": "high",
+            "title": "Add contact information",
+            "description": "Contact information is critical - recruiters need a way to reach you. "
+                          "Include at least email and phone number.",
+            "recommendation": "Add contact information including email, phone, and optionally LinkedIn/GitHub",
+            "examples": [
+                "Email: john.doe@email.com | Phone: (555) 123-4567",
+                "john.doe@email.com | linkedin.com/in/johndoe | github.com/johndoe",
+                "Contact: jane.smith@email.com | (555) 987-6543 | Portfolio: janesmith.com"
+            ]
+        }
+    }
+
+    text_lower = resume_text.lower()
+
+    # Check each section
+    for section_name, section_info in sections_to_check.items():
+        section_found = False
+
+        # Check in structured data first
+        if resume_data and section_info["data_key"] in resume_data:
+            data_value = resume_data[section_info["data_key"]]
+            # Check if the data is not empty
+            if data_value:
+                if isinstance(data_value, (list, dict)):
+                    section_found = bool(data_value)
+                elif isinstance(data_value, str):
+                    section_found = bool(data_value.strip())
+
+        # If not found in structured data, check in text
+        if not section_found:
+            for pattern in section_info["patterns"]:
+                if re.search(pattern, text_lower):
+                    section_found = True
+                    break
+
+        if section_found:
+            present_sections.append(section_name)
+        else:
+            missing_sections.append(section_name)
+            # Create suggestion for missing section
+            suggestions.append({
+                "type": "completeness",
+                "priority": section_info["priority"],
+                "category": "missing_section",
+                "title": section_info["title"],
+                "description": section_info["description"],
+                "current_state": f"No {section_name} section detected",
+                "recommendation": section_info["recommendation"],
+                "examples": section_info["examples"]
+            })
+
+    # Calculate completeness score (percentage of sections present)
+    total_sections = len(sections_to_check)
+    completeness_score = int((len(present_sections) / total_sections) * 100)
+
+    logger.info(
+        f"Completeness analysis: {len(present_sections)}/{total_sections} sections present "
+        f"({completeness_score}% complete)"
+    )
+
+    return {
+        "score": completeness_score,
+        "missing_sections": missing_sections,
+        "present_sections": present_sections,
+        "suggestions": suggestions,
+    }
 
 
 def _calculate_optimization_score(
