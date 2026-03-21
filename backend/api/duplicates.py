@@ -133,6 +133,182 @@ class RejectReviewResponse(BaseModel):
     message: str = Field(..., description="Success message")
 
 
+class PreUploadCheckRequest(BaseModel):
+    """Request model for pre-upload duplicate check."""
+
+    content_hash: str = Field(..., description="SHA-256 hash of the file content")
+    organization_id: str = Field(..., description="Organization ID")
+    filename: Optional[str] = Field(None, description="Original filename (optional)")
+
+
+class DuplicateMatch(BaseModel):
+    """Model for a single duplicate match."""
+
+    resume_id: str = Field(..., description="ID of the matching resume")
+    filename: str = Field(..., description="Filename of the matching resume")
+    detection_timestamp: str = Field(..., description="When the duplicate was detected")
+    status: str = Field(..., description="Resume status")
+
+
+class PreUploadCheckResponse(BaseModel):
+    """Response model for pre-upload duplicate check."""
+
+    is_duplicate: bool = Field(..., description="Whether duplicates were found")
+    duplicate_count: int = Field(..., description="Number of duplicate matches found")
+    matches: List[DuplicateMatch] = Field(default_factory=list, description="List of matching resumes")
+    message: str = Field(..., description="Response message")
+
+
+@router.post(
+    "/check",
+    response_model=PreUploadCheckResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Duplicates"],
+)
+async def check_duplicate_before_upload(
+    request: PreUploadCheckRequest,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Check for duplicate resumes before uploading.
+
+    This endpoint allows checking if a resume with the same content hash already
+    exists in the system before uploading. This prevents duplicate uploads and
+    provides information about existing matching resumes.
+
+    Args:
+        request: Pre-upload check request with content hash and organization ID
+        db: Database session
+
+    Returns:
+        JSON response indicating if duplicates exist and matching resume details
+
+    Raises:
+        HTTPException(400): If request parameters are invalid
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> import hashlib
+        >>> # Calculate SHA-256 hash of file content
+        >>> with open("resume.pdf", "rb") as f:
+        ...     content_hash = hashlib.sha256(f.read()).hexdigest()
+        >>> response = requests.post(
+        ...     "/api/duplicates/check",
+        ...     json={
+        ...         "content_hash": content_hash,
+        ...         "organization_id": "org-123",
+        ...         "filename": "john_doe_resume.pdf"
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "is_duplicate": true,
+            "duplicate_count": 2,
+            "matches": [
+                {
+                    "resume_id": "resume-uuid-1",
+                    "filename": "john_doe_resume.pdf",
+                    "detection_timestamp": "2026-03-20T15:30:00Z",
+                    "status": "completed"
+                },
+                {
+                    "resume_id": "resume-uuid-2",
+                    "filename": "john_doe_cv.pdf",
+                    "detection_timestamp": "2026-03-19T10:00:00Z",
+                    "status": "completed"
+                }
+            ],
+            "message": "Found 2 duplicate resumes"
+        }
+    """
+    try:
+        # Validate request
+        if not request.content_hash or not request.content_hash.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="content_hash is required and cannot be empty",
+            )
+
+        if not request.organization_id or not request.organization_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="organization_id is required and cannot be empty",
+            )
+
+        # Validate content_hash format (SHA-256 should be 64 hex characters)
+        if len(request.content_hash) != 64 or not all(c in '0123456789abcdefABCDEF' for c in request.content_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="content_hash must be a valid SHA-256 hash (64 hexadecimal characters)",
+            )
+
+        logger.info(
+            f"Pre-upload duplicate check - organization_id: {request.organization_id}, "
+            f"content_hash: {request.content_hash[:16]}..., filename: {request.filename}"
+        )
+
+        # Query for existing resumes with the same content hash
+        stmt = (
+            select(Resume)
+            .where(
+                Resume.organization_id == request.organization_id,
+                Resume.content_hash == request.content_hash
+            )
+            .order_by(Resume.created_at.desc())
+        )
+
+        result = await db.execute(stmt)
+        matching_resumes = result.scalars().all()
+
+        duplicate_count = len(matching_resumes)
+        is_duplicate = duplicate_count > 0
+
+        # Build list of matching resumes
+        matches = []
+        for resume in matching_resumes:
+            matches.append(
+                DuplicateMatch(
+                    resume_id=str(resume.id),
+                    filename=resume.filename,
+                    detection_timestamp=resume.created_at.isoformat(),
+                    status=resume.status.value,
+                )
+            )
+
+        # Build response message
+        if is_duplicate:
+            message = f"Found {duplicate_count} duplicate resume{'s' if duplicate_count > 1 else ''}"
+        else:
+            message = "No duplicates found"
+
+        logger.info(
+            f"Pre-upload check complete - organization_id: {request.organization_id}, "
+            f"is_duplicate: {is_duplicate}, count: {duplicate_count}"
+        )
+
+        response_data = PreUploadCheckResponse(
+            is_duplicate=is_duplicate,
+            duplicate_count=duplicate_count,
+            matches=matches,
+            message=message,
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking for duplicates: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check for duplicates: {str(e)}",
+        )
+
+
 @router.get(
     "",
     response_model=DuplicateListResponse,
