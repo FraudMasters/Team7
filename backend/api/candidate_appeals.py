@@ -7,13 +7,18 @@ documentation, while recruiters can review and take action on appeals through
 dedicated workflows. Supports multiple appeal types and status tracking.
 """
 import logging
+from datetime import datetime
 from typing import Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from database import get_db
+from models.candidate_appeal import CandidateAppeal
 from schemas.candidate_appeal import (
     AppealCreate,
     AppealResponse,
@@ -32,7 +37,10 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     tags=["Candidate Appeals"],
 )
-async def create_appeal(request: AppealCreate) -> JSONResponse:
+async def create_appeal(
+    request: AppealCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Submit a candidate appeal against a ranking decision.
 
@@ -43,6 +51,7 @@ async def create_appeal(request: AppealCreate) -> JSONResponse:
 
     Args:
         request: Appeal creation request with rank ID, email, type, and explanation
+        db: Database session
 
     Returns:
         JSON response with created appeal details
@@ -83,25 +92,47 @@ async def create_appeal(request: AppealCreate) -> JSONResponse:
                 detail=f"Invalid appeal_type. Must be one of: {', '.join(valid_appeal_types)}",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added when async session setup is complete
-        appeal_id = str(uuid4())
+        # Parse candidate_rank_id to UUID
+        try:
+            candidate_rank_uuid = UUID(request.candidate_rank_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid UUID format for candidate_rank_id: {e}",
+            )
+
+        # Create appeal object
+        appeal = CandidateAppeal(
+            candidate_rank_id=candidate_rank_uuid,
+            candidate_email=request.candidate_email,
+            appeal_type=request.appeal_type,
+            appeal_text=request.appeal_text,
+            supporting_documents=request.supporting_documents,
+            status="pending",
+        )
+
+        # Save to database
+        db.add(appeal)
+        await db.commit()
+        await db.refresh(appeal)
+
+        # Build response
         appeal_response = {
-            "id": appeal_id,
-            "candidate_rank_id": request.candidate_rank_id,
-            "candidate_email": request.candidate_email,
-            "appeal_type": request.appeal_type,
-            "appeal_text": request.appeal_text,
-            "supporting_documents": request.supporting_documents,
-            "status": "pending",
-            "reviewer_id": None,
-            "review_notes": None,
-            "resolution_outcome": None,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
+            "id": str(appeal.id),
+            "candidate_rank_id": str(appeal.candidate_rank_id),
+            "candidate_email": appeal.candidate_email,
+            "appeal_type": appeal.appeal_type,
+            "appeal_text": appeal.appeal_text,
+            "supporting_documents": appeal.supporting_documents,
+            "status": appeal.status,
+            "reviewer_id": str(appeal.reviewer_id) if appeal.reviewer_id else None,
+            "review_notes": appeal.review_notes,
+            "resolution_outcome": appeal.resolution_outcome,
+            "created_at": appeal.created_at.isoformat() if appeal.created_at else None,
+            "updated_at": appeal.updated_at.isoformat() if appeal.updated_at else None,
         }
 
-        logger.info(f"Created appeal {appeal_id} with status 'pending'")
+        logger.info(f"Created appeal {appeal.id} with status 'pending'")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
@@ -123,7 +154,10 @@ async def create_appeal(request: AppealCreate) -> JSONResponse:
     response_model=AppealResponse,
     tags=["Candidate Appeals"],
 )
-async def get_appeal(appeal_id: str) -> JSONResponse:
+async def get_appeal(
+    appeal_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Get a specific appeal by ID.
 
@@ -134,6 +168,7 @@ async def get_appeal(appeal_id: str) -> JSONResponse:
 
     Args:
         appeal_id: UUID of the appeal to retrieve
+        db: Database session
 
     Returns:
         JSON response with appeal details
@@ -155,20 +190,40 @@ async def get_appeal(appeal_id: str) -> JSONResponse:
     try:
         logger.info(f"Retrieving appeal {appeal_id}")
 
-        # Placeholder response - will be replaced with actual database query
+        # Parse appeal_id to UUID
+        try:
+            appeal_uuid = UUID(appeal_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid UUID format: {e}",
+            )
+
+        # Query database
+        query = select(CandidateAppeal).where(CandidateAppeal.id == appeal_uuid)
+        result = await db.execute(query)
+        appeal = result.scalar_one_or_none()
+
+        if not appeal:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Appeal {appeal_id} not found",
+            )
+
+        # Build response
         appeal_response = {
-            "id": appeal_id,
-            "candidate_rank_id": "placeholder-rank-id",
-            "candidate_email": "candidate@example.com",
-            "appeal_type": "ranking_position",
-            "appeal_text": "I have additional skills that were not considered",
-            "supporting_documents": None,
-            "status": "pending",
-            "reviewer_id": None,
-            "review_notes": None,
-            "resolution_outcome": None,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T00:00:00Z",
+            "id": str(appeal.id),
+            "candidate_rank_id": str(appeal.candidate_rank_id),
+            "candidate_email": appeal.candidate_email,
+            "appeal_type": appeal.appeal_type,
+            "appeal_text": appeal.appeal_text,
+            "supporting_documents": appeal.supporting_documents,
+            "status": appeal.status,
+            "reviewer_id": str(appeal.reviewer_id) if appeal.reviewer_id else None,
+            "review_notes": appeal.review_notes,
+            "resolution_outcome": appeal.resolution_outcome,
+            "created_at": appeal.created_at.isoformat() if appeal.created_at else None,
+            "updated_at": appeal.updated_at.isoformat() if appeal.updated_at else None,
         }
 
         logger.info(f"Retrieved appeal {appeal_id}")
@@ -178,6 +233,8 @@ async def get_appeal(appeal_id: str) -> JSONResponse:
             content=appeal_response,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving appeal {appeal_id}: {e}", exc_info=True)
         raise HTTPException(
@@ -193,6 +250,7 @@ async def list_appeals(
     appeal_type: Optional[str] = Query(None, description="Filter by appeal type"),
     status: Optional[str] = Query(None, description="Filter by appeal status"),
     reviewer_id: Optional[str] = Query(None, description="Filter by reviewer ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     List appeals with optional filters.
@@ -207,6 +265,7 @@ async def list_appeals(
         appeal_type: Optional filter by appeal type
         status: Optional filter by status (pending, under_review, accepted, rejected)
         reviewer_id: Optional filter by reviewer ID
+        db: Database session
 
     Returns:
         JSON response with list of appeals and total count
@@ -239,42 +298,59 @@ async def list_appeals(
             f"reviewer_id={reviewer_id}"
         )
 
-        # Placeholder response - will be replaced with actual database query
-        # In real implementation, this would filter based on the query parameters
-        appeals = [
-            {
-                "id": "appeal-1",
-                "candidate_rank_id": "rank-1",
-                "candidate_email": "candidate1@example.com",
-                "appeal_type": "ranking_position",
-                "appeal_text": "I have additional certifications in cloud computing",
-                "supporting_documents": {
-                    "documents": [
-                        {"filename": "aws-cert.pdf", "url": "s3://bucket/cert.pdf", "type": "certification"}
-                    ]
-                },
-                "status": "pending",
-                "reviewer_id": None,
-                "review_notes": None,
-                "resolution_outcome": None,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-            },
-            {
-                "id": "appeal-2",
-                "candidate_rank_id": "rank-2",
-                "candidate_email": "candidate2@example.com",
-                "appeal_type": "missing_skills",
-                "appeal_text": "My profile includes advanced Python skills not reflected in the ranking",
-                "supporting_documents": None,
-                "status": "under_review",
-                "reviewer_id": "reviewer-123",
-                "review_notes": "Reviewing additional skills claims",
-                "resolution_outcome": None,
-                "created_at": "2024-01-24T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-            },
-        ]
+        # Build query with filters
+        query = select(CandidateAppeal)
+
+        if candidate_email:
+            query = query.where(CandidateAppeal.candidate_email == candidate_email)
+
+        if candidate_rank_id:
+            try:
+                rank_uuid = UUID(candidate_rank_id)
+                query = query.where(CandidateAppeal.candidate_rank_id == rank_uuid)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid UUID format for candidate_rank_id",
+                )
+
+        if appeal_type:
+            query = query.where(CandidateAppeal.appeal_type == appeal_type)
+
+        if status:
+            query = query.where(CandidateAppeal.status == status)
+
+        if reviewer_id:
+            try:
+                reviewer_uuid = UUID(reviewer_id)
+                query = query.where(CandidateAppeal.reviewer_id == reviewer_uuid)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid UUID format for reviewer_id",
+                )
+
+        # Execute query
+        result = await db.execute(query)
+        appeals_db = result.scalars().all()
+
+        # Build response
+        appeals = []
+        for appeal in appeals_db:
+            appeals.append({
+                "id": str(appeal.id),
+                "candidate_rank_id": str(appeal.candidate_rank_id),
+                "candidate_email": appeal.candidate_email,
+                "appeal_type": appeal.appeal_type,
+                "appeal_text": appeal.appeal_text,
+                "supporting_documents": appeal.supporting_documents,
+                "status": appeal.status,
+                "reviewer_id": str(appeal.reviewer_id) if appeal.reviewer_id else None,
+                "review_notes": appeal.review_notes,
+                "resolution_outcome": appeal.resolution_outcome,
+                "created_at": appeal.created_at.isoformat() if appeal.created_at else None,
+                "updated_at": appeal.updated_at.isoformat() if appeal.updated_at else None,
+            })
 
         response_data = {
             "appeals": appeals,
@@ -288,6 +364,8 @@ async def list_appeals(
             content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing appeals: {e}", exc_info=True)
         raise HTTPException(
@@ -301,7 +379,11 @@ async def list_appeals(
     response_model=AppealResponse,
     tags=["Candidate Appeals"],
 )
-async def review_appeal(appeal_id: str, request: AppealReviewRequest) -> JSONResponse:
+async def review_appeal(
+    appeal_id: str,
+    request: AppealReviewRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Review and update the status of an appeal (recruiter action).
 
@@ -313,6 +395,7 @@ async def review_appeal(appeal_id: str, request: AppealReviewRequest) -> JSONRes
     Args:
         appeal_id: UUID of the appeal to review
         request: Review request with status, notes, and outcome
+        db: Database session
 
     Returns:
         JSON response with updated appeal details
@@ -349,20 +432,60 @@ async def review_appeal(appeal_id: str, request: AppealReviewRequest) -> JSONRes
                 detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
             )
 
-        # Placeholder response - will be replaced with actual database update
+        # Parse appeal_id to UUID
+        try:
+            appeal_uuid = UUID(appeal_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid UUID format: {e}",
+            )
+
+        # Query database
+        query = select(CandidateAppeal).where(CandidateAppeal.id == appeal_uuid)
+        result = await db.execute(query)
+        appeal = result.scalar_one_or_none()
+
+        if not appeal:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Appeal {appeal_id} not found",
+            )
+
+        # Update appeal fields
+        appeal.status = request.status
+        if request.review_notes is not None:
+            appeal.review_notes = request.review_notes
+        if request.resolution_outcome is not None:
+            appeal.resolution_outcome = request.resolution_outcome
+        if request.reviewer_id is not None:
+            try:
+                reviewer_uuid = UUID(request.reviewer_id)
+                appeal.reviewer_id = reviewer_uuid
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid UUID format for reviewer_id",
+                )
+
+        # Commit changes
+        await db.commit()
+        await db.refresh(appeal)
+
+        # Build response
         appeal_response = {
-            "id": appeal_id,
-            "candidate_rank_id": "placeholder-rank-id",
-            "candidate_email": "candidate@example.com",
-            "appeal_type": "ranking_position",
-            "appeal_text": "I have additional skills that were not considered",
-            "supporting_documents": None,
-            "status": request.status,
-            "reviewer_id": "reviewer-123",
-            "review_notes": request.review_notes,
-            "resolution_outcome": request.resolution_outcome,
-            "created_at": "2024-01-25T00:00:00Z",
-            "updated_at": "2024-01-25T12:00:00Z",
+            "id": str(appeal.id),
+            "candidate_rank_id": str(appeal.candidate_rank_id),
+            "candidate_email": appeal.candidate_email,
+            "appeal_type": appeal.appeal_type,
+            "appeal_text": appeal.appeal_text,
+            "supporting_documents": appeal.supporting_documents,
+            "status": appeal.status,
+            "reviewer_id": str(appeal.reviewer_id) if appeal.reviewer_id else None,
+            "review_notes": appeal.review_notes,
+            "resolution_outcome": appeal.resolution_outcome,
+            "created_at": appeal.created_at.isoformat() if appeal.created_at else None,
+            "updated_at": appeal.updated_at.isoformat() if appeal.updated_at else None,
         }
 
         logger.info(f"Updated appeal {appeal_id} to status '{request.status}'")
