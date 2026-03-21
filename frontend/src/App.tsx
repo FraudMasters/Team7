@@ -5,6 +5,7 @@ import { Box, Typography } from '@mui/material';
 import JobSeekerLayout from './layouts/JobSeekerLayout';
 import RecruiterLayout from './layouts/RecruiterLayout';
 import HiringManagerLayout from './layouts/HiringManagerLayout';
+import DeveloperLayout from './layouts/DeveloperLayout';
 
 // Authentication
 import ProtectedRoute from './auth/ProtectedRoute';
@@ -73,6 +74,14 @@ import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 
+// Developer Pages
+import DeveloperPortal from './pages/DeveloperPortal';
+import APIKeysPage from './pages/developer/APIKeys';
+import WebhooksPage from './pages/developer/Webhooks';
+import PluginsPage from './pages/developer/Plugins';
+import WorkflowsPage from './pages/developer/Workflows';
+import AnalyticsPage from './pages/developer/Analytics';
+
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
@@ -106,6 +115,23 @@ function ProtectedHiringManagerLayout() {
       redirectTo="/auth/login"
     >
       <HiringManagerLayout />
+    </ProtectedRoute>
+  );
+}
+
+/**
+ * Protected Developer Layout Wrapper
+ *
+ * Wraps the DeveloperLayout with role-based access control.
+ * All authenticated users can access developer routes.
+ */
+function ProtectedDeveloperLayout() {
+  return (
+    <ProtectedRoute
+      requiredRoles={[UserRole.Recruiter, UserRole.HiringManager, UserRole.JobSeeker, UserRole.Admin]}
+      redirectTo="/auth/login"
+    >
+      <DeveloperLayout />
     </ProtectedRoute>
   );
 }
@@ -225,6 +251,16 @@ function App() {
           <Route path="profile" element={<HiringManagerPlaceholder title="Profile" />} />
           <Route path="settings" element={<HiringManagerPlaceholder title="Settings" />} />
           <Route path="notifications" element={<HiringManagerPlaceholder title="Notifications" />} />
+        </Route>
+
+        {/* Developer Portal - Protected with role-based access control */}
+        <Route path="/developer" element={<ProtectedDeveloperLayout />}>
+          <Route index element={<DeveloperPortal />} />
+          <Route path="api-keys" element={<APIKeysPage />} />
+          <Route path="webhooks" element={<WebhooksPage />} />
+          <Route path="plugins" element={<PluginsPage />} />
+          <Route path="workflows" element={<WorkflowsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
         </Route>
 
         {/* Admin Routes - AI Explainability Dashboard */}
