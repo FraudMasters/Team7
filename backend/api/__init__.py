@@ -5,6 +5,7 @@ This module provides FastAPI routers for various API endpoints including
 resume upload, analysis, and job matching.
 """
 from . import (
+    ab_testing,
     analysis,
     analytics,
     ats_simulation,
@@ -51,6 +52,7 @@ from . import (
 )
 
 __all__ = [
+    "ab_testing",
     "analysis",
     "analytics",
     "ats_simulation",
