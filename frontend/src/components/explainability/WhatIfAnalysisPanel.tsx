@@ -19,6 +19,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  IconButton,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -27,6 +33,12 @@ import {
   Psychology as PsychologyIcon,
   Info as InfoIcon,
   CheckCircle as CheckIcon,
+  Add as AddIcon,
+  Close as CloseIcon,
+  School as SchoolIcon,
+  Work as WorkIcon,
+  Star as StarIcon,
+  EmojiObjects as IdeaIcon,
 } from '@mui/icons-material';
 import { explainability } from '@/api/explainability';
 import type {
@@ -142,6 +154,140 @@ const RECOMMENDATION_COLORS: Record<string, string> = {
 };
 
 /**
+ * Preset scenario definition
+ */
+interface PresetScenario {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  adjustments: AvailableAdjustments;
+  category: 'improvement' | 'reduction' | 'mixed' | 'optimization';
+}
+
+/**
+ * Preset scenario definitions
+ */
+const PRESET_SCENARIOS: PresetScenario[] = [
+  {
+    id: 'moreExperience',
+    name: 'More Experience (+1 year)',
+    description: 'Adds 12 months of experience to see impact on ranking',
+    icon: <WorkIcon />,
+    adjustments: { experience_months: 12 },
+    category: 'improvement',
+  },
+  {
+    id: 'lessExperience',
+    name: 'Less Experience (-1 year)',
+    description: 'Reduces experience by 12 months to test minimum requirements',
+    icon: <WorkIcon />,
+    adjustments: { experience_months: -12 },
+    category: 'reduction',
+  },
+  {
+    id: 'improveSkills',
+    name: 'Better Skills Match (+15%)',
+    description: 'Increases skills match ratio to evaluate skill importance',
+    icon: <StarIcon />,
+    adjustments: { skills_match_ratio: 0.15 },
+    category: 'improvement',
+  },
+  {
+    id: 'reduceSkills',
+    name: 'Weaker Skills Match (-15%)',
+    description: 'Decreases skills match to understand skill requirements',
+    icon: <StarIcon />,
+    adjustments: { skills_match_ratio: -0.15 },
+    category: 'reduction',
+  },
+  {
+    id: 'higherEducation',
+    name: 'Higher Education (+1 level)',
+    description: 'Upgrades education level (e.g., Bachelor to Master)',
+    icon: <SchoolIcon />,
+    adjustments: { education_level: 1 },
+    category: 'improvement',
+  },
+  {
+    id: 'lowerEducation',
+    name: 'Lower Education (-1 level)',
+    description: 'Tests impact of lower education requirement',
+    icon: <SchoolIcon />,
+    adjustments: { education_level: -1 },
+    category: 'reduction',
+  },
+  {
+    id: 'betterKeywords',
+    name: 'Better Keywords (+10%)',
+    description: 'Improves keyword matching for technical roles',
+    icon: <IdeaIcon />,
+    adjustments: { keyword_score: 0.1 },
+    category: 'improvement',
+  },
+  {
+    id: 'betterSemantic',
+    name: 'Better Semantic Match (+10%)',
+    description: 'Improves vector similarity for conceptual roles',
+    icon: <PsychologyIcon />,
+    adjustments: { vector_score: 0.1 },
+    category: 'improvement',
+  },
+  {
+    id: 'allImprovements',
+    name: 'All Improvements',
+    description: 'Moderate improvements across all factors',
+    icon: <TrendingUpIcon />,
+    adjustments: {
+      experience_months: 6,
+      skills_match_ratio: 0.1,
+      keyword_score: 0.05,
+      tfidf_score: 0.05,
+      education_level: 1,
+    },
+    category: 'optimization',
+  },
+  {
+    id: 'minimalCandidate',
+    name: 'Minimal Candidate',
+    description: 'Tests with reduced qualifications across all factors',
+    icon: <TrendingDownIcon />,
+    adjustments: {
+      experience_months: -12,
+      skills_match_ratio: -0.15,
+      keyword_score: -0.05,
+      education_level: -1,
+    },
+    category: 'reduction',
+  },
+  {
+    id: 'technicalOptimization',
+    name: 'Technical Role Optimization',
+    description: 'Optimizes for technical positions with keyword emphasis',
+    icon: <IdeaIcon />,
+    adjustments: {
+      experience_months: 12,
+      skills_match_ratio: 0.1,
+      keyword_score: 0.15,
+      tfidf_score: 0.1,
+    },
+    category: 'optimization',
+  },
+  {
+    id: 'creativeOptimization',
+    name: 'Creative Role Optimization',
+    description: 'Optimizes for creative positions with semantic emphasis',
+    icon: <PsychologyIcon />,
+    adjustments: {
+      experience_months: 6,
+      skills_match_ratio: 0.15,
+      vector_score: 0.15,
+    },
+    category: 'optimization',
+  },
+];
+
+/**
  * WhatIfAnalysisPanel Component
  *
  * Provides interactive what-if scenario analysis for candidate rankings.
@@ -182,6 +328,11 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
   // Feature adjustment values
   const [adjustments, setAdjustments] = useState<AvailableAdjustments>({});
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+
+  // Scenario builder dialog state
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [customScenarioName, setCustomScenarioName] = useState('');
+  const [customScenarioDescription, setCustomScenarioDescription] = useState('');
 
   /**
    * Fetch what-if analysis from backend
@@ -246,39 +397,36 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
   /**
    * Apply preset scenario
    */
-  const handleApplyPreset = (preset: string) => {
-    setSelectedPreset(preset);
-    let newAdjustments: AvailableAdjustments = {};
+  const handleApplyPreset = (presetId: string) => {
+    const preset = PRESET_SCENARIOS.find((p) => p.id === presetId);
+    if (!preset) return;
 
-    switch (preset) {
-      case 'moreExperience':
-        newAdjustments = { experience_months: 12 };
-        break;
-      case 'lessExperience':
-        newAdjustments = { experience_months: -12 };
-        break;
-      case 'improveSkills':
-        newAdjustments = { skills_match_ratio: 0.15 };
-        break;
-      case 'higherEducation':
-        newAdjustments = { education_level: 1 };
-        break;
-      case 'betterKeywords':
-        newAdjustments = { keyword_score: 0.1 };
-        break;
-      case 'allImprovements':
-        newAdjustments = {
-          experience_months: 6,
-          skills_match_ratio: 0.1,
-          keyword_score: 0.05,
-          education_level: 1,
-        };
-        break;
-      default:
-        newAdjustments = {};
-    }
+    setSelectedPreset(presetId);
+    setAdjustments(preset.adjustments);
+  };
 
-    setAdjustments(newAdjustments);
+  /**
+   * Open scenario builder
+   */
+  const handleOpenBuilder = () => {
+    setCustomScenarioName('');
+    setCustomScenarioDescription('');
+    setBuilderOpen(true);
+  };
+
+  /**
+   * Close scenario builder
+   */
+  const handleCloseBuilder = () => {
+    setBuilderOpen(false);
+  };
+
+  /**
+   * Apply custom scenario from builder
+   */
+  const handleApplyCustomScenario = () => {
+    setSelectedPreset('custom');
+    setBuilderOpen(false);
   };
 
   /**
@@ -484,53 +632,203 @@ const WhatIfAnalysisPanel: React.FC<WhatIfAnalysisPanelProps> = ({
           </Grid>
         </Grid>
 
+        <Divider sx={{ my: 2 }} />
+
         {/* Preset Scenarios */}
         <Box>
-          <Typography variant="subtitle2" gutterBottom>
-            {t('whatIfAnalysis.presets.title')}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-            {t('whatIfAnalysis.presets.description')}
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-            <Chip
-              label={t('whatIfAnalysis.presets.moreExperience')}
-              onClick={() => handleApplyPreset('moreExperience')}
-              sx={{ cursor: 'pointer' }}
-              color={selectedPreset === 'moreExperience' ? 'primary' : 'default'}
-              variant={selectedPreset === 'moreExperience' ? 'filled' : 'outlined'}
-            />
-            <Chip
-              label={t('whatIfAnalysis.presets.improveSkills')}
-              onClick={() => handleApplyPreset('improveSkills')}
-              sx={{ cursor: 'pointer' }}
-              color={selectedPreset === 'improveSkills' ? 'primary' : 'default'}
-              variant={selectedPreset === 'improveSkills' ? 'filled' : 'outlined'}
-            />
-            <Chip
-              label={t('whatIfAnalysis.presets.higherEducation')}
-              onClick={() => handleApplyPreset('higherEducation')}
-              sx={{ cursor: 'pointer' }}
-              color={selectedPreset === 'higherEducation' ? 'primary' : 'default'}
-              variant={selectedPreset === 'higherEducation' ? 'filled' : 'outlined'}
-            />
-            <Chip
-              label={t('whatIfAnalysis.presets.betterKeywords')}
-              onClick={() => handleApplyPreset('betterKeywords')}
-              sx={{ cursor: 'pointer' }}
-              color={selectedPreset === 'betterKeywords' ? 'primary' : 'default'}
-              variant={selectedPreset === 'betterKeywords' ? 'filled' : 'outlined'}
-            />
-            <Chip
-              label={t('whatIfAnalysis.presets.allImprovements')}
-              onClick={() => handleApplyPreset('allImprovements')}
-              sx={{ cursor: 'pointer' }}
-              color={selectedPreset === 'allImprovements' ? 'primary' : 'default'}
-              variant={selectedPreset === 'allImprovements' ? 'filled' : 'outlined'}
-            />
-          </Stack>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('whatIfAnalysis.presets.title')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {t('whatIfAnalysis.presets.description')}
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleOpenBuilder}
+            >
+              {t('whatIfAnalysis.customScenario')}
+            </Button>
+          </Box>
+
+          <Grid container spacing={2}>
+            {PRESET_SCENARIOS.map((preset) => (
+              <Grid item xs={12} sm={6} md={4} key={preset.id}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    cursor: 'pointer',
+                    borderColor: selectedPreset === preset.id ? 'primary.main' : 'divider',
+                    borderWidth: selectedPreset === preset.id ? 2 : 1,
+                    bgcolor: selectedPreset === preset.id ? 'primary.50' : 'transparent',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      boxShadow: 1,
+                    },
+                  }}
+                  onClick={() => handleApplyPreset(preset.id)}
+                >
+                  <CardContent sx={{ py: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1 }}>
+                      <Box
+                        sx={{
+                          color: selectedPreset === preset.id ? 'primary.main' : 'text.secondary',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {preset.icon}
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                          {preset.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          {preset.description}
+                        </Typography>
+                        <Chip
+                          label={preset.category}
+                          size="small"
+                          color={
+                            preset.category === 'improvement'
+                              ? 'success'
+                              : preset.category === 'reduction'
+                              ? 'error'
+                              : preset.category === 'optimization'
+                              ? 'primary'
+                              : 'default'
+                          }
+                          variant="outlined"
+                          sx={{ fontSize: '0.65rem', height: 20 }}
+                        />
+                      </Box>
+                    </Box>
+                    {selectedPreset === preset.id && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                        <CheckIcon fontSize="small" color="primary" />
+                        <Typography variant="caption" color="primary.main" fontWeight={500}>
+                          {t('whatIfAnalysis.presets.active')}
+                        </Typography>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
       </Paper>
+
+      {/* Custom Scenario Builder Dialog */}
+      <Dialog
+        open={builderOpen}
+        onClose={handleCloseBuilder}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" fontWeight={600}>
+              {t('whatIfAnalysis.scenarioBuilder.title')}
+            </Typography>
+            <IconButton onClick={handleCloseBuilder} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={3}>
+            <Alert severity="info" variant="outlined">
+              <Typography variant="body2">
+                {t('whatIfAnalysis.scenarioBuilder.description')}
+              </Typography>
+            </Alert>
+
+            <TextField
+              label={t('whatIfAnalysis.scenarioBuilder.nameLabel')}
+              value={customScenarioName}
+              onChange={(e) => setCustomScenarioName(e.target.value)}
+              fullWidth
+              placeholder={t('whatIfAnalysis.scenarioBuilder.namePlaceholder')}
+            />
+
+            <TextField
+              label={t('whatIfAnalysis.scenarioBuilder.descriptionLabel')}
+              value={customScenarioDescription}
+              onChange={(e) => setCustomScenarioDescription(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+              placeholder={t('whatIfAnalysis.scenarioBuilder.descriptionPlaceholder')}
+            />
+
+            <Divider />
+
+            <Typography variant="subtitle2" fontWeight={600}>
+              {t('whatIfAnalysis.scenarioBuilder.adjustmentsLabel')}
+            </Typography>
+
+            {FEATURE_ADJUSTMENTS.map((feature) => {
+              const currentValue = adjustments[feature.feature_name as keyof AvailableAdjustments] ?? 0;
+              const featureConfig = FEATURE_ADJUSTMENTS.find((f) => f.feature_name === feature.feature_name)!;
+
+              return (
+                <Box key={feature.feature_name}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" fontWeight={500}>
+                      {getFeatureDisplayName(feature.feature_name)}
+                    </Typography>
+                    <Chip
+                      label={formatValue(feature.feature_name, currentValue)}
+                      size="small"
+                      color={currentValue > 0 ? 'success' : currentValue < 0 ? 'error' : 'default'}
+                      variant={currentValue !== 0 ? 'filled' : 'outlined'}
+                    />
+                  </Box>
+                  <Slider
+                    value={currentValue}
+                    onChange={(_, value) => handleSliderChange(feature.feature_name as keyof AvailableAdjustments, value as number)}
+                    min={featureConfig.min_value}
+                    max={featureConfig.max_value}
+                    step={featureConfig.step}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value) => formatValue(feature.feature_name, value as number)}
+                    marks={[
+                      { value: featureConfig.min_value, label: formatValue(feature.feature_name, featureConfig.min_value) },
+                      { value: 0, label: '0' },
+                      { value: featureConfig.max_value, label: formatValue(feature.feature_name, featureConfig.max_value) },
+                    ]}
+                    sx={{
+                      '& .MuiSlider-thumb': {
+                        width: currentValue === 0 ? 12 : 20,
+                        height: currentValue === 0 ? 12 : 20,
+                      },
+                      color: currentValue > 0 ? 'success.main' : currentValue < 0 ? 'error.main' : 'primary.main',
+                    }}
+                  />
+                </Box>
+              );
+            })}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={handleCloseBuilder} variant="outlined">
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleApplyCustomScenario}
+            variant="contained"
+            disabled={Object.keys(adjustments).filter(k => adjustments[k as keyof AvailableAdjustments] !== 0).length === 0}
+          >
+            {t('whatIfAnalysis.scenarioBuilder.apply')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Error State */}
       {error && (
