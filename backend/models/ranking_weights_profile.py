@@ -93,6 +93,13 @@ class RankingWeightProfile(Base, UUIDMixin, TimestampMixin):
         comment="Whether this profile is active"
     )
 
+    preset_type: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        index=True,
+        comment="Type of preset profile (technical, sales, executive, balanced)"
+    )
+
     # Ranking feature weights (should sum to 1.0)
     overall_match_score_weight: Mapped[float] = mapped_column(
         Float,
