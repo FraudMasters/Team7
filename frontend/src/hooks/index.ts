@@ -65,17 +65,22 @@ export {
 } from './useAnalyticsRealTime';
 
 export {
-  useSkillFeedback,
-  type FeedbackEntry,
-  type FeedbackListResponse,
-  type FeedbackEntryCreate,
-  type FeedbackCreateRequest,
-  type FeedbackFilters,
-  type UseSkillFeedbackResult,
-} from './useSkillFeedback';
-
-export {
-  useTransparencyRealTime,
-  type UseTransparencyRealTimeOptions,
-  type UseTransparencyRealTimeReturn,
-} from './useTransparencyRealTime';
+  useKeyMetrics,
+  useQualityMetrics,
+  useFunnelMetrics,
+  useStageDuration,
+  useSourceTracking,
+  useRecruiterPerformance,
+  useSkillDemand,
+  useRankingAccuracy,
+  useTaxonomyUsage,
+  useAIConfidence,
+  useFeatureImportance,
+  useRankingRationale,
+  usePerformanceTrends,
+  type AnalyticsDateParams,
+  type SourceTrackingParams,
+  type RecruiterPerformanceParams,
+  type StageDurationParams,
+  type RankingAccuracyParams,
+} from './useAnalytics';
