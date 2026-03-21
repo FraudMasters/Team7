@@ -5,6 +5,7 @@ This module provides endpoints for managing custom analytics reports,
 including CRUD operations for creating, reading, updating, and deleting
 saved reports with metrics and filters.
 """
+import io
 import logging
 from typing import Dict, List, Optional
 from uuid import UUID
@@ -18,6 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.report import Report
+from services.report_template_service import (
+    ReportConfig,
+    ReportGenerationResult,
+    ReportTemplateService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -677,18 +683,22 @@ async def delete_reports_by_organization(organization_id: str) -> JSONResponse:
 
 
 @router.post("/export/pdf", tags=["Reports"])
-async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
+async def export_report_pdf(
+    request: PDFExportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
     """
     Export a report to PDF format.
 
-    This endpoint generates a PDF document from report data and returns
-    a download URL for the generated file.
+    This endpoint generates a PDF document from report data using the
+    ReportTemplateService and returns the PDF file directly as a streaming response.
 
     Args:
         request: PDF export request with report ID and data
+        db: Database session
 
     Returns:
-        JSON response with download URL and expiration
+        StreamingResponse with PDF file content
 
     Raises:
         HTTPException(422): If validation fails
@@ -708,12 +718,9 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
         ...     "/api/reports/export/pdf",
         ...     json=data
         ... )
-        >>> response.json()
-        {
-            "report_id": "test-id",
-            "download_url": "https://example.com/downloads/report-test-id.pdf",
-            "expires_at": "2024-01-26T00:00:00Z"
-        }
+        >>> # Response is a PDF file download
+        >>> with open("report.pdf", "wb") as f:
+        ...     f.write(response.content)
     """
     try:
         logger.info(f"Generating PDF for report: {request.report_id}")
@@ -732,23 +739,58 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
                 detail="Report data cannot be empty",
             )
 
-        # For now, generate a placeholder response
-        # Actual PDF generation will be added in a later subtask with reportlab or weasyprint
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
-        expires_at = (now + timedelta(hours=24)).isoformat() + "Z"
+        # Initialize ReportTemplateService
+        report_service = ReportTemplateService(db=db)
 
-        response_data = {
-            "report_id": request.report_id,
-            "download_url": f"/api/reports/downloads/{request.report_id}.pdf",
-            "expires_at": expires_at,
-        }
+        # Extract title from data or use default
+        title = request.data.get("title", f"Report {request.report_id}")
 
+        # Extract metrics and filters from data
+        metrics = request.data.get("metrics", [])
+        if isinstance(metrics, dict):
+            # If metrics is a dict, extract the keys as metric names
+            metrics = list(metrics.keys())
+
+        filters = request.data.get("filters", {})
+
+        # Create ReportConfig
+        config = ReportConfig(
+            report_type="custom_analytics",
+            output_format="pdf",
+            title=title,
+            page_format=request.format or "A4",
+            metrics=metrics,
+            filters=filters,
+        )
+
+        # Generate the report
+        result: ReportGenerationResult = await report_service.generate_report(
+            config=config,
+            data=request.data,
+        )
+
+        # Check if generation was successful
+        if not result.success:
+            error_msg = result.error_message or "Unknown error occurred during PDF generation"
+            logger.error(f"PDF generation failed for report {request.report_id}: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate PDF: {error_msg}",
+            )
+
+        # Return the PDF as a streaming response
         logger.info(f"PDF generated successfully for report: {request.report_id}")
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data,
+        pdf_bytes = result.report_bytes
+        filename = result.filename or f"report_{request.report_id}.pdf"
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type=result.content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(result.file_size),
+            },
         )
 
     except HTTPException:
