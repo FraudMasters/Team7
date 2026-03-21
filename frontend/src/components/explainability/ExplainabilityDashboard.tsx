@@ -44,6 +44,8 @@ import {
   Science as WhatIfIcon,
 } from '@mui/icons-material';
 import { apiClient } from '@/api/client';
+import FeatureRadarChart from './FeatureRadarChart';
+import InteractiveFeatureBreakdown, { InteractiveFeature } from './InteractiveFeatureBreakdown';
 
 /**
  * Feature explanation from backend API
@@ -91,7 +93,7 @@ interface ExplainabilityResponse {
 /**
  * ExplainabilityDashboard Component Props
  */
-interface ExplainabilityDashboardProps {
+export interface ExplainabilityDashboardProps {
   /** Resume ID for explanation */
   resumeId: string;
   /** Vacancy ID for explanation */
@@ -216,6 +218,33 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
         icon: <WarningIcon />,
       };
     }
+  };
+
+  /**
+   * Transform FeatureExplanation to InteractiveFeature format
+   */
+  const transformToInteractiveFeatures = (): InteractiveFeature[] => {
+    if (!data?.feature_explanations) return [];
+
+    return data.feature_explanations.map((feature) => {
+      const absContribution = Math.abs(feature.contribution_percentage);
+      const normalizedValue = Math.min(absContribution / 100, 1);
+      const weight = 1 / data.feature_explanations.length;
+
+      return {
+        name: feature.feature_name,
+        value: normalizedValue,
+        weight: weight,
+        contribution: feature.contribution_percentage / 100,
+        category: feature.direction === 'positive' ? 'Strength' : 'Weakness',
+        description: feature.description,
+        metadata: {
+          source: data.provider,
+          lastUpdated: data.generated_at,
+          confidence: data.confidence_interval ? data.confidence_interval.confidence_level / 100 : undefined,
+        },
+      };
+    });
   };
 
   /**
@@ -564,6 +593,23 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
             </Grid>
           </Grid>
 
+          {/* Interactive Feature Breakdown */}
+          {data.feature_explanations && data.feature_explanations.length > 0 && (
+            <Box>
+              <InteractiveFeatureBreakdown
+                features={transformToInteractiveFeatures()}
+                overallScore={data.rank_score}
+                title={t('explainability.interactiveBreakdown.title', 'Interactive Feature Analysis')}
+                description={t(
+                  'explainability.interactiveBreakdown.description',
+                  'Explore how each feature contributes to the candidate ranking. Hover for details, click to drill down.'
+                )}
+                showHoverDetails={true}
+                defaultExpanded={false}
+              />
+            </Box>
+          )}
+
           {/* Strengths List */}
           {data.strengths && data.strengths.length > 0 && (
             <Paper elevation={2} sx={{ p: 2 }}>
@@ -739,6 +785,15 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
               </Paper>
             </Grid>
           </Grid>
+
+          {/* Feature Radar Chart Visualization */}
+          <Box>
+            <FeatureRadarChart
+              apiUrl="/api/analytics/ai-explainability/feature-importance"
+              maxFeatures={8}
+              displayMode="importance"
+            />
+          </Box>
 
           {/* Resume Highlight Sections */}
           {data.highlight_sections && Object.keys(data.highlight_sections).length > 0 && (

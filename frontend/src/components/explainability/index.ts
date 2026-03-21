@@ -20,3 +20,6 @@ export type { ResumeHighlighterProps, FeatureSectionMapping, ResumeHighlightSect
 
 export { default as ExplanationReportExport } from './ExplanationReportExport';
 export type { ExplanationReportExportProps } from './ExplanationReportExport';
+
+export { default as ExplainabilityDashboard } from './ExplainabilityDashboard';
+export type { ExplainabilityDashboardProps } from './ExplainabilityDashboard';
