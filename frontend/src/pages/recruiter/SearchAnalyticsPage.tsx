@@ -24,9 +24,24 @@ import { SearchAnalytics } from '../../components/SearchAnalytics';
 // Импорт хука для определения размеров экрана
 import { useBreakpoints } from '../../hooks';
 
+// Импорт контекста аутентификации
+import { useAuthContext } from '../../contexts/AuthContext';
+
+// Импорт контекста организации
+import { useOrganizationContext } from '../../contexts/OrganizationContext';
+
 export function SearchAnalyticsPage() {
   // Определяем, мобильное ли устройство
   const { isMobile } = useBreakpoints();
+
+  // Получаем данные пользователя для проверки роли администратора
+  const { hasRole } = useAuthContext();
+
+  // Получаем ID организации
+  const { organization } = useOrganizationContext();
+
+  // Проверяем, является ли пользователь администратором
+  const isAdmin = hasRole('Admin');
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
@@ -49,7 +64,11 @@ export function SearchAnalyticsPage() {
       </Stack>
 
       {/* Компонент аналитики */}
-      <SearchAnalytics limit={15} />
+      <SearchAnalytics
+        limit={15}
+        isAdmin={isAdmin}
+        organizationId={organization?.id}
+      />
     </Container>
   );
 }
