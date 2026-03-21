@@ -690,3 +690,156 @@ async def get_funnel_metrics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Не удалось получить метрики воронки: {str(e)}",
         ) from e
+
+
+class SourceMetrics(BaseModel):
+    """Метрики эффективности источника."""
+
+    source_name: str = Field(..., description="Название источника кандидатов")
+    total_applications: int = Field(..., description="Общее количество заявок из этого источника")
+    total_hires: int = Field(..., description="Общее количество наймов из этого источника")
+    conversion_rate: float = Field(..., description="Коэффициент конверсии заявок в наймы (0-1)")
+    average_quality_score: float = Field(..., description="Средний показатель качества кандидатов (0-100)")
+    average_time_to_hire_days: float = Field(..., description="Среднее время найма из этого источника (дни)")
+    cost_per_hire: Optional[float] = Field(None, description="Стоимость найма одного кандидата")
+
+
+class SourceEffectivenessResponse(BaseModel):
+    """Модель ответа для аналитики эффективности источников."""
+
+    sources: list[SourceMetrics] = Field(..., description="Метрики эффективности для каждого источника")
+    total_sources: int = Field(..., description="Общее количество источников")
+    best_conversion_source: Optional[str] = Field(None, description="Источник с лучшей конверсией")
+    best_quality_source: Optional[str] = Field(None, description="Источник с лучшим качеством кандидатов")
+
+
+@router.get(
+    "/source-effectiveness",
+    response_model=SourceEffectivenessResponse,
+    tags=["Analytics"],
+)
+async def get_source_effectiveness(
+    start_date: Optional[str] = Query(None, description="Фильтр начальной даты (формат ISO 8601)"),
+    end_date: Optional[str] = Query(None, description="Фильтр конечной даты (формат ISO 8601)"),
+) -> JSONResponse:
+    """
+    Получить метрики эффективности источников кандидатов.
+
+    Этот эндпоинт предоставляет аналитику об эффективности различных источников
+    кандидатов (LinkedIn, Indeed, рефералы и т.д.), включая коэффициенты конверсии,
+    показатели качества и стоимость найма. Эти метрики помогают оптимизировать
+    инвестиции в каналы найма и сосредоточиться на наиболее эффективных источниках.
+
+    Args:
+        start_date: Опциональная начальная дата для фильтрации метрик (формат ISO 8601)
+        end_date: Опциональная конечная дата для фильтрации метрик (формат ISO 8601)
+
+    Returns:
+        JSON ответ с метриками эффективности для каждого источника кандидатов
+
+    Raises:
+        HTTPException(500): Если не удалось получить данные
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("http://localhost:8006/api/analytics/source-effectiveness")
+        >>> response.json()
+        {
+            "sources": [
+                {
+                    "source_name": "LinkedIn",
+                    "total_applications": 250,
+                    "total_hires": 35,
+                    "conversion_rate": 0.14,
+                    "average_quality_score": 78.5,
+                    "average_time_to_hire_days": 28.3,
+                    "cost_per_hire": 1250.0
+                },
+                {
+                    "source_name": "Referrals",
+                    "total_applications": 120,
+                    "total_hires": 28,
+                    "conversion_rate": 0.23,
+                    "average_quality_score": 85.2,
+                    "average_time_to_hire_days": 21.5,
+                    "cost_per_hire": 500.0
+                }
+            ],
+            "total_sources": 5,
+            "best_conversion_source": "Referrals",
+            "best_quality_source": "Referrals"
+        }
+    """
+    try:
+        logger.info(
+            f"Получение метрик эффективности источников - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # Возвращаем placeholder ответ
+        # Интеграция с базой данных будет добавлена в последующем подзадаче
+        response_data = {
+            "sources": [
+                {
+                    "source_name": "LinkedIn",
+                    "total_applications": 250,
+                    "total_hires": 35,
+                    "conversion_rate": 0.14,
+                    "average_quality_score": 78.5,
+                    "average_time_to_hire_days": 28.3,
+                    "cost_per_hire": 1250.0,
+                },
+                {
+                    "source_name": "Referrals",
+                    "total_applications": 120,
+                    "total_hires": 28,
+                    "conversion_rate": 0.23,
+                    "average_quality_score": 85.2,
+                    "average_time_to_hire_days": 21.5,
+                    "cost_per_hire": 500.0,
+                },
+                {
+                    "source_name": "Indeed",
+                    "total_applications": 180,
+                    "total_hires": 22,
+                    "conversion_rate": 0.12,
+                    "average_quality_score": 72.8,
+                    "average_time_to_hire_days": 32.1,
+                    "cost_per_hire": 980.0,
+                },
+                {
+                    "source_name": "Company Website",
+                    "total_applications": 90,
+                    "total_hires": 15,
+                    "conversion_rate": 0.17,
+                    "average_quality_score": 81.3,
+                    "average_time_to_hire_days": 25.7,
+                    "cost_per_hire": 200.0,
+                },
+                {
+                    "source_name": "Job Boards",
+                    "total_applications": 310,
+                    "total_hires": 30,
+                    "conversion_rate": 0.10,
+                    "average_quality_score": 68.9,
+                    "average_time_to_hire_days": 35.4,
+                    "cost_per_hire": 1100.0,
+                },
+            ],
+            "total_sources": 5,
+            "best_conversion_source": "Referrals",
+            "best_quality_source": "Referrals",
+        }
+
+        logger.info("Метрики эффективности источников успешно получены")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка получения метрик эффективности источников: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось получить метрики эффективности источников: {str(e)}",
+        ) from e
