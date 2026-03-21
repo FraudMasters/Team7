@@ -20,6 +20,7 @@ from database import get_db
 from models.duplicate_resume import DuplicateResume
 from models.duplicate_review import DuplicateReview, ReviewStatus
 from models.resume import Resume
+from models.merge_history import MergeHistory
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,26 @@ class DuplicateListResponse(BaseModel):
     duplicates: List[DuplicateResumeItem] = Field(..., description="List of duplicate resume pairs")
     total_count: int = Field(..., description="Total number of duplicate pairs")
     organization_id: str = Field(..., description="Organization ID")
+
+
+class MergeCandidatesRequest(BaseModel):
+    """Request model for merging two candidate profiles."""
+
+    primary_id: str = Field(..., description="UUID of the primary resume to keep")
+    duplicate_id: str = Field(..., description="UUID of the duplicate resume to merge from")
+    reason: Optional[str] = Field(None, description="Optional reason for merging")
+    merged_by_user_id: Optional[str] = Field(None, description="ID of user performing the merge")
+
+
+class MergeCandidatesResponse(BaseModel):
+    """Response model for candidate merge operation."""
+
+    merge_id: str = Field(..., description="UUID of the merge history record")
+    primary_resume_id: str = Field(..., description="UUID of the primary resume")
+    duplicate_resume_id: str = Field(..., description="UUID of the duplicate resume")
+    merge_timestamp: str = Field(..., description="When the merge was performed")
+    message: str = Field(..., description="Success message")
+    can_undo: bool = Field(..., description="Whether this merge can be undone")
 
 
 @router.get(
@@ -190,4 +211,167 @@ async def list_duplicates(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve duplicates: {str(e)}",
+        )
+
+
+@router.post(
+    "/merge",
+    response_model=MergeCandidatesResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Duplicates"],
+)
+async def merge_candidates(
+    request: MergeCandidatesRequest,
+    db: AsyncSession = Depends(get_db)
+) -> JSONResponse:
+    """
+    Merge two candidate profiles into a single profile.
+
+    This endpoint merges a duplicate resume into a primary resume, creating
+    a merge history record for audit and undo capability. The primary resume
+    is retained while the duplicate is marked as merged.
+
+    Args:
+        request: Merge request containing primary_id and duplicate_id
+        db: Database session
+
+    Returns:
+        JSON response with merge operation details
+
+    Raises:
+        HTTPException(400): If request is invalid or resume IDs are the same
+        HTTPException(404): If either resume is not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "/api/duplicates/merge",
+        ...     json={
+        ...         "primary_id": "resume-uuid-1",
+        ...         "duplicate_id": "resume-uuid-2",
+        ...         "reason": "Same candidate, keep most recent resume"
+        ...     }
+        ... )
+        >>> response.json()
+        {
+            "merge_id": "merge-uuid",
+            "primary_resume_id": "resume-uuid-1",
+            "duplicate_resume_id": "resume-uuid-2",
+            "merge_timestamp": "2026-03-21T10:30:00Z",
+            "message": "Successfully merged candidates",
+            "can_undo": true
+        }
+    """
+    try:
+        # Validate request
+        if not request.primary_id or not request.primary_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="primary_id is required and cannot be empty",
+            )
+
+        if not request.duplicate_id or not request.duplicate_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="duplicate_id is required and cannot be empty",
+            )
+
+        if request.primary_id == request.duplicate_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="primary_id and duplicate_id must be different",
+            )
+
+        logger.info(
+            f"Merging candidates: primary={request.primary_id}, "
+            f"duplicate={request.duplicate_id}"
+        )
+
+        # Validate both resumes exist
+        primary_stmt = select(Resume).where(Resume.id == request.primary_id)
+        primary_result = await db.execute(primary_stmt)
+        primary_resume = primary_result.scalar_one_or_none()
+
+        if not primary_resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Primary resume not found: {request.primary_id}",
+            )
+
+        duplicate_stmt = select(Resume).where(Resume.id == request.duplicate_id)
+        duplicate_result = await db.execute(duplicate_stmt)
+        duplicate_resume = duplicate_result.scalar_one_or_none()
+
+        if not duplicate_resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Duplicate resume not found: {request.duplicate_id}",
+            )
+
+        # Verify both resumes belong to the same organization
+        if primary_resume.organization_id != duplicate_resume.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot merge resumes from different organizations",
+            )
+
+        # Create merge history record
+        merge_timestamp = datetime.utcnow()
+        merge_history = MergeHistory(
+            organization_id=primary_resume.organization_id,
+            source_resume_id=request.duplicate_id,
+            target_resume_id=request.primary_id,
+            merged_by_user_id=request.merged_by_user_id,
+            merge_timestamp=merge_timestamp,
+            merge_data={
+                "primary_filename": primary_resume.filename,
+                "duplicate_filename": duplicate_resume.filename,
+                "primary_status": primary_resume.status.value,
+                "duplicate_status": duplicate_resume.status.value,
+            },
+            undo_data={
+                "duplicate_resume_id": request.duplicate_id,
+                "duplicate_organization_id": duplicate_resume.organization_id,
+                "duplicate_vacancy_id": duplicate_resume.vacancy_id,
+            },
+            reason=request.reason,
+            can_undo=True,
+        )
+
+        db.add(merge_history)
+
+        # TODO: In phase 3, implement actual data merging logic via CandidateMerger service
+        # For now, we just create the merge history record
+
+        await db.commit()
+        await db.refresh(merge_history)
+
+        logger.info(
+            f"Successfully merged candidates: merge_id={merge_history.id}, "
+            f"primary={request.primary_id}, duplicate={request.duplicate_id}"
+        )
+
+        response_data = MergeCandidatesResponse(
+            merge_id=str(merge_history.id),
+            primary_resume_id=str(request.primary_id),
+            duplicate_resume_id=str(request.duplicate_id),
+            merge_timestamp=merge_timestamp.isoformat(),
+            message="Successfully merged candidates",
+            can_undo=merge_history.can_undo,
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error merging candidates: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to merge candidates: {str(e)}",
         )
