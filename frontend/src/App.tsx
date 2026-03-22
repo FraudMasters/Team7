@@ -95,6 +95,9 @@ const AIExplainabilityDashboard = lazy(
 );
 import { AuditRetentionSettings } from './pages/admin/AuditRetentionSettings';
 import { AuditAlertSettings } from './pages/admin/AuditAlertSettings';
+const TransparencyDashboard = lazy(
+  () => import('./pages/admin/TransparencyDashboard')
+);
 
 /**
  * Protected Recruiter Layout Wrapper
@@ -288,6 +291,16 @@ function App() {
         />
         <Route path="/admin/audit-retention" element={<AuditRetentionSettings />} />
         <Route path="/admin/audit-alerts" element={<AuditAlertSettings />} />
+
+        {/* Admin Routes - Transparency Dashboard */}
+        <Route
+          path="/admin/transparency-dashboard"
+          element={
+            <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography>Loading...</Typography></Box>}>
+              <TransparencyDashboard />
+            </Suspense>
+          }
+        />
 
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />

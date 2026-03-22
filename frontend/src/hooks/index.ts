@@ -73,3 +73,9 @@ export {
   type FeedbackFilters,
   type UseSkillFeedbackResult,
 } from './useSkillFeedback';
+
+export {
+  useTransparencyRealTime,
+  type UseTransparencyRealTimeOptions,
+  type UseTransparencyRealTimeReturn,
+} from './useTransparencyRealTime';

@@ -315,6 +315,7 @@ from api import (
     audit_logs,
     audit_retention,
     audit_alerts,
+    confidence_dashboard,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -332,6 +333,7 @@ app.include_router(model_versions.router, prefix="/api/model-versions", tags=["M
 app.include_router(model_approvals.router, prefix="/api/model-approvals", tags=["Model Approvals"])
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(confidence_dashboard.router, prefix="/api/confidence-dashboard", tags=["Confidence Dashboard"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
