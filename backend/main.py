@@ -302,6 +302,7 @@ from api import (
     filter_suggestions,
     audit_logs,
     audit_retention,
+    audit_alerts,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -351,6 +352,7 @@ app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["H
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
 app.include_router(audit_logs.router, prefix="/api/audit-logs", tags=["Audit Logs"])
 app.include_router(audit_retention.router, prefix="/api/audit/retention", tags=["Audit Retention"])
+app.include_router(audit_alerts.router, prefix="/api/audit/alerts", tags=["Audit Alerts"])
 
 
 if __name__ == "__main__":
