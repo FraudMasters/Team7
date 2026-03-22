@@ -254,6 +254,7 @@ async def root() -> JSONResponse:
 
 # Include API routers
 from api import (
+    agencies,
     resumes,
     resume_templates,
     resume_builder,
@@ -308,6 +309,7 @@ from api import (
     candidate_portal,
 )
 
+app.include_router(agencies.router, prefix="/api/agencies", tags=["Agencies"])
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(resume_templates.router, prefix="/api/resume-templates", tags=["Resume Templates"])
 app.include_router(resume_builder.router, prefix="/api/resume-builder", tags=["Resume Builder"])

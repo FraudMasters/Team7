@@ -5,13 +5,12 @@ This module provides FastAPI routers for various API endpoints including
 resume upload, analysis, and job matching.
 """
 from . import (
-    ab_testing,
+    agencies,
     analysis,
     analytics,
     ats_simulation,
     auth,
     batch,
-    bias_alert_config,
     candidate_activities,
     candidate_notes,
     candidate_queue,
@@ -29,7 +28,6 @@ from . import (
     job_search,
     matching,
     matching_weights,
-    model_approvals,
     model_versions,
     ranking,
     reports,
@@ -54,13 +52,12 @@ from . import (
 )
 
 __all__ = [
-    "ab_testing",
+    "agencies",
     "analysis",
     "analytics",
     "ats_simulation",
     "auth",
     "batch",
-    "bias_alert_config",
     "candidate_activities",
     "candidate_notes",
     "candidate_queue",
@@ -78,7 +75,6 @@ __all__ = [
     "job_search",
     "matching",
     "matching_weights",
-    "model_approvals",
     "model_versions",
     "ranking",
     "reports",
