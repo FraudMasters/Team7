@@ -15,6 +15,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -249,6 +250,111 @@ async def _exchange_outlook_code_for_token(code: str, redirect_uri: str) -> Dict
         ) from e
 
 
+async def _get_google_user_email(access_token: str) -> str:
+    """
+    Fetch user's email address from Google UserInfo API.
+
+    Args:
+        access_token: Google OAuth access token
+
+    Returns:
+        User's email address
+
+    Raises:
+        HTTPException: If API call fails
+    """
+    logger.info("Fetching user email from Google UserInfo API")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            response.raise_for_status()
+            user_info = response.json()
+
+            if "email" not in user_info:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="User info response missing email",
+                )
+
+            logger.info(f"Successfully fetched Google user email: {user_info['email']}")
+            return user_info["email"]
+
+    except httpx.HTTPStatusError as e:
+        error_response = e.response.text
+        logger.error(f"Failed to fetch Google user email: {error_response}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch user email: {error_response}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error fetching Google user email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error fetching user email: {str(e)}",
+        ) from e
+
+
+async def _get_outlook_user_email(access_token: str) -> str:
+    """
+    Fetch user's email address from Microsoft Graph API.
+
+    Args:
+        access_token: Microsoft OAuth access token
+
+    Returns:
+        User's email address
+
+    Raises:
+        HTTPException: If API call fails
+    """
+    logger.info("Fetching user email from Microsoft Graph API")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://graph.microsoft.com/v1.0/me",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            response.raise_for_status()
+            user_info = response.json()
+
+            # Microsoft returns either 'mail' or 'userPrincipalName'
+            email = user_info.get("mail") or user_info.get("userPrincipalName")
+
+            if not email:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="User info response missing email",
+                )
+
+            logger.info(f"Successfully fetched Outlook user email: {email}")
+            return email
+
+    except httpx.HTTPStatusError as e:
+        error_response = e.response.text
+        logger.error(f"Failed to fetch Outlook user email: {error_response}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch user email: {error_response}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error fetching Outlook user email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error fetching user email: {str(e)}",
+        ) from e
+
+
 @router.get(
     "/google/authorize",
     response_class=RedirectResponse,
@@ -451,27 +557,73 @@ async def google_callback(
         expires_in = token_data.get("expires_in", 3600)
         token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
-        # Get calendar email (would need to call Google API to get user info)
-        # For now, using a placeholder - this should be implemented in subtask-1-2
-        calendar_email = "user@gmail.com"  # TODO: Fetch from Google API
+        # Get calendar email from Google UserInfo API
+        calendar_email = await _get_google_user_email(token_data["access_token"])
 
-        # Create or update calendar connection
-        from api.calendar import create_calendar_connection
-        from api.calendar import CalendarConnectionCreate
+        # Parse and validate recruiter ID
+        try:
+            recruiter_uuid = UUID(recruiter_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid recruiter_id: {recruiter_id}",
+            )
 
-        connection_create = CalendarConnectionCreate(
-            recruiter_id=recruiter_id,
-            provider="google",
-            access_token=token_data["access_token"],
-            refresh_token=token_data.get("refresh_token", ""),
-            token_expires_at=token_expires_at,
-            calendar_email=calendar_email,
+        # Verify recruiter exists
+        recruiter_query = select(Recruiter).where(Recruiter.id == recruiter_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
+
+        if not recruiter:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Recruiter not found: {recruiter_id}",
+            )
+
+        # Check for existing connection
+        existing_query = select(CalendarConnection).where(
+            and_(
+                CalendarConnection.recruiter_id == recruiter_uuid,
+                CalendarConnection.provider == CalendarProvider.GOOGLE
+            )
         )
+        existing_result = await db.execute(existing_query)
+        existing_connection = existing_result.scalar_one_or_none()
 
-        # Call the calendar API to create the connection
-        connection_response = await create_calendar_connection(request, connection_create, db)
+        if existing_connection:
+            # Update existing connection
+            logger.info(f"Updating existing Google Calendar connection for recruiter {recruiter_id}")
+            existing_connection.access_token = token_data["access_token"]
+            existing_connection.refresh_token = token_data.get("refresh_token", "")
+            existing_connection.token_expires_at = token_expires_at
+            existing_connection.calendar_email = calendar_email
+            existing_connection.status = ConnectionStatus.ACTIVE
+            existing_connection.error_message = None
 
-        logger.info(f"Google Calendar connection created for recruiter {recruiter_id}")
+            await db.commit()
+            await db.refresh(existing_connection)
+
+            connection_id = str(existing_connection.id)
+        else:
+            # Create new connection
+            logger.info(f"Creating new Google Calendar connection for recruiter {recruiter_id}")
+            connection = CalendarConnection(
+                recruiter_id=recruiter_uuid,
+                provider=CalendarProvider.GOOGLE,
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token", ""),
+                token_expires_at=token_expires_at,
+                calendar_email=calendar_email,
+                status=ConnectionStatus.ACTIVE,
+            )
+
+            db.add(connection)
+            await db.commit()
+            await db.refresh(connection)
+
+            connection_id = str(connection.id)
+
+        logger.info(f"Google Calendar connection created/updated for recruiter {recruiter_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -479,7 +631,7 @@ async def google_callback(
                 "success": True,
                 "message": "Google Calendar connected successfully",
                 "provider": "google",
-                "connection_id": connection_response.body.get("id") if hasattr(connection_response, "body") else None,
+                "connection_id": connection_id,
             },
         )
 
@@ -487,6 +639,7 @@ async def google_callback(
         raise
     except Exception as e:
         logger.error(f"Error processing Google OAuth callback: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process Google Calendar callback: {str(e)}",
@@ -555,27 +708,73 @@ async def outlook_callback(
         expires_in = token_data.get("expires_in", 3600)
         token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
-        # Get calendar email (would need to call Microsoft Graph API to get user info)
-        # For now, using a placeholder - this should be implemented in subtask-1-2
-        calendar_email = "user@outlook.com"  # TODO: Fetch from Microsoft Graph API
+        # Get calendar email from Microsoft Graph API
+        calendar_email = await _get_outlook_user_email(token_data["access_token"])
 
-        # Create or update calendar connection
-        from api.calendar import create_calendar_connection
-        from api.calendar import CalendarConnectionCreate
+        # Parse and validate recruiter ID
+        try:
+            recruiter_uuid = UUID(recruiter_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid recruiter_id: {recruiter_id}",
+            )
 
-        connection_create = CalendarConnectionCreate(
-            recruiter_id=recruiter_id,
-            provider="outlook",
-            access_token=token_data["access_token"],
-            refresh_token=token_data.get("refresh_token", ""),
-            token_expires_at=token_expires_at,
-            calendar_email=calendar_email,
+        # Verify recruiter exists
+        recruiter_query = select(Recruiter).where(Recruiter.id == recruiter_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
+
+        if not recruiter:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Recruiter not found: {recruiter_id}",
+            )
+
+        # Check for existing connection
+        existing_query = select(CalendarConnection).where(
+            and_(
+                CalendarConnection.recruiter_id == recruiter_uuid,
+                CalendarConnection.provider == CalendarProvider.OUTLOOK
+            )
         )
+        existing_result = await db.execute(existing_query)
+        existing_connection = existing_result.scalar_one_or_none()
 
-        # Call the calendar API to create the connection
-        connection_response = await create_calendar_connection(request, connection_create, db)
+        if existing_connection:
+            # Update existing connection
+            logger.info(f"Updating existing Outlook Calendar connection for recruiter {recruiter_id}")
+            existing_connection.access_token = token_data["access_token"]
+            existing_connection.refresh_token = token_data.get("refresh_token", "")
+            existing_connection.token_expires_at = token_expires_at
+            existing_connection.calendar_email = calendar_email
+            existing_connection.status = ConnectionStatus.ACTIVE
+            existing_connection.error_message = None
 
-        logger.info(f"Outlook Calendar connection created for recruiter {recruiter_id}")
+            await db.commit()
+            await db.refresh(existing_connection)
+
+            connection_id = str(existing_connection.id)
+        else:
+            # Create new connection
+            logger.info(f"Creating new Outlook Calendar connection for recruiter {recruiter_id}")
+            connection = CalendarConnection(
+                recruiter_id=recruiter_uuid,
+                provider=CalendarProvider.OUTLOOK,
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token", ""),
+                token_expires_at=token_expires_at,
+                calendar_email=calendar_email,
+                status=ConnectionStatus.ACTIVE,
+            )
+
+            db.add(connection)
+            await db.commit()
+            await db.refresh(connection)
+
+            connection_id = str(connection.id)
+
+        logger.info(f"Outlook Calendar connection created/updated for recruiter {recruiter_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -583,7 +782,7 @@ async def outlook_callback(
                 "success": True,
                 "message": "Outlook Calendar connected successfully",
                 "provider": "outlook",
-                "connection_id": connection_response.body.get("id") if hasattr(connection_response, "body") else None,
+                "connection_id": connection_id,
             },
         )
 
@@ -591,6 +790,7 @@ async def outlook_callback(
         raise
     except Exception as e:
         logger.error(f"Error processing Outlook OAuth callback: {e}", exc_info=True)
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process Outlook Calendar callback: {str(e)}",
