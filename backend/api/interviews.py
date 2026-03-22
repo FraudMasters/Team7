@@ -704,31 +704,49 @@ async def update_interview(
 
         # Sync with calendar if event exists
         if interview.calendar_event_id and interview.calendar_provider:
-            from tasks.calendar_tasks import update_calendar_event
+            # If interview was cancelled, delete the calendar event
+            if interview.status == InterviewStatus.CANCELLED:
+                from tasks.calendar_tasks import delete_calendar_event
 
-            event_details = {
-                "title": interview.title,
-                "description": interview.description or "",
-                "start_time": interview.scheduled_start.isoformat(),
-                "end_time": interview.scheduled_end.isoformat(),
-                "duration_minutes": interview.duration_minutes,
-                "location": interview.location,
-                "meeting_link": interview.meeting_link,
-                "interview_type": interview.interview_type.value,
-            }
+                try:
+                    delete_calendar_event.delay(
+                        interview_id=str(interview.id),
+                        calendar_provider=interview.calendar_provider,
+                        recruiter_id=str(interview.recruiter_id) if interview.recruiter_id else None,
+                        event_id=interview.calendar_event_id,
+                        notify_attendees=True,
+                    )
+                    logger.info(f"Calendar event deletion task queued for cancelled interview {interview.id}")
+                except Exception as e:
+                    logger.error(f"Failed to queue calendar event deletion task: {e}")
+                    # Don't fail the interview update if calendar task fails
+            else:
+                # Otherwise, update the calendar event with new details
+                from tasks.calendar_tasks import update_calendar_event
 
-            try:
-                update_calendar_event.delay(
-                    interview_id=str(interview.id),
-                    calendar_provider=interview.calendar_provider,
-                    recruiter_id=str(interview.recruiter_id) if interview.recruiter_id else None,
-                    event_id=interview.calendar_event_id,
-                    event_details=event_details,
-                )
-                logger.info(f"Calendar event update task queued for interview {interview.id}")
-            except Exception as e:
-                logger.error(f"Failed to queue calendar event update task: {e}")
-                # Don't fail the interview update if calendar task fails
+                event_details = {
+                    "title": interview.title,
+                    "description": interview.description or "",
+                    "start_time": interview.scheduled_start.isoformat(),
+                    "end_time": interview.scheduled_end.isoformat(),
+                    "duration_minutes": interview.duration_minutes,
+                    "location": interview.location,
+                    "meeting_link": interview.meeting_link,
+                    "interview_type": interview.interview_type.value,
+                }
+
+                try:
+                    update_calendar_event.delay(
+                        interview_id=str(interview.id),
+                        calendar_provider=interview.calendar_provider,
+                        recruiter_id=str(interview.recruiter_id) if interview.recruiter_id else None,
+                        event_id=interview.calendar_event_id,
+                        event_details=event_details,
+                    )
+                    logger.info(f"Calendar event update task queued for interview {interview.id}")
+                except Exception as e:
+                    logger.error(f"Failed to queue calendar event update task: {e}")
+                    # Don't fail the interview update if calendar task fails
 
         logger.info(f"Interview updated successfully: {interview.id}")
 
