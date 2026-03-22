@@ -75,6 +75,7 @@ import HealthDashboard from './pages/HealthDashboard';
 
 // Template Builder
 import { TemplateBuilder } from './components/TemplateBuilder/TemplateBuilder';
+import FeedbackTemplatesPage from './pages/FeedbackTemplates';
 
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
@@ -218,6 +219,7 @@ function App() {
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+          <Route path="feedback-templates" element={<FeedbackTemplatesPage />} />
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}
