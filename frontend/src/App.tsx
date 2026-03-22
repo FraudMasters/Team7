@@ -73,6 +73,9 @@ import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 
+// Template Builder
+import { TemplateBuilder } from './components/TemplateBuilder/TemplateBuilder';
+
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
@@ -184,6 +187,9 @@ function App() {
         <Route path="/profile" element={<JobSeekerLayout />}>
           <Route index element={<JobSeekerProfilePage />} />
         </Route>
+
+        {/* Template Builder (standalone, no auth required for development) */}
+        <Route path="/templates/builder" element={<TemplateBuilder />} />
 
         {/* Recruiter Flow - Protected with role-based access control */}
         <Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
