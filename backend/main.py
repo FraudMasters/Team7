@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
 from config.validation import validate_config, ConfigurationError
+from middleware.tenant_context import TenantContextMiddleware
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -97,7 +98,17 @@ app.add_middleware(
         "Origin",
         "Access-Control-Request-Method",
         "Access-Control-Request-Headers",
+        "X-Tenant-ID",
+        "X-Agency-ID",
     ],
+)
+
+
+# Configure tenant context middleware for multi-tenant agency support
+app.add_middleware(
+    TenantContextMiddleware,
+    require_tenant=False,  # Optional by default, can be required per endpoint
+    require_agency=False,
 )
 
 
