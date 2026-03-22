@@ -5,7 +5,8 @@
  * with dynamic variables, conditional blocks, and real-time preview.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -122,6 +123,7 @@ export function TemplateBuilder({
   onCancel,
 }: TemplateBuilderProps) {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
 
   // Template metadata
   const [templateName, setTemplateName] = useState('');
@@ -132,6 +134,14 @@ export function TemplateBuilder({
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [language, setLanguage] = useState('en');
+
+  // Read template type from URL params on mount
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    if (typeParam === 'email' || typeParam === 'sms') {
+      setTemplateType(typeParam);
+    }
+  }, [searchParams]);
 
   // Template blocks
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
@@ -144,6 +154,12 @@ export function TemplateBuilder({
 
   // Refs for text fields
   const subjectFieldRef = useRef<HTMLInputElement>(null);
+
+  // Filter block types based on template type
+  // SMS templates only support text blocks (no rich formatting)
+  const availableBlockTypes = templateType === 'sms'
+    ? BLOCK_TYPES.filter(blockType => blockType.type === 'text')
+    : BLOCK_TYPES;
 
   // Generate unique ID for new blocks
   const generateBlockId = () => {
@@ -327,9 +343,19 @@ export function TemplateBuilder({
         {/* Header */}
         <Paper sx={{ p: 2 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="h5" component="h1">
-              {templateId ? 'Edit Template' : 'Create New Template'}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h5" component="h1">
+                {templateId ? 'Edit Template' : 'Create New Template'}
+              </Typography>
+              {templateType === 'sms' && (
+                <Chip
+                  label="SMS Mode - Text Only"
+                  color="info"
+                  size="small"
+                  sx={{ fontWeight: 'medium' }}
+                />
+              )}
+            </Box>
             <Stack direction="row" spacing={2}>
               <Button
                 startIcon={<SettingsIcon />}
@@ -493,7 +519,9 @@ export function TemplateBuilder({
               Block Palette
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Drag blocks to the canvas to build your template
+              {templateType === 'sms'
+                ? 'SMS templates support text blocks only'
+                : 'Drag blocks to the canvas to build your template'}
             </Typography>
 
             <Droppable droppableId="palette" isDropDisabled>
@@ -507,7 +535,7 @@ export function TemplateBuilder({
                     opacity: snapshot.isDraggingOver ? 0.5 : 1,
                   }}
                 >
-                  {BLOCK_TYPES.map((blockType, index) => (
+                  {availableBlockTypes.map((blockType, index) => (
                     <Draggable
                       key={blockType.id}
                       draggableId={`palette-${blockType.type}`}
