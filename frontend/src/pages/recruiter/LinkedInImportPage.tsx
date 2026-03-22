@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -15,6 +15,7 @@ import {
   CircularProgress,
   Button,
   Alert,
+  Grid,
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -22,10 +23,14 @@ import {
   Info as InfoIcon,
   Refresh as RefreshIcon,
   CloudUpload as CloudUploadIcon,
+  Assessment as AssessmentIcon,
+  TrendingUp as TrendingUpIcon,
+  AccessTime as AccessTimeIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '@/api/client';
 import type { LinkedInImportHistoryItem } from '@/types/api';
+import { BentoCard } from '@/components/dashboard/BentoCard';
 
 /**
  * Get status icon for display
@@ -125,6 +130,36 @@ const LinkedInImportPage: React.FC = () => {
   );
 
   /**
+   * Calculate statistics from import data
+   */
+  const statistics = useMemo(() => {
+    const totalImports = total;
+
+    // Calculate success rate
+    const successfulImports = data.filter(
+      (item) => item.status.toLowerCase() === 'success' || item.status.toLowerCase() === 'completed'
+    ).length;
+    const successRate = totalImports > 0
+      ? ((successfulImports / totalImports) * 100).toFixed(1)
+      : '0.0';
+
+    // Calculate recent imports (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentImports = data.filter((item) => {
+      if (!item.imported_at) return false;
+      const importDate = new Date(item.imported_at);
+      return importDate >= sevenDaysAgo;
+    }).length;
+
+    return {
+      totalImports,
+      successRate,
+      recentImports,
+    };
+  }, [data, total]);
+
+  /**
    * Render loading state
    */
   if (loading && data.length === 0) {
@@ -169,6 +204,42 @@ const LinkedInImportPage: React.FC = () => {
           {error}
         </Alert>
       )}
+
+      {/* Statistics Dashboard */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        {/* Total Imports Card */}
+        <Grid item xs={12} sm={6} lg={4}>
+          <BentoCard
+            title={t('linkedin.import.stats.totalImports', 'Total Imports')}
+            value={statistics.totalImports}
+            subtitle={t('linkedin.import.stats.allTime', 'All time')}
+            icon={<AssessmentIcon sx={{ color: 'white' }} />}
+            color="primary"
+          />
+        </Grid>
+
+        {/* Success Rate Card */}
+        <Grid item xs={12} sm={6} lg={4}>
+          <BentoCard
+            title={t('linkedin.import.stats.successRate', 'Success Rate')}
+            value={`${statistics.successRate}%`}
+            subtitle={t('linkedin.import.stats.successful', 'Successful imports')}
+            icon={<TrendingUpIcon sx={{ color: 'white' }} />}
+            color="success"
+          />
+        </Grid>
+
+        {/* Recent Imports Card */}
+        <Grid item xs={12} sm={6} lg={4}>
+          <BentoCard
+            title={t('linkedin.import.stats.recentImports', 'Recent Imports')}
+            value={statistics.recentImports}
+            subtitle={t('linkedin.import.stats.lastSevenDays', 'Last 7 days')}
+            icon={<AccessTimeIcon sx={{ color: 'white' }} />}
+            color="secondary"
+          />
+        </Grid>
+      </Grid>
 
       {/* Import History Table */}
       <Paper elevation={2} sx={{ p: 3 }}>
