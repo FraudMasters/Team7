@@ -895,6 +895,15 @@
     "noData": {
       "title": "No Explanation Available",
       "message": "No explanation data found for the specified resume and vacancy."
+    },
+    "feedbackHistory": {
+      "title": "Recruiter Feedback History",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "correction": "Correction",
+      "actualSkill": "Actual Skill",
+      "source": "Source",
+      "confidence": "Confidence"
     }
   },
   "candidateComparison": {
