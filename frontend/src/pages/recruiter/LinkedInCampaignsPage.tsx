@@ -16,6 +16,17 @@ import {
   Button,
   Alert,
   Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Stack,
+  Divider,
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -29,11 +40,15 @@ import {
   PlayArrow as PlayIcon,
   Pause as PauseIcon,
   Stop as StopIcon,
+  Close as CloseIcon,
+  Save as SaveIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { linkedinApi } from '@/services/linkedinApi';
-import type { LinkedInCampaignResponse } from '@/types/api';
+import type { LinkedInCampaignResponse, LinkedInCampaignCreateRequest } from '@/types/api';
 import { BentoCard } from '@/components/dashboard/BentoCard';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/api/client';
 
 /**
  * Get status icon for display
@@ -76,8 +91,17 @@ const getStatusColor = (
   }
 };
 
+/**
+ * Vacancy interface for dropdown
+ */
+interface Vacancy {
+  id: string;
+  title: string;
+}
+
 const LinkedInCampaignsPage: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<LinkedInCampaignResponse[]>([]);
@@ -86,6 +110,15 @@ const LinkedInCampaignsPage: React.FC = () => {
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  // Create campaign dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [campaignName, setCampaignName] = useState('');
+  const [selectedVacancy, setSelectedVacancy] = useState('');
+  const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [vacanciesLoading, setVacanciesLoading] = useState(false);
 
   /**
    * Fetch campaigns from backend
@@ -131,12 +164,87 @@ const LinkedInCampaignsPage: React.FC = () => {
   );
 
   /**
+   * Fetch vacancies for dropdown
+   */
+  const fetchVacancies = useCallback(async () => {
+    setVacanciesLoading(true);
+    try {
+      const response = await apiClient.get<{ vacancies: Vacancy[] }>('/vacancies');
+      setVacancies(response.data.vacancies || []);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to load vacancies';
+      setDialogError(errorMessage);
+    } finally {
+      setVacanciesLoading(false);
+    }
+  }, []);
+
+  /**
    * Handle create campaign button click
    */
   const handleCreateCampaign = useCallback(() => {
-    // TODO: Navigate to campaign creation page or open dialog
-    alert('Create campaign functionality to be implemented');
-  }, []);
+    setDialogOpen(true);
+    fetchVacancies();
+  }, [fetchVacancies]);
+
+  /**
+   * Handle dialog close
+   */
+  const handleDialogClose = useCallback(() => {
+    if (!dialogLoading) {
+      setDialogOpen(false);
+      setCampaignName('');
+      setSelectedVacancy('');
+      setDialogError(null);
+    }
+  }, [dialogLoading]);
+
+  /**
+   * Handle campaign creation submit
+   */
+  const handleSubmitCampaign = useCallback(async () => {
+    if (!campaignName.trim()) {
+      setDialogError('Please enter a campaign name');
+      return;
+    }
+
+    if (!user?.id) {
+      setDialogError('User not authenticated');
+      return;
+    }
+
+    setDialogLoading(true);
+    setDialogError(null);
+
+    try {
+      const request: LinkedInCampaignCreateRequest = {
+        name: campaignName.trim(),
+        recruiter_id: user.id,
+      };
+
+      if (selectedVacancy) {
+        request.vacancy_id = selectedVacancy;
+      }
+
+      await linkedinApi.createCampaign(request);
+
+      // Refresh campaigns list
+      await fetchCampaigns();
+
+      // Close dialog and reset form
+      setDialogOpen(false);
+      setCampaignName('');
+      setSelectedVacancy('');
+      setDialogError(null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to create campaign';
+      setDialogError(errorMessage);
+    } finally {
+      setDialogLoading(false);
+    }
+  }, [campaignName, selectedVacancy, user, fetchCampaigns]);
 
   /**
    * Calculate statistics from campaign data
@@ -436,6 +544,95 @@ const LinkedInCampaignsPage: React.FC = () => {
           }
         />
       </Paper>
+
+      {/* Create Campaign Dialog */}
+      <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <CampaignIcon color="primary" />
+            <Typography variant="h6" fontWeight={600}>
+              {t('linkedin.campaigns.createCampaign', 'Create Campaign')}
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <Divider />
+
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            {/* Error Alert */}
+            {dialogError && (
+              <Alert severity="error" onClose={() => setDialogError(null)}>
+                {dialogError}
+              </Alert>
+            )}
+
+            {/* Campaign Name Input */}
+            <TextField
+              label={t('linkedin.campaigns.campaignName', 'Campaign Name')}
+              fullWidth
+              required
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder={t(
+                'linkedin.campaigns.campaignNamePlaceholder',
+                'e.g., Senior Developer Outreach Q1 2026'
+              )}
+              disabled={dialogLoading}
+              helperText={t(
+                'linkedin.campaigns.campaignNameHelper',
+                'A descriptive name for this outreach campaign'
+              )}
+            />
+
+            {/* Vacancy Selector */}
+            <FormControl fullWidth>
+              <InputLabel id="vacancy-select-label">
+                {t('linkedin.campaigns.vacancy', 'Vacancy (Optional)')}
+              </InputLabel>
+              <Select
+                labelId="vacancy-select-label"
+                id="vacancy-select"
+                value={selectedVacancy}
+                label={t('linkedin.campaigns.vacancy', 'Vacancy (Optional)')}
+                onChange={(e) => setSelectedVacancy(e.target.value)}
+                disabled={dialogLoading || vacanciesLoading}
+              >
+                <MenuItem value="">
+                  <em>{t('linkedin.campaigns.noVacancy', 'No Vacancy')}</em>
+                </MenuItem>
+                {vacancies.map((vacancy) => (
+                  <MenuItem key={vacancy.id} value={vacancy.id}>
+                    {vacancy.title}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+
+        <Divider />
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleDialogClose}
+            disabled={dialogLoading}
+            startIcon={<CloseIcon />}
+          >
+            {t('common.cancel', 'Cancel')}
+          </Button>
+          <Button
+            onClick={handleSubmitCampaign}
+            variant="contained"
+            disabled={dialogLoading || !campaignName.trim()}
+            startIcon={dialogLoading ? <CircularProgress size={16} /> : <SaveIcon />}
+          >
+            {dialogLoading
+              ? t('linkedin.campaigns.creating', 'Creating...')
+              : t('linkedin.campaigns.create', 'Create')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
