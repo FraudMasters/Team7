@@ -6,6 +6,16 @@ AI-powered resume analysis system with intelligent job matching, ML-based candid
 ![Frontend Coverage](.badges/frontend-coverage.svg)
 ![Backend Coverage](.badges/backend-coverage.svg)
 
+## 🚀 One-Click Deployments
+
+Deploy AgentHR to your preferred cloud platform in minutes:
+
+[![Deploy on DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/Soinex-Inc/agenthr/tree/main&refcode=agenthr)
+
+**AWS Marketplace**: [Launch CloudFormation Stack](./cloud/aws/marketplace.yaml) | [📖 AWS Deployment Guide](./cloud/aws/README.md)
+
+**Manual Deployment**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for Docker Compose, Kubernetes/Helm, and detailed configuration options.
+
 ## Features
 
 - **Resume Upload & Analysis**: Support for PDF and DOCX formats

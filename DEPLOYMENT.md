@@ -5,6 +5,9 @@ Complete deployment guide for AgentHR - AI-powered resume analysis and candidate
 ## Table of Contents
 
 - [Overview](#overview)
+- [One-Click Cloud Deployments](#one-click-cloud-deployments)
+  - [DigitalOcean App Platform](#digitalocean-app-platform)
+  - [AWS Marketplace](#aws-marketplace)
 - [Docker Deployment](#docker-deployment)
   - [Quick Start](#quick-start)
   - [Docker Profiles](#docker-profiles)
@@ -23,6 +26,7 @@ Complete deployment guide for AgentHR - AI-powered resume analysis and candidate
 
 AgentHR supports multiple deployment strategies:
 
+- **Cloud Platforms**: One-click deployments to DigitalOcean and AWS Marketplace
 - **Docker Compose**: For local development, testing, and single-server deployments
 - **Kubernetes/Helm**: For production-grade, scalable cloud deployments
 
@@ -39,6 +43,88 @@ AgentHR supports multiple deployment strategies:
 | Grafana | Monitoring dashboards | ❌ Optional |
 | Loki | Log aggregation | ❌ Optional |
 | Prometheus | Metrics collection | ❌ Optional |
+
+---
+
+## One-Click Cloud Deployments
+
+Deploy AgentHR to production-ready cloud platforms with minimal configuration. These deployment options include managed databases, automatic scaling, and built-in monitoring.
+
+### DigitalOcean App Platform
+
+Deploy AgentHR to DigitalOcean's fully-managed App Platform with one click:
+
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/Soinex-Inc/agenthr/tree/main&refcode=agenthr)
+
+**What's Included:**
+- ✅ Managed PostgreSQL database (v15)
+- ✅ Managed Redis cluster (v7)
+- ✅ Automatic SSL/TLS certificates
+- ✅ Built-in load balancing
+- ✅ Automatic scaling (backend & workers)
+- ✅ Zero-downtime deployments
+- ✅ Built-in monitoring & logs
+
+**Estimated Cost**: ~$299/month for production deployment (see [DigitalOcean pricing guide](./cloud/digitalocean/README.md#cost-estimation))
+
+**Configuration Guide**: See [./cloud/digitalocean/README.md](./cloud/digitalocean/README.md) for:
+- Pre-deployment checklist
+- Environment variable configuration
+- Post-deployment setup
+- Scaling recommendations
+- Troubleshooting
+
+### AWS Marketplace
+
+Deploy AgentHR on AWS using CloudFormation for enterprise-grade infrastructure:
+
+**[Launch CloudFormation Stack](./cloud/aws/marketplace.yaml)** | **[📖 Detailed AWS Guide](./cloud/aws/README.md)**
+
+**What's Included:**
+- ✅ VPC with public/private subnets
+- ✅ RDS PostgreSQL Multi-AZ
+- ✅ ElastiCache Redis with failover
+- ✅ Application Load Balancer
+- ✅ EC2 instance with Docker Compose
+- ✅ S3 backup bucket with lifecycle policies
+- ✅ CloudWatch alarms & monitoring
+- ✅ AWS Secrets Manager integration
+
+**Estimated Cost**: ~$450/month for production deployment (see [AWS pricing guide](./cloud/aws/README.md#cost-estimation))
+
+**Deployment Steps:**
+
+1. **Download the CloudFormation template:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/Soinex-Inc/agenthr/main/cloud/aws/marketplace.yaml
+   ```
+
+2. **Deploy via AWS Console:**
+   - Navigate to CloudFormation → Create Stack
+   - Upload `marketplace.yaml`
+   - Fill in parameters (database password, key pair, etc.)
+   - Review and create
+
+3. **Or deploy via AWS CLI:**
+   ```bash
+   aws cloudformation create-stack \
+     --stack-name agenthr-production \
+     --template-body file://marketplace.yaml \
+     --parameters \
+       ParameterKey=Environment,ParameterValue=production \
+       ParameterKey=DBPassword,ParameterValue=your-secure-password \
+       ParameterKey=KeyPairName,ParameterValue=your-key-pair \
+     --capabilities CAPABILITY_IAM
+   ```
+
+4. **Monitor deployment:**
+   ```bash
+   aws cloudformation describe-stacks \
+     --stack-name agenthr-production \
+     --query 'Stacks[0].StackStatus'
+   ```
+
+**Configuration Guide**: See [./cloud/aws/README.md](./cloud/aws/README.md) for complete deployment instructions, troubleshooting, and production best practices.
 
 ---
 
