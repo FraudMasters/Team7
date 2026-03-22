@@ -20,6 +20,7 @@ class CandidateRank(Base, UUIDMixin, TimestampMixin):
 
     Attributes:
         id: UUID primary key
+        organization_id: Organization that owns this ranking
         resume_id: Foreign key to Resume
         vacancy_id: Foreign key to JobVacancy
         rank_score: Overall ranking score (0-1) from ML model
@@ -40,6 +41,9 @@ class CandidateRank(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "candidate_ranks"
 
+    organization_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     resume_id: Mapped[UUID] = mapped_column(
         ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -97,9 +101,9 @@ class CandidateRank(Base, UUIDMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return (
-            f"<CandidateRank(id={self.id}, resume_id={self.resume_id}, "
-            f"vacancy_id={self.vacancy_id}, rank_score={self.rank_score}, "
-            f"recommendation={self.recommendation})>"
+            f"<CandidateRank(id={self.id}, org={self.organization_id}, "
+            f"resume_id={self.resume_id}, vacancy_id={self.vacancy_id}, "
+            f"rank_score={self.rank_score}, recommendation={self.recommendation})>"
         )
 
 

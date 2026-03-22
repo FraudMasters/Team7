@@ -33,8 +33,8 @@ class JobVacancy(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "job_vacancies"
 
-    organization_id: Mapped[Optional[UUID]] = mapped_column(
-        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    organization_id: Mapped[Optional[str]] = mapped_column(
+        String(100), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
