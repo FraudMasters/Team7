@@ -8,7 +8,7 @@
  * - Conditional blocks: condition builder with nested block support
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   TextField,
@@ -29,6 +29,7 @@ import {
   Delete as DeleteIcon,
   TextFields as TextIcon,
 } from '@mui/icons-material';
+import { VariableSelectorButton } from './VariableSelector';
 import type {
   TemplateBlock,
   TextBlock,
@@ -120,6 +121,34 @@ function TextBlockEditor({
   onDelete?: () => void;
   readOnly?: boolean;
 }) {
+  const textFieldRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleVariableSelect = (variableTag: string) => {
+    const textarea = textFieldRef.current;
+    if (!textarea) {
+      // Fallback: append to end
+      onUpdate({ content: (block.content || '') + variableTag });
+      return;
+    }
+
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+    const currentContent = block.content || '';
+    const newContent =
+      currentContent.substring(0, start) +
+      variableTag +
+      currentContent.substring(end);
+
+    onUpdate({ content: newContent });
+
+    // Set cursor position after the inserted variable
+    setTimeout(() => {
+      const newCursorPos = start + variableTag.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+      textarea.focus();
+    }, 0);
+  };
+
   return (
     <Stack spacing={2}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -134,6 +163,7 @@ function TextBlockEditor({
       </Box>
 
       <TextField
+        inputRef={textFieldRef}
         fullWidth
         multiline
         rows={4}
@@ -142,8 +172,14 @@ function TextBlockEditor({
         placeholder="Enter text content. Use {{variable_name}} for dynamic content."
         variant="outlined"
         disabled={readOnly}
-        helperText="Tip: Use {{candidate_name}}, {{job_title}}, {{company_name}}, etc."
+        helperText="Tip: Use the button below to insert variables"
       />
+
+      {!readOnly && (
+        <Box>
+          <VariableSelectorButton onVariableSelect={handleVariableSelect} />
+        </Box>
+      )}
     </Stack>
   );
 }
@@ -165,6 +201,33 @@ function HeadingBlockEditor({
   readOnly?: boolean;
 }) {
   const level = block.level || 2;
+  const textFieldRef = useRef<HTMLInputElement>(null);
+
+  const handleVariableSelect = (variableTag: string) => {
+    const input = textFieldRef.current;
+    if (!input) {
+      // Fallback: append to end
+      onUpdate({ content: (block.content || '') + variableTag });
+      return;
+    }
+
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const currentContent = block.content || '';
+    const newContent =
+      currentContent.substring(0, start) +
+      variableTag +
+      currentContent.substring(end);
+
+    onUpdate({ content: newContent });
+
+    // Set cursor position after the inserted variable
+    setTimeout(() => {
+      const newCursorPos = start + variableTag.length;
+      input.setSelectionRange(newCursorPos, newCursorPos);
+      input.focus();
+    }, 0);
+  };
 
   return (
     <Stack spacing={2}>
@@ -181,6 +244,7 @@ function HeadingBlockEditor({
 
       <Box sx={{ display: 'flex', gap: 2 }}>
         <TextField
+          inputRef={textFieldRef}
           fullWidth
           value={block.content || ''}
           onChange={(e) => onUpdate({ content: e.target.value })}
@@ -206,13 +270,11 @@ function HeadingBlockEditor({
         </FormControl>
       </Box>
 
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ fontStyle: 'italic' }}
-      >
-        Supports variables: {{candidate_name}}, {{job_title}}, etc.
-      </Typography>
+      {!readOnly && (
+        <Box>
+          <VariableSelectorButton onVariableSelect={handleVariableSelect} />
+        </Box>
+      )}
     </Stack>
   );
 }
@@ -234,6 +296,56 @@ function ButtonBlockEditor({
   readOnly?: boolean;
 }) {
   const style = block.style || 'primary';
+  const contentFieldRef = useRef<HTMLInputElement>(null);
+  const hrefFieldRef = useRef<HTMLInputElement>(null);
+
+  const handleContentVariableSelect = (variableTag: string) => {
+    const input = contentFieldRef.current;
+    if (!input) {
+      onUpdate({ content: (block.content || '') + variableTag });
+      return;
+    }
+
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const currentContent = block.content || '';
+    const newContent =
+      currentContent.substring(0, start) +
+      variableTag +
+      currentContent.substring(end);
+
+    onUpdate({ content: newContent });
+
+    setTimeout(() => {
+      const newCursorPos = start + variableTag.length;
+      input.setSelectionRange(newCursorPos, newCursorPos);
+      input.focus();
+    }, 0);
+  };
+
+  const handleHrefVariableSelect = (variableTag: string) => {
+    const input = hrefFieldRef.current;
+    if (!input) {
+      onUpdate({ href: (block.href || '') + variableTag });
+      return;
+    }
+
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const currentHref = block.href || '';
+    const newHref =
+      currentHref.substring(0, start) +
+      variableTag +
+      currentHref.substring(end);
+
+    onUpdate({ href: newHref });
+
+    setTimeout(() => {
+      const newCursorPos = start + variableTag.length;
+      input.setSelectionRange(newCursorPos, newCursorPos);
+      input.focus();
+    }, 0);
+  };
 
   return (
     <Stack spacing={2}>
@@ -248,26 +360,42 @@ function ButtonBlockEditor({
         )}
       </Box>
 
-      <TextField
-        fullWidth
-        label="Button Text"
-        value={block.content || ''}
-        onChange={(e) => onUpdate({ content: e.target.value })}
-        placeholder="Click Here"
-        variant="outlined"
-        disabled={readOnly}
-      />
+      <Box>
+        <TextField
+          inputRef={contentFieldRef}
+          fullWidth
+          label="Button Text"
+          value={block.content || ''}
+          onChange={(e) => onUpdate({ content: e.target.value })}
+          placeholder="Click Here"
+          variant="outlined"
+          disabled={readOnly}
+        />
+        {!readOnly && (
+          <Box sx={{ mt: 1 }}>
+            <VariableSelectorButton onVariableSelect={handleContentVariableSelect} />
+          </Box>
+        )}
+      </Box>
 
-      <TextField
-        fullWidth
-        label="Button URL"
-        value={block.href || ''}
-        onChange={(e) => onUpdate({ href: e.target.value })}
-        placeholder="https://example.com"
-        variant="outlined"
-        disabled={readOnly}
-        helperText="Supports variables: {{application_url}}, {{interview_link}}, etc."
-      />
+      <Box>
+        <TextField
+          inputRef={hrefFieldRef}
+          fullWidth
+          label="Button URL"
+          value={block.href || ''}
+          onChange={(e) => onUpdate({ href: e.target.value })}
+          placeholder="https://example.com"
+          variant="outlined"
+          disabled={readOnly}
+          helperText="Supports variables like {{application_url}}, {{interview_link}}, etc."
+        />
+        {!readOnly && (
+          <Box sx={{ mt: 1 }}>
+            <VariableSelectorButton onVariableSelect={handleHrefVariableSelect} />
+          </Box>
+        )}
+      </Box>
 
       <FormControl fullWidth>
         <InputLabel>Button Style</InputLabel>

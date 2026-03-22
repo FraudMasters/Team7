@@ -5,7 +5,7 @@
  * with dynamic variables, conditional blocks, and real-time preview.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -42,6 +42,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationTemplatesClient } from '../../api/notificationTemplates';
 import { BlockEditor } from './BlockEditor';
+import { VariableSelectorButton } from './VariableSelector';
 import type {
   TemplateBlock,
   TextBlock,
@@ -139,6 +140,9 @@ export function TemplateBuilder({
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs for text fields
+  const subjectFieldRef = useRef<HTMLInputElement>(null);
+
   // Generate unique ID for new blocks
   const generateBlockId = () => {
     return `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -234,6 +238,30 @@ export function TemplateBuilder({
     setBlocks(blocks.map(block =>
       block.id === blockId ? { ...block, ...updates } : block
     ));
+  };
+
+  // Handle variable insertion into subject field
+  const handleSubjectVariableSelect = (variableTag: string) => {
+    const input = subjectFieldRef.current;
+    if (!input) {
+      setSubject(subject + variableTag);
+      return;
+    }
+
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const newSubject =
+      subject.substring(0, start) +
+      variableTag +
+      subject.substring(end);
+
+    setSubject(newSubject);
+
+    setTimeout(() => {
+      const newCursorPos = start + variableTag.length;
+      input.setSelectionRange(newCursorPos, newCursorPos);
+      input.focus();
+    }, 0);
   };
 
   // Save template mutation
@@ -360,6 +388,7 @@ export function TemplateBuilder({
                 {templateType === 'email' && (
                   <Grid2 size={{ xs: 12 }}>
                     <TextField
+                      inputRef={subjectFieldRef}
                       fullWidth
                       label="Email Subject"
                       value={subject}
@@ -367,6 +396,9 @@ export function TemplateBuilder({
                       placeholder="Use {{variable_name}} for dynamic content"
                       required
                     />
+                    <Box sx={{ mt: 1 }}>
+                      <VariableSelectorButton onVariableSelect={handleSubjectVariableSelect} />
+                    </Box>
                   </Grid2>
                 )}
                 <Grid2 size={{ xs: 12, md: 4 }}>
