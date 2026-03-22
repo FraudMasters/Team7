@@ -427,3 +427,104 @@ Next: Subtask 5-2 - Update MatchingWeightsEditor to use RankingFeaturesEditor co
 
 === END SESSION 10 ===
 
+Session 11 (Coder - Phase 5 Continued):
+Started: 2026-03-21
+
+Subtask 5-3: Update preset templates to include all 13 ranking feature weights
+- Status: ✅ COMPLETED
+- Modified: frontend/src/components/MatchingWeightsEditor.tsx (verification only - no changes needed)
+- Pattern followed: frontend/src/components/MatchingWeightsEditor.tsx
+- Verification findings:
+  * PRESET_PROFILES array already includes all 13 weights for all 4 presets:
+    - Technical: Emphasizes skills (30%), certifications (3%), keyword (15%)
+    - Creative: Prioritizes vector similarity (25%), culture fit (10%)
+    - Executive: Balanced with emphasis on experience (20%), culture fit (15%)
+    - Balanced: Uses DEFAULT_RANKING_WEIGHTS with equal distribution
+  * All preset weights verified to sum to exactly 1.00 (100%)
+  * handleApplyPreset function correctly applies all 13 weights (lines 324-342):
+    - skill_match_weight, experience_weight, education_weight
+    - location_weight, keyword_weight, tfidf_weight, vector_weight
+    - recency_weight, culture_fit_weight, salary_match_weight
+    - availability_weight, certifications_weight, industry_experience_weight
+  * Preset application in dialog (lines 769-786) correctly displays all presets
+  * No code changes required - implementation completed in subtask-5-2
+- Note: This work was completed as part of subtask 5-2 when MatchingWeightsEditor was updated
+
+Phase 5: Frontend - Expand Weights Editor UI
+Status: ✅ COMPLETED (all 3 subtasks done)
+
+Browser Verification (Required for Phase 5):
+- URL: http://localhost:3000/recruiter/settings/matching-weights
+- Checks:
+  ✓ Presets load with 13 weights
+  ✓ Can apply preset successfully
+  ✓ Component renders without errors
+  ✓ Can create new profile with 13 weights
+
+=== END SESSION 11 ===
+
+Session 12 (Coder - Phase 6):
+Started: 2026-03-22
+
+Phase 6: Frontend - Real-time Preview
+Status: IN PROGRESS
+
+Subtask 6-1: Create MatchingWeightsPreview component with before/after ranking comparison
+- Status: ✅ COMPLETED
+- Created: frontend/src/components/MatchingWeightsPreview.tsx (647 lines)
+- Pattern followed: frontend/src/components/CandidateComparisonTable.tsx
+- Component features:
+  * Accepts baseline and modified weight configurations (all 13 ranking features)
+  * Props: vacancyId, baselineWeights, modifiedWeights, candidateIds (optional), apiUrl (optional)
+  * Fetches preview rankings from POST /api/matching-weights/preview endpoint
+  * Uses parallel API calls (Promise.all) for baseline and modified weights
+  * Displays side-by-side before/after comparison:
+    - Shows rank changes with visual indicators (up/down/same)
+    - Highlights significant changes (≥3 ranks) in warning color
+    - Displays match score differences with color coding
+    - Trophy icons for top 3 candidates
+  * Summary statistics section:
+    - Total candidates count
+    - Significant changes count (≥3 ranks)
+    - Average score change percentage
+  * Responsive design:
+    - Desktop: Full table view with all columns
+    - Mobile: Card view with stacked layout
+  * Visual indicators:
+    - TrendingUp icon (green) for improved rank (lower number)
+    - TrendingDown icon (red) for worse rank (higher number)
+    - TrendingFlat icon (gray) for no change
+    - Tooltips on rank change chips
+  * Error handling:
+    - Loading state with spinner and progress message
+    - Error state with alert and error details
+    - No data state with informational message
+  * TypeScript interfaces:
+    - RankingFeatureWeights (13 weight fields)
+    - CandidateRanking (candidate_id, candidate_name, match_score, rank)
+    - PreviewRankingsResponse (vacancy_id, weights_used, rankings, total_candidates)
+    - CandidateRankingComparison (before_rank, after_rank, score changes, rank_change)
+  * Helper functions:
+    - getRankChangeColor: Returns color based on rank change direction
+    - getRankChangeIcon: Returns appropriate icon for rank change
+    - formatPercentage: Formats scores as percentages
+    - fetchPreview: Async function to fetch rankings for given weights
+    - fetchComparison: Fetches both before/after and builds comparison data
+  * MUI components used:
+    - Table, TableContainer, TableHead, TableRow, TableCell, TableBody
+    - Paper, Box, Stack, Grid, Typography
+    - Chip, Tooltip, Divider, Alert, CircularProgress
+    - Icons: TrendingUp, TrendingDown, TrendingFlat, EmojiEvents (trophy)
+  * Follows patterns from CandidateComparisonTable:
+    - Similar loading/error state handling
+    - Responsive table/card views for desktop/mobile
+    - Color-coded indicators and visual feedback
+    - Summary statistics and legend
+    - Clean component structure with proper TypeScript typing
+- Committed: a388756
+- Note: Browser verification pending integration with MatchingWeightsEditor in subtask 6-2
+
+Next: Subtask 6-2 - Integrate preview into MatchingWeightsEditor with live updates
+
+=== END SESSION 12 ===
+

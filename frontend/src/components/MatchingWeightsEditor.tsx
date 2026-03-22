@@ -34,6 +34,7 @@ import RankingFeaturesEditor, {
   RankingFeatureWeights,
   DEFAULT_RANKING_WEIGHTS
 } from './RankingFeaturesEditor';
+import MatchingWeightsPreview from './MatchingWeightsPreview';
 
 /**
  * Weight profile entry interface
@@ -201,6 +202,8 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<WeightProfile | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [previewVacancyId, setPreviewVacancyId] = useState<string>('');
+  const [baselineWeights, setBaselineWeights] = useState<RankingFeatureWeights>(DEFAULT_RANKING_WEIGHTS);
 
   // Form state
   const [formData, setFormData] = useState<WeightProfileFormData>({
@@ -252,6 +255,8 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       ...DEFAULT_RANKING_WEIGHTS,
       is_default: false,
     });
+    setBaselineWeights(DEFAULT_RANKING_WEIGHTS);
+    setPreviewVacancyId('');
     setDialogOpen(true);
   };
 
@@ -260,9 +265,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
    */
   const handleEdit = (profile: WeightProfile) => {
     setEditingProfile(profile);
-    setFormData({
-      name: profile.name,
-      description: profile.description || '',
+    const profileWeights: RankingFeatureWeights = {
       skill_match_weight: profile.skill_match_weight,
       experience_weight: profile.experience_weight,
       education_weight: profile.education_weight,
@@ -276,8 +279,15 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       availability_weight: profile.availability_weight,
       certifications_weight: profile.certifications_weight,
       industry_experience_weight: profile.industry_experience_weight,
+    };
+    setFormData({
+      name: profile.name,
+      description: profile.description || '',
+      ...profileWeights,
       is_default: profile.is_default,
     });
+    setBaselineWeights(profileWeights);
+    setPreviewVacancyId('');
     setDialogOpen(true);
   };
 
@@ -746,7 +756,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       <Dialog
         open={dialogOpen}
         onClose={() => !submitting && setDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>
@@ -828,6 +838,52 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
               disabled={submitting}
               showValidation={true}
             />
+
+            {/* Real-time Preview Section */}
+            <Divider sx={{ my: 2 }} />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Real-time Preview (Optional):
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter a vacancy ID to see how weight changes affect candidate rankings in real-time
+              </Typography>
+              <TextField
+                label="Vacancy ID for Preview"
+                fullWidth
+                value={previewVacancyId}
+                onChange={(e) => setPreviewVacancyId(e.target.value)}
+                placeholder="e.g., vacancy-123"
+                disabled={submitting}
+                helperText="Leave empty to skip preview"
+              />
+            </Box>
+
+            {/* Show preview when vacancy ID is provided */}
+            {previewVacancyId && (
+              <Box sx={{ mt: 2 }}>
+                <MatchingWeightsPreview
+                  vacancyId={previewVacancyId}
+                  baselineWeights={baselineWeights}
+                  modifiedWeights={{
+                    skill_match_weight: formData.skill_match_weight,
+                    experience_weight: formData.experience_weight,
+                    education_weight: formData.education_weight,
+                    location_weight: formData.location_weight,
+                    keyword_weight: formData.keyword_weight,
+                    tfidf_weight: formData.tfidf_weight,
+                    vector_weight: formData.vector_weight,
+                    recency_weight: formData.recency_weight,
+                    culture_fit_weight: formData.culture_fit_weight,
+                    salary_match_weight: formData.salary_match_weight,
+                    availability_weight: formData.availability_weight,
+                    certifications_weight: formData.certifications_weight,
+                    industry_experience_weight: formData.industry_experience_weight,
+                  }}
+                />
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
