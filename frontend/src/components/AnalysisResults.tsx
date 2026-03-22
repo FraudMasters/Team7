@@ -25,6 +25,7 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
 import CandidateMatchVisualization from '@components/CandidateMatchVisualization';
+import SkillFeedbackWidget from '@components/SkillFeedbackWidget';
 
 /**
  * Error/Issue interface from backend analysis
@@ -580,9 +581,19 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               <Typography variant="subtitle2" color="secondary" gutterBottom>
                 {t('results.skills.title')}
               </Typography>
-              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1', alignItems: 'center' }}>
                 {(technical_skills || []).map((skill, index) => (
-                  <Chip key={index} label={skill} size="small" color="primary" variant="filled" />
+                  <Box key={index} css={{ display: 'inline-flex', alignItems: 'center', gap: '$0.5' }}>
+                    <Chip label={skill} size="small" color="primary" variant="filled" />
+                    {best_match && (
+                      <SkillFeedbackWidget
+                        resumeId={resumeId}
+                        vacancyId={best_match.vacancy_id}
+                        skill={skill}
+                        compact={true}
+                      />
+                    )}
+                  </Box>
                 ))}
               </Box>
             </Box>
@@ -614,20 +625,29 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 <Icon name="check-circle" css={{ verticalAlign: 'middle', mr: '$0.5' }} />
                 {t('results.skills.matched', { count: matched_skills.length })}
               </Typography>
-              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1', alignItems: 'center' }}>
                 {matched_skills.map((item, index) => (
-                  <Chip
-                    key={index}
-                    label={item.skill}
-                    size="small"
-                    css={{
-                      bgcolor: '$success',
-                      color: '$successContrastText',
-                      '&:hover': {
-                        bgcolor: '$successDark',
-                      },
-                    }}
-                  />
+                  <Box key={index} css={{ display: 'inline-flex', alignItems: 'center', gap: '$0.5' }}>
+                    <Chip
+                      label={item.skill}
+                      size="small"
+                      css={{
+                        bgcolor: '$success',
+                        color: '$successContrastText',
+                        '&:hover': {
+                          bgcolor: '$successDark',
+                        },
+                      }}
+                    />
+                    {best_match && (
+                      <SkillFeedbackWidget
+                        resumeId={resumeId}
+                        vacancyId={best_match.vacancy_id}
+                        skill={item.skill}
+                        compact={true}
+                      />
+                    )}
+                  </Box>
                 ))}
               </Box>
             </Box>
@@ -640,20 +660,29 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 <Icon name="x-circle" css={{ verticalAlign: 'middle', mr: '$0.5' }} />
                 {t('results.skills.missing', { count: missing_skills.length })}
               </Typography>
-              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1' }}>
+              <Box css={{ display: 'flex', flexWrap: 'wrap', gap: '$1', alignItems: 'center' }}>
                 {missing_skills.map((item, index) => (
-                  <Chip
-                    key={index}
-                    label={item.skill}
-                    size="small"
-                    css={{
-                      bgcolor: '$error',
-                      color: '$errorContrastText',
-                      '&:hover': {
-                        bgcolor: '$errorDark',
-                      },
-                    }}
-                  />
+                  <Box key={index} css={{ display: 'inline-flex', alignItems: 'center', gap: '$0.5' }}>
+                    <Chip
+                      label={item.skill}
+                      size="small"
+                      css={{
+                        bgcolor: '$error',
+                        color: '$errorContrastText',
+                        '&:hover': {
+                          bgcolor: '$errorDark',
+                        },
+                      }}
+                    />
+                    {best_match && (
+                      <SkillFeedbackWidget
+                        resumeId={resumeId}
+                        vacancyId={best_match.vacancy_id}
+                        skill={item.skill}
+                        compact={true}
+                      />
+                    )}
+                  </Box>
                 ))}
               </Box>
             </Box>

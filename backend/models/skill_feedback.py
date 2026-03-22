@@ -19,6 +19,7 @@ class SkillFeedback(Base, UUIDMixin, TimestampMixin):
         resume_id: Foreign key to Resume
         vacancy_id: Foreign key to JobVacancy
         match_result_id: Foreign key to MatchResult (optional)
+        recruiter_id: Foreign key to User (recruiter who provided feedback)
         skill: The skill name that was matched
         was_correct: Whether the AI's match was correct
         confidence_score: The confidence score the AI assigned (0-1)
@@ -41,6 +42,9 @@ class SkillFeedback(Base, UUIDMixin, TimestampMixin):
     )
     match_result_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("match_results.id", ondelete="SET NULL"), nullable=True
+    )
+    recruiter_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     skill: Mapped[str] = mapped_column(String(255), nullable=False)
     was_correct: Mapped[bool] = mapped_column(nullable=False)

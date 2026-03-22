@@ -110,3 +110,6 @@ testdata/
 
 # Auto Claude generated files
 logs/security/
+**/.venv/
+**/venv/
+# Virtual environment directories (added during QA fix)

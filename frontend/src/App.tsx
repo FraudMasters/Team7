@@ -73,6 +73,7 @@ import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
+import SkillFeedbackAnalytics from './components/SkillFeedbackAnalytics';
 
 // Developer Pages
 import DeveloperPortal from './pages/DeveloperPortal';
@@ -236,6 +237,7 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="analytics/skill-feedback" element={<SkillFeedbackAnalytics />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
         </Route>

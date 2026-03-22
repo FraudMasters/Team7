@@ -895,6 +895,15 @@
     "noData": {
       "title": "No Explanation Available",
       "message": "No explanation data found for the specified resume and vacancy."
+    },
+    "feedbackHistory": {
+      "title": "Recruiter Feedback History",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "correction": "Correction",
+      "actualSkill": "Actual Skill",
+      "source": "Source",
+      "confidence": "Confidence"
     }
   },
   "candidateComparison": {
@@ -1189,6 +1198,36 @@
         "inclusiveScore": "Inclusive Language Score: {{score}}%",
         "noWarnings": "No bias warnings detected. The description follows inclusive language guidelines."
       }
+    }
+  },
+  "skillFeedback": {
+    "tooltip": {
+      "correctSkill": "Mark this skill as correctly detected",
+      "incorrectSkill": "Mark this skill as incorrectly detected",
+      "addMissingSkill": "Add a missing skill"
+    },
+    "aria": {
+      "correctSkill": "Mark {{skill}} as correctly detected",
+      "incorrectSkill": "Mark {{skill}} as incorrectly detected",
+      "addMissingSkill": "Add a missing skill that the AI didn't detect"
+    },
+    "label": {
+      "giveFeedback": "Give feedback"
+    },
+    "success": {
+      "correctSkill": "Thank you! Confirmed that \"{{skill}}\" was correctly detected.",
+      "incorrectSkill": "Thank you! Noted that \"{{skill}}\" was incorrectly detected.",
+      "addedSkill": "Thank you! Added missing skill \"{{skill}}\"."
+    },
+    "error": {
+      "submitFailed": "Failed to submit feedback. Please try again.",
+      "emptySkillName": "Please enter a skill name."
+    },
+    "dialog": {
+      "addMissingSkill": "Add Missing Skill",
+      "description": "Enter the name of a skill that the AI missed on this resume. This helps improve future skill extraction.",
+      "skillNameLabel": "Skill Name",
+      "skillNamePlaceholder": "e.g., Python, Project Management, SQL"
     }
   }
 }
