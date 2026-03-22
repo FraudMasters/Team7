@@ -156,13 +156,21 @@ def create_calendar_event(
             location = event_details.get("location")
             meeting_link = event_details.get("meeting_link")
             attendees = event_details.get("attendees", [])
+            interview_type = event_details.get("interview_type", "")
+
+            # Determine if we should auto-generate conference link
+            # Auto-generate for video/phone interviews if no meeting_link provided
+            auto_generate_conference = (
+                interview_type.lower() in ("video", "phone") and not meeting_link
+            )
 
             # Create event via calendar service
             logger.info(
                 f"Creating {calendar_provider} calendar event: "
                 f"title='{title}', "
                 f"start={start_time}, "
-                f"attendees={len(attendees)}"
+                f"attendees={len(attendees)}, "
+                f"auto_conference={auto_generate_conference}"
             )
 
             created_event = calendar_service.create_event(
@@ -173,9 +181,10 @@ def create_calendar_event(
                 location=location,
                 attendees=attendees,
                 meeting_link=meeting_link,
+                auto_generate_conference=auto_generate_conference,
             )
 
-            # Update the interview record with the calendar event ID
+            # Update the interview record with the calendar event ID and meeting link
             from backend.models.interview import Interview
             from uuid import UUID
 
@@ -186,6 +195,14 @@ def create_calendar_event(
             if interview:
                 interview.calendar_event_id = created_event.event_id
                 interview.calendar_provider = calendar_provider
+
+                # Save auto-generated meeting link if one was created
+                if created_event.meeting_link and not interview.meeting_link:
+                    interview.meeting_link = created_event.meeting_link
+                    logger.info(
+                        f"Auto-generated meeting link saved to interview: {created_event.meeting_link}"
+                    )
+
                 db.commit()
                 logger.info(
                     f"Updated interview {interview_id} with calendar_event_id={created_event.event_id}"
@@ -359,6 +376,13 @@ def update_calendar_event(
             if event_details.get("end_time"):
                 end_time = datetime.fromisoformat(event_details["end_time"].replace('Z', '+00:00'))
 
+            # Determine if we should auto-generate conference link
+            interview_type = event_details.get("interview_type", "")
+            meeting_link = event_details.get("meeting_link")
+            auto_generate_conference = (
+                interview_type.lower() in ("video", "phone") and not meeting_link
+            )
+
             # Track which fields were updated
             updated_fields = [
                 key for key in event_details.keys()
@@ -367,7 +391,7 @@ def update_calendar_event(
 
             logger.info(
                 f"Updating {calendar_provider} calendar event {event_id}: "
-                f"fields={updated_fields}"
+                f"fields={updated_fields}, auto_conference={auto_generate_conference}"
             )
 
             updated_event = calendar_service.update_event(
@@ -378,8 +402,25 @@ def update_calendar_event(
                 description=event_details.get("description"),
                 location=event_details.get("location"),
                 attendees=event_details.get("attendees"),
-                meeting_link=event_details.get("meeting_link"),
+                meeting_link=meeting_link,
+                auto_generate_conference=auto_generate_conference,
             )
+
+            # Save auto-generated meeting link back to interview if one was created
+            if auto_generate_conference and updated_event.meeting_link:
+                from backend.models.interview import Interview
+                from uuid import UUID
+
+                interview = db.query(Interview).filter(
+                    Interview.id == UUID(interview_id)
+                ).first()
+
+                if interview and not interview.meeting_link:
+                    interview.meeting_link = updated_event.meeting_link
+                    db.commit()
+                    logger.info(
+                        f"Auto-generated meeting link saved to interview during update: {updated_event.meeting_link}"
+                    )
 
             processing_time = int((time.time() - start_time) * 1000)
 

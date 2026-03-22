@@ -282,6 +282,7 @@ class OutlookCalendarService(CalendarService):
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         meeting_link: Optional[str] = None,
+        auto_generate_conference: bool = False,
     ) -> Dict[str, Any]:
         """
         Build a Microsoft Graph event dictionary from parameters.
@@ -293,7 +294,8 @@ class OutlookCalendarService(CalendarService):
             description: Optional event description
             location: Optional physical location
             attendees: Optional list of attendee email addresses
-            meeting_link: Optional virtual meeting link
+            meeting_link: Optional virtual meeting link (if provided, disables auto-generation)
+            auto_generate_conference: Whether to auto-generate Teams meeting link
 
         Returns:
             Microsoft Graph API event dictionary
@@ -323,8 +325,8 @@ class OutlookCalendarService(CalendarService):
                 "displayName": location,
             }
 
-        # Add online meeting (Microsoft Teams)
-        if meeting_link or not location:
+        # Auto-generate Teams meeting link if requested and no manual link provided
+        if auto_generate_conference and not meeting_link:
             event["isOnlineMeeting"] = True
             event["onlineMeetingProvider"] = "teamsForBusiness"
 
@@ -352,6 +354,7 @@ class OutlookCalendarService(CalendarService):
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         meeting_link: Optional[str] = None,
+        auto_generate_conference: bool = False,
     ) -> CalendarEvent:
         """
         Create a new Outlook calendar event.
@@ -366,10 +369,11 @@ class OutlookCalendarService(CalendarService):
             description: Optional event description
             location: Optional physical location
             attendees: Optional list of attendee email addresses
-            meeting_link: Optional virtual meeting link (if None, may auto-generate Teams link)
+            meeting_link: Optional virtual meeting link (if provided, disables auto-generation)
+            auto_generate_conference: Auto-generate Teams meeting link if no manual link provided
 
         Returns:
-            Created CalendarEvent with Outlook-assigned event_id
+            Created CalendarEvent with Outlook-assigned event_id and meeting_link
 
         Raises:
             AuthenticationError: If authentication fails
@@ -382,8 +386,10 @@ class OutlookCalendarService(CalendarService):
             ...     start_time=datetime(2024, 1, 15, 14, 0),
             ...     end_time=datetime(2024, 1, 15, 15, 0),
             ...     attendees=["candidate@example.com"],
-            ...     description="Discuss Python experience and system design"
+            ...     description="Discuss Python experience and system design",
+            ...     auto_generate_conference=True
             ... )
+            >>> print(event.meeting_link)  # Teams meeting link
         """
         self._ensure_valid_token()
 
@@ -396,6 +402,7 @@ class OutlookCalendarService(CalendarService):
                 location=location,
                 attendees=attendees,
                 meeting_link=meeting_link,
+                auto_generate_conference=auto_generate_conference,
             )
 
             headers = {
@@ -405,7 +412,8 @@ class OutlookCalendarService(CalendarService):
 
             logger.info(
                 f"Creating Outlook event: {title} at {start_time} "
-                f"for {len(attendees or [])} attendees"
+                f"for {len(attendees or [])} attendees "
+                f"(auto_conference={auto_generate_conference})"
             )
 
             response = requests.post(
@@ -481,6 +489,7 @@ class OutlookCalendarService(CalendarService):
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         meeting_link: Optional[str] = None,
+        auto_generate_conference: bool = False,
     ) -> CalendarEvent:
         """
         Update an existing Outlook calendar event.
@@ -494,6 +503,7 @@ class OutlookCalendarService(CalendarService):
             location: New location (optional)
             attendees: New attendee list (optional)
             meeting_link: New meeting link (optional)
+            auto_generate_conference: Auto-generate Teams meeting link if no manual link provided
 
         Returns:
             Updated CalendarEvent
@@ -554,7 +564,8 @@ class OutlookCalendarService(CalendarService):
                     for email in attendees
                 ]
 
-            if meeting_link is not None:
+            # Auto-generate Teams meeting if requested and no manual link
+            if auto_generate_conference and meeting_link is None:
                 update_data["isOnlineMeeting"] = True
                 update_data["onlineMeetingProvider"] = "teamsForBusiness"
 
