@@ -1,0 +1,886 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AgentHR - AI-Powered Resume Analysis Platform (AWS Marketplace)'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: 'Application Configuration'
+        Parameters:
+          - InstanceType
+          - KeyPairName
+          - AllowedCIDR
+      - Label:
+          default: 'Database Configuration'
+        Parameters:
+          - DBInstanceClass
+          - DBAllocatedStorage
+          - DBUsername
+          - DBPassword
+      - Label:
+          default: 'Cache Configuration'
+        Parameters:
+          - CacheNodeType
+      - Label:
+          default: 'Monitoring & Alerts'
+        Parameters:
+          - AlertEmail
+      - Label:
+          default: 'Backup Configuration'
+        Parameters:
+          - BackupRetentionDays
+          - EnableS3Backup
+    ParameterLabels:
+      InstanceType:
+        default: 'EC2 Instance Type'
+      KeyPairName:
+        default: 'SSH Key Pair'
+      AllowedCIDR:
+        default: 'Allowed IP Range'
+      DBInstanceClass:
+        default: 'Database Instance Class'
+      DBUsername:
+        default: 'Database Username'
+      DBPassword:
+        default: 'Database Password'
+      CacheNodeType:
+        default: 'Redis Cache Node Type'
+      AlertEmail:
+        default: 'Alert Email Address'
+      BackupRetentionDays:
+        default: 'Backup Retention (Days)'
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.2xlarge
+    AllowedValues:
+      - t3.xlarge
+      - t3.2xlarge
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+    Description: 'EC2 instance type for application server (minimum: t3.2xlarge for ML workloads)'
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: 'SSH key pair for EC2 instance access'
+
+  AllowedCIDR:
+    Type: String
+    Default: '0.0.0.0/0'
+    Description: 'CIDR block allowed to access the application (e.g., 1.2.3.4/32 for single IP)'
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+    ConstraintDescription: 'Must be a valid CIDR block (e.g., 0.0.0.0/0)'
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.large
+    AllowedValues:
+      - db.t3.medium
+      - db.t3.large
+      - db.t3.xlarge
+      - db.r5.large
+      - db.r5.xlarge
+      - db.r5.2xlarge
+    Description: 'RDS PostgreSQL instance class'
+
+  DBAllocatedStorage:
+    Type: Number
+    Default: 100
+    MinValue: 20
+    MaxValue: 1000
+    Description: 'Database storage size in GB'
+
+  DBUsername:
+    Type: String
+    Default: agenthr
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    Description: 'Database administrator username'
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: '[a-zA-Z0-9!@#$%^&*()_+=-]*'
+    Description: 'Database administrator password (min 8 characters)'
+
+  CacheNodeType:
+    Type: String
+    Default: cache.t3.medium
+    AllowedValues:
+      - cache.t3.micro
+      - cache.t3.small
+      - cache.t3.medium
+      - cache.r5.large
+      - cache.r5.xlarge
+    Description: 'ElastiCache Redis node type'
+
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: 'Email address for CloudWatch alarms (optional)'
+    AllowedPattern: '^$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+  BackupRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 7
+    MaxValue: 90
+    Description: 'Number of days to retain automated backups'
+
+  EnableS3Backup:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Enable S3 bucket for application backups'
+
+Conditions:
+  CreateAlertTopic: !Not [!Equals [!Ref AlertEmail, '']]
+  CreateS3Backup: !Equals [!Ref EnableS3Backup, 'true']
+
+Resources:
+  # VPC and Network Configuration
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-vpc'
+        - Key: Application
+          Value: AgentHR
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-igw'
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-subnet-1'
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-subnet-2'
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-subnet-1'
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.12.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-subnet-2'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-rt'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # NAT Gateway for private subnets
+  NATGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NATGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat'
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-rt'
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+  PrivateSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Security Groups
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Security group for Application Load Balancer'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedCIDR
+          Description: 'HTTP access'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedCIDR
+          Description: 'HTTPS access'
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb-sg'
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Security group for AgentHR application server'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedCIDR
+          Description: 'SSH access'
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: 'Backend API'
+        - IpProtocol: tcp
+          FromPort: 5173
+          ToPort: 5173
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: 'Frontend'
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          CidrIp: !Ref AllowedCIDR
+          Description: 'Grafana dashboard'
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-app-sg'
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Security group for RDS PostgreSQL'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: 'PostgreSQL access from app'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-db-sg'
+
+  CacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Security group for ElastiCache Redis'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: 'Redis access from app'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cache-sg'
+
+  # RDS PostgreSQL Database
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: 'Subnet group for RDS'
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-db-subnet-group'
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${AWS::StackName}-postgres'
+      DBName: resume_analysis
+      Engine: postgres
+      EngineVersion: '14.12'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      BackupRetentionPeriod: !Ref BackupRetentionDays
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      MultiAZ: true
+      PubliclyAccessible: false
+      EnableCloudwatchLogsExports:
+        - postgresql
+      DeletionProtection: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-database'
+
+  # ElastiCache Redis
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: 'Subnet group for ElastiCache'
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cache-subnet-group'
+
+  RedisReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupId: !Sub '${AWS::StackName}-redis'
+      ReplicationGroupDescription: 'Redis cluster for AgentHR'
+      Engine: redis
+      EngineVersion: '7.0'
+      CacheNodeType: !Ref CacheNodeType
+      NumCacheClusters: 2
+      AutomaticFailoverEnabled: true
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: false
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      SecurityGroupIds:
+        - !Ref CacheSecurityGroup
+      PreferredMaintenanceWindow: 'sun:05:00-sun:06:00'
+      SnapshotRetentionLimit: 7
+      SnapshotWindow: '02:00-03:00'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-redis'
+
+  # S3 Backup Bucket
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateS3Backup
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-backups-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            ExpirationInDays: !Ref BackupRetentionDays
+            NoncurrentVersionExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-backups'
+
+  # IAM Role for EC2 Instance
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: S3BackupAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !If [CreateS3Backup, !GetAtt BackupBucket.Arn, !Ref 'AWS::NoValue']
+                  - !If [CreateS3Backup, !Sub '${BackupBucket.Arn}/*', !Ref 'AWS::NoValue']
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref AppSecrets
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ec2-role'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # Secrets Manager for Application Secrets
+  AppSecrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${AWS::StackName}-secrets'
+      Description: 'AgentHR application secrets'
+      SecretString: !Sub |
+        {
+          "POSTGRES_USER": "${DBUsername}",
+          "POSTGRES_PASSWORD": "${DBPassword}",
+          "POSTGRES_DB": "resume_analysis",
+          "DATABASE_URL": "postgresql://${DBUsername}:${DBPassword}@${Database.Endpoint.Address}:5432/resume_analysis",
+          "REDIS_URL": "redis://${RedisReplicationGroup.PrimaryEndPoint.Address}:6379/0",
+          "GRAFANA_USER": "admin",
+          "GRAFANA_PASSWORD": "${DBPassword}"
+        }
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${AWS::StackName}-alb'
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb'
+
+  FrontendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${AWS::StackName}-frontend-tg'
+      Port: 5173
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-frontend-tg'
+
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${AWS::StackName}-backend-tg'
+      Port: 8000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-backend-tg'
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendTargetGroup
+
+  BackendListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ALBListener
+      Priority: 1
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - '/api/*'
+            - '/docs'
+            - '/redoc'
+            - '/health'
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
+
+  # EC2 Launch Template
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${AWS::StackName}-lt'
+      LaunchTemplateData:
+        ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyPairName
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref AppSecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 100
+              VolumeType: gp3
+              DeleteOnTermination: true
+              Encrypted: true
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -e
+
+            # Update system
+            yum update -y
+
+            # Install Docker
+            yum install -y docker git
+            systemctl start docker
+            systemctl enable docker
+            usermod -aG docker ec2-user
+
+            # Install Docker Compose
+            curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+            ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+            # Install AWS CLI v2
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            yum install -y unzip
+            unzip awscliv2.zip
+            ./aws/install
+            rm -rf aws awscliv2.zip
+
+            # Install CloudWatch Agent
+            yum install -y amazon-cloudwatch-agent
+
+            # Create application directory
+            mkdir -p /opt/agenthr
+            cd /opt/agenthr
+
+            # Clone repository (placeholder - update with actual repository)
+            # git clone https://github.com/your-org/agenthr.git .
+
+            # Retrieve secrets from Secrets Manager
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${AppSecrets} --region ${AWS::Region} --query SecretString --output text)
+
+            # Create environment file
+            cat > .env.production << EOF
+            # Database Configuration
+            POSTGRES_USER=$(echo $SECRET_JSON | jq -r .POSTGRES_USER)
+            POSTGRES_PASSWORD=$(echo $SECRET_JSON | jq -r .POSTGRES_PASSWORD)
+            POSTGRES_DB=$(echo $SECRET_JSON | jq -r .POSTGRES_DB)
+            DATABASE_URL=$(echo $SECRET_JSON | jq -r .DATABASE_URL)
+
+            # Redis Configuration
+            REDIS_URL=$(echo $SECRET_JSON | jq -r .REDIS_URL)
+            REDIS_HOST=${RedisReplicationGroup.PrimaryEndPoint.Address}
+            REDIS_PORT=6379
+
+            # Application Configuration
+            ENVIRONMENT=production
+            LOG_LEVEL=WARNING
+            BACKEND_PORT=8000
+            FRONTEND_PORT=5173
+
+            # S3 Backup Configuration
+            BACKUP_S3_ENABLED=${EnableS3Backup}
+            BACKUP_S3_BUCKET=${!CreateS3Backup}
+            BACKUP_S3_REGION=${AWS::Region}
+            BACKUP_RETENTION_DAYS=${BackupRetentionDays}
+
+            # Grafana Configuration
+            GRAFANA_USER=$(echo $SECRET_JSON | jq -r .GRAFANA_USER)
+            GRAFANA_PASSWORD=$(echo $SECRET_JSON | jq -r .GRAFANA_PASSWORD)
+
+            # Alert Configuration
+            ALERT_EMAIL_ADDRESS=${AlertEmail}
+            HEALTH_CHECK_ALERT_ENABLED=true
+            EOF
+
+            # Start application with Docker Compose
+            # docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+
+            # Signal CloudFormation that instance is ready
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ApplicationInstance --region ${AWS::Region}
+
+  # EC2 Instance
+  ApplicationInstance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-app-server'
+
+  # Register instance with target groups
+  FrontendTargetGroupAttachment:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroupAttachment
+    Properties:
+      TargetGroupArn: !Ref FrontendTargetGroup
+      TargetId: !Ref ApplicationInstance
+      Port: 5173
+
+  BackendTargetGroupAttachment:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroupAttachment
+    Properties:
+      TargetGroupArn: !Ref BackendTargetGroup
+      TargetId: !Ref ApplicationInstance
+      Port: 8000
+
+  # CloudWatch Alarms
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateAlertTopic
+    Properties:
+      DisplayName: !Sub '${AWS::StackName} Alerts'
+      Subscription:
+        - Endpoint: !Ref AlertEmail
+          Protocol: email
+
+  CPUAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlertTopic
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-high-cpu'
+      AlarmDescription: 'Alert when CPU exceeds 80%'
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      AlarmActions:
+        - !Ref SNSTopic
+
+  MemoryAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlertTopic
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-high-memory'
+      AlarmDescription: 'Alert when memory exceeds 80%'
+      MetricName: mem_used_percent
+      Namespace: CWAgent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      AlarmActions:
+        - !Ref SNSTopic
+
+  DatabaseCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlertTopic
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-db-high-cpu'
+      AlarmDescription: 'Alert when database CPU exceeds 80%'
+      MetricName: CPUUtilization
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref Database
+      AlarmActions:
+        - !Ref SNSTopic
+
+  DatabaseStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlertTopic
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-db-low-storage'
+      AlarmDescription: 'Alert when database storage is low'
+      MetricName: FreeStorageSpace
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10737418240
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref Database
+      AlarmActions:
+        - !Ref SNSTopic
+
+Outputs:
+  ApplicationURL:
+    Description: 'URL to access the AgentHR application'
+    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-app-url'
+
+  BackendAPIURL:
+    Description: 'Backend API URL'
+    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}/api'
+    Export:
+      Name: !Sub '${AWS::StackName}-api-url'
+
+  GrafanaURL:
+    Description: 'Grafana monitoring dashboard'
+    Value: !Sub 'http://${ApplicationInstance.PublicIp}:3001'
+    Export:
+      Name: !Sub '${AWS::StackName}-grafana-url'
+
+  DatabaseEndpoint:
+    Description: 'RDS PostgreSQL endpoint'
+    Value: !GetAtt Database.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-db-endpoint'
+
+  RedisEndpoint:
+    Description: 'ElastiCache Redis endpoint'
+    Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-redis-endpoint'
+
+  BackupBucketName:
+    Condition: CreateS3Backup
+    Description: 'S3 bucket for application backups'
+    Value: !Ref BackupBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-backup-bucket'
+
+  SSHCommand:
+    Description: 'SSH command to access the application server'
+    Value: !Sub 'ssh -i ${KeyPairName}.pem ec2-user@${ApplicationInstance.PublicIp}'
+
+  SecretsManagerARN:
+    Description: 'ARN of the Secrets Manager secret'
+    Value: !Ref AppSecrets
+    Export:
+      Name: !Sub '${AWS::StackName}-secrets-arn'
+
+  VPCId:
+    Description: 'VPC ID'
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${AWS::StackName}-vpc-id'
