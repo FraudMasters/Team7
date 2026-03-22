@@ -206,3 +206,20 @@ export function useDeleteClientTenant() {
     },
   });
 }
+
+/**
+ * Hook for fetching agency analytics
+ *
+ * @returns Query result with agency analytics metrics
+ */
+export function useAgencyAnalytics() {
+  return useQuery({
+    queryKey: ['agency-analytics'],
+    queryFn: async () => {
+      const response = await agenciesClient.getAxiosInstance().get<AgencyAnalytics>(
+        '/api/agencies/analytics'
+      );
+      return response.data;
+    },
+  });
+}
