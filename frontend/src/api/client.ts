@@ -114,6 +114,12 @@ import type {
   CandidateListItem,
   MoveCandidateRequest,
   MoveCandidateResponse,
+  LinkedInAuthUrlResponse,
+  LinkedInCallbackResponse,
+  LinkedInProfileSummary,
+  LinkedInSearchResponse,
+  LinkedInProfileImportRequest,
+  LinkedInProfileImportResponse,
 } from '@/types/api';
 
 /**
@@ -2142,6 +2148,157 @@ export class ApiClient {
   async deleteWorkflowStage(stageId: string): Promise<void> {
     try {
       await this.client.delete(`/api/workflow-stages/${stageId}`);
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  // ==================== LinkedIn Integration Methods ====================
+
+  /**
+   * Get LinkedIn OAuth authorization URL
+   *
+   * @param scopes - Optional scopes to request
+   * @param forceLogin - Force user to re-login
+   * @returns Authorization URL and state for CSRF protection
+   * @throws ApiError if request fails
+   *
+   * @example
+   * ```ts
+   * const { auth_url, state } = await apiClient.getLinkedInAuthUrl();
+   * sessionStorage.setItem('linkedin_oauth_state', state);
+   * window.location.href = auth_url;
+   * ```
+   */
+  async getLinkedInAuthUrl(
+    scopes?: string[],
+    forceLogin = false
+  ): Promise<LinkedInAuthUrlResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (scopes && scopes.length > 0) {
+        params.append('scopes', scopes.join(','));
+      }
+      if (forceLogin) {
+        params.append('force_login', 'true');
+      }
+      const response: AxiosResponse<LinkedInAuthUrlResponse> = await this.client.get(
+        `/api/linkedin/auth/url${params.toString() ? '?' + params.toString() : ''}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Process LinkedIn OAuth callback
+   *
+   * @param params - Callback parameters with code and state
+   * @returns Access token and success status
+   * @throws ApiError if callback processing fails
+   *
+   * @example
+   * ```ts
+   * const { success, access_token } = await apiClient.processLinkedInCallback({
+   *   code: urlParams.get('code'),
+   *   state: urlParams.get('state')
+   * });
+   * ```
+   */
+  async processLinkedInCallback(params: {
+    code: string;
+    state: string;
+  }): Promise<LinkedInCallbackResponse> {
+    try {
+      const response: AxiosResponse<LinkedInCallbackResponse> = await this.client.get(
+        `/api/linkedin/auth/callback?code=${params.code}&state=${params.state}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Search LinkedIn profiles
+   *
+   * @param keywords - Search keywords
+   * @param skills - Required skills
+   * @param location - Location filter
+   * @param industry - Industry filter
+   * @param experienceLevel - Experience level filter
+   * @param limit - Results per page (default: 10, max: 50)
+   * @param page - Page number (default: 1)
+   * @returns Search results with profile summaries
+   * @throws ApiError if search fails
+   *
+   * @example
+   * ```ts
+   * const results = await apiClient.searchLinkedInProfiles(
+   *   'software engineer',
+   *   ['Python', 'React'],
+   *   'San Francisco',
+   *   'Technology',
+   *   'senior',
+   *   20
+   * );
+   * ```
+   */
+  async searchLinkedInProfiles(
+    keywords?: string,
+    skills?: string[],
+    location?: string,
+    industry?: string,
+    experienceLevel?: string,
+    limit = 10,
+    page = 1
+  ): Promise<LinkedInSearchResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (keywords) params.append('keywords', keywords);
+      if (skills && skills.length > 0) params.append('skills', skills.join(','));
+      if (location) params.append('location', location);
+      if (industry) params.append('industry', industry);
+      if (experienceLevel) params.append('experience_level', experienceLevel);
+      params.append('limit', limit.toString());
+      params.append('page', page.toString());
+
+      const response: AxiosResponse<LinkedInSearchResponse> = await this.client.get(
+        `/api/linkedin/search?${params.toString()}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
+
+  /**
+   * Import a LinkedIn profile
+   *
+   * @param request - Import request with LinkedIn URL and optional profile ID
+   * @returns Import result with resume ID
+   * @throws ApiError if import fails
+   *
+   * @example
+   * ```ts
+   * const result = await apiClient.importLinkedInProfile({
+   *   linkedin_url: 'https://www.linkedin.com/in/example',
+   *   profile_id: 'profile-123',
+   *   vacancy_id: 'vacancy-uuid'
+   * });
+   * console.log('Imported as resume:', result.resume_id);
+   * ```
+   */
+  async importLinkedInProfile(
+    request: LinkedInProfileImportRequest
+  ): Promise<LinkedInProfileImportResponse> {
+    try {
+      const response: AxiosResponse<LinkedInProfileImportResponse> = await this.client.post(
+        '/api/linkedin/import',
+        request
+      );
+      return response.data;
     } catch (error) {
       throw this.transformError(error);
     }

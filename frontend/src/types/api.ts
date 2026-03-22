@@ -3357,3 +3357,68 @@ export type {
   LearningFeedbackQueryParams,
 } from './parsingCorrection';
 
+// ==================== LinkedIn Integration Types ====================
+
+/**
+ * LinkedIn OAuth authentication URL response
+ */
+export interface LinkedInAuthUrlResponse {
+  auth_url: string;
+  state: string;
+}
+
+/**
+ * LinkedIn OAuth callback response
+ */
+export interface LinkedInCallbackResponse {
+  success: boolean;
+  access_token?: string;
+  message?: string;
+}
+
+/**
+ * LinkedIn profile summary from search results
+ */
+export interface LinkedInProfileSummary {
+  profile_id: string;
+  profile_url: string;
+  first_name: string;
+  last_name: string;
+  headline?: string;
+  location?: string;
+  industry?: string;
+  current_company?: string;
+  current_position?: string;
+}
+
+/**
+ * LinkedIn search response
+ */
+export interface LinkedInSearchResponse {
+  success: boolean;
+  results: LinkedInProfileSummary[];
+  total_results: number;
+  page: number;
+  limit: number;
+  message?: string;
+}
+
+/**
+ * LinkedIn profile import request
+ */
+export interface LinkedInProfileImportRequest {
+  linkedin_url: string;
+  profile_id?: string;
+  vacancy_id?: string;
+}
+
+/**
+ * LinkedIn profile import response
+ */
+export interface LinkedInProfileImportResponse {
+  success: boolean;
+  resume_id?: string;
+  candidate_id?: string;
+  message?: string;
+}
+
