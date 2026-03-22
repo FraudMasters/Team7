@@ -73,6 +73,10 @@ import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 
+// LinkedIn Integration Pages
+import LinkedInCampaignsPage from './pages/recruiter/LinkedInCampaignsPage';
+import LinkedInCampaignDetail from './components/LinkedInCampaignDetail';
+
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
@@ -212,6 +216,10 @@ function App() {
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+          <Route path="linkedin/campaigns">
+            <Route index element={<LinkedInCampaignsPage />} />
+            <Route path=":id" element={<LinkedInCampaignDetail />} />
+          </Route>
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}

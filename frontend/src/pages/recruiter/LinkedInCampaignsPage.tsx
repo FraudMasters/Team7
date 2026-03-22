@@ -49,6 +49,7 @@ import type { LinkedInCampaignResponse, LinkedInCampaignCreateRequest } from '@/
 import { BentoCard } from '@/components/dashboard/BentoCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/api/client';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Get status icon for display
@@ -102,6 +103,7 @@ interface Vacancy {
 const LinkedInCampaignsPage: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<LinkedInCampaignResponse[]>([]);
@@ -452,8 +454,16 @@ const LinkedInCampaignsPage: React.FC = () => {
                 paginatedCampaigns.map((campaign) => (
                   <TableRow key={campaign.id} hover>
                     {/* Campaign Name */}
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={500}>
+                    <TableCell
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                      }}
+                      onClick={() => navigate(`/recruiter/linkedin/campaigns/${campaign.id}`)}
+                    >
+                      <Typography variant="body2" fontWeight={500} color="primary.main">
                         {campaign.name || 'Unnamed Campaign'}
                       </Typography>
                       {campaign.description && (
