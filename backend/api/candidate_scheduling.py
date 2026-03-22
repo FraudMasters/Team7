@@ -14,6 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from jose import JWTError
 from pydantic import BaseModel, Field
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,12 @@ from models.recruiter import Recruiter
 from models.job_vacancy import JobVacancy
 from models.candidate_activity import CandidateActivity, CandidateActivityType
 from models.calendar_connection import CalendarConnection
+from utils.tokens import (
+    create_self_schedule_token,
+    decode_self_schedule_token,
+    validate_self_schedule_token,
+    is_self_schedule_token_expired,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,37 +122,35 @@ async def schedule_interview(
     try:
         logger.info(f"Processing self-schedule request with token: {schedule_data.token[:10]}...")
 
-        # TODO: Implement token validation and decoding (subtask 4-2)
-        # For now, we'll accept any token and use test data
-        # In the real implementation, the token should contain:
-        # - candidate_id
-        # - recruiter_id
-        # - vacancy_id (optional)
-        # - expiration timestamp
-        # - signature/hash for security
-
-        # Mock token parsing for initial implementation
-        # This will be replaced with actual token validation in subtask 4-2
-        token_data = {
-            "candidate_id": None,  # Will be extracted from token
-            "recruiter_id": None,  # Will be extracted from token
-            "vacancy_id": None,  # Will be extracted from token
-            "expires_at": None,  # Will be extracted from token
-        }
-
-        # Validate token format
-        if not schedule_data.token or len(schedule_data.token) < 10:
+        # Validate and decode the self-scheduling token
+        try:
+            token_data = validate_self_schedule_token(schedule_data.token)
+        except (JWTError, ValueError) as e:
+            logger.warning(f"Invalid or expired token: {e}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid scheduling token format",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired scheduling token. Please request a new scheduling link.",
             )
 
-        # TODO: Validate token hasn't expired
-        # TODO: Validate token hasn't been used already
-        # TODO: Extract candidate_id, recruiter_id, vacancy_id from token
+        # Extract IDs from token
+        candidate_id = UUID(token_data.candidate_id)
+        recruiter_id = UUID(token_data.recruiter_id)
+        vacancy_id = UUID(token_data.vacancy_id) if token_data.vacancy_id else None
 
-        # For initial implementation, we'll create a basic interview
-        # This will be enhanced when token system is implemented
+        # Check if token has already been used
+        existing_interview = await db.execute(
+            select(Interview).where(
+                and_(
+                    Interview.scheduling_token == schedule_data.token,
+                    Interview.status != InterviewStatus.CANCELLED,
+                )
+            )
+        )
+        if existing_interview.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This scheduling token has already been used. Please contact the recruiter for a new link.",
+            )
 
         # Validate selected time slot is in the future
         if schedule_data.selected_slot < datetime.now(schedule_data.selected_slot.tzinfo):
@@ -166,39 +171,94 @@ async def schedule_interview(
                 detail=f"Invalid interview type: {schedule_data.interview_type}. Must be one of: {[t.value for t in InterviewType]}",
             )
 
-        # TODO: Get actual candidate, recruiter, and vacancy from token
-        # For now, return a response indicating token validation is needed
-        candidate_name = "Candidate"  # Will come from token
-        recruiter_name = "Recruiter"  # Will come from token
-        vacancy_title = None  # Will come from token
+        # Fetch candidate information
+        candidate = await db.execute(
+            select(Resume).where(Resume.id == candidate_id)
+        )
+        candidate = candidate.scalar_one_or_none()
+        if not candidate:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Candidate not found",
+            )
+
+        # Fetch recruiter information
+        recruiter = await db.execute(
+            select(Recruiter).where(Recruiter.id == recruiter_id)
+        )
+        recruiter = recruiter.scalar_one_or_none()
+        if not recruiter:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recruiter not found",
+            )
+
+        # Fetch vacancy information if provided
+        vacancy_title = None
+        if vacancy_id:
+            vacancy = await db.execute(
+                select(JobVacancy).where(JobVacancy.id == vacancy_id)
+            )
+            vacancy = vacancy.scalar_one_or_none()
+            if vacancy:
+                vacancy_title = vacancy.title
 
         # Create interview title
+        candidate_name = f"{candidate.first_name} {candidate.last_name}".strip() or "Candidate"
         interview_title = f"Interview with {candidate_name}"
         if vacancy_title:
             interview_title = f"{vacancy_title} - {interview_title}"
 
-        # TODO: Create actual interview record once token validation is implemented
-        # For now, return success response with mock data for API contract testing
-
-        logger.info(
-            f"Successfully processed self-schedule request for time slot: {schedule_data.selected_slot.isoformat()}"
+        # Create the interview
+        new_interview = Interview(
+            candidate_id=candidate_id,
+            recruiter_id=recruiter_id,
+            vacancy_id=vacancy_id,
+            scheduled_start=schedule_data.selected_slot,
+            scheduled_end=scheduled_end,
+            duration_minutes=schedule_data.duration_minutes,
+            status=InterviewStatus.SCHEDULED,
+            interview_type=interview_type,
+            title=interview_title,
+            scheduling_token=schedule_data.token,
+            token_used_at=datetime.utcnow(),
         )
 
-        # Mock response for initial implementation
-        # This will be replaced with actual interview creation in subtask 4-2
-        mock_interview_id = "00000000-0000-0000-0000-000000000000"
+        db.add(new_interview)
+        await db.commit()
+        await db.refresh(new_interview)
+
+        logger.info(
+            f"Successfully scheduled interview {new_interview.id} for candidate {candidate_id} "
+            f"at {schedule_data.selected_slot.isoformat()}"
+        )
+
+        # Log candidate activity
+        activity = CandidateActivity(
+            candidate_id=candidate_id,
+            activity_type=CandidateActivityType.INTERVIEW_SCHEDULED,
+            description=f"Self-scheduled interview for {interview_title}",
+            metadata={
+                "interview_id": str(new_interview.id),
+                "scheduled_start": schedule_data.selected_slot.isoformat(),
+                "duration_minutes": schedule_data.duration_minutes,
+                "interview_type": interview_type.value,
+            },
+        )
+        db.add(activity)
+        await db.commit()
 
         response_data = {
-            "interview_id": mock_interview_id,
+            "interview_id": str(new_interview.id),
             "candidate_name": candidate_name,
             "scheduled_start": schedule_data.selected_slot.isoformat(),
             "scheduled_end": scheduled_end.isoformat(),
             "duration_minutes": schedule_data.duration_minutes,
             "interview_type": interview_type.value,
             "title": interview_title,
-            "meeting_link": None,  # Will be generated after calendar integration
-            "location": None,
-            "recruiter_name": recruiter_name,
+            "meeting_link": new_interview.meeting_link,
+            "location": new_interview.location,
+            "recruiter_name": f"{recruiter.first_name} {recruiter.last_name}".strip() if recruiter else "Recruiter",
             "message": "Interview scheduled successfully! You will receive a confirmation email shortly.",
         }
 
@@ -238,21 +298,43 @@ async def get_available_slots(
     try:
         logger.info(f"Fetching available slots for token: {slots_request.token[:10]}...")
 
-        # TODO: Implement token validation and decoding (subtask 4-2)
-        # For now, return mock data for API contract testing
-
-        # Validate token format
-        if not slots_request.token or len(slots_request.token) < 10:
+        # Validate and decode the self-scheduling token
+        try:
+            token_data = validate_self_schedule_token(slots_request.token)
+        except (JWTError, ValueError) as e:
+            logger.warning(f"Invalid or expired token: {e}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid scheduling token format",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired scheduling token. Please request a new scheduling link.",
             )
 
-        # TODO: Validate token and extract recruiter_id, vacancy_id
-        # TODO: Fetch actual available slots from recruiter's calendar
-        # TODO: Filter out already booked slots
+        # Extract IDs from token
+        recruiter_id = UUID(token_data.recruiter_id)
+        vacancy_id = UUID(token_data.vacancy_id) if token_data.vacancy_id else None
 
-        # Mock response for initial implementation
+        # Fetch recruiter information
+        recruiter = await db.execute(
+            select(Recruiter).where(Recruiter.id == recruiter_id)
+        )
+        recruiter = recruiter.scalar_one_or_none()
+        if not recruiter:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recruiter not found",
+            )
+
+        # Fetch vacancy information if provided
+        vacancy_title = None
+        if vacancy_id:
+            vacancy = await db.execute(
+                select(JobVacancy).where(JobVacancy.id == vacancy_id)
+            )
+            vacancy = vacancy.scalar_one_or_none()
+            if vacancy:
+                vacancy_title = vacancy.title
+
+        # TODO: Fetch actual available slots from recruiter's calendar
+        # For now, return mock slots (calendar integration in later subtasks)
         mock_slots = [
             {
                 "start_time": (datetime.now() + timedelta(days=1, hours=10)).isoformat(),
@@ -275,13 +357,13 @@ async def get_available_slots(
         ]
 
         response_data = {
-            "recruiter_name": "Recruiter Name",  # Will come from token
-            "vacancy_title": None,  # Will come from token
+            "recruiter_name": f"{recruiter.first_name} {recruiter.last_name}".strip() if recruiter else "Recruiter",
+            "vacancy_title": vacancy_title,
             "available_slots": mock_slots,
-            "expires_at": (datetime.now() + timedelta(days=7)).isoformat(),  # Default 7-day expiration
+            "expires_at": token_data.expires_at.isoformat(),
         }
 
-        logger.info(f"Retrieved {len(mock_slots)} available slots")
+        logger.info(f"Retrieved {len(mock_slots)} available slots for recruiter {recruiter_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -319,26 +401,67 @@ async def verify_scheduling_token(
     try:
         logger.info(f"Verifying token: {token[:10]}...")
 
-        # Validate token format
-        if not token or len(token) < 10:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token format",
+        # Validate and decode the self-scheduling token
+        try:
+            token_data = validate_self_schedule_token(token)
+        except (JWTError, ValueError) as e:
+            logger.warning(f"Invalid or expired token: {e}")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "valid": False,
+                    "message": "Invalid or expired scheduling token. Please request a new scheduling link.",
+                },
             )
 
-        # TODO: Implement actual token verification (subtask 4-2)
-        # For now, return mock success response
+        # Extract IDs from token
+        candidate_id = UUID(token_data.candidate_id)
+        recruiter_id = UUID(token_data.recruiter_id)
+        vacancy_id = UUID(token_data.vacancy_id) if token_data.vacancy_id else None
+
+        # Fetch candidate information
+        candidate = await db.execute(
+            select(Resume).where(Resume.id == candidate_id)
+        )
+        candidate = candidate.scalar_one_or_none()
+
+        # Fetch recruiter information
+        recruiter = await db.execute(
+            select(Recruiter).where(Recruiter.id == recruiter_id)
+        )
+        recruiter = recruiter.scalar_one_or_none()
+
+        # Fetch vacancy information if provided
+        vacancy_title = None
+        if vacancy_id:
+            vacancy = await db.execute(
+                select(JobVacancy).where(JobVacancy.id == vacancy_id)
+            )
+            vacancy = vacancy.scalar_one_or_none()
+            if vacancy:
+                vacancy_title = vacancy.title
+
+        # Check if token has already been used
+        existing_interview = await db.execute(
+            select(Interview).where(
+                and_(
+                    Interview.scheduling_token == token,
+                    Interview.status != InterviewStatus.CANCELLED,
+                )
+            )
+        )
+        token_already_used = existing_interview.scalar_one_or_none() is not None
 
         response_data = {
-            "valid": True,
-            "candidate_name": "Candidate Name",  # Will come from token
-            "recruiter_name": "Recruiter Name",  # Will come from token
-            "vacancy_title": None,  # Will come from token
-            "expires_at": (datetime.now() + timedelta(days=7)).isoformat(),
-            "message": "Token is valid and ready for scheduling",
+            "valid": not token_already_used,
+            "candidate_name": f"{candidate.first_name} {candidate.last_name}".strip() if candidate else "Candidate",
+            "recruiter_name": f"{recruiter.first_name} {recruiter.last_name}".strip() if recruiter else "Recruiter",
+            "vacancy_title": vacancy_title,
+            "expires_at": token_data.expires_at.isoformat(),
+            "message": "Token has already been used" if token_already_used else "Token is valid and ready for scheduling",
         }
 
-        logger.info(f"Token verified successfully")
+        logger.info(f"Token verified: valid={response_data['valid']}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

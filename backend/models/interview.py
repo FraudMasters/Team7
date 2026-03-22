@@ -59,6 +59,8 @@ class Interview(Base, UUIDMixin, TimestampMixin):
         calendar_event_id: Optional external calendar event ID
         calendar_provider: Provider of connected calendar (google/outlook)
         is_reminder_sent: Whether reminder notification has been sent
+        scheduling_token: Optional self-scheduling token for candidate booking
+        token_used_at: Optional timestamp when scheduling token was used
         created_at: Timestamp when interview was created (inherited)
         updated_at: Timestamp when interview was last updated (inherited)
     """
@@ -98,6 +100,12 @@ class Interview(Base, UUIDMixin, TimestampMixin):
     calendar_provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     is_reminder_sent: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
+    )
+    scheduling_token: Mapped[Optional[str]] = mapped_column(
+        String(500), nullable=True, index=True
+    )
+    token_used_at: Mapped[Optional[DateTime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     def __repr__(self) -> str:
