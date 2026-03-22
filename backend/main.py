@@ -297,6 +297,7 @@ from api import (
     config,
     websocket,
     auth,
+    oauth,
     inbound_email,
     hiring_manager,
     parsing_corrections,
@@ -347,6 +348,7 @@ app.include_router(job_descriptions.router, prefix="/api/job-descriptions", tags
 app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(oauth.router, prefix="/api/oauth", tags=["OAuth"])
 app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
 
