@@ -37,6 +37,7 @@ from .saved_job import SavedJob
 from .search_alert import SearchAlert
 from .search_history import SearchHistory
 from .audit_log import AuditLog, AuditActionType
+from .audit_alert_config import AuditAlertConfig, AlertType, AlertSeverity
 from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
@@ -93,6 +94,9 @@ __all__ = [
     "SearchHistory",
     "AuditLog",
     "AuditActionType",
+    "AuditAlertConfig",
+    "AlertType",
+    "AlertSeverity",
     "ConfigChange",
     "ConfigChangeAction",
     "OrganizationExplanationPreferences",

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -21,6 +22,8 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  ListItemButton,
+  ListItemIcon,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -33,6 +36,9 @@ import {
   Lock as LockIcon,
   Save as SaveIcon,
   Refresh as RefreshIcon,
+  History as HistoryIcon,
+  Notifications as NotificationsIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { apiClient } from '../../api/client';
 
@@ -125,6 +131,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
  * ```
  */
 export function AdminSettings() {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -595,6 +602,41 @@ export function AdminSettings() {
                   </Typography>
                 </Alert>
               )}
+            </Paper>
+          </Grid>
+
+          {/* Audit Settings */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <HistoryIcon color="primary" />
+                <Typography variant="h6" fontWeight={600}>
+                  Audit Settings
+                </Typography>
+              </Box>
+
+              <List>
+                <ListItemButton onClick={() => navigate('/admin/audit-retention')}>
+                  <ListItemIcon>
+                    <StorageIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Audit Retention"
+                    secondary="Configure audit log retention policies"
+                  />
+                  <ChevronRightIcon color="action" />
+                </ListItemButton>
+                <ListItemButton onClick={() => navigate('/admin/audit-alerts')}>
+                  <ListItemIcon>
+                    <NotificationsIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Audit Alerts"
+                    secondary="Configure audit log alert rules"
+                  />
+                  <ChevronRightIcon color="action" />
+                </ListItemButton>
+              </List>
             </Paper>
           </Grid>
 

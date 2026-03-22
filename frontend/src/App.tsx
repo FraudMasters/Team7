@@ -88,11 +88,13 @@ import { TemplateBuilder } from './components/TemplateBuilder/TemplateBuilder';
 import FeedbackTemplatesPage from './pages/FeedbackTemplates';
 import SMSTemplateDemo from './pages/SMSTemplateDemo';
 
-// AI Explainability Dashboard (lazy loaded)
+// Admin Pages
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
   () => import('./pages/admin/AIExplainabilityDashboard')
 );
+import { AuditRetentionSettings } from './pages/admin/AuditRetentionSettings';
+import { AuditAlertSettings } from './pages/admin/AuditAlertSettings';
 
 /**
  * Protected Recruiter Layout Wrapper
@@ -284,6 +286,8 @@ function App() {
             </Suspense>
           }
         />
+        <Route path="/admin/audit-retention" element={<AuditRetentionSettings />} />
+        <Route path="/admin/audit-alerts" element={<AuditAlertSettings />} />
 
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />

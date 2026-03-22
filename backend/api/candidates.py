@@ -31,6 +31,8 @@ from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
+from models.audit_log import AuditActionType
+from utils.audit_logger import log_audit_event, get_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -1602,6 +1604,23 @@ async def move_candidate(
         db.add(analytics_event)
         await db.commit()
 
+        # Log audit event for stage change
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.CANDIDATE_STAGE_CHANGED,
+            entity_type="resume",
+            entity_id=candidate_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            before_value={"stage": previous_stage},
+            after_value={"stage": new_stage_name},
+            action_data={
+                "vacancy_id": str(vacancy_uuid) if vacancy_uuid else None,
+                "notes": stage_data.notes,
+            },
+        )
+
         logger.info(
             f"Candidate {candidate_id} moved from {previous_stage} to {new_stage_name}"
         )
@@ -1802,6 +1821,25 @@ async def bulk_move_candidates(
                     },
                 )
                 db.add(analytics_event)
+
+                # Log audit event for stage change
+                ip_address, user_agent = get_request_context(request)
+                await log_audit_event(
+                    db=db,
+                    action_type=AuditActionType.CANDIDATE_STAGE_CHANGED,
+                    entity_type="resume",
+                    entity_id=candidate_uuid,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    before_value={"stage": previous_stage},
+                    after_value={"stage": new_stage_name},
+                    action_data={
+                        "vacancy_id": str(vacancy_uuid) if vacancy_uuid else None,
+                        "notes": bulk_data.notes,
+                        "bulk_operation": True,
+                    },
+                )
+
                 await db.commit()
 
                 results.append({
@@ -1856,6 +1894,7 @@ async def bulk_move_candidates(
     tags=["Candidates"],
 )
 async def get_candidates_for_vacancy(
+    request: Request,
     vacancy_id: str,
     limit: int = Query(50, ge=1, le=200, description="Maximum candidates to return"),
     db: AsyncSession = Depends(get_db),
@@ -1936,6 +1975,22 @@ async def get_candidates_for_vacancy(
 
         logger.info(
             f"Returning {len(rankings)} candidates for vacancy {vacancy_id}"
+        )
+
+        # Log audit event for candidate ranking
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.CANDIDATE_RANKED,
+            entity_type="vacancy",
+            entity_id=vacancy_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "candidate_count": len(rankings),
+                "limit": limit,
+                "ranking_algorithm": "enhanced_ml_ranking",
+            },
         )
 
         return JSONResponse(

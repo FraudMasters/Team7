@@ -35,6 +35,10 @@ import tasks.webhook_tasks  # noqa: F401
 # This ensures workflow tasks are available for Celery workers
 import tasks.workflow_tasks  # noqa: F401
 
+# Import audit alerting tasks to register suspicious activity monitoring tasks
+# This ensures audit alerting tasks are available for Celery workers
+import tasks.audit_alerting  # noqa: F401
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
