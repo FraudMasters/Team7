@@ -35,7 +35,8 @@
     "yes": "Yes",
     "no": "No",
     "or": "or",
-    "and": "and"
+    "and": "and",
+    "dismiss": "Dismiss"
   },
   "nav": {
     "home": "Home",
@@ -473,6 +474,43 @@
     },
     "matched": "Matched ({{count}})",
     "missing": "Missing ({{count}})"
+  },
+  "linkedin": {
+    "search": {
+      "title": "LinkedIn Candidate Search",
+      "keywords": "Keywords",
+      "keywordsPlaceholder": "e.g., Software Engineer, Product Manager",
+      "location": "Location",
+      "skills": "Skills",
+      "selectSkills": "Select or type skills",
+      "industry": "Industry",
+      "experienceLevel": "Experience Level",
+      "any": "Any",
+      "experience": {
+        "entry": "Entry Level (0-2 years)",
+        "associate": "Associate (2-4 years)",
+        "mid": "Mid-Senior (4-7 years)",
+        "senior": "Senior (7-10 years)",
+        "director": "Director (10+ years)",
+        "executive": "Executive (15+ years)"
+      },
+      "search": "Search",
+      "searching": "Searching...",
+      "clearFilters": "Clear All Filters",
+      "resultsTitle": "{{count}} candidates found",
+      "selectAll": "Select All",
+      "import": "Import",
+      "importing": "Importing...",
+      "imported": "Imported",
+      "importSelected": "Import Selected ({{count}})",
+      "viewProfile": "View on LinkedIn",
+      "noResults": "No candidates found",
+      "adjustFilters": "Try adjusting your search filters or keywords",
+      "errors": {
+        "searchFailed": "Failed to search LinkedIn profiles. Please try again.",
+        "importFailed": "Failed to import profile. Please try again."
+      }
+    }
   },
   "analyticsDashboard": {
     "title": "Hiring Analytics",
