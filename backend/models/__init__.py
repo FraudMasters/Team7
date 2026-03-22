@@ -44,6 +44,7 @@ from .built_resume import BuiltResume
 from .token_blacklist import TokenBlacklist
 from .oauth_provider import OAuthProvider
 from .oauth_token import OAuthToken
+from .login_attempt import LoginAttempt
 
 __all__ = [
     "Base",
@@ -102,4 +103,5 @@ __all__ = [
     "TokenBlacklist",
     "OAuthProvider",
     "OAuthToken",
+    "LoginAttempt",
 ]
