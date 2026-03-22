@@ -32,6 +32,7 @@ from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
+from .import_job import ImportJob, ImportJobStatus, ImportFormat
 from .ats_result import ATSResult
 from .saved_search import SavedSearch
 from .saved_job import SavedJob
@@ -88,6 +89,9 @@ __all__ = [
     "BackupConfig",
     "BackupType",
     "BackupStatus",
+    "ImportJob",
+    "ImportJobStatus",
+    "ImportFormat",
     "ATSResult",
     "SavedSearch",
     "SavedJob",
