@@ -3326,6 +3326,109 @@ export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
   data: AnalyticsUpdateData;
 }
 
+// ==================== Calendar Integration Types ====================
+
+/**
+ * Supported calendar providers
+ */
+export type CalendarProvider = 'google' | 'outlook';
+
+/**
+ * Calendar connection status
+ */
+export type ConnectionStatus = 'active' | 'expired' | 'error' | 'disconnected';
+
+/**
+ * Create calendar connection request
+ */
+export interface CalendarConnectionCreate {
+  recruiter_id: string;
+  provider: CalendarProvider;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+  calendar_email: string;
+  calendar_id?: string;
+  webhook_subscription_id?: string;
+}
+
+/**
+ * Update calendar connection request
+ */
+export interface CalendarConnectionUpdate {
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: string;
+  status?: ConnectionStatus;
+  error_message?: string;
+  webhook_subscription_id?: string;
+  last_sync_at?: string;
+}
+
+/**
+ * Calendar connection response
+ */
+export interface CalendarConnectionResponse {
+  id: string;
+  recruiter_id: string;
+  recruiter_name?: string;
+  recruiter_email?: string;
+  provider: CalendarProvider;
+  calendar_email: string;
+  calendar_id?: string;
+  status: ConnectionStatus;
+  token_expires_at: string;
+  webhook_subscription_id?: string;
+  last_sync_at?: string;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
+/**
+ * Calendar connection list response
+ */
+export interface CalendarConnectionListResponse {
+  connections: CalendarConnectionResponse[];
+  total_count: number;
+}
+
+/**
+ * Interviewer availability status
+ */
+export interface InterviewerAvailability {
+  interviewer_id: string;
+  interviewer_name?: string;
+  interviewer_email?: string;
+  is_available: boolean;
+  has_calendar_connection: boolean;
+  calendar_provider?: CalendarProvider;
+  conflicting_events: string[];
+}
+
+/**
+ * Availability check request
+ */
+export interface AvailabilityCheckRequest {
+  interviewer_ids: string[];
+  start_time: string;
+  duration_minutes: number;
+}
+
+/**
+ * Availability check response
+ */
+export interface AvailabilityCheckResponse {
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  all_available: boolean;
+  interviewer_count: number;
+  available_count: number;
+  interviewer_availability: InterviewerAvailability[];
+}
+
 // ==================== Parsing Correction Types ====================
 
 // Re-export types from parsingCorrection module for centralized access
