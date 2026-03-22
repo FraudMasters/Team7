@@ -43,6 +43,9 @@ class BaseConfig(BaseSettings):
         analysis_timeout_seconds: Maximum time for resume analysis
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         session_idle_timeout_minutes: Session idle timeout in minutes
+        login_max_attempts: Maximum failed login attempts before lockout
+        login_lockout_duration_minutes: Account lockout duration in minutes
+        login_lockout_enabled: Whether account lockout is enabled
         oauth_enabled: Whether OAuth 2.0 authentication is enabled
         oauth_session_lifetime_seconds: OAuth session lifetime in seconds
         oauth_google_client_id: Google OAuth 2.0 client ID
@@ -152,6 +155,26 @@ class BaseConfig(BaseSettings):
         ge=5,
         le=1440,
         description="Session idle timeout in minutes (5 minutes to 24 hours)",
+    )
+
+    # Login Protection Configuration
+    login_max_attempts: int = Field(
+        default=5,
+        ge=3,
+        le=10,
+        description="Maximum failed login attempts before account lockout",
+    )
+
+    login_lockout_duration_minutes: int = Field(
+        default=15,
+        ge=5,
+        le=1440,
+        description="Account lockout duration in minutes (5 minutes to 24 hours)",
+    )
+
+    login_lockout_enabled: bool = Field(
+        default=True,
+        description="Enable account lockout after failed login attempts",
     )
 
     # OAuth 2.0 Configuration
