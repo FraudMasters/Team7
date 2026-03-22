@@ -286,8 +286,8 @@ async def list_feedback(
             f"feedback_source: {feedback_source}"
         )
 
-        # Build query with filters
-        query = select(SkillFeedback)
+        # Build query with filters and ordering
+        query = select(SkillFeedback).order_by(SkillFeedback.created_at.desc())
 
         if resume_id:
             try:
