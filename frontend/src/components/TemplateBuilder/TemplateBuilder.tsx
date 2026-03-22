@@ -43,6 +43,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationTemplatesClient } from '../../api/notificationTemplates';
 import { BlockEditor } from './BlockEditor';
 import { VariableSelectorButton } from './VariableSelector';
+import { TemplatePreview } from './TemplatePreview';
 import type {
   TemplateBlock,
   TextBlock,
@@ -138,6 +139,7 @@ export function TemplateBuilder({
 
   // UI state
   const [showSettings, setShowSettings] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Refs for text fields
@@ -338,8 +340,8 @@ export function TemplateBuilder({
               </Button>
               <Button
                 startIcon={<PreviewIcon />}
-                variant="outlined"
-                disabled={blocks.length === 0}
+                variant={showPreview ? 'contained' : 'outlined'}
+                onClick={() => setShowPreview(!showPreview)}
               >
                 Preview
               </Button>
@@ -486,7 +488,7 @@ export function TemplateBuilder({
         {/* Main Content Area */}
         <Box sx={{ flex: 1, display: 'flex', gap: 2, minHeight: 0 }}>
           {/* Block Palette */}
-          <Paper sx={{ width: 280, p: 2, flexShrink: 0 }}>
+          <Paper sx={{ width: 250, p: 2, flexShrink: 0 }}>
             <Typography variant="h6" gutterBottom>
               Block Palette
             </Typography>
@@ -554,7 +556,7 @@ export function TemplateBuilder({
           {/* Template Canvas */}
           <Paper
             sx={{
-              flex: 1,
+              flex: showPreview ? 0.5 : 1,
               p: 3,
               display: 'flex',
               flexDirection: 'column',
@@ -641,6 +643,17 @@ export function TemplateBuilder({
               )}
             </Droppable>
           </Paper>
+
+          {/* Preview Pane */}
+          {showPreview && (
+            <Box sx={{ flex: 0.5, minWidth: 0 }}>
+              <TemplatePreview
+                type={templateType}
+                subject={subject}
+                blocks={blocks}
+              />
+            </Box>
+          )}
         </Box>
       </Box>
     </DragDropContext>
