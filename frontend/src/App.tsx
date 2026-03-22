@@ -79,6 +79,9 @@ const AIExplainabilityDashboard = lazy(
   () => import('./pages/admin/AIExplainabilityDashboard')
 );
 
+// Test Pages
+import AvailabilitySlotPickerTest from './pages/AvailabilitySlotPickerTest';
+
 /**
  * Protected Recruiter Layout Wrapper
  *
@@ -236,6 +239,9 @@ function App() {
             </Suspense>
           }
         />
+
+        {/* Test Routes - Development only */}
+        <Route path="/schedule/test-token" element={<AvailabilitySlotPickerTest />} />
 
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
