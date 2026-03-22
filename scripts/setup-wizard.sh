@@ -184,14 +184,22 @@ check_prerequisites() {
         if docker ps &> /dev/null; then
             log_success "✓ Docker daemon is running"
         else
-            log_error "✗ Docker daemon is not running"
-            log_info "Please start Docker Desktop or the Docker daemon"
-            all_good=false
+            if [ "$DRY_RUN" = true ]; then
+                log_warning "⚠ Docker daemon is not running (continuing in dry-run mode)"
+            else
+                log_error "✗ Docker daemon is not running"
+                log_info "Please start Docker Desktop or the Docker daemon"
+                all_good=false
+            fi
         fi
     else
-        log_error "✗ Docker is not installed"
-        log_info "Install from: https://www.docker.com/products/docker-desktop"
-        all_good=false
+        if [ "$DRY_RUN" = true ]; then
+            log_warning "⚠ Docker is not installed (continuing in dry-run mode)"
+        else
+            log_error "✗ Docker is not installed"
+            log_info "Install from: https://www.docker.com/products/docker-desktop"
+            all_good=false
+        fi
     fi
 
     # Check Docker Compose
@@ -204,9 +212,13 @@ check_prerequisites() {
         fi
         log_success "✓ Docker Compose installed (version $compose_version)"
     else
-        log_error "✗ Docker Compose is not available"
-        log_info "Install Docker Desktop which includes Compose"
-        all_good=false
+        if [ "$DRY_RUN" = true ]; then
+            log_warning "⚠ Docker Compose is not available (continuing in dry-run mode)"
+        else
+            log_error "✗ Docker Compose is not available"
+            log_info "Install Docker Desktop which includes Compose"
+            all_good=false
+        fi
     fi
 
     # Check curl
@@ -686,14 +698,14 @@ run_health_checks() {
         return 0
     fi
 
-    if [ "$DRY_RUN" = true ]; then
-        log_info "[DRY RUN] Would execute: bash scripts/health-check.sh"
-        return 0
-    fi
-
     # Check if health check script exists
     if [ ! -f scripts/health-check.sh ]; then
         log_warning "Health check script not found, performing basic checks..."
+
+        if [ "$DRY_RUN" = true ]; then
+            log_info "[DRY RUN] Would perform basic health checks"
+            return 0
+        fi
 
         # Basic health checks
         sleep 10
@@ -715,6 +727,18 @@ run_health_checks() {
         fi
 
         return 0
+    fi
+
+    # Run comprehensive health check using health-check.sh
+    if [ "$DRY_RUN" = true ]; then
+        log_info "Running health check validation in dry-run mode..."
+        if bash scripts/health-check.sh --dry-run; then
+            log_success "Health check script validation passed"
+            return 0
+        else
+            log_error "Health check script validation failed"
+            return 1
+        fi
     fi
 
     # Run comprehensive health check
@@ -777,6 +801,11 @@ display_summary() {
 main() {
     # Parse arguments
     parse_args "$@"
+
+    # Dry-run mode implies non-interactive
+    if [ "$DRY_RUN" = true ]; then
+        NON_INTERACTIVE=true
+    fi
 
     # Show banner
     echo ""
