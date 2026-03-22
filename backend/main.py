@@ -290,6 +290,7 @@ from api import (
     candidate_tags,
     candidate_notes,
     candidate_activities,
+    candidate_documents,
     search,
     job_search,
     job_applications,
@@ -351,6 +352,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
 app.include_router(candidate_portal.router, prefix="/api/candidate-portal", tags=["Candidate Portal"])
+app.include_router(candidate_documents.router, prefix="/api/candidate-documents", tags=["Candidate Documents"])
 
 
 if __name__ == "__main__":
