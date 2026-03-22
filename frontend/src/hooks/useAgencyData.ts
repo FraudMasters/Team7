@@ -21,6 +21,31 @@ export interface AgencyAnalytics {
 }
 
 /**
+ * Client billing data
+ */
+export interface ClientBillingData {
+  tenant_id: string;
+  name: string;
+  status: string;
+  monthly_fee: number;
+  usage_costs: number;
+  total_billing: number;
+  candidates_count: number;
+  active_jobs_count: number;
+}
+
+/**
+ * Agency billing metrics
+ */
+export interface AgencyBillingData {
+  total_revenue: number;
+  monthly_recurring: number;
+  usage_costs: number;
+  active_clients_count: number;
+  clients: ClientBillingData[];
+}
+
+/**
  * Hook for fetching agencies list
  *
  * @param isActive - Optional filter for active agencies
@@ -219,6 +244,28 @@ export function useAgencyAnalytics() {
       const response = await agenciesClient.getAxiosInstance().get<AgencyAnalytics>(
         '/api/agencies/analytics'
       );
+      return response.data;
+    },
+  });
+}
+
+/**
+ * Hook for fetching agency billing data
+ *
+ * @param startDate - Optional start date for filtering
+ * @param endDate - Optional end date for filtering
+ * @returns Query result with agency billing metrics and per-client breakdown
+ */
+export function useAgencyBilling(params?: { startDate?: string; endDate?: string }) {
+  return useQuery({
+    queryKey: ['agency-billing', params],
+    queryFn: async () => {
+      const queryParams = new URLSearchParams();
+      if (params?.startDate) queryParams.append('start_date', params.startDate);
+      if (params?.endDate) queryParams.append('end_date', params.endDate);
+
+      const url = `/api/agencies/billing${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await agenciesClient.getAxiosInstance().get<AgencyBillingData>(url);
       return response.data;
     },
   });
