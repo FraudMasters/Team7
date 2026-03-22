@@ -83,6 +83,11 @@ import PluginsPage from './pages/developer/Plugins';
 import WorkflowsPage from './pages/developer/Workflows';
 import AnalyticsPage from './pages/developer/Analytics';
 
+// Template Builder
+import { TemplateBuilder } from './components/TemplateBuilder/TemplateBuilder';
+import FeedbackTemplatesPage from './pages/FeedbackTemplates';
+import SMSTemplateDemo from './pages/SMSTemplateDemo';
+
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
@@ -212,6 +217,10 @@ function App() {
           <Route index element={<JobSeekerProfilePage />} />
         </Route>
 
+        {/* Template Builder (standalone, no auth required for development) */}
+        <Route path="/templates/builder" element={<TemplateBuilder />} />
+        <Route path="/templates/sms" element={<SMSTemplateDemo />} />
+
         {/* Recruiter Flow - Protected with role-based access control */}
         <Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
           <Route path="dashboard" element={<DashboardPage />} />
@@ -240,6 +249,7 @@ function App() {
           <Route path="analytics/skill-feedback" element={<SkillFeedbackAnalytics />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+          <Route path="feedback-templates" element={<FeedbackTemplatesPage />} />
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}
