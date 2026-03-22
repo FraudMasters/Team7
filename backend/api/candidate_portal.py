@@ -21,6 +21,7 @@ from models.job_application import JobApplication, ApplicationStatus
 from models.job_vacancy import JobVacancy
 from models.interview import Interview, InterviewStatus
 from models.candidate_document import CandidateDocument, DocumentType
+from models.communication import Communication
 from models.user import User
 from dependencies.auth import get_current_user
 
@@ -64,6 +65,22 @@ class DocumentSummaryItem(BaseModel):
     filename: str = Field(..., description="Original filename")
     description: Optional[str] = Field(None, description="Document description")
     uploaded_at: str = Field(..., description="Upload timestamp")
+
+
+class CommunicationSummaryItem(BaseModel):
+    """Summary of a communication for candidate portal display."""
+
+    id: str = Field(..., description="Communication ID")
+    type: str = Field(..., description="Communication type")
+    direction: str = Field(..., description="Communication direction")
+    status: str = Field(..., description="Communication status")
+    subject: Optional[str] = Field(None, description="Communication subject")
+    body: Optional[str] = Field(None, description="Communication body/content")
+    sent_at: Optional[str] = Field(None, description="Sent timestamp")
+    received_at: Optional[str] = Field(None, description="Received timestamp")
+    vacancy_id: Optional[str] = Field(None, description="Related vacancy ID")
+    vacancy_title: Optional[str] = Field(None, description="Related job title")
+    created_at: str = Field(..., description="Creation timestamp")
 
 
 class ApplicationStats(BaseModel):
@@ -495,4 +512,109 @@ async def get_candidate_interviews(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve interviews",
+        )
+
+
+@router.get(
+    "/communications",
+    response_model=List[CommunicationSummaryItem],
+    tags=["Candidate Portal"],
+)
+async def get_candidate_communications(
+    request: Request,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of records to return"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    Get all communications for authenticated candidate.
+
+    Retrieves communication history including emails, SMS messages, phone calls,
+    and in-system messages related to the candidate's job applications and interviews.
+
+    Args:
+        request: FastAPI request object
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        db: Database session
+        current_user: Authenticated user (candidate)
+
+    Returns:
+        JSON response with list of communications
+
+    Raises:
+        HTTPException(401): If user is not authenticated
+        HTTPException(500): If data retrieval fails
+
+    Example:
+        >>> # Get communication history
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/candidate-portal/communications",
+        ...     headers={"Authorization": f"Bearer {token}"}
+        ... )
+    """
+    try:
+        user_id = current_user.id
+
+        # Get candidate's resume IDs (communications are linked to resumes)
+        from models.resume import Resume
+        resume_query = select(Resume.id).where(Resume.user_id == user_id)
+        resume_result = await db.execute(resume_query)
+        resume_ids = [row[0] for row in resume_result.all()]
+
+        if not resume_ids:
+            logger.info(f"User {user_id} has no resumes, returning empty communications list")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=[],
+            )
+
+        # Build query to fetch communications with vacancy details
+        query = (
+            select(Communication, JobVacancy.title)
+            .outerjoin(JobVacancy, Communication.vacancy_id == JobVacancy.id)
+            .where(Communication.candidate_id.in_(resume_ids))
+            .order_by(Communication.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        # Execute query
+        result = await db.execute(query)
+        communications_data = result.all()
+
+        # Build response
+        communications = [
+            CommunicationSummaryItem(
+                id=str(comm.id),
+                type=comm.type.value,
+                direction=comm.direction.value,
+                status=comm.status.value,
+                subject=comm.subject,
+                body=comm.body,
+                sent_at=comm.sent_at.isoformat() if comm.sent_at else None,
+                received_at=comm.received_at.isoformat() if comm.received_at else None,
+                vacancy_id=str(comm.vacancy_id) if comm.vacancy_id else None,
+                vacancy_title=vacancy_title,
+                created_at=comm.created_at.isoformat() if comm.created_at else None,
+            )
+            for comm, vacancy_title in communications_data
+        ]
+
+        logger.info(
+            f"Retrieved {len(communications)} communications for user {user_id} "
+            f"(skip={skip}, limit={limit})"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=[comm.model_dump() for comm in communications],
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve communications for user {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve communications",
         )
