@@ -30,6 +30,9 @@ class EmailTemplate(Base):
         subject: Тема email с переменными
         body: Тело email с переменными
         variables: Список переменных для подстановки
+        template_blocks: JSON-структура для drag-drop построителя шаблонов
+        category: Категория шаблона
+        pipeline_stage: Этап pipeline для шаблона
         is_active: Флаг активности шаблона
         language: Язык шаблона (en, ru)
         created_at: Время создания записи
@@ -69,6 +72,26 @@ class EmailTemplate(Base):
         JSON,
         nullable=True,
         comment="Список переменных для подстановки",
+    )
+
+    template_blocks: Mapped[Optional[dict]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="JSON-структура для drag-drop построителя шаблонов",
+    )
+
+    category: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="Категория шаблона",
+    )
+
+    pipeline_stage: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="Этап pipeline для шаблона",
     )
 
     is_active: Mapped[bool] = mapped_column(
