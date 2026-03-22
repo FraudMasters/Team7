@@ -43,8 +43,8 @@ class AgencyUser(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "agency_users"
 
-    agency_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True),
+    agency_id: Mapped[str] = mapped_column(
+        String(100),
         ForeignKey("agencies.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
