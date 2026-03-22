@@ -214,6 +214,64 @@ class BulkActionResponse(BaseModel):
     export_data: Optional[Dict[str, Any]] = Field(None, description="Exported data (for 'export' action)")
 
 
+# Kanban-specific models
+class KanbanCandidateCard(BaseModel):
+    """A candidate card for the kanban board."""
+
+    id: str = Field(..., description="Candidate ID (resume ID)")
+    filename: str = Field(..., description="Resume filename")
+    current_stage: str = Field(..., description="Current workflow stage name")
+    stage_id: Optional[str] = Field(None, description="Workflow stage config ID if custom stage")
+    created_at: str = Field(..., description="When candidate was added")
+    updated_at: str = Field(..., description="Last update timestamp")
+    tags: List[TagInfo] = Field(default_factory=list, description="Tags assigned to this candidate")
+    notes_count: int = Field(0, description="Number of notes for this candidate")
+
+
+class KanbanStageColumn(BaseModel):
+    """A column in the kanban board representing a workflow stage."""
+
+    stage_id: Optional[str] = Field(None, description="Stage UUID (for custom stages)")
+    stage_name: str = Field(..., description="Stage name (enum value)")
+    display_name: str = Field(..., description="Display name for the stage")
+    order: int = Field(..., description="Order position of the stage")
+    candidates: List[KanbanCandidateCard] = Field(default_factory=list, description="Candidates in this stage")
+    count: int = Field(0, description="Number of candidates in this stage")
+    wip_limit: Optional[int] = Field(None, description="WIP limit for this stage (if set)")
+    is_over_limit: bool = Field(False, description="Whether this stage is over its WIP limit")
+
+
+class KanbanSwimlane(BaseModel):
+    """A swimlane in the kanban board (grouped by job, recruiter, etc.)."""
+
+    id: str = Field(..., description="Swimlane ID (e.g., vacancy ID for job grouping)")
+    title: str = Field(..., description="Swimlane title (e.g., job title)")
+    subtitle: Optional[str] = Field(None, description="Optional subtitle (e.g., location)")
+    stages: List[KanbanStageColumn] = Field(default_factory=list, description="Stage columns for this swimlane")
+    total_candidates: int = Field(0, description="Total candidates in this swimlane")
+
+
+class KanbanStageSummary(BaseModel):
+    """Summary counts for a stage across all swimlanes."""
+
+    stage_id: Optional[str] = Field(None, description="Stage UUID")
+    stage_name: str = Field(..., description="Stage name")
+    display_name: str = Field(..., description="Display name")
+    order: int = Field(..., description="Order position")
+    total_count: int = Field(0, description="Total candidates across all swimlanes")
+    wip_limit: Optional[int] = Field(None, description="WIP limit for this stage")
+
+
+class KanbanBoardResponse(BaseModel):
+    """Response model for the kanban board data."""
+
+    group_by: str = Field(..., description="Grouping mode: 'job', 'recruiter', or 'none'")
+    swimlanes: List[KanbanSwimlane] = Field(default_factory=list, description="Swimlanes (groups)")
+    stages: List[KanbanStageSummary] = Field(default_factory=list, description="Stage column definitions")
+    total_candidates: int = Field(0, description="Total candidates on the board")
+    unassigned: Optional[KanbanSwimlane] = Field(None, description="Candidates not assigned to any group")
+
+
 @router.get(
     "/",
     response_model=list[CandidateListItem],
@@ -541,6 +599,466 @@ async def list_candidates(
 
 
 @router.get(
+    "/kanban",
+    response_model=KanbanBoardResponse,
+    tags=["Candidates"],
+)
+async def get_kanban_board(
+    request: Request,
+    group_by: str = Query("job", description="Grouping mode: 'job', 'recruiter', or 'none'"),
+    vacancy_id: Optional[str] = Query(None, description="Filter by specific vacancy ID"),
+    tag_id: Optional[str] = Query(None, description="Filter by tag ID"),
+    search: Optional[str] = Query(None, description="Search term to filter candidates"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get kanban board data with swimlane grouping and stage counts.
+
+    Returns candidates organized for a kanban-style board view with:
+    - Swimlanes grouped by job (vacancy), recruiter, or ungrouped
+    - Stage columns with candidate counts and WIP limit status
+    - Candidate cards with key information
+
+    Args:
+        request: FastAPI request object
+        group_by: How to group candidates into swimlanes ('job', 'recruiter', 'none')
+        vacancy_id: Optional filter by specific vacancy ID
+        tag_id: Optional filter by tag ID
+        search: Optional search term to filter candidates by filename
+        db: Database session
+
+    Returns:
+        JSON response with kanban board structure including swimlanes, stages, and candidates
+
+    Raises:
+        HTTPException(400): Invalid group_by value
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> # Get kanban board grouped by job
+        >>> response = requests.get("/api/candidates/kanban?group_by=job")
+        >>> # Filter by vacancy
+        >>> response = requests.get("/api/candidates/kanban?group_by=job&vacancy_id=uuid-123")
+        >>> # No grouping (flat board)
+        >>> response = requests.get("/api/candidates/kanban?group_by=none")
+    """
+    try:
+        logger.info(
+            f"Fetching kanban board - group_by: {group_by}, vacancy_id: {vacancy_id}, "
+            f"tag_id: {tag_id}, search: {search}"
+        )
+
+        # Validate group_by parameter
+        valid_group_by = ["job", "recruiter", "none"]
+        if group_by not in valid_group_by:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid group_by value: {group_by}. Must be one of: {', '.join(valid_group_by)}",
+            )
+
+        # Import JobVacancy model for swimlane grouping
+        from models.job_vacancy import JobVacancy
+
+        # Get all workflow stage configs (ordered)
+        stage_configs_result = await db.execute(
+            select(WorkflowStageConfig)
+            .order_by(WorkflowStageConfig.order_index)
+        )
+        stage_configs = stage_configs_result.scalars().all()
+
+        # Build stage definitions with WIP limits
+        default_stage_order = {
+            "applied": 1,
+            "screening": 2,
+            "interview": 3,
+            "technical": 4,
+            "offer": 5,
+            "hired": 6,
+            "rejected": 7,
+            "withdrawn": 8,
+        }
+
+        # Build stage definitions map
+        stage_defs = {}  # stage_name -> {id, display_name, order, wip_limit}
+
+        # Add custom stages from configs
+        for config in stage_configs:
+            stage_defs[config.stage_name] = {
+                "id": str(config.id),
+                "display_name": config.display_name or config.stage_name,
+                "order": config.order_index or default_stage_order.get(config.stage_name.lower(), 999),
+                "wip_limit": config.wip_limit,
+            }
+
+        # Ensure default stages exist
+        for stage_name, order in default_stage_order.items():
+            if stage_name not in stage_defs:
+                stage_defs[stage_name] = {
+                    "id": None,
+                    "display_name": stage_name.capitalize(),
+                    "order": order,
+                    "wip_limit": None,
+                }
+
+        # Build base query for candidates with their latest hiring stage
+        latest_stage_subq = (
+            select(
+                HiringStage.resume_id,
+                func.max(HiringStage.created_at).label("max_created_at")
+            )
+            .group_by(HiringStage.resume_id)
+            .subquery()
+        )
+
+        # Main query to get candidates with their latest stage
+        query = (
+            select(
+                Resume,
+                HiringStage,
+                WorkflowStageConfig.stage_name.label("custom_stage_name"),
+                WorkflowStageConfig.display_name,
+                WorkflowStageConfig.wip_limit,
+            )
+            .outerjoin(
+                HiringStage,
+                and_(
+                    HiringStage.resume_id == Resume.id,
+                    HiringStage.created_at == latest_stage_subq.c.max_created_at,
+                ),
+            )
+            .outerjoin(
+                WorkflowStageConfig,
+                HiringStage.workflow_stage_config_id == WorkflowStageConfig.id,
+            )
+        )
+
+        # Apply filters
+        if vacancy_id:
+            try:
+                vacancy_uuid = UUID(vacancy_id)
+                query = query.where(HiringStage.vacancy_id == vacancy_uuid)
+            except ValueError:
+                logger.warning(f"Invalid vacancy_id format: {vacancy_id}")
+
+        if search:
+            query = query.where(Resume.filename.ilike(f"%{search}%"))
+
+        # Tag filtering
+        tag_resume_ids = None
+        if tag_id:
+            try:
+                tag_uuid = UUID(tag_id)
+            except ValueError:
+                logger.warning(f"Invalid tag_id format: {tag_id}")
+                tag_resume_ids = []
+                tag_uuid = None
+
+            if tag_uuid:
+                tag_resumes_subq = (
+                    select(
+                        CandidateActivity.candidate_id,
+                        func.max(CandidateActivity.created_at).label("max_created_at")
+                    )
+                    .where(
+                        CandidateActivity.tag_id == tag_uuid,
+                        CandidateActivity.activity_type.in_([
+                            CandidateActivityType.TAG_ADDED,
+                            CandidateActivityType.TAG_REMOVED
+                        ])
+                    )
+                    .group_by(CandidateActivity.candidate_id)
+                    .subquery()
+                )
+
+                tag_resumes_result = await db.execute(
+                    select(CandidateActivity.candidate_id)
+                    .join(
+                        tag_resumes_subq,
+                        and_(
+                            CandidateActivity.candidate_id == tag_resumes_subq.c.candidate_id,
+                            CandidateActivity.created_at == tag_resumes_subq.c.max_created_at,
+                            CandidateActivity.activity_type == CandidateActivityType.TAG_ADDED
+                        )
+                    )
+                )
+                tag_resume_ids = [row[0] for row in tag_resumes_result.all()]
+
+                if not tag_resume_ids:
+                    # No resumes have this tag, return empty board
+                    return JSONResponse(
+                        status_code=status.HTTP_200_OK,
+                        content={
+                            "group_by": group_by,
+                            "swimlanes": [],
+                            "stages": [],
+                            "total_candidates": 0,
+                            "unassigned": None,
+                        },
+                    )
+
+                query = query.where(Resume.id.in_(tag_resume_ids))
+
+        # Execute query
+        result = await db.execute(query)
+        rows = result.all()
+
+        # Get all resume IDs for bulk tag fetching
+        resume_ids = [str(row[0].id) for row in rows]
+
+        # Bulk fetch tags for all resumes
+        tags_by_resume = {}
+        if resume_ids:
+            all_tag_activities_result = await db.execute(
+                select(CandidateActivity, CandidateTag)
+                .outerjoin(
+                    CandidateTag,
+                    CandidateActivity.tag_id == CandidateTag.id
+                )
+                .where(
+                    CandidateActivity.candidate_id.in_(resume_ids),
+                    CandidateActivity.activity_type.in_([
+                        CandidateActivityType.TAG_ADDED,
+                        CandidateActivityType.TAG_REMOVED
+                    ]),
+                )
+                .order_by(CandidateActivity.candidate_id, CandidateActivity.created_at)
+            )
+            all_tag_activity_rows = all_tag_activities_result.all()
+
+            tag_activity_map = {}
+            for activity, tag in all_tag_activity_rows:
+                if tag:
+                    key = (str(activity.candidate_id), str(tag.id))
+                    if key not in tag_activity_map:
+                        tag_activity_map[key] = []
+                    tag_activity_map[key].append({
+                        "activity_type": activity.activity_type,
+                        "timestamp": activity.created_at,
+                        "tag_name": tag.tag_name,
+                        "tag_color": tag.color,
+                        "tag_id": str(tag.id),
+                        "organization_id": str(tag.organization_id),
+                    })
+
+            for (resume_id, tag_id_key), activities in tag_activity_map.items():
+                latest = max(activities, key=lambda x: x["timestamp"])
+                if latest["activity_type"] == CandidateActivityType.TAG_ADDED:
+                    if resume_id not in tags_by_resume:
+                        tags_by_resume[resume_id] = []
+                    tags_by_resume[resume_id].append({
+                        "id": tag_id_key,
+                        "tag_name": latest["tag_name"],
+                        "color": latest["tag_color"],
+                        "organization_id": latest["organization_id"],
+                    })
+
+        # Bulk fetch notes count
+        notes_count_by_resume = {}
+        if resume_ids:
+            notes_count_result = await db.execute(
+                select(CandidateNote.resume_id, func.count(CandidateNote.id))
+                .where(CandidateNote.resume_id.in_(resume_ids))
+                .group_by(CandidateNote.resume_id)
+            )
+            for resume_id, count in notes_count_result.all():
+                notes_count_by_resume[str(resume_id)] = count
+
+        # Get all active vacancies for swimlane grouping
+        vacancies_result = await db.execute(
+            select(JobVacancy).where(JobVacancy.is_active == True)
+        )
+        vacancies = vacancies_result.scalars().all()
+        vacancy_map = {str(v.id): v for v in vacancies}
+
+        # Build candidate cards grouped by swimlane
+        swimlanes_map = {}  # vacancy_id -> swimlane data
+        unassigned_candidates = []
+        stage_totals = {}  # stage_name -> count
+
+        for row in rows:
+            resume = row[0]
+            hiring_stage = row[1]
+            custom_stage_name = row[2]
+            display_name = row[3]
+            wip_limit = row[4]
+            resume_id_str = str(resume.id)
+
+            # Determine stage info
+            if hiring_stage:
+                stage_name = hiring_stage.stage_name
+                stage_display = display_name or custom_stage_name or stage_name
+                stage_id = str(hiring_stage.workflow_stage_config_id) if hiring_stage.workflow_stage_config_id else None
+                vacancy_id_str = str(hiring_stage.vacancy_id) if hiring_stage.vacancy_id else None
+            else:
+                stage_name = HiringStageName.APPLIED.value
+                stage_display = stage_name.capitalize()
+                stage_id = None
+                vacancy_id_str = None
+
+            # Get stage definition
+            stage_def = stage_defs.get(stage_name, stage_defs.get(stage_name.lower(), {
+                "id": stage_id,
+                "display_name": stage_display,
+                "order": 999,
+                "wip_limit": wip_limit,
+            }))
+
+            # Build candidate card
+            card = {
+                "id": resume_id_str,
+                "filename": resume.filename,
+                "current_stage": stage_name,
+                "stage_id": stage_def.get("id") or stage_id,
+                "created_at": resume.created_at.isoformat() if resume.created_at else None,
+                "updated_at": hiring_stage.updated_at.isoformat() if hiring_stage and hiring_stage.updated_at else resume.created_at.isoformat() if resume.created_at else None,
+                "tags": tags_by_resume.get(resume_id_str, []),
+                "notes_count": notes_count_by_resume.get(resume_id_str, 0),
+            }
+
+            # Update stage totals
+            stage_totals[stage_name] = stage_totals.get(stage_name, 0) + 1
+
+            # Group by swimlane based on group_by mode
+            if group_by == "job":
+                if vacancy_id_str and vacancy_id_str in vacancy_map:
+                    if vacancy_id_str not in swimlanes_map:
+                        vacancy = vacancy_map[vacancy_id_str]
+                        swimlanes_map[vacancy_id_str] = {
+                            "id": vacancy_id_str,
+                            "title": vacancy.title,
+                            "subtitle": vacancy.location,
+                            "stages": {},
+                            "total_candidates": 0,
+                        }
+                    swimlanes_map[vacancy_id_str]["total_candidates"] += 1
+                    if stage_name not in swimlanes_map[vacancy_id_str]["stages"]:
+                        swimlanes_map[vacancy_id_str]["stages"][stage_name] = []
+                    swimlanes_map[vacancy_id_str]["stages"][stage_name].append(card)
+                else:
+                    unassigned_candidates.append((stage_name, card))
+            elif group_by == "recruiter":
+                # For recruiter grouping, we would need recruiter assignment data
+                # For now, treat as unassigned
+                unassigned_candidates.append((stage_name, card))
+            else:  # group_by == "none"
+                unassigned_candidates.append((stage_name, card))
+
+        # Build the response structure
+        # Create stage summary list (sorted by order)
+        stages_summary = []
+        for stage_name, stage_def in sorted(stage_defs.items(), key=lambda x: x[1]["order"]):
+            stages_summary.append({
+                "stage_id": stage_def["id"],
+                "stage_name": stage_name,
+                "display_name": stage_def["display_name"],
+                "order": stage_def["order"],
+                "total_count": stage_totals.get(stage_name, 0),
+                "wip_limit": stage_def["wip_limit"],
+            })
+
+        # Build swimlanes with stage columns
+        swimlanes_list = []
+        for swimlane_id, swimlane_data in swimlanes_map.items():
+            stages_columns = []
+            for stage_summary in stages_summary:
+                stage_name = stage_summary["stage_name"]
+                candidates_in_stage = swimlane_data["stages"].get(stage_name, [])
+                stage_def = stage_defs.get(stage_name, {})
+                wip_limit = stage_def.get("wip_limit")
+                is_over_limit = wip_limit is not None and len(candidates_in_stage) > wip_limit
+
+                stages_columns.append({
+                    "stage_id": stage_summary["stage_id"],
+                    "stage_name": stage_name,
+                    "display_name": stage_summary["display_name"],
+                    "order": stage_summary["order"],
+                    "candidates": candidates_in_stage,
+                    "count": len(candidates_in_stage),
+                    "wip_limit": wip_limit,
+                    "is_over_limit": is_over_limit,
+                })
+
+            swimlanes_list.append({
+                "id": swimlane_id,
+                "title": swimlane_data["title"],
+                "subtitle": swimlane_data["subtitle"],
+                "stages": stages_columns,
+                "total_candidates": swimlane_data["total_candidates"],
+            })
+
+        # Sort swimlanes by title
+        swimlanes_list.sort(key=lambda x: x["title"])
+
+        # Build unassigned swimlane if there are unassigned candidates
+        unassigned_swimlane = None
+        if unassigned_candidates:
+            unassigned_stages_map = {}
+            unassigned_total = 0
+            for stage_name, card in unassigned_candidates:
+                if stage_name not in unassigned_stages_map:
+                    unassigned_stages_map[stage_name] = []
+                unassigned_stages_map[stage_name].append(card)
+                unassigned_total += 1
+
+            unassigned_stages_columns = []
+            for stage_summary in stages_summary:
+                stage_name = stage_summary["stage_name"]
+                candidates_in_stage = unassigned_stages_map.get(stage_name, [])
+                stage_def = stage_defs.get(stage_name, {})
+                wip_limit = stage_def.get("wip_limit")
+                is_over_limit = wip_limit is not None and len(candidates_in_stage) > wip_limit
+
+                unassigned_stages_columns.append({
+                    "stage_id": stage_summary["stage_id"],
+                    "stage_name": stage_name,
+                    "display_name": stage_summary["display_name"],
+                    "order": stage_summary["order"],
+                    "candidates": candidates_in_stage,
+                    "count": len(candidates_in_stage),
+                    "wip_limit": wip_limit,
+                    "is_over_limit": is_over_limit,
+                })
+
+            unassigned_swimlane = {
+                "id": "unassigned",
+                "title": "Unassigned Candidates",
+                "subtitle": None,
+                "stages": unassigned_stages_columns,
+                "total_candidates": unassigned_total,
+            }
+
+        total_candidates = sum(s["total_candidates"] for s in swimlanes_list)
+        if unassigned_swimlane:
+            total_candidates += unassigned_swimlane["total_candidates"]
+
+        logger.info(
+            f"Kanban board retrieved: {len(swimlanes_list)} swimlanes, "
+            f"{total_candidates} candidates"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "group_by": group_by,
+                "swimlanes": swimlanes_list,
+                "stages": stages_summary,
+                "total_candidates": total_candidates,
+                "unassigned": unassigned_swimlane,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching kanban board: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch kanban board: {str(e)}",
+        ) from e
+
+
+@router.get(
     "/{candidate_id}",
     response_model=CandidateListItem,
     tags=["Candidates"],
@@ -709,6 +1227,225 @@ async def get_candidate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get candidate: {str(e)}",
+        ) from e
+
+
+# Card Preview Models
+class CandidateCardPreview(BaseModel):
+    """Response model for candidate card preview data."""
+
+    id: str = Field(..., description="Candidate ID (resume ID)")
+    filename: str = Field(..., description="Resume filename")
+    match_score: Optional[float] = Field(None, description="Overall match score (0-1)")
+    recommendation: Optional[str] = Field(None, description="Hiring recommendation")
+    confidence: Optional[float] = Field(None, description="Model confidence (0-1)")
+    tags: List[TagInfo] = Field(default_factory=list, description="Tags assigned to this candidate")
+    recent_activities: List[LatestActivityInfo] = Field(default_factory=list, description="Recent activities for this candidate")
+    vacancy_id: Optional[str] = Field(None, description="Associated vacancy ID if any")
+
+
+@router.get(
+    "/{candidate_id}/card-preview",
+    response_model=CandidateCardPreview,
+    tags=["Candidates"],
+)
+async def get_candidate_card_preview(
+    request: Request,
+    candidate_id: str,
+    vacancy_id: Optional[str] = Query(None, description="Optional vacancy ID to get match score for"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get a candidate's card preview data including match score, tags, and recent activity.
+
+    This endpoint provides optimized data for rendering candidate cards on the kanban board.
+    It includes:
+    - Match score (if vacancy_id is provided or candidate has an associated vacancy)
+    - Tags assigned to the candidate
+    - Recent activities for the candidate
+
+    Args:
+        request: FastAPI request object
+        candidate_id: Resume UUID
+        vacancy_id: Optional vacancy ID to compute match score for specific vacancy
+        db: Database session
+
+    Returns:
+        JSON response with candidate card preview data
+
+    Raises:
+        HTTPException(400): Invalid candidate ID format
+        HTTPException(404): Candidate not found
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> # Get card preview with match score for specific vacancy
+        >>> response = requests.get(
+        ...     "/api/candidates/abc-123/card-preview?vacancy_id=vac-456"
+        ... )
+        >>> response.json()
+        {
+            "id": "abc-123",
+            "filename": "john_doe_resume.pdf",
+            "match_score": 0.85,
+            "recommendation": "excellent",
+            "confidence": 0.88,
+            "tags": [{"id": "tag-1", "tag_name": "Top Talent", "color": "#00ff00", "organization_id": "org-1"}],
+            "recent_activities": [{"activity_type": "STAGE_CHANGED", "created_at": "2024-01-15T10:30:00"}],
+            "vacancy_id": "vac-456"
+        }
+    """
+    try:
+        logger.info(f"Fetching card preview for candidate: {candidate_id}, vacancy_id: {vacancy_id}")
+
+        # Parse candidate_id as UUID
+        try:
+            candidate_uuid = UUID(candidate_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid candidate ID format: {candidate_id}",
+            )
+
+        # Get the resume
+        resume_query = select(Resume).where(Resume.id == candidate_uuid)
+        resume_result = await db.execute(resume_query)
+        resume = resume_result.scalar_one_or_none()
+
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Candidate not found: {candidate_id}",
+            )
+
+        # Get the latest hiring stage to find associated vacancy
+        stage_query = (
+            select(HiringStage)
+            .where(HiringStage.resume_id == candidate_uuid)
+            .order_by(HiringStage.created_at.desc())
+            .limit(1)
+        )
+        stage_result = await db.execute(stage_query)
+        latest_stage = stage_result.scalar_one_or_none()
+
+        # Determine which vacancy to use for match score
+        target_vacancy_id = None
+        if vacancy_id:
+            try:
+                target_vacancy_id = UUID(vacancy_id)
+            except ValueError:
+                logger.warning(f"Invalid vacancy_id format: {vacancy_id}")
+        elif latest_stage and latest_stage.vacancy_id:
+            target_vacancy_id = latest_stage.vacancy_id
+
+        # Fetch match score from CandidateRank if available
+        match_score = None
+        recommendation = None
+        confidence = None
+
+        if target_vacancy_id:
+            from models.candidate_rank import CandidateRank
+
+            rank_query = select(CandidateRank).where(
+                CandidateRank.resume_id == candidate_uuid,
+                CandidateRank.vacancy_id == target_vacancy_id,
+            )
+            rank_result = await db.execute(rank_query)
+            candidate_rank = rank_result.scalar_one_or_none()
+
+            if candidate_rank:
+                match_score = float(candidate_rank.rank_score) if candidate_rank.rank_score else None
+                recommendation = candidate_rank.recommendation
+                confidence = float(candidate_rank.prediction_confidence) if candidate_rank.prediction_confidence else None
+
+        # Fetch tags for this resume
+        tags = []
+        all_tag_activities_result = await db.execute(
+            select(CandidateActivity, CandidateTag)
+            .outerjoin(
+                CandidateTag,
+                CandidateActivity.tag_id == CandidateTag.id
+            )
+            .where(
+                CandidateActivity.candidate_id == candidate_uuid,
+                CandidateActivity.activity_type.in_([
+                    CandidateActivityType.TAG_ADDED,
+                    CandidateActivityType.TAG_REMOVED
+                ]),
+            )
+            .order_by(CandidateActivity.created_at)
+        )
+        all_tag_activity_rows = all_tag_activities_result.all()
+
+        # Build a map of tag_id -> [(activity_type, timestamp, tag_name, tag_color)]
+        tag_activity_map = {}
+        for activity, tag in all_tag_activity_rows:
+            if tag:
+                tag_id_str = str(tag.id)
+                if tag_id_str not in tag_activity_map:
+                    tag_activity_map[tag_id_str] = []
+                tag_activity_map[tag_id_str].append({
+                    "activity_type": activity.activity_type,
+                    "timestamp": activity.created_at,
+                    "tag_name": tag.tag_name,
+                    "tag_color": tag.color,
+                    "organization_id": str(tag.organization_id),
+                })
+
+        # For each tag, check if the latest activity is TAG_ADDED
+        for tag_id, activities in tag_activity_map.items():
+            latest = max(activities, key=lambda x: x["timestamp"])
+            if latest["activity_type"] == CandidateActivityType.TAG_ADDED:
+                tags.append({
+                    "id": tag_id,
+                    "tag_name": latest["tag_name"],
+                    "color": latest["tag_color"],
+                    "organization_id": latest["organization_id"],
+                })
+
+        # Fetch recent activities for this resume (last 5)
+        recent_activities_result = await db.execute(
+            select(CandidateActivity)
+            .where(CandidateActivity.candidate_id == candidate_uuid)
+            .order_by(CandidateActivity.created_at.desc())
+            .limit(5)
+        )
+        recent_activities = recent_activities_result.scalars().all()
+
+        recent_activities_list = [
+            {
+                "activity_type": activity.activity_type.value,
+                "created_at": activity.created_at.isoformat(),
+            }
+            for activity in recent_activities
+        ]
+
+        preview_data = {
+            "id": str(resume.id),
+            "filename": resume.filename,
+            "match_score": match_score,
+            "recommendation": recommendation,
+            "confidence": confidence,
+            "tags": tags,
+            "recent_activities": recent_activities_list,
+            "vacancy_id": str(target_vacancy_id) if target_vacancy_id else None,
+        }
+
+        logger.info(f"Card preview retrieved for candidate {candidate_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=preview_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting card preview for candidate {candidate_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get candidate card preview: {str(e)}",
         ) from e
 
 
