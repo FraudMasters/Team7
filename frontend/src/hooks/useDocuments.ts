@@ -26,7 +26,7 @@ export function useDocuments(params?: {
   return useQuery({
     queryKey: ['documents', params],
     queryFn: async () => {
-      const response = await apiClient.get<DocumentsResponse>('/api/candidate/documents/list', { params });
+      const response = await apiClient.get<DocumentsResponse>('/api/candidate-documents/list', { params });
       return response.data;
     },
   });

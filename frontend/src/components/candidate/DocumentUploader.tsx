@@ -101,7 +101,7 @@ interface DocumentUploaderProps {
  * const uploaderRef = useRef<DocumentUploaderHandle>(null);
  * <DocumentUploader
  *   ref={uploaderRef}
- *   uploadUrl={`${config.api.url}/api/candidate/documents/upload`}
+ *   uploadUrl={`${config.api.url}/api/candidate-documents/upload`}
  *   onUploadComplete={(id, type) => console.log('Uploaded:', id, type)}
  *   showDocumentTypeSelector={true}
  * />
@@ -112,7 +112,7 @@ interface DocumentUploaderProps {
  * ```
  */
 const DocumentUploader = forwardRef<DocumentUploaderHandle, DocumentUploaderProps>(({
-  uploadUrl = `${config.api.url}/api/candidate/documents/upload`,
+  uploadUrl = `${config.api.url}/api/candidate-documents/upload`,
   maxFileSize = 10 * 1024 * 1024, // 10MB
   acceptedFileTypes = ['.pdf', '.docx', '.jpg', '.jpeg', '.png'],
   showDocumentTypeSelector = true,
