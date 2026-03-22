@@ -61,3 +61,4 @@ export type {
   FileStatusItem,
   FileListStatus,
 } from './FileStatusList';
+export { default as ABTestingDashboard } from './ABTestingDashboard';
