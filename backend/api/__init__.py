@@ -6,6 +6,7 @@ resume upload, analysis, and job matching.
 """
 from . import (
     agencies,
+    agency_analytics,
     analysis,
     analytics,
     ats_simulation,
@@ -55,6 +56,7 @@ from . import (
 
 __all__ = [
     "agencies",
+    "agency_analytics",
     "analysis",
     "analytics",
     "ats_simulation",

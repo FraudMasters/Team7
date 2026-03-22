@@ -266,6 +266,7 @@ async def root() -> JSONResponse:
 # Include API routers
 from api import (
     agencies,
+    agency_analytics,
     client_tenants,
     resumes,
     resume_templates,
@@ -337,6 +338,7 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(agency_analytics.router, prefix="/api/agency-analytics", tags=["Agency Analytics"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(bias_alert_config.router, prefix="/api/bias-alert-config", tags=["Bias Alert Configuration"])
 app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
