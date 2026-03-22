@@ -769,69 +769,6 @@ export interface LanguagePreferenceResponse {
   updated_at: string;
 }
 
-// ==================== Search Analytics Types ====================
-
-/**
- * Search query response from analytics
- */
-export interface SearchQueryResponse {
-  id: string;
-  query: string;
-  filters: Record<string, unknown>;
-  results_count: number;
-  execution_time_ms?: number | null;
-  search_type?: string | null;
-  created_at: string;
-}
-
-/**
- * Recent searches response
- */
-export interface RecentSearchesResponse {
-  total: number;
-  searches: SearchQueryResponse[];
-}
-
-/**
- * Popular search response
- */
-export interface PopularSearchResponse {
-  id: string;
-  query: string;
-  filters: Record<string, unknown>;
-  search_count: number;
-  avg_results_count?: number | null;
-  avg_click_through_rate?: number | null;
-  last_searched_at: string;
-}
-
-/**
- * Popular searches response
- */
-export interface PopularSearchesResponse {
-  total: number;
-  searches: PopularSearchResponse[];
-}
-
-/**
- * Zero result search response
- */
-export interface ZeroResultSearchResponse {
-  id: string;
-  query: string;
-  filters: Record<string, unknown>;
-  search_type?: string | null;
-  created_at: string;
-}
-
-/**
- * Zero result searches response
- */
-export interface ZeroResultSearchesResponse {
-  total: number;
-  searches: ZeroResultSearchResponse[];
-}
-
 // ==================== Ranking Types ====================
 
 /**
@@ -2724,38 +2661,6 @@ export interface OptimizationRequest {
 }
 
 /**
- * ATS evaluation result for resume optimization
- */
-export interface ATSEvaluationResult {
-  /** Whether resume passed ATS threshold */
-  passed: boolean;
-  /** Overall ATS score (0-1) */
-  overall_score: number;
-  /** Keyword matching score (0-1) */
-  keyword_score: number;
-  /** Experience relevance score (0-1) */
-  experience_score: number;
-  /** Education match score (0-1) */
-  education_score: number;
-  /** Overall fit score (0-1) */
-  fit_score: number;
-  /** List of ATS-specific issues */
-  ats_issues: string[];
-  /** List of visual/formatting issues */
-  visual_issues: string[];
-  /** List of ATS improvement suggestions */
-  suggestions: string[];
-  /** Detailed ATS feedback */
-  feedback: string;
-  /** Whether resume looks professional */
-  looks_professional?: boolean;
-  /** Whether resume was disqualified */
-  disqualified?: boolean;
-  /** Missing keywords identified */
-  missing_keywords?: string[];
-}
-
-/**
  * Resume optimization feedback response
  */
 export interface OptimizationFeedback {
@@ -2781,8 +2686,6 @@ export interface OptimizationFeedback {
   error: string | null;
   /** Processing time in milliseconds */
   processing_time_ms?: number;
-  /** ATS evaluation result (if ATS check was performed) */
-  ats_result?: ATSEvaluationResult | null;
 }
 
 // ==================== Job Descriptions Types ====================
@@ -3423,235 +3326,155 @@ export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
   data: AnalyticsUpdateData;
 }
 
-// ==================== Model Approval Types ====================
+// ==================== Fairness Monitoring Types ====================
 
 /**
- * Status of a model approval request in its lifecycle
+ * Fairness summary across all models
  */
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'deployed' | 'cancelled';
-
-/**
- * Request model for creating a model deployment approval request
- */
-export interface ModelApprovalCreate {
-  /** UUID of the model version to request deployment for */
-  model_version_id: string;
-  /** Explanation of why this model should be deployed */
-  justification?: string;
-  /** Target environment for deployment (staging, production) */
-  target_environment?: string;
-  /** Organization that owns this approval request */
-  organization_id: string;
-  /** User ID who submitted the deployment request */
-  requested_by: string;
+export interface FairnessSummary {
+  total_models: number;
+  models_with_issues: number;
+  overall_fairness_score: number;
+  protected_attributes_analyzed: string[];
+  recent_alerts: number;
+  last_updated: string;
 }
 
 /**
- * Request model for updating an approval request (before review)
+ * Fairness alert
  */
-export interface ModelApprovalUpdate {
-  /** Updated justification for the deployment */
-  justification?: string;
-  /** Updated target environment */
-  target_environment?: string;
-}
-
-/**
- * Request model for approval actions (approve/reject)
- */
-export interface ModelApprovalAction {
-  /** User ID of the reviewer performing this action */
-  reviewed_by: string;
-  /** Reviewer's feedback or reasons for the decision */
-  review_notes?: string;
-}
-
-/**
- * Response model for a single approval request
- */
-export interface ModelApprovalResponse {
-  /** Unique identifier for the approval request */
+export interface FairnessAlert {
   id: string;
-  /** UUID of the model version being requested */
-  model_version_id: string;
-  /** Name of the model (from model version) */
-  model_name?: string;
-  /** Version identifier (from model version) */
-  model_version?: string;
-  /** Current approval status */
-  status: ApprovalStatus;
-  /** User ID who submitted the request */
-  requested_by: string;
-  /** User ID who reviewed the request */
-  reviewed_by?: string;
-  /** ISO timestamp when the request was submitted */
-  requested_at?: string;
-  /** ISO timestamp when the request was reviewed */
-  reviewed_at?: string;
-  /** Explanation for why this model should be deployed */
-  justification?: string;
-  /** Reviewer's feedback or reasons for rejection */
-  review_notes?: string;
-  /** Target environment for deployment */
-  target_environment: string;
-  /** Organization that owns this approval request */
-  organization_id: string;
-  /** ISO timestamp when record was created */
+  model_name: string;
+  alert_type: string;
+  severity: string;
+  message: string;
+  demographic_group?: string;
+  metric_value?: number;
+  threshold?: number;
   created_at: string;
-  /** ISO timestamp when record was last updated */
-  updated_at: string;
+  acknowledged_at?: string;
+  status: string;
 }
 
 /**
- * Response model for listing approval requests
+ * Fairness alert list response
  */
-export interface ModelApprovalListResponse {
-  /** List of approval request entries */
-  approvals: ModelApprovalResponse[];
-  /** Total number of approval requests */
+export interface FairnessAlertListResponse {
+  alerts: FairnessAlert[];
   total_count: number;
 }
 
 /**
- * Detailed response model for a single approval request with model version info
+ * Fairness metric
  */
-export interface ModelApprovalDetailResponse {
-  /** The approval request details */
-  approval_request: ModelApprovalResponse;
-  /** Details of the associated model version */
-  model_version: Record<string, unknown>;
-}
-
-/**
- * Single entry in the approval workflow audit log
- */
-export interface ModelApprovalAuditLogEntry {
-  /** Unique identifier for the audit entry */
+export interface FairnessMetric {
   id: string;
-  /** UUID of the related approval request */
-  approval_request_id: string;
-  /** Action performed (created, approved, rejected, deployed, cancelled) */
-  action: string;
-  /** User ID who performed the action */
-  performed_by: string;
-  /** Status before the action */
-  previous_status?: ApprovalStatus;
-  /** Status after the action */
-  new_status: ApprovalStatus;
-  /** Additional notes about the action */
-  notes?: string;
-  /** ISO timestamp when the action occurred */
-  timestamp: string;
+  model_name: string;
+  model_version?: string;
+  protected_attribute: string;
+  demographic_group: string;
+  metric_type: string;
+  metric_value: number;
+  is_acceptable: boolean;
+  sample_size: number;
+  analysis_date: string;
+  created_at: string;
 }
 
 /**
- * Response model for approval workflow audit log
+ * Fairness metrics list response
  */
-export interface ModelApprovalAuditLogResponse {
-  /** List of audit log entries */
-  entries: ModelApprovalAuditLogEntry[];
-  /** Total number of audit entries */
+export interface FairnessMetricsListResponse {
+  metrics: FairnessMetric[];
   total_count: number;
-  /** UUID of the approval request this log belongs to */
-  approval_request_id: string;
 }
 
 /**
- * Response model for approval workflow statistics
+ * Bias report
  */
-export interface ModelApprovalStatsResponse {
-  /** Total number of approval requests */
-  total_requests: number;
-  /** Number of pending requests */
-  pending_requests: number;
-  /** Number of approved requests */
-  approved_requests: number;
-  /** Number of rejected requests */
-  rejected_requests: number;
-  /** Number of deployed requests */
-  deployed_requests: number;
-  /** Number of cancelled requests */
-  cancelled_requests: number;
-  /** Average time from request to approval in hours */
-  average_approval_time_hours?: number;
-  /** Percentage of approved requests (0-100) */
-  approval_rate: number;
-  /** Start date of the statistics period (ISO 8601) */
-  period_start?: string;
-  /** End date of the statistics period (ISO 8601) */
-  period_end?: string;
+export interface BiasReport {
+  report_id: string;
+  model_name: string;
+  model_version?: string;
+  analysis_date: string;
+  report_type: string;
+  overall_fairness_score: number;
+  bias_detected: boolean;
+  severity_level: string;
+  protected_attributes: string[];
+  findings: Array<{
+    demographic_attribute: string;
+    disparate_impact_ratio: number;
+    issue_severity: string;
+    description: string;
+  }>;
+  recommendations: string[];
+  created_at: string;
 }
 
 /**
- * Response model for the approval workflow dashboard
+ * Bias report list response
  */
-export interface ModelApprovalDashboardResponse {
-  /** List of pending approval requests awaiting review */
-  pending_requests: ModelApprovalResponse[];
-  /** Recently approved requests */
-  recent_approvals: ModelApprovalResponse[];
-  /** Recently rejected requests */
-  recent_rejections: ModelApprovalResponse[];
-  /** Approval workflow statistics */
-  stats: ModelApprovalStatsResponse;
-  /** Number of pending requests submitted by the current user */
-  user_pending_count: number;
+export interface BiasReportListResponse {
+  reports: BiasReport[];
+  total_count: number;
 }
 
 /**
- * Query parameters for listing model approvals
+ * Generate bias report request
  */
-export interface ModelApprovalListParams {
-  /** Filter by status (pending, approved, rejected, deployed, cancelled) */
-  status?: ApprovalStatus;
-  /** Filter by requester user ID */
-  requested_by?: string;
-  /** Filter by target environment */
-  target_environment?: string;
-  /** Filter by organization ID */
-  organization_id?: string;
-  /** Filter by model name */
-  model_name?: string;
+export interface GenerateBiasReportRequest {
+  model_name: string;
+  model_version?: string;
+  report_type?: string;
 }
 
 /**
- * Deployment response with additional deployment status info
+ * Acknowledge alert response
  */
-export interface ModelApprovalDeployResponse extends ModelApprovalResponse {
-  /** Status of the deployment operation */
-  deployment_status: 'success' | 'failed';
-  /** Whether the model was successfully activated */
-  model_activated: boolean;
-}
-
-// ==================== Transparency Types ====================
-
-/**
- * Transparency update message type
- */
-export type TransparencyUpdateType =
-  | 'confidence_scores'
-  | 'model_accuracy'
-  | 'feature_importance'
-  | 'ai_human_comparison'
-  | 'ranking_created';
-
-/**
- * Transparency update data sent via WebSocket
- */
-export interface TransparencyUpdateData {
-  update_type: TransparencyUpdateType;
-  computed_at: string;
-  data: Record<string, unknown>;
+export interface AcknowledgeAlertResponse {
+  alert_id: string;
+  acknowledged: boolean;
+  acknowledged_at: string;
 }
 
 /**
- * WebSocket transparency update message
+ * Fairness scorecard
  */
-export interface WebSocketTransparencyUpdateMessage extends WebSocketMessage {
-  type: 'transparency_update';
-  update_type: TransparencyUpdateType;
-  data: TransparencyUpdateData;
+export interface FairnessScorecard {
+  vacancy_id?: string;
+  model_version?: string;
+  overall_score: number;
+  metrics: Array<{
+    attribute: string;
+    score: number;
+    status: string;
+  }>;
+  alerts: FairnessAlert[];
+}
+
+/**
+ * Single data point in fairness trends time series
+ */
+export interface FairnessTrendDataPoint {
+  timestamp: string;
+  disparate_impact_ratio: number | null;
+  demographic_parity_diff: number | null;
+  equal_opportunity_diff: number | null;
+  average_odds_diff: number | null;
+  theil_index: number | null;
+  sample_size: number;
+}
+
+/**
+ * Fairness trends response
+ */
+export interface FairnessTrendsResponse {
+  data_points: FairnessTrendDataPoint[];
+  total_count: number;
+  start_date: string;
+  end_date: string;
 }
 
 // ==================== Parsing Correction Types ====================
@@ -3684,213 +3507,4 @@ export type {
   CorrectionsQueryParams,
   LearningFeedbackQueryParams,
 } from './parsingCorrection';
-
-// ==================== LinkedIn Integration Types ====================
-
-/**
- * LinkedIn OAuth authentication URL response
- */
-export interface LinkedInAuthUrlResponse {
-  auth_url: string;
-  state: string;
-}
-
-/**
- * LinkedIn OAuth callback response
- */
-export interface LinkedInCallbackResponse {
-  success: boolean;
-  access_token?: string;
-  message?: string;
-}
-
-/**
- * LinkedIn profile summary from search results
- */
-export interface LinkedInProfileSummary {
-  profile_id: string;
-  profile_url: string;
-  first_name: string;
-  last_name: string;
-  headline?: string;
-  location?: string;
-  industry?: string;
-  current_company?: string;
-  current_position?: string;
-}
-
-/**
- * LinkedIn search response
- */
-export interface LinkedInSearchResponse {
-  success: boolean;
-  results: LinkedInProfileSummary[];
-  total_results: number;
-  page: number;
-  limit: number;
-  message?: string;
-}
-
-/**
- * LinkedIn profile import request
- */
-export interface LinkedInProfileImportRequest {
-  linkedin_url: string;
-  profile_id?: string;
-  vacancy_id?: string;
-}
-
-/**
- * LinkedIn profile import response
- */
-export interface LinkedInProfileImportResponse {
-  success: boolean;
-  resume_id?: string;
-  candidate_id?: string;
-  message?: string;
-}
-
-/**
- * LinkedIn campaign status
- */
-export type LinkedInCampaignStatus = 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
-
-/**
- * LinkedIn outreach response status
- */
-export type LinkedInOutreachResponseStatus = 'no_response' | 'interested' | 'not_interested' | 'replied' | 'bounced' | 'opened';
-
-/**
- * LinkedIn campaign response
- */
-export interface LinkedInCampaignResponse {
-  id: string;
-  name: string;
-  recruiter_id: string;
-  vacancy_id?: string;
-  status: LinkedInCampaignStatus;
-  target_count: number;
-  sent_count: number;
-  response_count: number;
-  response_rate: number;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * LinkedIn campaign list response
- */
-export interface LinkedInCampaignListResponse {
-  total: number;
-  campaigns: LinkedInCampaignResponse[];
-}
-
-/**
- * LinkedIn campaign create request
- */
-export interface LinkedInCampaignCreateRequest {
-  name: string;
-  vacancy_id?: string;
-  description?: string;
-  target_count?: number;
-  recruiter_id: string;
-}
-
-/**
- * LinkedIn campaign update request
- */
-export interface LinkedInCampaignUpdateRequest {
-  name?: string;
-  status?: LinkedInCampaignStatus;
-  description?: string;
-  target_count?: number;
-}
-
-/**
- * LinkedIn campaign statistics response
- */
-export interface LinkedInCampaignStatsResponse {
-  campaign_id: string;
-  total_outreach: number;
-  responses: number;
-  response_rate: number;
-  interested: number;
-  not_interested: number;
-  no_response: number;
-  by_status: Record<string, number>;
-}
-
-/**
- * LinkedIn outreach response
- */
-export interface LinkedInOutreachResponse {
-  id: string;
-  campaign_id: string;
-  linkedin_profile_id: string;
-  recruiter_id?: string;
-  message_subject?: string;
-  message_body?: string;
-  message_sent_at?: string;
-  response_received_at?: string;
-  response_status: LinkedInOutreachResponseStatus;
-  response_text?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * LinkedIn outreach create request
- */
-export interface LinkedInOutreachCreateRequest {
-  linkedin_profile_id: string;
-  recruiter_id: string;
-  message_subject?: string;
-  message_body?: string;
-  message_sent_at?: string;
-}
-
-/**
- * LinkedIn outreach update request
- */
-export interface LinkedInOutreachUpdateRequest {
-  response_status?: LinkedInOutreachResponseStatus;
-  response_text?: string;
-  response_received_at?: string;
-}
-
-/**
- * LinkedIn search filters
- */
-export interface LinkedInSearchFilters {
-  keywords?: string;
-  location?: string;
-  skills?: string;
-  title?: string;
-  industry?: string;
-  company?: string;
-  experience_level?: string;
-  limit?: number;
-  page?: number;
-}
-
-/**
- * Single item in LinkedIn import history
- */
-export interface LinkedInImportHistoryItem {
-  import_id: string;
-  profile_id: string;
-  profile_name: string;
-  imported_at: string;
-  status: string;
-  resume_id?: string | null;
-}
-
-/**
- * LinkedIn import history response
- */
-export interface LinkedInImportHistoryResponse {
-  total_imports: number;
-  imports: LinkedInImportHistoryItem[];
-}
 
