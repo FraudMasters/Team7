@@ -284,6 +284,9 @@ from api import (
     work_experience,
     skill_gap_analysis,
     backups,
+    data_export,
+    data_import,
+    migration,
     ats_simulation,
     performance_monitoring,
     workflow_stages,
@@ -334,6 +337,9 @@ app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(work_experience.router, prefix="/api/work-experiences", tags=["Work Experiences"])
 app.include_router(skill_gap_analysis.router, prefix="/api/skill-gap", tags=["Skill Gap Analysis"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
+app.include_router(data_export.router, prefix="/api/data-export", tags=["Data Export"])
+app.include_router(data_import.router, prefix="/api/data-import", tags=["Data Import"])
+app.include_router(migration.router, prefix="/api/migration", tags=["Migration"])
 app.include_router(ats_simulation.router, prefix="/api/ats", tags=["ATS Simulation"])
 app.include_router(performance_monitoring.router, prefix="/api/performance", tags=["Performance Monitoring"])
 app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=["Workflow Stages"])
