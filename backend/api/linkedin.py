@@ -725,7 +725,7 @@ async def search_profiles(
 
         try:
             # Perform search
-            search_results = await linkedin_service.search_candidates(
+            search_response = await linkedin_service.search_candidates(
                 keywords=keywords,
                 skills=skills_list,
                 location=location,
@@ -735,7 +735,7 @@ async def search_profiles(
 
             logger.info(
                 "LinkedIn search completed",
-                results_count=len(search_results),
+                results_count=search_response.get("total", 0),
             )
 
         except Exception as e:
@@ -744,6 +744,9 @@ async def search_profiles(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"LinkedIn search failed: {str(e)}",
             )
+
+        # Extract results from search response
+        search_results = search_response.get("results", [])
 
         # Format results as LinkedInSearchResponse
         results = [
@@ -762,7 +765,7 @@ async def search_profiles(
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
-                "total_results": len(results),
+                "total_results": search_response.get("total", 0),
                 "results": [r.model_dump() for r in results],
             },
         )
