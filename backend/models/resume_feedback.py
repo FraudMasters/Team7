@@ -42,6 +42,11 @@ class ResumeFeedback(Base, UUIDMixin, TimestampMixin):
         # Score
         score: Overall optimization score (0-100)
 
+        # Enhanced optimization scores
+        completeness_score: Resume completeness score (0-100)
+        ats_score: ATS compatibility score (0-100)
+        ranking_prediction: Before/after ranking prediction (JSON)
+
         # Processing metadata
         analyzer_version: Version of the optimizer used
     """
@@ -69,6 +74,11 @@ class ResumeFeedback(Base, UUIDMixin, TimestampMixin):
 
     # Score
     score: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Enhanced optimization scores
+    completeness_score: Mapped[Optional[int]] = mapped_column(nullable=True)
+    ats_score: Mapped[Optional[int]] = mapped_column(nullable=True)
+    ranking_prediction: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Processing metadata
     analyzer_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

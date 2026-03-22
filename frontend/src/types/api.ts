@@ -2661,6 +2661,38 @@ export interface OptimizationRequest {
 }
 
 /**
+ * ATS evaluation result for resume optimization
+ */
+export interface ATSEvaluationResult {
+  /** Whether resume passed ATS threshold */
+  passed: boolean;
+  /** Overall ATS score (0-1) */
+  overall_score: number;
+  /** Keyword matching score (0-1) */
+  keyword_score: number;
+  /** Experience relevance score (0-1) */
+  experience_score: number;
+  /** Education match score (0-1) */
+  education_score: number;
+  /** Overall fit score (0-1) */
+  fit_score: number;
+  /** List of ATS-specific issues */
+  ats_issues: string[];
+  /** List of visual/formatting issues */
+  visual_issues: string[];
+  /** List of ATS improvement suggestions */
+  suggestions: string[];
+  /** Detailed ATS feedback */
+  feedback: string;
+  /** Whether resume looks professional */
+  looks_professional?: boolean;
+  /** Whether resume was disqualified */
+  disqualified?: boolean;
+  /** Missing keywords identified */
+  missing_keywords?: string[];
+}
+
+/**
  * Resume optimization feedback response
  */
 export interface OptimizationFeedback {
@@ -2686,6 +2718,8 @@ export interface OptimizationFeedback {
   error: string | null;
   /** Processing time in milliseconds */
   processing_time_ms?: number;
+  /** ATS evaluation result (if ATS check was performed) */
+  ats_result?: ATSEvaluationResult | null;
 }
 
 // ==================== Job Descriptions Types ====================
