@@ -1,9 +1,9 @@
 """
-Celery Beat schedule configuration for automated model retraining, analytics reports, and search alerts.
+Celery Beat schedule configuration for automated model retraining, analytics reports, search alerts, and audit alerting.
 
 This module defines the periodic task schedule for Celery Beat, including
 daily and weekly automated model retraining schedules, analytics email
-report schedules, and search alert processing schedules. It integrates with
+report schedules, search alert processing schedules, and audit alerting schedules. It integrates with
 the main Celery configuration to provide scheduled task execution.
 
 Schedule Overview:
@@ -15,6 +15,7 @@ Schedule Overview:
 - Weekly analytics email report: Sends weekly summary on configured day
 - Daily search alert processing: Processes pending alerts for daily-frequency saved searches
 - Weekly search alert processing: Processes pending alerts for weekly-frequency saved searches
+- Audit alerting: Runs every 5 minutes to process audit rule violations and send alerts
 
 Feedback Volume Trigger:
 - Monitors accumulated feedback counts per model
@@ -30,6 +31,11 @@ Search Alert Processing:
 - Daily alerts: Processes pending alerts for saved searches with daily frequency
 - Weekly alerts: Processes pending alerts for saved searches with weekly frequency
 - Configurable timing via alert_schedule settings
+
+Audit Alerting:
+- Periodic checks: Runs every 5 minutes to detect audit rule violations
+- Processes audit logs and sends alerts based on configured rules
+- Can be enabled/disabled via audit_alerting_enabled setting
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -153,6 +159,65 @@ def get_alert_schedule_config() -> Dict[str, Any]:
         "weekly_hour": getattr(settings, "search_alert_weekly_hour", 7),
         "weekly_minute": getattr(settings, "search_alert_weekly_minute", 0),
         "batch_size": getattr(settings, "search_alert_batch_size", 100),
+    }
+
+
+def get_audit_alerting_schedule_config() -> Dict[str, Any]:
+    """
+    Get audit alerting schedule configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether audit alerting is enabled (default: True)
+    - interval_minutes: Interval in minutes for audit alert processing (default: 5)
+    - batch_size: Number of audit logs to process in one batch (default: 100)
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_audit_alerting_schedule_config()
+        >>> print(config['interval_minutes'])
+        5
+        >>> print(config['batch_size'])
+        100
+    """
+    return {
+        "enabled": getattr(settings, "audit_alerting_enabled", True),
+        "interval_minutes": getattr(settings, "audit_alerting_interval_minutes", 5),
+        "batch_size": getattr(settings, "audit_alerting_batch_size", 100),
+    }
+
+
+def get_elasticsearch_indexing_config() -> Dict[str, Any]:
+    """
+    Get Elasticsearch bulk indexing schedule configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether scheduled bulk indexing is enabled (default: False)
+    - hour: Hour for indexing (default: 3 AM)
+    - minute: Minute for indexing (default: 0)
+    - day_of_week: Day of week for indexing (default: 0 = Sunday)
+    - batch_size: Number of resumes to index per batch (default: 100)
+
+    Note: Bulk indexing is typically a one-time or manually triggered operation.
+    Enable scheduled indexing only if you need periodic re-indexing.
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_elasticsearch_indexing_config()
+        >>> print(config['enabled'])
+        False
+        >>> print(config['batch_size'])
+        100
+    """
+    return {
+        "enabled": getattr(settings, "elasticsearch_bulk_indexing_enabled", False),
+        "hour": getattr(settings, "elasticsearch_indexing_hour", 3),
+        "minute": getattr(settings, "elasticsearch_indexing_minute", 0),
+        "day_of_week": getattr(settings, "elasticsearch_indexing_day", 0),  # Sunday
+        "batch_size": getattr(settings, "elasticsearch_indexing_batch_size", 100),
     }
 
 
@@ -344,12 +409,48 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
             "queue": "default",  # Use default queue for alert tasks
         },
     },
+    # ==============================================
+    # Audit Alerting Schedule
+    # ==============================================
+    "audit_alerting": {
+        "task": "tasks.audit_alerts.process_audit_alerts",
+        "schedule": crontab(
+            minute=f"*/{get_audit_alerting_schedule_config()['interval_minutes']}",  # Run every N minutes
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "batch_size": get_audit_alerting_schedule_config()["batch_size"],
+        },
+        "options": {
+            "expires": 300,  # Task expires if not run within 5 minutes
+            "queue": "default",  # Use default queue for audit alert tasks
+        },
+    },
+    # ==============================================
+    # Elasticsearch Bulk Indexing Schedule
+    # ==============================================
+    "elasticsearch-bulk-index-resumes": {
+        "task": "tasks.elasticsearch_indexing.bulk_index_resumes",
+        "schedule": crontab(
+            day_of_week=get_elasticsearch_indexing_config()["day_of_week"],
+            hour=get_elasticsearch_indexing_config()["hour"],
+            minute=get_elasticsearch_indexing_config()["minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "batch_size": get_elasticsearch_indexing_config()["batch_size"],
+        },
+        "options": {
+            "expires": 7200,  # Task expires if not run within 2 hours
+            "queue": "default",  # Use default queue for indexing tasks
+        },
+    },
 }
 
 
 def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     """
-    Get the Celery Beat schedule for automated retraining, analytics reports, and search alerts.
+    Get the Celery Beat schedule for automated retraining, analytics reports, search alerts, and audit alerting.
 
     This function returns the beat schedule dictionary, optionally filtered
     to include only enabled tasks based on configuration settings.
@@ -369,6 +470,8 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     config = get_retraining_schedule_config()
     analytics_config = get_analytics_report_schedule_config()
     alert_config = get_alert_schedule_config()
+    audit_alerting_config = get_audit_alerting_schedule_config()
+    elasticsearch_config = get_elasticsearch_indexing_config()
 
     if not config["enabled"] and enabled_only:
         logger.info("Automated retraining is disabled in settings")
@@ -379,11 +482,19 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     if not alert_config["enabled"] and enabled_only:
         logger.info("Search alerts are disabled in settings")
 
+    if not audit_alerting_config["enabled"] and enabled_only:
+        logger.info("Audit alerting is disabled in settings")
+
+    if not elasticsearch_config["enabled"] and enabled_only:
+        logger.info("Elasticsearch bulk indexing is disabled in settings")
+
     # If all are disabled and we only want enabled tasks, return empty
     if (
         not config["enabled"]
         and not analytics_config["enabled"]
         and not alert_config["enabled"]
+        and not audit_alerting_config["enabled"]
+        and not elasticsearch_config["enabled"]
         and enabled_only
     ):
         return {}
@@ -392,7 +503,9 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         f"Retrieving beat schedule: {len(beat_schedule)} tasks, "
         f"retraining_enabled={config['enabled']}, models={config['models']}, "
         f"analytics_reports_enabled={analytics_config['enabled']}, "
-        f"search_alerts_enabled={alert_config['enabled']}"
+        f"search_alerts_enabled={alert_config['enabled']}, "
+        f"audit_alerting_enabled={audit_alerting_config['enabled']}, "
+        f"elasticsearch_indexing_enabled={elasticsearch_config['enabled']}"
     )
 
     if enabled_only:
@@ -430,6 +543,16 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
             # Skip search alert tasks if alerts are disabled
             if "search-alert" in task_name:
                 if not alert_config["enabled"]:
+                    continue
+
+            # Skip audit alerting tasks if audit alerting is disabled
+            if "audit_alerting" in task_name or "audit-alerting" in task_name:
+                if not audit_alerting_config["enabled"]:
+                    continue
+
+            # Skip elasticsearch indexing tasks if indexing is disabled
+            if "elasticsearch" in task_name:
+                if not elasticsearch_config["enabled"]:
                     continue
 
             # Include other tasks
@@ -530,6 +653,7 @@ def list_scheduled_tasks() -> Dict[str, Dict[str, Any]]:
 schedule_config = get_retraining_schedule_config()
 analytics_config = get_analytics_report_schedule_config()
 alert_config = get_alert_schedule_config()
+audit_alerting_config = get_audit_alerting_schedule_config()
 logger.info(
     f"Celery Beat schedule loaded: "
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
@@ -543,7 +667,9 @@ logger.info(
     f"analytics_weekly_on_day_{analytics_config['weekly_day']}_at_{analytics_config['weekly_hour']:02d}:{analytics_config['weekly_minute']:02d}, "
     f"search_alerts_enabled={alert_config['enabled']}, "
     f"search_alert_daily_at={alert_config['daily_hour']:02d}:{alert_config['daily_minute']:02d}, "
-    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}"
+    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}, "
+    f"audit_alerting_enabled={audit_alerting_config['enabled']}, "
+    f"audit_alerting_interval_minutes={audit_alerting_config['interval_minutes']}"
 )
 
 
@@ -555,6 +681,8 @@ __all__ = [
     "get_retraining_schedule_config",
     "get_analytics_report_schedule_config",
     "get_alert_schedule_config",
+    "get_audit_alerting_schedule_config",
+    "get_elasticsearch_indexing_config",
     "add_scheduled_task",
     "remove_scheduled_task",
     "list_scheduled_tasks",

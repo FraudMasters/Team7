@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, validator
 from sqlalchemy import select
@@ -24,6 +24,7 @@ from database import get_db
 from models.user import User
 from models.role import Role, UserRole
 from models.refresh_token import RefreshToken
+from models.audit_log import AuditActionType
 from utils.security import get_password_hash, verify_password, validate_password_strength
 from utils.jwt_handler import (
     create_access_token,
@@ -32,6 +33,7 @@ from utils.jwt_handler import (
     verify_token_type,
     TokenData,
 )
+from utils.audit_logger import log_audit_event, get_request_context
 from config import get_settings
 from services.email_service import get_email_service
 
@@ -203,6 +205,7 @@ class VerifyEmailResponse(BaseModel):
     tags=["Authentication"],
 )
 async def register(
+    request: Request,
     request_data: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -309,6 +312,25 @@ async def register(
 
         logger.info(f"User registered successfully: {new_user.email} (ID: {new_user.id}, role: {user_role_enum.value})")
 
+        # Log audit event for user registration
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.USER_CREATED,
+            entity_type="user",
+            entity_id=new_user.id,
+            user_id=new_user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            after_value={
+                "email": new_user.email,
+                "full_name": new_user.full_name,
+                "role": user_role_enum.value,
+                "is_active": new_user.is_active,
+                "is_verified": new_user.is_verified,
+            },
+        )
+
         # Send welcome email
         try:
             email_service = get_email_service()
@@ -382,6 +404,7 @@ The AgentHR Team
     tags=["Authentication"],
 )
 async def login(
+    request: Request,
     request_data: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -437,9 +460,24 @@ async def login(
         )
         user = result.scalar_one_or_none()
 
+        # Extract request context for audit logging
+        ip_address, user_agent = get_request_context(request)
+
         # Verify user exists
         if not user:
             logger.warning(f"Login failed: user not found - {request_data.email}")
+            # Log failed login attempt
+            await log_audit_event(
+                db=db,
+                action_type=AuditActionType.LOGIN_FAILED,
+                entity_type="user",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                action_data={
+                    "email": request_data.email,
+                    "reason": "user_not_found",
+                },
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
@@ -448,6 +486,20 @@ async def login(
         # Verify password
         if not verify_password(request_data.password, user.password_hash):
             logger.warning(f"Login failed: invalid password - {request_data.email}")
+            # Log failed login attempt
+            await log_audit_event(
+                db=db,
+                action_type=AuditActionType.LOGIN_FAILED,
+                entity_type="user",
+                entity_id=user.id,
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                action_data={
+                    "email": request_data.email,
+                    "reason": "invalid_password",
+                },
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
@@ -482,6 +534,20 @@ async def login(
         await db.commit()
 
         logger.info(f"User logged in successfully: {user.email} (ID: {user.id})")
+
+        # Log successful login
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.LOGIN_SUCCESS,
+            entity_type="user",
+            entity_id=user.id,
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "email": user.email,
+            },
+        )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -631,6 +697,7 @@ async def refresh_token(
     tags=["Authentication"],
 )
 async def logout(
+    request: Request,
     request_data: LogoutRequest,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -670,10 +737,25 @@ async def logout(
         )
         refresh_token_record = result.scalar_one_or_none()
 
+        # Extract request context for audit logging
+        ip_address, user_agent = get_request_context(request)
+
         if refresh_token_record:
             # Revoke the token
             refresh_token_record.is_revoked = True
             refresh_token_record.revoked_at = datetime.utcnow()
+
+            # Log logout event
+            await log_audit_event(
+                db=db,
+                action_type=AuditActionType.LOGOUT,
+                entity_type="user",
+                entity_id=refresh_token_record.user_id,
+                user_id=refresh_token_record.user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
             await db.commit()
             logger.info("Refresh token revoked successfully")
         else:
@@ -784,6 +866,7 @@ async def password_reset_request(
     tags=["Authentication"],
 )
 async def password_reset_confirm(
+    request: Request,
     request_data: PasswordResetConfirmRequest,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -901,6 +984,21 @@ async def password_reset_confirm(
 
         logger.info(f"Password reset successfully for user: {user.email}")
 
+        # Log password change event
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.PASSWORD_CHANGED,
+            entity_type="user",
+            entity_id=user.id,
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "reset_method": "password_reset_token",
+            },
+        )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={"message": "Password reset successfully"},
@@ -1004,6 +1102,7 @@ async def request_email_verification(
     tags=["Authentication"],
 )
 async def verify_email(
+    request: Request,
     request_data: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -1097,6 +1196,23 @@ async def verify_email(
         await db.commit()
 
         logger.info(f"Email verified successfully for user: {user.email}")
+
+        # Log email verification event
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.USER_UPDATED,
+            entity_type="user",
+            entity_id=user.id,
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "email_verified": True,
+            },
+            before_value={"is_verified": False},
+            after_value={"is_verified": True},
+        )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

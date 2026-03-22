@@ -36,6 +36,11 @@ specialized modules to improve maintainability, testability, and code organizati
   - AI-powered improvement suggestions
   - Job description matching
 
+* **comparison** - Resume comparison against top candidates endpoint
+  - Compare resume against top candidates for a vacancy
+  - Percentile ranking and recommendations
+  - Multi-dimensional scoring and benchmarking
+
 ## Usage
 
 Include this router in the main FastAPI application:
@@ -57,6 +62,7 @@ app.include_router(resumes_router, prefix="/api/resumes", tags=["Resumes"])
 from fastapi import APIRouter
 from . import (
     analysis,
+    comparison,
     listing,
     management,
     optimization,
@@ -72,17 +78,20 @@ router = APIRouter()
 # 2. listing - Browse existing resumes
 # 3. analysis - View detailed analysis
 # 4. optimization - Generate optimized versions
-# 5. management - Update status and delete resumes
+# 5. comparison - Compare against top candidates
+# 6. management - Update status and delete resumes
 router.include_router(upload.router)
 router.include_router(listing.router)
 router.include_router(analysis.router)
 router.include_router(optimization.router)
+router.include_router(comparison.router)
 router.include_router(management.router)
 
 # Export public API
 # Modules are exported for potential direct access in tests or other modules
 __all__ = [
     "analysis",
+    "comparison",
     "listing",
     "management",
     "optimization",

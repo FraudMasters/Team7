@@ -2661,6 +2661,38 @@ export interface OptimizationRequest {
 }
 
 /**
+ * ATS evaluation result for resume optimization
+ */
+export interface ATSEvaluationResult {
+  /** Whether resume passed ATS threshold */
+  passed: boolean;
+  /** Overall ATS score (0-1) */
+  overall_score: number;
+  /** Keyword matching score (0-1) */
+  keyword_score: number;
+  /** Experience relevance score (0-1) */
+  experience_score: number;
+  /** Education match score (0-1) */
+  education_score: number;
+  /** Overall fit score (0-1) */
+  fit_score: number;
+  /** List of ATS-specific issues */
+  ats_issues: string[];
+  /** List of visual/formatting issues */
+  visual_issues: string[];
+  /** List of ATS improvement suggestions */
+  suggestions: string[];
+  /** Detailed ATS feedback */
+  feedback: string;
+  /** Whether resume looks professional */
+  looks_professional?: boolean;
+  /** Whether resume was disqualified */
+  disqualified?: boolean;
+  /** Missing keywords identified */
+  missing_keywords?: string[];
+}
+
+/**
  * Resume optimization feedback response
  */
 export interface OptimizationFeedback {
@@ -2686,6 +2718,8 @@ export interface OptimizationFeedback {
   error: string | null;
   /** Processing time in milliseconds */
   processing_time_ms?: number;
+  /** ATS evaluation result (if ATS check was performed) */
+  ats_result?: ATSEvaluationResult | null;
 }
 
 // ==================== Job Descriptions Types ====================
@@ -3324,6 +3358,237 @@ export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
   type: 'analytics_update';
   update_type: AnalyticsUpdateType;
   data: AnalyticsUpdateData;
+}
+
+// ==================== Model Approval Types ====================
+
+/**
+ * Status of a model approval request in its lifecycle
+ */
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'deployed' | 'cancelled';
+
+/**
+ * Request model for creating a model deployment approval request
+ */
+export interface ModelApprovalCreate {
+  /** UUID of the model version to request deployment for */
+  model_version_id: string;
+  /** Explanation of why this model should be deployed */
+  justification?: string;
+  /** Target environment for deployment (staging, production) */
+  target_environment?: string;
+  /** Organization that owns this approval request */
+  organization_id: string;
+  /** User ID who submitted the deployment request */
+  requested_by: string;
+}
+
+/**
+ * Request model for updating an approval request (before review)
+ */
+export interface ModelApprovalUpdate {
+  /** Updated justification for the deployment */
+  justification?: string;
+  /** Updated target environment */
+  target_environment?: string;
+}
+
+/**
+ * Request model for approval actions (approve/reject)
+ */
+export interface ModelApprovalAction {
+  /** User ID of the reviewer performing this action */
+  reviewed_by: string;
+  /** Reviewer's feedback or reasons for the decision */
+  review_notes?: string;
+}
+
+/**
+ * Response model for a single approval request
+ */
+export interface ModelApprovalResponse {
+  /** Unique identifier for the approval request */
+  id: string;
+  /** UUID of the model version being requested */
+  model_version_id: string;
+  /** Name of the model (from model version) */
+  model_name?: string;
+  /** Version identifier (from model version) */
+  model_version?: string;
+  /** Current approval status */
+  status: ApprovalStatus;
+  /** User ID who submitted the request */
+  requested_by: string;
+  /** User ID who reviewed the request */
+  reviewed_by?: string;
+  /** ISO timestamp when the request was submitted */
+  requested_at?: string;
+  /** ISO timestamp when the request was reviewed */
+  reviewed_at?: string;
+  /** Explanation for why this model should be deployed */
+  justification?: string;
+  /** Reviewer's feedback or reasons for rejection */
+  review_notes?: string;
+  /** Target environment for deployment */
+  target_environment: string;
+  /** Organization that owns this approval request */
+  organization_id: string;
+  /** ISO timestamp when record was created */
+  created_at: string;
+  /** ISO timestamp when record was last updated */
+  updated_at: string;
+}
+
+/**
+ * Response model for listing approval requests
+ */
+export interface ModelApprovalListResponse {
+  /** List of approval request entries */
+  approvals: ModelApprovalResponse[];
+  /** Total number of approval requests */
+  total_count: number;
+}
+
+/**
+ * Detailed response model for a single approval request with model version info
+ */
+export interface ModelApprovalDetailResponse {
+  /** The approval request details */
+  approval_request: ModelApprovalResponse;
+  /** Details of the associated model version */
+  model_version: Record<string, unknown>;
+}
+
+/**
+ * Single entry in the approval workflow audit log
+ */
+export interface ModelApprovalAuditLogEntry {
+  /** Unique identifier for the audit entry */
+  id: string;
+  /** UUID of the related approval request */
+  approval_request_id: string;
+  /** Action performed (created, approved, rejected, deployed, cancelled) */
+  action: string;
+  /** User ID who performed the action */
+  performed_by: string;
+  /** Status before the action */
+  previous_status?: ApprovalStatus;
+  /** Status after the action */
+  new_status: ApprovalStatus;
+  /** Additional notes about the action */
+  notes?: string;
+  /** ISO timestamp when the action occurred */
+  timestamp: string;
+}
+
+/**
+ * Response model for approval workflow audit log
+ */
+export interface ModelApprovalAuditLogResponse {
+  /** List of audit log entries */
+  entries: ModelApprovalAuditLogEntry[];
+  /** Total number of audit entries */
+  total_count: number;
+  /** UUID of the approval request this log belongs to */
+  approval_request_id: string;
+}
+
+/**
+ * Response model for approval workflow statistics
+ */
+export interface ModelApprovalStatsResponse {
+  /** Total number of approval requests */
+  total_requests: number;
+  /** Number of pending requests */
+  pending_requests: number;
+  /** Number of approved requests */
+  approved_requests: number;
+  /** Number of rejected requests */
+  rejected_requests: number;
+  /** Number of deployed requests */
+  deployed_requests: number;
+  /** Number of cancelled requests */
+  cancelled_requests: number;
+  /** Average time from request to approval in hours */
+  average_approval_time_hours?: number;
+  /** Percentage of approved requests (0-100) */
+  approval_rate: number;
+  /** Start date of the statistics period (ISO 8601) */
+  period_start?: string;
+  /** End date of the statistics period (ISO 8601) */
+  period_end?: string;
+}
+
+/**
+ * Response model for the approval workflow dashboard
+ */
+export interface ModelApprovalDashboardResponse {
+  /** List of pending approval requests awaiting review */
+  pending_requests: ModelApprovalResponse[];
+  /** Recently approved requests */
+  recent_approvals: ModelApprovalResponse[];
+  /** Recently rejected requests */
+  recent_rejections: ModelApprovalResponse[];
+  /** Approval workflow statistics */
+  stats: ModelApprovalStatsResponse;
+  /** Number of pending requests submitted by the current user */
+  user_pending_count: number;
+}
+
+/**
+ * Query parameters for listing model approvals
+ */
+export interface ModelApprovalListParams {
+  /** Filter by status (pending, approved, rejected, deployed, cancelled) */
+  status?: ApprovalStatus;
+  /** Filter by requester user ID */
+  requested_by?: string;
+  /** Filter by target environment */
+  target_environment?: string;
+  /** Filter by organization ID */
+  organization_id?: string;
+  /** Filter by model name */
+  model_name?: string;
+}
+
+/**
+ * Deployment response with additional deployment status info
+ */
+export interface ModelApprovalDeployResponse extends ModelApprovalResponse {
+  /** Status of the deployment operation */
+  deployment_status: 'success' | 'failed';
+  /** Whether the model was successfully activated */
+  model_activated: boolean;
+}
+
+// ==================== Transparency Types ====================
+
+/**
+ * Transparency update message type
+ */
+export type TransparencyUpdateType =
+  | 'confidence_scores'
+  | 'model_accuracy'
+  | 'feature_importance'
+  | 'ai_human_comparison'
+  | 'ranking_created';
+
+/**
+ * Transparency update data sent via WebSocket
+ */
+export interface TransparencyUpdateData {
+  update_type: TransparencyUpdateType;
+  computed_at: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * WebSocket transparency update message
+ */
+export interface WebSocketTransparencyUpdateMessage extends WebSocketMessage {
+  type: 'transparency_update';
+  update_type: TransparencyUpdateType;
+  data: TransparencyUpdateData;
 }
 
 // ==================== Parsing Correction Types ====================

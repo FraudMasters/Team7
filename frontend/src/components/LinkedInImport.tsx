@@ -16,7 +16,7 @@ import {
   Error as ErrorIcon,
   PersonAdd as ImportIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 
 /**
  * LinkedIn import state interface

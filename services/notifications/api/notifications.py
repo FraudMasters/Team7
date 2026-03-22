@@ -20,6 +20,7 @@ from sqlalchemy import select, and_, or_
 from database import get_db
 from models.notification import Notification, NotificationStatus, NotificationType, NotificationPriority
 from models.email_template import EmailTemplate
+from services.template_service import TemplateService
 
 logger = logging.getLogger(__name__)
 
@@ -286,9 +287,59 @@ async def send_notification(
         body = request.body
 
         if request.template_name:
-            # TODO: Загрузка шаблона из базы данных
             logger.info(f"Loading template: {request.template_name}")
-            # Placeholder: в реальном приложении здесь была бы подстановка переменных
+
+            # Определение типа шаблона на основе типа уведомления
+            template_type = "email" if request.type == NotificationType.EMAIL.value else "sms"
+
+            # Инициализация сервиса шаблонов
+            template_service = TemplateService()
+
+            try:
+                # Загрузка шаблона из базы данных
+                template = await template_service.get_template_by_name(
+                    db=db,
+                    name=request.template_name,
+                    template_type=template_type,
+                    language="en",  # По умолчанию английский, можно добавить в request
+                )
+
+                if not template:
+                    logger.warning(
+                        f"Template not found: name={request.template_name}, "
+                        f"type={template_type}"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Template '{request.template_name}' not found",
+                    )
+
+                # Подстановка переменных в шаблон
+                variables = request.template_vars or {}
+                body = template_service.substitute_variables(template.body, variables)
+
+                # Для email шаблонов также подставляем переменные в subject
+                if template_type == "email" and hasattr(template, "subject"):
+                    subject = template_service.substitute_variables(
+                        template.subject, variables
+                    )
+
+                logger.info(
+                    f"Template loaded and rendered: name={request.template_name}, "
+                    f"vars_count={len(variables)}"
+                )
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(
+                    f"Error loading/rendering template {request.template_name}: {e}",
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to load template: {str(e)}",
+                ) from e
 
         # Создание записи в базе данных
         notification = await create_notification_record(

@@ -1,125 +1,44 @@
 /**
- * API Client for Resume Analysis Backend
+ * Base API Client
  *
- * This module provides a typed Axios client for communicating with the
- * backend resume analysis service. Handles resume upload, analysis,
- * job matching, skill taxonomies, custom synonyms, feedback, model versions,
- * resume comparisons, and health check endpoints.
+ * This module provides the foundational Axios client with error handling,
+ * request/response interceptors, and a few core endpoints (health checks,
+ * job matching comparison).
+ *
+ * For domain-specific operations, use the specialized clients:
+ * - Resumes: '@/api/resume' (upload, analyze, list, delete)
+ * - Feedback: '@/api/feedback' (create, list, update, delete feedback)
+ * - Comparisons: '@/api/comparisons' (resume comparisons, comparison matrix)
+ * - Analytics: '@/api/analytics' (metrics, funnel, skill demand)
+ * - And many more in '@/api/*'
  *
  * @example
  * ```ts
  * import { apiClient } from '@/api/client';
  *
- * // Upload resume
- * const uploadResult = await apiClient.uploadResume(file);
+ * // Check backend health
+ * const health = await apiClient.healthCheck();
  *
- * // Analyze resume
- * const analysis = await apiClient.analyzeResume(uploadResult.id);
- *
- * // Compare with job vacancy
- * const match = await apiClient.compareWithVacancy(resumeId, vacancyData);
- *
- * // Compare multiple resumes
- * const comparison = await apiClient.compareMultipleResumes({
- *   vacancy_id: 'vacancy-123',
- *   resume_ids: ['resume1', 'resume2', 'resume3'],
- * });
- *
- * // Create custom synonyms
- * const synonyms = await apiClient.createCustomSynonyms({
- *   organization_id: 'org123',
- *   synonyms: [{ canonical_skill: 'React', custom_synonyms: ['ReactJS'], is_active: true }],
- * });
- *
- * // Submit feedback
- * const feedback = await apiClient.submitMatchFeedback({
- *   match_id: 'match123',
- *   skill: 'React',
- *   was_correct: true,
- * });
+ * // Use getAxiosInstance() for custom requests
+ * const instance = apiClient.getAxiosInstance();
  * ```
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
-import {
-  trackApiCall,
-  logMetricsSummary,
-  getPerformanceStats as getPerformanceStatsUtil,
-  type PerformanceStats,
-} from '@/utils/performanceTracker';
 import { config } from '@/config';
 import type {
-  ResumeUploadResponse,
-  AnalysisRequest,
-  AnalysisResponse,
   JobVacancy,
   MatchResponse,
   HealthResponse,
-  UploadProgressCallback,
   ApiClientConfig,
   ApiError,
-  SkillTaxonomyCreate,
-  SkillTaxonomyUpdate,
-  SkillTaxonomyResponse,
-  SkillTaxonomyListResponse,
-  CustomSynonymCreate,
-  CustomSynonymUpdate,
-  CustomSynonymResponse,
-  CustomSynonymListResponse,
-  FeedbackCreate,
-  FeedbackUpdate,
-  FeedbackResponse,
-  FeedbackListResponse,
-  ModelVersionCreate,
-  ModelVersionUpdate,
-  ModelVersionResponse,
-  ModelVersionListResponse,
-  MatchFeedbackRequest,
-  MatchFeedbackResponse,
-  ComparisonCreate,
-  ComparisonUpdate,
-  ComparisonResponse,
-  ComparisonListResponse,
-  CompareMultipleRequest,
-  ComparisonMatrixData,
-  KeyMetricsResponse,
-  FunnelMetricsResponse,
-  SkillDemandResponse,
-  SourceTrackingResponse,
-  RecruiterPerformanceResponse,
-  LanguagePreferenceUpdate,
-  LanguagePreferenceResponse,
-  MatchingWeightsProfile,
-  MatchingWeightsCreate,
-  MatchingWeightsUpdate,
-  MatchingWeightsListResponse,
-  PresetProfile,
-  PresetsResponse,
-  WeightVersionEntry,
-  VersionHistoryResponse,
-  NormalizeWeightsRequest,
-  NormalizedWeightsResponse,
-  ApplyWeightsRequest,
-  ApplyWeightsResponse,
-  ATSEvaluationRequest,
-  ATSEvaluationResponse,
-  BatchATSEvaluationRequest,
-  BatchATSEvaluationResponse,
-  ATSConfigResponse,
-  ATSResultListResponse,
-  WorkflowStageCreate,
-  WorkflowStageUpdate,
-  WorkflowStageResponse,
-  WorkflowStageListResponse,
-  CandidateListItem,
-  MoveCandidateRequest,
-  MoveCandidateResponse,
-  LinkedInAuthUrlResponse,
-  LinkedInCallbackResponse,
-  LinkedInProfileSummary,
-  LinkedInSearchResponse,
-  LinkedInProfileImportRequest,
-  LinkedInProfileImportResponse,
+LinkedInAuthUrlResponse,
+LinkedInCallbackResponse,
+LinkedInProfileSummary,
+LinkedInSearchResponse,
+LinkedInProfileImportRequest,
+LinkedInProfileImportResponse,
+>>>>>>> master
 } from '@/types/api';
 
 /**
@@ -136,18 +55,22 @@ const DEFAULT_CONFIG: ApiClientConfig = {
 };
 
 /**
- * API Client class
+ * Base API Client class
  *
- * Provides methods for all backend API endpoints with proper error handling,
- * type safety, and progress tracking for file uploads.
+ * Provides foundational HTTP client with standardized error handling,
+ * request/response interceptors for debugging, and core utility endpoints.
+ * Domain-specific operations are handled by specialized client modules.
  */
 export class ApiClient {
   private client: AxiosInstance;
 
   /**
-   * Create a new API client instance
+   * Create a new base API client instance
    *
-   * @param config - Optional configuration overrides
+   * Sets up Axios with default configuration, request/response interceptors
+   * for timing metadata, and standardized error transformation.
+   *
+   * @param config - Optional configuration overrides for baseURL, timeout, headers
    */
   constructor(config: ApiClientConfig = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
@@ -173,38 +96,9 @@ export class ApiClient {
         const duration = Date.now() - (response.config.metadata?.startTime || 0);
         response.config.metadata = { ...response.config.metadata, duration };
 
-        // Track performance metrics
-        trackApiCall({
-          endpoint: response.config.url || '',
-          method: (response.config.method?.toUpperCase() || 'GET'),
-          duration,
-          status: response.status,
-          success: true,
-          timestamp: Date.now(),
-          responseSize: response.headers['content-length']
-            ? parseInt(response.headers['content-length'], 10)
-            : undefined,
-        });
-
         return response;
       },
       (error) => {
-        // Calculate request duration for failed requests
-        const duration = Date.now() - (error.config?.metadata?.startTime || 0);
-
-        // Track failed request metrics
-        if (error.config) {
-          trackApiCall({
-            endpoint: error.config.url || '',
-            method: (error.config.method?.toUpperCase() || 'GET'),
-            duration,
-            status: error.response?.status || 0,
-            success: false,
-            timestamp: Date.now(),
-            error: error.message,
-          });
-        }
-
         return Promise.reject(this.transformError(error));
       }
     );
@@ -261,80 +155,6 @@ export class ApiClient {
       detail: data?.detail || defaultMessages[status] || 'An unexpected error occurred.',
       status,
     };
-  }
-
-  /**
-   * Upload a resume file
-   *
-   * @param file - Resume file (PDF or DOCX)
-   * @param onProgress - Optional progress callback (0-100)
-   * @returns Upload response with resume ID
-   * @throws ApiError if upload fails
-   *
-   * @example
-   * ```ts
-   * const result = await apiClient.uploadResume(file, (progress) => {
-   *   console.log(`Upload progress: ${progress}%`);
-   * });
-   * ```
-   */
-  async uploadResume(
-    file: File,
-    onProgress?: UploadProgressCallback
-  ): Promise<ResumeUploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response: AxiosResponse<ResumeUploadResponse> = await this.client.post(
-        '/api/resumes/upload',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total && onProgress) {
-              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              onProgress(progress);
-            }
-          },
-        }
-      );
-
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
-  }
-
-  /**
-   * Analyze a resume
-   *
-   * @param request - Analysis request with resume ID and options
-   * @returns Analysis results with keywords, entities, grammar, and experience
-   * @throws ApiError if analysis fails
-   *
-   * @example
-   * ```ts
-   * const analysis = await apiClient.analyzeResume({
-   *   resume_id: 'abc-123',
-   *   extract_experience: true,
-   *   check_grammar: true,
-   * });
-   * ```
-   */
-  async analyzeResume(request: AnalysisRequest): Promise<AnalysisResponse> {
-    try {
-      const response: AxiosResponse<AnalysisResponse> = await this.client.post(
-        '/api/resumes/analyze',
-        request
-      );
-
-      return response.data;
-    } catch (error) {
-      throw this.transformError(error);
-    }
   }
 
   /**
@@ -410,44 +230,6 @@ export class ApiClient {
    */
   getAxiosInstance(): AxiosInstance {
     return this.client;
-  }
-
-  /**
-   * Get API performance statistics
-   *
-   * Returns performance metrics for all API calls made through this client.
-   * Useful for monitoring and debugging performance issues.
-   *
-   * @returns Performance statistics
-   *
-   * @example
-   * ```ts
-   * const stats = apiClient.getPerformanceStats();
-   * console.log(`Average duration: ${stats.averageDuration}ms`);
-   * console.log(`Total calls: ${stats.totalCalls}`);
-   * ```
-   */
-  getPerformanceStats(): PerformanceStats {
-    return getPerformanceStatsUtil();
-  }
-
-  /**
-   * Log API performance summary to console
-   *
-   * Outputs a formatted summary of all API performance metrics to the console.
-   * Useful for development and debugging.
-   *
-   * @example
-   * ```ts
-   * apiClient.logPerformanceSummary();
-   * // Output:
-   * // [API Performance Summary]
-   * // Total calls: 45
-   * // Average duration: 245ms
-   * ```
-   */
-  logPerformanceSummary(): void {
-    logMetricsSummary();
   }
 
   /**
@@ -2357,11 +2139,15 @@ declare module 'axios' {
 /**
  * Default API client instance
  *
- * Use this singleton instance for all API calls.
+ * Pre-configured singleton instance for core API operations.
+ * For domain-specific operations, prefer specialized clients from '@/api/*'.
  */
 export const apiClient = new ApiClient();
 
 /**
- * Export API client class for custom instances
+ * Export base API client class
+ *
+ * Use this to create custom client instances with different configurations.
+ * Most use cases should use the pre-configured singleton `apiClient` instead.
  */
 export default ApiClient;

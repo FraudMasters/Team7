@@ -95,6 +95,85 @@ class ModelRollbackRequest(BaseModel):
     target_version: str = Field(..., description="Target version to rollback to (e.g., v1.0.0)")
 
 
+class ChampionChallengerPromoteRequest(BaseModel):
+    """Request model for promoting a challenger to champion."""
+
+    model_name: str = Field(..., description="Name of the model (e.g., skill_matching, ranking)")
+    challenger_version_id: str = Field(..., description="UUID of the challenger model version to promote")
+    min_performance_improvement: Optional[float] = Field(
+        5.0,
+        description="Minimum performance improvement (%) required for promotion",
+        ge=0,
+        le=100,
+    )
+    min_sample_size: Optional[int] = Field(
+        100,
+        description="Minimum sample size required for statistical significance",
+        ge=10,
+    )
+    significance_level: Optional[float] = Field(
+        0.05,
+        description="Significance level (alpha) for hypothesis tests",
+        ge=0.01,
+        le=0.20,
+    )
+    min_confidence: Optional[float] = Field(
+        0.80,
+        description="Minimum confidence level required for auto-promotion",
+        ge=0.5,
+        le=1.0,
+    )
+    force: Optional[bool] = Field(
+        False,
+        description="If True, skip statistical validation and force promotion",
+    )
+
+
+class StatisticalAnalysisResponse(BaseModel):
+    """Response model for statistical analysis in champion/challenger promotion."""
+
+    champion_score: Optional[float] = Field(None, description="Performance score of champion model")
+    challenger_score: Optional[float] = Field(None, description="Performance score of challenger model")
+    improvement_pct: Optional[float] = Field(None, description="Percentage improvement of challenger over champion")
+    sample_sizes: Optional[dict] = Field(None, description="Sample sizes for each model")
+    meets_threshold: Optional[bool] = Field(None, description="Whether improvement meets minimum threshold")
+    confidence: Optional[float] = Field(None, description="Statistical confidence level")
+    p_value: Optional[float] = Field(None, description="P-value from statistical test")
+    effect_size: Optional[float] = Field(None, description="Effect size measure")
+    is_significant: Optional[bool] = Field(None, description="Whether result is statistically significant")
+    significance_level: Optional[float] = Field(None, description="Significance level used")
+    confidence_interval: Optional[List[float]] = Field(None, description="Confidence interval for the difference")
+    statistical_tests: Optional[dict] = Field(None, description="Detailed statistical test results")
+
+
+class ChampionChallengerPromoteResponse(BaseModel):
+    """Response model for champion/challenger promotion."""
+
+    success: bool = Field(..., description="Whether promotion was successful")
+    model_name: str = Field(..., description="Name of the model")
+    challenger_version: Optional[str] = Field(None, description="Version of the challenger model")
+    challenger_id: Optional[str] = Field(None, description="UUID of the challenger model")
+    previous_champion_version: Optional[str] = Field(None, description="Version of the previous champion")
+    statistical_analysis: Optional[StatisticalAnalysisResponse] = Field(
+        None, description="Statistical analysis results"
+    )
+    promotion_reason: Optional[str] = Field(None, description="Reason for promotion decision")
+    forced: Optional[bool] = Field(None, description="Whether promotion was forced")
+    promoted_at: Optional[str] = Field(None, description="Timestamp of promotion")
+    error: Optional[str] = Field(None, description="Error message if promotion failed")
+
+
+class ChampionChallengerStatusResponse(BaseModel):
+    """Response model for champion/challenger status."""
+
+    model_name: str = Field(..., description="Name of the model")
+    champion: Optional[dict] = Field(None, description="Current champion model details")
+    challengers: Optional[List[dict]] = Field(None, description="List of challenger models")
+    has_challenger: bool = Field(..., description="Whether any challenger exists")
+    challenger_count: Optional[int] = Field(None, description="Number of challenger models")
+    comparison: Optional[dict] = Field(None, description="Performance comparison between champion and best challenger")
+
+
 class PerformanceMetricPoint(BaseModel):
     """Single performance metric data point for trend charts."""
 
@@ -1507,4 +1586,500 @@ async def rollback_model_version(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to rollback model version: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/champion-challenger/promote",
+    tags=["Model Versions"],
+)
+async def promote_challenger_to_champion(
+    request: ChampionChallengerPromoteRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Promote a challenger model to champion with A/B test validation.
+
+    This endpoint implements the champion/challenger pattern for model promotion.
+    It performs statistical significance analysis to determine if the challenger
+    should replace the current champion model based on performance metrics.
+
+    The promotion process:
+    1. Validates that the challenger exists and is an experimental model
+    2. Gets the current champion (active) model
+    3. Performs A/B test statistical analysis comparing champion vs challenger
+    4. Promotes challenger if it meets criteria (or force=True)
+    5. Demotes champion to inactive status
+
+    Args:
+        request: Promotion request containing:
+            - model_name: Name of the model
+            - challenger_version_id: UUID of the challenger to promote
+            - min_performance_improvement: Minimum % improvement required (default: 5%)
+            - min_sample_size: Minimum sample size for stats (default: 100)
+            - significance_level: Alpha for hypothesis tests (default: 0.05)
+            - min_confidence: Minimum confidence level (default: 0.80)
+            - force: Skip validation and force promotion (default: False)
+        db: Database session
+
+    Returns:
+        JSON response with promotion result including:
+        - success: Whether promotion was successful
+        - statistical_analysis: A/B test results
+        - promotion_reason: Reason for decision
+
+    Raises:
+        HTTPException(400): If challenger_version_id is not a valid UUID
+        HTTPException(404): If model or challenger is not found
+        HTTPException(422): If validation fails
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "model_name": "skill_matching",
+        ...     "challenger_version_id": "123e4567-e89b-12d3-a456-426614174000",
+        ...     "min_confidence": 0.85
+        ... }
+        >>> response = requests.post(
+        ...     "/api/model-versions/champion-challenger/promote",
+        ...     json=data
+        ... )
+        >>> response.json()
+        {
+            "success": true,
+            "model_name": "skill_matching",
+            "challenger_version": "v2.0.0",
+            "previous_champion_version": "v1.0.0",
+            "statistical_analysis": {
+                "champion_score": 85.0,
+                "challenger_score": 90.5,
+                "improvement_pct": 6.47,
+                "confidence": 0.92,
+                "is_significant": true
+            },
+            "promotion_reason": "Statistically significant improvement...",
+            "promoted_at": "2024-01-15T10:30:00Z"
+        }
+    """
+    try:
+        logger.info(
+            f"Promoting challenger to champion for model: {request.model_name}, "
+            f"challenger_id: {request.challenger_version_id}, force: {request.force}"
+        )
+
+        # Validate model name
+        if not request.model_name or len(request.model_name.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Model name cannot be empty",
+            )
+
+        # Validate challenger_version_id is a valid UUID
+        try:
+            challenger_uuid = UUID(request.challenger_version_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid challenger_version_id: {request.challenger_version_id}. Must be a valid UUID.",
+            ) from e
+
+        # Import ModelVersionManager for champion/challenger logic
+        from analyzers.model_versioning import ModelVersionManager
+
+        manager = ModelVersionManager()
+
+        # Use synchronous session for the ModelVersionManager
+        # We need to run this in a sync context since ModelVersionManager uses sync queries
+        from sqlalchemy.ext.asyncio import AsyncSession as AsyncSessionType
+
+        # Create a sync wrapper using run_sync
+        async def run_promotion():
+            # Get a sync session from the async session
+            # The ModelVersionManager expects a sync session
+            sync_conn = await db.connection()
+            return await db.run_in_transaction(
+                lambda: manager.promote_challenger_to_champion(
+                    model_name=request.model_name,
+                    challenger_version_id=str(challenger_uuid),
+                    min_performance_improvement=request.min_performance_improvement or 5.0,
+                    min_sample_size=request.min_sample_size or 100,
+                    significance_level=request.significance_level or 0.05,
+                    min_confidence=request.min_confidence or 0.80,
+                    force=request.force or False,
+                    db_session=db.sync_session,
+                )
+            )
+
+        # Since ModelVersionManager uses sync SQLAlchemy, we need to adapt
+        # For async compatibility, we'll implement a direct async version here
+        # Query for the challenger model
+        challenger_query = select(MLModelVersion).where(
+            MLModelVersion.id == challenger_uuid,
+            MLModelVersion.model_name == request.model_name,
+        )
+        challenger_result = await db.execute(challenger_query)
+        challenger_model = challenger_result.scalar_one_or_none()
+
+        if not challenger_model:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Challenger model version {request.challenger_version_id} not found for model {request.model_name}",
+            )
+
+        # Get the current champion model
+        champion_query = select(MLModelVersion).where(
+            MLModelVersion.model_name == request.model_name,
+            MLModelVersion.is_active == True,
+            MLModelVersion.is_experiment == False,
+        )
+        champion_result = await db.execute(champion_query)
+        champion_model = champion_result.scalar_one_or_none()
+
+        previous_champion_version = champion_model.version if champion_model else None
+        challenger_version = challenger_model.version
+
+        # Prepare statistical analysis
+        statistical_analysis = None
+        should_promote = False
+        promotion_reason = ""
+
+        if request.force:
+            should_promote = True
+            promotion_reason = "Forced promotion - statistical validation bypassed"
+            logger.warning(
+                f"Force promoting challenger {request.model_name}:{challenger_version} "
+                "without statistical validation"
+            )
+        else:
+            # Perform statistical analysis
+            champion_metrics = champion_model.accuracy_metrics if champion_model else {}
+            challenger_metrics = challenger_model.accuracy_metrics or {}
+
+            champion_score = float(champion_model.performance_score) if champion_model and champion_model.performance_score else 0
+            challenger_score = float(challenger_model.performance_score) if challenger_model.performance_score else 0
+
+            improvement_pct = 0
+            if champion_score > 0:
+                improvement_pct = (challenger_score - champion_score) / champion_score * 100
+
+            # Get sample sizes
+            champion_sample = champion_metrics.get("sample_size", 0) if champion_metrics else 0
+            challenger_sample = challenger_metrics.get("sample_size", 0) if challenger_metrics else 0
+
+            # Initialize statistical analysis
+            statistical_analysis = {
+                "champion_score": champion_score,
+                "challenger_score": challenger_score,
+                "improvement_pct": round(improvement_pct, 2),
+                "sample_sizes": {
+                    "champion": champion_sample,
+                    "challenger": challenger_sample,
+                },
+                "meets_threshold": improvement_pct >= (request.min_performance_improvement or 5.0),
+                "confidence": 0.0,
+                "p_value": 1.0,
+                "effect_size": 0.0,
+                "is_significant": False,
+                "significance_level": request.significance_level or 0.05,
+                "confidence_interval": None,
+                "statistical_tests": {},
+            }
+
+            # Try to perform statistical testing if ABTestAnalyzer is available
+            try:
+                from analyzers.ab_test_analyzer import ABTestAnalyzer
+
+                analyzer = ABTestAnalyzer(
+                    default_significance_level=request.significance_level or 0.05,
+                    min_sample_size=request.min_sample_size or 100,
+                )
+
+                if champion_model and champion_sample >= analyzer.min_sample_size and challenger_sample >= analyzer.min_sample_size:
+                    # Perform statistical comparison
+                    comparison = analyzer.compare_models(
+                        control_model_id=str(champion_model.id) if champion_model else "unknown",
+                        treatment_model_id=str(challenger_model.id),
+                        control_metrics={
+                            **champion_metrics,
+                            "performance_score": champion_score,
+                            "sample_size": champion_sample,
+                        },
+                        treatment_metrics={
+                            **challenger_metrics,
+                            "performance_score": challenger_score,
+                            "sample_size": challenger_sample,
+                        },
+                        significance_level=request.significance_level or 0.05,
+                    )
+
+                    statistical_analysis["confidence"] = comparison.confidence
+                    statistical_analysis["is_significant"] = any(
+                        t.is_significant for t in comparison.statistical_tests.values()
+                    )
+
+                    # Get the best p-value
+                    p_values = [t.p_value for t in comparison.statistical_tests.values()]
+                    statistical_analysis["p_value"] = min(p_values) if p_values else 1.0
+
+                    # Get the best effect size
+                    effect_sizes = [t.effect_size for t in comparison.statistical_tests.values() if t.effect_size]
+                    statistical_analysis["effect_size"] = max(effect_sizes) if effect_sizes else 0.0
+
+                    # Get confidence interval
+                    for test_result in comparison.statistical_tests.values():
+                        if test_result.confidence_interval:
+                            statistical_analysis["confidence_interval"] = list(test_result.confidence_interval)
+                            break
+
+                    # Serialize statistical tests
+                    statistical_analysis["statistical_tests"] = {
+                        k: v.to_dict() if hasattr(v, "to_dict") else v
+                        for k, v in comparison.statistical_tests.items()
+                    }
+
+                    # Determine if should promote based on criteria
+                    min_conf = request.min_confidence or 0.80
+                    if comparison.confidence >= min_conf and statistical_analysis["is_significant"]:
+                        should_promote = True
+                        promotion_reason = (
+                            f"Statistically significant improvement of {improvement_pct:.2f}% "
+                            f"with {comparison.confidence:.0%} confidence. {comparison.recommendation}"
+                        )
+                    elif statistical_analysis["meets_threshold"]:
+                        # Meets improvement threshold but not statistical significance
+                        promotion_reason = (
+                            f"Challenger shows {improvement_pct:.2f}% improvement but "
+                            f"statistical confidence ({comparison.confidence:.0%}) is below "
+                            f"minimum threshold ({min_conf:.0%}). Continue A/B testing."
+                        )
+                    else:
+                        promotion_reason = (
+                            f"Challenger improvement ({improvement_pct:.2f}%) below "
+                            f"minimum threshold ({request.min_performance_improvement or 5.0}%)."
+                        )
+                else:
+                    # Not enough samples for statistical testing
+                    if statistical_analysis["meets_threshold"]:
+                        promotion_reason = (
+                            f"Challenger shows {improvement_pct:.2f}% improvement but "
+                            f"insufficient sample sizes for statistical validation "
+                            f"(champion: {champion_sample}, challenger: {challenger_sample})."
+                        )
+                    else:
+                        promotion_reason = (
+                            f"Challenger improvement ({improvement_pct:.2f}%) below "
+                            f"minimum threshold ({request.min_performance_improvement or 5.0}%)."
+                        )
+
+            except ImportError:
+                logger.warning("ABTestAnalyzer not available, using basic comparison")
+                # Fallback to basic comparison
+                if statistical_analysis["meets_threshold"]:
+                    promotion_reason = (
+                        f"Challenger shows {improvement_pct:.2f}% improvement. "
+                        f"Statistical analysis unavailable (ABTestAnalyzer not installed)."
+                    )
+                else:
+                    promotion_reason = (
+                        f"Challenger improvement ({improvement_pct:.2f}%) below "
+                        f"minimum threshold ({request.min_performance_improvement or 5.0}%)."
+                    )
+
+        # Perform promotion if criteria met
+        promoted_at = None
+        if should_promote:
+            # Demote current champion if exists
+            if champion_model:
+                champion_model.is_active = False
+                logger.info(
+                    f"Demoted champion {request.model_name}:{previous_champion_version}"
+                )
+
+            # Promote challenger to champion
+            challenger_model.is_active = True
+            challenger_model.is_experiment = False
+
+            # Update experiment config
+            experiment_config = challenger_model.experiment_config or {}
+            experiment_config["promotion_type"] = "champion_challenger"
+            experiment_config["promoted_at"] = challenger_model.updated_at.isoformat() if challenger_model.updated_at else None
+            experiment_config["previous_champion_version"] = previous_champion_version
+            experiment_config["promotion_reason"] = promotion_reason
+            experiment_config["was_forced"] = request.force or False
+            challenger_model.experiment_config = experiment_config
+
+            await db.commit()
+            await db.refresh(challenger_model)
+
+            promoted_at = challenger_model.updated_at.isoformat() if challenger_model.updated_at else None
+
+            logger.info(
+                f"Promoted challenger {request.model_name}:{challenger_version} to champion. "
+                f"Reason: {promotion_reason}"
+            )
+
+        # Build response
+        response_data = {
+            "success": should_promote,
+            "model_name": request.model_name,
+            "challenger_version": challenger_version,
+            "challenger_id": str(challenger_model.id),
+            "previous_champion_version": previous_champion_version,
+            "statistical_analysis": statistical_analysis,
+            "promotion_reason": promotion_reason,
+            "forced": request.force or False,
+            "promoted_at": promoted_at,
+        }
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error in champion/challenger promotion: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to promote challenger: {str(e)}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Error in champion/challenger promotion: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to promote challenger: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/champion-challenger/status/{model_name}",
+    tags=["Model Versions"],
+)
+async def get_champion_challenger_status(
+    model_name: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get the current champion/challenger status for a model.
+
+    This endpoint returns information about the current champion (active) model
+    and any challenger (experimental) models, including performance comparison
+    and recommendations for promotion.
+
+    Args:
+        model_name: Name of the model (e.g., skill_matching, ranking)
+        db: Database session
+
+    Returns:
+        JSON response with champion and challenger status including:
+        - champion: Current champion model details
+        - challengers: List of challenger models
+        - comparison: Performance comparison between champion and best challenger
+
+    Raises:
+        HTTPException(404): If model is not found
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/model-versions/champion-challenger/status/skill_matching")
+        >>> response.json()
+        {
+            "model_name": "skill_matching",
+            "champion": {"version": "v1.0.0", "performance_score": 85.0, ...},
+            "challengers": [{"version": "v2.0.0", "performance_score": 90.5, ...}],
+            "has_challenger": true,
+            "challenger_count": 1,
+            "comparison": {
+                "best_challenger_version": "v2.0.0",
+                "best_challenger_score": 90.5,
+                "champion_score": 85.0,
+                "improvement_pct": 6.47
+            }
+        }
+    """
+    try:
+        logger.info(f"Getting champion/challenger status for model: {model_name}")
+
+        # Get champion (active, non-experimental) model
+        champion_query = select(MLModelVersion).where(
+            MLModelVersion.model_name == model_name,
+            MLModelVersion.is_active == True,
+            MLModelVersion.is_experiment == False,
+        )
+        champion_result = await db.execute(champion_query)
+        champion_model = champion_result.scalar_one_or_none()
+
+        # Get challenger (experimental) models
+        challengers_query = select(MLModelVersion).where(
+            MLModelVersion.model_name == model_name,
+            MLModelVersion.is_experiment == True,
+        )
+        challengers_result = await db.execute(challengers_query)
+        challenger_models = challengers_result.scalars().all()
+
+        # Format champion response
+        champion = None
+        if champion_model:
+            champion = _format_model_response(champion_model)
+
+        # Format challengers response
+        challengers = [_format_model_response(m) for m in challenger_models]
+
+        # Calculate comparison metrics if both exist
+        comparison = None
+        if champion and challengers:
+            champion_score = champion.get("performance_score", 0) or 0
+            best_challenger = max(
+                challengers,
+                key=lambda c: c.get("performance_score", 0) or 0
+            )
+            challenger_score = best_challenger.get("performance_score", 0) or 0
+
+            if champion_score > 0:
+                improvement_pct = (challenger_score - champion_score) / champion_score * 100
+            else:
+                improvement_pct = 0 if challenger_score == 0 else 100
+
+            comparison = {
+                "best_challenger_version": best_challenger.get("version"),
+                "best_challenger_id": best_challenger.get("id"),
+                "best_challenger_score": challenger_score,
+                "champion_score": champion_score,
+                "improvement_pct": round(improvement_pct, 2),
+            }
+
+        response_data = {
+            "model_name": model_name,
+            "champion": champion,
+            "challengers": challengers,
+            "has_challenger": len(challengers) > 0,
+            "challenger_count": len(challengers),
+            "comparison": comparison,
+        }
+
+        logger.info(
+            f"Champion/challenger status for {model_name}: "
+            f"champion={champion.get('version') if champion else None}, "
+            f"challengers={len(challengers)}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting champion/challenger status: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get champion/challenger status: {str(e)}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Error getting champion/challenger status: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get champion/challenger status: {str(e)}",
         ) from e

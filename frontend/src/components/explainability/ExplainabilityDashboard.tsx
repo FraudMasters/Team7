@@ -36,8 +36,10 @@ import {
   Refresh as RefreshIcon,
   Warning as WarningIcon,
   Lightbulb as BulbIcon,
+  History as HistoryIcon,
+  Feedback as FeedbackIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 
 /**
  * Feature explanation from backend API
@@ -80,6 +82,26 @@ interface ExplainabilityResponse {
   provider: string;
   model: string;
   generated_at: string;
+}
+
+/**
+ * Feedback entry from backend API
+ */
+interface FeedbackEntry {
+  id: string;
+  resume_id: string;
+  vacancy_id: string;
+  match_result_id?: string;
+  skill: string;
+  was_correct: boolean;
+  confidence_score?: number;
+  recruiter_correction?: string;
+  actual_skill?: string;
+  feedback_source: string;
+  processed: boolean;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -129,6 +151,9 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [strengthsOpen, setStrengthsOpen] = useState(true);
   const [weaknessesOpen, setWeaknessesOpen] = useState(true);
+  const [feedbackHistory, setFeedbackHistory] = useState<FeedbackEntry[]>([]);
+  const [feedbackHistoryOpen, setFeedbackHistoryOpen] = useState(true);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   /**
    * Fetch explainability data from backend
@@ -154,9 +179,37 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
     }
   };
 
+  /**
+   * Fetch feedback history from backend
+   */
+  const fetchFeedbackHistory = async () => {
+    if (!resumeId || !vacancyId) return;
+
+    setFeedbackLoading(true);
+
+    try {
+      const queryParams = new URLSearchParams({
+        resume_id: resumeId,
+        vacancy_id: vacancyId,
+      });
+
+      const response = await apiClient.get<{ feedback: FeedbackEntry[]; total_count: number }>(
+        `/api/feedback/?${queryParams.toString()}`
+      );
+
+      setFeedbackHistory(response.data.feedback || []);
+    } catch (err) {
+      // Silently handle feedback loading errors - it's supplementary data
+      setFeedbackHistory([]);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (resumeId && vacancyId) {
       fetchExplanation();
+      fetchFeedbackHistory();
     }
   }, [resumeId, vacancyId, useLLM]);
 
@@ -582,6 +635,109 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
                     />
                     <Typography variant="body2">{weakness}</Typography>
                   </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
+
+      {/* Feedback History Section */}
+      {feedbackHistory.length > 0 && (
+        <Paper elevation={2} sx={{ p: 2 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            onClick={() => setFeedbackHistoryOpen(!feedbackHistoryOpen)}
+          >
+            <HistoryIcon color="info" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1" fontWeight={600}>
+              {t('explainability.feedbackHistory.title')}
+            </Typography>
+            <Chip
+              label={feedbackHistory.length}
+              size="small"
+              color="info"
+              sx={{ ml: 1, fontWeight: 700 }}
+            />
+            {feedbackLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
+            <IconButton size="small" sx={{ ml: 'auto' }}>
+              {feedbackHistoryOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+          <Collapse in={feedbackHistoryOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ mt: 2 }}>
+              <Stack spacing={2}>
+                {feedbackHistory.map((feedback) => (
+                  <Paper
+                    key={feedback.id}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      bgcolor: feedback.was_correct ? 'success.50' : 'warning.50',
+                      borderLeft: 4,
+                      borderColor: feedback.was_correct ? 'success.main' : 'warning.main',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FeedbackIcon
+                          fontSize="small"
+                          color={feedback.was_correct ? 'success' : 'warning'}
+                        />
+                        <Typography variant="subtitle2" fontWeight={600}>
+                          {feedback.skill}
+                        </Typography>
+                        <Chip
+                          label={feedback.was_correct ? t('explainability.feedbackHistory.correct') : t('explainability.feedbackHistory.incorrect')}
+                          size="small"
+                          color={feedback.was_correct ? 'success' : 'warning'}
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(feedback.created_at).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Typography>
+                    </Box>
+                    {feedback.recruiter_correction && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {t('explainability.feedbackHistory.correction')}:
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                          {feedback.recruiter_correction}
+                        </Typography>
+                      </Box>
+                    )}
+                    {feedback.actual_skill && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {t('explainability.feedbackHistory.actualSkill')}:
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>
+                          {feedback.actual_skill}
+                        </Typography>
+                      </Box>
+                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('explainability.feedbackHistory.source')}: {feedback.feedback_source}
+                      </Typography>
+                      {feedback.confidence_score !== undefined && (
+                        <>
+                          <Typography variant="caption" color="text.secondary">•</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('explainability.feedbackHistory.confidence')}: {Math.round(feedback.confidence_score * 100)}%
+                          </Typography>
+                        </>
+                      )}
+                    </Box>
+                  </Paper>
                 ))}
               </Stack>
             </Box>

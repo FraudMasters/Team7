@@ -15,6 +15,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
 from config.validation import validate_config, ConfigurationError
+from middleware.rate_limit_middleware import RateLimitMiddleware
+from middleware.api_key_auth import APIKeyAuthMiddleware
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -99,6 +101,12 @@ app.add_middleware(
         "Access-Control-Request-Headers",
     ],
 )
+
+# Configure API key authentication middleware
+app.add_middleware(APIKeyAuthMiddleware)
+
+# Configure rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
 
 
 # Exception handlers
@@ -254,6 +262,7 @@ async def root() -> JSONResponse:
 
 # Include API routers
 from api import (
+    ab_testing,
     resumes,
     resume_templates,
     resume_builder,
@@ -264,8 +273,10 @@ from api import (
     skill_taxonomies,
     skill_relationships,
     custom_synonyms,
+    duplicates,
     fairness,
     feedback,
+    model_approvals,
     model_versions,
     comparisons,
     analytics,
@@ -301,6 +312,12 @@ from api import (
     parsing_corrections,
     filter_suggestions,
     linkedin_campaigns,
+    api_keys,
+    api_usage,
+    audit_logs,
+    audit_retention,
+    audit_alerts,
+    confidence_dashboard,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -309,13 +326,17 @@ app.include_router(resume_builder.router, prefix="/api/resume-builder", tags=["R
 app.include_router(analysis.router, prefix="/api/resumes", tags=["Analysis"])
 app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
 app.include_router(matching_weights.router, prefix="/api/matching-weights", tags=["Matching Weights"])
+app.include_router(ab_testing.router, prefix="/api/ab-testing", tags=["A/B Testing"])
 app.include_router(skill_taxonomies.router, prefix="/api/skill-taxonomies", tags=["Skill Taxonomies"])
 app.include_router(skill_relationships.router, prefix="/api/skill-relationships", tags=["Skill Relationships"])
 app.include_router(custom_synonyms.router, prefix="/api/custom-synonyms", tags=["Custom Synonyms"])
+app.include_router(duplicates.router, prefix="/api/duplicates", tags=["Duplicates"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(model_versions.router, prefix="/api/model-versions", tags=["Model Versions"])
+app.include_router(model_approvals.router, prefix="/api/model-approvals", tags=["Model Approvals"])
 app.include_router(comparisons.router, prefix="/api/comparisons", tags=["Comparisons"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(confidence_dashboard.router, prefix="/api/confidence-dashboard", tags=["Confidence Dashboard"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
@@ -349,6 +370,11 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
 app.include_router(linkedin_campaigns.router, prefix="/api/linkedin/campaigns", tags=["LinkedIn Campaigns"])
+app.include_router(api_keys.router, prefix="/api/api-keys", tags=["API Keys"])
+app.include_router(api_usage.router, prefix="/api/api-usage", tags=["API Usage"])
+app.include_router(audit_logs.router, prefix="/api/audit-logs", tags=["Audit Logs"])
+app.include_router(audit_retention.router, prefix="/api/audit/retention", tags=["Audit Retention"])
+app.include_router(audit_alerts.router, prefix="/api/audit/alerts", tags=["Audit Alerts"])
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.matching_weights_profile import MatchingWeightsProfile
 from models.matching_weights_history import MatchingWeightsHistory
+from models.ranking_features_weights import RankingFeaturesWeights
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,173 @@ class CompareWeightsResponse(BaseModel):
     profile_a: MatchingWeightsProfileResponse = Field(..., description="First profile configuration")
     profile_b: MatchingWeightsProfileResponse = Field(..., description="Second profile configuration")
     differences: List[dict] = Field(..., description="List of candidate score differences between profiles")
+
+
+class PreviewRankingsRequest(BaseModel):
+    """Request model for previewing candidate rankings with custom weights."""
+
+    vacancy_id: str = Field(..., description="Vacancy ID to calculate rankings for")
+    skill_match_weight: float = Field(..., description="Weight for skill matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    experience_weight: float = Field(..., description="Weight for experience matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    education_weight: float = Field(..., description="Weight for education matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    location_weight: float = Field(..., description="Weight for location matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    keyword_weight: float = Field(..., description="Weight for keyword matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    tfidf_weight: float = Field(..., description="Weight for TF-IDF matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    vector_weight: float = Field(..., description="Weight for vector similarity matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    recency_weight: float = Field(..., description="Weight for recency (0.0 to 1.0)", ge=0.0, le=1.0)
+    culture_fit_weight: float = Field(..., description="Weight for culture fit (0.0 to 1.0)", ge=0.0, le=1.0)
+    salary_match_weight: float = Field(..., description="Weight for salary matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    availability_weight: float = Field(..., description="Weight for availability (0.0 to 1.0)", ge=0.0, le=1.0)
+    certifications_weight: float = Field(..., description="Weight for certifications (0.0 to 1.0)", ge=0.0, le=1.0)
+    industry_experience_weight: float = Field(..., description="Weight for industry experience (0.0 to 1.0)", ge=0.0, le=1.0)
+    candidate_ids: Optional[List[str]] = Field(None, description="Optional list of candidate IDs to limit preview to")
+
+    @field_validator(
+        "skill_match_weight",
+        "experience_weight",
+        "education_weight",
+        "location_weight",
+        "keyword_weight",
+        "tfidf_weight",
+        "vector_weight",
+        "recency_weight",
+        "culture_fit_weight",
+        "salary_match_weight",
+        "availability_weight",
+        "certifications_weight",
+        "industry_experience_weight",
+    )
+    @classmethod
+    def validate_weights(cls, v: float, info) -> float:
+        """Validate that weights are within valid range."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("Weight must be between 0.0 and 1.0")
+        return v
+
+
+class CandidateRanking(BaseModel):
+    """Individual candidate ranking in preview results."""
+
+    candidate_id: str = Field(..., description="Candidate/resume identifier")
+    candidate_name: Optional[str] = Field(None, description="Candidate name if available")
+    match_score: float = Field(..., description="Calculated match score (0.0 to 100.0)")
+    rank: int = Field(..., description="Rank position (1 = best match)")
+
+
+class PreviewRankingsResponse(BaseModel):
+    """Response model for ranking preview with custom weights."""
+
+    vacancy_id: str = Field(..., description="Vacancy ID used for ranking")
+    weights_used: dict = Field(..., description="Custom weights that were applied")
+    rankings: List[CandidateRanking] = Field(..., description="Sorted list of candidate rankings")
+    total_candidates: int = Field(..., description="Total number of candidates ranked")
+
+
+# Ranking Features Profile Schemas (13 weight fields)
+
+
+class RankingFeaturesProfileCreate(BaseModel):
+    """Request model for creating a ranking features profile with 13 weight fields."""
+
+    organization_id: str = Field(..., description="Organization identifier")
+    name: str = Field(..., description="Human-readable name for this profile", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Description of when to use this profile", max_length=1000)
+    skill_match_weight: float = Field(..., description="Weight for skill matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    experience_weight: float = Field(..., description="Weight for experience matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    education_weight: float = Field(..., description="Weight for education matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    location_weight: float = Field(..., description="Weight for location matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    keyword_weight: float = Field(..., description="Weight for keyword matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    tfidf_weight: float = Field(..., description="Weight for TF-IDF matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    vector_weight: float = Field(..., description="Weight for vector similarity matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    recency_weight: float = Field(..., description="Weight for recency (0.0 to 1.0)", ge=0.0, le=1.0)
+    culture_fit_weight: float = Field(..., description="Weight for culture fit (0.0 to 1.0)", ge=0.0, le=1.0)
+    salary_match_weight: float = Field(..., description="Weight for salary matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    availability_weight: float = Field(..., description="Weight for availability (0.0 to 1.0)", ge=0.0, le=1.0)
+    certifications_weight: float = Field(..., description="Weight for certifications (0.0 to 1.0)", ge=0.0, le=1.0)
+    industry_experience_weight: float = Field(..., description="Weight for industry experience (0.0 to 1.0)", ge=0.0, le=1.0)
+    is_default: bool = Field(False, description="Whether this is the default profile for the organization")
+    is_preset: bool = Field(False, description="Whether this is a system preset profile")
+    preset_type: Optional[PresetType] = Field(None, description="Type of preset if applicable")
+    created_by: Optional[str] = Field(None, description="User ID who is creating this profile")
+
+    @field_validator(
+        "skill_match_weight",
+        "experience_weight",
+        "education_weight",
+        "location_weight",
+        "keyword_weight",
+        "tfidf_weight",
+        "vector_weight",
+        "recency_weight",
+        "culture_fit_weight",
+        "salary_match_weight",
+        "availability_weight",
+        "certifications_weight",
+        "industry_experience_weight",
+    )
+    @classmethod
+    def validate_weights(cls, v: float, info) -> float:
+        """Validate that weights are within valid range."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("Weight must be between 0.0 and 1.0")
+        return v
+
+    @field_validator("preset_type")
+    @classmethod
+    def validate_preset_type(cls, v: Optional[str], info) -> Optional[str]:
+        """Validate that preset_type is only set if is_preset is True."""
+        if v is not None and not info.data.get("is_preset", False):
+            raise ValueError("preset_type can only be set for preset profiles")
+        return v
+
+
+class RankingFeaturesProfileUpdate(BaseModel):
+    """Request model for updating a ranking features profile."""
+
+    name: Optional[str] = Field(None, description="Human-readable name for this profile", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Description of when to use this profile", max_length=1000)
+    skill_match_weight: Optional[float] = Field(None, description="Weight for skill matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    experience_weight: Optional[float] = Field(None, description="Weight for experience matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    education_weight: Optional[float] = Field(None, description="Weight for education matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    location_weight: Optional[float] = Field(None, description="Weight for location matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    keyword_weight: Optional[float] = Field(None, description="Weight for keyword matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    tfidf_weight: Optional[float] = Field(None, description="Weight for TF-IDF matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    vector_weight: Optional[float] = Field(None, description="Weight for vector similarity matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    recency_weight: Optional[float] = Field(None, description="Weight for recency (0.0 to 1.0)", ge=0.0, le=1.0)
+    culture_fit_weight: Optional[float] = Field(None, description="Weight for culture fit (0.0 to 1.0)", ge=0.0, le=1.0)
+    salary_match_weight: Optional[float] = Field(None, description="Weight for salary matching (0.0 to 1.0)", ge=0.0, le=1.0)
+    availability_weight: Optional[float] = Field(None, description="Weight for availability (0.0 to 1.0)", ge=0.0, le=1.0)
+    certifications_weight: Optional[float] = Field(None, description="Weight for certifications (0.0 to 1.0)", ge=0.0, le=1.0)
+    industry_experience_weight: Optional[float] = Field(None, description="Weight for industry experience (0.0 to 1.0)", ge=0.0, le=1.0)
+    is_default: Optional[bool] = Field(None, description="Whether this is the default profile for the organization")
+
+
+class RankingFeaturesProfileResponse(BaseModel):
+    """Response model for a single ranking features profile."""
+
+    id: str = Field(..., description="Unique identifier for the profile")
+    organization_id: str = Field(..., description="Organization identifier")
+    name: str = Field(..., description="Human-readable name for this profile")
+    description: Optional[str] = Field(None, description="Description of when to use this profile")
+    skill_match_weight: float = Field(..., description="Weight for skill matching")
+    experience_weight: float = Field(..., description="Weight for experience matching")
+    education_weight: float = Field(..., description="Weight for education matching")
+    location_weight: float = Field(..., description="Weight for location matching")
+    keyword_weight: float = Field(..., description="Weight for keyword matching")
+    tfidf_weight: float = Field(..., description="Weight for TF-IDF matching")
+    vector_weight: float = Field(..., description="Weight for vector similarity matching")
+    recency_weight: float = Field(..., description="Weight for recency")
+    culture_fit_weight: float = Field(..., description="Weight for culture fit")
+    salary_match_weight: float = Field(..., description="Weight for salary matching")
+    availability_weight: float = Field(..., description="Weight for availability")
+    certifications_weight: float = Field(..., description="Weight for certifications")
+    industry_experience_weight: float = Field(..., description="Weight for industry experience")
+    is_default: bool = Field(..., description="Whether this is the default profile")
+    is_preset: bool = Field(..., description="Whether this is a system preset")
+    preset_type: Optional[str] = Field(None, description="Type of preset if applicable")
+    created_by: Optional[str] = Field(None, description="User ID who created this profile")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
 
 
 @router.post(
@@ -380,44 +548,95 @@ async def list_matching_weights_profiles(
             f"is_preset: {is_preset}, preset_type: {preset_type}"
         )
 
-        # Build query
-        query = select(MatchingWeightsProfile)
+        # If querying for preset profiles, use RankingFeaturesWeights table (13 weights)
+        # Otherwise, use MatchingWeightsProfile table (3 weights) for backward compatibility
+        if is_preset is True:
+            # Build query for 13-weight ranking features profiles
+            query = select(RankingFeaturesWeights)
 
-        if organization_id is not None:
-            query = query.where(MatchingWeightsProfile.organization_id == organization_id)
+            if organization_id is not None:
+                query = query.where(RankingFeaturesWeights.organization_id == organization_id)
 
-        if is_default is not None:
-            query = query.where(MatchingWeightsProfile.is_default == is_default)
+            if is_default is not None:
+                query = query.where(RankingFeaturesWeights.is_default == is_default)
 
-        if is_preset is not None:
-            query = query.where(MatchingWeightsProfile.is_preset == is_preset)
+            query = query.where(RankingFeaturesWeights.is_preset == True)
 
-        if preset_type is not None:
-            query = query.where(MatchingWeightsProfile.preset_type == preset_type)
+            if preset_type is not None:
+                query = query.where(RankingFeaturesWeights.preset_type == preset_type)
 
-        query = query.order_by(MatchingWeightsProfile.name)
+            query = query.order_by(RankingFeaturesWeights.name)
 
-        result = await db.execute(query)
-        profiles = result.scalars().all()
+            result = await db.execute(query)
+            profiles = result.scalars().all()
 
-        # Build response
-        profiles_data = []
-        for profile in profiles:
-            profiles_data.append({
-                "id": profile.id,
-                "organization_id": profile.organization_id,
-                "name": profile.name,
-                "description": profile.description,
-                "keyword_weight": profile.keyword_weight,
-                "tfidf_weight": profile.tfidf_weight,
-                "vector_weight": profile.vector_weight,
-                "is_default": profile.is_default,
-                "is_preset": profile.is_preset,
-                "preset_type": profile.preset_type,
-                "created_by": profile.created_by,
-                "created_at": profile.created_at.isoformat(),
-                "updated_at": profile.updated_at.isoformat(),
-            })
+            # Build response with all 13 weight fields
+            profiles_data = []
+            for profile in profiles:
+                profiles_data.append({
+                    "id": str(profile.id),
+                    "organization_id": profile.organization_id,
+                    "name": profile.name,
+                    "description": profile.description,
+                    "skill_match_weight": profile.skill_match_weight,
+                    "experience_weight": profile.experience_weight,
+                    "education_weight": profile.education_weight,
+                    "location_weight": profile.location_weight,
+                    "keyword_weight": profile.keyword_weight,
+                    "tfidf_weight": profile.tfidf_weight,
+                    "vector_weight": profile.vector_weight,
+                    "recency_weight": profile.recency_weight,
+                    "culture_fit_weight": profile.culture_fit_weight,
+                    "salary_match_weight": profile.salary_match_weight,
+                    "availability_weight": profile.availability_weight,
+                    "certifications_weight": profile.certifications_weight,
+                    "industry_experience_weight": profile.industry_experience_weight,
+                    "is_default": profile.is_default,
+                    "is_preset": profile.is_preset,
+                    "preset_type": profile.preset_type,
+                    "created_by": profile.created_by,
+                    "created_at": profile.created_at.isoformat(),
+                    "updated_at": profile.updated_at.isoformat(),
+                })
+        else:
+            # Build query for 3-weight matching profiles
+            query = select(MatchingWeightsProfile)
+
+            if organization_id is not None:
+                query = query.where(MatchingWeightsProfile.organization_id == organization_id)
+
+            if is_default is not None:
+                query = query.where(MatchingWeightsProfile.is_default == is_default)
+
+            if is_preset is not None:
+                query = query.where(MatchingWeightsProfile.is_preset == is_preset)
+
+            if preset_type is not None:
+                query = query.where(MatchingWeightsProfile.preset_type == preset_type)
+
+            query = query.order_by(MatchingWeightsProfile.name)
+
+            result = await db.execute(query)
+            profiles = result.scalars().all()
+
+            # Build response with 3 weight fields
+            profiles_data = []
+            for profile in profiles:
+                profiles_data.append({
+                    "id": str(profile.id),
+                    "organization_id": profile.organization_id,
+                    "name": profile.name,
+                    "description": profile.description,
+                    "keyword_weight": profile.keyword_weight,
+                    "tfidf_weight": profile.tfidf_weight,
+                    "vector_weight": profile.vector_weight,
+                    "is_default": profile.is_default,
+                    "is_preset": profile.is_preset,
+                    "preset_type": profile.preset_type,
+                    "created_by": profile.created_by,
+                    "created_at": profile.created_at.isoformat(),
+                    "updated_at": profile.updated_at.isoformat(),
+                })
 
         response_data = {
             "organization_id": organization_id,
@@ -1198,4 +1417,153 @@ async def compare_weight_profiles(request: CompareWeightsRequest) -> JSONRespons
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to compare weight profiles: {str(e)}",
+        ) from e
+
+
+@router.post("/preview", tags=["Matching Weights"])
+async def preview_rankings_with_custom_weights(
+    request: PreviewRankingsRequest,
+) -> JSONResponse:
+    """
+    Calculate preview rankings with custom weights without saving them.
+
+    This endpoint allows recruiters to test different weight configurations
+    and see how they affect candidate rankings in real-time, without creating
+    a permanent profile. This is useful for:
+    - A/B testing different configurations
+    - Fine-tuning weights before saving
+    - Understanding how weight changes affect rankings
+
+    The endpoint calculates match scores for all candidates (or a subset if
+    candidate_ids is provided) using the provided custom weights, then returns
+    the ranked list sorted by match score.
+
+    Args:
+        request: Request containing vacancy_id, custom weights, and optional candidate_ids
+
+    Returns:
+        JSON response with ranked candidates and their match scores
+
+    Raises:
+        HTTPException(422): If validation fails
+        HTTPException(500): If ranking calculation fails
+
+    Examples:
+        >>> import requests
+        >>> data = {
+        ...     "vacancy_id": "vacancy-123",
+        ...     "skill_match_weight": 0.3,
+        ...     "experience_weight": 0.2,
+        ...     "education_weight": 0.1,
+        ...     "location_weight": 0.05,
+        ...     "keyword_weight": 0.15,
+        ...     "tfidf_weight": 0.1,
+        ...     "vector_weight": 0.1,
+        ...     "recency_weight": 0.0,
+        ...     "culture_fit_weight": 0.0,
+        ...     "salary_match_weight": 0.0,
+        ...     "availability_weight": 0.0,
+        ...     "certifications_weight": 0.0,
+        ...     "industry_experience_weight": 0.0,
+        ...     "candidate_ids": ["candidate-1", "candidate-2"]
+        ... }
+        >>> response = requests.post("/api/matching-weights/preview", json=data)
+        >>> results = response.json()
+        >>> for ranking in results['rankings']:
+        ...     print(f"Rank {ranking['rank']}: {ranking['candidate_name']} - Score: {ranking['match_score']:.2f}%")
+    """
+    try:
+        logger.info(
+            f"Calculating preview rankings for vacancy {request.vacancy_id} "
+            f"with custom weights"
+        )
+
+        # Validate vacancy_id
+        if not request.vacancy_id or len(request.vacancy_id.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Vacancy ID cannot be empty",
+            )
+
+        # Calculate the sum of all weights to verify they're reasonable
+        total_weight = (
+            request.skill_match_weight
+            + request.experience_weight
+            + request.education_weight
+            + request.location_weight
+            + request.keyword_weight
+            + request.tfidf_weight
+            + request.vector_weight
+            + request.recency_weight
+            + request.culture_fit_weight
+            + request.salary_match_weight
+            + request.availability_weight
+            + request.certifications_weight
+            + request.industry_experience_weight
+        )
+
+        # Log the total weight sum for debugging
+        logger.debug(f"Total weight sum: {total_weight}")
+
+        # Store the weights used in the response
+        weights_used = {
+            "skill_match_weight": request.skill_match_weight,
+            "experience_weight": request.experience_weight,
+            "education_weight": request.education_weight,
+            "location_weight": request.location_weight,
+            "keyword_weight": request.keyword_weight,
+            "tfidf_weight": request.tfidf_weight,
+            "vector_weight": request.vector_weight,
+            "recency_weight": request.recency_weight,
+            "culture_fit_weight": request.culture_fit_weight,
+            "salary_match_weight": request.salary_match_weight,
+            "availability_weight": request.availability_weight,
+            "certifications_weight": request.certifications_weight,
+            "industry_experience_weight": request.industry_experience_weight,
+        }
+
+        # For now, return placeholder response with proper structure
+        # Actual ranking calculation will be integrated in a later subtask when we have:
+        # - Access to the matching service or algorithm
+        # - Candidate data retrieval from database
+        # - Implementation of the 13-feature ranking calculation
+        logger.debug(
+            f"Returning placeholder preview for vacancy {request.vacancy_id} "
+            f"(matching service integration pending)"
+        )
+
+        # Placeholder candidate rankings
+        # In full implementation, this will:
+        # 1. Fetch all candidates for the vacancy (or filtered by candidate_ids)
+        # 2. Calculate match score for each using the custom weights
+        # 3. Sort by score and assign ranks
+        placeholder_rankings = []
+
+        response_data = {
+            "vacancy_id": request.vacancy_id,
+            "weights_used": weights_used,
+            "rankings": placeholder_rankings,
+            "total_candidates": len(placeholder_rankings),
+        }
+
+        logger.info(
+            f"Generated preview rankings for vacancy {request.vacancy_id} "
+            f"({len(placeholder_rankings)} candidates ranked)"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error calculating preview rankings for vacancy {request.vacancy_id}: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to calculate preview rankings: {str(e)}",
         ) from e

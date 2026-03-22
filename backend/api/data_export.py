@@ -29,6 +29,8 @@ from models.workflow_stage_config import WorkflowStageConfig
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
+from models.audit_log import AuditActionType
+from utils.audit_logger import log_audit_event, get_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +255,22 @@ async def export_resume_data(
 
         logger.info(f"Data export generated for resume {resume_id}")
 
+        # Log audit event for data export (GDPR)
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.DATA_EXPORTED,
+            entity_type="resume",
+            entity_id=resume_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "export_format": "json",
+                "export_type": "resume_personal_data",
+                "gdpr_compliance": True,
+            },
+        )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=export_data,
@@ -434,6 +452,22 @@ async def export_resume_data_csv(
 
         logger.info(f"CSV data export generated for resume {resume_id}")
 
+        # Log audit event for CSV data export (GDPR)
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.DATA_EXPORTED,
+            entity_type="resume",
+            entity_id=resume_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "export_format": "csv",
+                "export_type": "resume_personal_data",
+                "gdpr_compliance": True,
+            },
+        )
+
         return StreamingResponse(
             io.StringIO(csv_content),
             media_type="text/csv",
@@ -529,6 +563,25 @@ async def export_organization_data(
             })
 
         logger.info(f"Organization data export generated for {organization_id}, {len(export_data)} records")
+
+        # Log audit event for organization-wide data export
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.DATA_EXPORTED,
+            entity_type="organization",
+            entity_id=organization_uuid,
+            organization_id=organization_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "export_format": format,
+                "export_type": "organization_data",
+                "record_count": len(export_data),
+                "skip": skip,
+                "limit": limit,
+            },
+        )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

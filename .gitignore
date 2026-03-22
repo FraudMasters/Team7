@@ -29,6 +29,7 @@ MANIFEST
 .coverage
 htmlcov/
 venv/
+.venv/
 env/
 ENV/
 
@@ -109,3 +110,7 @@ testdata/
 
 # Auto Claude generated files
 logs/security/
+
+# Python virtual environments
+.venv/
+venv/

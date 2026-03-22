@@ -43,6 +43,7 @@ class Resume(Base, UUIDMixin, TimestampMixin):
         language: Detected language (en, ru, etc.)
         source: Source of the resume (linkedin, direct_application, referral, etc.)
         error_message: Error message if processing failed
+        content_hash: SHA-256 hash of file content for duplicate detection
         uploaded_at: Timestamp when resume was uploaded (inherited from TimestampMixin)
     """
 
@@ -64,6 +65,7 @@ class Resume(Base, UUIDMixin, TimestampMixin):
     language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
 
     # Relationships
     job_applications: Mapped[list["JobApplication"]] = relationship(

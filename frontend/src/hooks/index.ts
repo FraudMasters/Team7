@@ -63,3 +63,19 @@ export {
   type UseAnalyticsRealTimeOptions,
   type UseAnalyticsRealTimeReturn,
 } from './useAnalyticsRealTime';
+
+export {
+  useSkillFeedback,
+  type FeedbackEntry,
+  type FeedbackListResponse,
+  type FeedbackEntryCreate,
+  type FeedbackCreateRequest,
+  type FeedbackFilters,
+  type UseSkillFeedbackResult,
+} from './useSkillFeedback';
+
+export {
+  useTransparencyRealTime,
+  type UseTransparencyRealTimeOptions,
+  type UseTransparencyRealTimeReturn,
+} from './useTransparencyRealTime';

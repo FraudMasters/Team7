@@ -34,13 +34,43 @@ class RankingWeights(BaseModel):
     """Custom weights for ranking criteria."""
 
     skill_match_weight: float = Field(
-        0.5, description="Weight for skill match percentage (0.0-1.0)", ge=0, le=1
+        0.25, description="Weight for skill match percentage (0.0-1.0)", ge=0, le=1
     )
     experience_weight: float = Field(
-        0.3, description="Weight for experience match (0.0-1.0)", ge=0, le=1
+        0.15, description="Weight for experience match (0.0-1.0)", ge=0, le=1
+    )
+    education_weight: float = Field(
+        0.10, description="Weight for education match (0.0-1.0)", ge=0, le=1
+    )
+    location_weight: float = Field(
+        0.05, description="Weight for location match (0.0-1.0)", ge=0, le=1
+    )
+    keyword_weight: float = Field(
+        0.10, description="Weight for keyword matching (0.0-1.0)", ge=0, le=1
+    )
+    tfidf_weight: float = Field(
+        0.10, description="Weight for TF-IDF similarity (0.0-1.0)", ge=0, le=1
+    )
+    vector_weight: float = Field(
+        0.10, description="Weight for vector similarity (0.0-1.0)", ge=0, le=1
     )
     recency_weight: float = Field(
-        0.2, description="Weight for resume recency (0.0-1.0)", ge=0, le=1
+        0.05, description="Weight for resume recency (0.0-1.0)", ge=0, le=1
+    )
+    culture_fit_weight: float = Field(
+        0.05, description="Weight for culture fit (0.0-1.0)", ge=0, le=1
+    )
+    salary_match_weight: float = Field(
+        0.02, description="Weight for salary match (0.0-1.0)", ge=0, le=1
+    )
+    availability_weight: float = Field(
+        0.01, description="Weight for availability match (0.0-1.0)", ge=0, le=1
+    )
+    certifications_weight: float = Field(
+        0.01, description="Weight for certifications match (0.0-1.0)", ge=0, le=1
+    )
+    industry_experience_weight: float = Field(
+        0.01, description="Weight for industry experience (0.0-1.0)", ge=0, le=1
     )
 
 
@@ -86,12 +116,22 @@ async def rank_resumes(
     Rank resumes against a job vacancy using weighted criteria.
 
     This endpoint ranks multiple resumes based on their match with a job vacancy,
-    using customizable weights for skill match, experience, and recency.
+    using customizable weights for 13 different features.
 
-    Ranking Formula:
-    score = (skill_match_weight * skill_percentage / 100) +
+    Ranking Formula (13 features):
+    score = (skill_match_weight * skill_score) +
             (experience_weight * experience_score) +
-            (recency_weight * recency_score)
+            (education_weight * education_score) +
+            (location_weight * location_score) +
+            (keyword_weight * keyword_score) +
+            (tfidf_weight * tfidf_score) +
+            (vector_weight * vector_score) +
+            (recency_weight * recency_score) +
+            (culture_fit_weight * culture_fit_score) +
+            (salary_match_weight * salary_match_score) +
+            (availability_weight * availability_score) +
+            (certifications_weight * certifications_score) +
+            (industry_experience_weight * industry_experience_score)
 
     Args:
         request: Ranking request with vacancy_id, resume_ids, and optional weights
@@ -111,9 +151,19 @@ async def rank_resumes(
         ...     "vacancy_id": "vacancy-123",
         ...     "resume_ids": ["resume1", "resume2", "resume3"],
         ...     "weights": {
-        ...         "skill_match_weight": 0.6,
-        ...         "experience_weight": 0.3,
-        ...         "recency_weight": 0.1
+        ...         "skill_match_weight": 0.25,
+        ...         "experience_weight": 0.15,
+        ...         "education_weight": 0.10,
+        ...         "location_weight": 0.05,
+        ...         "keyword_weight": 0.10,
+        ...         "tfidf_weight": 0.10,
+        ...         "vector_weight": 0.10,
+        ...         "recency_weight": 0.05,
+        ...         "culture_fit_weight": 0.05,
+        ...         "salary_match_weight": 0.02,
+        ...         "availability_weight": 0.01,
+        ...         "certifications_weight": 0.01,
+        ...         "industry_experience_weight": 0.01
         ...     },
         ...     "filter_min_match": 50
         ... }
@@ -128,7 +178,17 @@ async def rank_resumes(
                     "overall_score": 0.85,
                     "skill_match_score": 0.90,
                     "experience_score": 0.80,
+                    "education_score": 0.75,
+                    "location_score": 0.70,
+                    "keyword_score": 0.85,
+                    "tfidf_score": 0.82,
+                    "vector_score": 0.88,
                     "recency_score": 0.75,
+                    "culture_fit_score": 0.70,
+                    "salary_match_score": 0.95,
+                    "availability_score": 1.0,
+                    "certifications_score": 0.80,
+                    "industry_experience_score": 0.85,
                     "match_percentage": 90.0
                 },
                 {
@@ -141,9 +201,9 @@ async def rank_resumes(
             "total_resumes": 3,
             "filtered_count": 0,
             "weights_used": {
-                "skill_match_weight": 0.6,
-                "experience_weight": 0.3,
-                "recency_weight": 0.1
+                "skill_match_weight": 0.25,
+                "experience_weight": 0.15,
+                ...
             }
         }
     """
@@ -159,7 +219,17 @@ async def rank_resumes(
         total_weight = (
             weights.skill_match_weight +
             weights.experience_weight +
-            weights.recency_weight
+            weights.education_weight +
+            weights.location_weight +
+            weights.keyword_weight +
+            weights.tfidf_weight +
+            weights.vector_weight +
+            weights.recency_weight +
+            weights.culture_fit_weight +
+            weights.salary_match_weight +
+            weights.availability_weight +
+            weights.certifications_weight +
+            weights.industry_experience_weight
         )
         if abs(total_weight - 1.0) > 0.1:
             logger.warning(
@@ -168,7 +238,17 @@ async def rank_resumes(
             # Normalize weights
             weights.skill_match_weight /= total_weight
             weights.experience_weight /= total_weight
+            weights.education_weight /= total_weight
+            weights.location_weight /= total_weight
+            weights.keyword_weight /= total_weight
+            weights.tfidf_weight /= total_weight
+            weights.vector_weight /= total_weight
             weights.recency_weight /= total_weight
+            weights.culture_fit_weight /= total_weight
+            weights.salary_match_weight /= total_weight
+            weights.availability_weight /= total_weight
+            weights.certifications_weight /= total_weight
+            weights.industry_experience_weight /= total_weight
 
         # Get vacancy data or use cached match results
         vacancy_data = request.vacancy_data
@@ -210,21 +290,38 @@ async def rank_resumes(
                             filtered_count += 1
                             continue
 
-                        # Calculate component scores
+                        # Calculate component scores for all 13 features
                         skill_score = match_percentage / 100
 
-                        # Calculate experience score
-                        experience_score = 0.5  # Default if no verification
-                        # Could be calculated from match data if available
+                        # Extract scores from match result or use defaults
+                        experience_score = 1.0 if match.experience_verified else 0.5
+                        education_score = 0.5  # Default - to be enhanced with actual data
+                        location_score = 0.5  # Default - to be enhanced with actual data
+                        keyword_score = match.keyword_score if match.keyword_score is not None else 0.5
+                        tfidf_score = match.tfidf_score if match.tfidf_score is not None else 0.5
+                        vector_score = match.vector_score if match.vector_score is not None else 0.5
+                        recency_score = 0.5  # Default - to be enhanced with resume date
+                        culture_fit_score = 0.5  # Default - to be enhanced with culture analysis
+                        salary_match_score = 0.5  # Default - to be enhanced with salary data
+                        availability_score = 0.5  # Default - to be enhanced with availability data
+                        certifications_score = 0.5  # Default - to be enhanced with certifications data
+                        industry_experience_score = 0.5  # Default - to be enhanced with industry data
 
-                        # Calculate recency score (placeholder)
-                        recency_score = 0.5  # Default if no date info
-
-                        # Calculate overall score
+                        # Calculate overall score using all 13 weighted features
                         overall_score = (
                             weights.skill_match_weight * skill_score +
                             weights.experience_weight * experience_score +
-                            weights.recency_weight * recency_score
+                            weights.education_weight * education_score +
+                            weights.location_weight * location_score +
+                            weights.keyword_weight * keyword_score +
+                            weights.tfidf_weight * tfidf_score +
+                            weights.vector_weight * vector_score +
+                            weights.recency_weight * recency_score +
+                            weights.culture_fit_weight * culture_fit_score +
+                            weights.salary_match_weight * salary_match_score +
+                            weights.availability_weight * availability_score +
+                            weights.certifications_weight * certifications_score +
+                            weights.industry_experience_weight * industry_experience_score
                         )
 
                         # Extract matched and missing skills
@@ -241,7 +338,17 @@ async def rank_resumes(
                             "overall_score": round(overall_score, 3),
                             "skill_match_score": round(skill_score, 3),
                             "experience_score": round(experience_score, 3),
+                            "education_score": round(education_score, 3),
+                            "location_score": round(location_score, 3),
+                            "keyword_score": round(keyword_score, 3),
+                            "tfidf_score": round(tfidf_score, 3),
+                            "vector_score": round(vector_score, 3),
                             "recency_score": round(recency_score, 3),
+                            "culture_fit_score": round(culture_fit_score, 3),
+                            "salary_match_score": round(salary_match_score, 3),
+                            "availability_score": round(availability_score, 3),
+                            "certifications_score": round(certifications_score, 3),
+                            "industry_experience_score": round(industry_experience_score, 3),
                             "matched_skills": matched_skills,
                             "missing_skills": missing_skills,
                         })
@@ -363,16 +470,38 @@ async def rank_resumes(
                     filtered_count += 1
                     continue
 
-                # Calculate component scores
+                # Calculate component scores for all 13 features
                 skill_score = match_percentage / 100
-                experience_score = 0.5  # Default
-                recency_score = 0.5  # Default
 
-                # Calculate overall score
+                # Use defaults for features not yet computed in fresh matching
+                experience_score = 0.5  # Default - to be enhanced with actual data
+                education_score = 0.5  # Default - to be enhanced with actual data
+                location_score = 0.5  # Default - to be enhanced with actual data
+                keyword_score = 0.5  # Default - to be enhanced with actual data
+                tfidf_score = 0.5  # Default - to be enhanced with actual data
+                vector_score = 0.5  # Default - to be enhanced with actual data
+                recency_score = 0.5  # Default - to be enhanced with resume date
+                culture_fit_score = 0.5  # Default - to be enhanced with culture analysis
+                salary_match_score = 0.5  # Default - to be enhanced with salary data
+                availability_score = 0.5  # Default - to be enhanced with availability data
+                certifications_score = 0.5  # Default - to be enhanced with certifications data
+                industry_experience_score = 0.5  # Default - to be enhanced with industry data
+
+                # Calculate overall score using all 13 weighted features
                 overall_score = (
                     weights.skill_match_weight * skill_score +
                     weights.experience_weight * experience_score +
-                    weights.recency_weight * recency_score
+                    weights.education_weight * education_score +
+                    weights.location_weight * location_score +
+                    weights.keyword_weight * keyword_score +
+                    weights.tfidf_weight * tfidf_score +
+                    weights.vector_weight * vector_score +
+                    weights.recency_weight * recency_score +
+                    weights.culture_fit_weight * culture_fit_score +
+                    weights.salary_match_weight * salary_match_score +
+                    weights.availability_weight * availability_score +
+                    weights.certifications_weight * certifications_score +
+                    weights.industry_experience_weight * industry_experience_score
                 )
 
                 ranked_resumes.append({
@@ -381,7 +510,17 @@ async def rank_resumes(
                     "overall_score": round(overall_score, 3),
                     "skill_match_score": round(skill_score, 3),
                     "experience_score": round(experience_score, 3),
+                    "education_score": round(education_score, 3),
+                    "location_score": round(location_score, 3),
+                    "keyword_score": round(keyword_score, 3),
+                    "tfidf_score": round(tfidf_score, 3),
+                    "vector_score": round(vector_score, 3),
                     "recency_score": round(recency_score, 3),
+                    "culture_fit_score": round(culture_fit_score, 3),
+                    "salary_match_score": round(salary_match_score, 3),
+                    "availability_score": round(availability_score, 3),
+                    "certifications_score": round(certifications_score, 3),
+                    "industry_experience_score": round(industry_experience_score, 3),
                     "matched_skills": matched_skills,
                     "missing_skills": missing_skills,
                 })

@@ -34,6 +34,7 @@ class WorkflowStageCreate(BaseModel):
     is_active: bool = Field(True, description="Whether this stage is currently active")
     color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display (e.g., #3B82F6)")
     description: Optional[str] = Field(None, max_length=500, description="Description of what happens in this stage")
+    wip_limit: Optional[int] = Field(None, ge=1, description="Work-in-progress limit for Kanban (max candidates allowed in this stage)")
 
 
 class WorkflowStageUpdate(BaseModel):
@@ -45,6 +46,7 @@ class WorkflowStageUpdate(BaseModel):
     is_active: Optional[bool] = Field(None, description="Whether this stage is currently active")
     color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI display")
     description: Optional[str] = Field(None, max_length=500, description="Description of what happens in this stage")
+    wip_limit: Optional[int] = Field(None, ge=1, description="Work-in-progress limit for Kanban (max candidates allowed in this stage)")
 
 
 class WorkflowStageResponse(BaseModel):
@@ -58,6 +60,7 @@ class WorkflowStageResponse(BaseModel):
     is_active: bool = Field(..., description="Whether this stage is currently active")
     color: Optional[str] = Field(None, description="Hex color code for UI display")
     description: Optional[str] = Field(None, description="Description of what happens in this stage")
+    wip_limit: Optional[int] = Field(None, description="Work-in-progress limit for Kanban (max candidates allowed in this stage)")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
 
@@ -150,6 +153,7 @@ async def create_workflow_stage(
             is_active=request.is_active,
             color=request.color,
             description=request.description,
+            wip_limit=request.wip_limit,
         )
         db.add(new_stage)
         await db.flush()
@@ -163,6 +167,7 @@ async def create_workflow_stage(
             "is_active": new_stage.is_active,
             "color": new_stage.color,
             "description": new_stage.description,
+            "wip_limit": new_stage.wip_limit,
             "created_at": new_stage.created_at.isoformat(),
             "updated_at": new_stage.updated_at.isoformat(),
         }
@@ -255,6 +260,7 @@ async def list_workflow_stages(
                 "is_active": stage.is_active,
                 "color": stage.color,
                 "description": stage.description,
+                "wip_limit": stage.wip_limit,
                 "created_at": stage.created_at.isoformat(),
                 "updated_at": stage.updated_at.isoformat(),
             })
@@ -335,6 +341,7 @@ async def get_workflow_stage(
             "is_active": stage.is_active,
             "color": stage.color,
             "description": stage.description,
+            "wip_limit": stage.wip_limit,
             "created_at": stage.created_at.isoformat(),
             "updated_at": stage.updated_at.isoformat(),
         }
@@ -445,6 +452,8 @@ async def update_workflow_stage(
             stage.color = request.color
         if request.description is not None:
             stage.description = request.description
+        if request.wip_limit is not None:
+            stage.wip_limit = request.wip_limit
 
         await db.commit()
         await db.refresh(stage)
@@ -458,6 +467,7 @@ async def update_workflow_stage(
             "is_active": stage.is_active,
             "color": stage.color,
             "description": stage.description,
+            "wip_limit": stage.wip_limit,
             "created_at": stage.created_at.isoformat(),
             "updated_at": stage.updated_at.isoformat(),
         }

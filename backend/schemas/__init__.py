@@ -74,6 +74,19 @@ from .filter_suggestions import (
     BulkAlertSettingsUpdate,
     BulkAlertSettingsResponse,
 )
+from .model_approval import (
+    ApprovalStatus,
+    ApprovalRequestCreate,
+    ApprovalRequestUpdate,
+    ApprovalActionRequest,
+    ApprovalRequestResponse,
+    ApprovalRequestListResponse,
+    ApprovalRequestDetailResponse,
+    ApprovalAuditLogEntry,
+    ApprovalAuditLogResponse,
+    ApprovalStatsResponse,
+    ApprovalDashboardResponse,
+)
 
 __all__ = [
     "BackupResponse",
@@ -138,4 +151,16 @@ __all__ = [
     "SavedSearchListWithAlertsResponse",
     "BulkAlertSettingsUpdate",
     "BulkAlertSettingsResponse",
+    # Model Approval Workflow
+    "ApprovalStatus",
+    "ApprovalRequestCreate",
+    "ApprovalRequestUpdate",
+    "ApprovalActionRequest",
+    "ApprovalRequestResponse",
+    "ApprovalRequestListResponse",
+    "ApprovalRequestDetailResponse",
+    "ApprovalAuditLogEntry",
+    "ApprovalAuditLogResponse",
+    "ApprovalStatsResponse",
+    "ApprovalDashboardResponse",
 ]

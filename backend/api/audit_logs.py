@@ -10,14 +10,15 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.audit_log import AuditLog, AuditActionType
+from utils.audit_logger import log_audit_event, get_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -396,4 +397,129 @@ async def get_entity_types() -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve entity types: {str(e)}",
+        ) from e
+
+
+class AnonymizeLogsResponse(BaseModel):
+    """Response model for audit log anonymization."""
+
+    anonymized_count: int = Field(..., description="Number of audit logs anonymized")
+    message: str = Field(..., description="Success message")
+
+
+@router.post(
+    "/anonymize/{user_id}",
+    response_model=AnonymizeLogsResponse,
+    tags=["Audit Logs"],
+)
+async def anonymize_user_logs(
+    user_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Anonymize all audit logs for a specific user (GDPR Right to Erasure).
+
+    This endpoint anonymizes personally identifiable information (PII) in audit logs
+    for a given user while preserving the audit trail for compliance purposes.
+    It sets user_id, ip_address, and user_agent to anonymized values.
+
+    Args:
+        user_id: UUID of the user whose logs should be anonymized
+        request: FastAPI request object (for audit logging)
+        db: Database session
+
+    Returns:
+        JSON response with count of anonymized logs and success message
+
+    Raises:
+        HTTPException(400): If user_id format is invalid
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.post(
+        ...     "http://localhost:8000/api/audit-logs/anonymize/123e4567-e89b-12d3-a456-426614174000"
+        ... )
+        >>> response.json()
+        {
+            "anonymized_count": 42,
+            "message": "Successfully anonymized 42 audit logs for user"
+        }
+    """
+    try:
+        logger.info(f"Anonymizing audit logs for user: {user_id}")
+
+        # Validate user_id format
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid user_id format: {user_id}. Must be a valid UUID.",
+            )
+
+        # Count logs to be anonymized
+        count_query = select(AuditLog).where(AuditLog.user_id == user_uuid)
+        count_result = await db.execute(count_query)
+        logs_to_anonymize = count_result.scalars().all()
+        anonymized_count = len(logs_to_anonymize)
+
+        if anonymized_count == 0:
+            logger.info(f"No audit logs found for user: {user_id}")
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "anonymized_count": 0,
+                    "message": "No audit logs found for this user",
+                },
+            )
+
+        # Anonymize the logs by setting PII fields to None
+        update_stmt = (
+            update(AuditLog)
+            .where(AuditLog.user_id == user_uuid)
+            .values(
+                user_id=None,
+                ip_address=None,
+                user_agent=None,
+            )
+        )
+        await db.execute(update_stmt)
+        await db.commit()
+
+        # Log the anonymization action itself
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.USER_DELETED,  # Reusing existing action type
+            entity_type="audit_log",
+            entity_id=None,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "anonymized_user_id": user_id,
+                "anonymized_count": anonymized_count,
+                "reason": "GDPR Right to Erasure - User data anonymization",
+            },
+        )
+        await db.commit()
+
+        logger.info(f"Successfully anonymized {anonymized_count} audit logs for user: {user_id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "anonymized_count": anonymized_count,
+                "message": f"Successfully anonymized {anonymized_count} audit logs for user",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error anonymizing audit logs: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to anonymize audit logs: {str(e)}",
         ) from e

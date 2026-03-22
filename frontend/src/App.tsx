@@ -5,6 +5,7 @@ import { Box, Typography } from '@mui/material';
 import JobSeekerLayout from './layouts/JobSeekerLayout';
 import RecruiterLayout from './layouts/RecruiterLayout';
 import HiringManagerLayout from './layouts/HiringManagerLayout';
+import DeveloperLayout from './layouts/DeveloperLayout';
 
 // Authentication
 import ProtectedRoute from './auth/ProtectedRoute';
@@ -72,15 +73,35 @@ import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
+import SkillFeedbackAnalytics from './components/SkillFeedbackAnalytics';
 
 // LinkedIn Integration Pages
 import LinkedInCampaignsPage from './pages/recruiter/LinkedInCampaignsPage';
 import LinkedInCampaignDetail from './components/LinkedInCampaignDetail';
 
 // AI Explainability Dashboard (lazy loaded)
+// Developer Pages
+import DeveloperPortal from './pages/DeveloperPortal';
+import APIKeysPage from './pages/developer/APIKeys';
+import WebhooksPage from './pages/developer/Webhooks';
+import PluginsPage from './pages/developer/Plugins';
+import WorkflowsPage from './pages/developer/Workflows';
+import AnalyticsPage from './pages/developer/Analytics';
+
+// Template Builder
+import { TemplateBuilder } from './components/TemplateBuilder/TemplateBuilder';
+import FeedbackTemplatesPage from './pages/FeedbackTemplates';
+import SMSTemplateDemo from './pages/SMSTemplateDemo';
+
+// Admin Pages
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
   () => import('./pages/admin/AIExplainabilityDashboard')
+);
+import { AuditRetentionSettings } from './pages/admin/AuditRetentionSettings';
+import { AuditAlertSettings } from './pages/admin/AuditAlertSettings';
+const TransparencyDashboard = lazy(
+  () => import('./pages/admin/TransparencyDashboard')
 );
 
 /**
@@ -110,6 +131,23 @@ function ProtectedHiringManagerLayout() {
       redirectTo="/auth/login"
     >
       <HiringManagerLayout />
+    </ProtectedRoute>
+  );
+}
+
+/**
+ * Protected Developer Layout Wrapper
+ *
+ * Wraps the DeveloperLayout with role-based access control.
+ * All authenticated users can access developer routes.
+ */
+function ProtectedDeveloperLayout() {
+  return (
+    <ProtectedRoute
+      requiredRoles={[UserRole.Recruiter, UserRole.HiringManager, UserRole.JobSeeker, UserRole.Admin]}
+      redirectTo="/auth/login"
+    >
+      <DeveloperLayout />
     </ProtectedRoute>
   );
 }
@@ -189,6 +227,10 @@ function App() {
           <Route index element={<JobSeekerProfilePage />} />
         </Route>
 
+        {/* Template Builder (standalone, no auth required for development) */}
+        <Route path="/templates/builder" element={<TemplateBuilder />} />
+        <Route path="/templates/sms" element={<SMSTemplateDemo />} />
+
         {/* Recruiter Flow - Protected with role-based access control */}
         <Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
           <Route path="dashboard" element={<DashboardPage />} />
@@ -214,12 +256,14 @@ function App() {
           </Route>
           <Route path="weights" element={<WeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="analytics/skill-feedback" element={<SkillFeedbackAnalytics />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
           <Route path="linkedin/campaigns">
             <Route index element={<LinkedInCampaignsPage />} />
             <Route path=":id" element={<LinkedInCampaignDetail />} />
           </Route>
+          <Route path="feedback-templates" element={<FeedbackTemplatesPage />} />
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}
@@ -235,12 +279,34 @@ function App() {
           <Route path="notifications" element={<HiringManagerPlaceholder title="Notifications" />} />
         </Route>
 
+        {/* Developer Portal - Protected with role-based access control */}
+        <Route path="/developer" element={<ProtectedDeveloperLayout />}>
+          <Route index element={<DeveloperPortal />} />
+          <Route path="api-keys" element={<APIKeysPage />} />
+          <Route path="webhooks" element={<WebhooksPage />} />
+          <Route path="plugins" element={<PluginsPage />} />
+          <Route path="workflows" element={<WorkflowsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+        </Route>
+
         {/* Admin Routes - AI Explainability Dashboard */}
         <Route
           path="/admin/ai-explainability"
           element={
             <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography>Loading...</Typography></Box>}>
               <AIExplainabilityDashboard />
+            </Suspense>
+          }
+        />
+        <Route path="/admin/audit-retention" element={<AuditRetentionSettings />} />
+        <Route path="/admin/audit-alerts" element={<AuditAlertSettings />} />
+
+        {/* Admin Routes - Transparency Dashboard */}
+        <Route
+          path="/admin/transparency-dashboard"
+          element={
+            <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography>Loading...</Typography></Box>}>
+              <TransparencyDashboard />
             </Suspense>
           }
         />

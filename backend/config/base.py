@@ -42,6 +42,7 @@ class BaseConfig(BaseSettings):
         allowed_file_types: Comma-separated list of allowed file extensions
         analysis_timeout_seconds: Maximum time for resume analysis
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        rate_limit_per_minute: API rate limit (requests per minute per IP)
         celery_broker_url: Celery broker URL
         celery_result_backend: Celery result backend URL
         backup_retention_days: Default backup retention period in days
@@ -131,6 +132,14 @@ class BaseConfig(BaseSettings):
     log_level: str = Field(
         default="INFO",
         description="Logging level",
+    )
+
+    # Rate Limiting Configuration
+    rate_limit_per_minute: int = Field(
+        default=60,
+        ge=1,
+        le=10000,
+        description="API rate limit (requests per minute per IP)",
     )
 
     # Celery Configuration

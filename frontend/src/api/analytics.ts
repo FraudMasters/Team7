@@ -240,6 +240,33 @@ export interface PerformanceTrendsResponse {
 }
 
 /**
+ * Single data point in model accuracy trend
+ */
+export interface ModelAccuracyDataPoint {
+  timestamp: string;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  sample_size: number;
+}
+
+/**
+ * Model accuracy trend over time - matches API response structure
+ */
+export interface ModelAccuracyTrendResponse {
+  model_name: string;
+  period: string;
+  data_points: ModelAccuracyDataPoint[];
+  summary: {
+    avg_accuracy: number;
+    avg_f1_score: number;
+    trend: string;
+    total_samples: number;
+  };
+}
+
+/**
  * Analytics Client
  *
  * Handles API usage analytics retrieval operations.

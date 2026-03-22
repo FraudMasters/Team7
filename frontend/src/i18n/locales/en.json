@@ -933,6 +933,15 @@
     "noData": {
       "title": "No Explanation Available",
       "message": "No explanation data found for the specified resume and vacancy."
+    },
+    "feedbackHistory": {
+      "title": "Recruiter Feedback History",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "correction": "Correction",
+      "actualSkill": "Actual Skill",
+      "source": "Source",
+      "confidence": "Confidence"
     }
   },
   "candidateComparison": {
@@ -1128,7 +1137,75 @@
       "lowPriority": "Low Priority",
       "optimizationScore": "Optimization Score"
     },
-    "description": "AI-powered suggestions to improve your resume and increase your chances of getting noticed by recruiters."
+    "description": "AI-powered suggestions to improve your resume and increase your chances of getting noticed by recruiters.",
+    "completeness": {
+      "title": "Resume Completeness",
+      "score": "Completeness Score",
+      "missingSections": "Missing Sections",
+      "presentSections": "Present Sections",
+      "sections": {
+        "education": "Education",
+        "certifications": "Certifications",
+        "projects": "Projects",
+        "contact": "Contact Information",
+        "summary": "Professional Summary",
+        "experience": "Work Experience",
+        "skills": "Skills"
+      },
+      "suggestion": "Add {{section}} to improve your resume completeness"
+    },
+    "ats": {
+      "title": "ATS Compatibility",
+      "score": "ATS Score",
+      "formattingIssues": "Formatting Issues",
+      "suggestions": "ATS Suggestions",
+      "issues": {
+        "tables": "Tables may not parse correctly in ATS systems",
+        "images": "Images are not readable by ATS",
+        "specialChars": "Special characters may cause parsing issues",
+        "columns": "Multi-column layouts can confuse ATS parsers"
+      },
+      "passed": "Your resume passes ATS compatibility checks"
+    },
+    "comparison": {
+      "title": "Compare with Top Candidates",
+      "beforeAfter": "Before & After Comparison",
+      "currentScore": "Current Score",
+      "optimizedScore": "Optimized Score",
+      "improvement": "Potential Improvement",
+      "topCandidates": "Top Performing Candidates",
+      "skillsGap": "Skills Gap vs Top Candidates",
+      "matchingSkills": "Matching Skills",
+      "missingFromTop": "Skills to Add",
+      "rankingPrediction": {
+        "title": "Ranking Prediction",
+        "current": "Current Estimated Rank",
+        "optimized": "Optimized Estimated Rank",
+        "improvement": "Potential rank improvement: +{{positions}} positions"
+      }
+    },
+    "export": {
+      "title": "Export Optimized Resume",
+      "downloadPdf": "Download as PDF",
+      "downloadDocx": "Download as DOCX",
+      "downloadSuggestions": "Export Suggestions Report",
+      "generating": "Generating document...",
+      "success": "Document downloaded successfully",
+      "error": "Failed to generate document"
+    },
+    "skillGap": {
+      "title": "Skill Gap Analysis",
+      "missingSkills": "Missing Skills",
+      "matchedSkills": "Matched Skills",
+      "severity": {
+        "low": "Low Gap",
+        "medium": "Medium Gap",
+        "high": "High Gap"
+      },
+      "bridgeability": "Bridgeability Score",
+      "estimatedTime": "Estimated Time to Learn",
+      "priority": "Priority Order"
+    }
   },
   "jobDescriptionGenerator": {
     "title": "AI Job Description Generator",
@@ -1227,6 +1304,36 @@
         "inclusiveScore": "Inclusive Language Score: {{score}}%",
         "noWarnings": "No bias warnings detected. The description follows inclusive language guidelines."
       }
+    }
+  },
+  "skillFeedback": {
+    "tooltip": {
+      "correctSkill": "Mark this skill as correctly detected",
+      "incorrectSkill": "Mark this skill as incorrectly detected",
+      "addMissingSkill": "Add a missing skill"
+    },
+    "aria": {
+      "correctSkill": "Mark {{skill}} as correctly detected",
+      "incorrectSkill": "Mark {{skill}} as incorrectly detected",
+      "addMissingSkill": "Add a missing skill that the AI didn't detect"
+    },
+    "label": {
+      "giveFeedback": "Give feedback"
+    },
+    "success": {
+      "correctSkill": "Thank you! Confirmed that \"{{skill}}\" was correctly detected.",
+      "incorrectSkill": "Thank you! Noted that \"{{skill}}\" was incorrectly detected.",
+      "addedSkill": "Thank you! Added missing skill \"{{skill}}\"."
+    },
+    "error": {
+      "submitFailed": "Failed to submit feedback. Please try again.",
+      "emptySkillName": "Please enter a skill name."
+    },
+    "dialog": {
+      "addMissingSkill": "Add Missing Skill",
+      "description": "Enter the name of a skill that the AI missed on this resume. This helps improve future skill extraction.",
+      "skillNameLabel": "Skill Name",
+      "skillNamePlaceholder": "e.g., Python, Project Management, SQL"
     }
   }
 }
