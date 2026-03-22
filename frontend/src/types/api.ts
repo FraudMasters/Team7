@@ -3422,3 +3422,127 @@ export interface LinkedInProfileImportResponse {
   message?: string;
 }
 
+/**
+ * LinkedIn campaign status
+ */
+export type LinkedInCampaignStatus = 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+
+/**
+ * LinkedIn outreach response status
+ */
+export type LinkedInOutreachResponseStatus = 'no_response' | 'interested' | 'not_interested' | 'replied' | 'bounced' | 'opened';
+
+/**
+ * LinkedIn campaign response
+ */
+export interface LinkedInCampaignResponse {
+  id: string;
+  name: string;
+  recruiter_id: string;
+  vacancy_id?: string;
+  status: LinkedInCampaignStatus;
+  target_count: number;
+  sent_count: number;
+  response_count: number;
+  response_rate: number;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * LinkedIn campaign list response
+ */
+export interface LinkedInCampaignListResponse {
+  total: number;
+  campaigns: LinkedInCampaignResponse[];
+}
+
+/**
+ * LinkedIn campaign create request
+ */
+export interface LinkedInCampaignCreateRequest {
+  name: string;
+  vacancy_id?: string;
+  description?: string;
+  target_count?: number;
+  recruiter_id: string;
+}
+
+/**
+ * LinkedIn campaign update request
+ */
+export interface LinkedInCampaignUpdateRequest {
+  name?: string;
+  status?: LinkedInCampaignStatus;
+  description?: string;
+  target_count?: number;
+}
+
+/**
+ * LinkedIn campaign statistics response
+ */
+export interface LinkedInCampaignStatsResponse {
+  campaign_id: string;
+  total_outreach: number;
+  responses: number;
+  response_rate: number;
+  interested: number;
+  not_interested: number;
+  no_response: number;
+  by_status: Record<string, number>;
+}
+
+/**
+ * LinkedIn outreach response
+ */
+export interface LinkedInOutreachResponse {
+  id: string;
+  campaign_id: string;
+  linkedin_profile_id: string;
+  recruiter_id?: string;
+  message_subject?: string;
+  message_body?: string;
+  message_sent_at?: string;
+  response_received_at?: string;
+  response_status: LinkedInOutreachResponseStatus;
+  response_text?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * LinkedIn outreach create request
+ */
+export interface LinkedInOutreachCreateRequest {
+  linkedin_profile_id: string;
+  recruiter_id: string;
+  message_subject?: string;
+  message_body?: string;
+  message_sent_at?: string;
+}
+
+/**
+ * LinkedIn outreach update request
+ */
+export interface LinkedInOutreachUpdateRequest {
+  response_status?: LinkedInOutreachResponseStatus;
+  response_text?: string;
+  response_received_at?: string;
+}
+
+/**
+ * LinkedIn search filters
+ */
+export interface LinkedInSearchFilters {
+  keywords?: string;
+  location?: string;
+  skills?: string;
+  title?: string;
+  industry?: string;
+  company?: string;
+  experience_level?: string;
+  limit?: number;
+  page?: number;
+}
+
