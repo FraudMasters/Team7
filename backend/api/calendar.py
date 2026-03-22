@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.calendar_connection import CalendarConnection, CalendarProvider, ConnectionStatus
 from models.recruiter import Recruiter
-from services.calendar_service import get_calendar_service
+from services.calendar_service import get_calendar_service, AvailabilitySlot
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +150,56 @@ class AvailabilityCheckResponse(BaseModel):
     interviewer_availability: List[InterviewerAvailability] = Field(
         ..., description="Availability status for each interviewer"
     )
+
+
+class AvailabilitySlotsRequest(BaseModel):
+    """Request model for fetching availability slots."""
+
+    recruiter_id: str = Field(..., description="ID of the recruiter")
+    start_date: str = Field(..., description="Start date for availability search (YYYY-MM-DD)")
+    end_date: str = Field(..., description="End date for availability search (YYYY-MM-DD)")
+    duration_minutes: int = Field(..., gt=0, description="Duration of interview slots in minutes")
+
+    @validator("recruiter_id")
+    def validate_recruiter_id(cls, v):
+        """Validate recruiter_id is a valid UUID."""
+        try:
+            UUID(v)
+            return v
+        except ValueError:
+            raise ValueError(f"Invalid recruiter_id format: {v}")
+
+    @validator("start_date", "end_date")
+    def validate_date_format(cls, v):
+        """Validate date format is YYYY-MM-DD."""
+        try:
+            datetime.fromisoformat(v)
+            return v
+        except ValueError:
+            raise ValueError(f"Invalid date format: {v}. Expected YYYY-MM-DD")
+
+
+class AvailabilitySlotResponse(BaseModel):
+    """Response model for a single availability slot."""
+
+    start_time: str = Field(..., description="Slot start time (ISO 8601)")
+    end_time: str = Field(..., description="Slot end time (ISO 8601)")
+    available: bool = Field(..., description="Whether the slot is available")
+    confidence: float = Field(..., description="Confidence score for availability (0-1)")
+
+
+class AvailabilitySlotsResponse(BaseModel):
+    """Response model for availability slots."""
+
+    recruiter_id: str = Field(..., description="ID of the recruiter")
+    recruiter_name: Optional[str] = Field(None, description="Name of the recruiter")
+    recruiter_email: Optional[str] = Field(None, description="Email of the recruiter")
+    start_date: str = Field(..., description="Start date for availability search")
+    end_date: str = Field(..., description="End date for availability search")
+    duration_minutes: int = Field(..., description="Duration of interview slots in minutes")
+    has_calendar_connection: bool = Field(..., description="Whether recruiter has connected calendar")
+    calendar_provider: Optional[str] = Field(None, description="Calendar provider if connected")
+    slots: List[AvailabilitySlotResponse] = Field(..., description="List of availability slots")
 
 
 @router.get(
@@ -796,4 +846,158 @@ async def check_availability(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check availability: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/availability-slots",
+    tags=["Calendar"],
+)
+async def get_availability_slots(
+    request: Request,
+    slots_request: AvailabilitySlotsRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get available time slots for a recruiter.
+
+    Returns available time slots for a recruiter within a date range based on
+    their connected calendar. Checks for conflicts and returns only free slots
+    that match the requested duration.
+    """
+    try:
+        logger.info(
+            f"Fetching availability slots for recruiter {slots_request.recruiter_id} "
+            f"from {slots_request.start_date} to {slots_request.end_date} "
+            f"with duration {slots_request.duration_minutes} minutes"
+        )
+
+        try:
+            recruiter_uuid = UUID(slots_request.recruiter_id)
+        except ValueError:
+            logger.warning(f"Invalid recruiter_id format: {slots_request.recruiter_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid recruiter_id format: {slots_request.recruiter_id}",
+            )
+
+        recruiter_query = select(Recruiter).where(Recruiter.id == recruiter_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
+
+        if not recruiter:
+            logger.warning(f"Recruiter not found: {slots_request.recruiter_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Recruiter not found: {slots_request.recruiter_id}",
+            )
+
+        connection_query = select(CalendarConnection).where(
+            and_(
+                CalendarConnection.recruiter_id == recruiter_uuid,
+                CalendarConnection.status == ConnectionStatus.ACTIVE
+            )
+        )
+        connection_result = await db.execute(connection_query)
+        connection = connection_result.scalar_one_or_none()
+
+        if not connection or not connection.is_active():
+            logger.info(f"No active calendar connection for recruiter {slots_request.recruiter_id}")
+            response_data = {
+                "recruiter_id": slots_request.recruiter_id,
+                "recruiter_name": recruiter.name,
+                "recruiter_email": recruiter.email,
+                "start_date": slots_request.start_date,
+                "end_date": slots_request.end_date,
+                "duration_minutes": slots_request.duration_minutes,
+                "has_calendar_connection": False,
+                "calendar_provider": None,
+                "slots": [],
+            }
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=response_data,
+            )
+
+        try:
+            start_datetime = datetime.fromisoformat(slots_request.start_date)
+            end_datetime = datetime.fromisoformat(slots_request.end_date)
+        except ValueError as e:
+            logger.warning(f"Invalid date format: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid date format. Expected YYYY-MM-DD: {str(e)}",
+            )
+
+        if start_datetime >= end_datetime:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_date must be before end_date",
+            )
+
+        try:
+            calendar_service = get_calendar_service(
+                provider=connection.provider.value,
+                access_token=connection.access_token,
+                refresh_token=connection.refresh_token,
+                token_expires_at=connection.token_expires_at,
+                calendar_email=connection.calendar_email,
+                calendar_id=connection.calendar_id,
+            )
+
+            availability_slots = calendar_service.get_availability(
+                start_time=start_datetime,
+                end_time=end_datetime,
+                duration_minutes=slots_request.duration_minutes,
+            )
+
+            slot_responses = [
+                {
+                    "start_time": slot.start_time.isoformat(),
+                    "end_time": slot.end_time.isoformat(),
+                    "available": slot.available,
+                    "confidence": slot.confidence,
+                }
+                for slot in availability_slots
+                if slot.available
+            ]
+
+            response_data = {
+                "recruiter_id": slots_request.recruiter_id,
+                "recruiter_name": recruiter.name,
+                "recruiter_email": recruiter.email,
+                "start_date": slots_request.start_date,
+                "end_date": slots_request.end_date,
+                "duration_minutes": slots_request.duration_minutes,
+                "has_calendar_connection": True,
+                "calendar_provider": connection.provider.value,
+                "slots": slot_responses,
+            }
+
+            logger.info(
+                f"Retrieved {len(slot_responses)} available slots for recruiter {slots_request.recruiter_id}"
+            )
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=response_data,
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error fetching availability from calendar service for recruiter {slots_request.recruiter_id}: {e}",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch availability from calendar: {str(e)}",
+            ) from e
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching availability slots: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch availability slots: {str(e)}",
         ) from e
