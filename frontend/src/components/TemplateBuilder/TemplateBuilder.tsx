@@ -41,6 +41,7 @@ import {
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationTemplatesClient } from '../../api/notificationTemplates';
+import { BlockEditor } from './BlockEditor';
 import type {
   TemplateBlock,
   TextBlock,
@@ -590,31 +591,12 @@ export function TemplateBuilder({
                                   <DragIcon color="action" sx={{ cursor: 'grab' }} />
                                 </Box>
                                 <Box sx={{ flex: 1 }}>
-                                  <Stack spacing={1}>
-                                    <Typography variant="caption" color="text.secondary" fontWeight="medium">
-                                      {block.type.toUpperCase()} BLOCK
-                                    </Typography>
-                                    <TextField
-                                      fullWidth
-                                      multiline
-                                      rows={3}
-                                      value={block.content || ''}
-                                      onChange={(e) => handleUpdateBlock(block.id, { content: e.target.value })}
-                                      placeholder={`Enter ${block.type} content...`}
-                                      variant="outlined"
-                                      size="small"
-                                    />
-                                  </Stack>
+                                  <BlockEditor
+                                    block={block}
+                                    onUpdate={(updates) => handleUpdateBlock(block.id, updates)}
+                                    onDelete={() => handleDeleteBlock(block.id)}
+                                  />
                                 </Box>
-                                <Tooltip title="Delete block">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleDeleteBlock(block.id)}
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                               </Stack>
                             </Paper>
                           )}
