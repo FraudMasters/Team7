@@ -42,6 +42,7 @@ from .organization_explanation_preferences import OrganizationExplanationPrefere
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
 from .agency import Agency
+from .client_tenant import ClientTenant, ClientTenantStatus
 
 __all__ = [
     "Base",
@@ -98,4 +99,6 @@ __all__ = [
     "ResumeFeedback",
     "BuiltResume",
     "Agency",
+    "ClientTenant",
+    "ClientTenantStatus",
 ]
