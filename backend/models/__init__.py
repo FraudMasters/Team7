@@ -26,7 +26,6 @@ from .candidate_rank import CandidateRank, RankingFeedback
 from .candidate_tag import CandidateTag
 from .candidate_note import CandidateNote
 from .candidate_activity import CandidateActivity
-from .candidate_appeal import CandidateAppeal
 from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
@@ -42,10 +41,7 @@ from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
-from .agency import Agency
-from .agency_user import AgencyUser, AgencyUserRole
-from .client_tenant import ClientTenant, ClientTenantStatus
-from .client_usage import ClientUsage, ResourceType
+from .token_blacklist import TokenBlacklist
 
 __all__ = [
     "Base",
@@ -77,7 +73,6 @@ __all__ = [
     "CandidateTag",
     "CandidateNote",
     "CandidateActivity",
-    "CandidateAppeal",
     "RankingFeedback",
     "SkillGapReport",
     "LearningResource",
@@ -102,11 +97,5 @@ __all__ = [
     "OrganizationExplanationPreferences",
     "ResumeFeedback",
     "BuiltResume",
-    "Agency",
-    "AgencyUser",
-    "AgencyUserRole",
-    "ClientTenant",
-    "ClientTenantStatus",
-    "ClientUsage",
-    "ResourceType",
+    "TokenBlacklist",
 ]
