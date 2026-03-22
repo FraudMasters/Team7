@@ -11,7 +11,7 @@ This module provides endpoints for:
 Supports OAuth flow for connecting external calendar providers.
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, time, timezone, timedelta
 from typing import List, Optional
 from uuid import UUID
 
@@ -29,6 +29,12 @@ from services.calendar_service import get_calendar_service, AvailabilitySlot
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# Business hours configuration
+BUSINESS_HOURS_START = time(9, 0)  # 9:00 AM
+BUSINESS_HOURS_END = time(17, 0)    # 5:00 PM
+BUSINESS_DAYS = [0, 1, 2, 3, 4]     # Monday=0 through Friday=4
 
 
 # Request/Response Models
@@ -200,6 +206,83 @@ class AvailabilitySlotsResponse(BaseModel):
     has_calendar_connection: bool = Field(..., description="Whether recruiter has connected calendar")
     calendar_provider: Optional[str] = Field(None, description="Calendar provider if connected")
     slots: List[AvailabilitySlotResponse] = Field(..., description="List of availability slots")
+
+
+def filter_slots_by_business_hours(
+    slots: List[AvailabilitySlot],
+    duration_minutes: int,
+    business_hours_start: time = BUSINESS_HOURS_START,
+    business_hours_end: time = BUSINESS_HOURS_END,
+    business_days: List[int] = BUSINESS_DAYS,
+) -> List[AvailabilitySlot]:
+    """
+    Filter availability slots by business hours and split long slots into bookable chunks.
+
+    This function:
+    1. Filters out slots outside business hours (default: 9am-5pm)
+    2. Filters out slots on weekends (default: Saturday and Sunday)
+    3. Splits long free slots into bookable chunks based on the requested duration
+    4. Ensures each returned slot can accommodate the requested duration
+
+    Args:
+        slots: List of availability slots from calendar service
+        duration_minutes: Required duration for each bookable slot
+        business_hours_start: Start of business hours (default: 9:00 AM)
+        business_hours_end: End of business hours (default: 5:00 PM)
+        business_days: List of business day numbers (0=Monday, 6=Sunday)
+
+    Returns:
+        List of filtered and split AvailabilitySlots
+    """
+    filtered_slots = []
+    duration_delta = timedelta(minutes=duration_minutes)
+
+    for slot in slots:
+        # Skip unavailable slots
+        if not slot.available:
+            continue
+
+        # Skip weekend slots
+        if slot.start_time.weekday() not in business_days:
+            continue
+
+        # Calculate intersection with business hours for this day
+        slot_date = slot.start_time.date()
+        business_start_dt = datetime.combine(slot_date, business_hours_start)
+        business_end_dt = datetime.combine(slot_date, business_hours_end)
+
+        # Clip slot to business hours
+        clipped_start = max(slot.start_time, business_start_dt)
+        clipped_end = min(slot.end_time, business_end_dt)
+
+        # Skip if slot is entirely outside business hours
+        if clipped_start >= clipped_end:
+            continue
+
+        # Skip if clipped slot is too short for the requested duration
+        if (clipped_end - clipped_start) < duration_delta:
+            continue
+
+        # Split the slot into bookable chunks
+        current_time = clipped_start
+        while current_time + duration_delta <= clipped_end:
+            filtered_slots.append(
+                AvailabilitySlot(
+                    start_time=current_time,
+                    end_time=current_time + duration_delta,
+                    available=True,
+                    confidence=slot.confidence,
+                )
+            )
+            current_time += duration_delta
+
+    logger.info(
+        f"Filtered {len(slots)} slots to {len(filtered_slots)} business hour slots "
+        f"({business_hours_start.strftime('%H:%M')}-{business_hours_end.strftime('%H:%M')}, "
+        f"weekdays only)"
+    )
+
+    return filtered_slots
 
 
 @router.get(
@@ -951,6 +1034,12 @@ async def get_availability_slots(
                 duration_minutes=slots_request.duration_minutes,
             )
 
+            # Filter slots by business hours and split into bookable chunks
+            filtered_slots = filter_slots_by_business_hours(
+                slots=availability_slots,
+                duration_minutes=slots_request.duration_minutes,
+            )
+
             slot_responses = [
                 {
                     "start_time": slot.start_time.isoformat(),
@@ -958,8 +1047,7 @@ async def get_availability_slots(
                     "available": slot.available,
                     "confidence": slot.confidence,
                 }
-                for slot in availability_slots
-                if slot.available
+                for slot in filtered_slots
             ]
 
             response_data = {
