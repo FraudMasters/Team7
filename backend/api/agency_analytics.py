@@ -8,9 +8,15 @@ client tenants, resource utilization, and agency-level KPIs.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.agency import Agency
+from middleware.tenant_context import get_agency_context
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +75,11 @@ class AgencyAnalyticsSummary(BaseModel):
     tags=["Agency Analytics"],
 )
 async def get_agency_analytics_summary(
+    request: Request,
     agency_id: str = Query(..., description="Agency identifier for filtering metrics"),
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Get agency analytics summary with cross-client metrics.
@@ -131,6 +139,32 @@ async def get_agency_analytics_summary(
             f"Fetching agency analytics summary - agency_id: {agency_id}, "
             f"start_date: {start_date}, end_date: {end_date}"
         )
+
+        # Validate agency exists
+        agency_result = await db.execute(
+            select(Agency).where(Agency.id == agency_id)
+        )
+        agency = agency_result.scalars().first()
+
+        if not agency:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Agency not found: {agency_id}"
+            )
+
+        # Get agency context from headers for authorization
+        agency_context = get_agency_context(request)
+
+        # TODO: Add authentication/authorization check
+        # Verify that the current user has access to this agency
+        # For now, we log the agency context but don't enforce it
+        # until authentication is implemented
+        if agency_context:
+            logger.info(f"Agency context from headers: {agency_context}")
+            if agency_context != agency_id:
+                logger.warning(
+                    f"Agency context mismatch: header={agency_context}, requested={agency_id}"
+                )
 
         # Validate agency_id
         if not agency_id or not agency_id.strip():

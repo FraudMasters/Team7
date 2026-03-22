@@ -22,12 +22,10 @@ from i18n.backend_translations import get_error_message, get_success_message
 from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
-from models.duplicate_review import DuplicateReview, ReviewStatus
+from models.client_tenant import ClientTenant
 from utils.audit_logger import log_audit_event, get_request_context
-from utils.duplicate_detector import detect_duplicate, compute_content_hash
 from services.resume_cache_service import get_resume_cache
-from tasks.elasticsearch_indexing import index_single_resume
-from services.elasticsearch_service import ElasticsearchService
+from middleware.tenant_context import get_tenant_context
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -63,9 +61,6 @@ class ResumeUploadResponse(BaseModel):
     filename: str = Field(..., description="Original filename of the uploaded resume")
     status: str = Field(..., description="Processing status of the resume")
     message: str = Field(..., description="Success message")
-    duplicate_detected: Optional[bool] = Field(None, description="Whether a duplicate was detected")
-    original_resume_id: Optional[str] = Field(None, description="ID of the original resume if duplicate")
-    content_hash: Optional[str] = Field(None, description="SHA-256 hash of file content")
 
 
 class ResumeListItem(BaseModel):
@@ -215,27 +210,6 @@ async def upload_resume(
         # Validate file size
         validate_file_size(file_size, locale)
 
-        # Get organization_id from header or use default test organization
-        # In production, this should come from authenticated user context
-        organization_id = request.headers.get("X-Organization-ID", "default-org-id")
-
-        # Run duplicate detection
-        duplicate_match = None
-        try:
-            duplicate_match = await detect_duplicate(
-                file_content=file_content,
-                organization_id=organization_id,
-                db_session=db,
-                check_file_system=True,
-            )
-            if duplicate_match.is_duplicate:
-                logger.info(
-                    f"Duplicate detected: {file.filename} matches resume {duplicate_match.original_resume_id}"
-                )
-        except Exception as e:
-            # Log error but don't block upload
-            logger.warning(f"Duplicate detection failed: {e}", exc_info=True)
-
         # Generate UUID for the resume
         resume_id = uuid4()
         safe_filename = Path(file.filename or "resume").name
@@ -248,51 +222,45 @@ async def upload_resume(
         with open(file_path, "wb") as f:
             f.write(file_content)
 
-        # Compute content hash for duplicate detection
-        content_hash = compute_content_hash(file_content)
+        # Get tenant context for multi-tenant data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id = client_tenant.organization_id
+            logger.info(f"Resume upload for organization_id: {organization_id} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id = org_id_header
+                logger.info(f"Resume upload for organization_id from header: {organization_id}")
 
         # Create database record
         new_resume = Resume(
             id=resume_id,
-            organization_id=organization_id,
             filename=file.filename or "unknown",
             file_path=str(file_path),
             content_type=file.content_type or "application/octet-stream",
             status=ResumeStatus.PENDING,
-            content_hash=content_hash,
+            organization_id=organization_id,
         )
 
         db.add(new_resume)
         await db.commit()
         await db.refresh(new_resume)
-
-        # Add duplicate to review queue if detected
-        if duplicate_match and duplicate_match.is_duplicate:
-            try:
-                from datetime import datetime, timezone
-
-                # Create review queue entry for manual approval
-                duplicate_review = DuplicateReview(
-                    organization_id=organization_id,
-                    original_resume_id=duplicate_match.original_resume_id,
-                    duplicate_resume_id=resume_id,
-                    confidence_score=duplicate_match.similarity_score,
-                    status=ReviewStatus.PENDING,
-                    queue_entered_at=datetime.now(timezone.utc),
-                )
-                db.add(duplicate_review)
-                await db.commit()
-
-                logger.info(
-                    f"Added duplicate to review queue: original={duplicate_match.original_resume_id}, "
-                    f"duplicate={resume_id}, confidence={duplicate_match.similarity_score}"
-                )
-            except Exception as e:
-                # Log error but don't block upload
-                logger.error(f"Failed to add duplicate to review queue: {e}", exc_info=True)
-                # Rollback review queue creation but keep the resume
-                await db.rollback()
-                await db.refresh(new_resume)
 
         # Log audit event
         ip_address, user_agent = get_request_context(request)
@@ -307,18 +275,8 @@ async def upload_resume(
                 "filename": file.filename or "unknown",
                 "file_size": file_size,
                 "content_type": file.content_type or "application/octet-stream",
-                "duplicate_detected": duplicate_match.is_duplicate if duplicate_match else False,
             },
         )
-
-        # Trigger Elasticsearch indexing in background (asynchronous)
-        # This will index the resume once analysis is completed
-        try:
-            index_single_resume.delay(str(resume_id))
-            logger.info(f"Triggered Elasticsearch indexing for resume {resume_id}")
-        except Exception as index_err:
-            logger.warning(f"Failed to trigger Elasticsearch indexing for resume {resume_id}: {index_err}")
-            # Don't fail the upload if indexing trigger fails
 
         # Get translated success message
         success_message = get_success_message("file_uploaded", locale)
@@ -328,16 +286,7 @@ async def upload_resume(
             "filename": file.filename or "unknown",
             "status": ResumeStatus.PENDING.value,
             "message": success_message,
-            "content_hash": content_hash,
         }
-
-        # Add duplicate detection info if applicable
-        if duplicate_match and duplicate_match.is_duplicate:
-            response_data["duplicate_detected"] = True
-            response_data["original_resume_id"] = duplicate_match.original_resume_id
-            logger.info(f"Duplicate detected during upload: {resume_id} -> {duplicate_match.original_resume_id}")
-        else:
-            response_data["duplicate_detected"] = False
 
         logger.info(f"Resume uploaded successfully: {resume_id}")
 
@@ -968,15 +917,6 @@ async def update_resume_status(
         except Exception as audit_err:
             logger.warning(f"Failed to log audit event: {audit_err}")
 
-        # Trigger Elasticsearch re-indexing after status update
-        # This ensures the search index reflects the latest resume status
-        try:
-            index_single_resume.delay(str(resume_record.id))
-            logger.info(f"Triggered Elasticsearch re-indexing for updated resume {resume_id}")
-        except Exception as index_err:
-            logger.warning(f"Failed to trigger Elasticsearch re-indexing for resume {resume_id}: {index_err}")
-            # Don't fail the update if indexing trigger fails
-
         logger.info(f"Updated resume {resume_id} status from {old_status} to {new_status.value}")
 
         # Return lowercase status for frontend compatibility
@@ -1065,17 +1005,6 @@ async def delete_resume(
 
             await db.delete(resume_record)
             await db.commit()
-
-            # Remove from Elasticsearch index
-            try:
-                es_service = ElasticsearchService()
-                await es_service.initialize()
-                await es_service.delete_document(str(resume_record.id))
-                await es_service.close()
-                logger.info(f"Removed resume {resume_id} from Elasticsearch index")
-            except Exception as es_err:
-                logger.warning(f"Failed to remove resume {resume_id} from Elasticsearch: {es_err}")
-                # Don't fail the delete operation if Elasticsearch removal fails
 
         # Invalidate cache for this resume before deleting file
         if file_path and file_path.exists():

@@ -80,6 +80,9 @@ import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 import ReportBuilderPage from './pages/recruiter/ReportBuilderPage';
 
+// Agency Pages
+import { AgencyDashboardPage, ClientManagementPage, BillingDashboardPage } from './pages';
+
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
@@ -228,6 +231,13 @@ function App() {
           <Route path="analytics/reports/builder" element={<ReportBuilderPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+        </Route>
+
+        {/* Agency Flow - Multi-tenant agency management */}
+        <Route path="/agency" element={<ProtectedRecruiterLayout />}>
+          <Route path="dashboard" element={<AgencyDashboardPage />} />
+          <Route path="clients" element={<ClientManagementPage />} />
+          <Route path="billing" element={<BillingDashboardPage />} />
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}
