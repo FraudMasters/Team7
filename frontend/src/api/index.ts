@@ -74,7 +74,9 @@ export { jobIntegrationsClient, JobIntegrationsClient } from './jobIntegrations'
 export { webhooksClient, WebhooksClient } from './webhooks';
 
 // Organization management
+export { agenciesClient, AgenciesClient } from './agencies';
 export { calendarClient, CalendarClient } from './calendar';
+export { clientTenantsClient, ClientTenantsClient } from './clientTenants';
 export { interviewsClient, InterviewsClient } from './interviews';
 export { jobDescriptionsClient, JobDescriptionsClient } from './jobDescriptions';
 export { organizationsClient, OrganizationsClient } from './organizations';
