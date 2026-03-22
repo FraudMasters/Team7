@@ -344,6 +344,323 @@ Best regards,
         "language": "en",
         "description": "Sent to request feedback from candidates about their recruitment experience",
     },
+    # Russian variants / Русские варианты
+    {
+        "name": "application_received",
+        "subject": "Заявка получена - {{position_title}}",
+        "body": """Уважаемый(ая) {{candidate_name}},
+
+Благодарим вас за отклик на вакансию {{position_title}} в компании {{company_name}}.
+
+Мы получили вашу заявку и наша команда в данный момент рассматривает её. Мы свяжемся с вами в течение {{response_time}} и сообщим об обновлении статуса вашей заявки.
+
+Если у вас возникнут вопросы, пожалуйста, не стесняйтесь обращаться к нам.
+
+С уважением,
+{{recruiter_name}}
+Команда рекрутинга {{company_name}}""",
+        "variables": [
+            "candidate_name",
+            "position_title",
+            "company_name",
+            "response_time",
+            "recruiter_name",
+        ],
+        "template_blocks": {
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "header",
+                    "content": "Заявка получена",
+                },
+                {
+                    "id": "block-2",
+                    "type": "text",
+                    "content": "Благодарим вас за отклик на вакансию {{position_title}} в компании {{company_name}}.",
+                },
+                {
+                    "id": "block-3",
+                    "type": "text",
+                    "content": "Мы получили вашу заявку и наша команда в данный момент рассматривает её.",
+                },
+                {
+                    "id": "block-4",
+                    "type": "footer",
+                    "content": "С уважением,\n{{recruiter_name}}\nКоманда рекрутинга {{company_name}}",
+                },
+            ]
+        },
+        "category": "application",
+        "pipeline_stage": "applied",
+        "is_active": True,
+        "language": "ru",
+        "description": "Отправляется автоматически при подаче заявки кандидатом",
+    },
+    {
+        "name": "interview_invitation",
+        "subject": "Приглашение на собеседование - {{position_title}}",
+        "body": """Уважаемый(ая) {{candidate_name}},
+
+Мы рады пригласить вас на собеседование на позицию {{position_title}} в компании {{company_name}}.
+
+Детали собеседования:
+- Дата: {{interview_date}}
+- Время: {{interview_time}}
+- Место: {{interview_location}}
+- Продолжительность: {{interview_duration}}
+- Интервьюер(ы): {{interviewer_names}}
+
+Пожалуйста, подтвердите вашу доступность, ответив на это письмо или перейдя по ссылке ниже:
+{{confirmation_link}}
+
+Если у вас есть вопросы или необходимо перенести встречу, пожалуйста, сообщите нам как можно скорее.
+
+Мы с нетерпением ждем встречи с вами!
+
+С уважением,
+{{recruiter_name}}
+Команда рекрутинга {{company_name}}""",
+        "variables": [
+            "candidate_name",
+            "position_title",
+            "company_name",
+            "interview_date",
+            "interview_time",
+            "interview_location",
+            "interview_duration",
+            "interviewer_names",
+            "confirmation_link",
+            "recruiter_name",
+        ],
+        "template_blocks": {
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "header",
+                    "content": "Приглашение на собеседование",
+                },
+                {
+                    "id": "block-2",
+                    "type": "text",
+                    "content": "Мы рады пригласить вас на собеседование на позицию {{position_title}}.",
+                },
+                {
+                    "id": "block-3",
+                    "type": "info-box",
+                    "content": "Дата: {{interview_date}}\nВремя: {{interview_time}}\nМесто: {{interview_location}}",
+                },
+                {
+                    "id": "block-4",
+                    "type": "button",
+                    "content": "Подтвердить участие",
+                    "link": "{{confirmation_link}}",
+                },
+                {
+                    "id": "block-5",
+                    "type": "footer",
+                    "content": "С уважением,\n{{recruiter_name}}\nКоманда рекрутинга {{company_name}}",
+                },
+            ]
+        },
+        "category": "interview",
+        "pipeline_stage": "interview",
+        "is_active": True,
+        "language": "ru",
+        "description": "Отправляется для приглашения кандидатов на собеседование",
+    },
+    {
+        "name": "rejection",
+        "subject": "Обновление статуса заявки - {{position_title}}",
+        "body": """Уважаемый(ая) {{candidate_name}},
+
+Благодарим вас за интерес к позиции {{position_title}} в компании {{company_name}} и за время, уделенное процессу рекрутинга.
+
+После тщательного рассмотрения, мы вынуждены сообщить, что приняли решение продолжить работу с другими кандидатами, чья квалификация более точно соответствует нашим текущим потребностям.
+
+Мы ценим время и усилия, которые вы вложили в вашу заявку. Ваши навыки и опыт впечатляют, и мы рекомендуем вам откликаться на будущие вакансии, которые соответствуют вашему профилю.
+
+Желаем вам успехов в поиске работы и карьерном развитии.
+
+С уважением,
+{{recruiter_name}}
+Команда рекрутинга {{company_name}}""",
+        "variables": [
+            "candidate_name",
+            "position_title",
+            "company_name",
+            "recruiter_name",
+        ],
+        "template_blocks": {
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "header",
+                    "content": "Обновление статуса заявки",
+                },
+                {
+                    "id": "block-2",
+                    "type": "text",
+                    "content": "Благодарим вас за интерес к позиции {{position_title}} в компании {{company_name}}.",
+                },
+                {
+                    "id": "block-3",
+                    "type": "text",
+                    "content": "После тщательного рассмотрения, мы приняли решение продолжить работу с другими кандидатами.",
+                },
+                {
+                    "id": "block-4",
+                    "type": "text",
+                    "content": "Мы рекомендуем вам откликаться на будущие вакансии, которые соответствуют вашему профилю.",
+                },
+                {
+                    "id": "block-5",
+                    "type": "footer",
+                    "content": "С уважением,\n{{recruiter_name}}\nКоманда рекрутинга {{company_name}}",
+                },
+            ]
+        },
+        "category": "decision",
+        "pipeline_stage": "rejected",
+        "is_active": True,
+        "language": "ru",
+        "description": "Отправляется для информирования кандидатов об отклонении заявки",
+    },
+    {
+        "name": "offer",
+        "subject": "Предложение о работе - {{position_title}} в {{company_name}}",
+        "body": """Уважаемый(ая) {{candidate_name}},
+
+Поздравляем! Мы рады предложить вам позицию {{position_title}} в компании {{company_name}}.
+
+Детали предложения:
+- Позиция: {{position_title}}
+- Отдел: {{department}}
+- Дата начала: {{start_date}}
+- Зарплата: {{salary}}
+- Льготы: {{benefits_summary}}
+
+Пожалуйста, ознакомьтесь с подробным предложением о работе во вложении к этому письму. Мы будем благодарны, если вы рассмотрите предложение и ответите до {{offer_deadline}}.
+
+Для принятия этого предложения, пожалуйста, подпишите прилагаемый документ и верните его нам, или перейдите по ссылке ниже:
+{{offer_acceptance_link}}
+
+Если у вас есть вопросы о предложении или требуются разъяснения по любым пунктам, пожалуйста, не стесняйтесь связаться со мной.
+
+Мы с нетерпением ждем возможности вашего присоединения к нашей команде!
+
+С уважением,
+{{recruiter_name}}
+Команда рекрутинга {{company_name}}""",
+        "variables": [
+            "candidate_name",
+            "position_title",
+            "company_name",
+            "department",
+            "start_date",
+            "salary",
+            "benefits_summary",
+            "offer_deadline",
+            "offer_acceptance_link",
+            "recruiter_name",
+        ],
+        "template_blocks": {
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "header",
+                    "content": "Поздравляем!",
+                },
+                {
+                    "id": "block-2",
+                    "type": "text",
+                    "content": "Мы рады предложить вам позицию {{position_title}} в компании {{company_name}}.",
+                },
+                {
+                    "id": "block-3",
+                    "type": "info-box",
+                    "content": "Позиция: {{position_title}}\nОтдел: {{department}}\nДата начала: {{start_date}}\nЗарплата: {{salary}}",
+                },
+                {
+                    "id": "block-4",
+                    "type": "button",
+                    "content": "Принять предложение",
+                    "link": "{{offer_acceptance_link}}",
+                },
+                {
+                    "id": "block-5",
+                    "type": "footer",
+                    "content": "С уважением,\n{{recruiter_name}}\nКоманда рекрутинга {{company_name}}",
+                },
+            ]
+        },
+        "category": "decision",
+        "pipeline_stage": "offer",
+        "is_active": True,
+        "language": "ru",
+        "description": "Отправляется для предложения работы кандидату",
+    },
+    {
+        "name": "feedback_request",
+        "subject": "Мы будем рады вашему отзыву - {{company_name}}",
+        "body": """Уважаемый(ая) {{candidate_name}},
+
+Благодарим вас за участие в нашем процессе рекрутинга на позицию {{position_title}} в компании {{company_name}}.
+
+Мы постоянно работаем над улучшением процесса подбора персонала, и ваш отзыв для нас бесценен. Мы будем очень признательны, если вы уделите несколько минут и поделитесь своими мыслями о вашем опыте прохождения нашего процесса рекрутинга.
+
+Пожалуйста, перейдите по ссылке ниже, чтобы пройти наш короткий опрос:
+{{survey_link}}
+
+Ваши ответы будут конфиденциальными и помогут нам улучшить процесс для будущих кандидатов.
+
+Благодарим вас за ваше время и за рассмотрение {{company_name}}.
+
+С уважением,
+{{recruiter_name}}
+Команда рекрутинга {{company_name}}""",
+        "variables": [
+            "candidate_name",
+            "position_title",
+            "company_name",
+            "survey_link",
+            "recruiter_name",
+        ],
+        "template_blocks": {
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "header",
+                    "content": "Мы будем рады вашему отзыву",
+                },
+                {
+                    "id": "block-2",
+                    "type": "text",
+                    "content": "Благодарим вас за участие в нашем процессе рекрутинга на позицию {{position_title}}.",
+                },
+                {
+                    "id": "block-3",
+                    "type": "text",
+                    "content": "Мы будем очень признательны, если вы поделитесь своими мыслями о вашем опыте.",
+                },
+                {
+                    "id": "block-4",
+                    "type": "button",
+                    "content": "Пройти опрос",
+                    "link": "{{survey_link}}",
+                },
+                {
+                    "id": "block-5",
+                    "type": "footer",
+                    "content": "С уважением,\n{{recruiter_name}}\nКоманда рекрутинга {{company_name}}",
+                },
+            ]
+        },
+        "category": "feedback",
+        "pipeline_stage": None,
+        "is_active": True,
+        "language": "ru",
+        "description": "Отправляется для запроса обратной связи от кандидатов об опыте рекрутинга",
+    },
 ]
 
 
@@ -360,21 +677,22 @@ async def seed_default_templates() -> None:
                 # Check if template already exists / Проверка наличия шаблона
                 result = await session.execute(
                     select(EmailTemplate).where(
-                        EmailTemplate.name == template_data["name"]
+                        EmailTemplate.name == template_data["name"],
+                        EmailTemplate.language == template_data["language"]
                     )
                 )
                 existing_template = result.scalar_one_or_none()
 
                 if existing_template:
                     logger.info(
-                        f"Template '{template_data['name']}' already exists, skipping"
+                        f"Template '{template_data['name']}' ({template_data['language']}) already exists, skipping"
                     )
                     continue
 
                 # Create new template / Создание нового шаблона
                 template = EmailTemplate(**template_data)
                 session.add(template)
-                logger.info(f"Created template: {template_data['name']}")
+                logger.info(f"Created template: {template_data['name']} ({template_data['language']})")
 
             # Commit all changes / Коммит всех изменений
             await session.commit()
