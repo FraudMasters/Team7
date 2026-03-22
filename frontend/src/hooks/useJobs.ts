@@ -18,13 +18,13 @@ export interface JobsResponse {
 }
 
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { vacanciesClient } from '../api';
 
 export function useJobs(params?: { limit?: number; skip?: number }) {
   return useQuery({
     queryKey: ['jobs', params],
     queryFn: async () => {
-      const response = await apiClient.get<JobsResponse>('/vacancies', { params });
+      const response = await vacanciesClient.get<JobsResponse>('/vacancies', { params });
       return response.data;
     },
   });
@@ -34,7 +34,7 @@ export function useJob(id: string) {
   return useQuery({
     queryKey: ['job', id],
     queryFn: async () => {
-      const response = await apiClient.get<JobVacancy>(`/vacancies/${id}`);
+      const response = await vacanciesClient.get<JobVacancy>(`/vacancies/${id}`);
       return response.data;
     },
     enabled: !!id,

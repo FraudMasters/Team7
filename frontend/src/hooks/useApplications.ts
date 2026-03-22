@@ -19,7 +19,7 @@ export interface ApplicationsResponse {
 }
 
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { apiClient } from '../api';
 
 export function useApplications(params?: { limit?: number; skip?: number }) {
   return useQuery({

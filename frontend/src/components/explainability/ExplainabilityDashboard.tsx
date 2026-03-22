@@ -39,7 +39,7 @@ import {
   History as HistoryIcon,
   Feedback as FeedbackIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 
 /**
  * Feature explanation from backend API

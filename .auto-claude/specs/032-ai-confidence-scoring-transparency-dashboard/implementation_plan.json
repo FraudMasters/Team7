@@ -604,11 +604,11 @@
     "ready_for_merge": true,
     "confidence_level": "HIGH"
   },
-  "status": "human_review",
-  "planStatus": "review",
-  "xstateState": "human_review",
+  "status": "done",
+  "planStatus": "completed",
+  "xstateState": "done",
   "executionPhase": "complete",
-  "updated_at": "2026-03-21T19:56:03.552Z",
+  "updated_at": "2026-03-22T16:19:19.928Z",
   "last_updated": "2026-03-21T19:30:00.998674+00:00",
   "lastEvent": {
     "eventId": "68b74d9a-d037-48ad-838b-81ecedb7a156",
@@ -721,6 +721,5 @@
       "unknown": 1
     },
     "session_1_critical_issues_resolved": 2
-  },
-  "reviewReason": "completed"
+  }
 }

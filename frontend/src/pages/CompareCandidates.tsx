@@ -20,7 +20,7 @@ import {
 import ResumeComparisonMatrix from '@components/ResumeComparisonMatrix';
 import ComparisonControls from '@components/ComparisonControls';
 import ComparisonNotes from '@components/ComparisonNotes';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import type { ComparisonCreate } from '@/types/api';
 
 /**
