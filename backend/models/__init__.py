@@ -42,6 +42,8 @@ from .organization_explanation_preferences import OrganizationExplanationPrefere
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
 from .token_blacklist import TokenBlacklist
+from .oauth_provider import OAuthProvider
+from .oauth_token import OAuthToken
 
 __all__ = [
     "Base",
@@ -98,4 +100,6 @@ __all__ = [
     "ResumeFeedback",
     "BuiltResume",
     "TokenBlacklist",
+    "OAuthProvider",
+    "OAuthToken",
 ]
