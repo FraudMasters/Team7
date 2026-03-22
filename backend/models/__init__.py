@@ -44,6 +44,7 @@ from .built_resume import BuiltResume
 from .agency import Agency
 from .agency_user import AgencyUser, AgencyUserRole
 from .client_tenant import ClientTenant, ClientTenantStatus
+from .client_usage import ClientUsage, ResourceType
 
 __all__ = [
     "Base",
@@ -104,4 +105,6 @@ __all__ = [
     "AgencyUserRole",
     "ClientTenant",
     "ClientTenantStatus",
+    "ClientUsage",
+    "ResourceType",
 ]
