@@ -164,6 +164,26 @@ class InterviewResponse(BaseModel):
         from_attributes = True
 
 
+class InterviewSelfScheduleRequest(BaseModel):
+    """Request model for candidate self-scheduling an interview."""
+
+    candidate_id: UUID = Field(..., description="ID of the candidate")
+    vacancy_id: Optional[UUID] = Field(None, description="Optional ID of the job vacancy")
+    scheduled_start: datetime = Field(..., description="Selected interview start time")
+    duration_minutes: int = Field(
+        60,
+        ge=15,
+        le=480,
+        description="Duration in minutes (defaults to 60)"
+    )
+    interview_type: str = Field(
+        InterviewType.VIDEO.value,
+        description="Type of interview (defaults to video)"
+    )
+    recruiter_id: Optional[UUID] = Field(None, description="ID of the recruiter")
+    notes: Optional[str] = Field(None, description="Optional notes from the candidate")
+
+
 @router.get(
     "/",
     tags=["Interviews"],
@@ -482,6 +502,223 @@ async def create_interview(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create interview: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/schedule",
+    tags=["Interviews"],
+)
+async def self_schedule_interview(
+    request: Request,
+    schedule_data: InterviewSelfScheduleRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Allow candidates to self-schedule an interview.
+
+    This endpoint enables candidates to select an available time slot and
+    schedule their own interview, reducing back-and-forth coordination
+    with recruiters. The system validates availability before confirming.
+    """
+    try:
+        logger.info(
+            f"Candidate {schedule_data.candidate_id} self-scheduling interview "
+            f"for {schedule_data.scheduled_start}"
+        )
+
+        # Validate candidate exists
+        candidate_query = select(Resume).where(Resume.id == schedule_data.candidate_id)
+        candidate_result = await db.execute(candidate_query)
+        candidate = candidate_result.scalar_one_or_none()
+
+        if not candidate:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Candidate not found: {schedule_data.candidate_id}",
+            )
+
+        # Validate vacancy if provided
+        if schedule_data.vacancy_id:
+            vacancy_query = select(JobVacancy).where(JobVacancy.id == schedule_data.vacancy_id)
+            vacancy_result = await db.execute(vacancy_query)
+            vacancy = vacancy_result.scalar_one_or_none()
+            if not vacancy:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Vacancy not found: {schedule_data.vacancy_id}",
+                )
+
+        # Validate recruiter if provided
+        if schedule_data.recruiter_id:
+            recruiter_query = select(Recruiter).where(Recruiter.id == schedule_data.recruiter_id)
+            recruiter_result = await db.execute(recruiter_query)
+            recruiter = recruiter_result.scalar_one_or_none()
+            if not recruiter:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Recruiter not found: {schedule_data.recruiter_id}",
+                )
+
+        # Check if the selected time slot is available (basic validation)
+        scheduled_end = schedule_data.scheduled_start + timedelta(
+            minutes=schedule_data.duration_minutes
+        )
+
+        # Prevent scheduling in the past
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        if schedule_data.scheduled_start < now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot schedule interview in the past",
+            )
+
+        # Check for overlapping interviews for the same candidate
+        overlap_query = select(Interview).where(
+            and_(
+                Interview.candidate_id == schedule_data.candidate_id,
+                Interview.status.in_([InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED]),
+                Interview.scheduled_start < scheduled_end,
+                Interview.scheduled_end > schedule_data.scheduled_start,
+            )
+        )
+        overlap_result = await db.execute(overlap_query)
+        overlapping = overlap_result.scalar_one_or_none()
+
+        if overlapping:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="You already have an interview scheduled during this time",
+            )
+
+        # Check recruiter availability if recruiter_id is provided
+        if schedule_data.recruiter_id:
+            recruiter_overlap_query = select(Interview).where(
+                and_(
+                    Interview.recruiter_id == schedule_data.recruiter_id,
+                    Interview.status.in_([InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED]),
+                    Interview.scheduled_start < scheduled_end,
+                    Interview.scheduled_end > schedule_data.scheduled_start,
+                )
+            )
+            recruiter_overlap_result = await db.execute(recruiter_overlap_query)
+            recruiter_overlapping = recruiter_overlap_result.scalar_one_or_none()
+
+            if recruiter_overlapping:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="The selected time slot is not available for the recruiter",
+                )
+
+        # Validate interview type
+        try:
+            interview_type = InterviewType(schedule_data.interview_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid interview type: {schedule_data.interview_type}",
+            )
+
+        # Generate interview title
+        vacancy_title = None
+        if schedule_data.vacancy_id:
+            vacancy_query = select(JobVacancy).where(JobVacancy.id == schedule_data.vacancy_id)
+            vacancy_result = await db.execute(vacancy_query)
+            vacancy = vacancy_result.scalar_one_or_none()
+            if vacancy:
+                vacancy_title = vacancy.title
+                interview_title = f"Interview for {vacancy_title}"
+            else:
+                interview_title = "Interview"
+        else:
+            interview_title = "Interview"
+
+        # Create the interview
+        interview = Interview(
+            candidate_id=schedule_data.candidate_id,
+            vacancy_id=schedule_data.vacancy_id,
+            scheduled_start=schedule_data.scheduled_start,
+            scheduled_end=scheduled_end,
+            duration_minutes=schedule_data.duration_minutes,
+            status=InterviewStatus.SCHEDULED,
+            interview_type=interview_type,
+            title=interview_title,
+            description=schedule_data.notes,
+            recruiter_id=schedule_data.recruiter_id,
+        )
+
+        db.add(interview)
+        await db.commit()
+        await db.refresh(interview)
+
+        # Create candidate activity log
+        activity = CandidateActivity(
+            candidate_id=schedule_data.candidate_id,
+            activity_type=CandidateActivityType.INTERVIEW_SCHEDULED,
+            metadata={
+                "interview_id": str(interview.id),
+                "interview_title": interview_title,
+                "scheduled_start": interview.scheduled_start.isoformat(),
+                "duration_minutes": schedule_data.duration_minutes,
+                "interview_type": schedule_data.interview_type,
+                "self_scheduled": True,
+            },
+        )
+        db.add(activity)
+        await db.commit()
+
+        # Trigger calendar event creation if recruiter has connected calendar
+        if interview.recruiter_id:
+            calendar_query = select(CalendarConnection).where(
+                and_(
+                    CalendarConnection.recruiter_id == interview.recruiter_id,
+                    CalendarConnection.status == 'active'
+                )
+            )
+            calendar_result = await db.execute(calendar_query)
+            calendar_connection = calendar_result.scalar_one_or_none()
+
+            if calendar_connection:
+                from tasks.calendar_tasks import create_calendar_event
+
+                event_details = {
+                    "title": interview.title,
+                    "description": interview.description or "Self-scheduled interview",
+                    "start_time": interview.scheduled_start.isoformat(),
+                    "end_time": interview.scheduled_end.isoformat(),
+                    "duration_minutes": interview.duration_minutes,
+                    "interview_type": interview.interview_type.value,
+                    "candidate_id": str(interview.candidate_id),
+                    "candidate_name": candidate.full_name or "Candidate",
+                }
+
+                try:
+                    create_calendar_event.delay(
+                        interview_id=str(interview.id),
+                        calendar_provider=calendar_connection.provider,
+                        recruiter_id=str(interview.recruiter_id),
+                        event_details=event_details,
+                    )
+                    logger.info(f"Calendar event creation task queued for interview {interview.id}")
+                except Exception as e:
+                    logger.error(f"Failed to queue calendar event creation task: {e}")
+                    # Don't fail the interview creation if calendar task fails
+
+        logger.info(f"Interview self-scheduled successfully: {interview.id}")
+
+        # Return the created interview
+        interview_uuid_str = str(interview.id)
+        return await get_interview(request, interview_uuid_str, db)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error self-scheduling interview: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to self-schedule interview: {str(e)}",
         ) from e
 
 
