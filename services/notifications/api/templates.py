@@ -80,6 +80,22 @@ class TemplatesListResponse(BaseModel):
     templates: List[TemplateResponse] = Field(..., description="Список шаблонов")
 
 
+class PreviewTemplateRequest(BaseModel):
+    """Запрос на предпросмотр шаблона."""
+
+    template_id: str = Field(..., description="ID шаблона для предпросмотра")
+    template_type: str = Field("email", description="Тип шаблона (email, sms)")
+    variables: Dict[str, Any] = Field(..., description="Переменные для подстановки")
+
+
+class PreviewTemplateResponse(BaseModel):
+    """Ответ с отрендеренным шаблоном."""
+
+    subject: Optional[str] = Field(None, description="Отрендеренная тема (для email)")
+    body: str = Field(..., description="Отрендеренное тело")
+    active_blocks: List[Dict[str, Any]] = Field(..., description="Вычисленные активные блоки")
+
+
 # Helper Functions / Вспомогательные функции
 def template_to_response(template, template_type: str) -> TemplateResponse:
     """
@@ -436,4 +452,66 @@ async def delete_template(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Не удалось удалить шаблон: {str(e)}",
+        )
+
+
+@router.post("/preview", response_model=PreviewTemplateResponse, status_code=status.HTTP_200_OK)
+async def preview_template(
+    request: PreviewTemplateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Предпросмотр шаблона с подстановкой переменных.
+
+    Отрендерить шаблон с заданными переменными для предварительного просмотра
+    результата без фактической отправки уведомления.
+
+    Args:
+        request: Данные для предпросмотра (template_id, template_type, variables)
+        db: Сессия базы данных
+
+    Returns:
+        PreviewTemplateResponse с отрендеренным контентом
+
+    Raises:
+        HTTPException: Если шаблон не найден или произошла ошибка рендеринга
+
+    Example:
+        >>> curl -X POST "http://localhost:8008/api/templates/preview" \\
+        ...   -H "Content-Type: application/json" \\
+        ...   -d '{"template_id":"abc-123","template_type":"email","variables":{"name":"John"}}'
+        {"subject": "Welcome John", "body": "Hello John!", "active_blocks": [...]}
+    """
+    try:
+        service = get_template_service()
+
+        rendered = await service.render_template(
+            db=db,
+            template_id=request.template_id,
+            template_type=request.template_type,
+            variables=request.variables,
+        )
+
+        logger.info(
+            f"Previewed template: id={request.template_id}, type={request.template_type}, "
+            f"vars={list(request.variables.keys())}"
+        )
+
+        return PreviewTemplateResponse(
+            subject=rendered.get("subject"),
+            body=rendered["body"],
+            active_blocks=rendered["active_blocks"],
+        )
+
+    except ValueError as e:
+        logger.warning(f"Validation error previewing template: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error previewing template: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось выполнить предпросмотр шаблона: {str(e)}",
         )
