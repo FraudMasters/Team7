@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 SKIP_BACKUP=false
 ROLLBACK=false
 NO_DOWNTIME=false
+CHECK_MIGRATIONS=false
 BACKUP_DIR="./backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -50,6 +51,7 @@ OPTIONS:
     --skip-backup       Skip database backup before upgrade
     --rollback          Rollback to the previous version
     --no-downtime       Perform zero-downtime upgrade (blue-green deployment)
+    --check-migrations  Check for pending migrations without applying them
 
 EXAMPLES:
     # Standard upgrade with backup
@@ -63,6 +65,9 @@ EXAMPLES:
 
     # Rollback to previous version
     $0 --rollback
+
+    # Check for pending migrations
+    $0 --check-migrations
 
 UPGRADE PROCESS:
     1. Check prerequisites
@@ -98,6 +103,10 @@ parse_args() {
                 ;;
             --no-downtime)
                 NO_DOWNTIME=true
+                shift
+                ;;
+            --check-migrations)
+                CHECK_MIGRATIONS=true
                 shift
                 ;;
             *)
@@ -368,6 +377,82 @@ run_migrations() {
     echo ""
 }
 
+# Check for pending migrations without applying them
+check_pending_migrations() {
+    echo "========================================="
+    echo "  Checking Database Migrations"
+    echo "========================================="
+    echo ""
+
+    log_step "Checking migration status..."
+
+    # Ensure database is accessible
+    if ! docker-compose ps | grep -q "postgres"; then
+        log_error "PostgreSQL container is not running"
+        log_info "Please start the application first with: ./scripts/deploy.sh"
+        exit 1
+    fi
+
+    # Wait for PostgreSQL to be ready
+    wait_for_postgres || exit 1
+
+    # Get current database revision
+    log_info "Getting current database revision..."
+    local current_revision
+    current_revision=$(docker-compose run --rm backend alembic current 2>/dev/null | grep -oP '[a-f0-9]{12}' | head -1)
+
+    if [ -z "$current_revision" ]; then
+        log_warning "⚠ No migrations have been applied yet (empty database)"
+        current_revision="(empty)"
+    else
+        log_info "Current revision: $current_revision"
+    fi
+
+    # Get target head revision
+    log_info "Getting target head revision..."
+    local head_revision
+    head_revision=$(docker-compose run --rm backend alembic heads 2>/dev/null | grep -oP '[a-f0-9]{12}' | head -1)
+
+    if [ -z "$head_revision" ]; then
+        log_error "Failed to get head revision"
+        exit 1
+    fi
+    log_info "Head revision: $head_revision"
+
+    echo ""
+    echo "========================================="
+    echo "  Migration Status"
+    echo "========================================="
+    echo ""
+
+    # Compare revisions
+    if [ "$current_revision" = "$head_revision" ]; then
+        log_success "✓ Database is up to date"
+        echo ""
+        echo "Current revision: $current_revision"
+        echo "Target revision:  $head_revision"
+        echo ""
+        log_info "No pending migrations"
+        exit 0
+    else
+        log_warning "⚠ Database has pending migrations"
+        echo ""
+        echo "Current revision: $current_revision"
+        echo "Target revision:  $head_revision"
+        echo ""
+
+        # Show pending migrations
+        log_info "Pending migrations:"
+        docker-compose run --rm backend alembic history 2>/dev/null | head -20
+        echo ""
+
+        log_warning "Run the following command to apply migrations:"
+        echo "  $0"
+        echo ""
+        exit 1
+    fi
+}
+
 # Standard upgrade (with downtime)
 perform_standard_upgrade() {
     echo "========================================="
@@ -473,6 +558,23 @@ perform_zero_downtime_upgrade() {
 main() {
     # Parse arguments
     parse_args "$@"
+
+    # Handle migration check
+    if [ "$CHECK_MIGRATIONS" = true ]; then
+        # Check prerequisites
+        log_info "Checking prerequisites..."
+        check_docker || { log_error "Docker is required but not installed. Aborting."; exit 1; }
+        check_docker_compose || { log_error "Docker Compose is required but not installed. Aborting."; exit 1; }
+        log_success "✓ Prerequisites check passed"
+        echo ""
+
+        # Setup environment
+        setup_environment || exit 1
+        echo ""
+
+        check_pending_migrations
+        exit 0
+    fi
 
     # Handle rollback
     if [ "$ROLLBACK" = true ]; then
