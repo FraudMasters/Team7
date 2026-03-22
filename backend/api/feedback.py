@@ -600,3 +600,155 @@ async def delete_feedback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete feedback: {str(e)}",
         ) from e
+
+
+class AccuracyMetrics(BaseModel):
+    """Feedback accuracy metrics."""
+
+    total_feedback: int = Field(..., description="Total number of feedback entries")
+    correct_matches: int = Field(..., description="Number of correct matches")
+    incorrect_matches: int = Field(..., description="Number of incorrect matches")
+    accuracy_rate: float = Field(..., description="Overall accuracy rate (0-1)")
+
+
+class ConfidenceMetrics(BaseModel):
+    """Confidence score statistics."""
+
+    average_confidence: float = Field(..., description="Average confidence score across all feedback (0-1)")
+    median_confidence: float = Field(..., description="Median confidence score (0-1)")
+    high_confidence_count: int = Field(..., description="Number of high confidence predictions (>0.8)")
+    low_confidence_count: int = Field(..., description="Number of low confidence predictions (<0.5)")
+    confidence_std_dev: float = Field(..., description="Standard deviation of confidence scores")
+
+
+class FeedbackSourceMetrics(BaseModel):
+    """Breakdown of feedback by source."""
+
+    api_count: int = Field(..., description="Feedback entries from API")
+    frontend_count: int = Field(..., description="Feedback entries from frontend")
+    bulk_import_count: int = Field(..., description="Feedback entries from bulk import")
+    other_count: int = Field(..., description="Feedback entries from other sources")
+
+
+class ProcessingMetrics(BaseModel):
+    """ML pipeline processing metrics."""
+
+    total_processed: int = Field(..., description="Number of feedback entries processed by ML pipeline")
+    total_unprocessed: int = Field(..., description="Number of feedback entries not yet processed")
+    processing_rate: float = Field(..., description="Processing rate (0-1)")
+
+
+class FeedbackAnalyticsResponse(BaseModel):
+    """Response model for feedback analytics."""
+
+    accuracy: AccuracyMetrics = Field(..., description="Feedback accuracy metrics")
+    confidence: ConfidenceMetrics = Field(..., description="Confidence score statistics")
+    sources: FeedbackSourceMetrics = Field(..., description="Feedback source breakdown")
+    processing: ProcessingMetrics = Field(..., description="ML pipeline processing metrics")
+
+
+@router.get(
+    "/analytics",
+    response_model=FeedbackAnalyticsResponse,
+    tags=["Analytics"],
+)
+async def get_feedback_analytics(
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get aggregated feedback analytics metrics.
+
+    This endpoint provides comprehensive analytics on skill feedback data,
+    including accuracy rates, confidence score statistics, feedback source
+    breakdown, and ML pipeline processing status. These metrics help track
+    the quality and utilization of the feedback loop system.
+
+    Args:
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with aggregated feedback analytics
+
+    Raises:
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/feedback/analytics")
+        >>> response.json()
+        {
+            "accuracy": {
+                "total_feedback": 1500,
+                "correct_matches": 1200,
+                "incorrect_matches": 300,
+                "accuracy_rate": 0.80
+            },
+            "confidence": {
+                "average_confidence": 0.75,
+                "median_confidence": 0.78,
+                "high_confidence_count": 950,
+                "low_confidence_count": 200,
+                "confidence_std_dev": 0.18
+            },
+            "sources": {
+                "api_count": 800,
+                "frontend_count": 650,
+                "bulk_import_count": 50,
+                "other_count": 0
+            },
+            "processing": {
+                "total_processed": 1350,
+                "total_unprocessed": 150,
+                "processing_rate": 0.90
+            }
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching feedback analytics - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # For now, return placeholder response
+        # Database integration will be added in a later subtask when we have async session setup
+        response_data = {
+            "accuracy": {
+                "total_feedback": 1500,
+                "correct_matches": 1200,
+                "incorrect_matches": 300,
+                "accuracy_rate": 0.80,
+            },
+            "confidence": {
+                "average_confidence": 0.75,
+                "median_confidence": 0.78,
+                "high_confidence_count": 950,
+                "low_confidence_count": 200,
+                "confidence_std_dev": 0.18,
+            },
+            "sources": {
+                "api_count": 800,
+                "frontend_count": 650,
+                "bulk_import_count": 50,
+                "other_count": 0,
+            },
+            "processing": {
+                "total_processed": 1350,
+                "total_unprocessed": 150,
+                "processing_rate": 0.90,
+            },
+        }
+
+        logger.info("Feedback analytics retrieved successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving feedback analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve feedback analytics: {str(e)}",
+        ) from e
