@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<IndeedApplications>
+    <Application>
+        <ApplicantId>IND-2024-001</ApplicantId>
+        <FirstName>Sarah</FirstName>
+        <LastName>Williams</LastName>
+        <Email>sarah.williams@example.com</Email>
+        <Phone>+1-555-0101</Phone>
+        <JobTitle>Senior Software Engineer</JobTitle>
+        <ApplicationDate>2024-02-15</ApplicationDate>
+        <Status>Applied</Status>
+        <Location>San Francisco, CA</Location>
+        <ResumeUrl>https://indeed.com/resumes/sarah-williams-123456</ResumeUrl>
+        <ResumeText>Senior Software Engineer with 8+ years of experience in full-stack development. Expertise in Python, JavaScript, React, and cloud technologies. Led teams of 5-7 developers on enterprise projects.</ResumeText>
+        <CoverLetter>I am excited to apply for the Senior Software Engineer position. My experience in building scalable web applications aligns perfectly with your requirements.</CoverLetter>
+        <ProfileUrl>https://indeed.com/profile/sarah-williams-123456</ProfileUrl>
+    </Application>
+    <Application>
+        <ApplicantId>IND-2024-002</ApplicantId>
+        <FirstName>Michael</FirstName>
+        <LastName>Chen</LastName>
+        <Email>michael.chen@example.com</Email>
+        <Phone>+1-555-0102</Phone>
+        <JobTitle>Product Manager</JobTitle>
+        <ApplicationDate>2024-02-16</ApplicationDate>
+        <Status>Under Review</Status>
+        <Location>New York, NY</Location>
+        <ResumeUrl>https://indeed.com/resumes/michael-chen-789012</ResumeUrl>
+        <ResumeText>Product Manager with 6 years of experience in B2B SaaS. Strong track record of launching successful products and leading cross-functional teams. MBA from top business school.</ResumeText>
+        <ProfileUrl>https://indeed.com/profile/michael-chen-789012</ProfileUrl>
+    </Application>
+    <Application>
+        <ApplicantId>IND-2024-003</ApplicantId>
+        <FirstName>Emily</FirstName>
+        <LastName>Rodriguez</LastName>
+        <Email>emily.rodriguez@example.com</Email>
+        <JobTitle>UX Designer</JobTitle>
+        <ApplicationDate>2024-02-17</ApplicationDate>
+        <Status>Applied</Status>
+        <Location>Austin, TX</Location>
+        <ResumeUrl>https://indeed.com/resumes/emily-rodriguez-345678</ResumeUrl>
+        <ResumeText>UX Designer with 5 years of experience creating user-centered designs. Portfolio includes work for Fortune 500 companies and startups. Expert in Figma, Sketch, and user research methodologies.</ResumeText>
+        <CoverLetter>Your company's focus on user experience really resonates with me. I would love to contribute to creating exceptional user experiences for your products.</CoverLetter>
+        <ProfileUrl>https://indeed.com/profile/emily-rodriguez-345678</ProfileUrl>
+    </Application>
+    <Application>
+        <ApplicantId>IND-2024-004</ApplicantId>
+        <FirstName>James</FirstName>
+        <LastName>Taylor</LastName>
+        <Email>james.taylor@example.com</Email>
+        <Phone>+1-555-0104</Phone>
+        <JobTitle>Data Scientist</JobTitle>
+        <ApplicationDate>2024-02-18</ApplicationDate>
+        <Status>Interviewing</Status>
+        <Location>Seattle, WA</Location>
+        <ResumeUrl>https://indeed.com/resumes/james-taylor-901234</ResumeUrl>
+        <ResumeText>Data Scientist with PhD in Statistics and 4 years of industry experience. Specialized in machine learning, predictive modeling, and data visualization. Published researcher with expertise in Python, R, and SQL.</ResumeText>
+        <ProfileUrl>https://indeed.com/profile/james-taylor-901234</ProfileUrl>
+    </Application>
+    <Application>
+        <ApplicantId>IND-2024-005</ApplicantId>
+        <FirstName>Lisa</FirstName>
+        <LastName>Anderson</LastName>
+        <Email>lisa.anderson@example.com</Email>
+        <Phone>+1-555-0105</Phone>
+        <JobTitle>DevOps Engineer</JobTitle>
+        <ApplicationDate>2024-02-19</ApplicationDate>
+        <Status>Applied</Status>
+        <Location>Remote</Location>
+        <ResumeUrl>https://indeed.com/resumes/lisa-anderson-567890</ResumeUrl>
+        <ResumeText>DevOps Engineer with 7 years of experience in AWS, Kubernetes, and CI/CD pipelines. Reduced deployment time by 70% in previous role. Strong automation and infrastructure-as-code expertise.</ResumeText>
+        <CoverLetter>I am passionate about building robust and scalable infrastructure. I believe my DevOps expertise would be a great fit for your team.</CoverLetter>
+        <ProfileUrl>https://indeed.com/profile/lisa-anderson-567890</ProfileUrl>
+    </Application>
+    <Application>
+        <ApplicantId>IND-2024-006</ApplicantId>
+        <FirstName>David</FirstName>
+        <LastName>Kim</LastName>
+        <Email>david.kim@example.com</Email>
+        <JobTitle>Marketing Manager</JobTitle>
+        <ApplicationDate>2024-02-20</ApplicationDate>
+        <Status>Applied</Status>
+        <Location>Chicago, IL</Location>
+        <ResumeUrl>https://indeed.com/resumes/david-kim-234567</ResumeUrl>
+        <ResumeText>Marketing Manager with 5 years of experience in digital marketing and growth strategies. Increased customer acquisition by 150% in previous role. Expert in SEO, SEM, and marketing analytics.</ResumeText>
+        <ProfileUrl>https://indeed.com/profile/david-kim-234567</ProfileUrl>
+    </Application>
+</IndeedApplications>
