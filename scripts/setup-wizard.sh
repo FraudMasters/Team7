@@ -413,66 +413,186 @@ configure_environment() {
     return 0
 }
 
+# Validate .env file exists and is readable
+validate_env_file() {
+    if [ ! -f .env ]; then
+        log_error ".env file not found"
+        return 1
+    fi
+
+    if [ ! -r .env ]; then
+        log_error ".env file is not readable"
+        return 1
+    fi
+
+    log_success "✓ .env file exists"
+    return 0
+}
+
+# Validate required environment variables
+validate_required_variables() {
+    local all_valid=true
+
+    # Source environment variables
+    set -a
+    source .env 2>/dev/null || true
+    set +a
+
+    # Define required variables based on profile
+    local required_vars=("POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_DB" "REDIS_HOST")
+
+    # Add profile-specific required variables
+    if [[ "$PROFILE" =~ ^(core|full)$ ]]; then
+        required_vars+=("BACKEND_PORT" "FRONTEND_PORT" "DATABASE_URL")
+    fi
+
+    if [ "$ENABLE_NEO4J" = true ] || [ "$PROFILE" = "full" ]; then
+        required_vars+=("NEO4J_URI" "NEO4J_USER" "NEO4J_PASSWORD")
+    fi
+
+    if [ "$ENABLE_MONITORING" = true ] || [ "$PROFILE" = "full" ]; then
+        required_vars+=("GRAFANA_USER" "GRAFANA_PASSWORD")
+    fi
+
+    if [ "$ENABLE_BACKUPS" = true ] || [ "$PROFILE" = "full" ]; then
+        required_vars+=("BACKUP_ENABLED")
+    fi
+
+    # Validate each required variable
+    for var in "${required_vars[@]}"; do
+        if [ -z "${!var}" ]; then
+            log_error "✗ Required variable $var is not set"
+            all_valid=false
+        else
+            log_success "✓ $var is configured"
+        fi
+    done
+
+    if [ "$all_valid" = false ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Validate port availability
+validate_port_availability() {
+    local port=$1
+    local service_name=$2
+
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        log_warning "⚠ Port $port is already in use ($service_name)"
+
+        if [ "$NON_INTERACTIVE" = false ]; then
+            read -p "Continue anyway? [y/N]: " continue
+            if [[ ! "$continue" =~ ^[Yy]$ ]]; then
+                log_error "Setup cancelled by user"
+                exit 2
+            fi
+        fi
+        return 1
+    fi
+
+    log_success "✓ Port $port is available ($service_name)"
+    return 0
+}
+
+# Validate Docker Compose configuration
+validate_docker_compose_config() {
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY RUN] Would validate Docker Compose configuration"
+        return 0
+    fi
+
+    # Check if docker-compose.yml exists
+    if [ ! -f docker-compose.yml ]; then
+        log_error "docker-compose.yml not found"
+        return 1
+    fi
+
+    # Validate docker-compose configuration syntax
+    if docker compose --profile $PROFILE config > /dev/null 2>&1; then
+        log_success "✓ Docker Compose configuration is valid for profile: $PROFILE"
+        return 0
+    else
+        log_error "✗ Docker Compose configuration is invalid"
+        return 1
+    fi
+}
+
+# Validate database URL format
+validate_database_url() {
+    local db_url="${DATABASE_URL:-}"
+
+    if [ -z "$db_url" ]; then
+        log_warning "⚠ DATABASE_URL is not set"
+        return 1
+    fi
+
+    # Check if URL starts with postgresql://
+    if [[ ! "$db_url" =~ ^postgresql:// ]]; then
+        log_error "✗ DATABASE_URL must start with postgresql://"
+        return 1
+    fi
+
+    log_success "✓ DATABASE_URL format is valid"
+    return 0
+}
+
 # Validate configuration
 validate_configuration() {
     log_step "Step 4/7: Validate Configuration"
 
     local all_valid=true
 
-    # Check .env file exists
-    if [ ! -f .env ]; then
-        log_error ".env file not found"
+    # Validate .env file
+    if ! validate_env_file; then
         all_valid=false
-    else
-        log_success "✓ .env file exists"
-
-        # Source environment variables
-        set -a
-        source .env 2>/dev/null || true
-        set +a
-
-        # Validate required variables
-        local required_vars=("POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_DB" "REDIS_HOST")
-        for var in "${required_vars[@]}"; do
-            if [ -z "${!var}" ]; then
-                log_error "✗ Required variable $var is not set"
-                all_valid=false
-            else
-                log_success "✓ $var is configured"
-            fi
-        done
     fi
 
-    # Check port availability
-    local ports=(5432 6379 8000 5173)
-    local port_names=("PostgreSQL" "Redis" "Backend" "Frontend")
+    # Validate required variables
+    if ! validate_required_variables; then
+        all_valid=false
+    fi
 
+    # Validate database URL format
+    if ! validate_database_url; then
+        log_warning "⚠ DATABASE_URL validation failed (non-fatal)"
+    fi
+
+    # Check port availability for profile-specific services
+    local ports=()
+    local port_names=()
+
+    # Add ports based on profile
+    if [[ "$PROFILE" =~ ^(minimal|core|full)$ ]]; then
+        ports+=(5432 6379)
+        port_names+=("PostgreSQL" "Redis")
+    fi
+
+    if [[ "$PROFILE" =~ ^(core|full)$ ]]; then
+        ports+=(8000 5173)
+        port_names+=("Backend" "Frontend")
+    fi
+
+    if [ "$ENABLE_MONITORING" = true ] || [ "$PROFILE" = "full" ] || [ "$PROFILE" = "monitoring-only" ]; then
+        ports+=(9090 3001 5555)
+        port_names+=("Prometheus" "Grafana" "Flower")
+    fi
+
+    if [ "$ENABLE_NEO4J" = true ] || [ "$PROFILE" = "full" ]; then
+        ports+=(7474 7687)
+        port_names+=("Neo4j Browser" "Neo4j Bolt")
+    fi
+
+    # Validate each port
     for i in "${!ports[@]}"; do
-        local port=${ports[$i]}
-        local name=${port_names[$i]}
-
-        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-            log_warning "⚠ Port $port is already in use ($name)"
-            if [ "$NON_INTERACTIVE" = false ]; then
-                read -p "Continue anyway? [y/N]: " continue
-                if [[ ! "$continue" =~ ^[Yy]$ ]]; then
-                    log_error "Setup cancelled by user"
-                    exit 2
-                fi
-            fi
-        else
-            log_success "✓ Port $port is available ($name)"
-        fi
+        validate_port_availability "${ports[$i]}" "${port_names[$i]}" || true
     done
 
     # Validate Docker Compose configuration
-    if [ "$DRY_RUN" = false ]; then
-        if docker compose --profile $PROFILE config > /dev/null 2>&1; then
-            log_success "✓ Docker Compose configuration is valid for profile: $PROFILE"
-        else
-            log_error "✗ Docker Compose configuration is invalid"
-            all_valid=false
-        fi
+    if ! validate_docker_compose_config; then
+        all_valid=false
     fi
 
     if [ "$all_valid" = false ]; then
