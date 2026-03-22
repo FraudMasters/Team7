@@ -7,7 +7,7 @@ with different limits for different endpoint types.
 
 Features:
 - Extract client IP from request
-- Categorize endpoints by path patterns (standard, expensive, upload)
+- Categorize endpoints by path patterns (auth, standard, expensive, upload)
 - Apply appropriate rate limit per tier
 - Add rate limit headers to response (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
 - Return 429 Too Many Requests with JSONResponse when limit exceeded
@@ -15,6 +15,7 @@ Features:
 - Bypass rate limiting for health/check endpoints
 
 Tiered Limits:
+- Auth endpoints (login, register, password reset): 5 requests/minute (brute force protection)
 - Standard endpoints: 60 requests/minute
 - Expensive operations (analyze, ATS): 10 requests/minute
 - File uploads: 5 requests/minute
@@ -48,11 +49,19 @@ RATE_LIMIT_RETRY_AFTER_HEADER = "Retry-After"
 CATEGORY_STANDARD = "standard"
 CATEGORY_EXPENSIVE = "expensive"
 CATEGORY_UPLOAD = "upload"
+CATEGORY_AUTH = "auth"
 CATEGORY_BYPASS = "bypass"
 
 # Endpoint path patterns for categorization
 UPLOAD_PATTERNS = ["/api/resumes/upload"]
 EXPENSIVE_PATTERNS = ["/api/resumes/", "/api/ats/"]
+AUTH_PATTERNS = [
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/password-reset-request",
+    "/api/auth/password-reset-confirm",
+    "/api/auth/verify-email",
+]
 BYPASS_PATTERNS = ["/health", "/api/health", "/readiness", "/api/readiness"]
 
 
@@ -61,6 +70,7 @@ def categorize_endpoint(path: str) -> str:
     Categorize an endpoint path for rate limiting purposes.
 
     Determines which rate limit tier to apply based on the request path:
+    - 'auth': Authentication endpoints (5/min for security)
     - 'upload': File upload endpoints (5/min)
     - 'expensive': Computationally expensive operations (10/min)
     - 'standard': Regular endpoints (60/min)
@@ -70,9 +80,11 @@ def categorize_endpoint(path: str) -> str:
         path: The request path to categorize
 
     Returns:
-        Category name: 'upload', 'expensive', 'standard', or 'bypass'
+        Category name: 'auth', 'upload', 'expensive', 'standard', or 'bypass'
 
     Example:
+        >>> categorize_endpoint('/api/auth/login')
+        'auth'
         >>> categorize_endpoint('/api/resumes/upload')
         'upload'
         >>> categorize_endpoint('/api/resumes/123/analyze')
@@ -86,6 +98,11 @@ def categorize_endpoint(path: str) -> str:
     for pattern in BYPASS_PATTERNS:
         if path.startswith(pattern):
             return CATEGORY_BYPASS
+
+    # Check for auth endpoints (high security, low rate limit)
+    for pattern in AUTH_PATTERNS:
+        if path.startswith(pattern):
+            return CATEGORY_AUTH
 
     # Check for upload endpoints
     for pattern in UPLOAD_PATTERNS:
@@ -109,12 +126,14 @@ def get_rate_limit_for_category(category: str) -> int:
     given category.
 
     Args:
-        category: The endpoint category ('upload', 'expensive', 'standard', or 'bypass')
+        category: The endpoint category ('auth', 'upload', 'expensive', 'standard', or 'bypass')
 
     Returns:
         Rate limit in requests per minute (or 0 for bypass category)
 
     Example:
+        >>> get_rate_limit_for_category('auth')
+        5
         >>> get_rate_limit_for_category('upload')
         5
         >>> get_rate_limit_for_category('expensive')
@@ -126,7 +145,10 @@ def get_rate_limit_for_category(category: str) -> int:
     """
     settings = get_settings()
 
-    if category == CATEGORY_UPLOAD:
+    if category == CATEGORY_AUTH:
+        # Strict rate limit for auth endpoints to prevent brute force attacks
+        return getattr(settings, 'rate_limit_per_minute_auth', 5)
+    elif category == CATEGORY_UPLOAD:
         return settings.rate_limit_per_minute_upload
     elif category == CATEGORY_EXPENSIVE:
         return settings.rate_limit_per_minute_expensive
