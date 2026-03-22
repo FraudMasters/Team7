@@ -28,3 +28,4 @@ export { default as PasswordResetPage } from './auth/PasswordResetPage';
 export { default as ResumeOptimizationPage } from './jobs/ResumeOptimizationPage';
 export { default as JobDescriptionPage } from './recruiter/JobDescriptionPage';
 export { AgencyDashboard as AgencyDashboardPage } from './agency/AgencyDashboard';
+export { default as ClientManagementPage } from './agency/ClientManagement';
