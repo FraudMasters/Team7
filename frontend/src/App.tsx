@@ -76,6 +76,7 @@ import HealthDashboard from './pages/HealthDashboard';
 // Template Builder
 import { TemplateBuilder } from './components/TemplateBuilder/TemplateBuilder';
 import FeedbackTemplatesPage from './pages/FeedbackTemplates';
+import SMSTemplateDemo from './pages/SMSTemplateDemo';
 
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
@@ -191,6 +192,7 @@ function App() {
 
         {/* Template Builder (standalone, no auth required for development) */}
         <Route path="/templates/builder" element={<TemplateBuilder />} />
+        <Route path="/templates/sms" element={<SMSTemplateDemo />} />
 
         {/* Recruiter Flow - Protected with role-based access control */}
         <Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
