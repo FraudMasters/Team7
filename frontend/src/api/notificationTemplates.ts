@@ -46,51 +46,13 @@
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
-
-/**
- * Notification template type enum
- */
-export type NotificationTemplateType = 'email' | 'sms';
-
-/**
- * Template category enum
- */
-export type NotificationTemplateCategory = 'outreach' | 'interview' | 'rejection' | 'offer' | 'follow_up' | 'feedback' | 'other';
-
-/**
- * Pipeline stage enum
- */
-export type PipelineStage =
-  | 'application_received'
-  | 'screening'
-  | 'interview_scheduled'
-  | 'interview_completed'
-  | 'offer_extended'
-  | 'offer_accepted'
-  | 'rejected'
-  | 'withdrawn';
-
-/**
- * Conditional block operator enum
- */
-export type ConditionalOperator = 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'not_in' | 'contains';
-
-/**
- * Template block type
- */
-export interface TemplateBlock {
-  id: string;
-  type: 'text' | 'heading' | 'button' | 'conditional';
-  content?: string;
-  condition?: {
-    field: string;
-    operator: ConditionalOperator;
-    value: string | number | boolean | string[];
-  };
-  true_blocks?: TemplateBlock[];
-  false_blocks?: TemplateBlock[];
-  [key: string]: unknown;
-}
+import type {
+  NotificationTemplateType,
+  NotificationTemplateCategory,
+  PipelineStage,
+  TemplateBlock,
+  TemplateVariableContext,
+} from '@/types/templates';
 
 /**
  * Template create request
@@ -175,7 +137,7 @@ export interface NotificationTemplateListFilters {
 export interface TemplatePreviewRequest {
   template_id: string;
   template_type: NotificationTemplateType;
-  variables: Record<string, string | number | boolean>;
+  variables: TemplateVariableContext;
 }
 
 /**
@@ -478,3 +440,26 @@ export const notificationTemplatesClient = new NotificationTemplatesClient();
  * Export default instance for convenience
  */
 export default notificationTemplatesClient;
+
+/**
+ * Re-export template types for convenience
+ */
+export type {
+  NotificationTemplateType,
+  NotificationTemplateCategory,
+  PipelineStage,
+  TemplateBlock,
+  TemplateBlockType,
+  TemplateCondition,
+  TemplateVariable,
+  TemplateVariableValue,
+  TemplateVariableContext,
+  ConditionalOperator,
+  ConditionalBlock,
+  TextBlock,
+  HeadingBlock,
+  ButtonBlock,
+  BaseTemplateBlock,
+  TemplateValidationError,
+  TemplateValidationResult,
+} from '@/types/templates';
