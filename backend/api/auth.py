@@ -12,7 +12,7 @@ Implements secure authentication using bcrypt password hashing and JWT tokens.
 """
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -36,6 +36,9 @@ from utils.jwt_handler import (
 from utils.audit_logger import log_audit_event, get_request_context
 from config import get_settings
 from services.email_service import get_email_service
+from services.session_service import get_session_service
+from services.session_analytics_service import get_session_analytics_service
+from dependencies.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -192,6 +195,45 @@ class VerifyEmailResponse(BaseModel):
     """Response model for successful email verification."""
 
     message: str = Field(..., description="Success message")
+
+
+class SessionInfo(BaseModel):
+    """Session information model."""
+
+    id: str = Field(..., description="Session ID")
+    device_name: Optional[str] = Field(None, description="User-friendly device name")
+    device_type: Optional[str] = Field(None, description="Device type (desktop, mobile, tablet)")
+    ip_address: Optional[str] = Field(None, description="IP address")
+    location: Optional[str] = Field(None, description="Geographic location")
+    is_active: bool = Field(..., description="Whether session is active")
+    created_at: datetime = Field(..., description="Session creation time")
+    last_activity_at: Optional[datetime] = Field(None, description="Last activity time")
+    expires_at: Optional[datetime] = Field(None, description="Session expiration time")
+
+
+class ListSessionsResponse(BaseModel):
+    """Response model for listing active sessions."""
+
+    sessions: List[SessionInfo] = Field(..., description="List of active sessions")
+    total: int = Field(..., description="Total number of sessions")
+
+
+class RevokeSessionResponse(BaseModel):
+    """Response model for session revocation."""
+
+    message: str = Field(..., description="Success message")
+
+
+class SessionAnalyticsResponse(BaseModel):
+    """Response model for session analytics."""
+
+    period_days: int = Field(..., description="Analytics period in days")
+    total_sessions: int = Field(..., description="Total sessions created")
+    active_sessions: int = Field(..., description="Currently active sessions")
+    revoked_sessions: int = Field(..., description="Revoked sessions")
+    average_session_duration_minutes: Optional[float] = Field(None, description="Average session duration")
+    device_distribution: Dict[str, int] = Field(..., description="Sessions by device type")
+    revocation_reasons: Dict[str, int] = Field(..., description="Sessions by revocation reason")
 
 
 # ============================================================
@@ -1227,4 +1269,289 @@ async def verify_email(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Email verification failed: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/sessions",
+    response_model=ListSessionsResponse,
+    tags=["Session Management"],
+)
+async def list_sessions(
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    List all active sessions for the current user.
+
+    Returns all active sessions associated with the authenticated user,
+    including device information, IP addresses, and session metadata.
+    This allows users to view which devices have access to their account
+    and revoke sessions from unknown devices.
+
+    Args:
+        current_user: The authenticated user (injected by dependency)
+
+    Returns:
+        JSON response with list of active sessions
+
+    Raises:
+        HTTPException(401): If user is not authenticated
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> headers = {"Authorization": "Bearer <access_token>"}
+        >>> response = requests.get("http://localhost:8000/api/auth/sessions", headers=headers)
+        >>> response.json()
+        {
+            "sessions": [
+                {
+                    "id": "...",
+                    "device_name": "Chrome on Windows",
+                    "device_type": "desktop",
+                    "ip_address": "192.168.1.1",
+                    "location": "San Francisco, CA",
+                    "is_active": true,
+                    "created_at": "2026-03-22T10:00:00",
+                    "last_activity_at": "2026-03-22T11:00:00",
+                    "expires_at": "2026-03-23T10:00:00"
+                }
+            ],
+            "total": 1
+        }
+    """
+    try:
+        logger.info(f"Listing sessions for user: {current_user.id}")
+
+        # Get session service
+        session_service = get_session_service()
+
+        # Get active sessions for user
+        sessions = await session_service.get_active_sessions(str(current_user.id))
+
+        # Convert sessions to response format
+        session_list = [
+            {
+                "id": str(session.id),
+                "device_name": session.device_name,
+                "device_type": session.device_type,
+                "ip_address": session.ip_address,
+                "location": session.location,
+                "is_active": session.is_active,
+                "created_at": session.created_at.isoformat() if session.created_at else None,
+                "last_activity_at": session.last_activity_at.isoformat() if session.last_activity_at else None,
+                "expires_at": session.expires_at.isoformat() if session.expires_at else None,
+            }
+            for session in sessions
+        ]
+
+        logger.info(f"Retrieved {len(session_list)} active sessions for user: {current_user.id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "sessions": session_list,
+                "total": len(session_list),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing sessions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list sessions: {str(e)}",
+        ) from e
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    response_model=RevokeSessionResponse,
+    tags=["Session Management"],
+)
+async def revoke_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    Revoke a specific session.
+
+    Revokes (logs out) a specific session by session ID. Users can only
+    revoke their own sessions. This is useful for logging out from a
+    specific device or removing access from a lost or stolen device.
+
+    Args:
+        session_id: Session ID to revoke
+        current_user: The authenticated user (injected by dependency)
+
+    Returns:
+        JSON response confirming revocation
+
+    Raises:
+        HTTPException(401): If user is not authenticated
+        HTTPException(403): If session belongs to another user
+        HTTPException(404): If session is not found
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> headers = {"Authorization": "Bearer <access_token>"}
+        >>> response = requests.delete(
+        ...     "http://localhost:8000/api/auth/sessions/session-id-123",
+        ...     headers=headers
+        ... )
+        >>> response.json()
+        {"message": "Session revoked successfully"}
+    """
+    try:
+        logger.info(f"Revoking session {session_id} for user: {current_user.id}")
+
+        # Get session service
+        session_service = get_session_service()
+
+        # Get all user sessions to verify ownership
+        user_sessions = await session_service.get_active_sessions(str(current_user.id))
+        session_to_revoke = None
+
+        for session in user_sessions:
+            if str(session.id) == session_id:
+                session_to_revoke = session
+                break
+
+        # Check if session exists and belongs to user
+        if not session_to_revoke:
+            logger.warning(f"Session {session_id} not found or not owned by user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found or you do not have permission to revoke it",
+            )
+
+        # Revoke the session using its token
+        success = await session_service.revoke_session(
+            session_to_revoke.token,
+            reason="user_logout"
+        )
+
+        if not success:
+            logger.error(f"Failed to revoke session {session_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to revoke session",
+            )
+
+        logger.info(f"Session {session_id} revoked successfully")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": "Session revoked successfully"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to revoke session: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/sessions/analytics",
+    response_model=SessionAnalyticsResponse,
+    tags=["Session Management"],
+)
+async def get_session_analytics(
+    days: int = 30,
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    Get session analytics for the current user.
+
+    Returns comprehensive session analytics including session counts,
+    average duration, device distribution, and revocation reasons.
+    This helps users understand their session usage patterns and
+    identify potential security issues.
+
+    Args:
+        days: Number of days to look back for analytics (default: 30)
+        current_user: The authenticated user (injected by dependency)
+
+    Returns:
+        JSON response with session analytics
+
+    Raises:
+        HTTPException(401): If user is not authenticated
+        HTTPException(400): If days parameter is invalid
+        HTTPException(500): If database operation fails
+
+    Examples:
+        >>> import requests
+        >>> headers = {"Authorization": "Bearer <access_token>"}
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/auth/sessions/analytics?days=7",
+        ...     headers=headers
+        ... )
+        >>> response.json()
+        {
+            "period_days": 7,
+            "total_sessions": 15,
+            "active_sessions": 3,
+            "revoked_sessions": 12,
+            "average_session_duration_minutes": 45.5,
+            "device_distribution": {"desktop": 10, "mobile": 5},
+            "revocation_reasons": {"user_logout": 8, "timeout": 4}
+        }
+    """
+    try:
+        # Validate days parameter
+        if days < 1 or days > 365:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Days parameter must be between 1 and 365",
+            )
+
+        logger.info(f"Getting session analytics for user {current_user.id} (days={days})")
+
+        # Get analytics service
+        analytics_service = get_session_analytics_service()
+
+        # Get session metrics
+        metrics = await analytics_service.get_session_metrics(
+            user_id=str(current_user.id),
+            days=days
+        )
+
+        # Get device distribution
+        device_dist = await analytics_service.get_device_distribution(
+            user_id=str(current_user.id),
+            days=days
+        )
+
+        # Build response
+        response_data = {
+            "period_days": metrics.get("period_days", days),
+            "total_sessions": metrics.get("total_sessions", 0),
+            "active_sessions": metrics.get("active_sessions", 0),
+            "revoked_sessions": metrics.get("revoked_sessions", 0),
+            "average_session_duration_minutes": metrics.get("average_session_duration_minutes"),
+            "device_distribution": device_dist,
+            "revocation_reasons": metrics.get("revocation_reasons", {}),
+        }
+
+        logger.info(f"Retrieved session analytics for user {current_user.id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting session analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get session analytics: {str(e)}",
         ) from e
