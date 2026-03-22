@@ -1065,6 +1065,71 @@ class AuthService:
                 f"Please try again in {minutes_remaining} minutes."
             )
 
+    async def check_login_anomalies(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        days: int = 7,
+    ) -> Dict[str, Any]:
+        """
+        Check for login anomalies for a user.
+
+        This method analyzes recent login attempts to detect suspicious patterns
+        such as brute force attacks, credential stuffing, geographic impossibilities,
+        and other security concerns.
+
+        Args:
+            db: Database session
+            user_id: User ID to check
+            days: Number of days to analyze (default: 7)
+
+        Returns:
+            Dictionary with anomaly detection results including:
+                - has_anomaly: Boolean indicating if anomalies were detected
+                - anomalies: List of detected anomalies with details
+                - risk_score: Overall risk score (0-100)
+                - recommendations: List of recommended actions
+
+        Example:
+            >>> auth = AuthService()
+            >>> result = await auth.check_login_anomalies(db, user_id)
+            >>> if result["has_anomaly"]:
+            ...     print(f"Risk score: {result['risk_score']}")
+            ...     for rec in result["recommendations"]:
+            ...         print(f"- {rec}")
+        """
+        try:
+            # Import here to avoid circular dependency
+            from services.session_analytics_service import get_session_analytics_service
+
+            analytics_service = get_session_analytics_service()
+            result = await analytics_service.detect_anomaly(str(user_id), days=days)
+
+            # Log high-risk anomalies
+            if result.get("risk_score", 0) >= 70:
+                logger.error(
+                    f"High-risk login anomalies detected for user {user_id}: "
+                    f"risk_score={result['risk_score']}, "
+                    f"anomalies={len(result.get('anomalies', []))}"
+                )
+            elif result.get("risk_score", 0) >= 40:
+                logger.warning(
+                    f"Medium-risk login anomalies detected for user {user_id}: "
+                    f"risk_score={result['risk_score']}"
+                )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error checking login anomalies for user {user_id}: {e}", exc_info=True)
+            return {
+                "has_anomaly": False,
+                "anomalies": [],
+                "risk_score": 0,
+                "recommendations": [],
+                "error": str(e),
+            }
+
 
 def get_auth_service() -> AuthService:
     """

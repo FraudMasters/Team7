@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import async_session_maker
 from models.session import Session as SessionModel
+from models.login_attempt import LoginAttempt
 
 logger = logging.getLogger(__name__)
 
@@ -400,6 +401,246 @@ class SessionAnalyticsService:
             except Exception as e:
                 logger.error(f"Error detecting anomalies for user {user_id}: {e}", exc_info=True)
                 return []
+
+    async def detect_anomaly(
+        self,
+        user_id: str,
+        days: int = 7,
+    ) -> Dict[str, Any]:
+        """
+        Detect login anomalies for a user based on login attempt patterns.
+
+        Analyzes login attempts to detect suspicious patterns such as:
+        - Rapid failed login attempts (brute force attacks)
+        - Logins from unusual locations
+        - Logins at unusual times
+        - Multiple failed attempts followed by success (credential stuffing)
+        - Geographic impossibility (logins from different locations too close together)
+        - Unusual IP address patterns
+
+        Args:
+            user_id: User ID to analyze
+            days: Number of days to analyze (default: 7)
+
+        Returns:
+            Dictionary with anomaly detection results including:
+                - has_anomaly: Boolean indicating if any anomalies were detected
+                - anomalies: List of detected anomalies with details
+                - risk_score: Overall risk score (0-100)
+                - recommendations: List of recommended actions
+
+        Example:
+            >>> service = SessionAnalyticsService()
+            >>> result = await service.detect_anomaly("user-123")
+            >>> if result["has_anomaly"]:
+            ...     print(f"Risk score: {result['risk_score']}")
+            ...     for anomaly in result["anomalies"]:
+            ...         print(f"- {anomaly['type']}: {anomaly['description']}")
+        """
+        cutoff_time = datetime.utcnow() - timedelta(days=days)
+        anomalies = []
+        risk_score = 0
+
+        async with async_session_maker() as db:
+            try:
+                # Get user's login attempts
+                result = await db.execute(
+                    select(LoginAttempt)
+                    .where(
+                        and_(
+                            LoginAttempt.user_id == user_id,
+                            LoginAttempt.created_at >= cutoff_time,
+                        )
+                    )
+                    .order_by(LoginAttempt.created_at.desc())
+                )
+                login_attempts = result.scalars().all()
+
+                if not login_attempts:
+                    return {
+                        "has_anomaly": False,
+                        "anomalies": [],
+                        "risk_score": 0,
+                        "recommendations": [],
+                    }
+
+                # Separate successful and failed attempts
+                failed_attempts = [la for la in login_attempts if not la.success]
+                successful_attempts = [la for la in login_attempts if la.success]
+
+                # 1. Check for rapid failed login attempts (brute force)
+                if len(failed_attempts) > 0:
+                    # Check for failed attempts in the last hour
+                    recent_failed = [
+                        la for la in failed_attempts
+                        if la.created_at > datetime.utcnow() - timedelta(hours=1)
+                    ]
+                    if len(recent_failed) >= 3:
+                        severity = "high" if len(recent_failed) >= 5 else "medium"
+                        anomalies.append({
+                            "type": "rapid_failed_attempts",
+                            "severity": severity,
+                            "description": f"{len(recent_failed)} failed login attempts in the last hour",
+                            "count": len(recent_failed),
+                            "risk_impact": 25 if severity == "high" else 15,
+                        })
+                        risk_score += 25 if severity == "high" else 15
+
+                # 2. Check for credential stuffing pattern (many fails then success)
+                if len(failed_attempts) > 5 and len(successful_attempts) > 0:
+                    # Check if there are failed attempts followed by a success
+                    sorted_attempts = sorted(login_attempts, key=lambda x: x.created_at)
+                    for i, attempt in enumerate(sorted_attempts):
+                        if attempt.success and i >= 3:
+                            # Check if previous 3+ attempts were failures
+                            previous_attempts = sorted_attempts[max(0, i-5):i]
+                            if all(not pa.success for pa in previous_attempts):
+                                anomalies.append({
+                                    "type": "credential_stuffing",
+                                    "severity": "high",
+                                    "description": f"{len(previous_attempts)} failed attempts followed by successful login",
+                                    "count": len(previous_attempts),
+                                    "risk_impact": 30,
+                                })
+                                risk_score += 30
+                                break
+
+                # 3. Check for logins from multiple unusual locations
+                locations = set(la.location for la in login_attempts if la.location)
+                if len(locations) > 3:
+                    anomalies.append({
+                        "type": "multiple_locations",
+                        "severity": "medium",
+                        "description": f"Login attempts from {len(locations)} different locations in {days} days",
+                        "locations": list(locations),
+                        "risk_impact": 15,
+                    })
+                    risk_score += 15
+
+                # 4. Check for geographic impossibility
+                if len(successful_attempts) >= 2:
+                    sorted_successful = sorted(successful_attempts, key=lambda x: x.created_at)
+                    for i in range(1, len(sorted_successful)):
+                        prev_attempt = sorted_successful[i-1]
+                        curr_attempt = sorted_successful[i]
+
+                        # If both have locations and they're different
+                        if (prev_attempt.location and curr_attempt.location and
+                            prev_attempt.location != curr_attempt.location):
+                            time_diff = (curr_attempt.created_at - prev_attempt.created_at).total_seconds() / 3600
+                            # If logins from different locations within 1 hour
+                            if time_diff < 1:
+                                anomalies.append({
+                                    "type": "geographic_impossibility",
+                                    "severity": "high",
+                                    "description": (
+                                        f"Logins from different locations "
+                                        f"({prev_attempt.location} -> {curr_attempt.location}) "
+                                        f"within {int(time_diff * 60)} minutes"
+                                    ),
+                                    "time_diff_hours": time_diff,
+                                    "risk_impact": 35,
+                                })
+                                risk_score += 35
+                                break
+
+                # 5. Check for logins from suspicious IPs (many failed attempts from same IP)
+                ip_failed_counts = {}
+                for attempt in failed_attempts:
+                    if attempt.ip_address:
+                        ip_failed_counts[attempt.ip_address] = ip_failed_counts.get(
+                            attempt.ip_address, 0
+                        ) + 1
+
+                for ip, count in ip_failed_counts.items():
+                    if count >= 5:
+                        anomalies.append({
+                            "type": "suspicious_ip",
+                            "severity": "high",
+                            "description": f"IP address {ip} has {count} failed login attempts",
+                            "ip_address": ip,
+                            "count": count,
+                            "risk_impact": 20,
+                        })
+                        risk_score += 20
+
+                # 6. Check for unusual login times (late night/early morning)
+                unusual_hour_logins = []
+                for attempt in successful_attempts:
+                    hour = attempt.created_at.hour
+                    # Consider 2 AM - 6 AM as unusual hours
+                    if 2 <= hour < 6:
+                        unusual_hour_logins.append(attempt)
+
+                if len(unusual_hour_logins) >= 2:
+                    anomalies.append({
+                        "type": "unusual_login_times",
+                        "severity": "low",
+                        "description": f"{len(unusual_hour_logins)} logins during unusual hours (2 AM - 6 AM)",
+                        "count": len(unusual_hour_logins),
+                        "risk_impact": 10,
+                    })
+                    risk_score += 10
+
+                # 7. Check for multiple user agent strings (device switching)
+                user_agents = set(la.user_agent for la in login_attempts if la.user_agent)
+                if len(user_agents) > 5:
+                    anomalies.append({
+                        "type": "multiple_user_agents",
+                        "severity": "medium",
+                        "description": f"Login attempts from {len(user_agents)} different user agents",
+                        "count": len(user_agents),
+                        "risk_impact": 15,
+                    })
+                    risk_score += 15
+
+                # Cap risk score at 100
+                risk_score = min(risk_score, 100)
+
+                # Generate recommendations based on anomalies
+                recommendations = []
+                if risk_score >= 70:
+                    recommendations.append("Immediately require password change")
+                    recommendations.append("Enable two-factor authentication")
+                    recommendations.append("Review and revoke all active sessions")
+                elif risk_score >= 40:
+                    recommendations.append("Consider requiring password change")
+                    recommendations.append("Enable two-factor authentication if not already enabled")
+                    recommendations.append("Monitor account activity closely")
+                elif risk_score >= 20:
+                    recommendations.append("Monitor account activity")
+                    recommendations.append("Consider enabling two-factor authentication")
+
+                has_anomaly = len(anomalies) > 0
+
+                if has_anomaly:
+                    logger.warning(
+                        f"Login anomalies detected for user {user_id}: "
+                        f"{len(anomalies)} anomalies, risk score {risk_score}"
+                    )
+                else:
+                    logger.debug(f"No login anomalies detected for user {user_id}")
+
+                return {
+                    "has_anomaly": has_anomaly,
+                    "anomalies": anomalies,
+                    "risk_score": risk_score,
+                    "recommendations": recommendations,
+                    "analysis_period_days": days,
+                    "total_login_attempts": len(login_attempts),
+                    "failed_attempts": len(failed_attempts),
+                    "successful_attempts": len(successful_attempts),
+                }
+
+            except Exception as e:
+                logger.error(f"Error detecting login anomalies for user {user_id}: {e}", exc_info=True)
+                return {
+                    "has_anomaly": False,
+                    "anomalies": [],
+                    "risk_score": 0,
+                    "recommendations": [],
+                    "error": str(e),
+                }
 
     async def get_peak_usage_times(
         self,
