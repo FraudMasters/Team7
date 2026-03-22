@@ -300,6 +300,7 @@ from api import (
     hiring_manager,
     parsing_corrections,
     filter_suggestions,
+    oauth,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -338,6 +339,7 @@ app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=[
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(filter_suggestions.router, prefix="/api/filter-suggestions", tags=["Filter Suggestions"])
+app.include_router(oauth.router, prefix="/api/oauth", tags=["OAuth"])
 app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
 app.include_router(job_applications.router, prefix="/api/job-applications", tags=["Job Applications"])
 app.include_router(saved_jobs.router, prefix="/api/saved-jobs", tags=["Saved Jobs"])
