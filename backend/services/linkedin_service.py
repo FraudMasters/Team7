@@ -638,10 +638,13 @@ class LinkedInService:
                         picture_url = identifiers[0].get("identifier")
                         break
                 profile["profile_picture"] = picture_url or ""
+                profile["profile_picture_url"] = picture_url or ""  # Alias for compatibility
             else:
                 profile["profile_picture"] = ""
+                profile["profile_picture_url"] = ""
         else:
             profile["profile_picture"] = ""
+            profile["profile_picture_url"] = ""
 
         # Location
         location_data = response_data.get("location", {})
@@ -699,6 +702,10 @@ class LinkedInService:
         profile["languages"] = [
             lang.get("name", "") for lang in languages_data
         ]
+
+        # Add 'experience' as an alias for 'positions' for compatibility
+        # Some parts of the codebase expect 'experience' instead of 'positions'
+        profile["experience"] = profile["positions"]
 
         return profile
 
