@@ -3546,3 +3546,23 @@ export interface LinkedInSearchFilters {
   page?: number;
 }
 
+/**
+ * Single item in LinkedIn import history
+ */
+export interface LinkedInImportHistoryItem {
+  import_id: string;
+  profile_id: string;
+  profile_name: string;
+  imported_at: string;
+  status: string;
+  resume_id?: string | null;
+}
+
+/**
+ * LinkedIn import history response
+ */
+export interface LinkedInImportHistoryResponse {
+  total_imports: number;
+  imports: LinkedInImportHistoryItem[];
+}
+

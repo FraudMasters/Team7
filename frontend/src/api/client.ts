@@ -2303,6 +2303,45 @@ export class ApiClient {
       throw this.transformError(error);
     }
   }
+
+  /**
+   * Get LinkedIn import history
+   *
+   * Fetches the paginated list of LinkedIn profile imports with status information.
+   *
+   * @param skip - Number of records to skip (for pagination)
+   * @param limit - Maximum number of records to return (default: 100, max: 500)
+   * @returns Import history response with total count and import records
+   * @throws ApiError if the request fails
+   *
+   * @example
+   * ```typescript
+   * // Get first 50 imports
+   * const history = await apiClient.getLinkedInImportHistory(0, 50);
+   * console.log(`Total imports: ${history.total_imports}`);
+   * console.log(`Fetched ${history.imports.length} records`);
+   *
+   * // Get next page
+   * const nextPage = await apiClient.getLinkedInImportHistory(50, 50);
+   * ```
+   */
+  async getLinkedInImportHistory(
+    skip = 0,
+    limit = 100
+  ): Promise<LinkedInImportHistoryResponse> {
+    try {
+      const params = new URLSearchParams();
+      params.append('skip', skip.toString());
+      params.append('limit', limit.toString());
+
+      const response: AxiosResponse<LinkedInImportHistoryResponse> = await this.client.get(
+        `/api/linkedin/history?${params.toString()}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.transformError(error);
+    }
+  }
 }
 
 // Extend AxiosRequestConfig to include metadata
