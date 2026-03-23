@@ -1,11 +1,10 @@
 """
-Celery Beat schedule configuration for automated model retraining, analytics reports, search alerts, and fairness monitoring.
+Celery Beat schedule configuration for automated model retraining, analytics reports, and search alerts.
 
 This module defines the periodic task schedule for Celery Beat, including
 daily and weekly automated model retraining schedules, analytics email
-report schedules, search alert processing schedules, and fairness monitoring
-schedules. It integrates with the main Celery configuration to provide
-scheduled task execution.
+report schedules, and search alert processing schedules. It integrates with
+the main Celery configuration to provide scheduled task execution.
 
 Schedule Overview:
 - Feedback volume check: Runs every 6 hours to check if feedback threshold is met
@@ -16,7 +15,7 @@ Schedule Overview:
 - Weekly analytics email report: Sends weekly summary on configured day
 - Daily search alert processing: Processes pending alerts for daily-frequency saved searches
 - Weekly search alert processing: Processes pending alerts for weekly-frequency saved searches
-- Fairness metrics monitoring: Periodic monitoring of bias detection and fairness metrics
+- Scheduled report processing: Processes pending scheduled reports at configured intervals
 
 Feedback Volume Trigger:
 - Monitors accumulated feedback counts per model
@@ -33,10 +32,11 @@ Search Alert Processing:
 - Weekly alerts: Processes pending alerts for saved searches with weekly frequency
 - Configurable timing via alert_schedule settings
 
-Fairness Monitoring:
-- Daily fairness metrics check: Monitors bias and fairness metrics daily
-- Configurable thresholds via fairness_monitoring settings
-- Automated alerts when fairness thresholds are exceeded
+Scheduled Report Processing:
+- Daily reports: Processes pending scheduled reports with daily frequency
+- Weekly reports: Processes pending scheduled reports with weekly frequency
+- Monthly reports: Processes pending scheduled reports with monthly frequency
+- Configurable timing via scheduled_report_schedule settings
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -163,33 +163,43 @@ def get_alert_schedule_config() -> Dict[str, Any]:
     }
 
 
-def get_fairness_monitoring_schedule_config() -> Dict[str, Any]:
+def get_scheduled_report_config() -> Dict[str, Any]:
     """
-    Get fairness monitoring schedule configuration from settings.
+    Get scheduled report processing configuration from settings.
 
     Returns schedule configuration with defaults for:
-    - enabled: Whether fairness monitoring is enabled (default: True)
-    - daily_hour: Hour for daily fairness check (default: 4 AM)
-    - daily_minute: Minute for daily fairness check (default: 0)
-    - lookback_days: Number of days to look back for analysis (default: 30)
-    - alert_threshold: Threshold for triggering alerts (default: 0.8)
+    - enabled: Whether scheduled reports are enabled (default: True)
+    - daily_hour: Hour for daily report processing (default: 7 AM)
+    - daily_minute: Minute for daily report processing (default: 0)
+    - weekly_day: Day of week for weekly report processing (default: 1 = Monday)
+    - weekly_hour: Hour for weekly report processing (default: 8 AM)
+    - weekly_minute: Minute for weekly report processing (default: 0)
+    - monthly_day: Day of month for monthly report processing (default: 1)
+    - monthly_hour: Hour for monthly report processing (default: 9 AM)
+    - monthly_minute: Minute for monthly report processing (default: 0)
+    - batch_size: Number of reports to process in one batch (default: 50)
 
     Returns:
         Dictionary containing schedule configuration
 
     Example:
-        >>> config = get_fairness_monitoring_schedule_config()
+        >>> config = get_scheduled_report_config()
         >>> print(config['daily_hour'])
-        4
-        >>> print(config['lookback_days'])
-        30
+        7
+        >>> print(config['weekly_day'])
+        1
     """
     return {
-        "enabled": getattr(settings, "fairness_monitoring_enabled", True),
-        "daily_hour": getattr(settings, "fairness_monitoring_daily_hour", 4),
-        "daily_minute": getattr(settings, "fairness_monitoring_daily_minute", 0),
-        "lookback_days": getattr(settings, "fairness_monitoring_lookback_days", 30),
-        "alert_threshold": getattr(settings, "fairness_monitoring_alert_threshold", 0.8),
+        "enabled": getattr(settings, "scheduled_reports_enabled", True),
+        "daily_hour": getattr(settings, "scheduled_report_daily_hour", 7),
+        "daily_minute": getattr(settings, "scheduled_report_daily_minute", 0),
+        "weekly_day": getattr(settings, "scheduled_report_weekly_day", 1),  # Monday
+        "weekly_hour": getattr(settings, "scheduled_report_weekly_hour", 8),
+        "weekly_minute": getattr(settings, "scheduled_report_weekly_minute", 0),
+        "monthly_day": getattr(settings, "scheduled_report_monthly_day", 1),  # 1st of month
+        "monthly_hour": getattr(settings, "scheduled_report_monthly_hour", 9),
+        "monthly_minute": getattr(settings, "scheduled_report_monthly_minute", 0),
+        "batch_size": getattr(settings, "scheduled_report_batch_size", 50),
     }
 
 
@@ -382,22 +392,56 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
         },
     },
     # ==============================================
-    # Fairness Monitoring Schedule
+    # Scheduled Report Processing Schedule
     # ==============================================
-    "monitor_fairness_metrics": {
-        "task": "tasks.fairness_monitoring.monitor_fairness_metrics_task",
+    "daily-scheduled-report-processing": {
+        "task": "tasks.scheduled_reports.process_scheduled_reports",
         "schedule": crontab(
-            hour=get_fairness_monitoring_schedule_config()["daily_hour"],
-            minute=get_fairness_monitoring_schedule_config()["daily_minute"],
+            hour=get_scheduled_report_config()["daily_hour"],
+            minute=get_scheduled_report_config()["daily_minute"],
         ),
         "args": (),  # No positional args
         "kwargs": {
-            "lookback_days": get_fairness_monitoring_schedule_config()["lookback_days"],
-            "alert_threshold": get_fairness_monitoring_schedule_config()["alert_threshold"],
+            "frequency": "daily",  # Process daily frequency reports
+            "batch_size": get_scheduled_report_config()["batch_size"],
         },
         "options": {
             "expires": 3600,  # Task expires if not run within 1 hour
-            "queue": "learning",  # Route to learning queue
+            "queue": "default",  # Use default queue for report tasks
+        },
+    },
+    "weekly-scheduled-report-processing": {
+        "task": "tasks.scheduled_reports.process_scheduled_reports",
+        "schedule": crontab(
+            day_of_week=get_scheduled_report_config()["weekly_day"],
+            hour=get_scheduled_report_config()["weekly_hour"],
+            minute=get_scheduled_report_config()["weekly_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "frequency": "weekly",  # Process weekly frequency reports
+            "batch_size": get_scheduled_report_config()["batch_size"],
+        },
+        "options": {
+            "expires": 7200,  # Task expires if not run within 2 hours
+            "queue": "default",  # Use default queue for report tasks
+        },
+    },
+    "monthly-scheduled-report-processing": {
+        "task": "tasks.scheduled_reports.process_scheduled_reports",
+        "schedule": crontab(
+            day_of_month=get_scheduled_report_config()["monthly_day"],
+            hour=get_scheduled_report_config()["monthly_hour"],
+            minute=get_scheduled_report_config()["monthly_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "frequency": "monthly",  # Process monthly frequency reports
+            "batch_size": get_scheduled_report_config()["batch_size"],
+        },
+        "options": {
+            "expires": 14400,  # Task expires if not run within 4 hours
+            "queue": "default",  # Use default queue for report tasks
         },
     },
 }
@@ -425,7 +469,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     config = get_retraining_schedule_config()
     analytics_config = get_analytics_report_schedule_config()
     alert_config = get_alert_schedule_config()
-    fairness_config = get_fairness_monitoring_schedule_config()
+    scheduled_report_config = get_scheduled_report_config()
 
     if not config["enabled"] and enabled_only:
         logger.info("Automated retraining is disabled in settings")
@@ -436,15 +480,15 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     if not alert_config["enabled"] and enabled_only:
         logger.info("Search alerts are disabled in settings")
 
-    if not fairness_config["enabled"] and enabled_only:
-        logger.info("Fairness monitoring is disabled in settings")
+    if not scheduled_report_config["enabled"] and enabled_only:
+        logger.info("Scheduled reports are disabled in settings")
 
     # If all are disabled and we only want enabled tasks, return empty
     if (
         not config["enabled"]
         and not analytics_config["enabled"]
         and not alert_config["enabled"]
-        and not fairness_config["enabled"]
+        and not scheduled_report_config["enabled"]
         and enabled_only
     ):
         return {}
@@ -454,7 +498,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         f"retraining_enabled={config['enabled']}, models={config['models']}, "
         f"analytics_reports_enabled={analytics_config['enabled']}, "
         f"search_alerts_enabled={alert_config['enabled']}, "
-        f"fairness_monitoring_enabled={fairness_config['enabled']}"
+        f"scheduled_reports_enabled={scheduled_report_config['enabled']}"
     )
 
     if enabled_only:
@@ -494,9 +538,9 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
                 if not alert_config["enabled"]:
                     continue
 
-            # Skip fairness monitoring tasks if disabled
-            if "fairness" in task_name:
-                if not fairness_config["enabled"]:
+            # Skip scheduled report tasks if scheduled reports are disabled
+            if "scheduled-report" in task_name:
+                if not scheduled_report_config["enabled"]:
                     continue
 
             # Include other tasks
@@ -597,7 +641,7 @@ def list_scheduled_tasks() -> Dict[str, Dict[str, Any]]:
 schedule_config = get_retraining_schedule_config()
 analytics_config = get_analytics_report_schedule_config()
 alert_config = get_alert_schedule_config()
-fairness_config = get_fairness_monitoring_schedule_config()
+scheduled_report_config = get_scheduled_report_config()
 logger.info(
     f"Celery Beat schedule loaded: "
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
@@ -612,26 +656,26 @@ logger.info(
     f"search_alerts_enabled={alert_config['enabled']}, "
     f"search_alert_daily_at={alert_config['daily_hour']:02d}:{alert_config['daily_minute']:02d}, "
     f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}, "
-    f"fairness_monitoring_enabled={fairness_config['enabled']}, "
-    f"fairness_monitoring_daily_at={fairness_config['daily_hour']:02d}:{fairness_config['daily_minute']:02d}"
+    f"scheduled_reports_enabled={scheduled_report_config['enabled']}, "
+    f"scheduled_report_daily_at={scheduled_report_config['daily_hour']:02d}:{scheduled_report_config['daily_minute']:02d}, "
+    f"scheduled_report_weekly_on_day_{scheduled_report_config['weekly_day']}_at_{scheduled_report_config['weekly_hour']:02d}:{scheduled_report_config['weekly_minute']:02d}, "
+    f"scheduled_report_monthly_on_day_{scheduled_report_config['monthly_day']}_at_{scheduled_report_config['monthly_hour']:02d}:{scheduled_report_config['monthly_minute']:02d}"
 )
 
 
 # Export schedule and utility functions
 __all__ = [
     "beat_schedule",
-    "celery_schedule",  # Alias for compatibility
     "CELERYBEAT_SCHEDULE",  # Legacy alias for Celery config compatibility
     "get_beat_schedule",
     "get_retraining_schedule_config",
     "get_analytics_report_schedule_config",
     "get_alert_schedule_config",
-    "get_fairness_monitoring_schedule_config",
+    "get_scheduled_report_config",
     "add_scheduled_task",
     "remove_scheduled_task",
     "list_scheduled_tasks",
 ]
 
-# Aliases for compatibility
+# Legacy alias for Celery config compatibility
 CELERYBEAT_SCHEDULE = beat_schedule
-celery_schedule = beat_schedule

@@ -73,6 +73,8 @@ import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
+import { ReportsPage } from './pages/recruiter/ReportsPage';
+import { ReportSchedulePage } from './pages/recruiter/ReportSchedulePage';
 
 // Candidate Pages
 import AppealPortal from './pages/candidate/AppealPortal';
@@ -222,6 +224,10 @@ function App() {
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+          <Route path="reports">
+            <Route index element={<ReportsPage />} />
+            <Route path="schedule" element={<ReportSchedulePage />} />
+          </Route>
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}

@@ -13,7 +13,7 @@ from .learning_tasks import (
     retrain_skill_matching_model,
 )
 from .report_generation import (
-    generate_scheduled_reports,
+    generate_scheduled_report,
     process_all_pending_reports,
 )
 from .backup_tasks import (
@@ -41,7 +41,7 @@ __all__ = [
     "review_and_activate_synonyms",
     "periodic_feedback_aggregation",
     "retrain_skill_matching_model",
-    "generate_scheduled_reports",
+    "generate_scheduled_report",
     "process_all_pending_reports",
     "daily_backup_task",
     "create_backup_task",
