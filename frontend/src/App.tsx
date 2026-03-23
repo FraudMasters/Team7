@@ -49,6 +49,7 @@ import { VacancyFormPage } from './pages/recruiter/VacancyFormPage';
 import { VacancyDetailPage } from './pages/recruiter/VacancyDetailPage';
 import { CandidateDetailPage } from './pages/recruiter/CandidateDetailPage';
 import { WeightsPage } from './pages/recruiter/WeightsPage';
+import { RankingWeightsPage } from './pages/recruiter/RankingWeightsPage';
 import { SearchPage } from './pages/recruiter/SearchPage';
 import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
 import { ReviewQueuePage as RecruiterReviewQueuePage } from './pages/recruiter/ReviewQueuePage';
@@ -217,6 +218,7 @@ function App() {
             <Route path=":id/edit" element={<VacancyFormPage />} />
           </Route>
           <Route path="weights" element={<WeightsPage />} />
+          <Route path="ranking-weights" element={<RankingWeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />

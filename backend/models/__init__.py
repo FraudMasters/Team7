@@ -30,6 +30,8 @@ from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
+from .ranking_weights_profile import RankingWeightProfile
+from .ranking_weights_history import RankingWeightVersion
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
 from .ats_result import ATSResult
 from .saved_search import SavedSearch
@@ -84,6 +86,8 @@ __all__ = [
     "MatchingWeightVersion",
     "PRESET_PROFILES",
     "create_preset_profiles",
+    "RankingWeightProfile",
+    "RankingWeightVersion",
     "Backup",
     "BackupConfig",
     "BackupType",

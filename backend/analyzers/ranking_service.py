@@ -27,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import CandidateRank, JobVacancy, MatchResult, Resume, ResumeAnalysis
+from models.ranking_weights_profile import RankingWeightProfile
 from utils.metrics import get_metrics_registry
 
 logger = logging.getLogger(__name__)
@@ -705,6 +706,61 @@ class RankingService:
         self.model = RankingModel(model_type="random_forest")
         self.ab_test_ratio = 0.2  # 20% of candidates go to treatment group
 
+    async def get_ranking_weights(
+        self,
+        db: AsyncSession,
+        organization_id: Optional[UUID] = None,
+        vacancy_id: Optional[UUID] = None,
+    ) -> Optional[npt.NDArray[np.float64]]:
+        """
+        Get applicable ranking weights for organization or vacancy.
+
+        Priority order:
+        1. Vacancy-specific profile (if vacancy_id provided)
+        2. Organization default profile (if organization_id provided)
+        3. None (use default ML model)
+
+        Args:
+            db: Database session
+            organization_id: Organization UUID
+            vacancy_id: Vacancy UUID
+
+        Returns:
+            Numpy array of weights (13 elements) or None if no custom weights
+        """
+        profile = None
+
+        # Try vacancy-specific profile first
+        if vacancy_id:
+            query = select(RankingWeightProfile).where(
+                RankingWeightProfile.vacancy_id == vacancy_id,
+                RankingWeightProfile.is_active == True,
+            )
+            result = await db.execute(query)
+            profile = result.scalar_one_or_none()
+            if profile:
+                logger.info(f"Using vacancy-specific ranking weights: {profile.name}")
+
+        # Try organization default profile
+        if not profile and organization_id:
+            query = select(RankingWeightProfile).where(
+                RankingWeightProfile.organization_id == organization_id,
+                RankingWeightProfile.is_active == True,
+                RankingWeightProfile.vacancy_id.is_(None),
+            )
+            result = await db.execute(query)
+            profile = result.scalar_one_or_none()
+            if profile:
+                logger.info(f"Using organization default ranking weights: {profile.name}")
+
+        if profile:
+            # Convert weights to numpy array matching feature order
+            weights = np.array(profile.get_weights_as_list(), dtype=np.float64)
+            logger.debug(f"Custom weights: {weights}")
+            return weights
+
+        return None
+
     async def rank_candidate(
         self,
         db: AsyncSession,
@@ -789,9 +845,29 @@ class RankingService:
         # Extract features
         features = RankingFeatures.extract_features(resume_data, vacancy_data, match_result)
 
-        # Get model prediction
-        rank_score = self.model.predict_proba(features)
-        prediction, confidence = self.model.predict(features)
+        # Check for custom ranking weights
+        custom_weights = await self.get_ranking_weights(
+            db=db,
+            organization_id=UUID(vacancy.organization_id) if vacancy.organization_id else None,
+            vacancy_id=vacancy_id,
+        )
+
+        # Calculate rank score using custom weights or ML model
+        if custom_weights is not None:
+            # Use weighted sum: score = sum(feature[i] * weight[i])
+            rank_score = float(np.dot(features, custom_weights))
+            # Normalize to 0-1 range (features are already 0-1, so weighted sum should be too)
+            rank_score = np.clip(rank_score, 0.0, 1.0)
+            # For custom weights, confidence is based on variance of weighted features
+            weighted_features = features * custom_weights
+            confidence = float(1.0 - np.std(weighted_features))
+            prediction = 1 if rank_score > 0.5 else 0
+            logger.info(f"Using custom weights: rank_score={rank_score:.3f}")
+        else:
+            # Use ML model prediction (backward compatibility)
+            rank_score = self.model.predict_proba(features)
+            prediction, confidence = self.model.predict(features)
+            logger.debug(f"Using ML model: rank_score={rank_score:.3f}")
 
         # Determine A/B test group
         is_experiment = use_experiment and random.random() < self.ab_test_ratio

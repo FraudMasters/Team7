@@ -15,6 +15,7 @@ export { fairness, FairnessClient } from './fairness';
 export { industryClassifier, IndustryClassifierClient } from './industryClassifier';
 export { matchingClient, MatchingClient } from './matching';
 export { matchingWeightsClient, MatchingWeightsClient } from './matchingWeights';
+export { rankingWeightsClient, RankingWeightsClient } from './rankingWeights';
 export { modelVersionsClient, ModelVersionsClient } from './modelVersions';
 export { salaryBenchmarking, SalaryBenchmarkingClient } from './salaryBenchmarking';
 export { semanticSearchClient, SemanticSearchClient } from './semanticSearch';
