@@ -6,6 +6,16 @@ AI-powered resume analysis system with intelligent job matching, ML-based candid
 ![Frontend Coverage](.badges/frontend-coverage.svg)
 ![Backend Coverage](.badges/backend-coverage.svg)
 
+## 🚀 One-Click Deployments
+
+Deploy AgentHR to your preferred cloud platform in minutes:
+
+[![Deploy on DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/Soinex-Inc/agenthr/tree/main&refcode=agenthr)
+
+**AWS Marketplace**: [Launch CloudFormation Stack](./cloud/aws/marketplace.yaml) | [📖 AWS Deployment Guide](./cloud/aws/README.md)
+
+**Manual Deployment**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for Docker Compose, Kubernetes/Helm, and detailed configuration options.
+
 ## Features
 
 - **Resume Upload & Analysis**: Support for PDF and DOCX formats
@@ -32,12 +42,28 @@ AI-powered resume analysis system with intelligent job matching, ML-based candid
 git clone https://github.com/Soinex-Inc/agenthr.git
 cd agenthr
 
-# Start all services
-docker-compose up -d
+# Start core services (recommended for development)
+docker-compose --profile core up -d
+
+# Or start minimal services (fastest startup)
+docker-compose --profile minimal up -d
+
+# Or start with full monitoring stack (production-like)
+docker-compose --profile full up -d
 
 # Wait for services to be healthy (30-60 seconds)
 docker-compose ps
 ```
+
+**Docker Profiles Available:**
+
+| Profile | Services | RAM Required | Use Case |
+|---------|----------|--------------|----------|
+| `minimal` | DB, Redis, API, UI | ~4GB | Quick testing, CI/CD |
+| `core` | + Celery workers | ~8GB | Development, async processing |
+| `full` | + Monitoring stack | ~16GB | Production, full observability |
+
+> 📖 **See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment options including Kubernetes/Helm**
 
 ### Access URLs
 
@@ -315,6 +341,11 @@ For complete configuration documentation, see:
 - **[Configuration Management](docs/configuration.md)** - Complete configuration guide
 - **[Configuration Reference](docs/configuration/reference.md)** - All configuration options
 - **[Backend Config README](backend/config/README.md)** - Backend config module documentation
+
+## Deployment & Operations
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide (Docker, Kubernetes, Helm)
+- **[UPGRADE.md](./UPGRADE.md)** - Version upgrades, migrations, and rollback procedures
 
 ## Documentation
 

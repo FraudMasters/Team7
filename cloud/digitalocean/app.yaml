@@ -1,0 +1,435 @@
+# DigitalOcean App Platform Configuration for AgentHR
+# This file defines the complete application stack for deployment on DigitalOcean App Platform
+#
+# Deployment:
+#   doctl apps create --spec cloud/digitalocean/app.yaml
+#   doctl apps update <APP_ID> --spec cloud/digitalocean/app.yaml
+#
+# Note: Update environment variables before deployment
+
+name: agenthr
+region: nyc
+
+# Database Components
+databases:
+  - name: postgres
+    engine: PG
+    version: "15"
+    production: true
+    cluster_name: agenthr-postgres
+    db_name: resume_analysis
+    db_user: agenthr_user
+
+  - name: redis
+    engine: REDIS
+    version: "7"
+    production: true
+    cluster_name: agenthr-redis
+
+# Application Services
+services:
+  # Backend API Service (FastAPI + Uvicorn)
+  - name: backend
+    github:
+      repo: YOUR_GITHUB_USERNAME/agenthr
+      branch: main
+      deploy_on_push: true
+    source_dir: /prod
+    dockerfile_path: prod/Dockerfile
+    build_command: echo "Building backend via Dockerfile"
+
+    http_port: 8000
+    instance_count: 2
+    instance_size_slug: professional-l
+
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 60
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+
+    envs:
+      # Database Configuration
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${postgres.DATABASE_URL}
+      - key: POSTGRES_USER
+        scope: RUN_TIME
+        value: ${postgres.USERNAME}
+      - key: POSTGRES_PASSWORD
+        scope: RUN_TIME
+        value: ${postgres.PASSWORD}
+      - key: POSTGRES_DB
+        scope: RUN_TIME
+        value: ${postgres.DATABASE}
+
+      # Redis Configuration
+      - key: REDIS_URL
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: REDIS_HOST
+        scope: RUN_TIME
+        value: ${redis.HOSTNAME}
+      - key: REDIS_PORT
+        scope: RUN_TIME
+        value: ${redis.PORT}
+
+      # Celery Configuration
+      - key: CELERY_BROKER_URL
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: CELERY_RESULT_BACKEND
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+
+      # Application Settings
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: production
+      - key: LOG_LEVEL
+        scope: RUN_TIME
+        value: WARNING
+      - key: BACKEND_PORT
+        scope: RUN_TIME
+        value: "8000"
+      - key: BACKEND_HOST
+        scope: RUN_TIME
+        value: "0.0.0.0"
+
+      # Frontend URL (will be set after frontend deployment)
+      - key: FRONTEND_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_FRONTEND_URL"
+
+      # ML Models Configuration
+      - key: MODELS_CACHE_PATH
+        scope: RUN_TIME
+        value: /app/models_cache
+
+      # File Upload Settings
+      - key: MAX_UPLOAD_SIZE_MB
+        scope: RUN_TIME
+        value: "10"
+      - key: ALLOWED_FILE_TYPES
+        scope: RUN_TIME
+        value: ".pdf,.docx"
+      - key: ANALYSIS_TIMEOUT_SECONDS
+        scope: RUN_TIME
+        value: "300"
+
+      # Logging
+      - key: LOG_FORMAT
+        scope: RUN_TIME
+        value: json
+
+      # Neo4j Configuration (managed externally or separate service)
+      - key: NEO4J_URI
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_NEO4J_URI"
+      - key: NEO4J_USER
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_NEO4J_USER"
+      - key: NEO4J_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_NEO4J_PASSWORD"
+
+      # Graphiti Configuration
+      - key: GRAPHITI_TELEMETRY_ENABLED
+        scope: RUN_TIME
+        value: "false"
+      - key: SEMAPHORE_LIMIT
+        scope: RUN_TIME
+        value: "10"
+
+      # API Keys (Optional)
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ""
+      - key: ANTHROPIC_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ""
+
+      # LanguageTool Server
+      - key: LANGUAGETOOL_SERVER
+        scope: RUN_TIME
+        value: "http://languagetool:8081/v2/check"
+
+      # Backup Configuration
+      - key: BACKUP_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: BACKUP_RETENTION_DAYS
+        scope: RUN_TIME
+        value: "30"
+      - key: BACKUP_SCHEDULE
+        scope: RUN_TIME
+        value: "0 2 * * *"
+
+      # S3 Backup Configuration (DigitalOcean Spaces)
+      - key: BACKUP_S3_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: BACKUP_S3_BUCKET
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_SPACES_BUCKET"
+      - key: BACKUP_S3_ENDPOINT
+        scope: RUN_TIME
+        value: "https://nyc3.digitaloceanspaces.com"
+      - key: BACKUP_S3_ACCESS_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_SPACES_KEY"
+      - key: BACKUP_S3_SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_SPACES_SECRET"
+      - key: BACKUP_S3_REGION
+        scope: RUN_TIME
+        value: "nyc3"
+
+      # Alert Configuration
+      - key: ALERT_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: ALERT_EMAIL_ADDRESS
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_ALERT_EMAIL"
+      - key: HEALTH_CHECK_ALERT_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: HEALTH_CHECK_ALERT_EMAIL
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_ALERT_EMAIL"
+      - key: HEALTH_CHECK_ALERT_ON_WARNING
+        scope: RUN_TIME
+        value: "true"
+      - key: HEALTH_CHECK_ALERT_ON_CRITICAL
+        scope: RUN_TIME
+        value: "true"
+      - key: HEALTH_CHECK_ALERT_COOLDOWN_MINUTES
+        scope: RUN_TIME
+        value: "30"
+
+  # Celery Worker Service
+  - name: celery-worker
+    github:
+      repo: YOUR_GITHUB_USERNAME/agenthr
+      branch: main
+      deploy_on_push: true
+    source_dir: /prod
+    dockerfile_path: prod/Dockerfile
+    build_command: echo "Building celery worker via Dockerfile"
+    run_command: celery -A celery_app.celery_app worker --loglevel=warning --concurrency=4 --prefetch-multiplier=2 --queues=celery,analysis,learning,reporting --max-tasks-per-child=1000
+
+    instance_count: 1
+    instance_size_slug: professional-xl
+
+    health_check:
+      port: 8000
+      initial_delay_seconds: 60
+      period_seconds: 60
+      timeout_seconds: 10
+
+    envs:
+      # Inherit all backend environment variables
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${postgres.DATABASE_URL}
+      - key: POSTGRES_USER
+        scope: RUN_TIME
+        value: ${postgres.USERNAME}
+      - key: POSTGRES_PASSWORD
+        scope: RUN_TIME
+        value: ${postgres.PASSWORD}
+      - key: POSTGRES_DB
+        scope: RUN_TIME
+        value: ${postgres.DATABASE}
+      - key: REDIS_URL
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: REDIS_HOST
+        scope: RUN_TIME
+        value: ${redis.HOSTNAME}
+      - key: REDIS_PORT
+        scope: RUN_TIME
+        value: ${redis.PORT}
+      - key: CELERY_BROKER_URL
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: CELERY_RESULT_BACKEND
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: production
+      - key: LOG_LEVEL
+        scope: RUN_TIME
+        value: WARNING
+      - key: MODELS_CACHE_PATH
+        scope: RUN_TIME
+        value: /app/models_cache
+      - key: NEO4J_URI
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_NEO4J_URI"
+      - key: NEO4J_USER
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_NEO4J_USER"
+      - key: NEO4J_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: "REPLACE_WITH_NEO4J_PASSWORD"
+      - key: GRAPHITI_TELEMETRY_ENABLED
+        scope: RUN_TIME
+        value: "false"
+      - key: SEMAPHORE_LIMIT
+        scope: RUN_TIME
+        value: "10"
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ""
+      - key: ANTHROPIC_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ""
+
+  # Celery Beat Scheduler Service
+  - name: celery-beat
+    github:
+      repo: YOUR_GITHUB_USERNAME/agenthr
+      branch: main
+      deploy_on_push: true
+    source_dir: /prod
+    dockerfile_path: prod/Dockerfile
+    build_command: echo "Building celery beat via Dockerfile"
+    run_command: celery -A celery_app.celery_app beat --loglevel=warning
+
+    instance_count: 1
+    instance_size_slug: basic-xs
+
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${postgres.DATABASE_URL}
+      - key: REDIS_URL
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: CELERY_BROKER_URL
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: CELERY_RESULT_BACKEND
+        scope: RUN_TIME
+        value: ${redis.DATABASE_URL}
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: production
+      - key: LOG_LEVEL
+        scope: RUN_TIME
+        value: WARNING
+
+  # Frontend Service (React/Vite)
+  - name: frontend
+    github:
+      repo: YOUR_GITHUB_USERNAME/agenthr
+      branch: main
+      deploy_on_push: true
+    source_dir: /frontend
+
+    build_command: npm ci && npm run build
+    run_command: npm run preview -- --host 0.0.0.0 --port 8080
+
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-s
+
+    health_check:
+      http_path: /
+      initial_delay_seconds: 30
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+
+    envs:
+      - key: NODE_ENV
+        scope: RUN_AND_BUILD_TIME
+        value: production
+      - key: VITE_API_URL
+        scope: BUILD_TIME
+        value: "REPLACE_WITH_BACKEND_URL"
+      - key: VITE_APP_NAME
+        scope: BUILD_TIME
+        value: "AgentHR"
+
+# Static Sites (if needed for documentation or landing pages)
+static_sites: []
+
+# Workers (Background Jobs - alternative to services for workers)
+workers: []
+
+# Jobs (One-time or Cron Jobs)
+jobs:
+  # Database Migration Job
+  - name: db-migrate
+    github:
+      repo: YOUR_GITHUB_USERNAME/agenthr
+      branch: main
+      deploy_on_push: false
+    source_dir: /prod
+    dockerfile_path: prod/Dockerfile
+
+    kind: PRE_DEPLOY
+    run_command: alembic upgrade head
+
+    instance_count: 1
+    instance_size_slug: basic-xs
+
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${postgres.DATABASE_URL}
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: production
+
+# Ingress Configuration (Custom Domain)
+ingress:
+  rules:
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /api
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /docs
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /health
+    - component:
+        name: frontend
+      match:
+        path:
+          prefix: /
+
+# Alerts
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED

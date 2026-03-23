@@ -1,0 +1,74 @@
+{{- if .Values.persistence.modelsCache.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "agenthr.fullname" . }}-models-cache
+  labels:
+    {{- include "agenthr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - {{ .Values.persistence.modelsCache.accessMode }}
+  {{- if .Values.persistence.modelsCache.storageClass }}
+  {{- if (eq "-" .Values.persistence.modelsCache.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.modelsCache.storageClass | quote }}
+  {{- end }}
+  {{- else if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.modelsCache.size | quote }}
+{{- end }}
+---
+{{- if .Values.persistence.uploads.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "agenthr.fullname" . }}-uploads
+  labels:
+    {{- include "agenthr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - {{ .Values.persistence.uploads.accessMode }}
+  {{- if .Values.persistence.uploads.storageClass }}
+  {{- if (eq "-" .Values.persistence.uploads.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.uploads.storageClass | quote }}
+  {{- end }}
+  {{- else if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.uploads.size | quote }}
+{{- end }}
+---
+{{- if .Values.persistence.backups.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "agenthr.fullname" . }}-backups
+  labels:
+    {{- include "agenthr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - {{ .Values.persistence.backups.accessMode }}
+  {{- if .Values.persistence.backups.storageClass }}
+  {{- if (eq "-" .Values.persistence.backups.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.backups.storageClass | quote }}
+  {{- end }}
+  {{- else if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.backups.size | quote }}
+{{- end }}
