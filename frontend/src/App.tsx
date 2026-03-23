@@ -59,6 +59,7 @@ import { DashboardPage as HiringManagerDashboardPage } from './pages/hiring-mana
 import { ReviewQueuePage as HiringManagerReviewQueuePage } from './pages/hiring-manager/ReviewQueuePage';
 import { CandidateDetailPage as HiringManagerCandidateDetailPage } from './pages/hiring-manager/CandidateDetailPage';
 import { InterviewSchedulePage as HiringManagerInterviewSchedulePage } from './pages/hiring-manager/InterviewSchedulePage';
+import { CandidateSelfSchedulePage } from './pages/CandidateSelfSchedulePage';
 
 // Additional Recruiter Pages
 import ComparePage from './pages/Compare';
@@ -84,6 +85,9 @@ import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
   () => import('./pages/admin/AIExplainabilityDashboard')
 );
+
+// Test Pages
+import AvailabilitySlotPickerTest from './pages/AvailabilitySlotPickerTest';
 
 /**
  * Protected Recruiter Layout Wrapper
@@ -164,6 +168,9 @@ function App() {
 
         {/* Job Seeker Authentication Routes */}
         <Route path="/job-seeker/register" element={<JobSeekerRegisterPage />} />
+
+        {/* Candidate Self-Scheduling (Public) */}
+        <Route path="/schedule/:token" element={<CandidateSelfSchedulePage />} />
 
         {/* Job Seeker Flow */}
         <Route path="/jobs" element={<JobSeekerLayout />}>
@@ -252,6 +259,9 @@ function App() {
             </Suspense>
           }
         />
+
+        {/* Test Routes - Development only */}
+        <Route path="/schedule/test-token" element={<AvailabilitySlotPickerTest />} />
 
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />

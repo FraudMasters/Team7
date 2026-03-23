@@ -136,37 +136,88 @@ def create_calendar_event(
                 provider=calendar_provider,
                 access_token=calendar_connection.access_token,
                 refresh_token=calendar_connection.refresh_token,
+                token_expires_at=calendar_connection.token_expires_at,
+                calendar_email=calendar_connection.calendar_email,
+                calendar_id=calendar_connection.calendar_id,
             )
 
-            # Build calendar event from event_details
-            from backend.services.calendar_service import CalendarEvent
+            # Parse ISO datetime strings to datetime objects
+            from datetime import datetime
 
-            event = CalendarEvent(
-                title=event_details.get("title", "Interview"),
-                start_time=event_details.get("start_time"),
-                end_time=event_details.get("end_time"),
-                description=event_details.get("description", ""),
-                location=event_details.get("location"),
-                meet_link=event_details.get("meet_link"),
-                attendees=event_details.get("attendees", []),
+            start_time_str = event_details.get("start_time")
+            end_time_str = event_details.get("end_time")
+
+            start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00')) if start_time_str else datetime.utcnow()
+            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00')) if end_time_str else start_time + timedelta(hours=1)
+
+            # Get event parameters
+            title = event_details.get("title", "Interview")
+            description = event_details.get("description", "")
+            location = event_details.get("location")
+            meeting_link = event_details.get("meeting_link")
+            attendees = event_details.get("attendees", [])
+            interview_type = event_details.get("interview_type", "")
+
+            # Determine if we should auto-generate conference link
+            # Auto-generate for video/phone interviews if no meeting_link provided
+            auto_generate_conference = (
+                interview_type.lower() in ("video", "phone") and not meeting_link
             )
 
             # Create event via calendar service
             logger.info(
                 f"Creating {calendar_provider} calendar event: "
-                f"title='{event.title}', "
-                f"start={event.start_time}, "
-                f"attendees={len(event.attendees)}"
+                f"title='{title}', "
+                f"start={start_time}, "
+                f"attendees={len(attendees)}, "
+                f"auto_conference={auto_generate_conference}"
             )
 
-            created_event = calendar_service.create_event(event)
+            created_event = calendar_service.create_event(
+                title=title,
+                start_time=start_time,
+                end_time=end_time,
+                description=description,
+                location=location,
+                attendees=attendees,
+                meeting_link=meeting_link,
+                auto_generate_conference=auto_generate_conference,
+            )
+
+            # Update the interview record with the calendar event ID and meeting link
+            from backend.models.interview import Interview
+            from uuid import UUID
+
+            interview = db.query(Interview).filter(
+                Interview.id == UUID(interview_id)
+            ).first()
+
+            if interview:
+                interview.calendar_event_id = created_event.event_id
+                interview.calendar_provider = calendar_provider
+
+                # Save auto-generated meeting link if one was created
+                if created_event.meeting_link and not interview.meeting_link:
+                    interview.meeting_link = created_event.meeting_link
+                    logger.info(
+                        f"Auto-generated meeting link saved to interview: {created_event.meeting_link}"
+                    )
+
+                db.commit()
+                logger.info(
+                    f"Updated interview {interview_id} with calendar_event_id={created_event.event_id}"
+                )
+            else:
+                logger.warning(
+                    f"Interview {interview_id} not found - could not update calendar_event_id"
+                )
 
             # Log success details
             processing_time = int((time.time() - start_time) * 1000)
 
             logger.info(
                 f"Calendar event created successfully: "
-                f"event_id={created_event.id}, "
+                f"event_id={created_event.event_id}, "
                 f"provider={calendar_provider}, "
                 f"interview_id={interview_id}, "
                 f"processing_time={processing_time}ms"
@@ -176,9 +227,9 @@ def create_calendar_event(
                 "interview_id": interview_id,
                 "status": "created",
                 "provider": calendar_provider,
-                "event_id": created_event.id,
-                "event_url": created_event.html_link,
-                "attendees_invited": len(event.attendees),
+                "event_id": created_event.event_id,
+                "event_url": getattr(created_event, 'html_link', None),
+                "attendees_invited": len(attendees),
                 "created_at": time.time(),
                 "processing_time_ms": processing_time,
             }
@@ -310,17 +361,26 @@ def update_calendar_event(
                 provider=calendar_provider,
                 access_token=calendar_connection.access_token,
                 refresh_token=calendar_connection.refresh_token,
+                token_expires_at=calendar_connection.token_expires_at,
+                calendar_email=calendar_connection.calendar_email,
+                calendar_id=calendar_connection.calendar_id,
             )
 
-            # Build updated event
-            event = CalendarEvent(
-                id=event_id,
-                title=event_details.get("title"),
-                start_time=event_details.get("start_time"),
-                end_time=event_details.get("end_time"),
-                description=event_details.get("description"),
-                location=event_details.get("location"),
-                attendees=event_details.get("attendees", []),
+            # Parse datetime strings if needed
+            from datetime import datetime
+
+            start_time = None
+            end_time = None
+            if event_details.get("start_time"):
+                start_time = datetime.fromisoformat(event_details["start_time"].replace('Z', '+00:00'))
+            if event_details.get("end_time"):
+                end_time = datetime.fromisoformat(event_details["end_time"].replace('Z', '+00:00'))
+
+            # Determine if we should auto-generate conference link
+            interview_type = event_details.get("interview_type", "")
+            meeting_link = event_details.get("meeting_link")
+            auto_generate_conference = (
+                interview_type.lower() in ("video", "phone") and not meeting_link
             )
 
             # Track which fields were updated
@@ -331,10 +391,36 @@ def update_calendar_event(
 
             logger.info(
                 f"Updating {calendar_provider} calendar event {event_id}: "
-                f"fields={updated_fields}"
+                f"fields={updated_fields}, auto_conference={auto_generate_conference}"
             )
 
-            updated_event = calendar_service.update_event(event_id, event)
+            updated_event = calendar_service.update_event(
+                event_id=event_id,
+                title=event_details.get("title"),
+                start_time=start_time,
+                end_time=end_time,
+                description=event_details.get("description"),
+                location=event_details.get("location"),
+                attendees=event_details.get("attendees"),
+                meeting_link=meeting_link,
+                auto_generate_conference=auto_generate_conference,
+            )
+
+            # Save auto-generated meeting link back to interview if one was created
+            if auto_generate_conference and updated_event.meeting_link:
+                from backend.models.interview import Interview
+                from uuid import UUID
+
+                interview = db.query(Interview).filter(
+                    Interview.id == UUID(interview_id)
+                ).first()
+
+                if interview and not interview.meeting_link:
+                    interview.meeting_link = updated_event.meeting_link
+                    db.commit()
+                    logger.info(
+                        f"Auto-generated meeting link saved to interview during update: {updated_event.meeting_link}"
+                    )
 
             processing_time = int((time.time() - start_time) * 1000)
 
@@ -477,6 +563,9 @@ def delete_calendar_event(
                 provider=calendar_provider,
                 access_token=calendar_connection.access_token,
                 refresh_token=calendar_connection.refresh_token,
+                token_expires_at=calendar_connection.token_expires_at,
+                calendar_email=calendar_connection.calendar_email,
+                calendar_id=calendar_connection.calendar_id,
             )
 
             logger.info(f"Deleting {calendar_provider} calendar event {event_id}")

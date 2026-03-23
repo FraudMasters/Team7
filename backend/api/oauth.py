@@ -1,908 +1,797 @@
 """
-OAuth 2.0 endpoints for social authentication integration.
+OAuth 2.0 endpoints for calendar integrations.
 
-This module provides endpoints for OAuth 2.0 SSO integration with identity
-providers such as Google, GitHub, LinkedIn, and Microsoft. It handles OAuth
-authorization flow, provider configuration management, and callback handling.
+This module provides endpoints for:
+- OAuth 2.0 authentication with Google Calendar
+- OAuth 2.0 authentication with Outlook Calendar
+- Token exchange and storage
+- State management for CSRF protection
+
+Supports seamless integration with external calendar providers for
+interview scheduling and availability management.
 """
 import logging
-from typing import Dict, List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+import secrets
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
+from urllib.parse import urlencode
 from uuid import UUID
 
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse, JSONResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from database import get_db
-from models.oauth_provider import OAuthProvider
-from services.oauth_service import get_oauth_service, GoogleProvider, LinkedInProvider, GitHubProvider
+from models.calendar_connection import CalendarConnection, CalendarProvider, ConnectionStatus
+from models.recruiter import Recruiter
+from utils.redis_client import cache_set, cache_get, cache_delete
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-class OAuthProviderItem(BaseModel):
-    """Single OAuth provider configuration item."""
+# OAuth endpoints for Google Calendar
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/calendar.events",
+]
 
-    id: str = Field(..., description="OAuth provider ID")
-    organization_id: Optional[str] = Field(None, description="Organization ID")
-    provider_name: str = Field(..., description="Human-readable provider name")
-    provider_type: str = Field(..., description="Provider type (google, github, linkedin, microsoft, generic_oauth)")
-    client_id: str = Field(..., description="OAuth client ID")
-    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
-    token_url: str = Field(..., description="OAuth token endpoint URL")
-    userinfo_url: str = Field(..., description="OAuth userinfo endpoint URL")
-    scopes: str = Field(..., description="Space-separated list of OAuth scopes")
-    redirect_uri: str = Field(..., description="OAuth redirect URI")
-    attribute_mapping_email: str = Field(..., description="User profile attribute for email")
-    attribute_mapping_name: str = Field(..., description="User profile attribute for display name")
-    attribute_mapping_first_name: Optional[str] = Field(None, description="User profile attribute for first name")
-    attribute_mapping_last_name: Optional[str] = Field(None, description="User profile attribute for last name")
-    attribute_mapping_picture: Optional[str] = Field(None, description="User profile attribute for picture")
-    is_enabled: bool = Field(..., description="Whether this OAuth configuration is active")
-    is_default: bool = Field(..., description="Whether this is the default OAuth provider")
-    created_at: str = Field(..., description="When the configuration was created")
-    updated_at: str = Field(..., description="When the configuration was last updated")
+# OAuth endpoints for Outlook Calendar
+OUTLOOK_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+OUTLOOK_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+OUTLOOK_SCOPES = [
+    "https://graph.microsoft.com/Calendars.ReadWrite",
+    "https://graph.microsoft.com/User.Read",
+]
 
 
-class OAuthProvidersResponse(BaseModel):
-    """Response model for OAuth providers list."""
-
-    providers: List[OAuthProviderItem] = Field(..., description="List of OAuth providers")
-    total_count: int = Field(..., description="Total number of providers")
-
-
-class OAuthAuthorizeRequest(BaseModel):
-    """Request model for initiating OAuth login."""
-
-    provider_id: Optional[str] = Field(None, description="OAuth provider ID to use (optional if using provider_type)")
-    provider_type: Optional[str] = Field(None, description="Provider type shorthand (google, github, linkedin)")
-    use_pkce: bool = Field(default=False, description="Whether to use PKCE for enhanced security")
-    redirect_uri: Optional[str] = Field(None, description="Optional custom redirect URI")
-
-
-class OAuthAuthorizeResponse(BaseModel):
-    """Response model for OAuth authorization initiation."""
-
-    authorization_url: str = Field(..., description="URL to redirect user to provider for authentication")
-    state: str = Field(..., description="CSRF state token (must be validated in callback)")
-    provider_id: str = Field(..., description="OAuth provider ID being used")
-    provider_type: str = Field(..., description="Provider type being used")
-    code_verifier: Optional[str] = Field(None, description="PKCE code verifier (if PKCE is enabled)")
-
-
+# Request/Response Models
 class OAuthCallbackRequest(BaseModel):
-    """Request model for OAuth callback."""
+    """Request model for OAuth callback processing."""
 
     code: str = Field(..., description="Authorization code from OAuth provider")
-    state: str = Field(..., description="CSRF state token from authorization request")
-    expected_state: str = Field(..., description="Expected state token from session")
-    provider_id: str = Field(..., description="OAuth provider ID to validate against")
-    code_verifier: Optional[str] = Field(None, description="PKCE code verifier (if PKCE was used)")
+    state: str = Field(..., description="State parameter for CSRF protection")
+    recruiter_id: str = Field(..., description="ID of the recruiter connecting calendar")
 
 
 class OAuthCallbackResponse(BaseModel):
-    """Response model for successful OAuth authentication."""
+    """Response model for OAuth callback processing."""
 
-    access_token: str = Field(..., description="OAuth access token")
-    token_type: str = Field(..., description="Token type (usually Bearer)")
-    expires_in: Optional[int] = Field(None, description="Token expiration time in seconds")
-    refresh_token: Optional[str] = Field(None, description="OAuth refresh token")
-    scope: Optional[str] = Field(None, description="Granted OAuth scopes")
-    user_profile: Dict = Field(..., description="User profile data from provider")
-    provider_id: str = Field(..., description="OAuth provider ID used for authentication")
+    success: bool = Field(..., description="Whether the callback was processed successfully")
+    message: str = Field(..., description="Status message")
+    connection_id: Optional[str] = Field(None, description="Calendar connection ID (if successful)")
+    provider: str = Field(..., description="Calendar provider (google or outlook)")
 
 
-class OAuthProviderCreate(BaseModel):
-    """Request model for creating OAuth provider configuration."""
+def _generate_state() -> str:
+    """
+    Generate a cryptographically secure random state parameter.
 
-    organization_id: Optional[str] = Field(None, description="Organization ID (null for system-wide)")
-    provider_name: str = Field(..., description="Human-readable provider name")
-    provider_type: str = Field(..., description="Provider type (google, github, linkedin, microsoft, generic_oauth)")
-    client_id: str = Field(..., description="OAuth client ID from the identity provider")
-    client_secret: str = Field(..., description="OAuth client secret")
-    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
-    token_url: str = Field(..., description="OAuth token endpoint URL")
-    userinfo_url: str = Field(..., description="OAuth userinfo endpoint URL")
-    scopes: str = Field(default="openid profile email", description="Space-separated list of OAuth scopes")
-    redirect_uri: str = Field(..., description="OAuth redirect URI configured in the provider")
-    attribute_mapping_email: str = Field(default="email", description="User profile attribute for email")
-    attribute_mapping_name: str = Field(default="name", description="User profile attribute for display name")
-    attribute_mapping_first_name: Optional[str] = Field(default="given_name", description="User profile attribute for first name")
-    attribute_mapping_last_name: Optional[str] = Field(default="family_name", description="User profile attribute for last name")
-    attribute_mapping_picture: Optional[str] = Field(default="picture", description="User profile attribute for picture")
-    is_enabled: bool = Field(default=True, description="Whether this OAuth configuration is active")
-    is_default: bool = Field(default=False, description="Whether this is the default OAuth provider")
+    State parameters are used in OAuth 2.0 to prevent CSRF attacks.
+
+    Returns:
+        A URL-safe random string suitable for use as OAuth state
+    """
+    state = secrets.token_urlsafe(32)
+    logger.debug("Generated OAuth state parameter")
+    return state
 
 
-class OAuthProviderUpdate(BaseModel):
-    """Request model for updating OAuth provider configuration."""
+def _build_google_auth_url(state: str, redirect_uri: str) -> str:
+    """
+    Build Google OAuth authorization URL.
 
-    provider_name: Optional[str] = Field(None, description="Human-readable provider name")
-    client_id: Optional[str] = Field(None, description="OAuth client ID")
-    client_secret: Optional[str] = Field(None, description="OAuth client secret")
-    authorization_url: Optional[str] = Field(None, description="OAuth authorization endpoint URL")
-    token_url: Optional[str] = Field(None, description="OAuth token endpoint URL")
-    userinfo_url: Optional[str] = Field(None, description="OAuth userinfo endpoint URL")
-    scopes: Optional[str] = Field(None, description="Space-separated list of OAuth scopes")
-    redirect_uri: Optional[str] = Field(None, description="OAuth redirect URI")
-    attribute_mapping_email: Optional[str] = Field(None, description="User profile attribute for email")
-    attribute_mapping_name: Optional[str] = Field(None, description="User profile attribute for display name")
-    attribute_mapping_first_name: Optional[str] = Field(None, description="User profile attribute for first name")
-    attribute_mapping_last_name: Optional[str] = Field(None, description="User profile attribute for last name")
-    attribute_mapping_picture: Optional[str] = Field(None, description="User profile attribute for picture")
-    is_enabled: Optional[bool] = Field(None, description="Whether this OAuth configuration is active")
-    is_default: Optional[bool] = Field(None, description="Whether this is the default OAuth provider")
+    Args:
+        state: State parameter for CSRF protection
+        redirect_uri: OAuth redirect URI
+
+    Returns:
+        Complete Google authorization URL
+    """
+    params = {
+        "client_id": "YOUR_GOOGLE_CLIENT_ID",  # TODO: Replace with settings value
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(GOOGLE_SCOPES),
+        "state": state,
+        "access_type": "offline",  # Request refresh token
+        "prompt": "consent",  # Force consent screen to get refresh token
+    }
+    return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+
+
+def _build_outlook_auth_url(state: str, redirect_uri: str) -> str:
+    """
+    Build Outlook/Microsoft OAuth authorization URL.
+
+    Args:
+        state: State parameter for CSRF protection
+        redirect_uri: OAuth redirect URI
+
+    Returns:
+        Complete Outlook authorization URL
+    """
+    params = {
+        "client_id": "YOUR_OUTLOOK_CLIENT_ID",  # TODO: Replace with settings value
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(OUTLOOK_SCOPES),
+        "state": state,
+        "response_mode": "query",
+    }
+    return f"{OUTLOOK_AUTH_URL}?{urlencode(params)}"
+
+
+async def _exchange_google_code_for_token(code: str, redirect_uri: str) -> Dict[str, Any]:
+    """
+    Exchange Google authorization code for access token.
+
+    Args:
+        code: Authorization code from Google
+        redirect_uri: OAuth redirect URI (must match authorization request)
+
+    Returns:
+        Dictionary containing access_token, refresh_token, expires_in
+
+    Raises:
+        HTTPException: If token exchange fails
+    """
+    data = {
+        "code": code,
+        "client_id": "YOUR_GOOGLE_CLIENT_ID",  # TODO: Replace with settings value
+        "client_secret": "YOUR_GOOGLE_CLIENT_SECRET",  # TODO: Replace with settings value
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+
+    logger.info("Exchanging Google authorization code for access token")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                GOOGLE_TOKEN_URL,
+                data=data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+            )
+            response.raise_for_status()
+            token_data = response.json()
+
+            if "access_token" not in token_data:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Token response missing access_token",
+                )
+
+            logger.info("Successfully exchanged Google authorization code for access token")
+            return token_data
+
+    except httpx.HTTPStatusError as e:
+        error_response = e.response.text
+        logger.error(f"Google token exchange failed: {error_response}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to exchange authorization code: {error_response}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error during Google token exchange: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error during token exchange: {str(e)}",
+        ) from e
+
+
+async def _exchange_outlook_code_for_token(code: str, redirect_uri: str) -> Dict[str, Any]:
+    """
+    Exchange Outlook authorization code for access token.
+
+    Args:
+        code: Authorization code from Outlook
+        redirect_uri: OAuth redirect URI (must match authorization request)
+
+    Returns:
+        Dictionary containing access_token, refresh_token, expires_in
+
+    Raises:
+        HTTPException: If token exchange fails
+    """
+    data = {
+        "code": code,
+        "client_id": "YOUR_OUTLOOK_CLIENT_ID",  # TODO: Replace with settings value
+        "client_secret": "YOUR_OUTLOOK_CLIENT_SECRET",  # TODO: Replace with settings value
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+
+    logger.info("Exchanging Outlook authorization code for access token")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                OUTLOOK_TOKEN_URL,
+                data=data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+            )
+            response.raise_for_status()
+            token_data = response.json()
+
+            if "access_token" not in token_data:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Token response missing access_token",
+                )
+
+            logger.info("Successfully exchanged Outlook authorization code for access token")
+            return token_data
+
+    except httpx.HTTPStatusError as e:
+        error_response = e.response.text
+        logger.error(f"Outlook token exchange failed: {error_response}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to exchange authorization code: {error_response}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error during Outlook token exchange: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error during token exchange: {str(e)}",
+        ) from e
+
+
+async def _get_google_user_email(access_token: str) -> str:
+    """
+    Fetch user's email address from Google UserInfo API.
+
+    Args:
+        access_token: Google OAuth access token
+
+    Returns:
+        User's email address
+
+    Raises:
+        HTTPException: If API call fails
+    """
+    logger.info("Fetching user email from Google UserInfo API")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            response.raise_for_status()
+            user_info = response.json()
+
+            if "email" not in user_info:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="User info response missing email",
+                )
+
+            logger.info(f"Successfully fetched Google user email: {user_info['email']}")
+            return user_info["email"]
+
+    except httpx.HTTPStatusError as e:
+        error_response = e.response.text
+        logger.error(f"Failed to fetch Google user email: {error_response}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch user email: {error_response}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error fetching Google user email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error fetching user email: {str(e)}",
+        ) from e
+
+
+async def _get_outlook_user_email(access_token: str) -> str:
+    """
+    Fetch user's email address from Microsoft Graph API.
+
+    Args:
+        access_token: Microsoft OAuth access token
+
+    Returns:
+        User's email address
+
+    Raises:
+        HTTPException: If API call fails
+    """
+    logger.info("Fetching user email from Microsoft Graph API")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://graph.microsoft.com/v1.0/me",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            response.raise_for_status()
+            user_info = response.json()
+
+            # Microsoft returns either 'mail' or 'userPrincipalName'
+            email = user_info.get("mail") or user_info.get("userPrincipalName")
+
+            if not email:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="User info response missing email",
+                )
+
+            logger.info(f"Successfully fetched Outlook user email: {email}")
+            return email
+
+    except httpx.HTTPStatusError as e:
+        error_response = e.response.text
+        logger.error(f"Failed to fetch Outlook user email: {error_response}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch user email: {error_response}",
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error fetching Outlook user email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error fetching user email: {str(e)}",
+        ) from e
 
 
 @router.get(
-    "/providers",
-    response_model=OAuthProvidersResponse,
-    tags=["OAuth"],
+    "/google/authorize",
+    response_class=RedirectResponse,
+    tags=["OAuth", "Calendar"],
 )
-async def get_oauth_providers(
-    organization_id: Optional[str] = Query(None, description="Filter by organization ID"),
-    provider_type: Optional[str] = Query(None, description="Filter by provider type"),
-    is_enabled: Optional[bool] = Query(None, description="Filter by enabled status"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of providers to return"),
-    offset: int = Query(0, ge=0, description="Number of providers to skip for pagination"),
+async def google_authorize(
+    request: Request,
+    recruiter_id: str = Query(..., description="ID of the recruiter connecting calendar"),
+) -> RedirectResponse:
+    """
+    Initiate Google Calendar OAuth 2.0 authorization flow.
+
+    This endpoint generates a Google authorization URL and redirects the user
+    to Google's consent screen to grant calendar access permissions.
+
+    Args:
+        request: FastAPI request object
+        recruiter_id: ID of the recruiter connecting their calendar
+
+    Returns:
+        Redirect response to Google authorization URL
+
+    Raises:
+        HTTPException(400): If recruiter_id is invalid
+        HTTPException(404): If recruiter not found
+        HTTPException(500): If OAuth URL generation fails
+
+    Examples:
+        >>> # User clicks "Connect Google Calendar" button
+        >>> # Frontend redirects to:
+        >>> # GET /api/oauth/google/authorize?recruiter_id=uuid-here
+        >>> # User is redirected to Google consent screen
+        >>> # After authorization, Google redirects back to callback URL
+    """
+    try:
+        logger.info(f"Initiating Google Calendar OAuth for recruiter {recruiter_id}")
+
+        # Generate state for CSRF protection
+        state = _generate_state()
+
+        # Store state in Redis with recruiter_id for verification
+        state_key = f"oauth_state:{state}"
+        await cache_set(
+            key=state_key,
+            value={"recruiter_id": recruiter_id, "provider": "google"},
+            ttl_seconds=600,  # 10 minutes
+        )
+
+        # Build redirect URI (using request to get base URL)
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/oauth/google/callback"
+
+        # Build authorization URL
+        auth_url = _build_google_auth_url(state, redirect_uri)
+
+        logger.info(f"Redirecting to Google OAuth authorization URL for recruiter {recruiter_id}")
+
+        # Return 307 redirect to Google authorization page
+        return RedirectResponse(url=auth_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initiating Google OAuth: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate Google Calendar authorization: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/outlook/authorize",
+    response_class=RedirectResponse,
+    tags=["OAuth", "Calendar"],
+)
+async def outlook_authorize(
+    request: Request,
+    recruiter_id: str = Query(..., description="ID of the recruiter connecting calendar"),
+) -> RedirectResponse:
+    """
+    Initiate Outlook Calendar OAuth 2.0 authorization flow.
+
+    This endpoint generates an Outlook authorization URL and redirects the user
+    to Microsoft's consent screen to grant calendar access permissions.
+
+    Args:
+        request: FastAPI request object
+        recruiter_id: ID of the recruiter connecting their calendar
+
+    Returns:
+        Redirect response to Outlook authorization URL
+
+    Raises:
+        HTTPException(400): If recruiter_id is invalid
+        HTTPException(404): If recruiter not found
+        HTTPException(500): If OAuth URL generation fails
+
+    Examples:
+        >>> # User clicks "Connect Outlook Calendar" button
+        >>> # Frontend redirects to:
+        >>> # GET /api/oauth/outlook/authorize?recruiter_id=uuid-here
+        >>> # User is redirected to Microsoft consent screen
+        >>> # After authorization, Microsoft redirects back to callback URL
+    """
+    try:
+        logger.info(f"Initiating Outlook Calendar OAuth for recruiter {recruiter_id}")
+
+        # Generate state for CSRF protection
+        state = _generate_state()
+
+        # Store state in Redis with recruiter_id for verification
+        state_key = f"oauth_state:{state}"
+        await cache_set(
+            key=state_key,
+            value={"recruiter_id": recruiter_id, "provider": "outlook"},
+            ttl_seconds=600,  # 10 minutes
+        )
+
+        # Build redirect URI (using request to get base URL)
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/oauth/outlook/callback"
+
+        # Build authorization URL
+        auth_url = _build_outlook_auth_url(state, redirect_uri)
+
+        logger.info(f"Redirecting to Outlook OAuth authorization URL for recruiter {recruiter_id}")
+
+        # Return 307 redirect to Outlook authorization page
+        return RedirectResponse(url=auth_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initiating Outlook OAuth: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate Outlook Calendar authorization: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/google/callback",
+    tags=["OAuth", "Calendar"],
+)
+async def google_callback(
+    request: Request,
+    code: str = Query(..., description="Authorization code from Google"),
+    state: str = Query(..., description="State parameter for CSRF protection"),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
-    Get OAuth providers with filtering options.
+    Handle Google OAuth 2.0 callback and create calendar connection.
 
-    This endpoint retrieves configured OAuth 2.0 providers. Providers can be filtered
-    by organization, provider type, or enabled status. Only enabled providers should
-    be used for authentication.
+    This endpoint is called by Google after the user grants permission.
+    It exchanges the authorization code for access tokens and creates
+    a calendar connection record.
 
     Args:
-        organization_id: Optional filter for specific organization
-        provider_type: Optional filter for provider type (google, github, linkedin, microsoft, generic_oauth)
-        is_enabled: Optional filter for enabled status
-        limit: Maximum number of providers to return (default: 100, max: 1000)
-        offset: Number of providers to skip for pagination (default: 0)
+        request: FastAPI request object
+        code: Authorization code from Google
+        state: State parameter for CSRF verification
         db: Database session
 
     Returns:
-        JSON response with list of OAuth providers and total count
+        JSON response with connection status
 
     Raises:
-        HTTPException(400): If provider_type is invalid
-        HTTPException(400): If organization_id format is invalid
-        HTTPException(500): If data retrieval fails
-
-    Examples:
-        >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/oauth/providers")
-        >>> response.json()
-        {
-            "providers": [
-                {
-                    "id": "oauth-1",
-                    "organization_id": "org-1",
-                    "provider_name": "Google OAuth",
-                    "provider_type": "google",
-                    "client_id": "client-id",
-                    "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
-                    "token_url": "https://oauth2.googleapis.com/token",
-                    "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
-                    "scopes": "openid email profile",
-                    "redirect_uri": "http://localhost:8000/api/oauth/callback",
-                    "is_enabled": true,
-                    "is_default": true,
-                    "created_at": "2026-01-31T10:30:00Z",
-                    "updated_at": "2026-01-31T10:30:00Z"
-                }
-            ],
-            "total_count": 1
-        }
+        HTTPException(400): If state verification fails or code is invalid
+        HTTPException(500): If token exchange or database operation fails
     """
     try:
-        logger.info(
-            f"Fetching OAuth providers - organization_id: {organization_id}, "
-            f"provider_type: {provider_type}, is_enabled: {is_enabled}"
-        )
+        logger.info("Processing Google OAuth callback")
 
-        # Validate provider_type
-        valid_types = ["google", "github", "linkedin", "microsoft", "generic_oauth"]
-        if provider_type and provider_type not in valid_types:
+        # Verify state to prevent CSRF attacks
+        state_key = f"oauth_state:{state}"
+        state_data = await cache_get(state_key)
+        if not state_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid provider_type. Must be one of: {', '.join(valid_types)}"
+                detail="Invalid or expired state parameter",
+            )
+        # Delete state to prevent replay attacks
+        await cache_delete(state_key)
+
+        recruiter_id = state_data.get("recruiter_id")
+        if not recruiter_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing recruiter_id in state data",
             )
 
-        # Build query
-        query = select(OAuthProvider)
+        # Build redirect URI for token exchange
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/oauth/google/callback"
 
-        # Apply filters
-        if organization_id:
-            try:
-                org_uuid = UUID(organization_id)
-                query = query.where(OAuthProvider.organization_id == org_uuid)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid organization_id format (must be UUID)"
-                )
+        # Exchange code for tokens
+        token_data = await _exchange_google_code_for_token(code, redirect_uri)
 
-        if provider_type:
-            query = query.where(OAuthProvider.provider_type == provider_type)
+        # Calculate token expiration
+        expires_in = token_data.get("expires_in", 3600)
+        token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
-        if is_enabled is not None:
-            query = query.where(OAuthProvider.is_enabled == is_enabled)
+        # Get calendar email from Google UserInfo API
+        calendar_email = await _get_google_user_email(token_data["access_token"])
 
-        # Get total count
-        count_query = query
-        count_result = await db.execute(count_query)
-        total_count = len(count_result.scalars().all())
-
-        # Apply pagination
-        query = query.offset(offset).limit(limit)
-
-        # Execute query
-        result = await db.execute(query)
-        providers = result.scalars().all()
-
-        # Format response
-        provider_items = [
-            OAuthProviderItem(
-                id=str(provider.id),
-                organization_id=str(provider.organization_id) if provider.organization_id else None,
-                provider_name=provider.provider_name,
-                provider_type=provider.provider_type,
-                client_id=provider.client_id,
-                authorization_url=provider.authorization_url,
-                token_url=provider.token_url,
-                userinfo_url=provider.userinfo_url,
-                scopes=provider.scopes,
-                redirect_uri=provider.redirect_uri,
-                attribute_mapping_email=provider.attribute_mapping_email,
-                attribute_mapping_name=provider.attribute_mapping_name,
-                attribute_mapping_first_name=provider.attribute_mapping_first_name,
-                attribute_mapping_last_name=provider.attribute_mapping_last_name,
-                attribute_mapping_picture=provider.attribute_mapping_picture,
-                is_enabled=provider.is_enabled,
-                is_default=provider.is_default,
-                created_at=provider.created_at.isoformat(),
-                updated_at=provider.updated_at.isoformat(),
+        # Parse and validate recruiter ID
+        try:
+            recruiter_uuid = UUID(recruiter_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid recruiter_id: {recruiter_id}",
             )
-            for provider in providers
-        ]
 
-        logger.info(f"Found {len(provider_items)} OAuth providers (total: {total_count})")
+        # Verify recruiter exists
+        recruiter_query = select(Recruiter).where(Recruiter.id == recruiter_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "providers": [item.model_dump() for item in provider_items],
-                "total_count": total_count,
-            }
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to fetch OAuth providers: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch OAuth providers"
-        )
-
-
-@router.get(
-    "/{provider}/authorize",
-    response_model=OAuthAuthorizeResponse,
-    tags=["OAuth"],
-)
-async def get_oauth_authorization_url(
-    provider: str,
-    redirect_uri: Optional[str] = Query(None, description="Optional custom redirect URI"),
-    use_pkce: bool = Query(False, description="Whether to use PKCE for enhanced security"),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """
-    Generate OAuth authorization URL for user redirection.
-
-    This endpoint generates an authorization URL for the specified OAuth provider.
-    The user should be redirected to this URL to authenticate with the provider.
-    The provider will then redirect back to the callback endpoint with an authorization code.
-
-    Args:
-        provider: Provider type (google, github, linkedin, microsoft) or provider ID
-        redirect_uri: Optional custom redirect URI (overrides provider config)
-        use_pkce: Whether to use PKCE for enhanced security (recommended for public clients)
-        db: Database session
-
-    Returns:
-        JSON response with authorization URL, state token, and provider details
-
-    Raises:
-        HTTPException(404): If provider is not found or not enabled
-        HTTPException(500): If URL generation fails
-
-    Examples:
-        >>> import requests
-        >>> response = requests.get("http://localhost:8000/api/oauth/google/authorize")
-        >>> response.json()
-        {
-            "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...",
-            "state": "random-state-token",
-            "provider_id": "oauth-1",
-            "provider_type": "google",
-            "code_verifier": null
-        }
-    """
-    try:
-        logger.info(f"Generating OAuth authorization URL for provider: {provider}")
-
-        # Try to find provider by type first, then by ID
-        query = select(OAuthProvider).where(OAuthProvider.is_enabled == True)
-
-        # Check if provider is a known type
-        if provider.lower() in ["google", "github", "linkedin", "microsoft"]:
-            query = query.where(OAuthProvider.provider_type == provider.lower())
-            query = query.where(OAuthProvider.is_default == True)
-        else:
-            # Try to find by ID
-            try:
-                provider_uuid = UUID(provider)
-                query = query.where(OAuthProvider.id == provider_uuid)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Provider '{provider}' not found (must be a valid type or UUID)"
-                )
-
-        result = await db.execute(query)
-        provider_config = result.scalar_one_or_none()
-
-        if not provider_config:
+        if not recruiter:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"OAuth provider '{provider}' not found or not enabled"
+                detail=f"Recruiter not found: {recruiter_id}",
             )
 
-        # Get OAuth service
-        oauth_service = get_oauth_service()
+        # Check for existing connection
+        existing_query = select(CalendarConnection).where(
+            and_(
+                CalendarConnection.recruiter_id == recruiter_uuid,
+                CalendarConnection.provider == CalendarProvider.GOOGLE
+            )
+        )
+        existing_result = await db.execute(existing_query)
+        existing_connection = existing_result.scalar_one_or_none()
 
-        # Initialize provider based on type
-        provider_class = None
-        if provider_config.provider_type == "google":
-            provider_class = GoogleProvider
-        elif provider_config.provider_type == "github":
-            provider_class = GitHubProvider
-        elif provider_config.provider_type == "linkedin":
-            provider_class = LinkedInProvider
+        if existing_connection:
+            # Update existing connection
+            logger.info(f"Updating existing Google Calendar connection for recruiter {recruiter_id}")
+            existing_connection.access_token = token_data["access_token"]
+            existing_connection.refresh_token = token_data.get("refresh_token", "")
+            existing_connection.token_expires_at = token_expires_at
+            existing_connection.calendar_email = calendar_email
+            existing_connection.status = ConnectionStatus.ACTIVE
+            existing_connection.error_message = None
+
+            await db.commit()
+            await db.refresh(existing_connection)
+
+            connection_id = str(existing_connection.id)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=f"Provider type '{provider_config.provider_type}' not yet implemented"
+            # Create new connection
+            logger.info(f"Creating new Google Calendar connection for recruiter {recruiter_id}")
+            connection = CalendarConnection(
+                recruiter_id=recruiter_uuid,
+                provider=CalendarProvider.GOOGLE,
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token", ""),
+                token_expires_at=token_expires_at,
+                calendar_email=calendar_email,
+                status=ConnectionStatus.ACTIVE,
             )
 
-        # Create provider instance
-        provider_instance = provider_class(
-            client_id=provider_config.client_id,
-            client_secret=provider_config.client_secret,
-            redirect_uri=redirect_uri or provider_config.redirect_uri,
-            scopes=provider_config.scopes.split() if provider_config.scopes else None,
-        )
+            db.add(connection)
+            await db.commit()
+            await db.refresh(connection)
 
-        # Generate authorization URL
-        auth_data = provider_instance.get_authorization_url(use_pkce=use_pkce)
+            connection_id = str(connection.id)
 
-        logger.info(
-            f"Generated authorization URL for {provider_config.provider_type} "
-            f"(provider_id={provider_config.id})"
-        )
+        logger.info(f"Google Calendar connection created/updated for recruiter {recruiter_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
-                "authorization_url": auth_data["url"],
-                "state": auth_data["state"],
-                "provider_id": str(provider_config.id),
-                "provider_type": provider_config.provider_type,
-                "code_verifier": auth_data.get("code_verifier"),
-            }
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to generate OAuth authorization URL: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate OAuth authorization URL"
-        )
-
-
-@router.post(
-    "/callback",
-    response_model=OAuthCallbackResponse,
-    tags=["OAuth"],
-)
-async def handle_oauth_callback(
-    request: OAuthCallbackRequest,
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """
-    Handle OAuth callback after user authorization.
-
-    This endpoint processes the OAuth callback after the user has authenticated
-    with the provider. It validates the state token, exchanges the authorization
-    code for an access token, and fetches the user profile.
-
-    Args:
-        request: OAuth callback request with code, state, and provider info
-        db: Database session
-
-    Returns:
-        JSON response with access token, user profile, and provider details
-
-    Raises:
-        HTTPException(400): If state validation fails or parameters are invalid
-        HTTPException(404): If provider is not found
-        HTTPException(401): If token exchange fails
-        HTTPException(500): If processing fails
-
-    Examples:
-        >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/oauth/callback", json={
-        ...     "code": "auth-code",
-        ...     "state": "received-state",
-        ...     "expected_state": "expected-state",
-        ...     "provider_id": "oauth-1"
-        ... })
-        >>> response.json()
-        {
-            "access_token": "ya29...",
-            "token_type": "Bearer",
-            "expires_in": 3600,
-            "user_profile": {
-                "id": "123",
-                "email": "user@example.com",
-                "name": "John Doe"
+                "success": True,
+                "message": "Google Calendar connected successfully",
+                "provider": "google",
+                "connection_id": connection_id,
             },
-            "provider_id": "oauth-1"
-        }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing Google OAuth callback: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process Google Calendar callback: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/outlook/callback",
+    tags=["OAuth", "Calendar"],
+)
+async def outlook_callback(
+    request: Request,
+    code: str = Query(..., description="Authorization code from Outlook"),
+    state: str = Query(..., description="State parameter for CSRF protection"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Handle Outlook OAuth 2.0 callback and create calendar connection.
+
+    This endpoint is called by Microsoft after the user grants permission.
+    It exchanges the authorization code for access tokens and creates
+    a calendar connection record.
+
+    Args:
+        request: FastAPI request object
+        code: Authorization code from Outlook
+        state: State parameter for CSRF verification
+        db: Database session
+
+    Returns:
+        JSON response with connection status
+
+    Raises:
+        HTTPException(400): If state verification fails or code is invalid
+        HTTPException(500): If token exchange or database operation fails
     """
     try:
-        logger.info(f"Processing OAuth callback for provider: {request.provider_id}")
+        logger.info("Processing Outlook OAuth callback")
 
-        # Validate required fields
-        if not request.code:
+        # Verify state to prevent CSRF attacks
+        state_key = f"oauth_state:{state}"
+        state_data = await cache_get(state_key)
+        if not state_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing authorization code"
+                detail="Invalid or expired state parameter",
             )
+        # Delete state to prevent replay attacks
+        await cache_delete(state_key)
 
-        if not request.state or not request.expected_state:
+        recruiter_id = state_data.get("recruiter_id")
+        if not recruiter_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing state parameter"
+                detail="Missing recruiter_id in state data",
             )
 
-        # Validate state (CSRF protection)
-        if request.state != request.expected_state:
-            logger.warning(
-                f"OAuth state mismatch - received: {request.state[:8]}..., "
-                f"expected: {request.expected_state[:8]}..."
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="State parameter mismatch (possible CSRF attack)"
-            )
+        # Build redirect URI for token exchange
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/oauth/outlook/callback"
 
-        # Find provider by ID
+        # Exchange code for tokens
+        token_data = await _exchange_outlook_code_for_token(code, redirect_uri)
+
+        # Calculate token expiration
+        expires_in = token_data.get("expires_in", 3600)
+        token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+        # Get calendar email from Microsoft Graph API
+        calendar_email = await _get_outlook_user_email(token_data["access_token"])
+
+        # Parse and validate recruiter ID
         try:
-            provider_uuid = UUID(request.provider_id)
+            recruiter_uuid = UUID(recruiter_id)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid provider_id format (must be UUID)"
+                detail=f"Invalid recruiter_id: {recruiter_id}",
             )
 
-        query = select(OAuthProvider).where(
-            OAuthProvider.id == provider_uuid,
-            OAuthProvider.is_enabled == True
-        )
-        result = await db.execute(query)
-        provider_config = result.scalar_one_or_none()
+        # Verify recruiter exists
+        recruiter_query = select(Recruiter).where(Recruiter.id == recruiter_uuid)
+        recruiter_result = await db.execute(recruiter_query)
+        recruiter = recruiter_result.scalar_one_or_none()
 
-        if not provider_config:
+        if not recruiter:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"OAuth provider '{request.provider_id}' not found or not enabled"
+                detail=f"Recruiter not found: {recruiter_id}",
             )
 
-        # Initialize provider based on type
-        provider_class = None
-        if provider_config.provider_type == "google":
-            provider_class = GoogleProvider
-        elif provider_config.provider_type == "github":
-            provider_class = GitHubProvider
-        elif provider_config.provider_type == "linkedin":
-            provider_class = LinkedInProvider
+        # Check for existing connection
+        existing_query = select(CalendarConnection).where(
+            and_(
+                CalendarConnection.recruiter_id == recruiter_uuid,
+                CalendarConnection.provider == CalendarProvider.OUTLOOK
+            )
+        )
+        existing_result = await db.execute(existing_query)
+        existing_connection = existing_result.scalar_one_or_none()
+
+        if existing_connection:
+            # Update existing connection
+            logger.info(f"Updating existing Outlook Calendar connection for recruiter {recruiter_id}")
+            existing_connection.access_token = token_data["access_token"]
+            existing_connection.refresh_token = token_data.get("refresh_token", "")
+            existing_connection.token_expires_at = token_expires_at
+            existing_connection.calendar_email = calendar_email
+            existing_connection.status = ConnectionStatus.ACTIVE
+            existing_connection.error_message = None
+
+            await db.commit()
+            await db.refresh(existing_connection)
+
+            connection_id = str(existing_connection.id)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=f"Provider type '{provider_config.provider_type}' not yet implemented"
+            # Create new connection
+            logger.info(f"Creating new Outlook Calendar connection for recruiter {recruiter_id}")
+            connection = CalendarConnection(
+                recruiter_id=recruiter_uuid,
+                provider=CalendarProvider.OUTLOOK,
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token", ""),
+                token_expires_at=token_expires_at,
+                calendar_email=calendar_email,
+                status=ConnectionStatus.ACTIVE,
             )
 
-        # Create provider instance
-        provider_instance = provider_class(
-            client_id=provider_config.client_id,
-            client_secret=provider_config.client_secret,
-            redirect_uri=provider_config.redirect_uri,
-            scopes=provider_config.scopes.split() if provider_config.scopes else None,
-        )
+            db.add(connection)
+            await db.commit()
+            await db.refresh(connection)
 
-        # Exchange code for token
-        try:
-            token_data = provider_instance.exchange_code_for_token(
-                code=request.code,
-                code_verifier=request.code_verifier,
-            )
-        except Exception as e:
-            logger.error(f"Token exchange failed: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Token exchange failed: {str(e)}"
-            )
+            connection_id = str(connection.id)
 
-        # Fetch user profile
-        try:
-            user_profile = provider_instance.get_user_profile(token_data["access_token"])
-        except Exception as e:
-            logger.error(f"Profile fetch failed: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Profile fetch failed: {str(e)}"
-            )
-
-        logger.info(
-            f"OAuth callback successful for {provider_config.provider_type} "
-            f"(user_email={user_profile.get('email')})"
-        )
+        logger.info(f"Outlook Calendar connection created/updated for recruiter {recruiter_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
-                "access_token": token_data["access_token"],
-                "token_type": token_data.get("token_type", "Bearer"),
-                "expires_in": token_data.get("expires_in"),
-                "refresh_token": token_data.get("refresh_token"),
-                "scope": token_data.get("scope"),
-                "user_profile": user_profile,
-                "provider_id": str(provider_config.id),
-            }
+                "success": True,
+                "message": "Outlook Calendar connected successfully",
+                "provider": "outlook",
+                "connection_id": connection_id,
+            },
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to process OAuth callback: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process OAuth callback"
-        )
-
-
-@router.post(
-    "/providers",
-    response_model=OAuthProviderItem,
-    tags=["OAuth"],
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_oauth_provider(
-    provider: OAuthProviderCreate,
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """
-    Create a new OAuth provider configuration.
-
-    This endpoint creates a new OAuth 2.0 provider configuration for an organization
-    or system-wide. Only one provider can be set as default per organization.
-
-    Args:
-        provider: OAuth provider configuration to create
-        db: Database session
-
-    Returns:
-        JSON response with created provider configuration
-
-    Raises:
-        HTTPException(400): If validation fails or default conflict
-        HTTPException(500): If creation fails
-
-    Examples:
-        >>> import requests
-        >>> response = requests.post("http://localhost:8000/api/oauth/providers", json={
-        ...     "provider_name": "Google OAuth",
-        ...     "provider_type": "google",
-        ...     "client_id": "client-id",
-        ...     "client_secret": "client-secret",
-        ...     "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
-        ...     "token_url": "https://oauth2.googleapis.com/token",
-        ...     "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
-        ...     "redirect_uri": "http://localhost:8000/api/oauth/callback",
-        ...     "is_default": true
-        ... })
-    """
-    try:
-        logger.info(f"Creating OAuth provider: {provider.provider_name} ({provider.provider_type})")
-
-        # Validate provider type
-        valid_types = ["google", "github", "linkedin", "microsoft", "generic_oauth"]
-        if provider.provider_type not in valid_types:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid provider_type. Must be one of: {', '.join(valid_types)}"
-            )
-
-        # If setting as default, unset other defaults for this organization
-        if provider.is_default:
-            query = select(OAuthProvider).where(
-                OAuthProvider.is_default == True,
-                OAuthProvider.provider_type == provider.provider_type
-            )
-            if provider.organization_id:
-                query = query.where(OAuthProvider.organization_id == UUID(provider.organization_id))
-            else:
-                query = query.where(OAuthProvider.organization_id.is_(None))
-
-            result = await db.execute(query)
-            existing_defaults = result.scalars().all()
-
-            for existing in existing_defaults:
-                existing.is_default = False
-                db.add(existing)
-
-        # Create new provider
-        new_provider = OAuthProvider(
-            organization_id=UUID(provider.organization_id) if provider.organization_id else None,
-            provider_name=provider.provider_name,
-            provider_type=provider.provider_type,
-            client_id=provider.client_id,
-            client_secret=provider.client_secret,
-            authorization_url=provider.authorization_url,
-            token_url=provider.token_url,
-            userinfo_url=provider.userinfo_url,
-            scopes=provider.scopes,
-            redirect_uri=provider.redirect_uri,
-            attribute_mapping_email=provider.attribute_mapping_email,
-            attribute_mapping_name=provider.attribute_mapping_name,
-            attribute_mapping_first_name=provider.attribute_mapping_first_name,
-            attribute_mapping_last_name=provider.attribute_mapping_last_name,
-            attribute_mapping_picture=provider.attribute_mapping_picture,
-            is_enabled=provider.is_enabled,
-            is_default=provider.is_default,
-        )
-
-        db.add(new_provider)
-        await db.commit()
-        await db.refresh(new_provider)
-
-        logger.info(f"Created OAuth provider: {new_provider.id}")
-
-        provider_item = OAuthProviderItem(
-            id=str(new_provider.id),
-            organization_id=str(new_provider.organization_id) if new_provider.organization_id else None,
-            provider_name=new_provider.provider_name,
-            provider_type=new_provider.provider_type,
-            client_id=new_provider.client_id,
-            authorization_url=new_provider.authorization_url,
-            token_url=new_provider.token_url,
-            userinfo_url=new_provider.userinfo_url,
-            scopes=new_provider.scopes,
-            redirect_uri=new_provider.redirect_uri,
-            attribute_mapping_email=new_provider.attribute_mapping_email,
-            attribute_mapping_name=new_provider.attribute_mapping_name,
-            attribute_mapping_first_name=new_provider.attribute_mapping_first_name,
-            attribute_mapping_last_name=new_provider.attribute_mapping_last_name,
-            attribute_mapping_picture=new_provider.attribute_mapping_picture,
-            is_enabled=new_provider.is_enabled,
-            is_default=new_provider.is_default,
-            created_at=new_provider.created_at.isoformat(),
-            updated_at=new_provider.updated_at.isoformat(),
-        )
-
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=provider_item.model_dump()
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create OAuth provider: {e}", exc_info=True)
+        logger.error(f"Error processing Outlook OAuth callback: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create OAuth provider"
-        )
-
-
-@router.put(
-    "/providers/{provider_id}",
-    response_model=OAuthProviderItem,
-    tags=["OAuth"],
-)
-async def update_oauth_provider(
-    provider_id: str,
-    provider_update: OAuthProviderUpdate,
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """
-    Update an existing OAuth provider configuration.
-
-    This endpoint updates an OAuth 2.0 provider configuration.
-    Only provided fields will be updated.
-
-    Args:
-        provider_id: OAuth provider ID to update
-        provider_update: Fields to update
-        db: Database session
-
-    Returns:
-        JSON response with updated provider configuration
-
-    Raises:
-        HTTPException(404): If provider is not found
-        HTTPException(400): If validation fails
-        HTTPException(500): If update fails
-    """
-    try:
-        logger.info(f"Updating OAuth provider: {provider_id}")
-
-        # Find provider
-        try:
-            provider_uuid = UUID(provider_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid provider_id format (must be UUID)"
-            )
-
-        query = select(OAuthProvider).where(OAuthProvider.id == provider_uuid)
-        result = await db.execute(query)
-        provider = result.scalar_one_or_none()
-
-        if not provider:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"OAuth provider '{provider_id}' not found"
-            )
-
-        # Update fields
-        update_data = provider_update.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(provider, field, value)
-
-        # If setting as default, unset other defaults
-        if provider_update.is_default:
-            query = select(OAuthProvider).where(
-                OAuthProvider.is_default == True,
-                OAuthProvider.provider_type == provider.provider_type,
-                OAuthProvider.id != provider_uuid
-            )
-            if provider.organization_id:
-                query = query.where(OAuthProvider.organization_id == provider.organization_id)
-            else:
-                query = query.where(OAuthProvider.organization_id.is_(None))
-
-            result = await db.execute(query)
-            existing_defaults = result.scalars().all()
-
-            for existing in existing_defaults:
-                existing.is_default = False
-                db.add(existing)
-
-        await db.commit()
-        await db.refresh(provider)
-
-        logger.info(f"Updated OAuth provider: {provider.id}")
-
-        provider_item = OAuthProviderItem(
-            id=str(provider.id),
-            organization_id=str(provider.organization_id) if provider.organization_id else None,
-            provider_name=provider.provider_name,
-            provider_type=provider.provider_type,
-            client_id=provider.client_id,
-            authorization_url=provider.authorization_url,
-            token_url=provider.token_url,
-            userinfo_url=provider.userinfo_url,
-            scopes=provider.scopes,
-            redirect_uri=provider.redirect_uri,
-            attribute_mapping_email=provider.attribute_mapping_email,
-            attribute_mapping_name=provider.attribute_mapping_name,
-            attribute_mapping_first_name=provider.attribute_mapping_first_name,
-            attribute_mapping_last_name=provider.attribute_mapping_last_name,
-            attribute_mapping_picture=provider.attribute_mapping_picture,
-            is_enabled=provider.is_enabled,
-            is_default=provider.is_default,
-            created_at=provider.created_at.isoformat(),
-            updated_at=provider.updated_at.isoformat(),
-        )
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=provider_item.model_dump()
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to update OAuth provider: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update OAuth provider"
-        )
-
-
-@router.delete(
-    "/providers/{provider_id}",
-    tags=["OAuth"],
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_oauth_provider(
-    provider_id: str,
-    db: AsyncSession = Depends(get_db),
-) -> None:
-    """
-    Delete an OAuth provider configuration.
-
-    This endpoint deletes an OAuth 2.0 provider configuration.
-
-    Args:
-        provider_id: OAuth provider ID to delete
-        db: Database session
-
-    Returns:
-        No content on success
-
-    Raises:
-        HTTPException(404): If provider is not found
-        HTTPException(400): If provider_id format is invalid
-        HTTPException(500): If deletion fails
-    """
-    try:
-        logger.info(f"Deleting OAuth provider: {provider_id}")
-
-        # Find provider
-        try:
-            provider_uuid = UUID(provider_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid provider_id format (must be UUID)"
-            )
-
-        query = select(OAuthProvider).where(OAuthProvider.id == provider_uuid)
-        result = await db.execute(query)
-        provider = result.scalar_one_or_none()
-
-        if not provider:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"OAuth provider '{provider_id}' not found"
-            )
-
-        await db.delete(provider)
-        await db.commit()
-
-        logger.info(f"Deleted OAuth provider: {provider_id}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete OAuth provider: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete OAuth provider"
-        )
+            detail=f"Failed to process Outlook Calendar callback: {str(e)}",
+        ) from e

@@ -3326,155 +3326,107 @@ export interface WebSocketAnalyticsUpdateMessage extends WebSocketMessage {
   data: AnalyticsUpdateData;
 }
 
-// ==================== Fairness Monitoring Types ====================
+// ==================== Calendar Integration Types ====================
 
 /**
- * Fairness summary across all models
+ * Supported calendar providers
  */
-export interface FairnessSummary {
-  total_models: number;
-  models_with_issues: number;
-  overall_fairness_score: number;
-  protected_attributes_analyzed: string[];
-  recent_alerts: number;
-  last_updated: string;
+export type CalendarProvider = 'google' | 'outlook';
+
+/**
+ * Calendar connection status
+ */
+export type ConnectionStatus = 'active' | 'expired' | 'error' | 'disconnected';
+
+/**
+ * Create calendar connection request
+ */
+export interface CalendarConnectionCreate {
+  recruiter_id: string;
+  provider: CalendarProvider;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+  calendar_email: string;
+  calendar_id?: string;
+  webhook_subscription_id?: string;
 }
 
 /**
- * Fairness alert
+ * Update calendar connection request
  */
-export interface FairnessAlert {
+export interface CalendarConnectionUpdate {
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: string;
+  status?: ConnectionStatus;
+  error_message?: string;
+  webhook_subscription_id?: string;
+  last_sync_at?: string;
+}
+
+/**
+ * Calendar connection response
+ */
+export interface CalendarConnectionResponse {
   id: string;
-  model_name: string;
-  alert_type: string;
-  severity: string;
-  message: string;
-  demographic_group?: string;
-  metric_value?: number;
-  threshold?: number;
+  recruiter_id: string;
+  recruiter_name?: string;
+  recruiter_email?: string;
+  provider: CalendarProvider;
+  calendar_email: string;
+  calendar_id?: string;
+  status: ConnectionStatus;
+  token_expires_at: string;
+  webhook_subscription_id?: string;
+  last_sync_at?: string;
+  error_message?: string;
   created_at: string;
-  acknowledged_at?: string;
-  status: string;
+  updated_at: string;
+  is_active: boolean;
 }
 
 /**
- * Fairness alert list response
+ * Calendar connection list response
  */
-export interface FairnessAlertListResponse {
-  alerts: FairnessAlert[];
+export interface CalendarConnectionListResponse {
+  connections: CalendarConnectionResponse[];
   total_count: number;
 }
 
 /**
- * Fairness metric
+ * Interviewer availability status
  */
-export interface FairnessMetric {
-  id: string;
-  model_name: string;
-  model_version?: string;
-  protected_attribute: string;
-  demographic_group: string;
-  metric_type: string;
-  metric_value: number;
-  is_acceptable: boolean;
-  sample_size: number;
-  analysis_date: string;
-  created_at: string;
+export interface InterviewerAvailability {
+  interviewer_id: string;
+  interviewer_name?: string;
+  interviewer_email?: string;
+  is_available: boolean;
+  has_calendar_connection: boolean;
+  calendar_provider?: CalendarProvider;
+  conflicting_events: string[];
 }
 
 /**
- * Fairness metrics list response
+ * Availability check request
  */
-export interface FairnessMetricsListResponse {
-  metrics: FairnessMetric[];
-  total_count: number;
+export interface AvailabilityCheckRequest {
+  interviewer_ids: string[];
+  start_time: string;
+  duration_minutes: number;
 }
 
 /**
- * Bias report
+ * Availability check response
  */
-export interface BiasReport {
-  report_id: string;
-  model_name: string;
-  model_version?: string;
-  analysis_date: string;
-  report_type: string;
-  overall_fairness_score: number;
-  bias_detected: boolean;
-  severity_level: string;
-  protected_attributes: string[];
-  findings: Array<{
-    demographic_attribute: string;
-    disparate_impact_ratio: number;
-    issue_severity: string;
-    description: string;
-  }>;
-  recommendations: string[];
-  created_at: string;
-}
-
-/**
- * Bias report list response
- */
-export interface BiasReportListResponse {
-  reports: BiasReport[];
-  total_count: number;
-}
-
-/**
- * Generate bias report request
- */
-export interface GenerateBiasReportRequest {
-  model_name: string;
-  model_version?: string;
-  report_type?: string;
-}
-
-/**
- * Acknowledge alert response
- */
-export interface AcknowledgeAlertResponse {
-  alert_id: string;
-  acknowledged: boolean;
-  acknowledged_at: string;
-}
-
-/**
- * Fairness scorecard
- */
-export interface FairnessScorecard {
-  vacancy_id?: string;
-  model_version?: string;
-  overall_score: number;
-  metrics: Array<{
-    attribute: string;
-    score: number;
-    status: string;
-  }>;
-  alerts: FairnessAlert[];
-}
-
-/**
- * Single data point in fairness trends time series
- */
-export interface FairnessTrendDataPoint {
-  timestamp: string;
-  disparate_impact_ratio: number | null;
-  demographic_parity_diff: number | null;
-  equal_opportunity_diff: number | null;
-  average_odds_diff: number | null;
-  theil_index: number | null;
-  sample_size: number;
-}
-
-/**
- * Fairness trends response
- */
-export interface FairnessTrendsResponse {
-  data_points: FairnessTrendDataPoint[];
-  total_count: number;
-  start_date: string;
-  end_date: string;
+export interface AvailabilityCheckResponse {
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  all_available: boolean;
+  interviewer_count: number;
+  available_count: number;
+  interviewer_availability: InterviewerAvailability[];
 }
 
 // ==================== Parsing Correction Types ====================

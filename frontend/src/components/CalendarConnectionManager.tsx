@@ -73,8 +73,33 @@ export function CalendarConnectionManager({
   const queryClient = useQueryClient();
   const [internalOpen, setInternalOpen] = useState(true);
   const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [oauthSuccess, setOauthSuccess] = useState<boolean>(false);
 
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+
+  // Check for OAuth callback on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const success = urlParams.get('success');
+
+    if (error) {
+      setOauthError(decodeURIComponent(error));
+      setConnectingProvider(null);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    if (success === 'true') {
+      setOauthSuccess(true);
+      setConnectingProvider(null);
+      // Refetch connections to show new connection
+      refetchConnections();
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // Fetch calendar connections
   const {
@@ -85,36 +110,15 @@ export function CalendarConnectionManager({
   } = useQuery({
     queryKey: ['calendarConnections', recruiterId],
     queryFn: async () => {
-      return await calendarClient.listConnections(
+      const response = await calendarClient.listConnections(
         recruiterId ? { recruiter_id: recruiterId } : undefined
       );
+      return {
+        connections: Array.isArray(response) ? response : response.connections || [],
+        total_count: Array.isArray(response) ? response.length : response.total_count || 0,
+      };
     },
     enabled: open,
-  });
-
-  // Create connection mutation (for OAuth callback handling)
-  const createConnectionMutation = useMutation({
-    mutationFn: async (provider: CalendarProvider) => {
-      // Initiate OAuth flow by redirecting to backend OAuth endpoint
-      const params = new URLSearchParams({
-        provider,
-        redirect_uri: window.location.origin + '/calendar/callback',
-        state: JSON.stringify({ provider, recruiterId }),
-      });
-
-      // This would typically redirect to the OAuth provider
-      // For now, we'll simulate the flow
-      window.location.href = `/api/calendar/authorize?${params.toString()}`;
-
-      // Return a placeholder (in real flow, this would be handled by callback)
-      return {} as CalendarConnectionResponse;
-    },
-    onSuccess: (connection) => {
-      queryClient.invalidateQueries({ queryKey: ['calendarConnections'] });
-      if (onSuccess) {
-        onSuccess(connection);
-      }
-    },
   });
 
   // Delete connection mutation
@@ -149,7 +153,24 @@ export function CalendarConnectionManager({
 
   const handleConnect = (provider: CalendarProvider) => {
     setConnectingProvider(provider);
-    createConnectionMutation.mutate(provider);
+
+    // Build OAuth authorization URL
+    const apiBaseUrl = import.meta.env.VITE_API_URL || '';
+    const oauthUrl = `${apiBaseUrl}/api/oauth/${provider}/authorize`;
+
+    // Add recruiter_id as query parameter
+    const params = new URLSearchParams();
+    if (recruiterId) {
+      params.append('recruiter_id', recruiterId);
+    } else {
+      // If no recruiter ID is provided, use a default or current user
+      // TODO: Get current user ID from auth context
+      params.append('recruiter_id', 'default-recruiter-id');
+    }
+
+    // Redirect to OAuth authorization endpoint
+    const fullUrl = `${oauthUrl}?${params.toString()}`;
+    window.location.href = fullUrl;
   };
 
   const handleDisconnect = (connectionId: string, provider: CalendarProvider) => {
@@ -199,6 +220,20 @@ export function CalendarConnectionManager({
 
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1 }}>
+          {/* OAuth Success Alert */}
+          {oauthSuccess && (
+            <Alert severity="success" onClose={() => setOauthSuccess(false)}>
+              Calendar connected successfully! Your calendar is now linked to AgentHR.
+            </Alert>
+          )}
+
+          {/* OAuth Error Alert */}
+          {oauthError && (
+            <Alert severity="error" onClose={() => setOauthError(null)}>
+              Failed to connect calendar: {oauthError}
+            </Alert>
+          )}
+
           {/* Google Calendar Section */}
           <Paper sx={{ p: 2 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
@@ -224,14 +259,12 @@ export function CalendarConnectionManager({
               </Stack>
               <Button
                 variant="outlined"
-                startIcon={<LinkIcon />}
+                startIcon={connectingProvider === 'google' ? <CircularProgress size={16} /> : <LinkIcon />}
                 onClick={() => handleConnect('google')}
-                disabled={createConnectionMutation.isPending || getProviderConnections('google').length > 0}
+                disabled={connectingProvider !== null || getProviderConnections('google').length > 0}
                 size="small"
               >
-                {createConnectionMutation.isPending && connectingProvider === 'google'
-                  ? 'Connecting...'
-                  : 'Connect'}
+                {connectingProvider === 'google' ? 'Connecting...' : 'Connect'}
               </Button>
             </Stack>
 
@@ -322,14 +355,12 @@ export function CalendarConnectionManager({
               </Stack>
               <Button
                 variant="outlined"
-                startIcon={<LinkIcon />}
+                startIcon={connectingProvider === 'outlook' ? <CircularProgress size={16} /> : <LinkIcon />}
                 onClick={() => handleConnect('outlook')}
-                disabled={createConnectionMutation.isPending || getProviderConnections('outlook').length > 0}
+                disabled={connectingProvider !== null || getProviderConnections('outlook').length > 0}
                 size="small"
               >
-                {createConnectionMutation.isPending && connectingProvider === 'outlook'
-                  ? 'Connecting...'
-                  : 'Connect'}
+                {connectingProvider === 'outlook' ? 'Connecting...' : 'Connect'}
               </Button>
             </Stack>
 
@@ -425,7 +456,7 @@ export function CalendarConnectionManager({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose} disabled={createConnectionMutation.isPending}>
+        <Button onClick={handleClose} disabled={connectingProvider !== null}>
           Close
         </Button>
         <Button

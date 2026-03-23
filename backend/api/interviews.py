@@ -458,6 +458,29 @@ async def create_interview(
             if calendar_connection:
                 from tasks.calendar_tasks import create_calendar_event
 
+                # Gather attendee email addresses
+                attendees = []
+
+                # Add organizer/recruiter email
+                organizer_query = select(Recruiter).where(Recruiter.id == interview.recruiter_id)
+                organizer_result = await db.execute(organizer_query)
+                organizer = organizer_result.scalar_one_or_none()
+                if organizer and organizer.email:
+                    attendees.append(organizer.email)
+
+                # Add participant emails
+                if interview_data.participant_ids:
+                    for participant_id in interview_data.participant_ids:
+                        participant_query = select(Recruiter).where(Recruiter.id == participant_id)
+                        participant_result = await db.execute(participant_query)
+                        participant_recruiter = participant_result.scalar_one_or_none()
+                        if participant_recruiter and participant_recruiter.email:
+                            attendees.append(participant_recruiter.email)
+
+                # Add candidate email if available
+                if hasattr(candidate, 'email') and candidate.email:
+                    attendees.append(candidate.email)
+
                 event_details = {
                     "title": interview.title,
                     "description": interview.description or "",
@@ -468,12 +491,9 @@ async def create_interview(
                     "meeting_link": interview.meeting_link,
                     "interview_type": interview.interview_type.value,
                     "candidate_id": str(interview.candidate_id),
-                    "candidate_name": candidate.full_name or "Candidate",
+                    "candidate_name": candidate.full_name or candidate.filename or "Candidate",
+                    "attendees": attendees,
                 }
-
-                # Add participants to event details
-                if interview_data.participant_ids:
-                    event_details["participant_ids"] = [str(pid) for pid in interview_data.participant_ids]
 
                 try:
                     create_calendar_event.delay(
@@ -482,7 +502,7 @@ async def create_interview(
                         recruiter_id=str(interview.recruiter_id),
                         event_details=event_details,
                     )
-                    logger.info(f"Calendar event creation task queued for interview {interview.id}")
+                    logger.info(f"Calendar event creation task queued for interview {interview.id} with {len(attendees)} attendees")
                 except Exception as e:
                     logger.error(f"Failed to queue calendar event creation task: {e}")
                     # Don't fail the interview creation if calendar task fails
@@ -921,31 +941,49 @@ async def update_interview(
 
         # Sync with calendar if event exists
         if interview.calendar_event_id and interview.calendar_provider:
-            from tasks.calendar_tasks import update_calendar_event
+            # If interview was cancelled, delete the calendar event
+            if interview.status == InterviewStatus.CANCELLED:
+                from tasks.calendar_tasks import delete_calendar_event
 
-            event_details = {
-                "title": interview.title,
-                "description": interview.description or "",
-                "start_time": interview.scheduled_start.isoformat(),
-                "end_time": interview.scheduled_end.isoformat(),
-                "duration_minutes": interview.duration_minutes,
-                "location": interview.location,
-                "meeting_link": interview.meeting_link,
-                "interview_type": interview.interview_type.value,
-            }
+                try:
+                    delete_calendar_event.delay(
+                        interview_id=str(interview.id),
+                        calendar_provider=interview.calendar_provider,
+                        recruiter_id=str(interview.recruiter_id) if interview.recruiter_id else None,
+                        event_id=interview.calendar_event_id,
+                        notify_attendees=True,
+                    )
+                    logger.info(f"Calendar event deletion task queued for cancelled interview {interview.id}")
+                except Exception as e:
+                    logger.error(f"Failed to queue calendar event deletion task: {e}")
+                    # Don't fail the interview update if calendar task fails
+            else:
+                # Otherwise, update the calendar event with new details
+                from tasks.calendar_tasks import update_calendar_event
 
-            try:
-                update_calendar_event.delay(
-                    interview_id=str(interview.id),
-                    calendar_provider=interview.calendar_provider,
-                    recruiter_id=str(interview.recruiter_id) if interview.recruiter_id else None,
-                    calendar_event_id=interview.calendar_event_id,
-                    event_details=event_details,
-                )
-                logger.info(f"Calendar event update task queued for interview {interview.id}")
-            except Exception as e:
-                logger.error(f"Failed to queue calendar event update task: {e}")
-                # Don't fail the interview update if calendar task fails
+                event_details = {
+                    "title": interview.title,
+                    "description": interview.description or "",
+                    "start_time": interview.scheduled_start.isoformat(),
+                    "end_time": interview.scheduled_end.isoformat(),
+                    "duration_minutes": interview.duration_minutes,
+                    "location": interview.location,
+                    "meeting_link": interview.meeting_link,
+                    "interview_type": interview.interview_type.value,
+                }
+
+                try:
+                    update_calendar_event.delay(
+                        interview_id=str(interview.id),
+                        calendar_provider=interview.calendar_provider,
+                        recruiter_id=str(interview.recruiter_id) if interview.recruiter_id else None,
+                        event_id=interview.calendar_event_id,
+                        event_details=event_details,
+                    )
+                    logger.info(f"Calendar event update task queued for interview {interview.id}")
+                except Exception as e:
+                    logger.error(f"Failed to queue calendar event update task: {e}")
+                    # Don't fail the interview update if calendar task fails
 
         logger.info(f"Interview updated successfully: {interview.id}")
 
@@ -1010,7 +1048,7 @@ async def delete_interview(
                     interview_id=interview_id,
                     calendar_provider=calendar_provider,
                     recruiter_id=str(recruiter_id) if recruiter_id else None,
-                    calendar_event_id=calendar_event_id,
+                    event_id=calendar_event_id,
                 )
                 logger.info(f"Calendar event deletion task queued for interview {interview_id}")
             except Exception as e:
