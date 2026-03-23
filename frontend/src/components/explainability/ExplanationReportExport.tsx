@@ -57,9 +57,242 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
     return t(key, recommendation);
   };
 
+  /**
+   * Generate chart as base64 data URL for embedding
+   */
+  const generateFeatureContributionChart = (): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // Sort features by contribution magnitude
+    const sortedFeatures = [...explanationData.feature_explanations].sort(
+      (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)
+    );
+
+    // Take top 10 features
+    const topFeatures = sortedFeatures.slice(0, 10);
+
+    const padding = 60;
+    const chartWidth = canvas.width - padding * 2;
+    const chartHeight = canvas.height - padding * 2;
+    const barHeight = 30;
+    const barSpacing = 10;
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Top Feature Contributions', canvas.width / 2, 30);
+
+    // Find max absolute contribution for scaling
+    const maxContribution = Math.max(
+      ...topFeatures.map((f) => Math.abs(f.contribution))
+    );
+
+    // Draw bars
+    topFeatures.forEach((feature, index) => {
+      const y = padding + index * (barHeight + barSpacing);
+      const barWidth = (Math.abs(feature.contribution) / maxContribution) * (chartWidth / 2);
+      const color = feature.direction === 'positive' ? '#4caf50' : '#f44336';
+
+      // Draw bar
+      ctx.fillStyle = color;
+      if (feature.contribution >= 0) {
+        ctx.fillRect(canvas.width / 2, y, barWidth, barHeight);
+      } else {
+        ctx.fillRect(canvas.width / 2 - barWidth, y, barWidth, barHeight);
+      }
+
+      // Draw feature name
+      ctx.fillStyle = '#2c3e50';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(
+        feature.feature_name.substring(0, 25),
+        canvas.width / 2 - 10,
+        y + barHeight / 2 + 4
+      );
+
+      // Draw contribution value
+      ctx.textAlign = 'left';
+      ctx.fillStyle = color;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(
+        `${feature.contribution > 0 ? '+' : ''}${feature.contribution_percentage.toFixed(1)}%`,
+        canvas.width / 2 + (feature.contribution >= 0 ? barWidth + 10 : -barWidth - 60),
+        y + barHeight / 2 + 4
+      );
+    });
+
+    // Draw center line
+    ctx.strokeStyle = '#95a5a6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, padding);
+    ctx.lineTo(canvas.width / 2, padding + topFeatures.length * (barHeight + barSpacing));
+    ctx.stroke();
+
+    return canvas.toDataURL('image/png');
+  };
+
+  /**
+   * Generate confidence interval visualization chart
+   */
+  const generateConfidenceChart = (): string => {
+    if (!explanationData.confidence_interval) return '';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    const padding = 60;
+    const chartWidth = canvas.width - padding * 2;
+    const chartHeight = 100;
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Confidence Interval', canvas.width / 2, 30);
+
+    const ci = explanationData.confidence_interval;
+    const y = 80;
+
+    // Draw scale line
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(canvas.width - padding, y);
+    ctx.stroke();
+
+    // Draw confidence interval bar
+    const lowerX = padding + ci.lower_bound * chartWidth;
+    const upperX = padding + ci.upper_bound * chartWidth;
+    const scoreX = padding + (explanationData.rank_score / 100) * chartWidth;
+
+    ctx.fillStyle = '#2196f3';
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(lowerX, y - 20, upperX - lowerX, 40);
+    ctx.globalAlpha = 1;
+
+    // Draw bounds
+    ctx.strokeStyle = '#2196f3';
+    ctx.lineWidth = 2;
+    [lowerX, upperX].forEach((x) => {
+      ctx.beginPath();
+      ctx.moveTo(x, y - 25);
+      ctx.lineTo(x, y + 25);
+      ctx.stroke();
+    });
+
+    // Draw actual score marker
+    ctx.fillStyle = getScoreColor(explanationData.rank_score);
+    ctx.beginPath();
+    ctx.arc(scoreX, y, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Labels
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(ci.lower_bound * 100)}%`, lowerX, y + 45);
+    ctx.fillText(`${Math.round(ci.upper_bound * 100)}%`, upperX, y + 45);
+    ctx.fillText(`${Math.round(explanationData.rank_score)}%`, scoreX, y - 15);
+
+    // Legend
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#7f8c8d';
+    ctx.fillText(
+      `${ci.confidence_level * 100}% Confidence Interval`,
+      canvas.width / 2,
+      y + 70
+    );
+
+    return canvas.toDataURL('image/png');
+  };
+
+  /**
+   * Generate score breakdown chart
+   */
+  const generateScoreChart = (): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 120;
+
+    // Draw circular progress
+    const score = explanationData.rank_score / 100;
+    const color = getScoreColor(explanationData.rank_score);
+
+    // Background circle
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 20;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Score arc
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 20;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + score * Math.PI * 2);
+    ctx.stroke();
+
+    // Center text - score
+    ctx.fillStyle = color;
+    ctx.font = 'bold 64px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${Math.round(explanationData.rank_score)}`, centerX, centerY - 10);
+
+    // Percentage symbol
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('%', centerX, centerY + 40);
+
+    // Recommendation label below
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(
+      getRecommendationLabel(explanationData.recommendation),
+      centerX,
+      centerY + radius + 40
+    );
+
+    return canvas.toDataURL('image/png');
+  };
+
   const generateHTMLReport = (): string => {
     const timestamp = new Date().toLocaleString();
     const overallColor = getScoreColor(explanationData.rank_score);
+
+    // Generate charts
+    const featureChart = generateFeatureContributionChart();
+    const confidenceChart = generateConfidenceChart();
+    const scoreChart = generateScoreChart();
 
     return `
 <!DOCTYPE html>
@@ -317,19 +550,98 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
             margin-bottom: 5px;
         }
 
+        /* Chart styling */
+        .chart-container {
+            margin: 20px 0;
+            text-align: center;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            page-break-inside: avoid;
+        }
+
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        /* Page break controls for PDF */
+        .page-break-before {
+            page-break-before: always;
+        }
+
+        .page-break-after {
+            page-break-after: always;
+        }
+
+        .no-page-break {
+            page-break-inside: avoid;
+        }
+
         @media print {
             body {
                 background: white;
                 padding: 0;
             }
+
             .container {
                 box-shadow: none;
+                max-width: 100%;
+                padding: 20px;
+            }
+
+            .header {
+                page-break-after: avoid;
+            }
+
+            .overall-score {
+                page-break-inside: avoid;
+                page-break-after: avoid;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+
+            .section h2 {
+                page-break-after: avoid;
+            }
+
+            .feature-item {
+                page-break-inside: avoid;
+            }
+
+            .chart-container {
+                page-break-inside: avoid;
+            }
+
+            /* Ensure charts fit on page */
+            img {
+                max-width: 100%;
+                height: auto;
+            }
+
+            /* Optimize colors for print */
+            .overall-score {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .feature-item.positive,
+            .feature-item.negative {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
         }
 
         @media (max-width: 600px) {
             .strengths-weaknesses {
                 grid-template-columns: 1fr;
+            }
+
+            .overall-score > div {
+                flex-direction: column;
             }
         }
     </style>
@@ -345,17 +657,26 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
             <div class="timestamp">Generated: ${timestamp}</div>
         </div>
 
-        <!-- Overall Score -->
+        <!-- Overall Score with Chart -->
         <div class="overall-score">
-            <div class="score">${Math.round(explanationData.rank_score)}%</div>
-            <div class="recommendation">${getRecommendationLabel(explanationData.recommendation)}</div>
-            <div style="font-size: 14px; color: #7f8c8d;">
-                ${explanationData.rank_position ? `Position: #${explanationData.rank_position}` : 'Position not ranked'}
+            <div style="display: flex; align-items: center; justify-content: center; gap: 40px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px; text-align: center;">
+                    <div class="score">${Math.round(explanationData.rank_score)}%</div>
+                    <div class="recommendation">${getRecommendationLabel(explanationData.recommendation)}</div>
+                    <div style="font-size: 14px; color: #7f8c8d; margin-top: 10px;">
+                        ${explanationData.rank_position ? `Position: #${explanationData.rank_position}` : 'Position not ranked'}
+                    </div>
+                </div>
+                ${scoreChart ? `
+                <div style="flex: 0 0 auto;">
+                    <img src="${scoreChart}" alt="Score Visualization" style="max-width: 300px; height: auto;" />
+                </div>
+                ` : ''}
             </div>
         </div>
 
         <!-- Narrative Explanation -->
-        <div class="narrative">
+        <div class="narrative no-page-break">
             <div class="title">💡 AI Explanation</div>
             <div class="text">${explanationData.narrative}</div>
         </div>
@@ -373,6 +694,11 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
                     <br>
                     ${explanationData.confidence_interval.interpretation}
                 </div>
+                ${confidenceChart ? `
+                <div style="margin-top: 20px; text-align: center;">
+                    <img src="${confidenceChart}" alt="Confidence Interval Visualization" style="max-width: 100%; height: auto;" />
+                </div>
+                ` : ''}
             </div>
         </div>
         ` : ''}
@@ -380,6 +706,11 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
         <!-- Feature Contributions -->
         <div class="section">
             <h2>🔍 Feature Contributions</h2>
+            ${featureChart ? `
+            <div style="margin-bottom: 30px; text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <img src="${featureChart}" alt="Feature Contributions Chart" style="max-width: 100%; height: auto;" />
+            </div>
+            ` : ''}
             <div class="feature-list">
                 ${explanationData.feature_explanations.map((feature: FeatureExplanation) => `
                     <div class="feature-item ${feature.direction}">
@@ -401,7 +732,7 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
         </div>
 
         <!-- Strengths and Weaknesses -->
-        <div class="section">
+        <div class="section no-page-break">
             <h2>💪 Strengths & Areas for Improvement</h2>
             <div class="strengths-weaknesses">
                 <!-- Strengths -->
@@ -424,11 +755,11 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
 
         <!-- Resume Section Highlights -->
         ${Object.keys(explanationData.highlight_sections).length > 0 ? `
-        <div class="section">
+        <div class="section page-break-before">
             <h2>📝 Influential Resume Sections</h2>
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
                 ${Object.entries(explanationData.highlight_sections).map(([section, content]) => `
-                    <div style="margin-bottom: 15px;">
+                    <div style="margin-bottom: 15px;" class="no-page-break">
                         <div style="font-weight: 600; color: #2c3e50; margin-bottom: 5px;">${section}</div>
                         <div style="font-size: 14px; color: #424242; line-height: 1.6; white-space: pre-wrap;">${content}</div>
                     </div>
@@ -438,7 +769,7 @@ const ExplanationReportExport: React.FC<ExplanationReportExportProps> = ({
         ` : ''}
 
         <!-- Metadata -->
-        <div class="metadata">
+        <div class="metadata no-page-break">
             <div class="row">
                 <span><strong>Resume ID:</strong> ${explanationData.resume_id}</span>
                 <span><strong>Vacancy ID:</strong> ${explanationData.vacancy_id}</span>

@@ -18,6 +18,14 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
+  ToggleButton,
+  ToggleButtonGroup,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -32,8 +40,24 @@ import {
   CheckCircle as BetterIcon,
   Cancel as WorseIcon,
   Remove as EqualIcon,
+  ViewModule as CardViewIcon,
+  TableChart as TableViewIcon,
+  BarChart as ChartViewIcon,
+  CheckCircle as CheckIcon,
+  Cancel as CrossIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api';
+import { apiClient } from '@/api/client';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 /**
  * Individual candidate score breakdown from backend
@@ -82,6 +106,11 @@ interface CandidateComparisonData {
   }[];
   processing_time_ms: number;
 }
+
+/**
+ * Comparison view mode
+ */
+type ComparisonViewMode = 'cards' | 'table' | 'chart';
 
 /**
  * CandidateComparisonView Component Props
@@ -165,6 +194,7 @@ const CandidateComparisonView: React.FC<CandidateComparisonViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CandidateComparisonData | null>(null);
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<ComparisonViewMode>('cards');
 
   /**
    * Fetch candidate comparison data from backend
@@ -330,9 +360,19 @@ const CandidateComparisonView: React.FC<CandidateComparisonViewProps> = ({
     const isBest = score === bestScore;
 
     let comparisonIcon: React.ReactNode = null;
+    let diffText: string | null = null;
+    let diffColor: string = 'text.secondary';
+
     if (showComparison && referenceScore !== undefined) {
       const indicator = getDifferenceIndicator(score, referenceScore, true);
       comparisonIcon = getDifferenceIcon(indicator);
+
+      // Calculate percentage difference
+      const diff = ((score - referenceScore) * 100);
+      if (Math.abs(diff) >= 0.5) {
+        diffText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
+        diffColor = diff > 0 ? 'success.main' : 'error.main';
+      }
     }
 
     return (
@@ -354,6 +394,19 @@ const CandidateComparisonView: React.FC<CandidateComparisonViewProps> = ({
             </Typography>
             {isBest && <TrophyIcon sx={{ fontSize: 14, color: `${color}.main` }} />}
             {comparisonIcon}
+            {diffText && (
+              <Chip
+                label={diffText}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  bgcolor: diffColor,
+                  color: 'white',
+                }}
+              />
+            )}
           </Box>
         </Box>
         <LinearProgress
@@ -370,6 +423,217 @@ const CandidateComparisonView: React.FC<CandidateComparisonViewProps> = ({
           }}
         />
       </Box>
+    );
+  };
+
+  /**
+   * Render skills comparison table view
+   */
+  const SkillsTableView: React.FC = () => {
+    if (!data || !data.candidates || data.candidates.length === 0) return null;
+
+    // Collect all unique skills
+    const allSkills = new Set<string>();
+    data.candidates.forEach((candidate) => {
+      candidate.matched_skills.forEach((skill) => allSkills.add(skill));
+      candidate.missing_skills.forEach((skill) => allSkills.add(skill));
+    });
+
+    const skillsList = Array.from(allSkills).sort();
+
+    return (
+      <TableContainer component={Paper} elevation={2}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>
+                {t('candidateComparison.skill')}
+              </TableCell>
+              {data.candidates.map((candidate, index) => (
+                <TableCell key={candidate.resume_id} align="center" sx={{ fontWeight: 700 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="caption" fontWeight={700} noWrap>
+                      #{index + 1} {candidate.candidate_name || candidate.filename}
+                    </Typography>
+                    <Chip
+                      label={`${Math.round(candidate.match_score.overall_score * 100)}%`}
+                      size="small"
+                      color={getScoreColor(candidate.match_score.overall_score)}
+                    />
+                  </Box>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {skillsList.map((skill, index) => (
+              <TableRow
+                key={skill}
+                sx={{
+                  bgcolor: index % 2 === 0 ? 'action.hover' : 'transparent',
+                  '&:hover': { bgcolor: 'action.selected' },
+                }}
+              >
+                <TableCell>
+                  <Typography variant="body2">{skill}</Typography>
+                </TableCell>
+                {data.candidates.map((candidate) => {
+                  const hasSkill = candidate.matched_skills.includes(skill);
+                  const missingSkill = candidate.missing_skills.includes(skill);
+
+                  return (
+                    <TableCell key={candidate.resume_id} align="center">
+                      {hasSkill ? (
+                        <CheckIcon sx={{ color: 'success.main', fontSize: 20 }} />
+                      ) : missingSkill ? (
+                        <CrossIcon sx={{ color: 'error.main', fontSize: 20 }} />
+                      ) : (
+                        <EqualIcon sx={{ color: 'action.disabled', fontSize: 20 }} />
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
+
+  /**
+   * Render chart comparison view
+   */
+  const ChartComparisonView: React.FC = () => {
+    if (!data || !data.candidates || data.candidates.length === 0) return null;
+
+    const chartData = data.candidates.map((candidate, index) => ({
+      name: `#${index + 1} ${candidate.candidate_name || candidate.filename.substring(0, 15)}`,
+      overall: candidate.match_score.overall_score * 100,
+      keyword: candidate.match_score.keyword_score * 100,
+      tfidf: candidate.match_score.tfidf_score * 100,
+      vector: candidate.match_score.vector_score * 100,
+    }));
+
+    const colors = {
+      overall: theme.palette.primary.main,
+      keyword: theme.palette.secondary.main,
+      tfidf: theme.palette.info.main,
+      vector: theme.palette.success.main,
+    };
+
+    return (
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Typography variant="h6" fontWeight={600} gutterBottom>
+          {t('candidateComparison.scoreComparison')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          {t('candidateComparison.scoreComparisonDescription')}
+        </Typography>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+            <YAxis domain={[0, 100]} />
+            <RechartsTooltip
+              formatter={(value: number) => `${value.toFixed(1)}%`}
+              contentStyle={{
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 4,
+              }}
+            />
+            <Legend />
+            <Bar
+              dataKey="overall"
+              name={t('candidateComparison.overallScore')}
+              fill={colors.overall}
+            />
+            <Bar
+              dataKey="keyword"
+              name={t('candidateComparison.keywordScore')}
+              fill={colors.keyword}
+            />
+            <Bar
+              dataKey="tfidf"
+              name={t('candidateComparison.tfidfScore')}
+              fill={colors.tfidf}
+            />
+            <Bar
+              dataKey="vector"
+              name={t('candidateComparison.vectorScore')}
+              fill={colors.vector}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+
+        {/* Score breakdown table */}
+        <Box sx={{ mt: 3 }}>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>{t('candidateComparison.candidate')}</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>
+                    {t('candidateComparison.overallScore')}
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>
+                    {t('candidateComparison.keywordScore')}
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>
+                    {t('candidateComparison.tfidfScore')}
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>
+                    {t('candidateComparison.vectorScore')}
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.candidates.map((candidate, index) => (
+                  <TableRow
+                    key={candidate.resume_id}
+                    sx={{
+                      bgcolor: index === 0 ? 'success.50' : 'transparent',
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {index === 0 && <TrophyIcon sx={{ fontSize: 18, color: 'warning.main' }} />}
+                        <Typography variant="body2" fontWeight={index === 0 ? 700 : 400}>
+                          #{index + 1} {candidate.candidate_name || candidate.filename}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={`${Math.round(candidate.match_score.overall_score * 100)}%`}
+                        size="small"
+                        color={getScoreColor(candidate.match_score.overall_score)}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2">
+                        {Math.round(candidate.match_score.keyword_score * 100)}%
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2">
+                        {Math.round(candidate.match_score.tfidf_score * 100)}%
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2">
+                        {Math.round(candidate.match_score.vector_score * 100)}%
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      </Paper>
     );
   };
 
@@ -576,9 +840,34 @@ const CandidateComparisonView: React.FC<CandidateComparisonViewProps> = ({
               {data.vacancy_title} • {t('candidateComparison.subtitle', { count: data.candidates.length })}
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
-            {t('candidateComparison.refresh')}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(_, newMode) => newMode && setViewMode(newMode)}
+              size="small"
+              aria-label={t('candidateComparison.viewMode')}
+            >
+              <ToggleButton value="cards" aria-label="Card view">
+                <Tooltip title={t('candidateComparison.cardView')}>
+                  <CardViewIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="table" aria-label="Table view">
+                <Tooltip title={t('candidateComparison.tableView')}>
+                  <TableViewIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="chart" aria-label="Chart view">
+                <Tooltip title={t('candidateComparison.chartView')}>
+                  <ChartViewIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchComparison} size="small">
+              {t('candidateComparison.refresh')}
+            </Button>
+          </Box>
         </Box>
 
         {/* Summary Stats */}
@@ -646,25 +935,43 @@ const CandidateComparisonView: React.FC<CandidateComparisonViewProps> = ({
         </Paper>
       )}
 
-      {/* Candidate Comparison Cards */}
-      <Grid container spacing={2}>
-        {data.candidates.map((candidate, index) => {
-          const isExpanded = expandedCandidates.has(candidate.resume_id);
-          // Use top candidate as reference for comparison
-          const referenceCandidate = index > 0 ? data.candidates[0] : undefined;
+      {/* Candidate Comparison Views */}
+      {viewMode === 'cards' && (
+        <Grid container spacing={2}>
+          {data.candidates.map((candidate, index) => {
+            const isExpanded = expandedCandidates.has(candidate.resume_id);
+            // Use top candidate as reference for comparison
+            const referenceCandidate = index > 0 ? data.candidates[0] : undefined;
 
-          return (
-            <Grid item xs={12} md={data.candidates.length === 2 ? 6 : 4} key={candidate.resume_id}>
-              <CandidateCard
-                candidate={candidate}
-                rank={index + 1}
-                isExpanded={isExpanded}
-                referenceCandidate={referenceCandidate}
-              />
-            </Grid>
-          );
-        })}
-      </Grid>
+            return (
+              <Grid item xs={12} md={data.candidates.length === 2 ? 6 : 4} key={candidate.resume_id}>
+                <CandidateCard
+                  candidate={candidate}
+                  rank={index + 1}
+                  isExpanded={isExpanded}
+                  referenceCandidate={referenceCandidate}
+                />
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
+
+      {viewMode === 'table' && (
+        <Stack spacing={3}>
+          <SkillsTableView />
+          <Paper elevation={2} sx={{ p: 2 }}>
+            <Typography variant="body2" color="text.secondary" align="center">
+              <CheckIcon sx={{ fontSize: 16, color: 'success.main', verticalAlign: 'middle', mr: 0.5 }} />
+              {t('candidateComparison.skillsLegend.has')}
+              <CrossIcon sx={{ fontSize: 16, color: 'error.main', verticalAlign: 'middle', ml: 1, mr: 0.5 }} />
+              {t('candidateComparison.skillsLegend.missing')}
+            </Typography>
+          </Paper>
+        </Stack>
+      )}
+
+      {viewMode === 'chart' && <ChartComparisonView />}
 
       {/* Legend */}
       <Paper elevation={1} sx={{ p: 2, bgcolor: 'action.hover' }}>

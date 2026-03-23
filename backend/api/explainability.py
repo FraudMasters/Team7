@@ -39,13 +39,13 @@ from services.report_generator import (
     ReportData,
     get_report_generator,
 )
-from schemas.comparison_explanation import (
-    CompareRequest,
-    CompareResponse,
-    CandidateInfo,
-    FactorComparison,
-    ScoreDifferential,
-    StrengthsWeaknessesTable,
+from schemas.explainability import (
+    ExplainRankingResponse,
+    FeatureCategoryData,
+    PercentileData,
+    RelativeComparisonData,
+    RankingFactorDetail,
+    SkillsMatchDetail,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,14 +63,15 @@ class ExplainRequest(BaseModel):
         True,
         description="Whether to use LLM for narrative generation (requires API key)"
     )
-    detailed: bool = Field(
-        False,
-        description="Whether to include detailed narrative sections (ranking_rationale, strengths_analysis, improvement_areas, overall_assessment)"
-    )
 
 
 class ExplainResponse(BaseModel):
-    """Response containing ranking explanation."""
+    """
+    DEPRECATED: Use ExplainRankingResponse from schemas.explainability instead.
+
+    Legacy response containing ranking explanation.
+    Kept for backward compatibility only.
+    """
 
     resume_id: str = Field(..., description="Resume UUID")
     vacancy_id: str = Field(..., description="Vacancy UUID")
@@ -95,18 +96,6 @@ class ExplainResponse(BaseModel):
     )
     percentile_explanation: str = Field(
         "", description="Natural language percentile comparison explanation"
-    )
-    ranking_rationale: Optional[str] = Field(
-        None, description="Detailed explanation of why candidate ranked at this position (detailed mode)"
-    )
-    strengths_analysis: Optional[List[str]] = Field(
-        None, description="Detailed analysis of candidate strengths (detailed mode)"
-    )
-    improvement_areas: Optional[List[str]] = Field(
-        None, description="Detailed analysis of areas for improvement (detailed mode)"
-    )
-    overall_assessment: Optional[str] = Field(
-        None, description="Overall assessment and summary (detailed mode)"
     )
     provider: str = Field(..., description="LLM provider used")
     model: str = Field(..., description="Model name used")
@@ -204,9 +193,158 @@ class CompareExplainResponse(BaseModel):
     generated_at: str = Field(..., description="Timestamp of generation")
 
 
+# =============================================================================
+# Helper Functions for Enhanced Data Structures
+# =============================================================================
+
+
+def _build_feature_categories(
+    feature_contributions: Dict[str, float],
+    ranking_factors: Dict[str, Any],
+    all_candidate_scores: List[float],
+) -> List[FeatureCategoryData]:
+    """
+    Build feature category data for visualization.
+
+    Groups features into logical categories (Skills Match, Experience, Education, etc.)
+    and calculates aggregate scores and percentiles for each category.
+    """
+    # Define feature category mappings
+    category_mapping = {
+        "Skills Match": ["skills_match_ratio", "keyword_score", "tfidf_score", "vector_score"],
+        "Experience": ["experience_months", "experience_relevance", "title_similarity"],
+        "Education": ["education_level", "education_score"],
+        "Profile Quality": ["resume_completeness", "profile_freshness"],
+    }
+
+    categories = []
+    for category_name, feature_names in category_mapping.items():
+        # Calculate category score as average of constituent features
+        category_features = []
+        category_score_sum = 0.0
+        feature_count = 0
+
+        for feature_name in feature_names:
+            if feature_name in feature_contributions:
+                category_features.append(feature_name)
+                category_score_sum += feature_contributions.get(feature_name, 0.0)
+                feature_count += 1
+
+        if feature_count > 0:
+            category_score = category_score_sum / feature_count
+
+            # Calculate percentile for this category (simplified - use overall percentile)
+            percentile = None
+            if all_candidate_scores and len(all_candidate_scores) > 1:
+                sorted_scores = sorted(all_candidate_scores)
+                percentile = (sorted_scores.index(max(sorted_scores, key=lambda x: abs(x - category_score))) / len(sorted_scores)) * 100
+
+            categories.append(FeatureCategoryData(
+                category_name=category_name,
+                category_score=category_score,
+                weight=1.0 / len(category_mapping),  # Equal weighting for simplicity
+                features_in_category=category_features,
+                percentile=percentile,
+            ))
+
+    return categories
+
+
+def _build_percentile_data(
+    rank_score: float,
+    rank_position: Optional[int],
+    all_candidate_scores: List[float],
+    feature_contributions: Dict[str, float],
+) -> PercentileData:
+    """
+    Build percentile data structure for candidate comparison.
+
+    Calculates overall percentile and category-level percentiles.
+    """
+    # Calculate overall percentile
+    overall_percentile = 0.0
+    if all_candidate_scores and len(all_candidate_scores) > 1:
+        sorted_scores = sorted(all_candidate_scores)
+        rank = sorted_scores.index(min(sorted_scores, key=lambda x: abs(x - rank_score)))
+        overall_percentile = (rank / len(sorted_scores)) * 100
+
+    # Calculate category percentiles (simplified - using feature contributions)
+    category_percentiles = {}
+    for feature_name, contribution in feature_contributions.items():
+        # Determine category
+        if feature_name in ["skills_match_ratio", "keyword_score", "tfidf_score", "vector_score"]:
+            category_percentiles["Skills Match"] = overall_percentile  # Simplified
+        elif feature_name in ["experience_months", "experience_relevance", "title_similarity"]:
+            category_percentiles["Experience"] = overall_percentile  # Simplified
+        elif feature_name in ["education_level", "education_score"]:
+            category_percentiles["Education"] = overall_percentile  # Simplified
+
+    return PercentileData(
+        overall_percentile=overall_percentile,
+        category_percentiles=category_percentiles,
+        rank_position=rank_position or 0,
+        total_candidates=len(all_candidate_scores),
+        score_distribution=all_candidate_scores if len(all_candidate_scores) <= 100 else None,
+    )
+
+
+def _build_skills_match_detail(
+    ranking_factors: Dict[str, Any],
+    resume: Optional[Resume] = None,
+    vacancy: Optional[JobVacancy] = None,
+) -> SkillsMatchDetail:
+    """
+    Build detailed skills match information.
+
+    Extracts matched, missing, and additional skills from ranking factors.
+    """
+    # Extract skills data from ranking_factors if available
+    skills_data = ranking_factors.get("skills_match", {})
+
+    matched_skills = skills_data.get("matched", [])
+    missing_skills = skills_data.get("missing", [])
+    additional_skills = skills_data.get("additional", [])
+    match_percentage = skills_data.get("match_percentage", 0.0)
+
+    # Fallback: calculate from feature contributions if skills_data is empty
+    if not matched_skills and ranking_factors.get("skills_match_ratio"):
+        match_percentage = float(ranking_factors.get("skills_match_ratio", 0.0)) * 100
+
+    return SkillsMatchDetail(
+        matched_skills=matched_skills if matched_skills else [],
+        missing_skills=missing_skills if missing_skills else [],
+        additional_skills=additional_skills if additional_skills else [],
+        match_percentage=match_percentage,
+    )
+
+
+def _convert_to_ranking_factors(
+    feature_explanations: List[Any],
+) -> List[RankingFactorDetail]:
+    """
+    Convert feature explanations to ranking factor details.
+
+    Transforms FeatureExplanation objects into RankingFactorDetail schema format.
+    """
+    factors = []
+    for feat in feature_explanations:
+        feat_dict = feat.to_dict() if hasattr(feat, "to_dict") else feat
+
+        factors.append(RankingFactorDetail(
+            factor_name=feat_dict.get("feature_name", ""),
+            score=feat_dict.get("contribution_score", 0.0),
+            weight=feat_dict.get("importance", 1.0),
+            contribution=feat_dict.get("contribution_score", 0.0),
+            description=feat_dict.get("explanation", ""),
+            raw_value=feat_dict.get("value", None),
+        ))
+
+    return factors
+
+
 @router.post(
     "/explain",
-    response_model=ExplainResponse,
+    response_model=ExplainRankingResponse,
     status_code=status.HTTP_200_OK,
     tags=["Explainability"],
 )
@@ -343,60 +481,50 @@ async def explain_ranking(
             use_llm=use_llm,
         )
 
-        # Generate detailed narrative if requested
-        detailed_narrative = None
-        if request.detailed and use_llm:
-            logger.info("Generating detailed narrative sections")
-            try:
-                detailed_narrative = await generator.generate_detailed_narrative(
-                    candidate_name=resume.filename or None,
-                    rank_score=float(ranking.rank_score),
-                    rank_position=ranking.rank_position,
-                    feature_contributions=ranking.feature_contributions or {},
-                    ranking_factors=ranking.ranking_factors or {},
-                    job_title=vacancy.title,
-                    job_description=vacancy.description or "",
-                    recommendation=ranking.recommendation or "good",
-                    all_candidate_scores=all_candidate_scores,
-                )
-            except Exception as e:
-                logger.warning(f"Detailed narrative generation failed: {e}")
-                # Continue without detailed narrative
+        # Build enhanced response with visualization data
+        feature_categories = _build_feature_categories(
+            ranking.feature_contributions or {},
+            ranking.ranking_factors or {},
+            all_candidate_scores,
+        )
 
-        # Build response
-        response_data = {
-            "resume_id": request.resume_id,
-            "vacancy_id": request.vacancy_id,
-            "candidate_name": explanation.candidate_name,
-            "rank_score": explanation.rank_score,
-            "rank_position": explanation.rank_position,
-            "narrative": explanation.narrative,
-            "feature_explanations": [f.to_dict() for f in explanation.feature_explanations],
-            "confidence_interval": (
-                explanation.confidence_interval.to_dict()
-                if explanation.confidence_interval
-                else None
-            ),
-            "strengths": explanation.strengths,
-            "weaknesses": explanation.weaknesses,
-            "recommendation": explanation.recommendation,
-            "highlight_sections": explanation.highlight_sections,
-            "percentile_rank": explanation.percentile_rank,
-            "percentile_explanation": explanation.percentile_explanation,
-            "ranking_rationale": detailed_narrative.get("ranking_rationale") if detailed_narrative else None,
-            "strengths_analysis": detailed_narrative.get("strengths_analysis") if detailed_narrative else None,
-            "improvement_areas": detailed_narrative.get("improvement_areas") if detailed_narrative else None,
-            "overall_assessment": detailed_narrative.get("overall_assessment") if detailed_narrative else None,
-            "provider": explanation.provider,
-            "model": explanation.model,
-            "generated_at": explanation.generated_at,
-        }
+        percentile_data = _build_percentile_data(
+            float(ranking.rank_score),
+            ranking.rank_position,
+            all_candidate_scores,
+            ranking.feature_contributions or {},
+        )
+
+        skills_match = _build_skills_match_detail(
+            ranking.ranking_factors or {},
+            resume,
+            vacancy,
+        )
+
+        factors = _convert_to_ranking_factors(explanation.feature_explanations)
+
+        # Build response matching ExplainRankingResponse schema
+        response = ExplainRankingResponse(
+            candidate_id=request.resume_id,
+            vacancy_id=request.vacancy_id,
+            rank_score=explanation.rank_score,
+            rank_position=explanation.rank_position or 0,
+            confidence=float(ranking.confidence) if ranking.confidence else 0.0,
+            narrative=explanation.narrative,
+            factors=factors,
+            feature_categories=feature_categories,
+            percentile_data=percentile_data,
+            relative_comparisons=None,  # Optional, can be added in future enhancement
+            strengths=explanation.strengths,
+            weaknesses=explanation.weaknesses,
+            skills_match=skills_match,
+        )
 
         logger.info(f"Explanation generated for resume {request.resume_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content=response.model_dump(),
         )
 
     except HTTPException:
@@ -876,263 +1004,6 @@ async def explain_comparison(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Comparison explanation failed: {str(e)}",
-        )
-
-
-@router.post(
-    "/compare",
-    response_model=CompareResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Explainability"],
-)
-async def compare_candidates(
-    request: CompareRequest,
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """
-    Compare two candidates side-by-side with comprehensive analysis.
-
-    This endpoint provides detailed side-by-side comparison of two candidates,
-    including:
-    - Overall score differential analysis
-    - Factor-by-factor breakdown showing which candidate is stronger in each area
-    - Natural language winner narrative explaining key differences
-    - Strengths and weaknesses comparison table
-    - Hiring recommendation
-
-    Args:
-        request: Comparison request with two resume IDs and vacancy ID
-        db: Database session
-
-    Returns:
-        Comprehensive comparison analysis
-
-    Raises:
-        HTTPException(404): If resume, vacancy, or ranking not found
-        HTTPException(422): If UUID format is invalid
-        HTTPException(500): If comparison generation fails
-
-    Examples:
-        >>> import requests
-        >>> data = {
-        ...     "resume_id_a": "abc-123",
-        ...     "resume_id_b": "def-456",
-        ...     "vacancy_id": "vac-789",
-        ...     "use_llm": True
-        ... }
-        >>> response = requests.post(
-        ...     "http://localhost:8000/api/explainability/compare",
-        ...     json=data
-        ... )
-        >>> response.json()
-        {
-            "vacancy_id": "vac-789",
-            "candidate_a_info": {...},
-            "candidate_b_info": {...},
-            "score_differential": {...},
-            "factor_by_factor_comparison": [...],
-            "winner_narrative": "Candidate A ranks higher due to...",
-            "key_differences": [...],
-            "strengths_weaknesses_table": {...}
-        }
-    """
-    try:
-        logger.info(
-            f"Comparing candidates: resume_a={request.resume_id_a}, "
-            f"resume_b={request.resume_id_b}, vacancy={request.vacancy_id}"
-        )
-
-        # Parse UUIDs
-        try:
-            resume_a_uuid = UUID(request.resume_id_a)
-            resume_b_uuid = UUID(request.resume_id_b)
-            vacancy_uuid = UUID(request.vacancy_id)
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid UUID format: {e}",
-            )
-
-        # Fetch rankings for both candidates
-        rank_a_query = select(CandidateRank).where(
-            CandidateRank.resume_id == resume_a_uuid,
-            CandidateRank.vacancy_id == vacancy_uuid,
-        )
-        rank_a_result = await db.execute(rank_a_query)
-        ranking_a = rank_a_result.scalar_one_or_none()
-
-        rank_b_query = select(CandidateRank).where(
-            CandidateRank.resume_id == resume_b_uuid,
-            CandidateRank.vacancy_id == vacancy_uuid,
-        )
-        rank_b_result = await db.execute(rank_b_query)
-        ranking_b = rank_b_result.scalar_one_or_none()
-
-        if not ranking_a or not ranking_b:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="One or both rankings not found",
-            )
-
-        # Fetch resumes
-        resume_a_query = select(Resume).where(Resume.id == resume_a_uuid)
-        resume_a_result = await db.execute(resume_a_query)
-        resume_a = resume_a_result.scalar_one_or_none()
-
-        resume_b_query = select(Resume).where(Resume.id == resume_b_uuid)
-        resume_b_result = await db.execute(resume_b_query)
-        resume_b = resume_b_result.scalar_one_or_none()
-
-        if not resume_a or not resume_b:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="One or both resumes not found",
-            )
-
-        # Fetch vacancy
-        vacancy_query = select(JobVacancy).where(JobVacancy.id == vacancy_uuid)
-        vacancy_result = await db.execute(vacancy_query)
-        vacancy = vacancy_result.scalar_one_or_none()
-
-        if not vacancy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vacancy not found",
-            )
-
-        # Get explanation generator
-        generator = get_explanation_generator()
-        if not generator:
-            generator = ExplanationGenerator()
-            use_llm = False
-        else:
-            use_llm = request.use_llm
-
-        # Extract ranking factors
-        factors_a = ranking_a.ranking_factors or {}
-        factors_b = ranking_b.ranking_factors or {}
-
-        # Generate comparison explanation using existing generator
-        comparison = await generator.generate_comparison_explanation(
-            candidate_a_name=resume_a.filename or request.resume_id_a,
-            candidate_b_name=resume_b.filename or request.resume_id_b,
-            candidate_a_score=float(ranking_a.rank_score),
-            candidate_b_score=float(ranking_b.rank_score),
-            candidate_a_factors=factors_a,
-            candidate_b_factors=factors_b,
-            job_title=vacancy.title,
-            use_llm=use_llm,
-        )
-
-        # Build candidate info objects
-        candidate_a_info = CandidateInfo(
-            resume_id=request.resume_id_a,
-            candidate_name=resume_a.filename or request.resume_id_a,
-            rank_score=float(ranking_a.rank_score),
-            rank_position=ranking_a.rank_position,
-            confidence=float(ranking_a.confidence_score) if ranking_a.confidence_score else 0.0,
-        )
-
-        candidate_b_info = CandidateInfo(
-            resume_id=request.resume_id_b,
-            candidate_name=resume_b.filename or request.resume_id_b,
-            rank_score=float(ranking_b.rank_score),
-            rank_position=ranking_b.rank_position,
-            confidence=float(ranking_b.confidence_score) if ranking_b.confidence_score else 0.0,
-        )
-
-        # Calculate score differential
-        score_diff = abs(ranking_a.rank_score - ranking_b.rank_score)
-        score_diff_percent = (score_diff / max(ranking_a.rank_score, ranking_b.rank_score)) * 100 if max(ranking_a.rank_score, ranking_b.rank_score) > 0 else 0
-        higher_candidate = "A" if ranking_a.rank_score >= ranking_b.rank_score else "B"
-
-        # Determine margin category
-        if score_diff_percent >= 20:
-            margin_category = "significant"
-        elif score_diff_percent >= 10:
-            margin_category = "moderate"
-        else:
-            margin_category = "slight"
-
-        score_differential = ScoreDifferential(
-            score_difference=float(score_diff),
-            score_difference_percent=float(score_diff_percent),
-            higher_candidate=higher_candidate,
-            margin_category=margin_category,
-        )
-
-        # Build factor-by-factor comparison
-        factor_comparisons = []
-        all_factor_names = set(factors_a.keys()) | set(factors_b.keys())
-
-        for factor_name in sorted(all_factor_names):
-            score_a = factors_a.get(factor_name, 0.0)
-            score_b = factors_b.get(factor_name, 0.0)
-            difference = score_a - score_b
-
-            if abs(difference) < 0.01:
-                winner = "tie"
-            elif difference > 0:
-                winner = "A"
-            else:
-                winner = "B"
-
-            # Generate brief explanation
-            if winner == "tie":
-                explanation = f"Both candidates are equally matched in {factor_name}"
-            elif winner == "A":
-                explanation = f"Candidate A has stronger {factor_name} (+{abs(difference):.2f})"
-            else:
-                explanation = f"Candidate B has stronger {factor_name} (+{abs(difference):.2f})"
-
-            factor_comparisons.append(FactorComparison(
-                factor_name=factor_name,
-                candidate_a_score=float(score_a),
-                candidate_b_score=float(score_b),
-                difference=float(difference),
-                winner=winner,
-                explanation=explanation,
-            ))
-
-        # Build strengths/weaknesses table
-        # Extract from comparison object or generate defaults
-        strengths_weaknesses_table = StrengthsWeaknessesTable(
-            candidate_a_strengths=comparison.winning_factors if higher_candidate == "A" else comparison.losing_factors,
-            candidate_b_strengths=comparison.winning_factors if higher_candidate == "B" else comparison.losing_factors,
-            candidate_a_weaknesses=comparison.losing_factors if higher_candidate == "A" else comparison.winning_factors,
-            candidate_b_weaknesses=comparison.losing_factors if higher_candidate == "B" else comparison.winning_factors,
-        )
-
-        # Build response
-        response_data = CompareResponse(
-            vacancy_id=request.vacancy_id,
-            candidate_a_info=candidate_a_info,
-            candidate_b_info=candidate_b_info,
-            score_differential=score_differential,
-            factor_by_factor_comparison=factor_comparisons,
-            winner_narrative=comparison.narrative,
-            key_differences=comparison.key_differences,
-            strengths_weaknesses_table=strengths_weaknesses_table,
-            recommendation=comparison.recommendation,
-            provider=comparison.provider,
-            model=comparison.model,
-            generated_at=comparison.generated_at,
-        )
-
-        logger.info("Candidate comparison generated successfully")
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data.dict(),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error comparing candidates: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Candidate comparison failed: {str(e)}",
         )
 
 
@@ -1723,6 +1594,43 @@ async def export_explainability_pdf(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"PDF export failed: {str(e)}",
         ) from e
+
+
+@router.post(
+    "/export-pdf",
+    response_model=PDFExportResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Explainability"],
+)
+async def export_explainability_pdf_alias(
+    request: PDFExportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Export explainability report as PDF (alternative endpoint).
+
+    This is an alias endpoint for /export/pdf providing the same functionality.
+    Generates a professional PDF report containing:
+    - Candidate ranking explanation
+    - Feature contribution breakdowns with charts
+    - Confidence intervals visualization
+    - Strengths and weaknesses
+    - Resume section highlights
+
+    Args:
+        request: PDF export request with resume_id and vacancy_id
+        db: Database session
+
+    Returns:
+        PDF export response with download URL
+
+    Raises:
+        HTTPException(404): If resume, vacancy, or ranking not found
+        HTTPException(422): If UUID format is invalid
+        HTTPException(500): If PDF generation fails
+    """
+    # Delegate to the main implementation
+    return await export_explainability_pdf(request, db)
 
 
 @router.get(

@@ -307,6 +307,170 @@ class TestEnhancedExplainabilityE2E:
             # Ranking exists but no explainability data - acceptable for test environment
             pass
 
+    def test_enhanced_visualization_data_structure(
+        self, test_vacancy, test_resumes, test_rankings
+    ):
+        """
+        Test that enhanced API returns proper visualization data structures.
+
+        Verifies the enhanced explainability API response includes:
+        1. feature_categories - grouped features for radar charts
+        2. percentile_data - percentile rankings with category breakdowns
+        3. skills_match - detailed skills matching information
+        4. factors - ranking factor details with contributions
+
+        These structures enable advanced frontend visualizations like:
+        - FeatureRadarChart component
+        - InteractiveFeatureBreakdown component
+        - FactorComparisonChart component
+        """
+        if not test_rankings.get("ranked_candidates") or len(test_rankings["ranked_candidates"]) == 0:
+            pytest.skip("Rankings not available - ML model may not be trained")
+
+        # Get top candidate for explanation
+        top_candidate = test_rankings["ranked_candidates"][0]
+        resume_id = top_candidate["resume_id"]
+        vacancy_id = test_vacancy["id"]
+
+        # Request enhanced explanation
+        explanation_request = {
+            "resume_id": resume_id,
+            "vacancy_id": vacancy_id,
+            "use_llm": False,  # Basic test without LLM requirement
+        }
+
+        response = requests.post(
+            f"{self.BASE_URL}/api/explainability/explain",
+            json=explanation_request
+        )
+
+        if response.status_code == 200:
+            explanation = response.json()
+
+            # Verify core enhanced fields are present
+            assert "feature_categories" in explanation, "feature_categories field missing from response"
+            assert "percentile_data" in explanation, "percentile_data field missing from response"
+            assert "skills_match" in explanation, "skills_match field missing from response"
+            assert "factors" in explanation, "factors field missing from response"
+
+            # Verify feature_categories structure (for radar charts)
+            feature_categories = explanation["feature_categories"]
+            assert isinstance(feature_categories, list), "feature_categories should be a list"
+
+            if len(feature_categories) > 0:
+                for category in feature_categories:
+                    assert "category_name" in category, "category_name missing from feature_categories"
+                    assert "category_score" in category, "category_score missing from feature_categories"
+                    assert "weight" in category, "weight missing from feature_categories"
+                    assert "features_in_category" in category, "features_in_category missing"
+
+                    # Validate data types
+                    assert isinstance(category["category_name"], str)
+                    assert isinstance(category["category_score"], (int, float))
+                    assert isinstance(category["weight"], (int, float))
+                    assert isinstance(category["features_in_category"], list)
+
+                    # Validate score range (0-1)
+                    assert 0 <= category["category_score"] <= 1, \
+                        f"category_score {category['category_score']} out of range [0,1]"
+
+                    # Percentile is optional but if present should be 0-100
+                    if "percentile" in category and category["percentile"] is not None:
+                        assert 0 <= category["percentile"] <= 100, \
+                            f"category percentile {category['percentile']} out of range [0,100]"
+
+            # Verify percentile_data structure (for candidate comparison context)
+            percentile_data = explanation["percentile_data"]
+            assert isinstance(percentile_data, dict), "percentile_data should be a dict"
+
+            # Required fields in percentile_data
+            assert "overall_percentile" in percentile_data, "overall_percentile missing from percentile_data"
+            assert "category_percentiles" in percentile_data, "category_percentiles missing"
+            assert "rank_position" in percentile_data, "rank_position missing from percentile_data"
+            assert "total_candidates" in percentile_data, "total_candidates missing from percentile_data"
+
+            # Validate data types
+            assert isinstance(percentile_data["overall_percentile"], (int, float))
+            assert isinstance(percentile_data["category_percentiles"], dict)
+            assert isinstance(percentile_data["rank_position"], int)
+            assert isinstance(percentile_data["total_candidates"], int)
+
+            # Validate ranges
+            assert 0 <= percentile_data["overall_percentile"] <= 100, \
+                f"overall_percentile {percentile_data['overall_percentile']} out of range [0,100]"
+            assert percentile_data["rank_position"] > 0, "rank_position should be positive"
+            assert percentile_data["total_candidates"] > 0, "total_candidates should be positive"
+
+            # Validate category percentiles
+            for category_name, percentile in percentile_data["category_percentiles"].items():
+                assert isinstance(category_name, str)
+                assert isinstance(percentile, (int, float))
+                assert 0 <= percentile <= 100, \
+                    f"Category percentile {percentile} for {category_name} out of range [0,100]"
+
+            # Verify skills_match structure (for skills visualizations)
+            skills_match = explanation["skills_match"]
+            assert isinstance(skills_match, dict), "skills_match should be a dict"
+
+            # Required fields in skills_match
+            assert "matched_skills" in skills_match, "matched_skills missing from skills_match"
+            assert "missing_skills" in skills_match, "missing_skills missing from skills_match"
+            assert "additional_skills" in skills_match, "additional_skills missing from skills_match"
+            assert "match_percentage" in skills_match, "match_percentage missing from skills_match"
+
+            # Validate data types
+            assert isinstance(skills_match["matched_skills"], list)
+            assert isinstance(skills_match["missing_skills"], list)
+            assert isinstance(skills_match["additional_skills"], list)
+            assert isinstance(skills_match["match_percentage"], (int, float))
+
+            # Validate match_percentage range
+            assert 0 <= skills_match["match_percentage"] <= 100, \
+                f"match_percentage {skills_match['match_percentage']} out of range [0,100]"
+
+            # All skills should be strings
+            for skill in skills_match["matched_skills"]:
+                assert isinstance(skill, str), "Matched skills should be strings"
+            for skill in skills_match["missing_skills"]:
+                assert isinstance(skill, str), "Missing skills should be strings"
+            for skill in skills_match["additional_skills"]:
+                assert isinstance(skill, str), "Additional skills should be strings"
+
+            # Verify factors structure (for factor-by-factor comparison)
+            factors = explanation["factors"]
+            assert isinstance(factors, list), "factors should be a list"
+
+            if len(factors) > 0:
+                for factor in factors:
+                    assert "factor_name" in factor, "factor_name missing from factors"
+                    assert "score" in factor, "score missing from factors"
+                    assert "weight" in factor, "weight missing from factors"
+                    assert "contribution" in factor, "contribution missing from factors"
+                    assert "description" in factor, "description missing from factors"
+
+                    # Validate data types
+                    assert isinstance(factor["factor_name"], str)
+                    assert isinstance(factor["score"], (int, float))
+                    assert isinstance(factor["weight"], (int, float))
+                    assert isinstance(factor["contribution"], (int, float))
+                    assert isinstance(factor["description"], str)
+
+                    # raw_value is optional
+                    if "raw_value" in factor and factor["raw_value"] is not None:
+                        assert isinstance(factor["raw_value"], (int, float))
+
+            # Verify backward compatibility - old fields should still be present
+            assert "candidate_id" in explanation or "resume_id" in explanation
+            assert "vacancy_id" in explanation
+            assert "rank_score" in explanation
+            assert "narrative" in explanation
+            assert "strengths" in explanation
+            assert "weaknesses" in explanation
+
+        elif response.status_code == 404:
+            # Ranking not found - acceptable in test environment
+            pass
+
     def test_percentile_calculation_accuracy(
         self, test_vacancy, test_resumes, test_rankings
     ):
