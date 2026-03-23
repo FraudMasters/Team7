@@ -8,12 +8,19 @@ and other key performance indicators for the recruitment process.
 import csv
 import io
 import logging
+from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func, and_, case
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.resume import Resume, ResumeStatus
+from models.hiring_stage import HiringStage, HiringStageName
+from models.candidate_rank import CandidateRank
 
 from schemas.ranking_metrics import (
     FeedbackConversionMetrics,
@@ -71,6 +78,7 @@ class KeyMetricsResponse(BaseModel):
     tags=["Analytics"],
 )
 async def get_key_metrics(
+    db: AsyncSession = Depends(get_db),
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
 ) -> JSONResponse:
@@ -83,6 +91,7 @@ async def get_key_metrics(
     areas for improvement.
 
     Args:
+        db: Database session (injected by FastAPI)
         start_date: Optional start date for filtering metrics (ISO 8601 format)
         end_date: Optional end date for filtering metrics (ISO 8601 format)
 
@@ -124,29 +133,46 @@ async def get_key_metrics(
             f"Fetching key metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Parse date filters
+        date_filter_start = None
+        date_filter_end = None
+        if start_date:
+            try:
+                date_filter_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {str(e)}",
+                ) from e
+
+        if end_date:
+            try:
+                date_filter_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {str(e)}",
+                ) from e
+
+        # Calculate time-to-hire metrics
+        time_to_hire_metrics = await _calculate_time_to_hire_metrics(
+            db, date_filter_start, date_filter_end
+        )
+
+        # Calculate resume processing metrics
+        resume_metrics = await _calculate_resume_metrics(
+            db, date_filter_start, date_filter_end
+        )
+
+        # Calculate match rate metrics
+        match_rate_metrics = await _calculate_match_rate_metrics(
+            db, date_filter_start, date_filter_end
+        )
+
         response_data = {
-            "time_to_hire": {
-                "average_days": 32.5,
-                "median_days": 28.0,
-                "min_days": 7,
-                "max_days": 90,
-                "percentile_25": 21.0,
-                "percentile_75": 45.0,
-            },
-            "resumes": {
-                "total_processed": 1250,
-                "processed_this_month": 180,
-                "processed_this_week": 42,
-                "processing_rate_avg": 8.5,
-            },
-            "match_rates": {
-                "overall_match_rate": 0.78,
-                "high_confidence_matches": 890,
-                "low_confidence_matches": 156,
-                "average_confidence": 0.72,
-            },
+            "time_to_hire": time_to_hire_metrics,
+            "resumes": resume_metrics,
+            "match_rates": match_rate_metrics,
         }
 
         logger.info("Key metrics retrieved successfully")
@@ -156,12 +182,444 @@ async def get_key_metrics(
             content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving key metrics: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve key metrics: {str(e)}",
         ) from e
+
+
+async def _calculate_time_to_hire_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate time-to-hire performance metrics.
+
+    Time-to-hire is measured as the time from when a resume enters the 'APPLIED' stage
+    to when it reaches the 'HIRED' stage.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with time-to-hire metrics
+    """
+    try:
+        # Build subquery to get hired candidates with their applied and hired timestamps
+        hired_subquery = (
+            select(
+                HiringStage.resume_id,
+                HiringStage.created_at.label("hired_at"),
+            )
+            .where(HiringStage.stage_name == HiringStageName.HIRED)
+        )
+
+        if start_date:
+            hired_subquery = hired_subquery.where(HiringStage.created_at >= start_date)
+        if end_date:
+            hired_subquery = hired_subquery.where(HiringStage.created_at <= end_date)
+
+        hired_subquery = hired_subquery.subquery()
+
+        # Get applied timestamps for hired candidates
+        applied_subquery = (
+            select(
+                HiringStage.resume_id,
+                func.min(HiringStage.created_at).label("applied_at"),
+            )
+            .where(HiringStage.stage_name == HiringStageName.APPLIED)
+            .group_by(HiringStage.resume_id)
+            .subquery()
+        )
+
+        # Calculate time differences in days
+        query = select(
+            func.extract("epoch", hired_subquery.c.hired_at - applied_subquery.c.applied_at) / 86400.0
+        ).select_from(hired_subquery).join(
+            applied_subquery,
+            hired_subquery.c.resume_id == applied_subquery.c.resume_id
+        )
+
+        result = await db.execute(query)
+        time_to_hire_days = [float(row[0]) for row in result.fetchall() if row[0] is not None]
+
+        if not time_to_hire_days:
+            # Return default values if no data
+            return {
+                "average_days": 0.0,
+                "median_days": 0.0,
+                "min_days": 0,
+                "max_days": 0,
+                "percentile_25": 0.0,
+                "percentile_75": 0.0,
+            }
+
+        # Calculate statistics
+        time_to_hire_days.sort()
+        n = len(time_to_hire_days)
+
+        average_days = sum(time_to_hire_days) / n
+        median_days = (
+            time_to_hire_days[n // 2]
+            if n % 2 == 1
+            else (time_to_hire_days[n // 2 - 1] + time_to_hire_days[n // 2]) / 2
+        )
+        min_days = int(min(time_to_hire_days))
+        max_days = int(max(time_to_hire_days))
+
+        # Calculate percentiles
+        idx_25 = int(n * 0.25)
+        idx_75 = int(n * 0.75)
+        percentile_25 = time_to_hire_days[idx_25]
+        percentile_75 = time_to_hire_days[idx_75]
+
+        return {
+            "average_days": round(average_days, 1),
+            "median_days": round(median_days, 1),
+            "min_days": min_days,
+            "max_days": max_days,
+            "percentile_25": round(percentile_25, 1),
+            "percentile_75": round(percentile_75, 1),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating time-to-hire metrics: {e}", exc_info=True)
+        # Return default values on error
+        return {
+            "average_days": 0.0,
+            "median_days": 0.0,
+            "min_days": 0,
+            "max_days": 0,
+            "percentile_25": 0.0,
+            "percentile_75": 0.0,
+        }
+
+
+async def _calculate_resume_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate resume processing metrics.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with resume processing metrics
+    """
+    try:
+        # Get total processed resumes
+        total_query = select(func.count(Resume.id)).where(
+            Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED])
+        )
+
+        if start_date:
+            total_query = total_query.where(Resume.created_at >= start_date)
+        if end_date:
+            total_query = total_query.where(Resume.created_at <= end_date)
+
+        result = await db.execute(total_query)
+        total_processed = result.scalar() or 0
+
+        # Get resumes processed this month
+        now = datetime.utcnow()
+        first_day_of_month = datetime(now.year, now.month, 1)
+
+        month_query = select(func.count(Resume.id)).where(
+            and_(
+                Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED]),
+                Resume.created_at >= first_day_of_month,
+            )
+        )
+        result = await db.execute(month_query)
+        processed_this_month = result.scalar() or 0
+
+        # Get resumes processed this week
+        first_day_of_week = now - timedelta(days=now.weekday())
+        first_day_of_week = datetime(
+            first_day_of_week.year, first_day_of_week.month, first_day_of_week.day
+        )
+
+        week_query = select(func.count(Resume.id)).where(
+            and_(
+                Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED]),
+                Resume.created_at >= first_day_of_week,
+            )
+        )
+        result = await db.execute(week_query)
+        processed_this_week = result.scalar() or 0
+
+        # Calculate processing rate (resumes per day)
+        # Get earliest resume date to calculate rate
+        earliest_query = select(func.min(Resume.created_at)).where(
+            Resume.status.in_([ResumeStatus.COMPLETED, ResumeStatus.FAILED])
+        )
+        result = await db.execute(earliest_query)
+        earliest_date = result.scalar()
+
+        if earliest_date and total_processed > 0:
+            days_diff = (now - earliest_date).days
+            if days_diff > 0:
+                processing_rate_avg = total_processed / days_diff
+            else:
+                processing_rate_avg = float(total_processed)
+        else:
+            processing_rate_avg = 0.0
+
+        return {
+            "total_processed": total_processed,
+            "processed_this_month": processed_this_month,
+            "processed_this_week": processed_this_week,
+            "processing_rate_avg": round(processing_rate_avg, 1),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating resume metrics: {e}", exc_info=True)
+        # Return default values on error
+        return {
+            "total_processed": 0,
+            "processed_this_month": 0,
+            "processed_this_week": 0,
+            "processing_rate_avg": 0.0,
+        }
+
+
+async def _calculate_match_rate_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate skill matching performance metrics.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with match rate metrics
+    """
+    try:
+        # Build base query
+        base_query = select(CandidateRank)
+
+        if start_date:
+            base_query = base_query.where(CandidateRank.created_at >= start_date)
+        if end_date:
+            base_query = base_query.where(CandidateRank.created_at <= end_date)
+
+        # Get all candidate ranks for analysis
+        result = await db.execute(base_query)
+        ranks = result.scalars().all()
+
+        if not ranks:
+            # Return default values if no data
+            return {
+                "overall_match_rate": 0.0,
+                "high_confidence_matches": 0,
+                "low_confidence_matches": 0,
+                "average_confidence": 0.0,
+            }
+
+        # Calculate metrics
+        total_ranks = len(ranks)
+
+        # Count high confidence matches (rank_score > 0.8)
+        high_confidence_matches = sum(
+            1 for rank in ranks if rank.rank_score > 0.8
+        )
+
+        # Count low confidence matches (rank_score < 0.5)
+        low_confidence_matches = sum(
+            1 for rank in ranks if rank.rank_score < 0.5
+        )
+
+        # Calculate average confidence (using rank_score as confidence proxy)
+        average_confidence = sum(rank.rank_score for rank in ranks) / total_ranks
+
+        # Calculate overall match rate (percentage of candidates with score > 0.6)
+        matches_above_threshold = sum(
+            1 for rank in ranks if rank.rank_score > 0.6
+        )
+        overall_match_rate = matches_above_threshold / total_ranks
+
+        return {
+            "overall_match_rate": round(overall_match_rate, 2),
+            "high_confidence_matches": high_confidence_matches,
+            "low_confidence_matches": low_confidence_matches,
+            "average_confidence": round(average_confidence, 2),
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating match rate metrics: {e}", exc_info=True)
+        # Return default values on error
+        return {
+            "overall_match_rate": 0.0,
+            "high_confidence_matches": 0,
+            "low_confidence_matches": 0,
+            "average_confidence": 0.0,
+        }
+
+
+async def _calculate_funnel_metrics(
+    db: AsyncSession,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+) -> dict:
+    """
+    Calculate hiring funnel metrics.
+
+    This function queries the hiring_stages table to get the current stage
+    for each resume and calculates conversion rates between stages.
+
+    Args:
+        db: Database session
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+
+    Returns:
+        Dictionary with funnel metrics including stages and total_candidates
+    """
+    try:
+        # Define funnel stages in order (using actual HiringStageName values)
+        funnel_stage_order = [
+            HiringStageName.APPLIED.value,
+            HiringStageName.SCREENING.value,
+            HiringStageName.INTERVIEW.value,
+            HiringStageName.TECHNICAL.value,
+            HiringStageName.OFFER.value,
+            HiringStageName.HIRED.value,
+        ]
+
+        # Build subquery to get the latest stage for each resume
+        # Using row_number() window function to get most recent stage per resume
+        from sqlalchemy import desc
+
+        subquery = (
+            select(
+                HiringStage.resume_id,
+                HiringStage.stage_name,
+                func.row_number().over(
+                    partition_by=HiringStage.resume_id,
+                    order_by=desc(HiringStage.created_at)
+                ).label('rn')
+            )
+        )
+
+        # Apply date filters if provided
+        if start_date:
+            subquery = subquery.where(HiringStage.created_at >= start_date)
+        if end_date:
+            subquery = subquery.where(HiringStage.created_at <= end_date)
+
+        subquery = subquery.subquery()
+
+        # Query to count resumes by their latest stage
+        stage_count_query = (
+            select(
+                subquery.c.stage_name,
+                func.count().label('count')
+            )
+            .where(subquery.c.rn == 1)
+            .group_by(subquery.c.stage_name)
+        )
+
+        result = await db.execute(stage_count_query)
+        stage_counts = {str(row[0]): int(row[1]) for row in result.fetchall()}
+
+        # Calculate total candidates (sum of all stages)
+        total_candidates = sum(stage_counts.values())
+
+        if total_candidates == 0:
+            # Return empty funnel if no data
+            return {
+                "stages": [
+                    {
+                        "stage_name": stage,
+                        "count": 0,
+                        "conversion_rate_from_previous": None if i == 0 else 0.0,
+                        "conversion_rate_from_start": 1.0 if i == 0 else 0.0,
+                    }
+                    for i, stage in enumerate(funnel_stage_order)
+                ],
+                "total_candidates": 0,
+            }
+
+        # Build ordered funnel stages with conversion rates
+        funnel_stages = []
+        previous_count = None
+
+        for stage_name in funnel_stage_order:
+            count = stage_counts.get(stage_name, 0)
+
+            # Calculate conversion rates
+            if previous_count is None:
+                # First stage - no previous stage
+                conversion_from_previous = None
+                # For the first stage, conversion from start is always 1.0 if there are candidates
+                conversion_from_start = 1.0 if total_candidates > 0 else 0.0
+            else:
+                # Calculate conversion from previous stage
+                conversion_from_previous = (
+                    round(count / previous_count, 3) if previous_count > 0 else 0.0
+                )
+                # Calculate conversion from total candidates
+                conversion_from_start = (
+                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
+                )
+
+            funnel_stages.append({
+                "stage_name": stage_name,
+                "count": count,
+                "conversion_rate_from_previous": conversion_from_previous,
+                "conversion_rate_from_start": conversion_from_start,
+            })
+
+            previous_count = count
+
+        # Include any additional stages not in the standard list
+        # (e.g., REJECTED, WITHDRAWN)
+        for stage_name, count in stage_counts.items():
+            if stage_name not in funnel_stage_order:
+                conversion_from_previous = (
+                    round(count / previous_count, 3) if previous_count and previous_count > 0 else 0.0
+                )
+                conversion_from_start = (
+                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
+                )
+
+                funnel_stages.append({
+                    "stage_name": stage_name,
+                    "count": count,
+                    "conversion_rate_from_previous": conversion_from_previous,
+                    "conversion_rate_from_start": conversion_from_start,
+                })
+                previous_count = count
+
+        return {
+            "stages": funnel_stages,
+            "total_candidates": total_candidates,
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating funnel metrics: {e}", exc_info=True)
+        # Return empty funnel on error
+        return {
+            "stages": [],
+            "total_candidates": 0,
+        }
 
 
 class QualityMetricsResponse(BaseModel):
@@ -740,6 +1198,7 @@ class FunnelMetricsResponse(BaseModel):
     tags=["Analytics"],
 )
 async def get_funnel_metrics(
+    db: AsyncSession = Depends(get_db),
     start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
     end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
 ) -> JSONResponse:
@@ -751,9 +1210,8 @@ async def get_funnel_metrics(
     This helps identify bottlenecks in the recruitment process and optimize
     conversion strategies.
 
-    The funnel stages include:
-    - uploaded: Resumes uploaded to the system
-    - analyzed: Resumes processed through NLP analysis
+    The funnel stages are based on the HiringStageName enum:
+    - applied: Candidates who have applied
     - screening: Candidates in initial screening
     - interview: Candidates scheduled for interviews
     - technical: Candidates in technical assessment
@@ -761,6 +1219,7 @@ async def get_funnel_metrics(
     - hired: Candidates successfully hired
 
     Args:
+        db: Database session (injected by FastAPI)
         start_date: Optional start date for filtering metrics (ISO 8601 format)
         end_date: Optional end date for filtering metrics (ISO 8601 format)
 
@@ -768,6 +1227,7 @@ async def get_funnel_metrics(
         JSON response with funnel metrics including stage counts and conversion rates
 
     Raises:
+        HTTPException(400): If date format is invalid
         HTTPException(500): If data retrieval fails
 
     Examples:
@@ -777,21 +1237,15 @@ async def get_funnel_metrics(
         {
             "stages": [
                 {
-                    "stage_name": "uploaded",
+                    "stage_name": "applied",
                     "count": 500,
                     "conversion_rate_from_previous": null,
                     "conversion_rate_from_start": 1.0
                 },
                 {
-                    "stage_name": "analyzed",
-                    "count": 450,
-                    "conversion_rate_from_previous": 0.9,
-                    "conversion_rate_from_start": 0.9
-                },
-                {
                     "stage_name": "screening",
                     "count": 300,
-                    "conversion_rate_from_previous": 0.67,
+                    "conversion_rate_from_previous": 0.6,
                     "conversion_rate_from_start": 0.6
                 },
                 {
@@ -815,199 +1269,40 @@ async def get_funnel_metrics(
             f"Fetching funnel metrics - start_date: {start_date}, end_date: {end_date}"
         )
 
-        from sqlalchemy import func, desc
-        from models import HiringStage, Resume, AnalyticsEvent
-        from database import get_db
+        # Parse date filters
+        date_filter_start = None
+        date_filter_end = None
+        if start_date:
+            try:
+                date_filter_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {str(e)}",
+                ) from e
 
-        # Define standard funnel stages in order
-        funnel_stage_order = [
-            "uploaded",
-            "analyzed",
-            "screening",
-            "interview",
-            "technical",
-            "offer",
-            "hired",
-        ]
+        if end_date:
+            try:
+                date_filter_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {str(e)}",
+                ) from e
 
-        stage_metrics = {}
-
-        async for db in get_db():
-            # Build query for HiringStage with date filters
-            hiring_query = select(HiringStage)
-
-            if start_date:
-                from datetime import datetime
-                try:
-                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                    hiring_query = hiring_query.where(HiringStage.created_at >= start_dt)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid start_date format: {start_date}. Use ISO 8601 format.",
-                    )
-
-            if end_date:
-                from datetime import datetime
-                try:
-                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                    hiring_query = hiring_query.where(HiringStage.created_at <= end_dt)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid end_date format: {end_date}. Use ISO 8601 format.",
-                    )
-
-            # Get the most recent stage for each resume
-            # We need to find the latest HiringStage record for each resume_id
-            from sqlalchemy import literal_column
-            subquery = (
-                select(
-                    HiringStage.resume_id,
-                    HiringStage.stage_name,
-                    func.row_number().over(
-                        partition_by=HiringStage.resume_id,
-                        order_by=desc(HiringStage.created_at)
-                    ).label('rn')
-                )
-            )
-
-            if start_date:
-                from datetime import datetime
-                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                subquery = subquery.where(HiringStage.created_at >= start_dt)
-
-            if end_date:
-                from datetime import datetime
-                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                subquery = subquery.where(HiringStage.created_at <= end_dt)
-
-            # Wrap subquery to filter by row_number
-            from sqlalchemy import alias
-            stage_cte = alias(subquery)
-
-            # Count resumes by their latest stage
-            stage_counts = {}
-            result = await db.execute(
-                select(stage_cte.c.stage_name, func.count().label('count'))
-                .where(stage_cte.c.rn == 1)
-                .group_by(stage_cte.c.stage_name)
-            )
-
-            for row in result:
-                stage_counts[row[0]] = row[1]
-
-            # Get uploaded count from AnalyticsEvent (resume_uploaded events)
-            uploaded_query = select(func.count(AnalyticsEvent.id)).where(
-                AnalyticsEvent.event_type == "resume_uploaded"
-            )
-
-            if start_date:
-                from datetime import datetime
-                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                uploaded_query = uploaded_query.where(AnalyticsEvent.created_at >= start_dt)
-
-            if end_date:
-                from datetime import datetime
-                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                uploaded_query = uploaded_query.where(AnalyticsEvent.created_at <= end_dt)
-
-            uploaded_result = await db.execute(uploaded_query)
-            uploaded_count = uploaded_result.scalar() or 0
-
-            # Get analyzed count from Resume table (resumes with analysis)
-            analyzed_query = select(func.count(Resume.id)).where(
-                Resume.status == "analyzed"
-            )
-
-            if start_date:
-                from datetime import datetime
-                start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                analyzed_query = analyzed_query.where(Resume.created_at >= start_dt)
-
-            if end_date:
-                from datetime import datetime
-                end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                analyzed_query = analyzed_query.where(Resume.created_at <= end_dt)
-
-            analyzed_result = await db.execute(analyzed_query)
-            analyzed_count = analyzed_result.scalar() or 0
-
-            # Build stage metrics dictionary
-            stage_metrics = {
-                "uploaded": uploaded_count,
-                "analyzed": analyzed_count,
-            }
-
-            # Add counts from HiringStage for other stages
-            for stage_name, count in stage_counts.items():
-                if stage_name not in stage_metrics:
-                    stage_metrics[stage_name] = count
-
-            break
-
-        # Build ordered funnel stages
-        funnel_stages = []
-        total_candidates = stage_metrics.get("uploaded", 0)
-
-        previous_count = None
-        for stage_name in funnel_stage_order:
-            count = stage_metrics.get(stage_name, 0)
-
-            # Calculate conversion rates
-            if previous_count is None:
-                # First stage - no previous stage
-                conversion_from_previous = None
-                conversion_from_start = 1.0 if count > 0 else 0.0
-            else:
-                # Calculate conversion from previous stage
-                conversion_from_previous = (
-                    round(count / previous_count, 3) if previous_count > 0 else 0.0
-                )
-                conversion_from_start = (
-                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
-                )
-
-            funnel_stages.append({
-                "stage_name": stage_name,
-                "count": count,
-                "conversion_rate_from_previous": conversion_from_previous,
-                "conversion_rate_from_start": conversion_from_start,
-            })
-
-            previous_count = count
-
-        # Include any additional stages not in the standard list
-        for stage_name, count in stage_metrics.items():
-            if stage_name not in funnel_stage_order:
-                conversion_from_previous = (
-                    round(count / previous_count, 3) if previous_count and previous_count > 0 else 0.0
-                )
-                conversion_from_start = (
-                    round(count / total_candidates, 3) if total_candidates > 0 else 0.0
-                )
-
-                funnel_stages.append({
-                    "stage_name": stage_name,
-                    "count": count,
-                    "conversion_rate_from_previous": conversion_from_previous,
-                    "conversion_rate_from_start": conversion_from_start,
-                })
-                previous_count = count
-
-        response_data = {
-            "stages": funnel_stages,
-            "total_candidates": total_candidates,
-        }
+        # Calculate funnel metrics using helper function
+        funnel_data = await _calculate_funnel_metrics(
+            db, date_filter_start, date_filter_end
+        )
 
         logger.info(
-            f"Funnel metrics retrieved successfully - {len(funnel_stages)} stages, "
-            f"{total_candidates} total candidates"
+            f"Funnel metrics retrieved successfully - {len(funnel_data['stages'])} stages, "
+            f"{funnel_data['total_candidates']} total candidates"
         )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=response_data,
+            content=funnel_data,
         )
 
     except HTTPException:
@@ -3055,6 +3350,296 @@ async def get_source_tracking(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve source tracking: {str(e)}",
+        ) from e
+
+
+class SourceEffectivenessMetrics(BaseModel):
+    """Source effectiveness analytics metrics."""
+
+    source: str = Field(..., description="Candidate source (e.g., referral, LinkedIn, website)")
+    total_candidates: int = Field(..., description="Total candidates from this source")
+    hired_count: int = Field(..., description="Number of candidates hired from this source")
+    conversion_rate: float = Field(..., description="Conversion rate (hired/total) for this source (0-1)")
+    avg_time_to_hire: Optional[float] = Field(None, description="Average time to hire in days for this source")
+    interview_count: int = Field(0, description="Number of candidates who reached interview stage")
+    interview_rate: float = Field(0.0, description="Rate of candidates reaching interview (0-1)")
+
+
+class SourceEffectivenessResponse(BaseModel):
+    """Response model for source effectiveness analytics."""
+
+    sources: list[SourceEffectivenessMetrics] = Field(..., description="List of source effectiveness metrics")
+    total_candidates: int = Field(..., description="Total candidates across all sources")
+    best_source: Optional[str] = Field(None, description="Most effective source by conversion rate")
+
+
+@router.get(
+    "/source-effectiveness",
+    response_model=SourceEffectivenessResponse,
+    tags=["Analytics"],
+)
+async def get_source_effectiveness(
+    db: AsyncSession = Depends(get_db),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO 8601 format)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO 8601 format)"),
+) -> JSONResponse:
+    """
+    Get source effectiveness analytics.
+
+    This endpoint provides comprehensive effectiveness metrics for candidate recruiting sources,
+    including conversion rates, time-to-hire, and interview progression rates. This helps
+    identify which recruiting channels (LinkedIn, referrals, job boards, etc.) produce
+    the best quality candidates and optimize recruitment budget allocation.
+
+    Key metrics per source:
+    - Conversion rate: Percentage of candidates who get hired
+    - Average time-to-hire: How quickly candidates from this source get hired
+    - Interview rate: Percentage of candidates who reach interview stage
+    - Total volume: Number of candidates from each source
+
+    Args:
+        db: Database session (injected by FastAPI)
+        start_date: Optional start date for filtering metrics (ISO 8601 format)
+        end_date: Optional end date for filtering metrics (ISO 8601 format)
+
+    Returns:
+        JSON response with source effectiveness metrics and best performing source
+
+    Raises:
+        HTTPException(400): If date format is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get("/api/analytics/source-effectiveness")
+        >>> response.json()
+        {
+            "sources": [
+                {
+                    "source": "referral",
+                    "total_candidates": 120,
+                    "hired_count": 18,
+                    "conversion_rate": 0.15,
+                    "avg_time_to_hire": 25.5,
+                    "interview_count": 45,
+                    "interview_rate": 0.375
+                },
+                {
+                    "source": "linkedin",
+                    "total_candidates": 350,
+                    "hired_count": 28,
+                    "conversion_rate": 0.08,
+                    "avg_time_to_hire": 32.0,
+                    "interview_count": 105,
+                    "interview_rate": 0.3
+                }
+            ],
+            "total_candidates": 720,
+            "best_source": "referral"
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching source effectiveness - start_date: {start_date}, end_date: {end_date}"
+        )
+
+        # Parse date filters
+        date_filter_start = None
+        date_filter_end = None
+        if start_date:
+            try:
+                date_filter_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid start_date format: {str(e)}",
+                ) from e
+
+        if end_date:
+            try:
+                date_filter_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid end_date format: {str(e)}",
+                ) from e
+
+        # Calculate source effectiveness metrics
+        from models.analytics_event import AnalyticsEvent
+        from collections import defaultdict
+
+        source_data = defaultdict(lambda: {
+            "total": 0,
+            "hired": 0,
+            "interview": 0,
+            "resume_ids": set(),
+            "hired_resume_ids": set(),
+        })
+
+        # Query resume_uploaded events to get source information
+        upload_query = select(AnalyticsEvent).where(
+            AnalyticsEvent.event_type == "resume_uploaded"
+        )
+
+        # Apply date filters
+        if date_filter_start:
+            upload_query = upload_query.where(AnalyticsEvent.created_at >= date_filter_start)
+        if date_filter_end:
+            upload_query = upload_query.where(AnalyticsEvent.created_at <= date_filter_end)
+
+        upload_result = await db.execute(upload_query)
+        upload_events = upload_result.scalars().all()
+
+        # Extract source from event_data and count candidates per source
+        resume_to_source = {}
+        for event in upload_events:
+            # Get source from event_data JSON field
+            source = "unknown"
+            if event.event_data and isinstance(event.event_data, dict):
+                source = event.event_data.get("source", "unknown")
+                if not source or not isinstance(source, str):
+                    source = "unknown"
+                # Normalize source name (lowercase, strip whitespace)
+                source = source.strip().lower() if source.strip() else "unknown"
+            else:
+                source = "unknown"
+
+            # Track resume to source mapping
+            if event.entity_id:
+                resume_to_source[str(event.entity_id)] = source
+                source_data[source]["total"] += 1
+                source_data[source]["resume_ids"].add(str(event.entity_id))
+
+        # Get hired candidates
+        from models.hiring_stage import HiringStage
+
+        hired_query = select(
+            HiringStage.resume_id,
+            HiringStage.created_at,
+            HiringStage.updated_at
+        ).where(
+            HiringStage.stage_name == "hired"
+        )
+
+        # Apply date filters
+        if date_filter_start:
+            hired_query = hired_query.where(HiringStage.created_at >= date_filter_start)
+        if date_filter_end:
+            hired_query = hired_query.where(HiringStage.created_at <= date_filter_end)
+
+        hired_result = await db.execute(hired_query)
+        hired_rows = hired_result.all()
+
+        # Track hired candidates by source
+        for row in hired_rows:
+            resume_id = str(row[0])
+            if resume_id in resume_to_source:
+                source = resume_to_source[resume_id]
+                source_data[source]["hired"] += 1
+                source_data[source]["hired_resume_ids"].add(resume_id)
+
+        # Get interview stage candidates
+        interview_query = select(HiringStage.resume_id).where(
+            HiringStage.stage_name.in_(["screening", "interview", "technical", "offer"])
+        )
+
+        # Apply date filters
+        if date_filter_start:
+            interview_query = interview_query.where(HiringStage.created_at >= date_filter_start)
+        if date_filter_end:
+            interview_query = interview_query.where(HiringStage.created_at <= date_filter_end)
+
+        interview_result = await db.execute(interview_query)
+        interview_resume_ids = set([str(row[0]) for row in interview_result])
+
+        # Count interview candidates by source
+        for resume_id in interview_resume_ids:
+            if resume_id in resume_to_source:
+                source = resume_to_source[resume_id]
+                source_data[source]["interview"] += 1
+
+        # Calculate average time to hire per source
+        source_time_to_hire = {}
+        for source, data in source_data.items():
+            if data["hired_resume_ids"]:
+                # Query for time to hire for hired candidates from this source
+                time_query = select(
+                    HiringStage.resume_id,
+                    func.min(HiringStage.created_at).label("start_date"),
+                    func.max(HiringStage.created_at).label("end_date")
+                ).where(
+                    HiringStage.resume_id.in_([row for row in data["hired_resume_ids"]])
+                ).group_by(HiringStage.resume_id)
+
+                time_result = await db.execute(time_query)
+                time_rows = time_result.all()
+
+                total_days = 0
+                count = 0
+                for row in time_rows:
+                    if row[1] and row[2]:
+                        days = (row[2] - row[1]).days
+                        if days >= 0:
+                            total_days += days
+                            count += 1
+
+                if count > 0:
+                    source_time_to_hire[source] = round(total_days / count, 1)
+
+        # Build sources list with metrics
+        sources_list = []
+        for source, data in source_data.items():
+            total = data["total"]
+            hired = data["hired"]
+            interview = data["interview"]
+
+            # Calculate metrics
+            conversion_rate = round(hired / total, 3) if total > 0 else 0.0
+            interview_rate = round(interview / total, 3) if total > 0 else 0.0
+            avg_time = source_time_to_hire.get(source)
+
+            sources_list.append({
+                "source": source,
+                "total_candidates": total,
+                "hired_count": hired,
+                "conversion_rate": conversion_rate,
+                "avg_time_to_hire": avg_time,
+                "interview_count": interview,
+                "interview_rate": interview_rate,
+            })
+
+        # Sort by conversion rate descending
+        sources_list.sort(key=lambda x: x["conversion_rate"], reverse=True)
+
+        # Identify best source
+        best_source = sources_list[0]["source"] if sources_list and sources_list[0]["conversion_rate"] > 0 else None
+
+        # Calculate total candidates
+        total_candidates = sum(data["total"] for data in source_data.values())
+
+        response_data = {
+            "sources": sources_list,
+            "total_candidates": total_candidates,
+            "best_source": best_source,
+        }
+
+        logger.info(
+            f"Source effectiveness retrieved successfully - {len(sources_list)} sources, "
+            f"{total_candidates} total candidates, best source: {best_source}"
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving source effectiveness: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve source effectiveness: {str(e)}",
         ) from e
 
 
