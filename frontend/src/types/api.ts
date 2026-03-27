@@ -769,6 +769,69 @@ export interface LanguagePreferenceResponse {
   updated_at: string;
 }
 
+// ==================== Search Analytics Types ====================
+
+/**
+ * Search query response from analytics
+ */
+export interface SearchQueryResponse {
+  id: string;
+  query: string;
+  filters: Record<string, unknown>;
+  results_count: number;
+  execution_time_ms?: number | null;
+  search_type?: string | null;
+  created_at: string;
+}
+
+/**
+ * Recent searches response
+ */
+export interface RecentSearchesResponse {
+  total: number;
+  searches: SearchQueryResponse[];
+}
+
+/**
+ * Popular search response
+ */
+export interface PopularSearchResponse {
+  id: string;
+  query: string;
+  filters: Record<string, unknown>;
+  search_count: number;
+  avg_results_count?: number | null;
+  avg_click_through_rate?: number | null;
+  last_searched_at: string;
+}
+
+/**
+ * Popular searches response
+ */
+export interface PopularSearchesResponse {
+  total: number;
+  searches: PopularSearchResponse[];
+}
+
+/**
+ * Zero result search response
+ */
+export interface ZeroResultSearchResponse {
+  id: string;
+  query: string;
+  filters: Record<string, unknown>;
+  search_type?: string | null;
+  created_at: string;
+}
+
+/**
+ * Zero result searches response
+ */
+export interface ZeroResultSearchesResponse {
+  total: number;
+  searches: ZeroResultSearchResponse[];
+}
+
 // ==================== Ranking Types ====================
 
 /**

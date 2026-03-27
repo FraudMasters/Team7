@@ -52,6 +52,7 @@ import { WeightsPage } from './pages/recruiter/WeightsPage';
 import { RankingWeightsPage } from './pages/recruiter/RankingWeightsPage';
 import { SearchPage } from './pages/recruiter/SearchPage';
 import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
+import { SearchAnalyticsPage } from './pages/recruiter/SearchAnalyticsPage';
 import { ReviewQueuePage as RecruiterReviewQueuePage } from './pages/recruiter/ReviewQueuePage';
 
 // Hiring Manager Pages
@@ -211,6 +212,7 @@ function App() {
           <Route path="review-queue" element={<RecruiterReviewQueuePage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="saved-searches" element={<SavedSearchesPage />} />
+          <Route path="search-analytics" element={<SearchAnalyticsPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
           <Route path="resumes" element={<ResumeDatabasePage />} />
           <Route path="upload" element={<UploadPage />} />

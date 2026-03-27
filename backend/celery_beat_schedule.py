@@ -163,6 +163,39 @@ def get_alert_schedule_config() -> Dict[str, Any]:
     }
 
 
+def get_elasticsearch_indexing_config() -> Dict[str, Any]:
+    """
+    Get Elasticsearch bulk indexing schedule configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether scheduled bulk indexing is enabled (default: False)
+    - hour: Hour for indexing (default: 3 AM)
+    - minute: Minute for indexing (default: 0)
+    - day_of_week: Day of week for indexing (default: 0 = Sunday)
+    - batch_size: Number of resumes to index per batch (default: 100)
+
+    Note: Bulk indexing is typically a one-time or manually triggered operation.
+    Enable scheduled indexing only if you need periodic re-indexing.
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_elasticsearch_indexing_config()
+        >>> print(config['enabled'])
+        False
+        >>> print(config['batch_size'])
+        100
+    """
+    return {
+        "enabled": getattr(settings, "elasticsearch_bulk_indexing_enabled", False),
+        "hour": getattr(settings, "elasticsearch_indexing_hour", 3),
+        "minute": getattr(settings, "elasticsearch_indexing_minute", 0),
+        "day_of_week": getattr(settings, "elasticsearch_indexing_day", 0),  # Sunday
+        "batch_size": getattr(settings, "elasticsearch_indexing_batch_size", 100),
+    }
+
+
 def get_scheduled_report_config() -> Dict[str, Any]:
     """
     Get scheduled report processing configuration from settings.
@@ -392,6 +425,25 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
         },
     },
     # ==============================================
+    # Elasticsearch Bulk Indexing Schedule
+    # ==============================================
+    "elasticsearch-bulk-index-resumes": {
+        "task": "tasks.elasticsearch_indexing.bulk_index_resumes",
+        "schedule": crontab(
+            day_of_week=get_elasticsearch_indexing_config()["day_of_week"],
+            hour=get_elasticsearch_indexing_config()["hour"],
+            minute=get_elasticsearch_indexing_config()["minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "batch_size": get_elasticsearch_indexing_config()["batch_size"],
+        },
+        "options": {
+            "expires": 7200,  # Task expires if not run within 2 hours
+            "queue": "default",  # Use default queue for indexing tasks
+        },
+    },
+    # ==============================================
     # Scheduled Report Processing Schedule
     # ==============================================
     "daily-scheduled-report-processing": {
@@ -469,6 +521,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     config = get_retraining_schedule_config()
     analytics_config = get_analytics_report_schedule_config()
     alert_config = get_alert_schedule_config()
+    elasticsearch_config = get_elasticsearch_indexing_config()
     scheduled_report_config = get_scheduled_report_config()
 
     if not config["enabled"] and enabled_only:
@@ -480,6 +533,9 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     if not alert_config["enabled"] and enabled_only:
         logger.info("Search alerts are disabled in settings")
 
+    if not elasticsearch_config["enabled"] and enabled_only:
+        logger.info("Elasticsearch bulk indexing is disabled in settings")
+
     if not scheduled_report_config["enabled"] and enabled_only:
         logger.info("Scheduled reports are disabled in settings")
 
@@ -488,6 +544,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         not config["enabled"]
         and not analytics_config["enabled"]
         and not alert_config["enabled"]
+        and not elasticsearch_config["enabled"]
         and not scheduled_report_config["enabled"]
         and enabled_only
     ):
@@ -498,6 +555,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         f"retraining_enabled={config['enabled']}, models={config['models']}, "
         f"analytics_reports_enabled={analytics_config['enabled']}, "
         f"search_alerts_enabled={alert_config['enabled']}, "
+        f"elasticsearch_indexing_enabled={elasticsearch_config['enabled']}, "
         f"scheduled_reports_enabled={scheduled_report_config['enabled']}"
     )
 
@@ -536,6 +594,11 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
             # Skip search alert tasks if alerts are disabled
             if "search-alert" in task_name:
                 if not alert_config["enabled"]:
+                    continue
+
+            # Skip elasticsearch indexing tasks if indexing is disabled
+            if "elasticsearch" in task_name:
+                if not elasticsearch_config["enabled"]:
                     continue
 
             # Skip scheduled report tasks if scheduled reports are disabled

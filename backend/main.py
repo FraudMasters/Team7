@@ -292,6 +292,7 @@ from api import (
     candidate_activities,
     candidate_appeals,
     search,
+    search_analytics,
     job_search,
     job_applications,
     job_descriptions,
@@ -344,6 +345,7 @@ app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=[
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
 app.include_router(candidate_appeals.router, prefix="/api/candidate-appeals", tags=["Candidate Appeals"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(search_analytics.router, prefix="/api/search/analytics", tags=["Search Analytics"])
 app.include_router(filter_suggestions.router, prefix="/api/filter-suggestions", tags=["Filter Suggestions"])
 app.include_router(oauth.router, prefix="/api/oauth", tags=["OAuth"])
 app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
