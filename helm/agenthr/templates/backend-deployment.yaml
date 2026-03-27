@@ -1,0 +1,253 @@
+{{- if .Values.backend.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agenthr.fullname" . }}-backend
+  labels:
+    {{- include "agenthr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "agenthr.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "agenthr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "agenthr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: backend
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        command:
+          - uvicorn
+          - main:app
+          - --host
+          - "0.0.0.0"
+          - --port
+          - "8000"
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        # Python environment
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PYTHONPATH
+          value: "/app:/app/services"
+        # Database configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: database-url
+        - name: PGHOST
+          value: {{ include "agenthr.postgresql.fullname" . }}
+        - name: PGPORT
+          value: "5432"
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: postgres-user
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: postgres-password
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: postgres-db
+        # Redis configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: redis-url
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: redis-url
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: redis-url
+        # ML Models configuration
+        - name: MODELS_CACHE_PATH
+          value: {{ .Values.config.modelsCachePath | quote }}
+        - name: TRANSFORMERS_CACHE
+          value: {{ .Values.config.transformersCache | quote }}
+        - name: HF_HOME
+          value: {{ .Values.config.modelsCachePath | quote }}
+        - name: PYTORCH_ENABLE_MPS_FALLBACK
+          value: {{ .Values.config.pytorchEnableMpsFallback | quote }}
+        # Application configuration
+        - name: BACKEND_PORT
+          value: {{ .Values.config.backendPort | quote }}
+        - name: BACKEND_HOST
+          value: {{ .Values.config.backendHost | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.config.logLevel | quote }}
+        - name: LOG_FORMAT
+          value: {{ .Values.config.logFormat | quote }}
+        - name: MAX_UPLOAD_SIZE_MB
+          value: {{ .Values.config.maxUploadSizeMb | quote }}
+        - name: ALLOWED_FILE_TYPES
+          value: {{ .Values.config.allowedFileTypes | quote }}
+        - name: ANALYSIS_TIMEOUT_SECONDS
+          value: {{ .Values.config.analysisTimeoutSeconds | quote }}
+        # CORS configuration
+        {{- if .Values.config.frontendUrl }}
+        - name: FRONTEND_URL
+          value: {{ .Values.config.frontendUrl | quote }}
+        {{- end }}
+        # Backup configuration
+        - name: BACKUP_ENABLED
+          value: {{ .Values.config.backupEnabled | quote }}
+        - name: BACKUP_DIR
+          value: "/app/data/backups"
+        - name: BACKUP_RETENTION_DAYS
+          value: {{ .Values.config.backupRetentionDays | quote }}
+        # Graphiti configuration
+        - name: GRAPHITI_TELEMETRY_ENABLED
+          value: {{ .Values.config.graphitiTelemetryEnabled | quote }}
+        - name: SEMAPHORE_LIMIT
+          value: {{ .Values.config.semaphoreLimit | quote }}
+        # Neo4j configuration (if enabled)
+        {{- if .Values.config.neo4j.enabled }}
+        - name: NEO4J_URI
+          value: {{ .Values.config.neo4j.uri | quote }}
+        - name: NEO4J_USER
+          value: {{ .Values.config.neo4j.user | quote }}
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: neo4j-password
+        {{- end }}
+        # Optional API keys
+        {{- if .Values.secrets.openaiApiKey }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: openai-api-key
+        {{- end }}
+        {{- if .Values.secrets.anthropicApiKey }}
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: anthropic-api-key
+        {{- end }}
+        # Backup S3 configuration (if enabled)
+        {{- if eq .Values.config.backupS3Enabled "true" }}
+        - name: BACKUP_S3_ENABLED
+          value: "true"
+        - name: BACKUP_S3_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-bucket
+        - name: BACKUP_S3_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-endpoint
+        - name: BACKUP_S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-access-key
+        - name: BACKUP_S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-secret-key
+        - name: BACKUP_S3_REGION
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-region
+        {{- end }}
+        livenessProbe:
+          {{- toYaml .Values.backend.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.backend.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.backend.resources | nindent 12 }}
+        volumeMounts:
+        - name: models-cache
+          mountPath: /app/models_cache
+        - name: uploads
+          mountPath: /app/data/uploads
+        - name: backups
+          mountPath: /app/data/backups
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: models-cache
+        {{- if .Values.persistence.modelsCache.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "agenthr.fullname" . }}-models-cache
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: uploads
+        {{- if .Values.persistence.uploads.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "agenthr.fullname" . }}-uploads
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: backups
+        {{- if .Values.persistence.backups.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "agenthr.fullname" . }}-backups
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: logs
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

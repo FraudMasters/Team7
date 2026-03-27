@@ -182,6 +182,130 @@ class RankingRationaleResponse(BaseModel):
     skills_match: SkillsMatchDetail = Field(
         ..., description="Detailed skills matching information"
     )
+    ranking_rationale: Optional[str] = Field(
+        None, description="Detailed explanation of why candidate ranked at this position (when detailed mode is enabled)"
+    )
+    strengths_analysis: Optional[list[str]] = Field(
+        None, description="Detailed analysis of candidate strengths (when detailed mode is enabled)"
+    )
+    improvement_areas: Optional[list[str]] = Field(
+        None, description="Detailed analysis of areas for improvement (when detailed mode is enabled)"
+    )
+    overall_assessment: Optional[str] = Field(
+        None, description="Overall assessment and summary (when detailed mode is enabled)"
+    )
+
+
+# =============================================================================
+# Structured Visualization Data Schemas
+# =============================================================================
+
+
+class FeatureCategoryData(BaseModel):
+    """Feature grouping data for category-level analysis."""
+
+    category_name: str = Field(
+        ..., description="Name of the feature category (e.g., 'Skills Match', 'Experience')"
+    )
+    category_score: float = Field(
+        ..., description="Aggregate score for this category (0-1)"
+    )
+    weight: float = Field(
+        ..., description="Weight/importance of this category in overall ranking"
+    )
+    features_in_category: list[str] = Field(
+        ..., description="List of feature names that belong to this category"
+    )
+    percentile: Optional[float] = Field(
+        None, description="Percentile rank for this category across all candidates (0-100)"
+    )
+
+
+class RelativeComparisonData(BaseModel):
+    """Relative comparison metrics between candidates."""
+
+    candidate_a_id: str = Field(
+        ..., description="UUID of the first candidate being compared"
+    )
+    candidate_b_id: str = Field(
+        ..., description="UUID of the second candidate being compared"
+    )
+    score_difference: float = Field(
+        ..., description="Difference in overall ranking scores (A - B)"
+    )
+    key_differentiators: list[str] = Field(
+        ..., description="Features that contribute most to the score difference"
+    )
+    category_comparison: list[dict[str, float]] = Field(
+        ..., description="Category-by-category score comparison"
+    )
+    stronger_candidate: str = Field(
+        ..., description="Candidate ID with the higher score"
+    )
+
+
+class PercentileData(BaseModel):
+    """Percentile ranking data for a candidate."""
+
+    overall_percentile: float = Field(
+        ..., description="Overall percentile rank across all candidates (0-100)"
+    )
+    category_percentiles: dict[str, float] = Field(
+        ..., description="Percentile rank for each feature category"
+    )
+    rank_position: int = Field(
+        ..., description="Absolute position in the ranked list (1-based)"
+    )
+    total_candidates: int = Field(
+        ..., description="Total number of candidates in the ranking pool"
+    )
+    score_distribution: Optional[list[float]] = Field(
+        None, description="Distribution of scores across all candidates for context"
+    )
+
+
+class ExplainRankingResponse(BaseModel):
+    """Enhanced response model for explaining a candidate's ranking with visualization data."""
+
+    candidate_id: str = Field(
+        ..., description="UUID of the candidate being explained"
+    )
+    vacancy_id: str = Field(
+        ..., description="UUID of the vacancy this ranking is for"
+    )
+    rank_score: float = Field(
+        ..., description="Overall ranking score (0-1)"
+    )
+    rank_position: int = Field(
+        ..., description="Position in the ranked list (1-based)"
+    )
+    confidence: float = Field(
+        ..., description="Model confidence in the prediction (0-1)"
+    )
+    narrative: str = Field(
+        ..., description="Human-readable explanation of the ranking"
+    )
+    factors: list[RankingFactorDetail] = Field(
+        ..., description="Breakdown of ranking factors with contributions"
+    )
+    feature_categories: list[FeatureCategoryData] = Field(
+        ..., description="Feature importance grouped by category for visualization"
+    )
+    percentile_data: PercentileData = Field(
+        ..., description="Percentile ranking information"
+    )
+    relative_comparisons: Optional[list[RelativeComparisonData]] = Field(
+        None, description="Comparisons with other candidates if requested"
+    )
+    strengths: list[str] = Field(
+        ..., description="List of candidate's key strengths"
+    )
+    weaknesses: list[str] = Field(
+        ..., description="List of candidate's areas for improvement"
+    )
+    skills_match: SkillsMatchDetail = Field(
+        ..., description="Detailed skills matching information"
+    )
 
 
 # =============================================================================

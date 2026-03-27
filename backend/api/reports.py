@@ -5,13 +5,28 @@ This module provides endpoints for managing custom analytics reports,
 including CRUD operations for creating, reading, updating, and deleting
 saved reports with metrics and filters.
 """
+import io
 import logging
+import re
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models.audit_log import AuditLog, AuditActionType
+from models.report import Report, ScheduledReport
+from services.report_template_service import (
+    ReportConfig,
+    ReportGenerationResult,
+    ReportTemplateService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +131,10 @@ class ScheduleReportResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["Reports"],
 )
-async def create_report(request: ReportCreate) -> JSONResponse:
+async def create_report(
+    request: ReportCreate,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Create a custom report.
 
@@ -125,6 +143,7 @@ async def create_report(request: ReportCreate) -> JSONResponse:
 
     Args:
         request: Create request with report details
+        db: Database session
 
     Returns:
         JSON response with created report entry
@@ -170,25 +189,42 @@ async def create_report(request: ReportCreate) -> JSONResponse:
                 detail="At least one metric must be provided",
             )
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        from datetime import datetime
-        now = datetime.utcnow().isoformat() + "Z"
-
-        response_data = {
-            "id": "placeholder-report-id",
-            "organization_id": request.organization_id or "default",
-            "name": request.name,
-            "description": request.description,
-            "created_by": request.created_by,
+        # Build configuration JSON from metrics, filters, and is_public
+        configuration = {
             "metrics": request.metrics,
             "filters": request.filters,
             "is_public": request.is_public,
-            "created_at": now,
-            "updated_at": now,
         }
 
-        logger.info(f"Created report '{request.name}' with ID: {response_data['id']}")
+        # Create new report
+        new_report = Report(
+            organization_id=request.organization_id or "default",
+            name=request.name,
+            description=request.description,
+            report_type="custom",
+            configuration=configuration,
+            created_by=request.created_by,
+            is_active=True,
+        )
+        db.add(new_report)
+        await db.flush()
+
+        response_data = {
+            "id": str(new_report.id),
+            "organization_id": new_report.organization_id,
+            "name": new_report.name,
+            "description": new_report.description,
+            "created_by": new_report.created_by,
+            "metrics": new_report.configuration.get("metrics", []),
+            "filters": new_report.configuration.get("filters", {}),
+            "is_public": new_report.configuration.get("is_public", False),
+            "created_at": new_report.created_at.isoformat(),
+            "updated_at": new_report.updated_at.isoformat(),
+        }
+
+        await db.commit()
+
+        logger.info(f"Created report '{request.name}' with ID: {new_report.id}")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
@@ -205,19 +241,29 @@ async def create_report(request: ReportCreate) -> JSONResponse:
         ) from e
 
 
-@router.get("/", tags=["Reports"])
+@router.get(
+    "/",
+    response_model=ReportListResponse,
+    tags=["Reports"],
+)
 async def list_reports(
     organization_id: Optional[str] = Query(None, description="Filter by organization ID"),
     created_by: Optional[str] = Query(None, description="Filter by creator user ID"),
     is_public: Optional[bool] = Query(None, description="Filter by public status"),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     List custom reports with optional filters.
+
+    This endpoint retrieves all custom reports, optionally filtered by organization,
+    creator, or public visibility status. Results include report metadata,
+    configuration, and metrics definitions for each saved report.
 
     Args:
         organization_id: Optional organization ID filter
         created_by: Optional creator user ID filter
         is_public: Optional public status filter
+        db: Database session
 
     Returns:
         JSON response with list of report entries
@@ -229,17 +275,68 @@ async def list_reports(
         >>> import requests
         >>> response = requests.get("/api/reports/?organization_id=org123")
         >>> response.json()
+        {
+            "organization_id": "org123",
+            "reports": [
+                {
+                    "id": "report-123",
+                    "organization_id": "org123",
+                    "name": "Monthly Hiring Report",
+                    "description": "Overview of hiring metrics",
+                    "created_by": "user456",
+                    "metrics": ["time_to_hire", "resumes_processed"],
+                    "filters": {"start_date": "2024-01-01"},
+                    "is_public": True,
+                    "created_at": "2024-01-25T00:00:00Z",
+                    "updated_at": "2024-01-25T00:00:00Z"
+                }
+            ],
+            "total_count": 1
+        }
     """
     try:
         logger.info(f"Listing reports with filters - organization_id: {organization_id}, created_by: {created_by}, is_public: {is_public}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Build query with filters
+        query = select(Report).where(Report.is_active == True)
+
+        if organization_id:
+            query = query.where(Report.organization_id == organization_id)
+
+        if created_by:
+            query = query.where(Report.created_by == created_by)
+
+        if is_public is not None:
+            # Filter by is_public field in configuration JSON
+            query = query.where(Report.configuration["is_public"].astext.cast(bool) == is_public)
+
+        # Execute query
+        result = await db.execute(query)
+        reports = result.scalars().all()
+
+        # Build response data
+        report_list = []
+        for report in reports:
+            report_list.append({
+                "id": str(report.id),
+                "organization_id": report.organization_id,
+                "name": report.name,
+                "description": report.description,
+                "created_by": report.created_by,
+                "metrics": report.configuration.get("metrics", []),
+                "filters": report.configuration.get("filters", {}),
+                "is_public": report.configuration.get("is_public", False),
+                "created_at": report.created_at.isoformat(),
+                "updated_at": report.updated_at.isoformat(),
+            })
+
         response_data = {
             "organization_id": organization_id,
-            "reports": [],
-            "total_count": 0,
+            "reports": report_list,
+            "total_count": len(report_list),
         }
+
+        logger.info(f"Retrieved {len(report_list)} reports")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -254,13 +351,25 @@ async def list_reports(
         ) from e
 
 
-@router.get("/{report_id}", tags=["Reports"])
-async def get_report(report_id: str) -> JSONResponse:
+@router.get(
+    "/{report_id}",
+    response_model=ReportResponse,
+    tags=["Reports"],
+)
+async def get_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Get a specific report by ID.
 
+    This endpoint retrieves detailed information about a single custom report,
+    including its configuration, metrics, filters, and metadata. The report
+    must be active to be retrieved.
+
     Args:
         report_id: Unique identifier of the report
+        db: Database session
 
     Returns:
         JSON response with report details
@@ -273,28 +382,57 @@ async def get_report(report_id: str) -> JSONResponse:
         >>> import requests
         >>> response = requests.get("/api/reports/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "organization_id": "org123",
+            "name": "Monthly Hiring Report",
+            "description": "Overview of hiring metrics for this month",
+            "created_by": "user456",
+            "metrics": ["time_to_hire", "resumes_processed", "match_rates"],
+            "filters": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
+            "is_public": True,
+            "created_at": "2024-01-25T00:00:00Z",
+            "updated_at": "2024-01-25T00:00:00Z"
+        }
     """
     try:
         logger.info(f"Getting report: {report_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Query report by ID
+        query = select(Report).where(Report.id == report_id, Report.is_active == True)
+        result = await db.execute(query)
+        report = result.scalar_one_or_none()
+
+        if not report:
+            logger.warning(f"Report not found: {report_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report not found: {report_id}",
+            )
+
+        # Build response data
+        response_data = {
+            "id": str(report.id),
+            "organization_id": report.organization_id,
+            "name": report.name,
+            "description": report.description,
+            "created_by": report.created_by,
+            "metrics": report.configuration.get("metrics", []),
+            "filters": report.configuration.get("filters", {}),
+            "is_public": report.configuration.get("is_public", False),
+            "created_at": report.created_at.isoformat(),
+            "updated_at": report.updated_at.isoformat(),
+        }
+
+        logger.info(f"Retrieved report: {report_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": report_id,
-                "organization_id": "org123",
-                "name": "Sample Report",
-                "description": "A sample report",
-                "created_by": "user456",
-                "metrics": ["time_to_hire", "resumes_processed"],
-                "filters": {},
-                "is_public": True,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": "2024-01-25T00:00:00Z",
-            },
+            content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting report: {e}", exc_info=True)
         raise HTTPException(
@@ -303,16 +441,27 @@ async def get_report(report_id: str) -> JSONResponse:
         ) from e
 
 
-@router.put("/{report_id}", tags=["Reports"])
+@router.put(
+    "/{report_id}",
+    response_model=ReportResponse,
+    tags=["Reports"],
+)
 async def update_report(
-    report_id: str, request: ReportUpdate
+    report_id: str,
+    request: ReportUpdate,
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Update a custom report.
 
+    This endpoint updates an existing custom report with new values for name,
+    description, metrics, filters, or visibility settings. Only provided fields
+    will be updated; omitted fields retain their current values.
+
     Args:
         report_id: Unique identifier of the report
         request: Update request with fields to modify
+        db: Database session
 
     Returns:
         JSON response with updated report entry
@@ -326,35 +475,98 @@ async def update_report(
         >>> import requests
         >>> data = {"name": "Updated Report Name", "metrics": ["time_to_hire", "match_rates"]}
         >>> response = requests.put(
-        ...     "/api/reports/123",
+        ...     "/api/reports/123e4567-e89b-12d3-a456-426614174000",
         ...     json=data
         ... )
         >>> response.json()
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "organization_id": "org123",
+            "name": "Updated Report Name",
+            "description": "Overview of hiring metrics",
+            "created_by": "user456",
+            "metrics": ["time_to_hire", "match_rates"],
+            "filters": {"start_date": "2024-01-01"},
+            "is_public": True,
+            "created_at": "2024-01-25T00:00:00Z",
+            "updated_at": "2024-01-26T10:30:00Z"
+        }
     """
     try:
         logger.info(f"Updating report: {report_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
-        from datetime import datetime
-        now = datetime.utcnow().isoformat() + "Z"
+        # Query report by ID
+        query = select(Report).where(Report.id == report_id, Report.is_active == True)
+        result = await db.execute(query)
+        report = result.scalar_one_or_none()
+
+        if not report:
+            logger.warning(f"Report not found: {report_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report not found: {report_id}",
+            )
+
+        # Validate name if provided
+        if request.name is not None:
+            if len(request.name.strip()) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Report name cannot be empty",
+                )
+            report.name = request.name
+
+        # Update description if provided
+        if request.description is not None:
+            report.description = request.description
+
+        # Update configuration with new metrics, filters, or is_public if provided
+        configuration = report.configuration.copy() if report.configuration else {}
+
+        if request.metrics is not None:
+            if len(request.metrics) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="At least one metric must be provided",
+                )
+            configuration["metrics"] = request.metrics
+
+        if request.filters is not None:
+            configuration["filters"] = request.filters
+
+        if request.is_public is not None:
+            configuration["is_public"] = request.is_public
+
+        report.configuration = configuration
+
+        # Commit changes
+        await db.flush()
+
+        # Build response data
+        response_data = {
+            "id": str(report.id),
+            "organization_id": report.organization_id,
+            "name": report.name,
+            "description": report.description,
+            "created_by": report.created_by,
+            "metrics": report.configuration.get("metrics", []),
+            "filters": report.configuration.get("filters", {}),
+            "is_public": report.configuration.get("is_public", False),
+            "created_at": report.created_at.isoformat(),
+            "updated_at": report.updated_at.isoformat(),
+        }
+
+        await db.commit()
+
+        logger.info(f"Updated report: {report_id}")
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={
-                "id": report_id,
-                "organization_id": "org123",
-                "name": request.name or "Sample Report",
-                "description": request.description,
-                "created_by": "user456",
-                "metrics": request.metrics or ["time_to_hire"],
-                "filters": request.filters or {},
-                "is_public": request.is_public if request.is_public is not None else True,
-                "created_at": "2024-01-25T00:00:00Z",
-                "updated_at": now,
-            },
+            content=response_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating report: {e}", exc_info=True)
         raise HTTPException(
@@ -363,13 +575,24 @@ async def update_report(
         ) from e
 
 
-@router.delete("/{report_id}", tags=["Reports"])
-async def delete_report(report_id: str) -> JSONResponse:
+@router.delete(
+    "/{report_id}",
+    tags=["Reports"],
+)
+async def delete_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Delete a custom report.
 
+    This endpoint performs a soft delete by marking the report as inactive.
+    The report data is preserved in the database but will not appear in
+    queries or list endpoints. This allows for data recovery if needed.
+
     Args:
         report_id: Unique identifier of the report
+        db: Database session
 
     Returns:
         JSON response confirming deletion
@@ -380,20 +603,42 @@ async def delete_report(report_id: str) -> JSONResponse:
 
     Examples:
         >>> import requests
-        >>> response = requests.delete("/api/reports/123")
+        >>> response = requests.delete("/api/reports/123e4567-e89b-12d3-a456-426614174000")
         >>> response.json()
-        {"message": "Report deleted successfully"}
+        {"message": "Report deleted successfully", "report_id": "123e4567-e89b-12d3-a456-426614174000"}
     """
     try:
         logger.info(f"Deleting report: {report_id}")
 
-        # For now, return placeholder response
-        # Database integration will be added in a later subtask when we have async session setup
+        # Query report by ID
+        query = select(Report).where(Report.id == report_id, Report.is_active == True)
+        result = await db.execute(query)
+        report = result.scalar_one_or_none()
+
+        if not report:
+            logger.warning(f"Report not found: {report_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report not found: {report_id}",
+            )
+
+        # Soft delete by marking as inactive
+        report.is_active = False
+        await db.flush()
+        await db.commit()
+
+        logger.info(f"Deleted report: {report_id}")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"message": f"Report {report_id} deleted successfully"},
+            content={
+                "message": "Report deleted successfully",
+                "report_id": str(report.id),
+            },
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting report: {e}", exc_info=True)
         raise HTTPException(
@@ -441,18 +686,22 @@ async def delete_reports_by_organization(organization_id: str) -> JSONResponse:
 
 
 @router.post("/export/pdf", tags=["Reports"])
-async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
+async def export_report_pdf(
+    request: PDFExportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
     """
     Export a report to PDF format.
 
-    This endpoint generates a PDF document from report data and returns
-    a download URL for the generated file.
+    This endpoint generates a PDF document from report data using the
+    ReportTemplateService and returns the PDF file directly as a streaming response.
 
     Args:
         request: PDF export request with report ID and data
+        db: Database session
 
     Returns:
-        JSON response with download URL and expiration
+        StreamingResponse with PDF file content
 
     Raises:
         HTTPException(422): If validation fails
@@ -472,12 +721,9 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
         ...     "/api/reports/export/pdf",
         ...     json=data
         ... )
-        >>> response.json()
-        {
-            "report_id": "test-id",
-            "download_url": "https://example.com/downloads/report-test-id.pdf",
-            "expires_at": "2024-01-26T00:00:00Z"
-        }
+        >>> # Response is a PDF file download
+        >>> with open("report.pdf", "wb") as f:
+        ...     f.write(response.content)
     """
     try:
         logger.info(f"Generating PDF for report: {request.report_id}")
@@ -496,23 +742,95 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
                 detail="Report data cannot be empty",
             )
 
-        # For now, generate a placeholder response
-        # Actual PDF generation will be added in a later subtask with reportlab or weasyprint
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
-        expires_at = (now + timedelta(hours=24)).isoformat() + "Z"
+        # Initialize ReportTemplateService
+        report_service = ReportTemplateService(db=db)
 
-        response_data = {
-            "report_id": request.report_id,
-            "download_url": f"/api/reports/downloads/{request.report_id}.pdf",
-            "expires_at": expires_at,
-        }
+        # Extract title from data or use default
+        title = request.data.get("title", f"Report {request.report_id}")
 
+        # Extract metrics and filters from data
+        metrics = request.data.get("metrics", [])
+        if isinstance(metrics, dict):
+            # If metrics is a dict, extract the keys as metric names
+            metrics = list(metrics.keys())
+
+        filters = request.data.get("filters", {})
+
+        # Create ReportConfig
+        config = ReportConfig(
+            report_type="custom_analytics",
+            output_format="pdf",
+            title=title,
+            page_format=request.format or "A4",
+            metrics=metrics,
+            filters=filters,
+        )
+
+        # Generate the report
+        result: ReportGenerationResult = await report_service.generate_report(
+            config=config,
+            data=request.data,
+        )
+
+        # Check if generation was successful
+        if not result.success:
+            error_msg = result.error_message or "Unknown error occurred during PDF generation"
+            logger.error(f"PDF generation failed for report {request.report_id}: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate PDF: {error_msg}",
+            )
+
+        # Return the PDF as a streaming response
         logger.info(f"PDF generated successfully for report: {request.report_id}")
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_data,
+        pdf_bytes = result.report_bytes
+        filename = result.filename or f"report_{request.report_id}.pdf"
+
+        # Create audit log entry for the export
+        try:
+            # Extract organization_id and user_id from report data if available
+            organization_id = request.data.get("organization_id")
+            user_id = request.data.get("user_id") or request.data.get("created_by")
+
+            # Convert string IDs to UUID if present
+            org_uuid = UUID(organization_id) if organization_id else None
+            user_uuid = UUID(user_id) if user_id else None
+            report_uuid = None
+            try:
+                report_uuid = UUID(request.report_id)
+            except (ValueError, AttributeError):
+                pass
+
+            audit_log = AuditLog(
+                action_type=AuditActionType.REPORT_GENERATED,
+                entity_type="report",
+                entity_id=report_uuid,
+                user_id=user_uuid,
+                organization_id=org_uuid,
+                action_data={
+                    "export_format": "pdf",
+                    "page_format": request.format or "A4",
+                    "report_title": title,
+                    "metrics": metrics,
+                    "file_size": result.file_size,
+                    "filename": filename,
+                },
+            )
+            db.add(audit_log)
+            await db.commit()
+            logger.info(f"Audit log created for PDF export of report: {request.report_id}")
+        except Exception as audit_error:
+            logger.error(f"Failed to create audit log for PDF export: {audit_error}", exc_info=True)
+            # Don't fail the export if audit logging fails
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type=result.content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(result.file_size),
+            },
         )
 
     except HTTPException:
@@ -526,15 +844,20 @@ async def export_report_pdf(request: PDFExportRequest) -> JSONResponse:
 
 
 @router.post("/export/csv", tags=["Reports"])
-async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
+async def export_report_csv(
+    request: CSVExportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
     """
     Export analytics data to CSV format.
 
     This endpoint generates a CSV file from analytics metrics and filters,
-    returning the file directly for download.
+    using the ReportTemplateService to collect and format actual data from
+    the database.
 
     Args:
         request: CSV export request with metrics and filters
+        db: Database session
 
     Returns:
         StreamingResponse with CSV file content
@@ -566,45 +889,71 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
                 detail="At least one metric must be provided",
             )
 
-        # Generate CSV content
-        # For now, generate a placeholder CSV with sample data
-        # Actual data fetching will be added in a later subtask when database is integrated
-        import io
-        csv_buffer = io.StringIO()
+        # Initialize report template service
+        report_service = ReportTemplateService(db)
 
-        # Write CSV header
-        header = ["metric", "value", "date"]
-        csv_buffer.write(",".join(header) + "\n")
+        # Create report configuration for custom analytics report
+        config = ReportConfig(
+            report_type="custom_analytics",
+            output_format="csv",
+            metrics=request.metrics,
+            filters=request.filters or {},
+        )
 
-        # Write sample data rows based on requested metrics
-        from datetime import datetime, timedelta
-        sample_data = {
-            "time_to_hire": {"value": "15 days", "unit": "days"},
-            "resumes_processed": {"value": "150", "unit": "count"},
-            "match_rates": {"value": "85%", "unit": "percentage"},
-            "interviews_scheduled": {"value": "25", "unit": "count"},
-            "offers_extended": {"value": "10", "unit": "count"},
-            "offers_accepted": {"value": "8", "unit": "count"},
+        # Prepare data for report generation
+        data = {
+            "title": "Analytics Export",
+            "metrics": request.metrics,
+            "filters": request.filters or {},
         }
 
-        # Generate a row for each metric with today's date
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-        for metric in request.metrics:
-            if metric in sample_data:
-                row = [metric, sample_data[metric]["value"], today]
-                csv_buffer.write(",".join(row) + "\n")
-            else:
-                row = [metric, "N/A", today]
-                csv_buffer.write(",".join(row) + "\n")
+        # Generate CSV using ReportTemplateService
+        logger.info(f"Generating CSV with ReportTemplateService for metrics: {request.metrics}")
+        result: ReportGenerationResult = await report_service.generate_report(config, data)
 
-        csv_content = csv_buffer.getvalue()
-        csv_buffer.close()
+        if not result.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"CSV generation failed: {result.error}",
+            )
 
         logger.info(f"CSV generated successfully for metrics: {request.metrics}")
 
+        # Create audit log entry for the export
+        try:
+            # Extract organization_id from filters if available
+            filters = request.filters or {}
+            organization_id = filters.get("organization_id")
+            user_id = filters.get("user_id")
+
+            # Convert string IDs to UUID if present
+            org_uuid = UUID(organization_id) if organization_id else None
+            user_uuid = UUID(user_id) if user_id else None
+
+            audit_log = AuditLog(
+                action_type=AuditActionType.DATA_EXPORTED,
+                entity_type="analytics",
+                entity_id=None,
+                user_id=user_uuid,
+                organization_id=org_uuid,
+                action_data={
+                    "export_format": "csv",
+                    "metrics": request.metrics,
+                    "filters": filters,
+                    "file_size": len(result.content),
+                    "filename": "analytics_export.csv",
+                },
+            )
+            db.add(audit_log)
+            await db.commit()
+            logger.info(f"Audit log created for CSV export of metrics: {request.metrics}")
+        except Exception as audit_error:
+            logger.error(f"Failed to create audit log for CSV export: {audit_error}", exc_info=True)
+            # Don't fail the export if audit logging fails
+
         # Return as downloadable CSV file
         return StreamingResponse(
-            io.BytesIO(csv_content.encode("utf-8")),
+            io.BytesIO(result.content),
             media_type="text/csv",
             headers={
                 "Content-Disposition": "attachment; filename=analytics_export.csv",
@@ -623,7 +972,10 @@ async def export_report_csv(request: CSVExportRequest) -> StreamingResponse:
 
 
 @router.post("/schedule", tags=["Reports"], response_model=ScheduleReportResponse)
-async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
+async def schedule_report(
+    request: ScheduleReportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
     """
     Schedule an automated report with email delivery.
 
@@ -695,7 +1047,6 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
             )
 
         # Validate email format for recipients
-        import re
         email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         for email in request.recipients:
             if not re.match(email_pattern, email):
@@ -752,16 +1103,8 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
                 detail="Format must be one of: pdf, csv, both",
             )
 
-        # For now, generate a placeholder response
-        # Database integration and Celery task scheduling will be added in later subtasks
-        from datetime import datetime, timedelta
-        import uuid
-
-        schedule_id = str(uuid.uuid4())
-        now = datetime.utcnow()
-        created_at = now.isoformat() + "Z"
-
         # Calculate next_run_at based on schedule configuration
+        now = datetime.utcnow()
         if freq == "daily":
             next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
             if next_run <= now:
@@ -783,17 +1126,66 @@ async def schedule_report(request: ScheduleReportRequest) -> JSONResponse:
                 else:
                     next_run = next_run.replace(month=now.month + 1)
 
-        next_run_at = next_run.isoformat() + "Z"
+        # Handle report creation or validation
+        report_id_to_use = request.report_id
+
+        if report_id_to_use:
+            # Validate that the report exists
+            stmt = select(Report).where(Report.id == report_id_to_use)
+            result = await db.execute(stmt)
+            existing_report = result.scalar_one_or_none()
+
+            if not existing_report:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Report with ID {report_id_to_use} not found",
+                )
+
+            logger.info(f"Using existing report ID: {report_id_to_use}")
+        else:
+            # Create a new report from the configuration
+            new_report = Report(
+                organization_id=request.organization_id or "default",
+                name=f"{request.name} - Report Configuration",
+                description=f"Auto-generated report configuration for scheduled report: {request.name}",
+                report_type="scheduled",
+                configuration=request.configuration,
+                created_by=None,
+                is_active=True,
+            )
+            db.add(new_report)
+            await db.flush()
+            report_id_to_use = str(new_report.id)
+
+            logger.info(f"Created new report with ID: {report_id_to_use}")
+
+        # Create the scheduled report
+        new_scheduled_report = ScheduledReport(
+            organization_id=request.organization_id or "default",
+            report_id=report_id_to_use,
+            name=request.name,
+            schedule_config=request.schedule_config,
+            delivery_config=request.delivery_config,
+            recipients=request.recipients,
+            created_by=None,
+            is_active=request.is_active,
+            next_run_at=next_run,
+            last_run_at=None,
+        )
+        db.add(new_scheduled_report)
+        await db.flush()
 
         response_data = {
-            "id": schedule_id,
-            "name": request.name,
-            "report_id": request.report_id,
-            "next_run_at": next_run_at,
-            "created_at": created_at,
+            "id": str(new_scheduled_report.id),
+            "name": new_scheduled_report.name,
+            "report_id": new_scheduled_report.report_id,
+            "next_run_at": new_scheduled_report.next_run_at.isoformat() + "Z",
+            "created_at": new_scheduled_report.created_at.isoformat() + "Z",
         }
 
-        logger.info(f"Scheduled report '{request.name}' created with ID: {schedule_id}, next run: {next_run_at}")
+        await db.commit()
+
+        logger.info(f"Scheduled report '{request.name}' created with ID: {new_scheduled_report.id}, next run: {next_run}")
 
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,

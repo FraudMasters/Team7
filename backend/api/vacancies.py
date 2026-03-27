@@ -22,8 +22,10 @@ from analyzers import (
 )
 from database import get_db
 from models.job_vacancy import JobVacancy
+from models.client_tenant import ClientTenant
 from models.audit_log import AuditActionType
 from utils.audit_logger import log_audit_event, get_request_context
+from middleware.tenant_context import get_tenant_context
 
 from config import get_settings
 
@@ -150,6 +152,32 @@ async def create_vacancy(
         >>> response = requests.post("/api/vacancies/", json=vacancy_data)
     """
     try:
+        # Get tenant context for multi-tenant data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id = client_tenant.organization_id
+            logger.info(f"Creating vacancy for organization_id: {organization_id} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id = org_id_header
+                logger.info(f"Creating vacancy for organization_id from header: {organization_id}")
+
         # Create new JobVacancy instance
         new_vacancy = JobVacancy(
             title=vacancy.title,
@@ -166,6 +194,7 @@ async def create_vacancy(
             employment_type=vacancy.employment_type,
             external_id=vacancy.external_id,
             source=vacancy.source,
+            organization_id=organization_id,
         )
 
         db.add(new_vacancy)
@@ -226,8 +255,37 @@ async def list_vacancies(
         >>> vacancies = response.json()
     """
     try:
+        # Get tenant context for data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id_filter = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id for filtering
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id_filter = client_tenant.organization_id
+            logger.info(f"Filtering vacancies by organization_id: {organization_id_filter} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id_filter = org_id_header
+                logger.info(f"Filtering vacancies by organization_id from header: {organization_id_filter}")
+
         # Query vacancies from database
-        query = select(JobVacancy).order_by(JobVacancy.created_at.desc()).offset(skip).limit(limit)
+        query = select(JobVacancy)
+        if organization_id_filter:
+            query = query.where(JobVacancy.organization_id == organization_id_filter)
+        query = query.order_by(JobVacancy.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
         vacancies = result.scalars().all()
 

@@ -9,11 +9,13 @@ export { ApiClient, apiClient } from './client';
 
 // AI/ML services
 export { biasReports, BiasReportsClient } from './biasReports';
+export { comparisonsClient, ComparisonsClient } from './comparisons';
 export { explainability, ExplainabilityClient } from './explainability';
 export { fairness, FairnessClient } from './fairness';
 export { industryClassifier, IndustryClassifierClient } from './industryClassifier';
 export { matchingClient, MatchingClient } from './matching';
 export { matchingWeightsClient, MatchingWeightsClient } from './matchingWeights';
+export { rankingWeightsClient, RankingWeightsClient } from './rankingWeights';
 export { modelVersionsClient, ModelVersionsClient } from './modelVersions';
 export { salaryBenchmarking, SalaryBenchmarkingClient } from './salaryBenchmarking';
 export { semanticSearchClient, SemanticSearchClient } from './semanticSearch';
@@ -73,7 +75,9 @@ export { jobIntegrationsClient, JobIntegrationsClient } from './jobIntegrations'
 export { webhooksClient, WebhooksClient } from './webhooks';
 
 // Organization management
+export { agenciesClient, AgenciesClient } from './agencies';
 export { calendarClient, CalendarClient } from './calendar';
+export { clientTenantsClient, ClientTenantsClient } from './clientTenants';
 export { interviewsClient, InterviewsClient } from './interviews';
 export { jobDescriptionsClient, JobDescriptionsClient } from './jobDescriptions';
 export { organizationsClient, OrganizationsClient } from './organizations';

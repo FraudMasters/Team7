@@ -53,6 +53,11 @@ class User(Base, UUIDMixin, TimestampMixin):
         back_populates="referrer",
         foreign_keys="ApplicationSource.referrer_id"
     )
+    candidate_documents: Mapped[list["CandidateDocument"]] = relationship(
+        "CandidateDocument",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, is_active={self.is_active})>"

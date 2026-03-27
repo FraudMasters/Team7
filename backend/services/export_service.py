@@ -2,11 +2,11 @@
 Data export service for GDPR right to portability.
 
 This module provides functionality to export candidate data in machine-readable formats
-(JSON/CSV) to support GDPR Article 15 - Right of Access (Data Portability).
+(JSON/CSV/XML) to support GDPR Article 15 - Right of Access (Data Portability).
 
 The export service supports:
 - Exporting all personal data for a candidate (resume, parsed data, activities, notes, tags)
-- Multiple export formats (JSON for structured data, CSV for tabular data)
+- Multiple export formats (JSON for structured data, CSV for tabular data, XML for hierarchical data)
 - Comprehensive data collection including consent records, activities, and analytics
 - GDPR-compliant data portability
 
@@ -18,6 +18,7 @@ GDPR Requirements Met:
 import csv
 import io
 import logging
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -44,7 +45,7 @@ class ExportService:
     Service for exporting candidate data for GDPR data portability.
 
     This service provides methods to export all personal data associated with a candidate
-    in either JSON or CSV format, supporting GDPR Article 15 - Right of Access.
+    in JSON, CSV, or XML format, supporting GDPR Article 15 - Right of Access.
 
     Attributes:
         db: Database session for executing queries
@@ -53,6 +54,7 @@ class ExportService:
         >>> export_service = ExportService(db)
         >>> json_data = await export_service.export_candidate_data(resume_id, format="json")
         >>> csv_data = await export_service.export_candidate_data(resume_id, format="csv")
+        >>> xml_data = await export_service.export_candidate_data(resume_id, format="xml")
     """
 
     def __init__(self, db: AsyncSession) -> None:
@@ -86,13 +88,13 @@ class ExportService:
 
         Args:
             resume_id: UUID of the resume to export
-            export_format: Format for export - "json" or "csv" (default: "json")
+            export_format: Format for export - "json", "csv", or "xml" (default: "json")
             include_analytics: Whether to include analytics data (default: False)
 
         Returns:
             Dictionary containing:
-                - format: Export format ("json" or "csv")
-                - data: Export data (dict for JSON, string for CSV)
+                - format: Export format ("json", "csv", or "xml")
+                - data: Export data (dict for JSON, string for CSV/XML)
                 - metadata: Export metadata (timestamp, resume_id, record counts)
 
         Raises:
@@ -110,7 +112,7 @@ class ExportService:
         logger.info(f"Exporting data for resume_id={resume_id}, format={export_format}")
 
         # Validate export format
-        valid_formats = ["json", "csv"]
+        valid_formats = ["json", "csv", "xml"]
         if export_format not in valid_formats:
             raise ValueError(
                 f"Invalid export format: {export_format}. Must be one of: {', '.join(valid_formats)}"
@@ -125,6 +127,8 @@ class ExportService:
         # Format the data based on requested format
         if export_format == "csv":
             formatted_data = self._format_as_csv(candidate_data)
+        elif export_format == "xml":
+            formatted_data = self._format_as_xml(candidate_data)
         else:  # json
             formatted_data = self._format_as_json(candidate_data)
 
@@ -494,6 +498,136 @@ class ExportService:
             writer.writerows(records)
 
         return output.getvalue()
+
+    def _format_as_xml(self, candidate_data: Dict[str, Any]) -> str:
+        """
+        Format candidate data as XML.
+
+        Creates a hierarchical XML representation of all candidate data.
+        Nested structures are preserved in XML element hierarchy.
+
+        Args:
+            candidate_data: Collected candidate data
+
+        Returns:
+            XML-formatted string
+        """
+        # Create root element
+        root = ET.Element("candidate_export")
+
+        # Add resume data
+        resume = candidate_data.get("resume", {})
+        if resume:
+            resume_elem = ET.SubElement(root, "resume")
+            for key, value in resume.items():
+                if value is not None:
+                    child = ET.SubElement(resume_elem, key)
+                    child.text = str(value)
+
+        # Add parsed resume data
+        parsed = candidate_data.get("parsed_resume", {})
+        if parsed:
+            parsed_elem = ET.SubElement(root, "parsed_resume")
+            for key, value in parsed.items():
+                if value is not None:
+                    if isinstance(value, (list, dict)):
+                        child = ET.SubElement(parsed_elem, key)
+                        child.text = str(value)
+                    else:
+                        child = ET.SubElement(parsed_elem, key)
+                        child.text = str(value)
+
+        # Add hiring stages
+        hiring_stages = candidate_data.get("hiring_stages", [])
+        if hiring_stages:
+            stages_elem = ET.SubElement(root, "hiring_stages")
+            for stage in hiring_stages:
+                stage_elem = ET.SubElement(stages_elem, "hiring_stage")
+                for key, value in stage.items():
+                    if value is not None:
+                        child = ET.SubElement(stage_elem, key)
+                        child.text = str(value)
+
+        # Add activities
+        activities = candidate_data.get("activities", [])
+        if activities:
+            activities_elem = ET.SubElement(root, "activities")
+            for activity in activities:
+                activity_elem = ET.SubElement(activities_elem, "activity")
+                for key, value in activity.items():
+                    if value is not None:
+                        child = ET.SubElement(activity_elem, key)
+                        child.text = str(value)
+
+        # Add notes
+        notes = candidate_data.get("notes", [])
+        if notes:
+            notes_elem = ET.SubElement(root, "notes")
+            for note in notes:
+                note_elem = ET.SubElement(notes_elem, "note")
+                for key, value in note.items():
+                    if value is not None:
+                        child = ET.SubElement(note_elem, key)
+                        child.text = str(value)
+
+        # Add tags
+        tags = candidate_data.get("tags", [])
+        if tags:
+            tags_elem = ET.SubElement(root, "tags")
+            for tag in tags:
+                tag_elem = ET.SubElement(tags_elem, "tag")
+                for key, value in tag.items():
+                    if value is not None:
+                        child = ET.SubElement(tag_elem, key)
+                        child.text = str(value)
+
+        # Add consent records
+        consents = candidate_data.get("consent_records", [])
+        if consents:
+            consents_elem = ET.SubElement(root, "consent_records")
+            for consent in consents:
+                consent_elem = ET.SubElement(consents_elem, "consent_record")
+                for key, value in consent.items():
+                    if value is not None:
+                        child = ET.SubElement(consent_elem, key)
+                        child.text = str(value)
+
+        # Add feedback
+        feedbacks = candidate_data.get("feedback", [])
+        if feedbacks:
+            feedbacks_elem = ET.SubElement(root, "feedback")
+            for feedback in feedbacks:
+                feedback_elem = ET.SubElement(feedbacks_elem, "feedback_record")
+                for key, value in feedback.items():
+                    if value is not None:
+                        child = ET.SubElement(feedback_elem, key)
+                        child.text = str(value)
+
+        # Add work experience
+        work_exp = candidate_data.get("work_experience", [])
+        if work_exp:
+            work_exp_elem = ET.SubElement(root, "work_experience")
+            for exp in work_exp:
+                exp_elem = ET.SubElement(work_exp_elem, "experience")
+                for key, value in exp.items():
+                    if value is not None:
+                        child = ET.SubElement(exp_elem, key)
+                        child.text = str(value)
+
+        # Add resume analyses
+        analyses = candidate_data.get("resume_analyses", [])
+        if analyses:
+            analyses_elem = ET.SubElement(root, "resume_analyses")
+            for analysis in analyses:
+                analysis_elem = ET.SubElement(analyses_elem, "resume_analysis")
+                for key, value in analysis.items():
+                    if value is not None:
+                        child = ET.SubElement(analysis_elem, key)
+                        child.text = str(value)
+
+        # Convert to string with pretty formatting
+        ET.indent(root, space="  ", level=0)
+        return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
     def _count_records(self, candidate_data: Dict[str, Any]) -> int:
         """

@@ -3,6 +3,7 @@ import { Container, Paper, Typography, Box, Tabs, Tab } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import FairnessDashboard from '@components/analytics/FairnessDashboard';
 import FairnessReport from '@components/analytics/FairnessReport';
+import FairnessTrendsChart from '@components/analytics/FairnessTrendsChart';
 
 /**
  * FairnessMonitoringPage Component
@@ -34,10 +35,11 @@ const FairnessMonitoringPage: React.FC = () => {
           <Tabs value={currentTab} onChange={handleTabChange}>
             <Tab label={t('fairnessMonitoring.tabs.dashboard')} />
             <Tab label={t('fairnessMonitoring.tabs.report')} />
+            <Tab label={t('fairnessMonitoring.tabs.trends')} />
           </Tabs>
         </Box>
 
-        <Box sx={{ p: 0 }}>
+        <Box sx={{ p: 3 }}>
           {currentTab === 0 && (
             <Box>
               <FairnessDashboard />
@@ -46,6 +48,11 @@ const FairnessMonitoringPage: React.FC = () => {
           {currentTab === 1 && (
             <Box>
               <FairnessReport />
+            </Box>
+          )}
+          {currentTab === 2 && (
+            <Box>
+              <FairnessTrendsChart />
             </Box>
           )}
         </Box>

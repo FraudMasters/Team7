@@ -35,7 +35,8 @@
     "yes": "Yes",
     "no": "No",
     "or": "or",
-    "and": "and"
+    "and": "and",
+    "dismiss": "Dismiss"
   },
   "nav": {
     "home": "Home",
@@ -474,6 +475,43 @@
     "matched": "Matched ({{count}})",
     "missing": "Missing ({{count}})"
   },
+  "linkedin": {
+    "search": {
+      "title": "LinkedIn Candidate Search",
+      "keywords": "Keywords",
+      "keywordsPlaceholder": "e.g., Software Engineer, Product Manager",
+      "location": "Location",
+      "skills": "Skills",
+      "selectSkills": "Select or type skills",
+      "industry": "Industry",
+      "experienceLevel": "Experience Level",
+      "any": "Any",
+      "experience": {
+        "entry": "Entry Level (0-2 years)",
+        "associate": "Associate (2-4 years)",
+        "mid": "Mid-Senior (4-7 years)",
+        "senior": "Senior (7-10 years)",
+        "director": "Director (10+ years)",
+        "executive": "Executive (15+ years)"
+      },
+      "search": "Search",
+      "searching": "Searching...",
+      "clearFilters": "Clear All Filters",
+      "resultsTitle": "{{count}} candidates found",
+      "selectAll": "Select All",
+      "import": "Import",
+      "importing": "Importing...",
+      "imported": "Imported",
+      "importSelected": "Import Selected ({{count}})",
+      "viewProfile": "View on LinkedIn",
+      "noResults": "No candidates found",
+      "adjustFilters": "Try adjusting your search filters or keywords",
+      "errors": {
+        "searchFailed": "Failed to search LinkedIn profiles. Please try again.",
+        "importFailed": "Failed to import profile. Please try again."
+      }
+    }
+  },
   "analyticsDashboard": {
     "title": "Hiring Analytics",
     "subtitle": "Real-time metrics and candidate progression insights",
@@ -819,11 +857,26 @@
     "title": "AI Ranking Explanation",
     "rankScore": "Ranking Score",
     "rankPosition": "Position",
+    "tabs": {
+      "overview": "Overview",
+      "details": "Details",
+      "comparison": "Comparison",
+      "whatIf": "What-If"
+    },
     "recommendation": {
+      "title": "Recommendation",
       "excellent": "Excellent Candidate",
       "good": "Good Candidate",
       "fair": "Fair Candidate",
       "poor": "Poor Candidate"
+    },
+    "comparison": {
+      "comingSoon": "Comparison Coming Soon",
+      "description": "Compare this candidate with others to understand relative strengths and weaknesses. This feature will allow side-by-side analysis of multiple candidates."
+    },
+    "whatIf": {
+      "comingSoon": "What-If Analysis Coming Soon",
+      "description": "Explore how changes to candidate attributes would affect their ranking score. Test different scenarios to understand which factors have the most impact."
     },
     "confidenceInterval": {
       "title": "Confidence Interval",
@@ -895,6 +948,15 @@
     "noData": {
       "title": "No Explanation Available",
       "message": "No explanation data found for the specified resume and vacancy."
+    },
+    "feedbackHistory": {
+      "title": "Recruiter Feedback History",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "correction": "Correction",
+      "actualSkill": "Actual Skill",
+      "source": "Source",
+      "confidence": "Confidence"
     }
   },
   "candidateComparison": {
@@ -936,6 +998,18 @@
       "better": "Better than reference",
       "worse": "Worse than reference",
       "equal": "Equal to reference"
+    },
+    "skill": "Skill",
+    "candidate": "Candidate",
+    "viewMode": "View mode",
+    "cardView": "Card view",
+    "tableView": "Skills comparison table",
+    "chartView": "Score comparison chart",
+    "scoreComparison": "Score Comparison",
+    "scoreComparisonDescription": "Visual comparison of all scoring components across candidates",
+    "skillsLegend": {
+      "has": "Has skill",
+      "missing": "Missing skill"
     }
   },
   "whatIfAnalysis": {
@@ -945,8 +1019,18 @@
     "originalScore": "Original Score",
     "adjustedScore": "Adjusted Score",
     "scoreChange": "Score Change",
+    "predictedRank": "Predicted Rank",
+    "rankImprovement": "Rank improved",
+    "rankDrop": "Rank decreased",
+    "noRankChange": "No rank change",
     "changeFromOriginal": "from original",
     "updating": "Updating analysis...",
+    "skillAddition": {
+      "title": "Add Skills to Resume",
+      "description": "Select skills from the vacancy requirements to see how they would improve the candidate's ranking",
+      "placeholder": "Select skills to add...",
+      "impact": "Adding {{count}} skill(s) will increase the skills match ratio"
+    },
     "presets": {
       "title": "Quick Scenarios",
       "description": "Click a preset to see how different changes would affect the ranking",
@@ -1090,7 +1174,75 @@
       "lowPriority": "Low Priority",
       "optimizationScore": "Optimization Score"
     },
-    "description": "AI-powered suggestions to improve your resume and increase your chances of getting noticed by recruiters."
+    "description": "AI-powered suggestions to improve your resume and increase your chances of getting noticed by recruiters.",
+    "completeness": {
+      "title": "Resume Completeness",
+      "score": "Completeness Score",
+      "missingSections": "Missing Sections",
+      "presentSections": "Present Sections",
+      "sections": {
+        "education": "Education",
+        "certifications": "Certifications",
+        "projects": "Projects",
+        "contact": "Contact Information",
+        "summary": "Professional Summary",
+        "experience": "Work Experience",
+        "skills": "Skills"
+      },
+      "suggestion": "Add {{section}} to improve your resume completeness"
+    },
+    "ats": {
+      "title": "ATS Compatibility",
+      "score": "ATS Score",
+      "formattingIssues": "Formatting Issues",
+      "suggestions": "ATS Suggestions",
+      "issues": {
+        "tables": "Tables may not parse correctly in ATS systems",
+        "images": "Images are not readable by ATS",
+        "specialChars": "Special characters may cause parsing issues",
+        "columns": "Multi-column layouts can confuse ATS parsers"
+      },
+      "passed": "Your resume passes ATS compatibility checks"
+    },
+    "comparison": {
+      "title": "Compare with Top Candidates",
+      "beforeAfter": "Before & After Comparison",
+      "currentScore": "Current Score",
+      "optimizedScore": "Optimized Score",
+      "improvement": "Potential Improvement",
+      "topCandidates": "Top Performing Candidates",
+      "skillsGap": "Skills Gap vs Top Candidates",
+      "matchingSkills": "Matching Skills",
+      "missingFromTop": "Skills to Add",
+      "rankingPrediction": {
+        "title": "Ranking Prediction",
+        "current": "Current Estimated Rank",
+        "optimized": "Optimized Estimated Rank",
+        "improvement": "Potential rank improvement: +{{positions}} positions"
+      }
+    },
+    "export": {
+      "title": "Export Optimized Resume",
+      "downloadPdf": "Download as PDF",
+      "downloadDocx": "Download as DOCX",
+      "downloadSuggestions": "Export Suggestions Report",
+      "generating": "Generating document...",
+      "success": "Document downloaded successfully",
+      "error": "Failed to generate document"
+    },
+    "skillGap": {
+      "title": "Skill Gap Analysis",
+      "missingSkills": "Missing Skills",
+      "matchedSkills": "Matched Skills",
+      "severity": {
+        "low": "Low Gap",
+        "medium": "Medium Gap",
+        "high": "High Gap"
+      },
+      "bridgeability": "Bridgeability Score",
+      "estimatedTime": "Estimated Time to Learn",
+      "priority": "Priority Order"
+    }
   },
   "jobDescriptionGenerator": {
     "title": "AI Job Description Generator",
@@ -1189,6 +1341,36 @@
         "inclusiveScore": "Inclusive Language Score: {{score}}%",
         "noWarnings": "No bias warnings detected. The description follows inclusive language guidelines."
       }
+    }
+  },
+  "skillFeedback": {
+    "tooltip": {
+      "correctSkill": "Mark this skill as correctly detected",
+      "incorrectSkill": "Mark this skill as incorrectly detected",
+      "addMissingSkill": "Add a missing skill"
+    },
+    "aria": {
+      "correctSkill": "Mark {{skill}} as correctly detected",
+      "incorrectSkill": "Mark {{skill}} as incorrectly detected",
+      "addMissingSkill": "Add a missing skill that the AI didn't detect"
+    },
+    "label": {
+      "giveFeedback": "Give feedback"
+    },
+    "success": {
+      "correctSkill": "Thank you! Confirmed that \"{{skill}}\" was correctly detected.",
+      "incorrectSkill": "Thank you! Noted that \"{{skill}}\" was incorrectly detected.",
+      "addedSkill": "Thank you! Added missing skill \"{{skill}}\"."
+    },
+    "error": {
+      "submitFailed": "Failed to submit feedback. Please try again.",
+      "emptySkillName": "Please enter a skill name."
+    },
+    "dialog": {
+      "addMissingSkill": "Add Missing Skill",
+      "description": "Enter the name of a skill that the AI missed on this resume. This helps improve future skill extraction.",
+      "skillNameLabel": "Skill Name",
+      "skillNamePlaceholder": "e.g., Python, Project Management, SQL"
     }
   }
 }

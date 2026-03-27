@@ -467,7 +467,7 @@ class DemographicAnalyzer:
 
         return None
 
-    def _infer_gender(self, text: str, name: Optional[str]) -> Tuple[Optional[str, float, Dict]]:
+    def _infer_gender(self, text: str, name: Optional[str]) -> Tuple[Optional[str], float, Dict]:
         """
         Infer gender from name and pronouns.
 
@@ -544,7 +544,7 @@ class DemographicAnalyzer:
 
     def _infer_age_group(
         self, text: str, analysis: Optional[ResumeAnalysis]
-    ) -> Tuple[Optional[str, float, Dict]]:
+    ) -> Tuple[Optional[str], float, Dict]:
         """
         Infer age group from graduation dates and experience.
 
@@ -633,7 +633,7 @@ class DemographicAnalyzer:
 
         return "35_44", 0.5, features  # Default fallback
 
-    def _infer_ethnicity(self, name: Optional[str], text: str) -> Tuple[Optional[str, float, Dict]]:
+    def _infer_ethnicity(self, name: Optional[str], text: str) -> Tuple[Optional[str], float, Dict]:
         """
         Infer ethnicity from surname patterns.
 
@@ -688,7 +688,7 @@ class DemographicAnalyzer:
 
         return best_ethnicity, confidence, features
 
-    def _infer_geographic_region(self, text: str) -> Tuple[Optional[str, float, Dict]]:
+    def _infer_geographic_region(self, text: str) -> Tuple[Optional[str], float, Dict]:
         """
         Infer geographic region from location mentions.
 
@@ -739,7 +739,7 @@ class DemographicAnalyzer:
 
         return best_region, confidence, features
 
-    def _infer_education_level(self, text: str) -> Tuple[Optional[str, float, Dict]]:
+    def _infer_education_level(self, text: str) -> Tuple[Optional[str], float, Dict]:
         """
         Infer education level from degree mentions.
 
@@ -786,7 +786,7 @@ class DemographicAnalyzer:
 
     def _infer_career_stage(
         self, text: str, analysis: Optional[ResumeAnalysis]
-    ) -> Tuple[Optional[str, float, Dict]]:
+    ) -> Tuple[Optional[str], float, Dict]:
         """
         Infer career stage from titles and experience.
 

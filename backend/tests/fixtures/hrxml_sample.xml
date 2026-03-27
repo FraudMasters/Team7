@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Candidates xmlns="http://ns.hr-xml.org/2007-04-15">
+    <Candidate>
+        <CandidateId>HRXML-2024-001</CandidateId>
+        <PersonName>
+            <GivenName>Jennifer</GivenName>
+            <FamilyName>Martinez</FamilyName>
+        </PersonName>
+        <ContactMethod>
+            <InternetEmailAddress>jennifer.martinez@example.com</InternetEmailAddress>
+            <Telephone>
+                <FormattedNumber>+1-555-1001</FormattedNumber>
+            </Telephone>
+        </ContactMethod>
+        <PositionTitle>Software Architect</PositionTitle>
+        <ApplicationDate>2024-03-10</ApplicationDate>
+        <CandidateStatus>Active</CandidateStatus>
+        <PostalAddress>
+            <Municipality>Boston, MA</Municipality>
+        </PostalAddress>
+        <ResumeLink>https://example.com/resumes/jennifer-martinez-001</ResumeLink>
+        <TextResume>Software Architect with 10+ years of experience in designing scalable systems. Expert in microservices, cloud architecture (AWS, Azure), and distributed systems. Led architecture for systems handling 10M+ daily users.</TextResume>
+        <CoverLetter>I am thrilled to apply for the Software Architect position. My experience designing enterprise-scale systems aligns perfectly with your technical requirements and growth objectives.</CoverLetter>
+        <LinkedInURL>https://linkedin.com/in/jennifer-martinez</LinkedInURL>
+    </Candidate>
+    <Candidate>
+        <CandidateId>HRXML-2024-002</CandidateId>
+        <PersonName>
+            <GivenName>Robert</GivenName>
+            <FamilyName>Johnson</FamilyName>
+        </PersonName>
+        <ContactMethod>
+            <InternetEmailAddress>robert.johnson@example.com</InternetEmailAddress>
+            <Telephone>
+                <FormattedNumber>+1-555-1002</FormattedNumber>
+            </Telephone>
+        </ContactMethod>
+        <PositionTitle>Senior Data Engineer</PositionTitle>
+        <ApplicationDate>2024-03-11</ApplicationDate>
+        <CandidateStatus>Under Review</CandidateStatus>
+        <PostalAddress>
+            <Municipality>Denver, CO</Municipality>
+        </PostalAddress>
+        <ResumeLink>https://example.com/resumes/robert-johnson-002</ResumeLink>
+        <TextResume>Senior Data Engineer with 8 years of experience building data pipelines and analytics platforms. Expertise in Spark, Kafka, Airflow, and modern data warehousing (Snowflake, BigQuery). Built pipelines processing 5TB+ daily.</TextResume>
+        <LinkedInURL>https://linkedin.com/in/robert-johnson</LinkedInURL>
+    </Candidate>
+    <Candidate>
+        <CandidateId>HRXML-2024-003</CandidateId>
+        <PersonName>
+            <GivenName>Amanda</GivenName>
+            <FamilyName>Thompson</FamilyName>
+        </PersonName>
+        <ContactMethod>
+            <InternetEmailAddress>amanda.thompson@example.com</InternetEmailAddress>
+        </ContactMethod>
+        <PositionTitle>Product Designer</PositionTitle>
+        <ApplicationDate>2024-03-12</ApplicationDate>
+        <CandidateStatus>Active</CandidateStatus>
+        <PostalAddress>
+            <Municipality>Portland, OR</Municipality>
+        </PostalAddress>
+        <ResumeLink>https://example.com/resumes/amanda-thompson-003</ResumeLink>
+        <TextResume>Product Designer with 6 years of experience creating delightful user experiences. Portfolio includes award-winning mobile and web applications. Expert in design systems, prototyping, and user research.</TextResume>
+        <CoverLetter>Your mission to create user-centered products resonates deeply with me. I would be honored to contribute my design expertise to your innovative team.</CoverLetter>
+        <LinkedInURL>https://linkedin.com/in/amanda-thompson</LinkedInURL>
+    </Candidate>
+    <Candidate>
+        <CandidateId>HRXML-2024-004</CandidateId>
+        <PersonName>
+            <GivenName>Christopher</GivenName>
+            <FamilyName>Lee</FamilyName>
+        </PersonName>
+        <ContactMethod>
+            <InternetEmailAddress>christopher.lee@example.com</InternetEmailAddress>
+            <Telephone>
+                <FormattedNumber>+1-555-1004</FormattedNumber>
+            </Telephone>
+        </ContactMethod>
+        <PositionTitle>Engineering Manager</PositionTitle>
+        <ApplicationDate>2024-03-13</ApplicationDate>
+        <CandidateStatus>Interviewing</CandidateStatus>
+        <PostalAddress>
+            <Municipality>Atlanta, GA</Municipality>
+        </PostalAddress>
+        <ResumeLink>https://example.com/resumes/christopher-lee-004</ResumeLink>
+        <TextResume>Engineering Manager with 12 years of experience leading high-performing teams. Built and managed teams of 15-20 engineers. Track record of delivering complex projects on time and fostering engineering excellence.</TextResume>
+        <LinkedInURL>https://linkedin.com/in/christopher-lee</LinkedInURL>
+    </Candidate>
+    <Candidate>
+        <CandidateId>HRXML-2024-005</CandidateId>
+        <PersonName>
+            <GivenName>Michelle</GivenName>
+            <FamilyName>Davis</FamilyName>
+        </PersonName>
+        <ContactMethod>
+            <InternetEmailAddress>michelle.davis@example.com</InternetEmailAddress>
+            <Telephone>
+                <FormattedNumber>+1-555-1005</FormattedNumber>
+            </Telephone>
+        </ContactMethod>
+        <PositionTitle>Security Engineer</PositionTitle>
+        <ApplicationDate>2024-03-14</ApplicationDate>
+        <CandidateStatus>Active</CandidateStatus>
+        <PostalAddress>
+            <Municipality>Washington, DC</Municipality>
+        </PostalAddress>
+        <ResumeLink>https://example.com/resumes/michelle-davis-005</ResumeLink>
+        <TextResume>Security Engineer with 7 years of experience in application security and penetration testing. CISSP certified. Expertise in security architecture, threat modeling, and security automation. Reduced security incidents by 80% in previous role.</TextResume>
+        <CoverLetter>I am passionate about building secure systems and protecting user data. My security expertise would be valuable in strengthening your security posture.</CoverLetter>
+        <LinkedInURL>https://linkedin.com/in/michelle-davis</LinkedInURL>
+    </Candidate>
+    <Candidate>
+        <CandidateId>HRXML-2024-006</CandidateId>
+        <PersonName>
+            <GivenName>Daniel</GivenName>
+            <FamilyName>Garcia</FamilyName>
+        </PersonName>
+        <ContactMethod>
+            <InternetEmailAddress>daniel.garcia@example.com</InternetEmailAddress>
+        </ContactMethod>
+        <PositionTitle>Mobile Developer</PositionTitle>
+        <ApplicationDate>2024-03-15</ApplicationDate>
+        <CandidateStatus>Active</CandidateStatus>
+        <PostalAddress>
+            <Municipality>Miami, FL</Municipality>
+        </PostalAddress>
+        <ResumeLink>https://example.com/resumes/daniel-garcia-006</ResumeLink>
+        <TextResume>Mobile Developer with 5 years of experience building iOS and Android applications. Published 10+ apps with millions of downloads. Expert in Swift, Kotlin, React Native, and mobile best practices.</TextResume>
+        <LinkedInURL>https://linkedin.com/in/daniel-garcia</LinkedInURL>
+    </Candidate>
+</Candidates>

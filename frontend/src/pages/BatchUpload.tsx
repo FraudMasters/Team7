@@ -40,6 +40,7 @@ import {
   Stop as StopIcon,
   Warning as WarningIcon,
   ContentCopy as DuplicateIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import ErrorBoundary from '@components/ErrorBoundary';
 
@@ -547,6 +548,63 @@ const BatchUploadPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to fetch results:', err);
+    }
+  };
+
+  const exportBatchResults = async () => {
+    if (!currentBatch) return;
+
+    try {
+      // Fetch results if not already loaded
+      let resultsData = batchResults;
+      if (!resultsData) {
+        const response = await fetch(`${API_URL}/api/batch/${currentBatch.batch_id}/results`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch batch results');
+        }
+        resultsData = await response.json();
+      }
+
+      if (!resultsData) return;
+
+      // Create CSV headers
+      const headers = ['Filename', 'Status', 'Resume ID', 'Error'];
+
+      // Create CSV rows
+      const rows = resultsData.files?.map((file: any) => [
+        file.filename || '',
+        file.status || '',
+        file.resume_id || '',
+        file.error || '',
+      ]) || [];
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row: string[]) =>
+          row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ),
+      ].join('\n');
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', `batch-results-${currentBatch.batch_id}.csv`);
+      link.style.visibility = 'hidden';
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+
+      setSuccess('Batch results exported successfully');
+    } catch (err) {
+      console.error('Failed to export results:', err);
+      setError('Failed to export batch results');
     }
   };
 
@@ -1323,6 +1381,16 @@ const BatchUploadPage: React.FC = () => {
                 >
                   View Results
                 </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={exportBatchResults}
+                  disabled={currentBatch.status !== 'completed'}
+                  fullWidth={{ xs: true, sm: false }}
+                  sx={{ minHeight: 44 }}
+                >
+                  Export CSV
+                </Button>
                 {/* Review Duplicates button - visible when batch has duplicates */}
                 {((currentBatch.duplicates_detected && currentBatch.duplicates_detected > 0) || duplicates.length > 0) && (
                   <Tooltip title="Review detected duplicate resumes">
@@ -1476,6 +1544,14 @@ const BatchUploadPage: React.FC = () => {
             )}
           </DialogContent>
           <DialogActions>
+            <Button
+              onClick={exportBatchResults}
+              startIcon={<DownloadIcon />}
+              variant="contained"
+              disabled={!batchResults || !batchResults.files || batchResults.files.length === 0}
+            >
+              Export CSV
+            </Button>
             <Button onClick={() => setResultsDialog(false)}>Close</Button>
           </DialogActions>
         </Dialog>

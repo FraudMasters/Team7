@@ -5,6 +5,7 @@ x-backend-common-env: &backend-common-env
   REDIS_URL: redis://redis:6379/0
   CELERY_BROKER_URL: redis://redis:6379/0
   CELERY_RESULT_BACKEND: redis://redis:6379/0
+  ELASTICSEARCH_URL: http://elasticsearch:9200
   MODELS_CACHE_PATH: /app/models_cache
   PYTHONPATH: /app:/app/services
   # Hugging Face optimizations
@@ -27,6 +28,7 @@ services:
   postgres:
     image: postgres:14-alpine
     container_name: resume_analysis_db
+    profiles: ["minimal", "core", "full"]
     env_file:
       - .env
     environment:
@@ -58,6 +60,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: resume_analysis_redis
+    profiles: ["minimal", "core", "full"]
     env_file:
       - .env
     ports:
@@ -85,6 +88,7 @@ services:
   postgres_exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     container_name: resume_analysis_postgres_exporter
+    profiles: ["full"]
     env_file:
       - .env
     environment:
@@ -112,6 +116,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: resume_analysis_backend
+    profiles: ["minimal", "core", "full"]
     env_file:
       - .env
     environment:
@@ -149,6 +154,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: resume_analysis_celery_worker
+    profiles: ["core", "full"]
     env_file:
       - .env
     environment:
@@ -183,6 +189,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: resume_analysis_celery_beat
+    profiles: ["core", "full"]
     env_file:
       - .env
     environment:
@@ -213,6 +220,7 @@ services:
   celery_exporter:
     image: quay.io/prometheuscommunity/celery-exporter:v0.0.16
     container_name: resume_analysis_celery_exporter
+    profiles: ["full"]
     env_file:
       - .env
     environment:
@@ -242,6 +250,7 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: resume_analysis_cadvisor
+    profiles: ["full"]
     env_file:
       - .env
     ports:
@@ -273,6 +282,7 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: resume_analysis_frontend
+    profiles: ["minimal", "core", "full"]
     env_file:
       - .env
     ports:
@@ -286,6 +296,7 @@ services:
   grafana:
     image: grafana/grafana:11.1.0
     container_name: resume_analysis_grafana
+    profiles: ["full"]
     env_file:
       - .env
     environment:
@@ -331,6 +342,7 @@ services:
   loki:
     image: grafana/loki:3.1.1
     container_name: resume_analysis_loki
+    profiles: ["full"]
     env_file:
       - .env
     command: -config.file=/etc/loki/local-config.yaml
@@ -355,6 +367,7 @@ services:
   promtail:
     image: grafana/promtail:3.1.1
     container_name: resume_analysis_promtail
+    profiles: ["full"]
     env_file:
       - .env
     command: -config.file=/etc/promtail/config.yml
@@ -380,6 +393,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.53.0
     container_name: resume_analysis_prometheus
+    profiles: ["full"]
     env_file:
       - .env
     command:

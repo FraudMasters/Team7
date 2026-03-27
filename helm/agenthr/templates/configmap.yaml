@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agenthr.fullname" . }}-config
+  labels:
+    {{- include "agenthr.labels" . | nindent 4 }}
+data:
+  # Backend configuration
+  BACKEND_PORT: {{ .Values.config.backendPort | quote }}
+  BACKEND_HOST: {{ .Values.config.backendHost | quote }}
+
+  # Frontend configuration
+  FRONTEND_PORT: {{ .Values.config.frontendPort | quote }}
+  FRONTEND_HOST: {{ .Values.config.frontendHost | quote }}
+  {{- if .Values.config.frontendUrl }}
+  FRONTEND_URL: {{ .Values.config.frontendUrl | quote }}
+  {{- end }}
+
+  # ML Models configuration
+  MODELS_CACHE_PATH: {{ .Values.config.modelsCachePath | quote }}
+  TRANSFORMERS_CACHE: {{ .Values.config.transformersCache | quote }}
+  PYTORCH_ENABLE_MPS_FALLBACK: {{ .Values.config.pytorchEnableMpsFallback | quote }}
+
+  # Logging configuration
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  LOG_FORMAT: {{ .Values.config.logFormat | quote }}
+
+  # Application settings
+  MAX_UPLOAD_SIZE_MB: {{ .Values.config.maxUploadSizeMb | quote }}
+  ALLOWED_FILE_TYPES: {{ .Values.config.allowedFileTypes | quote }}
+  ANALYSIS_TIMEOUT_SECONDS: {{ .Values.config.analysisTimeoutSeconds | quote }}
+
+  # Backup configuration
+  BACKUP_ENABLED: {{ .Values.config.backupEnabled | quote }}
+  BACKUP_RETENTION_DAYS: {{ .Values.config.backupRetentionDays | quote }}
+  BACKUP_SCHEDULE: {{ .Values.config.backupSchedule | quote }}
+  BACKUP_S3_ENABLED: {{ .Values.config.backupS3Enabled | quote }}
+
+  # Graphiti configuration
+  GRAPHITI_TELEMETRY_ENABLED: {{ .Values.config.graphitiTelemetryEnabled | quote }}
+  SEMAPHORE_LIMIT: {{ .Values.config.semaphoreLimit | quote }}
+
+  # Neo4j configuration
+  {{- if .Values.config.neo4j.enabled }}
+  NEO4J_URI: {{ .Values.config.neo4j.uri | quote }}
+  NEO4J_USER: {{ .Values.config.neo4j.user | quote }}
+  {{- end }}

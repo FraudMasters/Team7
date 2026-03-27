@@ -15,7 +15,7 @@ from config import get_settings
 from tasks import (
     analyze_resume_async,
     batch_analyze_resumes,
-    generate_scheduled_reports,
+    generate_scheduled_report,
     process_all_pending_reports,
 )
 
@@ -34,6 +34,10 @@ import tasks.webhook_tasks  # noqa: F401
 # Import workflow tasks to register workflow execution tasks
 # This ensures workflow tasks are available for Celery workers
 import tasks.workflow_tasks  # noqa: F401
+
+# Import audit alerting tasks to register suspicious activity monitoring tasks
+# This ensures audit alerting tasks are available for Celery workers
+import tasks.audit_alerting  # noqa: F401
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -295,7 +299,7 @@ __all__ = [
     "long_running_task",
     "analyze_resume_async",
     "batch_analyze_resumes",
-    "generate_scheduled_reports",
+    "generate_scheduled_report",
     "process_all_pending_reports",
     "preload_ml_models",
     "health_check_with_models",

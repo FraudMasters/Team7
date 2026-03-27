@@ -31,6 +31,8 @@ from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
+from .ranking_weights_profile import RankingWeightProfile
+from .ranking_weights_history import RankingWeightVersion
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
 from .ats_result import ATSResult
 from .saved_search import SavedSearch
@@ -44,6 +46,10 @@ from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
 from .diversity_metrics import DiversityMetrics, DiversityGoal
 from .pipeline_stage import PipelineStageTransition, PipelineStage, TransitionReason
+from .token_blacklist import TokenBlacklist
+from .oauth_provider import OAuthProvider
+from .oauth_token import OAuthToken
+from .login_attempt import LoginAttempt
 
 __all__ = [
     "Base",
@@ -85,6 +91,8 @@ __all__ = [
     "MatchingWeightVersion",
     "PRESET_PROFILES",
     "create_preset_profiles",
+    "RankingWeightProfile",
+    "RankingWeightVersion",
     "Backup",
     "BackupConfig",
     "BackupType",
@@ -106,4 +114,11 @@ __all__ = [
     "PipelineStageTransition",
     "PipelineStage",
     "TransitionReason",
+    "TokenBlacklist",
+    "OAuthProvider",
+    "OAuthToken",
+    "LoginAttempt",
+    "ApplicationSource",
+    "SourceType",
+    "CandidateDocument",
 ]

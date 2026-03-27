@@ -102,6 +102,27 @@ class FairnessSummary(BaseModel):
     last_updated: str = Field(..., description="Timestamp of last update (ISO 8601 format)")
 
 
+class FairnessTrendDataPoint(BaseModel):
+    """Single data point in fairness trends time series."""
+
+    timestamp: str = Field(..., description="Timestamp of the data point (ISO 8601 format)")
+    disparate_impact_ratio: Optional[float] = Field(None, description="Disparate impact ratio value")
+    demographic_parity_diff: Optional[float] = Field(None, description="Demographic parity difference value")
+    equal_opportunity_diff: Optional[float] = Field(None, description="Equal opportunity difference value")
+    average_odds_diff: Optional[float] = Field(None, description="Average odds difference value")
+    theil_index: Optional[float] = Field(None, description="Theil index value")
+    sample_size: int = Field(..., description="Number of samples evaluated")
+
+
+class FairnessTrendsResponse(BaseModel):
+    """Response model for fairness trends over time."""
+
+    data_points: List[FairnessTrendDataPoint] = Field(..., description="Time series data points")
+    total_count: int = Field(..., description="Total number of data points")
+    start_date: str = Field(..., description="Start date of the time series")
+    end_date: str = Field(..., description="End date of the time series")
+
+
 @router.get(
     "/metrics",
     response_model=FairnessMetricsListResponse,
@@ -866,6 +887,176 @@ async def get_fairness_summary() -> JSONResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch fairness summary: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/trends",
+    response_model=FairnessTrendsResponse,
+    tags=["Fairness"],
+)
+async def get_fairness_trends(
+    start_date: str = Query(..., description="Start date for trends (ISO 8601 format, e.g., 2026-01-01)"),
+    end_date: str = Query(..., description="End date for trends (ISO 8601 format, e.g., 2026-03-21)"),
+    model_name: Optional[str] = Query(None, description="Filter by model name"),
+    model_version: Optional[str] = Query(None, description="Filter by model version"),
+    protected_attribute: Optional[str] = Query(None, description="Filter by protected attribute"),
+) -> JSONResponse:
+    """
+    Get historical fairness metrics as time series data.
+
+    This endpoint retrieves fairness metrics over time, allowing users to track
+    trends and patterns in AI model fairness. The data is aggregated by analysis
+    date and includes all key fairness metrics.
+
+    Time series data helps identify:
+    - Trends in model fairness over time
+    - Impact of model updates on fairness
+    - Seasonal or temporal patterns in bias
+    - Effectiveness of bias mitigation strategies
+
+    Args:
+        start_date: Start date for the time series (ISO 8601 format, required)
+        end_date: End date for the time series (ISO 8601 format, required)
+        model_name: Optional filter for specific model name
+        model_version: Optional filter for specific model version
+        protected_attribute: Optional filter for specific protected attribute
+
+    Returns:
+        JSON response with time series data points
+
+    Raises:
+        HTTPException(422): If date validation fails
+        HTTPException(500): If database query fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "/api/fairness/trends?start_date=2026-01-01&end_date=2026-03-21"
+        ... )
+        >>> response.json()
+        {
+            "data_points": [
+                {
+                    "timestamp": "2026-01-15T00:00:00Z",
+                    "disparate_impact_ratio": 0.85,
+                    "demographic_parity_diff": 0.12,
+                    "equal_opportunity_diff": 0.08,
+                    "average_odds_diff": 0.10,
+                    "theil_index": 0.05,
+                    "sample_size": 1500
+                },
+                ...
+            ],
+            "total_count": 30,
+            "start_date": "2026-01-01",
+            "end_date": "2026-03-21"
+        }
+    """
+    try:
+        logger.info(
+            f"Fetching fairness trends - start_date: {start_date}, end_date: {end_date}, "
+            f"model_name: {model_name}, model_version: {model_version}, "
+            f"protected_attribute: {protected_attribute}"
+        )
+
+        # Validate date parameters
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+
+            if start_dt > end_dt:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="start_date must be before or equal to end_date",
+                )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid date format. Use ISO 8601 format (e.g., 2026-01-01): {str(e)}",
+            ) from e
+
+        from database import get_db
+        from models.fairness_metrics import FairnessMetrics as FairnessMetricsModel
+        from sqlalchemy import func
+
+        data_points = []
+        total_count = 0
+
+        async for db in get_db():
+            # Build query to get metrics grouped by analysis_date
+            query = select(
+                FairnessMetricsModel.analysis_date,
+                func.avg(FairnessMetricsModel.disparate_impact_ratio).label('avg_disparate_impact'),
+                func.avg(FairnessMetricsModel.demographic_parity_diff).label('avg_demographic_parity'),
+                func.avg(FairnessMetricsModel.equal_opportunity_diff).label('avg_equal_opportunity'),
+                func.avg(FairnessMetricsModel.average_odds_diff).label('avg_average_odds'),
+                func.avg(FairnessMetricsModel.theil_index).label('avg_theil_index'),
+                func.sum(FairnessMetricsModel.sample_size).label('total_sample_size'),
+            ).group_by(
+                FairnessMetricsModel.analysis_date
+            )
+
+            # Apply date range filter
+            query = query.where(FairnessMetricsModel.analysis_date >= start_date)
+            query = query.where(FairnessMetricsModel.analysis_date <= end_date)
+
+            # Apply optional filters
+            if model_version:
+                query = query.where(FairnessMetricsModel.model_version_id == model_version)
+
+            if protected_attribute:
+                query = query.where(FairnessMetricsModel.demographic_group == protected_attribute)
+
+            # Order by analysis_date ascending (chronological)
+            query = query.order_by(FairnessMetricsModel.analysis_date)
+
+            # Execute query
+            result = await db.execute(query)
+            trend_records = result.all()
+
+            total_count = len(trend_records)
+
+            # Transform database records to API response format
+            for record in trend_records:
+                # Convert analysis_date to ISO 8601 timestamp
+                timestamp = f"{record.analysis_date}T00:00:00Z"
+
+                data_point = FairnessTrendDataPoint(
+                    timestamp=timestamp,
+                    disparate_impact_ratio=round(record.avg_disparate_impact, 3) if record.avg_disparate_impact else None,
+                    demographic_parity_diff=round(record.avg_demographic_parity, 3) if record.avg_demographic_parity else None,
+                    equal_opportunity_diff=round(record.avg_equal_opportunity, 3) if record.avg_equal_opportunity else None,
+                    average_odds_diff=round(record.avg_average_odds, 3) if record.avg_average_odds else None,
+                    theil_index=round(record.avg_theil_index, 3) if record.avg_theil_index else None,
+                    sample_size=int(record.total_sample_size) if record.total_sample_size else 0,
+                )
+                data_points.append(data_point)
+
+            break
+
+        # Build response
+        response_data = FairnessTrendsResponse(
+            data_points=data_points,
+            total_count=total_count,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        logger.info(f"Retrieved {total_count} trend data points from {start_date} to {end_date}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response_data.model_dump(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching fairness trends: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch fairness trends: {str(e)}",
         ) from e
 
 

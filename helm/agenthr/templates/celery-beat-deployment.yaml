@@ -1,0 +1,207 @@
+{{- if .Values.celeryBeat.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agenthr.fullname" . }}-celery-beat
+  labels:
+    {{- include "agenthr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-beat
+spec:
+  # Celery beat must run as a single replica (scheduler singleton)
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "agenthr.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-beat
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "agenthr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-beat
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "agenthr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: celery-beat
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.celeryBeat.image.repository }}:{{ .Values.celeryBeat.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.celeryBeat.image.pullPolicy }}
+        command:
+          - celery
+          - -A
+          - celery_app.celery_app
+          - beat
+          - --loglevel=info
+        env:
+        # Python environment
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PYTHONPATH
+          value: "/app:/app/services"
+        # Database configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: database-url
+        - name: PGHOST
+          value: {{ include "agenthr.postgresql.fullname" . }}
+        - name: PGPORT
+          value: "5432"
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: postgres-user
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: postgres-password
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: postgres-db
+        # Redis configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: redis-url
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: redis-url
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: redis-url
+        # Application configuration
+        - name: LOG_LEVEL
+          value: {{ .Values.config.logLevel | quote }}
+        - name: LOG_FORMAT
+          value: {{ .Values.config.logFormat | quote }}
+        # Backup configuration
+        - name: BACKUP_ENABLED
+          value: {{ .Values.config.backupEnabled | quote }}
+        - name: BACKUP_DIR
+          value: "/app/data/backups"
+        - name: BACKUP_RETENTION_DAYS
+          value: {{ .Values.config.backupRetentionDays | quote }}
+        - name: BACKUP_SCHEDULE
+          value: {{ .Values.config.backupSchedule | quote }}
+        # Graphiti configuration
+        - name: GRAPHITI_TELEMETRY_ENABLED
+          value: {{ .Values.config.graphitiTelemetryEnabled | quote }}
+        # Neo4j configuration (if enabled)
+        {{- if .Values.config.neo4j.enabled }}
+        - name: NEO4J_URI
+          value: {{ .Values.config.neo4j.uri | quote }}
+        - name: NEO4J_USER
+          value: {{ .Values.config.neo4j.user | quote }}
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: neo4j-password
+        {{- end }}
+        # Backup S3 configuration (if enabled)
+        {{- if eq .Values.config.backupS3Enabled "true" }}
+        - name: BACKUP_S3_ENABLED
+          value: "true"
+        - name: BACKUP_S3_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-bucket
+        - name: BACKUP_S3_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-endpoint
+        - name: BACKUP_S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-access-key
+        - name: BACKUP_S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-secret-key
+        - name: BACKUP_S3_REGION
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: backup-s3-region
+        {{- end }}
+        # Alert notification configuration
+        {{- if .Values.secrets.alertEmail }}
+        - name: ALERT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: alert-email
+        {{- end }}
+        {{- if .Values.secrets.alertWebhookUrl }}
+        - name: ALERT_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "agenthr.fullname" . }}-secrets
+              key: alert-webhook-url
+        {{- end }}
+        resources:
+          {{- toYaml .Values.celeryBeat.resources | nindent 12 }}
+        volumeMounts:
+        - name: backups
+          mountPath: /app/data/backups
+        - name: celerybeat-schedule
+          mountPath: /app/celerybeat
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: backups
+        {{- if .Values.persistence.backups.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "agenthr.fullname" . }}-backups
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: celerybeat-schedule
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

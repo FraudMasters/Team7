@@ -279,6 +279,7 @@ class GoogleCalendarService(CalendarService):
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         meeting_link: Optional[str] = None,
+        auto_generate_conference: bool = False,
     ) -> Dict[str, Any]:
         """
         Build a Google Calendar event dictionary from parameters.
@@ -290,7 +291,8 @@ class GoogleCalendarService(CalendarService):
             description: Optional event description
             location: Optional physical location
             attendees: Optional list of attendee email addresses
-            meeting_link: Optional virtual meeting link
+            meeting_link: Optional virtual meeting link (if provided, disables auto-generation)
+            auto_generate_conference: Whether to auto-generate Google Meet link
 
         Returns:
             Google Calendar API event dictionary
@@ -314,10 +316,11 @@ class GoogleCalendarService(CalendarService):
         if location:
             event["location"] = location
 
-        if meeting_link:
+        # Auto-generate Google Meet link if requested and no manual link provided
+        if auto_generate_conference and not meeting_link:
             event["conferenceData"] = {
                 "createRequest": {
-                    "requestId": f"{start_time.timestamp()}",
+                    "requestId": f"agenthr-{int(start_time.timestamp())}",
                     "conferenceSolutionKey": {"type": "hangoutsMeet"},
                 }
             }
@@ -336,6 +339,7 @@ class GoogleCalendarService(CalendarService):
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         meeting_link: Optional[str] = None,
+        auto_generate_conference: bool = False,
     ) -> CalendarEvent:
         """
         Create a new Google Calendar event.
@@ -350,10 +354,11 @@ class GoogleCalendarService(CalendarService):
             description: Optional event description
             location: Optional physical location
             attendees: Optional list of attendee email addresses
-            meeting_link: Optional virtual meeting link (if None, may auto-generate Google Meet)
+            meeting_link: Optional virtual meeting link (if provided, disables auto-generation)
+            auto_generate_conference: Auto-generate Google Meet link if no manual link provided
 
         Returns:
-            Created CalendarEvent with Google-assigned event_id
+            Created CalendarEvent with Google-assigned event_id and meeting_link
 
         Raises:
             AuthenticationError: If authentication fails
@@ -366,8 +371,10 @@ class GoogleCalendarService(CalendarService):
             ...     start_time=datetime(2024, 1, 15, 14, 0),
             ...     end_time=datetime(2024, 1, 15, 15, 0),
             ...     attendees=["candidate@example.com"],
-            ...     description="Discuss Python experience and system design"
+            ...     description="Discuss Python experience and system design",
+            ...     auto_generate_conference=True
             ... )
+            >>> print(event.meeting_link)  # Google Meet link
         """
         self._ensure_valid_token()
 
@@ -382,15 +389,17 @@ class GoogleCalendarService(CalendarService):
                 location=location,
                 attendees=attendees,
                 meeting_link=meeting_link,
+                auto_generate_conference=auto_generate_conference,
             )
 
-            # Create conference data if meeting_link requested
-            if meeting_link or not location:
+            # Enable conference data if auto-generating or manual link provided
+            if auto_generate_conference or meeting_link:
                 google_event["conferenceDataVersion"] = 1
 
             logger.info(
                 f"Creating Google Calendar event: {title} at {start_time} "
-                f"for {len(attendees or [])} attendees"
+                f"for {len(attendees or [])} attendees "
+                f"(auto_conference={auto_generate_conference})"
             )
 
             # Insert event
@@ -400,6 +409,7 @@ class GoogleCalendarService(CalendarService):
                     calendarId=self.calendar_id,
                     body=google_event,
                     sendUpdates="all",  # Send notifications to attendees
+                    conferenceDataVersion=1 if (auto_generate_conference or meeting_link) else 0,
                 )
                 .execute()
             )
@@ -471,6 +481,7 @@ class GoogleCalendarService(CalendarService):
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         meeting_link: Optional[str] = None,
+        auto_generate_conference: bool = False,
     ) -> CalendarEvent:
         """
         Update an existing Google Calendar event.
@@ -484,6 +495,7 @@ class GoogleCalendarService(CalendarService):
             location: New location (optional)
             attendees: New attendee list (optional)
             meeting_link: New meeting link (optional)
+            auto_generate_conference: Auto-generate Google Meet link if no manual link provided
 
         Returns:
             Updated CalendarEvent
@@ -537,27 +549,30 @@ class GoogleCalendarService(CalendarService):
             if attendees is not None:
                 update_data["attendees"] = [{"email": email} for email in attendees]
 
-            if meeting_link is not None:
+            # Auto-generate conference data if requested and no manual link
+            if auto_generate_conference and meeting_link is None:
+                timestamp = start_time.timestamp() if start_time else datetime.utcnow().timestamp()
                 update_data["conferenceData"] = {
                     "createRequest": {
-                        "requestId": f"{start_time or datetime.utcnow().timestamp()}",
+                        "requestId": f"agenthr-update-{int(timestamp)}",
                         "conferenceSolutionKey": {"type": "hangoutsMeet"},
                     }
                 }
 
             logger.info(f"Updating Google Calendar event: {event_id}")
 
-            # Update event
-            updated_event = (
-                service.events()
-                .patch(
-                    calendarId=self.calendar_id,
-                    eventId=event_id,
-                    body=update_data,
-                    sendUpdates="all",  # Send notifications to attendees
-                )
-                .execute()
-            )
+            # Update event with conference data version if needed
+            params = {
+                "calendarId": self.calendar_id,
+                "eventId": event_id,
+                "body": update_data,
+                "sendUpdates": "all",  # Send notifications to attendees
+            }
+
+            if auto_generate_conference:
+                params["conferenceDataVersion"] = 1
+
+            updated_event = service.events().patch(**params).execute()
 
             parsed_event = self._parse_google_event(updated_event)
 

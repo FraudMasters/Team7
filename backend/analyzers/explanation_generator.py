@@ -1239,6 +1239,230 @@ Important guidelines:
 
         return f"{base} with a score of {rank_score:.2f}."
 
+    async def generate_detailed_narrative(
+        self,
+        candidate_name: Optional[str],
+        rank_score: float,
+        rank_position: Optional[int],
+        feature_contributions: Dict[str, float],
+        ranking_factors: Dict[str, Any],
+        job_title: str,
+        job_description: str = "",
+        recommendation: str = "good",
+        all_candidate_scores: Optional[List[float]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate detailed narrative explanation with structured sections.
+
+        This method provides enhanced explanations with four key sections:
+        1. Ranking rationale - Why the candidate ranked at this specific position
+        2. Strengths analysis - Key strengths that helped the candidate
+        3. Improvement areas - Areas where the candidate could improve
+        4. Overall assessment - Summary assessment and recommendation
+
+        Args:
+            candidate_name: Candidate's name (if available)
+            rank_score: Overall ranking score
+            rank_position: Position in ranked list
+            feature_contributions: Dictionary of feature contributions
+            ranking_factors: Dictionary of ranking factor details
+            job_title: Job posting title
+            job_description: Job posting description
+            recommendation: Hiring recommendation
+            all_candidate_scores: List of all candidate scores for percentile calculation
+
+        Returns:
+            Dictionary with structured narrative sections:
+            {
+                "ranking_rationale": str,  # Why ranked at position X
+                "strengths_analysis": List[str],  # Key strengths
+                "improvement_areas": List[str],  # Areas for improvement
+                "overall_assessment": str  # Summary assessment
+            }
+
+        Example:
+            >>> narrative = await generator.generate_detailed_narrative(
+            ...     candidate_name="John Doe",
+            ...     rank_score=0.85,
+            ...     rank_position=3,
+            ...     feature_contributions={"skills_match": 0.30, ...},
+            ...     ranking_factors={"skills_match": {"score": 0.9, ...}, ...},
+            ...     job_title="Senior Python Developer",
+            ...     recommendation="excellent"
+            ... )
+            >>> print(narrative["ranking_rationale"])
+            "John Doe ranked 3rd primarily due to exceptional Python skills..."
+        """
+        logger.info(
+            f"Generating detailed narrative for {candidate_name or 'candidate'}, "
+            f"score={rank_score:.2f}, position={rank_position}"
+        )
+
+        # Build enhanced prompt for detailed narrative
+        prompt = self._create_detailed_narrative_prompt(
+            candidate_name=candidate_name,
+            rank_score=rank_score,
+            rank_position=rank_position,
+            feature_contributions=feature_contributions,
+            ranking_factors=ranking_factors,
+            job_title=job_title,
+            job_description=job_description,
+            recommendation=recommendation,
+            all_candidate_scores=all_candidate_scores,
+        )
+
+        try:
+            # Call LLM with structured prompt
+            llm_result = await self._call_llm(prompt)
+
+            # Extract structured sections
+            ranking_rationale = llm_result.get("ranking_rationale", "")
+            strengths_analysis = llm_result.get("strengths_analysis", [])
+            improvement_areas = llm_result.get("improvement_areas", [])
+            overall_assessment = llm_result.get("overall_assessment", "")
+
+            logger.info("Detailed narrative generated successfully")
+
+            return {
+                "ranking_rationale": ranking_rationale,
+                "strengths_analysis": strengths_analysis,
+                "improvement_areas": improvement_areas,
+                "overall_assessment": overall_assessment,
+            }
+
+        except Exception as e:
+            logger.warning(f"LLM detailed narrative generation failed: {e}")
+
+            # Fallback to basic narrative structure
+            name = candidate_name or "This candidate"
+            position_text = f"ranked #{rank_position}" if rank_position else f"scored {rank_score:.2f}"
+
+            # Basic ranking rationale
+            top_features = sorted(
+                feature_contributions.items(),
+                key=lambda x: abs(x[1]),
+                reverse=True
+            )[:3]
+            top_feature_names = [self.FEATURE_DESCRIPTIONS.get(f[0], f[0]) for f in top_features]
+
+            ranking_rationale = (
+                f"{name} {position_text} based on {', '.join(top_feature_names[:2])}."
+            )
+
+            # Basic strengths
+            strengths_analysis = [
+                f"Strong {self.FEATURE_DESCRIPTIONS.get(f[0], f[0]).lower()}"
+                for f in top_features if f[1] > 0
+            ][:3]
+
+            # Basic improvement areas
+            weak_features = sorted(
+                feature_contributions.items(),
+                key=lambda x: x[1]
+            )[:2]
+            improvement_areas = [
+                f"Could improve {self.FEATURE_DESCRIPTIONS.get(f[0], f[0]).lower()}"
+                for f in weak_features if f[1] < 0
+            ]
+
+            # Basic overall assessment
+            if recommendation == "excellent":
+                overall_assessment = f"{name} is an excellent match for this {job_title} position."
+            elif recommendation == "good":
+                overall_assessment = f"{name} is a good match for this {job_title} position."
+            elif recommendation == "maybe":
+                overall_assessment = f"{name} shows potential for this {job_title} position."
+            else:
+                overall_assessment = f"{name} may need additional qualifications for this {job_title} position."
+
+            return {
+                "ranking_rationale": ranking_rationale,
+                "strengths_analysis": strengths_analysis,
+                "improvement_areas": improvement_areas,
+                "overall_assessment": overall_assessment,
+            }
+
+    def _create_detailed_narrative_prompt(
+        self,
+        candidate_name: Optional[str],
+        rank_score: float,
+        rank_position: Optional[int],
+        feature_contributions: Dict[str, float],
+        ranking_factors: Dict[str, Any],
+        job_title: str,
+        job_description: str,
+        recommendation: str,
+        all_candidate_scores: Optional[List[float]],
+    ) -> str:
+        """Create prompt for detailed narrative generation."""
+        # Calculate percentile if available
+        percentile_info = ""
+        if all_candidate_scores and self.org_preferences.include_percentiles:
+            percentile_rank = self._calculate_percentile(rank_score, all_candidate_scores)
+            percentile_info = f"\nPercentile Rank: {percentile_rank:.0f}% (out of {len(all_candidate_scores)} candidates)"
+
+        # Build candidate context
+        candidate_context = self._format_candidate_context(
+            candidate_name or "Candidate",
+            rank_score,
+            ranking_factors
+        )
+
+        # Sort features by contribution
+        sorted_features = sorted(
+            feature_contributions.items(),
+            key=lambda x: abs(x[1]),
+            reverse=True
+        )
+
+        feature_details = []
+        for feature_name, contribution in sorted_features[:5]:
+            description = self.FEATURE_DESCRIPTIONS.get(
+                feature_name,
+                feature_name.replace("_", " ").title()
+            )
+            impact = "positive" if contribution > 0 else "negative"
+            feature_details.append(
+                f"- {description}: {contribution:.3f} ({impact} impact)"
+            )
+
+        position_text = f"ranked at position #{rank_position}" if rank_position else f"scored {rank_score:.2f}"
+
+        prompt_parts = [
+            f"Generate a detailed explanation for why a candidate {position_text} for a job opening.\n\n",
+            f"=== JOB POSTING ===\n",
+            f"Title: {job_title}\n",
+            f"Description: {job_description[:500]}...\n\n" if job_description else "\n",
+            f"=== CANDIDATE ===\n",
+            candidate_context,
+            percentile_info,
+            f"\n\n=== TOP FACTORS INFLUENCING RANKING ===\n",
+        ]
+        prompt_parts.extend([f"{fd}\n" for fd in feature_details])
+
+        prompt_parts.append(f"\n=== TASK ===\n")
+        prompt_parts.append(
+            "Provide a structured explanation in the following JSON format:\n"
+            "```json\n"
+            "{\n"
+            '  "ranking_rationale": "1-3 sentences explaining WHY the candidate ranked at this specific position. '
+            'Focus on the most impactful factors.",\n'
+            '  "strengths_analysis": [\n'
+            '    "Specific strength 1 that helped the candidate",\n'
+            '    "Specific strength 2 that helped the candidate",\n'
+            '    "Specific strength 3 that helped the candidate"\n'
+            '  ],\n'
+            '  "improvement_areas": [\n'
+            '    "Specific area 1 where the candidate could improve",\n'
+            '    "Specific area 2 where the candidate could improve"\n'
+            '  ],\n'
+            '  "overall_assessment": "2-3 sentences providing an overall assessment and recommendation"\n'
+            "}\n"
+            "```\n"
+        )
+
+        return "".join(prompt_parts)
+
     async def generate_comparison_explanation(
         self,
         candidate_a_name: str,

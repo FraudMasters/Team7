@@ -37,6 +37,8 @@ import { candidateSearchClient } from '../../api/search';
 import { savedSearchesClient } from '../../api/savedSearches';
 import { useBreakpoints } from '../../hooks';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
+import RecentSearches from '../../components/RecentSearches';
+import type { SearchQueryResponse } from '../../types/api';
 
 // Интерфейс кандидата
 interface Candidate {
@@ -139,6 +141,29 @@ export function SearchPage() {
     navigate(`/recruiter/candidates/${candidateId}`);
   };
 
+  // Обработчик выбора недавнего поиска
+  const handleRecentSearchSelect = (search: SearchQueryResponse) => {
+    // Применяем параметры из недавнего поиска
+    setSearchQuery(search.query || '');
+
+    // Применяем фильтры
+    if (search.filters) {
+      if (search.filters.skills) {
+        const skills = Array.isArray(search.filters.skills)
+          ? search.filters.skills.join(', ')
+          : String(search.filters.skills);
+        setSkillsFilter(skills);
+      }
+
+      if (typeof search.filters.min_match_score === 'number') {
+        setMinMatchScore([search.filters.min_match_score]);
+      }
+    }
+
+    // Автоматически запускаем поиск
+    setTimeout(() => refetch(), 100);
+  };
+
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Заголовок страницы */}
@@ -161,9 +186,13 @@ export function SearchPage() {
         </Button>
       </Stack>
 
-      {/* Форма поиска и фильтры */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Grid2 container spacing={3}>
+      {/* Основная сетка с формой поиска и недавними поисками */}
+      <Grid2 container spacing={3}>
+        {/* Левая колонка - форма поиска и результаты */}
+        <Grid2 size={{ xs: 12, lg: 8 }}>
+          {/* Форма поиска и фильтры */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Grid2 container spacing={3}>
           {/* Поле поиска */}
           <Grid2 size={{ xs: 12, md: 6 }}>
             <TextField
@@ -252,137 +281,149 @@ export function SearchPage() {
                 {aiRankingEnabled ? 'Enabled' : 'Disabled'}
               </Button>
             </Stack>
-          </Grid2>
-        </Grid2>
-      </Paper>
-
-      {/* Сообщение об ошибке */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {(error as { detail?: string }).detail || 'Search failed. Please try again.'}
-        </Alert>
-      )}
-
-      {/* Сводка результатов */}
-      {candidates.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}>
-          <Grid2 container spacing={2}>
-            <Grid2 size={{ xs: 6, md: 3 }}>
-              <Typography variant="h6">{candidates.length}</Typography>
-              <Typography variant="body2" color="text.secondary">Candidates</Typography>
-            </Grid2>
-            <Grid2 size={{ xs: 6, md: 3 }}>
-              <Typography variant="h6" color="success.main">{highMatchCount}</Typography>
-              <Typography variant="body2" color="text.secondary">High Match</Typography>
-            </Grid2>
-            <Grid2 size={{ xs: 6, md: 3 }}>
-              <Typography variant="h6" color="warning.main">{mediumMatchCount}</Typography>
-              <Typography variant="body2" color="text.secondary">Medium Match</Typography>
-            </Grid2>
-            <Grid2 size={{ xs: 6, md: 3 }}>
-              <Typography variant="h6">{avgMatchScore}%</Typography>
-              <Typography variant="body2" color="text.secondary">Avg Score</Typography>
             </Grid2>
           </Grid2>
         </Paper>
-      )}
 
-      {/* Сетка кандидатов */}
-      {isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
-        </Box>
-      ) : candidates.length > 0 ? (
-        <Grid2 container spacing={3}>
-          {candidates.map((candidate) => (
-            <Grid2 key={candidate.id} size={{ xs: 12, sm: 6, lg: 4 }}>
-              <Paper
-                sx={{
-                  p: 3,
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                }}
-                onClick={() => handleCandidateClick(candidate.id)}
-                role="button"
-                tabIndex={0}
-                aria-label={`View ${candidate.name || candidate.filename}`}
-                onKeyPress={(e) => e.key === 'Enter' && handleCandidateClick(candidate.id)}
-              >
-                {/* Бейдж соответствия */}
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
-                  <Chip
-                    label={`${candidate.match_percentage}%`}
-                    color={candidate.match_percentage >= 80 ? 'success' : candidate.match_percentage >= 60 ? 'warning' : 'default'}
-                    size="small"
-                  />
-                  {aiRankingEnabled && candidate.ai_ranking_score && (
+          {/* Сообщение об ошибке */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {(error as { detail?: string }).detail || 'Search failed. Please try again.'}
+          </Alert>
+        )}
+
+        {/* Сводка результатов */}
+        {candidates.length > 0 && (
+          <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}>
+            <Grid2 container spacing={2}>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="h6">{candidates.length}</Typography>
+                <Typography variant="body2" color="text.secondary">Candidates</Typography>
+              </Grid2>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="h6" color="success.main">{highMatchCount}</Typography>
+                <Typography variant="body2" color="text.secondary">High Match</Typography>
+              </Grid2>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="h6" color="warning.main">{mediumMatchCount}</Typography>
+                <Typography variant="body2" color="text.secondary">Medium Match</Typography>
+              </Grid2>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="h6">{avgMatchScore}%</Typography>
+                <Typography variant="body2" color="text.secondary">Avg Score</Typography>
+              </Grid2>
+            </Grid2>
+          </Paper>
+        )}
+
+        {/* Сетка кандидатов */}
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : candidates.length > 0 ? (
+          <Grid2 container spacing={3}>
+            {candidates.map((candidate) => (
+              <Grid2 key={candidate.id} size={{ xs: 12, sm: 6, lg: 6 }}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4,
+                    },
+                  }}
+                  onClick={() => handleCandidateClick(candidate.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View ${candidate.name || candidate.filename}`}
+                  onKeyPress={(e) => e.key === 'Enter' && handleCandidateClick(candidate.id)}
+                >
+                  {/* Бейдж соответствия */}
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                     <Chip
-                      icon={<TrendingUpIcon fontSize="small" />}
-                      label={`AI: ${candidate.ai_ranking_score}`}
+                      label={`${candidate.match_percentage}%`}
+                      color={candidate.match_percentage >= 80 ? 'success' : candidate.match_percentage >= 60 ? 'warning' : 'default'}
                       size="small"
+                    />
+                    {aiRankingEnabled && candidate.ai_ranking_score && (
+                      <Chip
+                        icon={<TrendingUpIcon fontSize="small" />}
+                        label={`AI: ${candidate.ai_ranking_score}`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    )}
+                  </Stack>
+
+                  {/* Информация о кандидате */}
+                  <Typography variant="h6" noWrap sx={{ mb: 1 }}>
+                    {candidate.name || candidate.filename}
+                  </Typography>
+                  {candidate.email && (
+                    <Typography variant="body2" color="text.secondary" noWrap sx={{ mb: 2 }}>
+                      {candidate.email}
+                    </Typography>
+                  )}
+
+                  {/* Навыки */}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 2 }}>
+                    {candidate.skills.slice(0, 5).map((skill) => (
+                      <Chip key={skill} label={skill} size="small" variant="outlined" />
+                    ))}
+                    {candidate.skills.length > 5 && (
+                      <Chip label={`+${candidate.skills.length - 5}`} size="small" />
+                    )}
+                  </Box>
+
+                  {/* Бейдж TOP рекомендации */}
+                  {candidate.match_percentage >= 90 && (
+                    <Chip
+                      label="TOP"
                       color="primary"
-                      variant="outlined"
+                      size="small"
+                      sx={{ mt: 2 }}
                     />
                   )}
-                </Stack>
-
-                {/* Информация о кандидате */}
-                <Typography variant="h6" noWrap sx={{ mb: 1 }}>
-                  {candidate.name || candidate.filename}
-                </Typography>
-                {candidate.email && (
-                  <Typography variant="body2" color="text.secondary" noWrap sx={{ mb: 2 }}>
-                    {candidate.email}
-                  </Typography>
-                )}
-
-                {/* Навыки */}
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 2 }}>
-                  {candidate.skills.slice(0, 5).map((skill) => (
-                    <Chip key={skill} label={skill} size="small" variant="outlined" />
-                  ))}
-                  {candidate.skills.length > 5 && (
-                    <Chip label={`+${candidate.skills.length - 5}`} size="small" />
-                  )}
-                </Box>
-
-                {/* Бейдж TOP рекомендации */}
-                {candidate.match_percentage >= 90 && (
-                  <Chip
-                    label="TOP"
-                    color="primary"
-                    size="small"
-                    sx={{ mt: 2 }}
-                  />
-                )}
-              </Paper>
-            </Grid2>
-          ))}
+                </Paper>
+              </Grid2>
+            ))}
+          </Grid2>
+        ) : searchQuery || skillsFilter || minMatchScore[0] > 0 ? (
+          <Paper sx={{ p: 8, textAlign: 'center' }}>
+            <Typography variant="h6" color="text.secondary">
+              No candidates found
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Try adjusting your search criteria
+            </Typography>
+          </Paper>
+        ) : (
+          <Paper sx={{ p: 8, textAlign: 'center' }}>
+            <SearchIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+            <Typography variant="h6" color="text.secondary">
+              Start your search
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Enter keywords or select filters to find candidates
+            </Typography>
+          </Paper>
+        )}
         </Grid2>
-      ) : searchQuery || skillsFilter || minMatchScore[0] > 0 ? (
-        <Paper sx={{ p: 8, textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
-            No candidates found
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Try adjusting your search criteria
-          </Typography>
-        </Paper>
-      ) : (
-        <Paper sx={{ p: 8, textAlign: 'center' }}>
-          <SearchIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">
-            Start your search
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Enter keywords or select filters to find candidates
-          </Typography>
-        </Paper>
-      )}
+
+        {/* Правая колонка - недавние поиски */}
+        <Grid2 size={{ xs: 12, lg: 4 }}>
+          <Box sx={{ position: { lg: 'sticky' }, top: { lg: 24 } }}>
+            <RecentSearches
+              onSearchSelect={handleRecentSearchSelect}
+              maxItems={10}
+            />
+          </Box>
+        </Grid2>
+      </Grid2>
 
       {/* Диалог сохранения поиска */}
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>

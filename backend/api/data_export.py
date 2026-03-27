@@ -2,7 +2,7 @@
 Data export endpoints for GDPR right to portability.
 
 This module provides endpoints for:
-- Exporting candidate/resume data in machine-readable formats (JSON, CSV)
+- Exporting candidate/resume data in machine-readable formats (JSON, CSV, XML)
 - Supporting GDPR Article 15 - Right of Access and Article 20 - Data Portability
 - Providing comprehensive data export including all associated information
 
@@ -12,6 +12,7 @@ resume data, hiring stages, notes, tags, activities, and audit trails.
 import csv
 import io
 import logging
+import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 from datetime import datetime
@@ -29,6 +30,8 @@ from models.workflow_stage_config import WorkflowStageConfig
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
+from models.audit_log import AuditActionType
+from utils.audit_logger import log_audit_event, get_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +256,22 @@ async def export_resume_data(
 
         logger.info(f"Data export generated for resume {resume_id}")
 
+        # Log audit event for data export (GDPR)
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.DATA_EXPORTED,
+            entity_type="resume",
+            entity_id=resume_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "export_format": "json",
+                "export_type": "resume_personal_data",
+                "gdpr_compliance": True,
+            },
+        )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=export_data,
@@ -434,6 +453,22 @@ async def export_resume_data_csv(
 
         logger.info(f"CSV data export generated for resume {resume_id}")
 
+        # Log audit event for CSV data export (GDPR)
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.DATA_EXPORTED,
+            entity_type="resume",
+            entity_id=resume_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "export_format": "csv",
+                "export_type": "resume_personal_data",
+                "gdpr_compliance": True,
+            },
+        )
+
         return StreamingResponse(
             io.StringIO(csv_content),
             media_type="text/csv",
@@ -449,6 +484,228 @@ async def export_resume_data_csv(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export CSV data: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/resume/{resume_id}/xml",
+    tags=["Data Export"],
+)
+async def export_resume_data_xml(
+    resume_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export all personal data for a specific resume/candidate in XML format.
+
+    This endpoint provides the same comprehensive export as the JSON endpoint
+    but formats the data as XML for easier import into other systems and
+    compliance with industry standards like HR-XML.
+
+    Args:
+        resume_id: Resume UUID
+        request: FastAPI request object
+        db: Database session
+
+    Returns:
+        XML file download with comprehensive personal data
+
+    Raises:
+        HTTPException(404): If resume is not found
+        HTTPException(422): If resume_id format is invalid
+        HTTPException(500): If data retrieval fails
+
+    Examples:
+        >>> import requests
+        >>> response = requests.get(
+        ...     "http://localhost:8000/api/data-export/resume/123e4567-e89b-12d3-a456-426614174000/xml"
+        ... )
+        >>> # Returns XML file for download
+    """
+    locale = _extract_locale(request)
+
+    try:
+        # Validate resume_id format
+        try:
+            resume_uuid = UUID(resume_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid resume ID format: {resume_id}",
+            )
+
+        # Get the resume
+        resume_query = select(Resume).where(Resume.id == resume_uuid)
+        resume_result = await db.execute(resume_query)
+        resume = resume_result.scalar_one_or_none()
+
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume not found: {resume_id}",
+            )
+
+        # Get all hiring stages for this resume
+        hiring_stages_query = (
+            select(HiringStage, WorkflowStageConfig)
+            .outerjoin(
+                WorkflowStageConfig,
+                HiringStage.workflow_stage_config_id == WorkflowStageConfig.id,
+            )
+            .where(HiringStage.resume_id == resume_uuid)
+            .order_by(HiringStage.created_at)
+        )
+        hiring_stages_result = await db.execute(hiring_stages_query)
+        hiring_stages_rows = hiring_stages_result.all()
+
+        # Get all notes for this resume
+        notes_query = (
+            select(CandidateNote)
+            .where(CandidateNote.resume_id == resume_uuid)
+            .order_by(CandidateNote.created_at)
+        )
+        notes_result = await db.execute(notes_query)
+        notes = notes_result.scalars().all()
+
+        # Get all tag-related activities
+        tag_activities_query = (
+            select(CandidateActivity, CandidateTag)
+            .outerjoin(
+                CandidateTag,
+                CandidateActivity.tag_id == CandidateTag.id
+            )
+            .where(
+                and_(
+                    CandidateActivity.candidate_id == resume_uuid,
+                    CandidateActivity.activity_type.in_([
+                        CandidateActivityType.TAG_ADDED,
+                        CandidateActivityType.TAG_REMOVED
+                    ])
+                )
+            )
+            .order_by(CandidateActivity.created_at)
+        )
+        tag_activities_result = await db.execute(tag_activities_query)
+        tag_activities_rows = tag_activities_result.all()
+
+        # Get all activities for this resume
+        activities_query = (
+            select(CandidateActivity)
+            .where(CandidateActivity.candidate_id == resume_uuid)
+            .order_by(CandidateActivity.created_at)
+        )
+        activities_result = await db.execute(activities_query)
+        activities = activities_result.scalars().all()
+
+        # Create XML structure
+        root = ET.Element("candidate_export")
+        root.set("xmlns", "http://www.hr-xml.org/3")
+        root.set("version", "1.0")
+
+        # Add metadata
+        metadata_elem = ET.SubElement(root, "export_metadata")
+        ET.SubElement(metadata_elem, "export_date").text = datetime.utcnow().isoformat() + "Z"
+        ET.SubElement(metadata_elem, "resume_id").text = resume_id
+        ET.SubElement(metadata_elem, "format").text = "xml"
+
+        # Add resume information
+        resume_elem = ET.SubElement(root, "resume")
+        ET.SubElement(resume_elem, "id").text = str(resume.id)
+        ET.SubElement(resume_elem, "filename").text = resume.filename
+        ET.SubElement(resume_elem, "content_type").text = resume.content_type
+        if resume.language:
+            ET.SubElement(resume_elem, "language").text = resume.language
+        ET.SubElement(resume_elem, "status").text = resume.status.value
+        if resume.created_at:
+            ET.SubElement(resume_elem, "created_at").text = resume.created_at.isoformat()
+        if resume.updated_at:
+            ET.SubElement(resume_elem, "updated_at").text = resume.updated_at.isoformat()
+        if resume.raw_text:
+            raw_text_elem = ET.SubElement(resume_elem, "raw_text")
+            raw_text_elem.text = resume.raw_text
+
+        # Add hiring stages
+        if hiring_stages_rows:
+            stages_elem = ET.SubElement(root, "hiring_stages")
+            for hs, wc in hiring_stages_rows:
+                stage_elem = ET.SubElement(stages_elem, "hiring_stage")
+                ET.SubElement(stage_elem, "id").text = str(hs.id)
+                ET.SubElement(stage_elem, "stage_name").text = hs.stage_name
+                if wc and wc.stage_name:
+                    ET.SubElement(stage_elem, "custom_stage_name").text = wc.stage_name
+                if wc and wc.display_name:
+                    ET.SubElement(stage_elem, "display_name").text = wc.display_name
+                if hs.vacancy_id:
+                    ET.SubElement(stage_elem, "vacancy_id").text = str(hs.vacancy_id)
+                if hs.notes:
+                    ET.SubElement(stage_elem, "notes").text = hs.notes
+                if hs.created_at:
+                    ET.SubElement(stage_elem, "created_at").text = hs.created_at.isoformat()
+                if hs.updated_at:
+                    ET.SubElement(stage_elem, "updated_at").text = hs.updated_at.isoformat()
+
+        # Add notes
+        if notes:
+            notes_elem = ET.SubElement(root, "notes")
+            for note in notes:
+                note_elem = ET.SubElement(notes_elem, "note")
+                ET.SubElement(note_elem, "id").text = str(note.id)
+                ET.SubElement(note_elem, "content").text = note.content
+                if note.created_at:
+                    ET.SubElement(note_elem, "created_at").text = note.created_at.isoformat()
+                if note.updated_at:
+                    ET.SubElement(note_elem, "updated_at").text = note.updated_at.isoformat()
+
+        # Add tag history
+        if tag_activities_rows:
+            tags_elem = ET.SubElement(root, "tags")
+            for activity, tag in tag_activities_rows:
+                tag_elem = ET.SubElement(tags_elem, "tag")
+                if tag:
+                    ET.SubElement(tag_elem, "tag_id").text = str(tag.id)
+                    ET.SubElement(tag_elem, "tag_name").text = tag.tag_name
+                    if tag.color:
+                        ET.SubElement(tag_elem, "color").text = tag.color
+                ET.SubElement(tag_elem, "activity_type").text = activity.activity_type.value
+                if activity.created_at:
+                    ET.SubElement(tag_elem, "created_at").text = activity.created_at.isoformat()
+
+        # Add activities
+        if activities:
+            activities_elem = ET.SubElement(root, "activities")
+            for activity in activities:
+                activity_elem = ET.SubElement(activities_elem, "activity")
+                ET.SubElement(activity_elem, "id").text = str(activity.id)
+                ET.SubElement(activity_elem, "activity_type").text = activity.activity_type.value
+                if activity.tag_id:
+                    ET.SubElement(activity_elem, "tag_id").text = str(activity.tag_id)
+                if activity.metadata:
+                    ET.SubElement(activity_elem, "metadata").text = str(activity.metadata)
+                if activity.created_at:
+                    ET.SubElement(activity_elem, "created_at").text = activity.created_at.isoformat()
+
+        # Format XML with proper indentation
+        ET.indent(root, space="  ", level=0)
+        xml_content = ET.tostring(root, encoding="unicode", xml_declaration=True)
+
+        logger.info(f"XML data export generated for resume {resume_id}")
+
+        return StreamingResponse(
+            io.StringIO(xml_content),
+            media_type="application/xml",
+            headers={
+                "Content-Disposition": f"attachment; filename=resume_{resume_id}_export.xml"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting XML data for resume {resume_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export XML data: {str(e)}",
         ) from e
 
 
@@ -529,6 +786,25 @@ async def export_organization_data(
             })
 
         logger.info(f"Organization data export generated for {organization_id}, {len(export_data)} records")
+
+        # Log audit event for organization-wide data export
+        ip_address, user_agent = get_request_context(request)
+        await log_audit_event(
+            db=db,
+            action_type=AuditActionType.DATA_EXPORTED,
+            entity_type="organization",
+            entity_id=organization_uuid,
+            organization_id=organization_uuid,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            action_data={
+                "export_format": format,
+                "export_type": "organization_data",
+                "record_count": len(export_data),
+                "skip": skip,
+                "limit": limit,
+            },
+        )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { candidatesClient, vacanciesClient, analyticsClient, apiClient } from '../api';
 
 export interface Candidate {
   id: string;
@@ -87,23 +87,133 @@ export interface ReviewQueueFilters {
   limit?: number;
 }
 
+/**
+ * Time-to-hire performance metrics
+ */
+export interface TimeToHireMetrics {
+  average_days: number;
+  median_days: number;
+  min_days: number;
+  max_days: number;
+  percentile_25: number;
+  percentile_75: number;
+}
+
+/**
+ * Resume processing metrics
+ */
+export interface ResumeMetrics {
+  total_processed: number;
+  processed_this_month: number;
+  processed_this_week: number;
+  processing_rate_avg: number;
+}
+
+/**
+ * Skill matching performance metrics
+ */
+export interface MatchRateMetrics {
+  overall_match_rate: number;
+  high_confidence_matches: number;
+  low_confidence_matches: number;
+  average_confidence: number;
+}
+
+/**
+ * Key analytics metrics response from backend
+ */
 export interface AnalyticsMetrics {
-  time_to_hire: number;
-  applications_per_job: number;
-  source_performance?: Record<string, number>;
-  funnel_metrics?: {
-    views: number;
-    applications: number;
-    interviews: number;
-    offers: number;
-  };
+  time_to_hire: TimeToHireMetrics;
+  resumes: ResumeMetrics;
+  match_rates: MatchRateMetrics;
+}
+
+/**
+ * Tag information for kanban candidate card
+ */
+export interface KanbanTagInfo {
+  id: string;
+  tag_name: string;
+  color?: string;
+}
+
+/**
+ * Candidate card for the kanban board
+ */
+export interface KanbanCandidateCard {
+  id: string;
+  filename: string;
+  current_stage: string;
+  stage_id?: string;
+  created_at: string;
+  updated_at: string;
+  tags: KanbanTagInfo[];
+  notes_count: number;
+}
+
+/**
+ * Column in the kanban board representing a workflow stage
+ */
+export interface KanbanStageColumn {
+  stage_id?: string;
+  stage_name: string;
+  display_name: string;
+  order: number;
+  candidates: KanbanCandidateCard[];
+  count: number;
+  wip_limit?: number;
+  is_over_limit: boolean;
+}
+
+/**
+ * Swimlane in the kanban board (grouped by job, recruiter, etc.)
+ */
+export interface KanbanSwimlane {
+  id: string;
+  title: string;
+  subtitle?: string;
+  stages: KanbanStageColumn[];
+  total_candidates: number;
+}
+
+/**
+ * Summary counts for a stage across all swimlanes
+ */
+export interface KanbanStageSummary {
+  stage_id?: string;
+  stage_name: string;
+  display_name: string;
+  order: number;
+  total_count: number;
+  wip_limit?: number;
+}
+
+/**
+ * Response model for the kanban board data
+ */
+export interface KanbanBoardResponse {
+  group_by: 'job' | 'recruiter' | 'none';
+  swimlanes: KanbanSwimlane[];
+  stages: KanbanStageSummary[];
+  total_candidates: number;
+  unassigned?: KanbanSwimlane;
+}
+
+/**
+ * Filters for kanban board endpoint
+ */
+export interface KanbanBoardFilters {
+  group_by?: 'job' | 'recruiter' | 'none';
+  vacancy_id?: string;
+  tag_id?: string;
+  search?: string;
 }
 
 export function useCandidates(params?: { stage?: string; vacancy_id?: string }) {
   return useQuery({
     queryKey: ['candidates', params],
     queryFn: async () => {
-      const response = await apiClient.get<{ candidates: Candidate[] }>('/candidates', { params });
+      const response = await candidatesClient.get<{ candidates: Candidate[] }>('/candidates', { params });
       return response.data;
     },
   });
@@ -113,7 +223,7 @@ export function useCandidateStages() {
   return useQuery({
     queryKey: ['candidate-stages'],
     queryFn: async () => {
-      const response = await apiClient.get('/candidates/stages');
+      const response = await candidatesClient.get('/candidates/stages');
       return response.data;
     },
   });
@@ -123,11 +233,61 @@ export function useUpdateCandidateStage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ candidateId, stage }: { candidateId: string; stage: string }) => {
-      const response = await apiClient.put(`/candidates/${candidateId}/stage`, { stage });
+      const response = await candidatesClient.put(`/candidates/${candidateId}/stage`, { stage });
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-board'] });
+    },
+  });
+}
+
+/**
+ * Hook for fetching kanban board data with swimlane grouping
+ *
+ * @param filters - Optional filters for the kanban board (group_by, vacancy_id, tag_id, search)
+ * @returns Query result with kanban board data including swimlanes, stages, and candidates
+ */
+export function useKanbanBoard(filters?: KanbanBoardFilters) {
+  return useQuery({
+    queryKey: ['kanban-board', filters],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (filters?.group_by) params.group_by = filters.group_by;
+      if (filters?.vacancy_id) params.vacancy_id = filters.vacancy_id;
+      if (filters?.tag_id) params.tag_id = filters.tag_id;
+      if (filters?.search) params.search = filters.search;
+
+      const response = await apiClient.get<KanbanBoardResponse>('/candidates/kanban', { params });
+      return response.data;
+    },
+    staleTime: 1000 * 30, // 30 seconds - shorter than review queue since board is more interactive
+  });
+}
+
+/**
+ * Hook for moving a candidate between stages on the kanban board
+ *
+ * Optimistically updates the kanban board data for smooth drag-and-drop experience.
+ */
+export function useMoveCandidateKanban() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      candidateId,
+      stage,
+    }: {
+      candidateId: string;
+      stage: string;
+    }) => {
+      const response = await apiClient.put(`/candidates/${candidateId}/stage`, { stage });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate both candidates and kanban board queries
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-board'] });
     },
   });
 }
@@ -136,7 +296,7 @@ export function useRecruiterVacancies() {
   return useQuery({
     queryKey: ['recruiter-vacancies'],
     queryFn: async () => {
-      const response = await apiClient.get('/vacancies');
+      const response = await vacanciesClient.get('/vacancies');
       return response.data;
     },
   });
@@ -146,7 +306,7 @@ export function useRecruiterAnalytics() {
   return useQuery({
     queryKey: ['recruiter-analytics'],
     queryFn: async () => {
-      const response = await apiClient.get<AnalyticsMetrics>('/analytics/key-metrics');
+      const response = await analyticsClient.get<AnalyticsMetrics>('/analytics/key-metrics');
       return response.data;
     },
   });

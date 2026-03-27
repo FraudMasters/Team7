@@ -42,6 +42,22 @@ class BaseConfig(BaseSettings):
         allowed_file_types: Comma-separated list of allowed file extensions
         analysis_timeout_seconds: Maximum time for resume analysis
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        session_idle_timeout_minutes: Session idle timeout in minutes
+        login_max_attempts: Maximum failed login attempts before lockout
+        login_lockout_duration_minutes: Account lockout duration in minutes
+        login_lockout_enabled: Whether account lockout is enabled
+        oauth_enabled: Whether OAuth 2.0 authentication is enabled
+        oauth_session_lifetime_seconds: OAuth session lifetime in seconds
+        oauth_google_client_id: Google OAuth 2.0 client ID
+        oauth_google_client_secret: Google OAuth 2.0 client secret
+        oauth_google_redirect_uri: Google OAuth 2.0 redirect URI
+        oauth_microsoft_client_id: Microsoft OAuth 2.0 client ID
+        oauth_microsoft_client_secret: Microsoft OAuth 2.0 client secret
+        oauth_microsoft_redirect_uri: Microsoft OAuth 2.0 redirect URI
+        oauth_microsoft_tenant: Microsoft OAuth 2.0 tenant ID
+        oauth_github_client_id: GitHub OAuth 2.0 client ID
+        oauth_github_client_secret: GitHub OAuth 2.0 client secret
+        oauth_github_redirect_uri: GitHub OAuth 2.0 redirect URI
         celery_broker_url: Celery broker URL
         celery_result_backend: Celery result backend URL
         backup_retention_days: Default backup retention period in days
@@ -131,6 +147,100 @@ class BaseConfig(BaseSettings):
     log_level: str = Field(
         default="INFO",
         description="Logging level",
+    )
+
+    # Session Configuration
+    session_idle_timeout_minutes: int = Field(
+        default=30,
+        ge=5,
+        le=1440,
+        description="Session idle timeout in minutes (5 minutes to 24 hours)",
+    )
+
+    # Login Protection Configuration
+    login_max_attempts: int = Field(
+        default=5,
+        ge=3,
+        le=10,
+        description="Maximum failed login attempts before account lockout",
+    )
+
+    login_lockout_duration_minutes: int = Field(
+        default=15,
+        ge=5,
+        le=1440,
+        description="Account lockout duration in minutes (5 minutes to 24 hours)",
+    )
+
+    login_lockout_enabled: bool = Field(
+        default=True,
+        description="Enable account lockout after failed login attempts",
+    )
+
+    # OAuth 2.0 Configuration
+    oauth_enabled: bool = Field(
+        default=True,
+        description="Enable OAuth 2.0 authentication",
+    )
+
+    oauth_session_lifetime_seconds: int = Field(
+        default=3600,
+        ge=300,
+        le=86400,
+        description="OAuth session lifetime in seconds (5 minutes to 24 hours)",
+    )
+
+    # Google OAuth Configuration
+    oauth_google_client_id: Optional[str] = Field(
+        default=None,
+        description="Google OAuth 2.0 client ID",
+    )
+
+    oauth_google_client_secret: Optional[str] = Field(
+        default=None,
+        description="Google OAuth 2.0 client secret",
+    )
+
+    oauth_google_redirect_uri: Optional[str] = Field(
+        default=None,
+        description="Google OAuth 2.0 redirect URI",
+    )
+
+    # Microsoft OAuth Configuration
+    oauth_microsoft_client_id: Optional[str] = Field(
+        default=None,
+        description="Microsoft OAuth 2.0 client ID",
+    )
+
+    oauth_microsoft_client_secret: Optional[str] = Field(
+        default=None,
+        description="Microsoft OAuth 2.0 client secret",
+    )
+
+    oauth_microsoft_redirect_uri: Optional[str] = Field(
+        default=None,
+        description="Microsoft OAuth 2.0 redirect URI",
+    )
+
+    oauth_microsoft_tenant: str = Field(
+        default="common",
+        description="Microsoft OAuth 2.0 tenant ID (default: common for multi-tenant)",
+    )
+
+    # GitHub OAuth Configuration
+    oauth_github_client_id: Optional[str] = Field(
+        default=None,
+        description="GitHub OAuth 2.0 client ID",
+    )
+
+    oauth_github_client_secret: Optional[str] = Field(
+        default=None,
+        description="GitHub OAuth 2.0 client secret",
+    )
+
+    oauth_github_redirect_uri: Optional[str] = Field(
+        default=None,
+        description="GitHub OAuth 2.0 redirect URI",
     )
 
     # Celery Configuration

@@ -1,0 +1,63 @@
+# Search Services Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.search.yml up
+
+services:
+  # Elasticsearch (Full-text search and analytics)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.1
+    container_name: resume_analysis_elasticsearch
+    env_file:
+      - .env
+    environment:
+      # Single-node configuration for development/testing
+      discovery.type: single-node
+      # Security settings
+      xpack.security.enabled: false
+      xpack.security.enrollment.enabled: false
+      # Memory settings
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Disable machine learning
+      xpack.ml.enabled: false
+      # HTTP settings
+      http.cors.enabled: true
+      http.cors.allow-origin: "*"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - resume_network
+
+  # Update backend to depend on Elasticsearch
+  backend:
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # Update celery_worker to depend on Elasticsearch
+  celery_worker:
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  elasticsearch_data:
+
+networks:
+  resume_network:
+    driver: bridge

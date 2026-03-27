@@ -49,6 +49,7 @@ import { VacancyFormPage } from './pages/recruiter/VacancyFormPage';
 import { VacancyDetailPage } from './pages/recruiter/VacancyDetailPage';
 import { CandidateDetailPage } from './pages/recruiter/CandidateDetailPage';
 import { WeightsPage } from './pages/recruiter/WeightsPage';
+import { RankingWeightsPage } from './pages/recruiter/RankingWeightsPage';
 import { SearchPage } from './pages/recruiter/SearchPage';
 import { SavedSearchesPage } from './pages/recruiter/SavedSearchesPage';
 import { ReviewQueuePage as RecruiterReviewQueuePage } from './pages/recruiter/ReviewQueuePage';
@@ -58,6 +59,7 @@ import { DashboardPage as HiringManagerDashboardPage } from './pages/hiring-mana
 import { ReviewQueuePage as HiringManagerReviewQueuePage } from './pages/hiring-manager/ReviewQueuePage';
 import { CandidateDetailPage as HiringManagerCandidateDetailPage } from './pages/hiring-manager/CandidateDetailPage';
 import { InterviewSchedulePage as HiringManagerInterviewSchedulePage } from './pages/hiring-manager/InterviewSchedulePage';
+import { CandidateSelfSchedulePage } from './pages/CandidateSelfSchedulePage';
 
 // Additional Recruiter Pages
 import ComparePage from './pages/Compare';
@@ -73,12 +75,20 @@ import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
 import ReportBuilderPage from './pages/recruiter/ReportBuilderPage';
+import { ReportsPage } from './pages/recruiter/ReportsPage';
+import { ReportSchedulePage } from './pages/recruiter/ReportSchedulePage';
+
+// Candidate Pages
+import AppealPortal from './pages/candidate/AppealPortal';
 
 // AI Explainability Dashboard (lazy loaded)
 import { lazy, Suspense } from 'react';
 const AIExplainabilityDashboard = lazy(
   () => import('./pages/admin/AIExplainabilityDashboard')
 );
+
+// Test Pages
+import AvailabilitySlotPickerTest from './pages/AvailabilitySlotPickerTest';
 
 /**
  * Protected Recruiter Layout Wrapper
@@ -160,6 +170,9 @@ function App() {
         {/* Job Seeker Authentication Routes */}
         <Route path="/job-seeker/register" element={<JobSeekerRegisterPage />} />
 
+        {/* Candidate Self-Scheduling (Public) */}
+        <Route path="/schedule/:token" element={<CandidateSelfSchedulePage />} />
+
         {/* Job Seeker Flow */}
         <Route path="/jobs" element={<JobSeekerLayout />}>
           <Route index element={<JobsBrowsePage />} />
@@ -186,6 +199,11 @@ function App() {
           <Route index element={<JobSeekerProfilePage />} />
         </Route>
 
+        {/* Candidate Routes */}
+        <Route path="/candidate">
+          <Route path="appeal" element={<AppealPortal />} />
+        </Route>
+
         {/* Recruiter Flow - Protected with role-based access control */}
         <Route path="/recruiter" element={<ProtectedRecruiterLayout />}>
           <Route path="dashboard" element={<DashboardPage />} />
@@ -210,10 +228,15 @@ function App() {
             <Route path=":id/edit" element={<VacancyFormPage />} />
           </Route>
           <Route path="weights" element={<WeightsPage />} />
+          <Route path="ranking-weights" element={<RankingWeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
           <Route path="analytics/reports/builder" element={<ReportBuilderPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
+          <Route path="reports">
+            <Route index element={<ReportsPage />} />
+            <Route path="schedule" element={<ReportSchedulePage />} />
+          </Route>
         </Route>
 
         {/* Hiring Manager Flow - Protected with role-based access control */}
@@ -238,6 +261,9 @@ function App() {
             </Suspense>
           }
         />
+
+        {/* Test Routes - Development only */}
+        <Route path="/schedule/test-token" element={<AvailabilitySlotPickerTest />} />
 
         {/* Catch-all route - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />

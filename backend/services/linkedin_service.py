@@ -638,10 +638,13 @@ class LinkedInService:
                         picture_url = identifiers[0].get("identifier")
                         break
                 profile["profile_picture"] = picture_url or ""
+                profile["profile_picture_url"] = picture_url or ""  # Alias for compatibility
             else:
                 profile["profile_picture"] = ""
+                profile["profile_picture_url"] = ""
         else:
             profile["profile_picture"] = ""
+            profile["profile_picture_url"] = ""
 
         # Location
         location_data = response_data.get("location", {})
@@ -699,6 +702,10 @@ class LinkedInService:
         profile["languages"] = [
             lang.get("name", "") for lang in languages_data
         ]
+
+        # Add 'experience' as an alias for 'positions' for compatibility
+        # Some parts of the codebase expect 'experience' instead of 'positions'
+        profile["experience"] = profile["positions"]
 
         return profile
 
@@ -823,3 +830,249 @@ class LinkedInService:
 
         # LinkedIn access tokens are typically long strings (200+ chars)
         return len(self.access_token) > 50
+
+    async def search_candidates(
+        self,
+        keywords: Optional[str] = None,
+        location: Optional[str] = None,
+        skills: Optional[List[str]] = None,
+        title: Optional[str] = None,
+        industry: Optional[str] = None,
+        company: Optional[str] = None,
+        experience_level: Optional[str] = None,
+        start: int = 0,
+        count: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        Search for LinkedIn candidates matching the specified criteria.
+
+        Implements Boolean search with filters for location, skills, experience, title, etc.
+        Uses LinkedIn's People Search API with rate limiting and retry logic.
+
+        Args:
+            keywords: Search keywords for general matching
+            location: Location filter (e.g., "San Francisco, CA", "United States")
+            skills: List of skills to filter by (e.g., ["Python", "Machine Learning"])
+            title: Job title filter (e.g., "Software Engineer")
+            industry: Industry filter (e.g., "Technology")
+            company: Company name filter (e.g., "Google")
+            experience_level: Experience level (e.g., "entry", "mid", "senior", "executive")
+            start: Starting position for pagination (default: 0)
+            count: Number of results to return (default: 10, max: 50)
+
+        Returns:
+            Dictionary containing search results with keys:
+                - total: Total number of results matching criteria
+                - start: Starting position of this page
+                - count: Number of results in this page
+                - results: List of candidate profiles (simplified format)
+                - paging: Pagination information
+
+        Raises:
+            LinkedInAPIError: For API errors
+            LinkedInRateLimitError: For rate limit errors
+            LinkedInAuthError: For authentication errors
+            ValueError: For invalid parameters
+
+        Examples:
+            >>> service = LinkedInService(access_token="your_token")
+            >>> results = await service.search_candidates(
+            ...     keywords="Python developer",
+            ...     location="San Francisco",
+            ...     skills=["Python", "Django"],
+            ...     experience_level="mid",
+            ...     count=20
+            ... )
+            >>> print(f"Found {results['total']} candidates")
+            >>> for candidate in results['results']:
+            ...     print(f"{candidate['first_name']} {candidate['last_name']} - {candidate['headline']}")
+        """
+        # Validate parameters
+        if count < 1 or count > 50:
+            raise ValueError("count must be between 1 and 50")
+        if start < 0:
+            raise ValueError("start must be non-negative")
+
+        # Build search parameters
+        params: Dict[str, Any] = {
+            "start": start,
+            "count": count,
+        }
+
+        # Build search query (keywords parameter)
+        if keywords:
+            params["keywords"] = keywords
+
+        # Add filters as projection fields
+        # LinkedIn API uses a facet-based search with filters
+        facets = []
+
+        if location:
+            facets.append(f"(geoUrn,{location})")
+        if title:
+            facets.append(f"(title,{title})")
+        if industry:
+            facets.append(f"(industry,{industry})")
+        if company:
+            facets.append(f"(currentCompany,{company})")
+        if experience_level:
+            # Map experience levels to LinkedIn's seniority levels
+            seniority_map = {
+                "entry": "1",  # Entry level
+                "mid": "4",  # Mid-Senior level
+                "senior": "5",  # Senior level
+                "executive": "8",  # Executive level
+            }
+            seniority_code = seniority_map.get(experience_level.lower(), experience_level)
+            facets.append(f"(seniority,{seniority_code})")
+
+        # Skills are added as keywords or separate facets
+        if skills and len(skills) > 0:
+            # LinkedIn typically allows skill filtering through keywords or facets
+            # Combine skills with keywords for better matching
+            skill_query = " OR ".join(skills)
+            if keywords:
+                params["keywords"] = f"{keywords} AND ({skill_query})"
+            else:
+                params["keywords"] = skill_query
+
+        # Add facets to params if any
+        if facets:
+            params["facets"] = ",".join(facets)
+
+        # Specify fields to return in projection
+        projection_fields = [
+            "id",
+            "firstName",
+            "lastName",
+            "headline",
+            "profilePicture(displayImage~:playableStreams)",
+            "location",
+            "industry",
+            "summary",
+        ]
+        params["projection"] = f"({','.join(projection_fields)})"
+
+        endpoint = "/peopleSearch"
+
+        try:
+            logger.info(
+                f"Searching LinkedIn candidates: keywords='{keywords}', location='{location}', "
+                f"skills={skills}, title='{title}', start={start}, count={count}"
+            )
+
+            response_data = await self._make_request("GET", endpoint, params=params)
+
+            # Parse search results
+            search_results = self._parse_search_response(response_data)
+
+            logger.info(
+                f"LinkedIn search completed: {search_results['total']} total results, "
+                f"returned {len(search_results['results'])} candidates"
+            )
+
+            return search_results
+
+        except (LinkedInAPIError, LinkedInRateLimitError, LinkedInAuthError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to search candidates: {e}")
+            raise LinkedInAPIError(f"Failed to search candidates: {str(e)}") from e
+
+    def _parse_search_response(self, response_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse and normalize LinkedIn search API response.
+
+        Args:
+            response_data: Raw JSON response from LinkedIn search API
+
+        Returns:
+            Normalized search results dictionary with:
+                - total: Total number of results
+                - start: Starting position
+                - count: Number of results in this page
+                - results: List of simplified candidate profiles
+                - paging: Pagination links
+        """
+        # Extract pagination info
+        paging = response_data.get("paging", {})
+        total = paging.get("total", 0)
+        start = paging.get("start", 0)
+        count = paging.get("count", 0)
+
+        # Extract and parse results
+        elements = response_data.get("elements", [])
+        results = []
+
+        for element in elements:
+            # Parse each candidate profile (simplified format)
+            candidate = {
+                "id": element.get("id", ""),
+            }
+
+            # Name handling (LinkedIn API returns localized names)
+            first_name_data = element.get("firstName", {})
+            last_name_data = element.get("lastName", {})
+
+            if isinstance(first_name_data, dict):
+                candidate["first_name"] = first_name_data.get("localized", {}).get(
+                    "en_US", first_name_data.get("localized", {})
+                )
+            else:
+                candidate["first_name"] = str(first_name_data) if first_name_data else ""
+
+            if isinstance(last_name_data, dict):
+                candidate["last_name"] = last_name_data.get("localized", {}).get(
+                    "en_US", last_name_data.get("localized", {})
+                )
+            else:
+                candidate["last_name"] = str(last_name_data) if last_name_data else ""
+
+            # Headline and summary
+            candidate["headline"] = element.get("headline", "")
+            candidate["summary"] = element.get("summary", "")
+
+            # Profile picture
+            profile_picture = element.get("profilePicture", {})
+            if profile_picture:
+                display_elements = profile_picture.get("displayImage~", {}).get(
+                    "elements", []
+                )
+                if display_elements:
+                    # Get the largest available picture
+                    picture_url = None
+                    for pic_element in reversed(display_elements):
+                        identifiers = pic_element.get("identifiers", [])
+                        if identifiers:
+                            picture_url = identifiers[0].get("identifier")
+                            break
+                    candidate["profile_picture"] = picture_url or ""
+                else:
+                    candidate["profile_picture"] = ""
+            else:
+                candidate["profile_picture"] = ""
+
+            # Location
+            location_data = element.get("location", {})
+            candidate["location"] = (
+                f"{location_data.get('country', {}).get('name', '')}" if location_data else ""
+            )
+            candidate["country_code"] = location_data.get("country", {}).get("code", "") if location_data else ""
+
+            # Industry
+            candidate["industry"] = element.get("industry", "")
+
+            results.append(candidate)
+
+        return {
+            "total": total,
+            "start": start,
+            "count": count,
+            "results": results,
+            "paging": {
+                "links": paging.get("links", []),
+                "total": total,
+                "start": start,
+                "count": count,
+            },
+        }

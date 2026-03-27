@@ -8,8 +8,8 @@
  * - Анализ качества наемных сотрудников
  */
 
-// Импорт хука состояния React
-import { useState } from 'react';
+// Импорт хуков React
+import { useState, useEffect } from 'react';
 
 // Импорт компонентов MUI
 import {
@@ -29,6 +29,7 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 
 // Импорт иконок MUI
@@ -39,6 +40,9 @@ import {
   Assessment as AssessmentIcon,
   Download as DownloadIcon,
 } from '@mui/icons-material';
+
+// Импорт API клиента и типов
+import { analyticsClient, type FunnelMetricsResponse, type SourceTrackingResponse, type RecruiterPerformanceResponse } from '@/api/analytics';
 
 // Интерфейс для метрик воронки
 interface FunnelMetrics {
@@ -60,6 +64,16 @@ interface SourceMetrics {
   candidates: number;
   hires: number;
   conversion_rate: number;
+}
+
+// Интерфейс для метрик производительности рекрутера
+interface RecruiterPerformanceMetrics {
+  total_candidates_processed: number;
+  total_interviews_conducted: number;
+  successful_hires: number;
+  success_rate: number;
+  avg_time_per_candidate: number;
+  interview_completion_rate: number;
 }
 
 /**
@@ -92,29 +106,73 @@ export function AdvancedAnalyticsPage() {
   // Состояние загрузки данных
   const [loading, setLoading] = useState(false);
 
-  // Тестовые данные для воронки найма
-  const funnelData: FunnelMetrics[] = [
-    { stage: 'Applied', count: 450, conversion_rate: 100 },
-    { stage: 'Screened', count: 180, conversion_rate: 40 },
-    { stage: 'Interview', count: 90, conversion_rate: 50 },
-    { stage: 'Offer', count: 45, conversion_rate: 50 },
-    { stage: 'Hired', count: 35, conversion_rate: 78 },
-  ];
+  // Состояние ошибки
+  const [error, setError] = useState<string | null>(null);
 
-  // Тестовые данные для времени найма
+  // Состояние данных воронки найма
+  const [funnelData, setFunnelData] = useState<FunnelMetricsResponse | null>(null);
+
+  // Состояние данных источников кандидатов
+  const [sourceData, setSourceData] = useState<SourceTrackingResponse | null>(null);
+
+  // Состояние данных производительности рекрутеров
+  const [recruiterData, setRecruiterData] = useState<RecruiterPerformanceResponse | null>(null);
+
+  // Тестовые данные для времени найма (не реализовано в этом подзадании)
   const timeToFillData: TimeToFillMetrics[] = [
     { vacancy_id: '1', vacancy_title: 'Senior React Developer', days: 28 },
     { vacancy_id: '2', vacancy_title: 'Product Manager', days: 35 },
     { vacancy_id: '3', vacancy_title: 'DevOps Engineer', days: 21 },
   ];
 
-  // Тестовые данные для эффективности источников
-  const sourceData: SourceMetrics[] = [
-    { source: 'LinkedIn', candidates: 150, hires: 20, conversion_rate: 13.3 },
-    { source: 'Indeed', candidates: 200, hires: 10, conversion_rate: 5.0 },
-    { source: 'Referral', candidates: 50, hires: 15, conversion_rate: 30.0 },
-    { source: 'Direct', candidates: 50, hires: 5, conversion_rate: 10.0 },
-  ];
+  // Загрузка данных при монтировании и изменении периода
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Вычисляем даты на основе выбранного периода
+        const endDate = new Date();
+        const startDate = new Date();
+
+        switch (timePeriod) {
+          case '7d':
+            startDate.setDate(endDate.getDate() - 7);
+            break;
+          case '30d':
+            startDate.setDate(endDate.getDate() - 30);
+            break;
+          case '90d':
+            startDate.setDate(endDate.getDate() - 90);
+            break;
+          case '1y':
+            startDate.setFullYear(endDate.getFullYear() - 1);
+            break;
+        }
+
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+
+        // Параллельная загрузка данных воронки, источников и производительности рекрутеров
+        const [funnelResponse, sourceResponse, recruiterResponse] = await Promise.all([
+          analyticsClient.getFunnelMetrics(startDateStr, endDateStr),
+          analyticsClient.getSourceTracking(startDateStr, endDateStr),
+          analyticsClient.getRecruiterPerformance(startDateStr, endDateStr, 10),
+        ]);
+
+        setFunnelData(funnelResponse);
+        setSourceData(sourceResponse);
+        setRecruiterData(recruiterResponse);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Ошибка загрузки данных аналитики');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [timePeriod]);
 
   // Обработчик смены вкладки
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -129,7 +187,26 @@ export function AdvancedAnalyticsPage() {
   // Обработчик экспорта отчета
   const handleExport = () => {
     // TODO: Implement export functionality
-    console.log('Exporting analytics report...');
+  };
+
+  // Форматирование названия этапа для отображения
+  const formatStageName = (stageName: string): string => {
+    const stageNames: Record<string, string> = {
+      uploaded: 'Uploaded',
+      analyzed: 'Analyzed',
+      screening: 'Screening',
+      interview: 'Interview',
+      technical: 'Technical',
+      offer: 'Offer',
+      hired: 'Hired',
+    };
+    return stageNames[stageName] || stageName;
+  };
+
+  // Форматирование названия источника для отображения
+  const formatSourceName = (source: string): string => {
+    if (source === 'unknown') return 'Unknown';
+    return source.charAt(0).toUpperCase() + source.slice(1);
   };
 
   return (
@@ -173,6 +250,13 @@ export function AdvancedAnalyticsPage() {
           </Stack>
         </Paper>
 
+        {/* Отображение ошибки */}
+        {error && (
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
         {/* Состояние загрузки */}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -187,34 +271,48 @@ export function AdvancedAnalyticsPage() {
                 <Tab label="Time to Fill" />
                 <Tab label="Source Effectiveness" />
                 <Tab label="Quality Metrics" />
+                <Tab label="Recruiter Performance" />
               </Tabs>
 
               {/* Вкладка "Воронка найма" */}
               <TabPanel value={activeTab} index={0}>
-                <Grid container spacing={3}>
-                  {funnelData.map((item) => (
-                    <Grid item xs={12} sm={6} md={2.4} key={item.stage}>
-                      <Card>
-                        <CardContent>
-                          <Stack spacing={2}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <PeopleIcon color="primary" />
-                              <Typography variant="caption" color="text.secondary">
-                                {item.stage}
+                {funnelData && funnelData.stages.length > 0 ? (
+                  <Grid container spacing={3}>
+                    {funnelData.stages.map((stage) => (
+                      <Grid item xs={12} sm={6} md={2.4} key={stage.stage_name}>
+                        <Card>
+                          <CardContent>
+                            <Stack spacing={2}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <PeopleIcon color="primary" />
+                                <Typography variant="caption" color="text.secondary">
+                                  {formatStageName(stage.stage_name)}
+                                </Typography>
+                              </Box>
+                              <Typography variant="h4" fontWeight={700}>
+                                {stage.count}
                               </Typography>
-                            </Box>
-                            <Typography variant="h4" fontWeight={700}>
-                              {item.count}
-                            </Typography>
-                            <Typography variant="body2" color="success.main">
-                              {item.conversion_rate}% conversion
-                            </Typography>
-                          </Stack>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
+                              <Typography variant="body2" color="success.main">
+                                {(stage.conversion_rate_from_start * 100).toFixed(1)}% from start
+                              </Typography>
+                              {stage.conversion_rate_from_previous !== null && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {(stage.conversion_rate_from_previous * 100).toFixed(1)}% from previous
+                                </Typography>
+                              )}
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <Typography color="text.secondary">
+                      Нет данных о воронке найма за выбранный период
+                    </Typography>
+                  </Box>
+                )}
               </TabPanel>
 
               {/* Вкладка "Время найма" */}
@@ -244,45 +342,53 @@ export function AdvancedAnalyticsPage() {
 
               {/* Вкладка "Эффективность источников" */}
               <TabPanel value={activeTab} index={2}>
-                <Grid container spacing={2}>
-                  {sourceData.map((item, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
-                      <Card>
-                        <CardContent>
-                          <Stack spacing={2}>
-                            <Typography variant="h6" noWrap>
-                              {item.source}
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                Candidates
+                {sourceData && sourceData.sources.length > 0 ? (
+                  <Grid container spacing={2}>
+                    {sourceData.sources.map((source, index) => (
+                      <Grid item xs={12} sm={6} md={3} key={index}>
+                        <Card>
+                          <CardContent>
+                            <Stack spacing={2}>
+                              <Typography variant="h6" noWrap>
+                                {formatSourceName(source.source)}
                               </Typography>
-                              <Typography variant="body2" fontWeight={600}>
-                                {item.candidates}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                Hires
-                              </Typography>
-                              <Typography variant="body2" fontWeight={600}>
-                                {item.hires}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                Conversion
-                              </Typography>
-                              <Typography variant="body2" color="success.main" fontWeight={600}>
-                                {item.conversion_rate}%
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Candidates
+                                </Typography>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {source.candidate_count}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Hires
+                                </Typography>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {source.hired_count}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Conversion
+                                </Typography>
+                                <Typography variant="body2" color="success.main" fontWeight={600}>
+                                  {(source.conversion_rate * 100).toFixed(1)}%
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <Typography color="text.secondary">
+                      Нет данных об источниках кандидатов за выбранный период
+                    </Typography>
+                  </Box>
+                )}
               </TabPanel>
 
               {/* Вкладка "Метрики качества" */}
@@ -340,6 +446,173 @@ export function AdvancedAnalyticsPage() {
                     </Card>
                   </Grid>
                 </Grid>
+              </TabPanel>
+
+              {/* Вкладка "Производительность рекрутера" */}
+              <TabPanel value={activeTab} index={4}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <PeopleIcon color="primary" />
+                            <Typography variant="caption" color="text.secondary">
+                              Total Candidates Processed
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters ? (
+                              recruiterData.recruiters.reduce((sum, r) => sum + r.resumes_processed, 0)
+                            ) : (
+                              '--'
+                            )}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AssessmentIcon color="info" />
+                            <Typography variant="caption" color="text.secondary">
+                              Interviews Conducted
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters ? (
+                              recruiterData.recruiters.reduce((sum, r) => sum + r.interviews_conducted, 0)
+                            ) : (
+                              '--'
+                            )}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TrendingUpIcon color="success" />
+                            <Typography variant="caption" color="text.secondary">
+                              Successful Hires
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters ? (
+                              recruiterData.recruiters.reduce((sum, r) => sum + r.hires, 0)
+                            ) : (
+                              '--'
+                            )}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TrendingUpIcon color="success" />
+                            <Typography variant="caption" color="text.secondary">
+                              Success Rate
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters && recruiterData.recruiters.length > 0 ? (
+                              (
+                                recruiterData.recruiters.reduce((sum, r) => sum + r.placement_rate, 0) /
+                                recruiterData.recruiters.length *
+                                100
+                              ).toFixed(1) + '%'
+                            ) : (
+                              '--'
+                            )}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <ScheduleIcon color="action" />
+                            <Typography variant="caption" color="text.secondary">
+                              Avg. Time per Candidate
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters && recruiterData.recruiters.length > 0 ? (
+                              (
+                                recruiterData.recruiters.reduce((sum, r) => sum + r.average_time_to_hire_days, 0) /
+                                recruiterData.recruiters.length
+                              ).toFixed(1) + ' days'
+                            ) : (
+                              '--'
+                            )}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Card>
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AssessmentIcon color="primary" />
+                            <Typography variant="caption" color="text.secondary">
+                              Interview Completion Rate
+                            </Typography>
+                          </Box>
+                          <Typography variant="h4" fontWeight={700}>
+                            {loading ? (
+                              <CircularProgress size={24} />
+                            ) : recruiterData?.recruiters && recruiterData.recruiters.length > 0 ? (
+                              (() => {
+                                const totalInterviews = recruiterData.recruiters.reduce((sum, r) => sum + r.interviews_conducted, 0);
+                                const totalResumes = recruiterData.recruiters.reduce((sum, r) => sum + r.resumes_processed, 0);
+                                return totalResumes > 0 ? ((totalInterviews / totalResumes) * 100).toFixed(1) + '%' : '0%';
+                              })()
+                            ) : (
+                              '--'
+                            )}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {error && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    Failed to load recruiter performance data: {error}
+                  </Alert>
+                )}
+
+                {!loading && recruiterData?.recruiters.length === 0 && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    No recruiter performance data available for the selected time period.
+                  </Alert>
+                )}
               </TabPanel>
             </Paper>
           </>
