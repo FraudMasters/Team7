@@ -9,6 +9,7 @@ from .analysis_result import AnalysisResult
 from .comparison import ResumeComparison
 from .job_vacancy import JobVacancy
 from .job_application import JobApplication, ApplicationStatus
+from .application_source import ApplicationSource, SourceType
 from .match_result import MatchResult
 from .skill_taxonomy import SkillTaxonomy
 from .skill_relationship import SkillRelationship, RelationshipType
@@ -43,6 +44,8 @@ from .config_change import ConfigChange, ConfigChangeAction
 from .organization_explanation_preferences import OrganizationExplanationPreferences
 from .resume_feedback import ResumeFeedback
 from .built_resume import BuiltResume
+from .diversity_metrics import DiversityMetrics, DiversityGoal
+from .pipeline_stage import PipelineStageTransition, PipelineStage, TransitionReason
 from .token_blacklist import TokenBlacklist
 from .oauth_provider import OAuthProvider
 from .oauth_token import OAuthToken
@@ -58,6 +61,8 @@ __all__ = [
     "JobVacancy",
     "JobApplication",
     "ApplicationStatus",
+    "ApplicationSource",
+    "SourceType",
     "MatchResult",
     "SkillTaxonomy",
     "SkillRelationship",
@@ -104,8 +109,16 @@ __all__ = [
     "OrganizationExplanationPreferences",
     "ResumeFeedback",
     "BuiltResume",
+    "DiversityMetrics",
+    "DiversityGoal",
+    "PipelineStageTransition",
+    "PipelineStage",
+    "TransitionReason",
     "TokenBlacklist",
     "OAuthProvider",
     "OAuthToken",
     "LoginAttempt",
+    "ApplicationSource",
+    "SourceType",
+    "CandidateDocument",
 ]

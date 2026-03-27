@@ -48,6 +48,11 @@ class User(Base, UUIDMixin, TimestampMixin):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+    referred_applications: Mapped[list["ApplicationSource"]] = relationship(
+        "ApplicationSource",
+        back_populates="referrer",
+        foreign_keys="ApplicationSource.referrer_id"
+    )
     candidate_documents: Mapped[list["CandidateDocument"]] = relationship(
         "CandidateDocument",
         back_populates="user",

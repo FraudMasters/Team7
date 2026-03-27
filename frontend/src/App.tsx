@@ -74,6 +74,7 @@ import AnalyticsDashboardPage from './pages/AnalyticsDashboard';
 import BiasDetectionDashboardPage from './pages/BiasDetectionDashboard';
 import ResultsPage from './pages/Results';
 import HealthDashboard from './pages/HealthDashboard';
+import ReportBuilderPage from './pages/recruiter/ReportBuilderPage';
 import { ReportsPage } from './pages/recruiter/ReportsPage';
 import { ReportSchedulePage } from './pages/recruiter/ReportSchedulePage';
 
@@ -229,6 +230,7 @@ function App() {
           <Route path="weights" element={<WeightsPage />} />
           <Route path="ranking-weights" element={<RankingWeightsPage />} />
           <Route path="analytics" element={<AnalyticsDashboardPage />} />
+          <Route path="analytics/reports/builder" element={<ReportBuilderPage />} />
           <Route path="bias-detection" element={<BiasDetectionDashboardPage />} />
           <Route path="health" element={<HealthDashboard />} />
           <Route path="reports">
