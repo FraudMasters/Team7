@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Bias Detection Alert</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table {border-collapse: collapse;}
+        .mj-container {font-size: 0 !important;}
+    </style>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        body {{
+            margin: 0;
+            padding: 0;
+            word-spacing: normal;
+            background-color: #f4f4f7;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }}
+        .mj-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }}
+        .mj-header {{
+            background-color: #dc2626;
+            padding: 24px;
+            text-align: center;
+        }}
+        .mj-header h1 {{
+            color: #ffffff;
+            font-size: 24px;
+            margin: 0;
+            font-weight: 600;
+        }}
+        .mj-content {{
+            padding: 32px 24px;
+        }}
+        .mj-section {{
+            margin-bottom: 24px;
+        }}
+        .mj-section h2 {{
+            color: #1e293b;
+            font-size: 18px;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }}
+        .mj-section p {{
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 12px 0;
+        }}
+        .mj-alert-box {{
+            background-color: #fef2f2;
+            border-left: 4px solid #dc2626;
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+        .mj-alert-box.warning {{
+            background-color: #fef3c7;
+            border-left-color: #f59e0b;
+        }}
+        .mj-alert-title {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }}
+        .mj-alert-meta {{
+            color: #64748b;
+            font-size: 13px;
+        }}
+        .mj-severity-critical {{
+            display: inline-block;
+            background-color: #dc2626;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }}
+        .mj-severity-high {{
+            display: inline-block;
+            background-color: #f59e0b;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }}
+        .mj-severity-medium {{
+            display: inline-block;
+            background-color: #eab308;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }}
+        .mj-severity-low {{
+            display: inline-block;
+            background-color: #3b82f6;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }}
+        .mj-metric-card {{
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+        }}
+        .mj-metric-name {{
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }}
+        .mj-metric-value {{
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+        }}
+        .mj-metric-threshold {{
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }}
+        .mj-bias-item {{
+            display: inline-block;
+            background-color: #dc2626;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin: 4px;
+        }}
+        .mj-button {{
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+        }}
+        .mj-button:hover {{
+            background-color: #1d4ed8;
+        }}
+        .mj-button-secondary {{
+            display: inline-block;
+            background-color: #64748b;
+            color: #ffffff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            margin-left: 8px;
+        }}
+        .mj-button-secondary:hover {{
+            background-color: #475569;
+        }}
+        .mj-footer {{
+            background-color: #f8fafc;
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .mj-footer p {{
+            color: #94a3b8;
+            font-size: 13px;
+            margin: 0;
+        }}
+        .mj-divider {{
+            border-bottom: 1px solid #e2e8f0;
+            margin: 24px 0;
+        }}
+        .mj-recommendation {{
+            background-color: #eff6ff;
+            border-left: 4px solid #2563eb;
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+        .mj-recommendation h3 {{
+            color: #1e3a8a;
+            font-size: 15px;
+            margin: 0 0 8px 0;
+            font-weight: 600;
+        }}
+        .mj-recommendation ul {{
+            margin: 0;
+            padding-left: 20px;
+            color: #475569;
+        }}
+        .mj-recommendation li {{
+            margin-bottom: 4px;
+            font-size: 14px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="mj-container">
+        <!-- Header -->
+        <div class="mj-header">
+            <h1>⚠️ Bias Detection Alert</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="mj-content">
+            <!-- Greeting -->
+            <div class="mj-section">
+                <p>Hello{recipient_name,", {recipient_name}" if recipient_name else ""},</p>
+                <p>A bias has been detected in the {model_name} model that requires your attention.</p>
+            </div>
+
+            <!-- Alert Summary -->
+            <div class="mj-alert-box{severity_class}">
+                <div class="mj-alert-title">Bias Detected: {bias_type}</div>
+                <div class="mj-alert-meta">
+                    Severity: <span class="mj-severity-{severity}">{severity_upper}</span><br>
+                    Detected: {detected_at}<br>
+                    Model: {model_name} (v{model_version})
+                </div>
+            </div>
+
+            <!-- Bias Metrics -->
+            <div class="mj-section">
+                <h2>Fairness Metrics</h2>
+                {metrics_start}
+                <div class="mj-metric-card">
+                    <div class="mj-metric-name">{metric_name}</div>
+                    <div class="mj-metric-value">{metric_value}</div>
+                    <div class="mj-metric-threshold">Threshold: {metric_threshold} | Status: {metric_status}</div>
+                </div>
+                {metrics_end}
+            </div>
+
+            <!-- Protected Attributes Affected -->
+            {protected_attrs_section_start}
+            <div class="mj-section">
+                <h2>Affected Protected Attributes</h2>
+                <div>
+                    {protected_attrs_start}
+                    <span class="mj-bias-item">{protected_attr}</span>
+                    {protected_attrs_end}
+                </div>
+            </div>
+            {protected_attrs_section_end}
+
+            <!-- Impact Summary -->
+            {impact_section_start}
+            <div class="mj-section">
+                <h2>Impact Summary</h2>
+                <p>{impact_summary}</p>
+                {impact_stats_start}
+                <div class="mj-metric-card">
+                    <p><strong>Affected Predictions:</strong> {affected_predictions}</p>
+                    <p><strong>Time Period:</strong> {time_period}</p>
+                </div>
+                {impact_stats_end}
+            </div>
+            {impact_section_end}
+
+            <!-- Recommendations -->
+            <div class="mj-recommendation">
+                <h3>📋 Recommended Actions</h3>
+                <ul>
+                    <li>Review the affected model predictions immediately</li>
+                    <li>Investigate the root cause of the bias in the training data</li>
+                    <li>Consider temporarily disabling the model until the bias is addressed</li>
+                    <li>Retrain the model with bias mitigation techniques applied</li>
+                    <li>Document the incident and remediation steps taken</li>
+                </ul>
+            </div>
+
+            <!-- Divider -->
+            <div class="mj-divider"></div>
+
+            <!-- Call to Action -->
+            <div class="mj-section" style="text-align: center;">
+                <a href="{dashboard_url}" class="mj-button">View Bias Report</a>
+                <a href="{model_url}" class="mj-button-secondary">View Model Details</a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mj-footer">
+            <p>This is an automated bias detection alert from AgentHR Fairness Monitoring System.</p>
+            <p>You received this email because you are subscribed to bias alerts for the {model_name} model.</p>
+            <p>&copy; {current_year} AgentHR. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

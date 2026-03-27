@@ -23,6 +23,8 @@ import {
   TableCell,
   TableContainer,
   TableRow,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -36,8 +38,14 @@ import {
   Refresh as RefreshIcon,
   Warning as WarningIcon,
   Lightbulb as BulbIcon,
+  Visibility as OverviewIcon,
+  Details as DetailsIcon,
+  CompareArrows as CompareIcon,
+  Science as WhatIfIcon,
 } from '@mui/icons-material';
 import { apiClient } from '@/api/client';
+import FeatureRadarChart from './FeatureRadarChart';
+import InteractiveFeatureBreakdown, { InteractiveFeature } from './InteractiveFeatureBreakdown';
 
 /**
  * Feature explanation from backend API
@@ -85,7 +93,7 @@ interface ExplainabilityResponse {
 /**
  * ExplainabilityDashboard Component Props
  */
-interface ExplainabilityDashboardProps {
+export interface ExplainabilityDashboardProps {
   /** Resume ID for explanation */
   resumeId: string;
   /** Vacancy ID for explanation */
@@ -129,6 +137,7 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [strengthsOpen, setStrengthsOpen] = useState(true);
   const [weaknessesOpen, setWeaknessesOpen] = useState(true);
+  const [currentTab, setCurrentTab] = useState<number>(0);
 
   /**
    * Fetch explainability data from backend
@@ -209,6 +218,40 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
         icon: <WarningIcon />,
       };
     }
+  };
+
+  /**
+   * Transform FeatureExplanation to InteractiveFeature format
+   */
+  const transformToInteractiveFeatures = (): InteractiveFeature[] => {
+    if (!data?.feature_explanations) return [];
+
+    return data.feature_explanations.map((feature) => {
+      const absContribution = Math.abs(feature.contribution_percentage);
+      const normalizedValue = Math.min(absContribution / 100, 1);
+      const weight = 1 / data.feature_explanations.length;
+
+      return {
+        name: feature.feature_name,
+        value: normalizedValue,
+        weight: weight,
+        contribution: feature.contribution_percentage / 100,
+        category: feature.direction === 'positive' ? 'Strength' : 'Weakness',
+        description: feature.description,
+        metadata: {
+          source: data.provider,
+          lastUpdated: data.generated_at,
+          confidence: data.confidence_interval ? data.confidence_interval.confidence_level / 100 : undefined,
+        },
+      };
+    });
+  };
+
+  /**
+   * Handle tab change
+   */
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
   };
 
   /**
@@ -393,246 +436,303 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
         </Box>
       </Paper>
 
-      {/* Confidence Interval Display */}
-      {data.confidence_interval && (
-        <Paper elevation={2} sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <InfoIcon color="info" />
-              <Typography variant="subtitle1" fontWeight={600}>
-                {t('explainability.confidenceInterval.title')}
-              </Typography>
-            </Box>
-            <Chip
-              label={`${data.confidence_interval.confidence_level}% ${t('explainability.confidenceInterval.confidence')}`}
-              size="small"
-              color="info"
-              sx={{ fontWeight: 600 }}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              {t('explainability.confidenceInterval.range')}:
-            </Typography>
-            <Typography variant="h6" fontWeight={600} color="primary.main">
-              {Math.round(data.confidence_interval.lower_bound * 100)}% - {Math.round(data.confidence_interval.upper_bound * 100)}%
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {data.confidence_interval.interpretation}
-          </Typography>
-        </Paper>
-      )}
+      {/* Tabs Navigation */}
+      <Paper elevation={2}>
+        <Tabs
+          value={currentTab}
+          onChange={handleTabChange}
+          variant="fullWidth"
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Tab
+            icon={<OverviewIcon />}
+            iconPosition="start"
+            label={t('explainability.tabs.overview')}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          />
+          <Tab
+            icon={<DetailsIcon />}
+            iconPosition="start"
+            label={t('explainability.tabs.details')}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          />
+          <Tab
+            icon={<CompareIcon />}
+            iconPosition="start"
+            label={t('explainability.tabs.comparison')}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          />
+          <Tab
+            icon={<WhatIfIcon />}
+            iconPosition="start"
+            label={t('explainability.tabs.whatIf')}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          />
+        </Tabs>
+      </Paper>
 
-      {/* Feature Contributions Grid */}
-      <Grid container spacing={2}>
-        {/* Positive Factors */}
-        <Grid item xs={12} md={6}>
-          <Paper
-            elevation={2}
-            sx={{
-              p: 2,
-              height: '100%',
-              bgcolor: 'success.50',
-              borderLeft: 4,
-              borderColor: 'success.main',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <PositiveIcon color="success" sx={{ mr: 1 }} />
-              <Typography variant="subtitle1" fontWeight={600} color="success.main">
-                {t('explainability.strengths.title')}
-              </Typography>
-              <Chip
-                label={data.feature_explanations.filter(f => f.direction === 'positive').length}
-                size="small"
-                color="success"
-                sx={{ ml: 'auto', fontWeight: 700 }}
-              />
-            </Box>
-            {data.feature_explanations.filter(f => f.direction === 'positive').length > 0 ? (
-              <Stack spacing={1.5}>
-                {data.feature_explanations
-                  .filter(f => f.direction === 'positive')
-                  .slice(0, 3)
-                  .map((feature, index) => (
-                    <FeatureBar key={index} feature={feature} />
-                  ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                {t('explainability.strengths.none')}
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Negative Factors */}
-        <Grid item xs={12} md={6}>
-          <Paper
-            elevation={2}
-            sx={{
-              p: 2,
-              height: '100%',
-              bgcolor: 'error.50',
-              borderLeft: 4,
-              borderColor: 'error.main',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <NegativeIcon color="error" sx={{ mr: 1 }} />
-              <Typography variant="subtitle1" fontWeight={600} color="error.main">
-                {t('explainability.weaknesses.title')}
-              </Typography>
-              <Chip
-                label={data.feature_explanations.filter(f => f.direction === 'negative').length}
-                size="small"
-                color="error"
-                sx={{ ml: 'auto', fontWeight: 700 }}
-              />
-            </Box>
-            {data.feature_explanations.filter(f => f.direction === 'negative').length > 0 ? (
-              <Stack spacing={1.5}>
-                {data.feature_explanations
-                  .filter(f => f.direction === 'negative')
-                  .slice(0, 3)
-                  .map((feature, index) => (
-                    <FeatureBar key={index} feature={feature} />
-                  ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="success.main">
-                {t('explainability.weaknesses.none')}
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Strengths List */}
-      {data.strengths && data.strengths.length > 0 && (
-        <Paper elevation={2} sx={{ p: 2 }}>
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-            onClick={() => setStrengthsOpen(!strengthsOpen)}
-          >
-            <BulbIcon color="success" sx={{ mr: 1 }} />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t('explainability.candidateStrengths')}
-            </Typography>
-            <Chip
-              label={data.strengths.length}
-              size="small"
-              color="success"
-              sx={{ ml: 1, fontWeight: 700 }}
-            />
-            <IconButton size="small" sx={{ ml: 'auto' }}>
-              {strengthsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-          </Box>
-          <Collapse in={strengthsOpen} timeout="auto" unmountOnExit>
-            <Box sx={{ mt: 2 }}>
-              <Stack spacing={1}>
-                {data.strengths.map((strength, index) => (
-                  <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                    <CheckIcon
-                      fontSize="small"
-                      color="success"
-                      sx={{ mt: 0.3, flexShrink: 0 }}
-                    />
-                    <Typography variant="body2">{strength}</Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-          </Collapse>
-        </Paper>
-      )}
-
-      {/* Weaknesses List */}
-      {data.weaknesses && data.weaknesses.length > 0 && (
-        <Paper elevation={2} sx={{ p: 2 }}>
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-            onClick={() => setWeaknessesOpen(!weaknessesOpen)}
-          >
-            <WarningIcon color="warning" sx={{ mr: 1 }} />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t('explainability.improvementAreas')}
-            </Typography>
-            <Chip
-              label={data.weaknesses.length}
-              size="small"
-              color="warning"
-              sx={{ ml: 1, fontWeight: 700 }}
-            />
-            <IconButton size="small" sx={{ ml: 'auto' }}>
-              {weaknessesOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-          </Box>
-          <Collapse in={weaknessesOpen} timeout="auto" unmountOnExit>
-            <Box sx={{ mt: 2 }}>
-              <Stack spacing={1}>
-                {data.weaknesses.map((weakness, index) => (
-                  <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                    <WarningIcon
-                      fontSize="small"
-                      color="warning"
-                      sx={{ mt: 0.3, flexShrink: 0 }}
-                    />
-                    <Typography variant="body2">{weakness}</Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-          </Collapse>
-        </Paper>
-      )}
-
-      {/* Expandable Feature Details */}
-      <Paper
-        elevation={2}
-        sx={{
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          '&:hover': { elevation: 4, bgcolor: 'action.hover' },
-        }}
-        onClick={() => setDetailsOpen(!detailsOpen)}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ImportanceIcon color="primary" />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t('explainability.featureDetails.title')}
-            </Typography>
-            <Tooltip title={t('explainability.featureDetails.tooltip')}>
-              <InfoIcon fontSize="small" color="info" sx={{ ml: 0.5 }} />
-            </Tooltip>
-          </Box>
-          <IconButton size="small">
-            {detailsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          </IconButton>
-        </Box>
-
-        <Collapse in={detailsOpen} timeout="auto" unmountOnExit>
-          <Divider />
-          <Box sx={{ p: 2 }}>
-            <Grid container spacing={3}>
-              {/* All Feature Contributions */}
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  {t('explainability.featureDetails.contributions')}
+      {/* Tab Panel: Overview */}
+      {currentTab === 0 && (
+        <Stack spacing={3}>
+          {/* Confidence Interval Display */}
+          {data.confidence_interval && (
+            <Paper elevation={2} sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <InfoIcon color="info" />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {t('explainability.confidenceInterval.title')}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${data.confidence_interval.confidence_level}% ${t('explainability.confidenceInterval.confidence')}`}
+                  size="small"
+                  color="info"
+                  sx={{ fontWeight: 600 }}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {t('explainability.confidenceInterval.range')}:
                 </Typography>
+                <Typography variant="h6" fontWeight={600} color="primary.main">
+                  {Math.round(data.confidence_interval.lower_bound * 100)}% - {Math.round(data.confidence_interval.upper_bound * 100)}%
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {data.confidence_interval.interpretation}
+              </Typography>
+            </Paper>
+          )}
+
+          {/* Feature Contributions Grid */}
+          <Grid container spacing={2}>
+            {/* Positive Factors */}
+            <Grid item xs={12} md={6}>
+              <Paper
+                elevation={2}
+                sx={{
+                  p: 2,
+                  height: '100%',
+                  bgcolor: 'success.50',
+                  borderLeft: 4,
+                  borderColor: 'success.main',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <PositiveIcon color="success" sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1" fontWeight={600} color="success.main">
+                    {t('explainability.strengths.title')}
+                  </Typography>
+                  <Chip
+                    label={data.feature_explanations.filter(f => f.direction === 'positive').length}
+                    size="small"
+                    color="success"
+                    sx={{ ml: 'auto', fontWeight: 700 }}
+                  />
+                </Box>
+                {data.feature_explanations.filter(f => f.direction === 'positive').length > 0 ? (
+                  <Stack spacing={1.5}>
+                    {data.feature_explanations
+                      .filter(f => f.direction === 'positive')
+                      .slice(0, 3)
+                      .map((feature, index) => (
+                        <FeatureBar key={index} feature={feature} />
+                      ))}
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    {t('explainability.strengths.none')}
+                  </Typography>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Negative Factors */}
+            <Grid item xs={12} md={6}>
+              <Paper
+                elevation={2}
+                sx={{
+                  p: 2,
+                  height: '100%',
+                  bgcolor: 'error.50',
+                  borderLeft: 4,
+                  borderColor: 'error.main',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <NegativeIcon color="error" sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1" fontWeight={600} color="error.main">
+                    {t('explainability.weaknesses.title')}
+                  </Typography>
+                  <Chip
+                    label={data.feature_explanations.filter(f => f.direction === 'negative').length}
+                    size="small"
+                    color="error"
+                    sx={{ ml: 'auto', fontWeight: 700 }}
+                  />
+                </Box>
+                {data.feature_explanations.filter(f => f.direction === 'negative').length > 0 ? (
+                  <Stack spacing={1.5}>
+                    {data.feature_explanations
+                      .filter(f => f.direction === 'negative')
+                      .slice(0, 3)
+                      .map((feature, index) => (
+                        <FeatureBar key={index} feature={feature} />
+                      ))}
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" color="success.main">
+                    {t('explainability.weaknesses.none')}
+                  </Typography>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* Interactive Feature Breakdown */}
+          {data.feature_explanations && data.feature_explanations.length > 0 && (
+            <Box>
+              <InteractiveFeatureBreakdown
+                features={transformToInteractiveFeatures()}
+                overallScore={data.rank_score}
+                title={t('explainability.interactiveBreakdown.title', 'Interactive Feature Analysis')}
+                description={t(
+                  'explainability.interactiveBreakdown.description',
+                  'Explore how each feature contributes to the candidate ranking. Hover for details, click to drill down.'
+                )}
+                showHoverDetails={true}
+                defaultExpanded={false}
+              />
+            </Box>
+          )}
+
+          {/* Strengths List */}
+          {data.strengths && data.strengths.length > 0 && (
+            <Paper elevation={2} sx={{ p: 2 }}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+                onClick={() => setStrengthsOpen(!strengthsOpen)}
+              >
+                <BulbIcon color="success" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {t('explainability.candidateStrengths')}
+                </Typography>
+                <Chip
+                  label={data.strengths.length}
+                  size="small"
+                  color="success"
+                  sx={{ ml: 1, fontWeight: 700 }}
+                />
+                <IconButton size="small" sx={{ ml: 'auto' }}>
+                  {strengthsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
+              <Collapse in={strengthsOpen} timeout="auto" unmountOnExit>
+                <Box sx={{ mt: 2 }}>
+                  <Stack spacing={1}>
+                    {data.strengths.map((strength, index) => (
+                      <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <CheckIcon
+                          fontSize="small"
+                          color="success"
+                          sx={{ mt: 0.3, flexShrink: 0 }}
+                        />
+                        <Typography variant="body2">{strength}</Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              </Collapse>
+            </Paper>
+          )}
+
+          {/* Weaknesses List */}
+          {data.weaknesses && data.weaknesses.length > 0 && (
+            <Paper elevation={2} sx={{ p: 2 }}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+                onClick={() => setWeaknessesOpen(!weaknessesOpen)}
+              >
+                <WarningIcon color="warning" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {t('explainability.improvementAreas')}
+                </Typography>
+                <Chip
+                  label={data.weaknesses.length}
+                  size="small"
+                  color="warning"
+                  sx={{ ml: 1, fontWeight: 700 }}
+                />
+                <IconButton size="small" sx={{ ml: 'auto' }}>
+                  {weaknessesOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
+              <Collapse in={weaknessesOpen} timeout="auto" unmountOnExit>
+                <Box sx={{ mt: 2 }}>
+                  <Stack spacing={1}>
+                    {data.weaknesses.map((weakness, index) => (
+                      <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <WarningIcon
+                          fontSize="small"
+                          color="warning"
+                          sx={{ mt: 0.3, flexShrink: 0 }}
+                        />
+                        <Typography variant="body2">{weakness}</Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              </Collapse>
+            </Paper>
+          )}
+
+          {/* Overview Recommendation */}
+          <Paper elevation={2} sx={{ p: 3, bgcolor: 'action.hover' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              {recommendationConfig.icon}
+              <Typography variant="subtitle1" fontWeight={600}>
+                {t('explainability.recommendation.title')}
+              </Typography>
+            </Box>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+              {data.recommendation}
+            </Typography>
+          </Paper>
+        </Stack>
+      )}
+
+      {/* Tab Panel: Details */}
+      {currentTab === 1 && (
+        <Stack spacing={3}>
+          <Grid container spacing={3}>
+            {/* All Feature Contributions */}
+            <Grid item xs={12} md={6}>
+              <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <ImportanceIcon color="primary" />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {t('explainability.featureDetails.contributions')}
+                  </Typography>
+                  <Tooltip title={t('explainability.featureDetails.tooltip')}>
+                    <InfoIcon fontSize="small" color="info" sx={{ ml: 0.5 }} />
+                  </Tooltip>
+                </Box>
                 <Box sx={{ mt: 2 }}>
                   {data.feature_explanations.map((feature, index) => (
                     <FeatureBar key={index} feature={feature} />
                   ))}
                 </Box>
-              </Grid>
+              </Paper>
+            </Grid>
 
-              {/* Metrics Table */}
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+            {/* Metrics Table */}
+            <Grid item xs={12} md={6}>
+              <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                   {t('explainability.featureDetails.metrics')}
                 </Typography>
                 <TableContainer>
@@ -663,7 +763,7 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
                 </TableContainer>
 
                 {/* Feature Legend */}
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                   <Typography variant="caption" fontWeight={600} gutterBottom display="block">
                     {t('explainability.legend.title')}:
                   </Typography>
@@ -682,58 +782,79 @@ const ExplainabilityDashboard: React.FC<ExplainabilityDashboardProps> = ({
                     </Box>
                   </Stack>
                 </Box>
-              </Grid>
+              </Paper>
             </Grid>
+          </Grid>
 
-            {/* Resume Highlight Sections */}
-            {data.highlight_sections && Object.keys(data.highlight_sections).length > 0 && (
-              <>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  {t('explainability.highlightSections.title')}
-                </Typography>
-                <Grid container spacing={2}>
-                  {Object.entries(data.highlight_sections).map(([section, explanation]) => (
-                    <Grid item xs={12} md={6} key={section}>
-                      <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" fontWeight={600} color="primary.main">
-                          {section}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          {explanation}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
-              </>
-            )}
-
-            {/* Technical Info */}
-            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="caption" color="text.secondary">
-                <strong>{t('explainability.method')}:</strong> Explainable AI (SHAP values)
-                {' • '}
-                <strong>{t('explainability.provider')}:</strong> {data.provider}
-                {' • '}
-                <strong>{t('explainability.model')}:</strong> {data.model}
-                {' • '}
-                <strong>{t('explainability.features')}:</strong> {data.feature_explanations.length}
-              </Typography>
-            </Box>
+          {/* Feature Radar Chart Visualization */}
+          <Box>
+            <FeatureRadarChart
+              apiUrl="/api/analytics/ai-explainability/feature-importance"
+              maxFeatures={8}
+              displayMode="importance"
+            />
           </Box>
-        </Collapse>
-      </Paper>
 
-      {/* Compact Footer */}
-      {!detailsOpen && (
-        <Paper elevation={1} sx={{ p: 2, bgcolor: 'action.hover' }}>
-          <Typography variant="caption" color="text.secondary">
-            <strong>{t('explainability.aiModel')}:</strong> Candidate Ranking v1.0
-            {' • '}
-            <strong>{t('explainability.method')}:</strong> SHAP (SHapley Additive exPlanations)
-            {' • '}
-            <strong>{t('explainability.features')}:</strong> {data.feature_explanations.length}
+          {/* Resume Highlight Sections */}
+          {data.highlight_sections && Object.keys(data.highlight_sections).length > 0 && (
+            <Paper elevation={2} sx={{ p: 2 }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                {t('explainability.highlightSections.title')}
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                {Object.entries(data.highlight_sections).map(([section, explanation]) => (
+                  <Grid item xs={12} md={6} key={section}>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                      <Typography variant="subtitle2" fontWeight={600} color="primary.main">
+                        {section}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        {explanation}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          )}
+
+          {/* Technical Info */}
+          <Paper elevation={1} sx={{ p: 2, bgcolor: 'action.hover' }}>
+            <Typography variant="caption" color="text.secondary">
+              <strong>{t('explainability.method')}:</strong> Explainable AI (SHAP values)
+              {' • '}
+              <strong>{t('explainability.provider')}:</strong> {data.provider}
+              {' • '}
+              <strong>{t('explainability.model')}:</strong> {data.model}
+              {' • '}
+              <strong>{t('explainability.features')}:</strong> {data.feature_explanations.length}
+            </Typography>
+          </Paper>
+        </Stack>
+      )}
+
+      {/* Tab Panel: Comparison */}
+      {currentTab === 2 && (
+        <Paper elevation={2} sx={{ p: 4, textAlign: 'center', minHeight: 300 }}>
+          <CompareIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {t('explainability.comparison.comingSoon')}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto', mt: 2 }}>
+            {t('explainability.comparison.description')}
+          </Typography>
+        </Paper>
+      )}
+
+      {/* Tab Panel: What-If Analysis */}
+      {currentTab === 3 && (
+        <Paper elevation={2} sx={{ p: 4, textAlign: 'center', minHeight: 300 }}>
+          <WhatIfIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {t('explainability.whatIf.comingSoon')}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto', mt: 2 }}>
+            {t('explainability.whatIf.description')}
           </Typography>
         </Paper>
       )}

@@ -11,7 +11,7 @@ import {
   Grid,
 } from '@/components/ui';
 import { useParams } from 'react-router-dom';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import MatchScoreBreakdown from '@components/MatchScoreBreakdown';
 import SkillDetailsWithConfidence, {
   SkillMatchDetail,

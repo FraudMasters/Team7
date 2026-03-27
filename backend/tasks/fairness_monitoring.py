@@ -5,6 +5,7 @@ This module provides Celery tasks for monitoring model fairness across demograph
 detecting algorithmic bias in candidate rankings, and triggering alerts when fairness
 thresholds are exceeded.
 """
+import asyncio
 import logging
 import time
 from typing import Dict, Any, List, Optional
@@ -22,6 +23,7 @@ from models.fairness_metrics import FairnessMetrics, FairnessAlert
 from models.demographic_inference import DemographicInference
 from analyzers.fairness_calculator import get_fairness_calculator
 from config import get_settings
+from database import async_session_maker
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -35,6 +37,23 @@ MONITORING_INTERVAL_HOURS = 24
 
 # Minimum samples required for fairness evaluation
 MIN_EVALUATION_SAMPLES = 10
+
+
+async def _query_fairness_metrics_async(
+    vacancy_id: str,
+    demographic_group: str,
+):
+    """Async helper to query fairness metrics from database."""
+    async with async_session_maker() as db:
+        metrics_query = select(FairnessMetrics).where(
+            and_(
+                FairnessMetrics.vacancy_id == UUID(vacancy_id),
+                FairnessMetrics.demographic_group == demographic_group
+            )
+        ).order_by(desc(FairnessMetrics.created_at))
+        metrics_result = await db.execute(metrics_query)
+        metrics_records = list(metrics_result.scalars().all())
+        return metrics_records
 
 
 def calculate_fairness_metrics(
@@ -78,17 +97,8 @@ def calculate_fairness_metrics(
         >>> print(metrics["latest_metrics"]["disparate_impact_ratio"])
         0.92
     """
-    # Note: In a real implementation, you would query the database here
-    # from sqlalchemy.ext.asyncio import AsyncSession
-    # metrics_query = select(FairnessMetrics).where(
-    #     and_(
-    #         FairnessMetrics.vacancy_id == vacancy_id,
-    #         FairnessMetrics.demographic_group == demographic_group
-    #     )
-    # ).order_by(desc(FairnessMetrics.created_at))
-    # metrics_records = await db_session.execute(metrics_query)
-    # For now, return placeholder data
-    metrics_records = []
+    # Query fairness metrics from database
+    metrics_records = asyncio.run(_query_fairness_metrics_async(vacancy_id, demographic_group))
 
     if not metrics_records:
         logger.warning(
@@ -106,32 +116,30 @@ def calculate_fairness_metrics(
         }
 
     # Extract metrics from records
-    # In a real implementation, you would process the actual records
-    latest_record = metrics_records[0] if metrics_records else None
+    latest_record = metrics_records[0]
 
-    # Build group metrics
-    # In a real implementation, you would extract from actual records
-    group_metrics = {}
+    # Build group metrics from the group_metrics JSON field
+    group_metrics = latest_record.group_metrics if latest_record.group_metrics else {}
 
     result = {
         "vacancy_id": vacancy_id,
         "demographic_group": demographic_group,
         "latest_metrics": {
-            "disparate_impact_ratio": float(latest_record.disparate_impact_ratio) if latest_record and latest_record.disparate_impact_ratio else None,
-            "statistical_parity_difference": float(latest_record.statistical_parity_difference) if latest_record and latest_record.statistical_parity_difference else None,
-            "overall_selection_rate": float(latest_record.overall_selection_rate) if latest_record and latest_record.overall_selection_rate else None,
-            "group_sample_size": latest_record.group_sample_size if latest_record else None,
-            "total_sample_size": latest_record.total_sample_size if latest_record else None,
-        } if latest_record else None,
+            "disparate_impact_ratio": float(latest_record.disparate_impact_ratio) if latest_record.disparate_impact_ratio else None,
+            "statistical_parity_difference": float(latest_record.statistical_parity_difference) if latest_record.statistical_parity_difference else None,
+            "overall_selection_rate": float(latest_record.overall_selection_rate) if latest_record.overall_selection_rate else None,
+            "group_sample_size": latest_record.group_sample_size,
+            "total_sample_size": latest_record.total_sample_size,
+        },
         "group_metrics": group_metrics,
-        "alert_triggered": latest_record.alert_triggered if latest_record else False,
-        "alert_severity": latest_record.alert_severity if latest_record else None,
+        "alert_triggered": latest_record.alert_triggered,
+        "alert_severity": latest_record.alert_severity,
         "metric_count": len(metrics_records),
     }
 
     logger.info(
         f"Calculated fairness metrics for vacancy {vacancy_id}: "
-        f"DI={result['latest_metrics']['disparate_impact_ratio'] if result['latest_metrics'] else 'N/A'}, "
+        f"DI={result['latest_metrics']['disparate_impact_ratio']}, "
         f"alert={result['alert_triggered']}"
     )
 
@@ -252,6 +260,57 @@ def detect_fairness_violation(
     return result
 
 
+async def _compare_demographic_outcomes_async(
+    vacancy_id: str,
+    demographic_groups: List[str],
+):
+    """Async helper to compare demographic outcomes from database."""
+    async with async_session_maker() as db:
+        # Get all fairness metrics for this vacancy for the specified demographic groups
+        metrics_query = select(FairnessMetrics).where(
+            and_(
+                FairnessMetrics.vacancy_id == UUID(vacancy_id),
+                FairnessMetrics.demographic_group.in_(demographic_groups)
+            )
+        ).order_by(desc(FairnessMetrics.created_at))
+
+        metrics_result = await db.execute(metrics_query)
+        metrics_records = metrics_result.scalars().all()
+
+        # Build group selection rates from latest metrics
+        group_selection_rates = {}
+        max_disparity = 0.0
+        groups_with_violations = []
+
+        for metric in metrics_records:
+            demo_group = metric.demographic_group
+
+            # Only include the latest metric for each demographic group
+            if demo_group in group_selection_rates:
+                continue
+
+            # Extract group metrics from the JSON field
+            if metric.group_metrics:
+                group_selection_rates[demo_group] = {}
+
+                # Build selection rates for each subgroup
+                for subgroup, data in metric.group_metrics.items():
+                    selection_rate = data.get('selection_rate', 0.0)
+                    group_selection_rates[demo_group][subgroup] = selection_rate
+
+                # Calculate max disparity for this demographic
+                rates = list(group_selection_rates[demo_group].values())
+                if len(rates) >= 2:
+                    disparity = max(rates) - min(rates)
+                    max_disparity = max(max_disparity, disparity)
+
+            # Check if this group has violations
+            if metric.alert_triggered:
+                groups_with_violations.append(demo_group)
+
+        return group_selection_rates, max_disparity, groups_with_violations
+
+
 def compare_demographic_outcomes(
     vacancy_id: str,
     demographic_groups: List[str],
@@ -268,7 +327,7 @@ def compare_demographic_outcomes(
     Args:
         vacancy_id: JobVacancy UUID to analyze
         demographic_groups: List of demographic attributes to compare (e.g., ["gender", "age_group"])
-        db_session: Optional database session for querying
+        db_session: Optional database session for querying (not used, kept for API compatibility)
 
     Returns:
         Dictionary containing comparison results:
@@ -301,33 +360,13 @@ def compare_demographic_outcomes(
         >>> print(comparison['groups_with_violations'])
         ['gender']
     """
-    if db_session is None:
-        logger.warning(
-            f"No database session provided for compare_demographic_outcomes, returning empty comparison"
-        )
-        return {
-            "vacancy_id": vacancy_id,
-            "demographics_compared": demographic_groups,
-            "group_selection_rates": {},
-            "max_disparity": 0.0,
-            "groups_with_violations": [],
-            "comparison_count": 0,
-        }
-
     logger.info(f"Comparing outcomes for {len(demographic_groups)} demographic groups")
 
     try:
-        # Note: This is a placeholder for database query
-        # In a real implementation, you would:
-        # 1. Query CandidateRank for the vacancy
-        # 2. Query DemographicInference for ranked resumes
-        # 3. Calculate selection rates by demographic group
-        # 4. Identify groups with fairness violations
-
-        # Placeholder data
-        group_selection_rates = {}
-        max_disparity = 0.0
-        groups_with_violations = []
+        # Query database for fairness metrics
+        group_selection_rates, max_disparity, groups_with_violations = asyncio.run(
+            _compare_demographic_outcomes_async(vacancy_id, demographic_groups)
+        )
 
         result = {
             "vacancy_id": vacancy_id,
@@ -853,13 +892,16 @@ def monitor_fairness(
         self.update_state(state="PROGRESS", meta=progress)
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Querying vacancies")
 
-        # Note: This is a placeholder for database query
-        # In a real implementation, you would use async session to query JobVacancy
-        # query = select(JobVacancy).where(JobVacancy.status == "active")
-        # if vacancy_id:
-        #     query = query.where(JobVacancy.id == vacancy_id)
-        # vacancies = await db_session.execute(query)
-        vacancies = []
+        # Query active vacancies from database
+        async def query_vacancies():
+            async with async_session_maker() as db:
+                query = select(JobVacancy).where(JobVacancy.status == "active")
+                if vacancy_id:
+                    query = query.where(JobVacancy.id == UUID(vacancy_id))
+                result = await db.execute(query)
+                return list(result.scalars().all())
+
+        vacancies = asyncio.run(query_vacancies())
         vacancies_checked = len(vacancies)
 
         logger.info(f"Found {vacancies_checked} vacancies to monitor")
@@ -901,19 +943,40 @@ def monitor_fairness(
         self.update_state(state="PROGRESS", meta=progress)
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Calculating metrics")
 
-        vacancy_metrics = {}
-        for vacancy in vacancies:
-            vacancy_uuid = str(vacancy.id) if hasattr(vacancy, 'id') else "placeholder-uuid"
-            vacancy_metrics[vacancy_uuid] = {}
+        # Use FairnessCalculator to analyze vacancies
+        async def analyze_vacancies():
+            async with async_session_maker() as db:
+                calculator = get_fairness_calculator()
+                vacancy_metrics = {}
 
-            for demographic_group in demographic_groups:
-                # In a real implementation, you would use FairnessCalculator
-                # calculator = get_fairness_calculator()
-                # metrics = await calculator.analyze_vacancy_fairness(
-                #     db_session, UUID(vacancy_uuid), analysis_date=datetime.now().strftime("%Y-%m-%d")
-                # )
-                metrics = calculate_fairness_metrics(vacancy_uuid, demographic_group)
-                vacancy_metrics[vacancy_uuid][demographic_group] = metrics
+                for vacancy in vacancies:
+                    vacancy_uuid = str(vacancy.id)
+                    vacancy_metrics[vacancy_uuid] = {}
+
+                    # Analyze fairness for this vacancy
+                    analysis = await calculator.analyze_vacancy_fairness(
+                        db,
+                        UUID(vacancy_uuid),
+                        analysis_date=datetime.now().strftime("%Y-%m-%d"),
+                        is_fairness_aware=False
+                    )
+
+                    # Extract metrics for each demographic group
+                    if "attributes_analyzed" in analysis:
+                        for demo_group, demo_metrics in analysis["attributes_analyzed"].items():
+                            if demo_group in demographic_groups:
+                                # Convert to format expected by downstream code
+                                vacancy_metrics[vacancy_uuid][demo_group] = {
+                                    "vacancy_id": vacancy_uuid,
+                                    "demographic_group": demo_group,
+                                    "latest_metrics": demo_metrics if not demo_metrics.get("error") else None,
+                                    "alert_triggered": demo_metrics.get("alert_triggered", False),
+                                    "alert_severity": demo_metrics.get("max_severity"),
+                                }
+
+                return vacancy_metrics
+
+        vacancy_metrics = asyncio.run(analyze_vacancies())
 
         # Step 4: Detect fairness violations
         current_step += 1
@@ -958,6 +1021,7 @@ def monitor_fairness(
         logger.info(f"Task {self.request.id}: Step {current_step}/{total_steps} - Storing metrics")
 
         violations_detected = len(violating_vacancies)
+        alerts_sent = 0
         for violation_info in violating_vacancies:
             vac_id = violation_info["vacancy_id"]
             demo_group = violation_info["demographic_group"]
@@ -970,10 +1034,31 @@ def monitor_fairness(
                 f"violated_metrics={', '.join(violation['violated_metrics'])}"
             )
 
-            # Note: In a real implementation, you would:
-            # - Store FairnessMetrics in database
-            # - Create FairnessAlert records
-            # - Send notifications if configured
+            # FairnessMetrics and FairnessAlert records are already stored
+            # by the FairnessCalculator.analyze_vacancy_fairness() method above
+
+            # Send notification alert for this violation
+            try:
+                violation_details = {
+                    "demographic_group": demo_group,
+                    "violation": violation,
+                    "current_metrics": violation_info["current_metrics"],
+                    "detected_at": datetime.utcnow().isoformat(),
+                }
+
+                # Trigger async notification task
+                send_fairness_alert.delay(vac_id, violation_details)
+                alerts_sent += 1
+
+                logger.info(
+                    f"Triggered fairness alert notification for vacancy {vac_id}, "
+                    f"demographic_group={demo_group}, severity={severity}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to trigger fairness alert notification for vacancy {vac_id}: {e}",
+                    exc_info=True
+                )
 
         # Step 6: Generate monitoring report
         current_step += 1
@@ -992,6 +1077,7 @@ def monitor_fairness(
         result = {
             "vacancies_checked": vacancies_checked,
             "violations_detected": violations_detected,
+            "alerts_sent": alerts_sent,
             "violating_vacancies": violating_vacancies,
             "demographic_groups_analyzed": demographic_groups,
             "monitoring_time_ms": processing_time_ms,
@@ -1001,7 +1087,7 @@ def monitor_fairness(
 
         logger.info(
             f"Fairness monitoring completed: {vacancies_checked} vacancies checked, "
-            f"{violations_detected} violations detected in {processing_time_ms}ms"
+            f"{violations_detected} violations detected, {alerts_sent} alerts sent in {processing_time_ms}ms"
         )
 
         return result
@@ -1115,23 +1201,71 @@ def generate_fairness_report(
         period_end = datetime.utcnow()
         period_start = period_end - timedelta(days=days_back)
 
-        # Note: This is a placeholder for database query
-        # In a real implementation, you would:
-        # 1. Query FairnessMetrics for the vacancy over the time period
-        # 2. Query FairnessAlert for the period
-        # 3. Aggregate metrics by demographic group
-        # 4. Calculate trends and patterns
-        # 5. Generate recommendations
+        # Query fairness metrics and alerts from database
+        async def generate_report_async():
+            async with async_session_maker() as db:
+                calculator = get_fairness_calculator()
 
-        # Placeholder data
-        current_metrics = {}
-        historical_trends = []
-        violations_summary = {
-            "total_violations": 0,
-            "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0},
-            "by_demographic": {},
-        }
-        recommendations = []
+                # Use the fairness calculator's report generation method
+                report = await calculator.get_fairness_report(
+                    db,
+                    UUID(vacancy_id),
+                    analysis_date=None  # Get latest
+                )
+
+                # Query historical metrics for trends
+                start_date = period_start.strftime("%Y-%m-%d")
+                metrics_query = select(FairnessMetrics).where(
+                    and_(
+                        FairnessMetrics.vacancy_id == UUID(vacancy_id),
+                        FairnessMetrics.analysis_date >= start_date,
+                        FairnessMetrics.demographic_group.in_(demographic_groups)
+                    )
+                ).order_by(FairnessMetrics.analysis_date)
+
+                metrics_result = await db.execute(metrics_query)
+                historical_metrics = list(metrics_result.scalars().all())
+
+                # Build historical trends
+                historical_trends = []
+                for metric in historical_metrics:
+                    historical_trends.append({
+                        "date": metric.analysis_date,
+                        "demographic_group": metric.demographic_group,
+                        "disparate_impact_ratio": float(metric.disparate_impact_ratio or 0),
+                        "statistical_parity_difference": float(metric.statistical_parity_difference or 0),
+                        "alert_triggered": metric.alert_triggered,
+                        "alert_severity": metric.alert_severity,
+                    })
+
+                # Extract current metrics and violations from report
+                current_metrics = report.get("metrics_by_demographic", {})
+                alerts = report.get("alerts", [])
+
+                # Build violations summary
+                violations_summary = {
+                    "total_violations": len([a for a in alerts if a["status"] == "active"]),
+                    "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+                    "by_demographic": {},
+                }
+
+                for alert in alerts:
+                    severity = alert.get("severity", "low")
+                    if severity in violations_summary["by_severity"]:
+                        violations_summary["by_severity"][severity] += 1
+
+                for demo_group, metrics in current_metrics.items():
+                    if metrics.get("alert_triggered"):
+                        violations_summary["by_demographic"][demo_group] = metrics.get("alert_severity")
+
+                # Get recommendations from report
+                recommendations = report.get("recommendations", [])
+
+                return current_metrics, historical_trends, violations_summary, recommendations
+
+        current_metrics, historical_trends, violations_summary, recommendations = asyncio.run(
+            generate_report_async()
+        )
 
         processing_time_ms = round((time.time() - start_time) * 1000, 2)
 

@@ -24,6 +24,7 @@ from models.linkedin_import import LinkedInImport, LinkedInImportStatus
 from models.linkedin_profile import LinkedInProfile, LinkedInProfileStatus
 from models.linkedin_token import LinkedInToken
 from models.recruiter import Recruiter
+from models.resume import Resume, ResumeStatus
 from utils.linkedin_oauth import generate_auth_url, generate_state, verify_state
 from utils.redis_client import store_oauth_state, verify_oauth_state
 from utils.token_encryption import encrypt_token
@@ -565,6 +566,62 @@ async def import_profile(
 
         await db.flush()  # Get the profile ID
 
+        # Create Resume record with LinkedIn source attribution
+        try:
+            # Generate filename from profile name
+            profile_name = f"{profile_data.get('first_name', '')} {profile_data.get('last_name', '')}".strip()
+            if not profile_name:
+                profile_name = f"linkedin_profile_{linkedin_profile.linkedin_id}"
+
+            # Generate virtual file path for LinkedIn import
+            # LinkedIn profiles don't have physical files, so we use a virtual path
+            virtual_file_path = f"linkedin/{linkedin_profile.linkedin_id}.json"
+
+            # Extract text content from LinkedIn profile for raw_text field
+            raw_text_parts = []
+            if profile_data.get('first_name'):
+                raw_text_parts.append(f"Name: {profile_data.get('first_name')} {profile_data.get('last_name', '')}")
+            if profile_data.get('headline'):
+                raw_text_parts.append(f"Headline: {profile_data.get('headline')}")
+            if profile_data.get('location'):
+                raw_text_parts.append(f"Location: {profile_data.get('location')}")
+            if profile_data.get('skills'):
+                skills = profile_data.get('skills')
+                if isinstance(skills, list):
+                    raw_text_parts.append(f"Skills: {', '.join(str(s) for s in skills)}")
+            if profile_data.get('experience'):
+                raw_text_parts.append("Experience: (see structured data)")
+            if profile_data.get('education'):
+                raw_text_parts.append("Education: (see structured data)")
+
+            raw_text = "\n".join(raw_text_parts)
+
+            # Create Resume record
+            resume = Resume(
+                filename=f"{profile_name}_linkedin.json",
+                file_path=virtual_file_path,
+                content_type="application/json",
+                status=ResumeStatus.COMPLETED,  # LinkedIn profiles are already "complete"
+                source="linkedin",
+                raw_text=raw_text,
+                language="en",  # Default to English, can be enhanced with language detection
+            )
+            db.add(resume)
+            await db.flush()  # Get the resume ID
+
+            logger.info(
+                f"Created Resume record for LinkedIn profile",
+                resume_id=str(resume.id),
+                profile_id=str(linkedin_profile.id),
+            )
+
+            resume_id = str(resume.id)
+
+        except Exception as e:
+            logger.error(f"Failed to create Resume record: {e}")
+            # Don't fail the entire import if Resume creation fails
+            resume_id = None
+
         # Trigger background task for skill extraction and taxonomy mapping
         try:
             from tasks.linkedin_sync import sync_linkedin_profile, map_linkedin_skills_to_taxonomy
@@ -590,6 +647,7 @@ async def import_profile(
                 "success": True,
                 "message": "LinkedIn profile imported successfully",
                 "profile_id": str(linkedin_profile.id),
+                "resume_id": resume_id,
             },
         )
 
@@ -725,7 +783,7 @@ async def search_profiles(
 
         try:
             # Perform search
-            search_results = await linkedin_service.search_candidates(
+            search_response = await linkedin_service.search_candidates(
                 keywords=keywords,
                 skills=skills_list,
                 location=location,
@@ -735,7 +793,7 @@ async def search_profiles(
 
             logger.info(
                 "LinkedIn search completed",
-                results_count=len(search_results),
+                results_count=search_response.get("total", 0),
             )
 
         except Exception as e:
@@ -744,6 +802,9 @@ async def search_profiles(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"LinkedIn search failed: {str(e)}",
             )
+
+        # Extract results from search response
+        search_results = search_response.get("results", [])
 
         # Format results as LinkedInSearchResponse
         results = [
@@ -762,7 +823,7 @@ async def search_profiles(
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
-                "total_results": len(results),
+                "total_results": search_response.get("total", 0),
                 "results": [r.model_dump() for r in results],
             },
         )

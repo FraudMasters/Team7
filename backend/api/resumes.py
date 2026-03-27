@@ -22,10 +22,12 @@ from i18n.backend_translations import get_error_message, get_success_message
 from database import get_db
 from models.resume import Resume, ResumeStatus
 from models.audit_log import AuditActionType
+from models.client_tenant import ClientTenant
 from utils.audit_logger import log_audit_event, get_request_context
 from services.resume_cache_service import get_resume_cache
 from tasks.elasticsearch_indexing import index_single_resume
 from services.elasticsearch_service import ElasticsearchService
+from middleware.tenant_context import get_tenant_context
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -222,6 +224,32 @@ async def upload_resume(
         with open(file_path, "wb") as f:
             f.write(file_content)
 
+        # Get tenant context for multi-tenant data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id = client_tenant.organization_id
+            logger.info(f"Resume upload for organization_id: {organization_id} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id = org_id_header
+                logger.info(f"Resume upload for organization_id from header: {organization_id}")
+
         # Create database record
         new_resume = Resume(
             id=resume_id,
@@ -229,6 +257,7 @@ async def upload_resume(
             file_path=str(file_path),
             content_type=file.content_type or "application/octet-stream",
             status=ResumeStatus.PENDING,
+            organization_id=organization_id,
         )
 
         db.add(new_resume)

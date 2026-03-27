@@ -28,7 +28,7 @@ import { Icon } from '@/components/ui/primitives';
 import type { SelectChangeEvent } from '@/components/ui/Select';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import { candidateTagsClient } from '@/api/candidateTags';
 import type { WorkflowStageResponse } from '@/types/api';
 import {

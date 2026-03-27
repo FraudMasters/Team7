@@ -20,11 +20,6 @@ import {
   TextField,
   CircularProgress,
   IconButton,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Slider,
   Chip,
 } from '@mui/material';
 import {
@@ -35,6 +30,11 @@ import {
   Close as CloseIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
+import RankingFeaturesEditor, {
+  RankingFeatureWeights,
+  DEFAULT_RANKING_WEIGHTS
+} from './RankingFeaturesEditor';
+import MatchingWeightsPreview from './MatchingWeightsPreview';
 
 /**
  * Weight profile entry interface
@@ -44,9 +44,19 @@ interface WeightProfile {
   organization_id: string;
   name: string;
   description?: string;
+  skill_match_weight: number;
+  experience_weight: number;
+  education_weight: number;
+  location_weight: number;
   keyword_weight: number;
   tfidf_weight: number;
   vector_weight: number;
+  recency_weight: number;
+  culture_fit_weight: number;
+  salary_match_weight: number;
+  availability_weight: number;
+  certifications_weight: number;
+  industry_experience_weight: number;
   is_default: boolean;
   is_preset: boolean;
   preset_type?: string;
@@ -67,24 +77,18 @@ interface WeightProfileListResponse {
 /**
  * Form data for creating/editing weight profiles
  */
-interface WeightProfileFormData {
+interface WeightProfileFormData extends RankingFeatureWeights {
   name: string;
   description: string;
-  keyword_weight: number;
-  tfidf_weight: number;
-  vector_weight: number;
   is_default: boolean;
 }
 
 /**
  * Preset profile definitions
  */
-interface PresetProfile {
+interface PresetProfile extends RankingFeatureWeights {
   name: string;
   description: string;
-  keyword_weight: number;
-  tfidf_weight: number;
-  vector_weight: number;
   preset_type: string;
 }
 
@@ -101,39 +105,67 @@ interface MatchingWeightsEditorProps {
 }
 
 /**
- * Preset profiles
+ * Preset profiles with all 13 ranking features
  */
 const PRESET_PROFILES: PresetProfile[] = [
   {
     name: 'Technical',
-    description: 'Emphasizes exact keyword matching for technical roles with specific skill requirements',
-    keyword_weight: 0.6,
-    tfidf_weight: 0.3,
-    vector_weight: 0.1,
+    description: 'Emphasizes skills, certifications, and keyword matching for technical roles',
+    skill_match_weight: 0.30,
+    experience_weight: 0.15,
+    education_weight: 0.08,
+    location_weight: 0.03,
+    keyword_weight: 0.15,
+    tfidf_weight: 0.10,
+    vector_weight: 0.05,
+    recency_weight: 0.02,
+    culture_fit_weight: 0.03,
+    salary_match_weight: 0.03,
+    availability_weight: 0.02,
+    certifications_weight: 0.03,
+    industry_experience_weight: 0.01,
     preset_type: 'technical',
   },
   {
     name: 'Creative',
-    description: 'Prioritizes semantic understanding for creative and conceptual roles',
-    keyword_weight: 0.2,
-    tfidf_weight: 0.2,
-    vector_weight: 0.6,
+    description: 'Prioritizes semantic understanding, culture fit, and portfolio for creative roles',
+    skill_match_weight: 0.15,
+    experience_weight: 0.10,
+    education_weight: 0.12,
+    location_weight: 0.04,
+    keyword_weight: 0.05,
+    tfidf_weight: 0.08,
+    vector_weight: 0.25,
+    recency_weight: 0.05,
+    culture_fit_weight: 0.10,
+    salary_match_weight: 0.02,
+    availability_weight: 0.02,
+    certifications_weight: 0.01,
+    industry_experience_weight: 0.01,
     preset_type: 'creative',
   },
   {
     name: 'Executive',
-    description: 'Balanced approach for executive and leadership positions',
-    keyword_weight: 0.33,
-    tfidf_weight: 0.34,
-    vector_weight: 0.33,
+    description: 'Balanced approach emphasizing experience, culture fit, and industry knowledge',
+    skill_match_weight: 0.12,
+    experience_weight: 0.20,
+    education_weight: 0.10,
+    location_weight: 0.05,
+    keyword_weight: 0.08,
+    tfidf_weight: 0.08,
+    vector_weight: 0.10,
+    recency_weight: 0.03,
+    culture_fit_weight: 0.15,
+    salary_match_weight: 0.03,
+    availability_weight: 0.02,
+    certifications_weight: 0.02,
+    industry_experience_weight: 0.02,
     preset_type: 'executive',
   },
   {
     name: 'Balanced',
-    description: 'Equal weighting for all matching algorithms',
-    keyword_weight: 0.33,
-    tfidf_weight: 0.33,
-    vector_weight: 0.34,
+    description: 'Equal weighting across all ranking features',
+    ...DEFAULT_RANKING_WEIGHTS,
     preset_type: 'balanced',
   },
 ];
@@ -170,14 +202,14 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<WeightProfile | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [previewVacancyId, setPreviewVacancyId] = useState<string>('');
+  const [baselineWeights, setBaselineWeights] = useState<RankingFeatureWeights>(DEFAULT_RANKING_WEIGHTS);
 
   // Form state
   const [formData, setFormData] = useState<WeightProfileFormData>({
     name: '',
     description: '',
-    keyword_weight: 0.33,
-    tfidf_weight: 0.33,
-    vector_weight: 0.34,
+    ...DEFAULT_RANKING_WEIGHTS,
     is_default: false,
   });
 
@@ -213,21 +245,6 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
   }, [organizationId]);
 
   /**
-   * Normalize weights to sum to 1.0
-   */
-  const normalizeWeights = (keyword: number, tfidf: number, vector: number) => {
-    const total = keyword + tfidf + vector;
-    if (total === 0) {
-      return { keyword_weight: 0.33, tfidf_weight: 0.33, vector_weight: 0.34 };
-    }
-    return {
-      keyword_weight: Math.round((keyword / total) * 100) / 100,
-      tfidf_weight: Math.round((tfidf / total) * 100) / 100,
-      vector_weight: Math.round((vector / total) * 100) / 100,
-    };
-  };
-
-  /**
    * Open create dialog
    */
   const handleCreate = () => {
@@ -235,11 +252,11 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
     setFormData({
       name: '',
       description: '',
-      keyword_weight: 0.33,
-      tfidf_weight: 0.33,
-      vector_weight: 0.34,
+      ...DEFAULT_RANKING_WEIGHTS,
       is_default: false,
     });
+    setBaselineWeights(DEFAULT_RANKING_WEIGHTS);
+    setPreviewVacancyId('');
     setDialogOpen(true);
   };
 
@@ -248,14 +265,29 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
    */
   const handleEdit = (profile: WeightProfile) => {
     setEditingProfile(profile);
-    setFormData({
-      name: profile.name,
-      description: profile.description || '',
+    const profileWeights: RankingFeatureWeights = {
+      skill_match_weight: profile.skill_match_weight,
+      experience_weight: profile.experience_weight,
+      education_weight: profile.education_weight,
+      location_weight: profile.location_weight,
       keyword_weight: profile.keyword_weight,
       tfidf_weight: profile.tfidf_weight,
       vector_weight: profile.vector_weight,
+      recency_weight: profile.recency_weight,
+      culture_fit_weight: profile.culture_fit_weight,
+      salary_match_weight: profile.salary_match_weight,
+      availability_weight: profile.availability_weight,
+      certifications_weight: profile.certifications_weight,
+      industry_experience_weight: profile.industry_experience_weight,
+    };
+    setFormData({
+      name: profile.name,
+      description: profile.description || '',
+      ...profileWeights,
       is_default: profile.is_default,
     });
+    setBaselineWeights(profileWeights);
+    setPreviewVacancyId('');
     setDialogOpen(true);
   };
 
@@ -302,24 +334,28 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
   const handleApplyPreset = (preset: PresetProfile) => {
     setFormData({
       ...formData,
+      skill_match_weight: preset.skill_match_weight,
+      experience_weight: preset.experience_weight,
+      education_weight: preset.education_weight,
+      location_weight: preset.location_weight,
       keyword_weight: preset.keyword_weight,
       tfidf_weight: preset.tfidf_weight,
       vector_weight: preset.vector_weight,
+      recency_weight: preset.recency_weight,
+      culture_fit_weight: preset.culture_fit_weight,
+      salary_match_weight: preset.salary_match_weight,
+      availability_weight: preset.availability_weight,
+      certifications_weight: preset.certifications_weight,
+      industry_experience_weight: preset.industry_experience_weight,
       description: preset.description,
     });
   };
 
   /**
-   * Handle slider change with auto-normalization
+   * Handle weight changes from RankingFeaturesEditor
    */
-  const handleSliderChange = (field: 'keyword_weight' | 'tfidf_weight' | 'vector_weight', value: number) => {
-    const newFormData = { ...formData, [field]: value };
-    const normalized = normalizeWeights(
-      newFormData.keyword_weight,
-      newFormData.tfidf_weight,
-      newFormData.vector_weight
-    );
-    setFormData({ ...newFormData, ...normalized });
+  const handleWeightsChange = (weights: RankingFeatureWeights) => {
+    setFormData({ ...formData, ...weights });
   };
 
   /**
@@ -330,16 +366,9 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
     setError(null);
 
     try {
-      // Normalize weights before submission
-      const normalized = normalizeWeights(
-        formData.keyword_weight,
-        formData.tfidf_weight,
-        formData.vector_weight
-      );
-
+      // Weights are already normalized by RankingFeaturesEditor
       const submitData = {
         ...formData,
-        ...normalized,
       };
 
       if (editingProfile) {
@@ -391,9 +420,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       setFormData({
         name: '',
         description: '',
-        keyword_weight: 0.33,
-        tfidf_weight: 0.33,
-        vector_weight: 0.34,
+        ...DEFAULT_RANKING_WEIGHTS,
         is_default: false,
       });
     } catch (err) {
@@ -421,6 +448,31 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       default:
         return 'default' as const;
     }
+  };
+
+  /**
+   * Get top N weights from a profile for display
+   */
+  const getTopWeights = (profile: WeightProfile, limit: number = 5) => {
+    const weights = [
+      { label: 'Skills', value: profile.skill_match_weight },
+      { label: 'Experience', value: profile.experience_weight },
+      { label: 'Education', value: profile.education_weight },
+      { label: 'Location', value: profile.location_weight },
+      { label: 'Keyword', value: profile.keyword_weight },
+      { label: 'TF-IDF', value: profile.tfidf_weight },
+      { label: 'Vector', value: profile.vector_weight },
+      { label: 'Recency', value: profile.recency_weight },
+      { label: 'Culture Fit', value: profile.culture_fit_weight },
+      { label: 'Salary', value: profile.salary_match_weight },
+      { label: 'Availability', value: profile.availability_weight },
+      { label: 'Certs', value: profile.certifications_weight },
+      { label: 'Industry', value: profile.industry_experience_weight },
+    ];
+    return weights
+      .sort((a, b) => b.value - a.value)
+      .slice(0, limit)
+      .filter(w => w.value > 0);
   };
 
   /**
@@ -589,24 +641,17 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
 
                     <Box sx={{ mt: 2 }}>
                       <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                        Algorithm Weights
+                        Top Ranking Features
                       </Typography>
                       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                        <Chip
-                          label={`Keyword: ${Math.round(profile.keyword_weight * 100)}%`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`TF-IDF: ${Math.round(profile.tfidf_weight * 100)}%`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`Vector: ${Math.round(profile.vector_weight * 100)}%`}
-                          size="small"
-                          variant="outlined"
-                        />
+                        {getTopWeights(profile, 5).map((weight, idx) => (
+                          <Chip
+                            key={weight.label}
+                            label={`${weight.label}: ${Math.round(weight.value * 100)}%`}
+                            size="small"
+                            variant="outlined"
+                          />
+                        ))}
                       </Stack>
                     </Box>
                   </CardContent>
@@ -675,27 +720,18 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
 
                     <Box sx={{ mt: 2 }}>
                       <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                        Algorithm Weights
+                        Top Ranking Features
                       </Typography>
                       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                        <Chip
-                          label={`Keyword: ${Math.round(profile.keyword_weight * 100)}%`}
-                          size="small"
-                          variant="filled"
-                          color="primary"
-                        />
-                        <Chip
-                          label={`TF-IDF: ${Math.round(profile.tfidf_weight * 100)}%`}
-                          size="small"
-                          variant="filled"
-                          color="secondary"
-                        />
-                        <Chip
-                          label={`Vector: ${Math.round(profile.vector_weight * 100)}%`}
-                          size="small"
-                          variant="filled"
-                          color="info"
-                        />
+                        {getTopWeights(profile, 5).map((weight, idx) => (
+                          <Chip
+                            key={weight.label}
+                            label={`${weight.label}: ${Math.round(weight.value * 100)}%`}
+                            size="small"
+                            variant="filled"
+                            color={idx === 0 ? 'primary' : idx === 1 ? 'secondary' : 'default'}
+                          />
+                        ))}
                       </Stack>
                     </Box>
 
@@ -720,7 +756,7 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
       <Dialog
         open={dialogOpen}
         onClose={() => !submitting && setDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>
@@ -781,94 +817,73 @@ const MatchingWeightsEditor: React.FC<MatchingWeightsEditorProps> = ({
               disabled={submitting}
             />
 
-            {/* Weight Sliders */}
+            {/* Ranking Features Editor */}
+            <RankingFeaturesEditor
+              weights={{
+                skill_match_weight: formData.skill_match_weight,
+                experience_weight: formData.experience_weight,
+                education_weight: formData.education_weight,
+                location_weight: formData.location_weight,
+                keyword_weight: formData.keyword_weight,
+                tfidf_weight: formData.tfidf_weight,
+                vector_weight: formData.vector_weight,
+                recency_weight: formData.recency_weight,
+                culture_fit_weight: formData.culture_fit_weight,
+                salary_match_weight: formData.salary_match_weight,
+                availability_weight: formData.availability_weight,
+                certifications_weight: formData.certifications_weight,
+                industry_experience_weight: formData.industry_experience_weight,
+              }}
+              onChange={handleWeightsChange}
+              disabled={submitting}
+              showValidation={true}
+            />
+
+            {/* Real-time Preview Section */}
+            <Divider sx={{ my: 2 }} />
+
             <Box>
               <Typography variant="subtitle2" gutterBottom>
-                Algorithm Weights (auto-normalized to 100%)
+                Real-time Preview (Optional):
               </Typography>
-
-              <Stack spacing={3}>
-                {/* Keyword Weight */}
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Keyword Matching
-                    </Typography>
-                    <Typography variant="body2" fontWeight={600}>
-                      {Math.round(formData.keyword_weight * 100)}%
-                    </Typography>
-                  </Box>
-                  <Slider
-                    value={formData.keyword_weight * 100}
-                    onChange={(_, value) => handleSliderChange('keyword_weight', (value as number) / 100)}
-                    disabled={submitting}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value) => `${Math.round(value)}%`}
-                    sx={{ color: 'primary.main' }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Exact keyword and phrase matching
-                  </Typography>
-                </Box>
-
-                {/* TF-IDF Weight */}
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      TF-IDF Matching
-                    </Typography>
-                    <Typography variant="body2" fontWeight={600}>
-                      {Math.round(formData.tfidf_weight * 100)}%
-                    </Typography>
-                  </Box>
-                  <Slider
-                    value={formData.tfidf_weight * 100}
-                    onChange={(_, value) => handleSliderChange('tfidf_weight', (value as number) / 100)}
-                    disabled={submitting}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value) => `${Math.round(value)}%`}
-                    sx={{ color: 'secondary.main' }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Term frequency-inverse document frequency
-                  </Typography>
-                </Box>
-
-                {/* Vector Weight */}
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Vector Similarity
-                    </Typography>
-                    <Typography variant="body2" fontWeight={600}>
-                      {Math.round(formData.vector_weight * 100)}%
-                    </Typography>
-                  </Box>
-                  <Slider
-                    value={formData.vector_weight * 100}
-                    onChange={(_, value) => handleSliderChange('vector_weight', (value as number) / 100)}
-                    disabled={submitting}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value) => `${Math.round(value)}%`}
-                    sx={{ color: 'info.main' }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Semantic vector embeddings similarity
-                  </Typography>
-                </Box>
-              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter a vacancy ID to see how weight changes affect candidate rankings in real-time
+              </Typography>
+              <TextField
+                label="Vacancy ID for Preview"
+                fullWidth
+                value={previewVacancyId}
+                onChange={(e) => setPreviewVacancyId(e.target.value)}
+                placeholder="e.g., vacancy-123"
+                disabled={submitting}
+                helperText="Leave empty to skip preview"
+              />
             </Box>
 
-            {/* Total Validation */}
-            <Alert severity="info" variant="outlined">
-              <Typography variant="body2">
-                Weights are automatically normalized to sum to 100%:
-                Keyword {Math.round(formData.keyword_weight * 100)}% +
-                TF-IDF {Math.round(formData.tfidf_weight * 100)}% +
-                Vector {Math.round(formData.vector_weight * 100)}% = {' '}
-                {Math.round((formData.keyword_weight + formData.tfidf_weight + formData.vector_weight) * 100)}%
-              </Typography>
-            </Alert>
+            {/* Show preview when vacancy ID is provided */}
+            {previewVacancyId && (
+              <Box sx={{ mt: 2 }}>
+                <MatchingWeightsPreview
+                  vacancyId={previewVacancyId}
+                  baselineWeights={baselineWeights}
+                  modifiedWeights={{
+                    skill_match_weight: formData.skill_match_weight,
+                    experience_weight: formData.experience_weight,
+                    education_weight: formData.education_weight,
+                    location_weight: formData.location_weight,
+                    keyword_weight: formData.keyword_weight,
+                    tfidf_weight: formData.tfidf_weight,
+                    vector_weight: formData.vector_weight,
+                    recency_weight: formData.recency_weight,
+                    culture_fit_weight: formData.culture_fit_weight,
+                    salary_match_weight: formData.salary_match_weight,
+                    availability_weight: formData.availability_weight,
+                    certifications_weight: formData.certifications_weight,
+                    industry_experience_weight: formData.industry_experience_weight,
+                  }}
+                />
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>

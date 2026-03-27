@@ -994,3 +994,333 @@ def format_follow_up_reminder_email(
             "body": f"You have {len(followups)} follow-up(s) scheduled. Check the Communications page for details.",
             "priority": "normal",
         }
+
+
+def format_bias_alert_email(
+    model_name: str,
+    bias_details: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Format bias detection alert email.
+
+    This function formats an email notification for bias detection alerts,
+    including bias type, severity, affected metrics, and recommended actions.
+
+    Args:
+        model_name: Name of the model where bias was detected
+        bias_details: Bias details dictionary containing:
+            - bias_type: Type of bias detected (e.g., demographic_parity, equal_opportunity)
+            - severity: Severity level (critical, high, medium, low)
+            - detected_at: Timestamp when bias was detected
+            - model_version: Version of the model
+            - fairness_metrics: Dictionary of fairness metrics with values and thresholds
+            - protected_attributes: List of protected attributes affected
+            - impact_summary: Summary of bias impact (optional)
+            - affected_predictions: Number of predictions affected (optional)
+            - time_period: Time period analyzed (optional)
+
+    Returns:
+        Dictionary containing email details:
+        {
+            "subject": "Bias Detection Alert: ranking model",
+            "body": "Email body with bias details...",
+            "priority": "high"
+        }
+
+    Example:
+        >>> details = {"bias_type": "demographic_parity", "severity": "high"}
+        >>> email = format_bias_alert_email("ranking", details)
+        >>> print(email['subject'])
+        '⚠️ Bias Detection Alert: ranking model'
+    """
+    try:
+        logger.info(f"Formatting bias alert email for model: {model_name}")
+
+        bias_type = bias_details.get("bias_type", "unknown")
+        severity = bias_details.get("severity", "medium").lower()
+        detected_at = bias_details.get("detected_at", datetime.utcnow().isoformat())
+        model_version = bias_details.get("model_version", "unknown")
+        fairness_metrics = bias_details.get("fairness_metrics", {})
+        protected_attributes = bias_details.get("protected_attributes", [])
+        impact_summary = bias_details.get("impact_summary")
+        affected_predictions = bias_details.get("affected_predictions")
+        time_period = bias_details.get("time_period")
+
+        # Determine email subject and priority based on severity
+        severity_emoji_map = {
+            "critical": "🚨",
+            "high": "⚠️",
+            "medium": "⚠️",
+            "low": "ℹ️",
+        }
+        severity_emoji = severity_emoji_map.get(severity, "⚠️")
+
+        # Format bias type for display
+        bias_type_display = bias_type.replace("_", " ").title()
+
+        subject = f"{severity_emoji} Bias Detection Alert: {model_name} model"
+        if severity in ["critical", "high"]:
+            subject += f" [{severity.upper()}]"
+
+        # Determine email priority
+        priority_map = {
+            "critical": "high",
+            "high": "high",
+            "medium": "normal",
+            "low": "normal",
+        }
+        email_priority = priority_map.get(severity, "normal")
+
+        # Build email body
+        body_lines = [
+            f"Bias Detection Alert",
+            f"",
+            f"Model: {model_name}",
+            f"Status: {severity_emoji} {severity.upper()} SEVERITY",
+            f"Bias Type: {bias_type_display}",
+            f"Detected: {detected_at}",
+            f"Model Version: {model_version}",
+        ]
+
+        # Add fairness metrics
+        if fairness_metrics:
+            body_lines.extend([
+                f"",
+                f"Fairness Metrics:",
+            ])
+            for metric_name, metric_data in fairness_metrics.items():
+                if isinstance(metric_data, dict):
+                    value = metric_data.get("value", "N/A")
+                    threshold = metric_data.get("threshold", "N/A")
+                    status = metric_data.get("status", "unknown")
+
+                    if isinstance(value, float):
+                        value_str = f"{value:.4f}"
+                    else:
+                        value_str = str(value)
+
+                    status_indicator = "❌" if status == "failed" else "✅"
+                    body_lines.append(
+                        f"  {status_indicator} {metric_name}: {value_str} "
+                        f"(threshold: {threshold})"
+                    )
+                else:
+                    body_lines.append(f"  - {metric_name}: {metric_data}")
+
+        # Add protected attributes
+        if protected_attributes:
+            body_lines.extend([
+                f"",
+                f"Affected Protected Attributes:",
+            ])
+            for attr in protected_attributes:
+                body_lines.append(f"  - {attr}")
+
+        # Add impact summary
+        if impact_summary:
+            body_lines.extend([
+                f"",
+                f"Impact Summary:",
+                f"  {impact_summary}",
+            ])
+
+            if affected_predictions:
+                body_lines.append(f"  Affected Predictions: {affected_predictions:,}")
+
+            if time_period:
+                body_lines.append(f"  Time Period: {time_period}")
+
+        # Add recommendations
+        body_lines.extend([
+            f"",
+            f"Recommended Actions:",
+            f"  1. Review the affected model predictions immediately",
+            f"  2. Investigate the root cause of the bias in the training data",
+        ])
+
+        if severity in ["critical", "high"]:
+            body_lines.append(
+                f"  3. Consider temporarily disabling the model until the bias is addressed"
+            )
+
+        body_lines.extend([
+            f"  4. Retrain the model with bias mitigation techniques applied",
+            f"  5. Document the incident and remediation steps taken",
+            f"",
+            f"---",
+            f"This is an automated alert from AgentHR Fairness Monitoring System.",
+        ])
+
+        body = "\n".join(body_lines)
+
+        email_details = {
+            "subject": subject,
+            "body": body,
+            "priority": email_priority,
+        }
+
+        logger.info(f"Bias alert email formatted successfully")
+        return email_details
+
+    except Exception as e:
+        logger.error(f"Failed to format bias alert email: {e}", exc_info=True)
+        # Return a basic email format on error
+        return {
+            "subject": f"Bias Alert: {model_name}",
+            "body": f"Bias detected in model {model_name}. Type: {bias_details.get('bias_type')}. Severity: {bias_details.get('severity')}.",
+            "priority": "high",
+        }
+
+
+@shared_task(
+    name="tasks.notifications.send_bias_detection_alert",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def send_bias_detection_alert(
+    self,
+    model_name: str,
+    bias_details: Dict[str, Any],
+    recipients: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Send alert about bias detection in a model.
+
+    This Celery task handles sending email alerts when bias is detected in a model.
+    It formats the alert with bias type, severity, fairness metrics, and recommended
+    actions for addressing the bias.
+
+    Task Workflow:
+    1. Format alert email with bias details
+    2. Determine recipients (default: admin and compliance team emails)
+    3. Send alert via email
+    4. Return delivery status
+
+    Args:
+        self: Celery task instance (bind=True)
+        model_name: Name of the model where bias was detected
+        bias_details: Bias details dictionary containing metrics and impact
+        recipients: Optional list of email recipients (defaults to admin/compliance emails)
+
+    Returns:
+        Dictionary containing alert results:
+        - model_name: Name of the model
+        - notification_type: Type of notification (bias_detection)
+        - bias_type: Type of bias detected
+        - severity: Severity level of the bias
+        - status: Task status (sent/failed)
+        - recipients_count: Number of recipients notified
+        - delivery_successful: Whether delivery was successful
+        - processing_time_ms: Total processing time
+        - error: Error message (if failed)
+
+    Raises:
+        SoftTimeLimitExceeded: If task exceeds time limit
+        Exception: For email sending errors
+
+    Example:
+        >>> from tasks.notifications import send_bias_detection_alert
+        >>> details = {"bias_type": "demographic_parity", "severity": "high"}
+        >>> task = send_bias_detection_alert.delay("ranking", details)
+        >>> alert_result = task.get()
+        >>> print(alert_result['status'])
+        'sent'
+    """
+    start_time = time.time()
+
+    try:
+        bias_type = bias_details.get("bias_type", "unknown")
+        severity = bias_details.get("severity", "medium")
+
+        logger.info(
+            f"Sending bias detection alert for: {model_name}, "
+            f"bias type: {bias_type}, severity: {severity}"
+        )
+
+        # Step 1: Format alert email
+        progress = {
+            "current": 1,
+            "total": 2,
+            "percentage": 50,
+            "status": "formatting_alert",
+            "message": "Formatting bias alert email...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Formatting bias alert email")
+
+        email_details = format_bias_alert_email(model_name, bias_details)
+
+        # Step 2: Determine recipients
+        if not recipients:
+            # Default to admin and compliance team emails from settings
+            admin_emails = getattr(settings, 'admin_email_addresses', ['admin@agenthr.com'])
+            compliance_emails = getattr(settings, 'compliance_email_addresses', [])
+            recipients = list(set(admin_emails + compliance_emails))
+        elif isinstance(recipients, str):
+            recipients = [recipients]
+
+        logger.info(f"Recipients: {len(recipients)} email addresses")
+
+        # Step 3: Send alert
+        progress = {
+            "current": 2,
+            "total": 2,
+            "percentage": 100,
+            "status": "sending_alert",
+            "message": "Sending bias alert email...",
+        }
+        self.update_state(state="PROGRESS", meta=progress)
+        logger.info(f"Task {self.request.id}: Sending bias alert email")
+
+        delivery_result = send_notification_via_email(recipients, email_details)
+        delivery_successful = delivery_result.get("success", False)
+
+        processing_time_ms = round((time.time() - start_time) * 1000, 2)
+
+        result = {
+            "model_name": model_name,
+            "notification_type": "bias_detection",
+            "bias_type": bias_type,
+            "severity": severity,
+            "status": "sent" if delivery_successful else "failed",
+            "recipients_count": len(recipients),
+            "delivery_successful": delivery_successful,
+            "delivery_result": delivery_result,
+            "processing_time_ms": processing_time_ms,
+        }
+
+        if delivery_successful:
+            logger.info(
+                f"Bias detection alert sent successfully: {model_name}, "
+                f"bias type: {bias_type}, severity: {severity}, "
+                f"delivered to {len(recipients)} recipients, "
+                f"time: {processing_time_ms}ms"
+            )
+        else:
+            logger.warning(
+                f"Bias detection alert delivery failed: {model_name}, "
+                f"error: {delivery_result.get('error')}"
+            )
+
+        return result
+
+    except SoftTimeLimitExceeded:
+        logger.error(f"Task {self.request.id} exceeded time limit")
+        return {
+            "model_name": model_name,
+            "notification_type": "bias_detection",
+            "status": "failed",
+            "error": "Bias alert sending exceeded maximum time limit",
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }
+
+    except Exception as e:
+        logger.error(f"Error in bias detection alert: {e}", exc_info=True)
+        return {
+            "model_name": model_name,
+            "notification_type": "bias_detection",
+            "status": "failed",
+            "error": str(e),
+            "processing_time_ms": round((time.time() - start_time) * 1000, 2),
+        }

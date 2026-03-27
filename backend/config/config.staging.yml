@@ -52,6 +52,14 @@ backup_s3_region: us-east-1
 backup_incremental_enabled: true
 backup_compression_enabled: true
 
+# Rate Limiting Configuration (production-like)
+rate_limit_enabled: true
+rate_limit_storage: redis
+rate_limit_per_minute: 60
+rate_limit_per_minute_expensive: 10
+rate_limit_per_minute_upload: 5
+rate_limit_per_minute_auth: 5
+
 # Sensitive values (should be overridden by environment variables)
 # zai_api_key: staging_key_here
 # openai_api_key: staging_key_here

@@ -26,6 +26,7 @@ class WorkflowStageConfig(Base, UUIDMixin, TimestampMixin):
         is_active: Whether this stage is currently active and visible
         color: Optional color code for UI display (e.g., "#3B82F6" for blue)
         description: Optional description of what happens in this stage
+        wip_limit: Optional work-in-progress limit for Kanban (max candidates in this stage)
         created_at: Timestamp when record was created (inherited)
         updated_at: Timestamp when record was last updated (inherited)
     """
@@ -41,6 +42,7 @@ class WorkflowStageConfig(Base, UUIDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # Hex color code
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    wip_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Kanban WIP limit
 
     def __repr__(self) -> str:
         return f"<WorkflowStageConfig(id={self.id}, org={self.organization_id}, stage={self.stage_name})>"

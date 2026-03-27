@@ -32,7 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
-from models import User, Role, RefreshToken
+from models import User, Role, RefreshToken, LoginAttempt
 from services.jwt_service import JWTService, get_jwt_service
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,11 @@ class AuthService:
     # Token expiration times
     PASSWORD_RESET_EXPIRE_HOURS = 24
     EMAIL_VERIFICATION_EXPIRE_HOURS = 48
+
+    # Account lockout settings
+    MAX_LOGIN_ATTEMPTS = 5
+    LOGIN_ATTEMPT_WINDOW_MINUTES = 15
+    ACCOUNT_LOCKOUT_DURATION_MINUTES = 30
 
     def __init__(
         self,
@@ -254,6 +259,9 @@ class AuthService:
         db: AsyncSession,
         email: str,
         password: str,
+        ip_address: str = "unknown",
+        user_agent: Optional[str] = None,
+        location: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Authenticate a user with email and password.
@@ -262,12 +270,15 @@ class AuthService:
             db: Database session
             email: User's email address
             password: User's password
+            ip_address: IP address of the client (for tracking)
+            user_agent: User agent string (for tracking)
+            location: Optional location derived from IP (for tracking)
 
         Returns:
             Dictionary with access_token, refresh_token, and user info
 
         Raises:
-            ValueError: If credentials are invalid or user is inactive
+            ValueError: If credentials are invalid, user is inactive, or account is locked
 
         Example:
             >>> auth = AuthService()
@@ -275,6 +286,9 @@ class AuthService:
             >>> print(result["access_token"])
             eyJ0eXAiOiJKV1QiLCJhbGc...
         """
+        # Check if account is locked before proceeding
+        await self.check_account_lockout(db, email)
+
         # Get user
         result = await db.execute(
             select(User).where(User.email == email)
@@ -283,16 +297,48 @@ class AuthService:
 
         if not user:
             logger.warning(f"Login attempt with non-existent email: {email}")
+            # Track failed login attempt for non-existent user
+            await self.track_login_attempt(
+                db,
+                email=email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=False,
+                failure_reason="user_not_found",
+                location=location,
+            )
             raise ValueError("Invalid email or password")
 
         # Verify password
         if not self.verify_password(password, user.password_hash):
             logger.warning(f"Login attempt with invalid password for: {email}")
+            # Track failed login attempt due to invalid password
+            await self.track_login_attempt(
+                db,
+                email=email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=False,
+                failure_reason="invalid_password",
+                user_id=user.id,
+                location=location,
+            )
             raise ValueError("Invalid email or password")
 
         # Check if user is active
         if not user.is_active:
             logger.warning(f"Login attempt for inactive user: {email}")
+            # Track failed login attempt due to inactive account
+            await self.track_login_attempt(
+                db,
+                email=email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=False,
+                failure_reason="account_disabled",
+                user_id=user.id,
+                location=location,
+            )
             raise ValueError("User account is disabled")
 
         # Get user role
@@ -314,6 +360,17 @@ class AuthService:
             db,
             user_id=user.id,
             token=refresh_token,
+        )
+
+        # Track successful login attempt
+        await self.track_login_attempt(
+            db,
+            email=email,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            success=True,
+            user_id=user.id,
+            location=location,
         )
 
         logger.info(f"User logged in successfully: {user.id}")
@@ -824,6 +881,254 @@ class AuthService:
         """
         result = await db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
+
+    async def track_login_attempt(
+        self,
+        db: AsyncSession,
+        email: str,
+        ip_address: str,
+        user_agent: Optional[str],
+        success: bool,
+        failure_reason: Optional[str] = None,
+        user_id: Optional[UUID] = None,
+        location: Optional[str] = None,
+    ) -> LoginAttempt:
+        """
+        Track a login attempt for security monitoring and brute force protection.
+
+        Args:
+            db: Database session
+            email: Email address used in login attempt
+            ip_address: IP address of the client
+            user_agent: User agent string from the browser/client
+            success: Whether the login attempt was successful
+            failure_reason: Reason for failure (e.g., "invalid_password", "account_locked")
+            user_id: User ID if the account exists
+            location: Optional location derived from IP
+
+        Returns:
+            Created LoginAttempt object
+
+        Example:
+            >>> auth = AuthService()
+            >>> attempt = await auth.track_login_attempt(
+            ...     db, "john@example.com", "192.168.1.1", "Mozilla/5.0",
+            ...     False, "invalid_password"
+            ... )
+            >>> print(attempt.success)
+            False
+        """
+        try:
+            login_attempt = LoginAttempt(
+                user_id=user_id,
+                email=email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=success,
+                failure_reason=failure_reason,
+                location=location,
+            )
+
+            db.add(login_attempt)
+            await db.flush()
+            await db.refresh(login_attempt)
+
+            if success:
+                logger.info(f"Successful login attempt tracked: {email} from {ip_address}")
+            else:
+                logger.warning(
+                    f"Failed login attempt tracked: {email} from {ip_address} "
+                    f"(reason: {failure_reason})"
+                )
+
+            return login_attempt
+
+        except Exception as e:
+            logger.error(f"Error tracking login attempt: {e}")
+            raise
+
+    async def is_account_locked(
+        self,
+        db: AsyncSession,
+        email: str,
+    ) -> Tuple[bool, Optional[datetime]]:
+        """
+        Check if an account is currently locked due to too many failed login attempts.
+
+        Args:
+            db: Database session
+            email: Email address to check
+
+        Returns:
+            Tuple of (is_locked, locked_until) where:
+                - is_locked: True if account is locked
+                - locked_until: Datetime when lockout expires (None if not locked)
+
+        Example:
+            >>> auth = AuthService()
+            >>> is_locked, locked_until = await auth.is_account_locked(db, "john@example.com")
+            >>> if is_locked:
+            ...     print(f"Account locked until {locked_until}")
+        """
+        try:
+            # Calculate the time window for checking failed attempts
+            window_start = datetime.utcnow() - timedelta(
+                minutes=self.LOGIN_ATTEMPT_WINDOW_MINUTES
+            )
+
+            # Count failed login attempts within the window
+            result = await db.execute(
+                select(LoginAttempt)
+                .where(
+                    LoginAttempt.email == email,
+                    LoginAttempt.success == False,
+                    LoginAttempt.created_at >= window_start,
+                )
+                .order_by(LoginAttempt.created_at.desc())
+            )
+            failed_attempts = result.scalars().all()
+
+            # If we don't have enough failed attempts, account is not locked
+            if len(failed_attempts) < self.MAX_LOGIN_ATTEMPTS:
+                return False, None
+
+            # Check if there was a successful login after the failed attempts
+            # This would reset the lockout
+            if failed_attempts:
+                oldest_failed_attempt = failed_attempts[-1]
+                result = await db.execute(
+                    select(LoginAttempt)
+                    .where(
+                        LoginAttempt.email == email,
+                        LoginAttempt.success == True,
+                        LoginAttempt.created_at >= oldest_failed_attempt.created_at,
+                    )
+                    .order_by(LoginAttempt.created_at.desc())
+                    .limit(1)
+                )
+                successful_attempt = result.scalar_one_or_none()
+
+                if successful_attempt:
+                    # There was a successful login after the failed attempts
+                    return False, None
+
+            # Account is locked - calculate when it will unlock
+            # Use the timestamp of the oldest failed attempt in the window
+            lockout_start = failed_attempts[-1].created_at
+            locked_until = lockout_start + timedelta(
+                minutes=self.ACCOUNT_LOCKOUT_DURATION_MINUTES
+            )
+
+            # Check if lockout has expired
+            if datetime.utcnow() >= locked_until:
+                logger.info(f"Account lockout expired for {email}")
+                return False, None
+
+            logger.warning(
+                f"Account locked for {email} until {locked_until} "
+                f"({len(failed_attempts)} failed attempts)"
+            )
+            return True, locked_until
+
+        except Exception as e:
+            logger.error(f"Error checking account lockout: {e}")
+            # In case of error, don't lock the account
+            return False, None
+
+    async def check_account_lockout(
+        self,
+        db: AsyncSession,
+        email: str,
+    ) -> None:
+        """
+        Check if an account is locked and raise an error if it is.
+
+        Args:
+            db: Database session
+            email: Email address to check
+
+        Raises:
+            ValueError: If account is currently locked
+
+        Example:
+            >>> auth = AuthService()
+            >>> await auth.check_account_lockout(db, "john@example.com")
+            >>> # Raises ValueError if account is locked
+        """
+        is_locked, locked_until = await self.is_account_locked(db, email)
+
+        if is_locked and locked_until:
+            minutes_remaining = int((locked_until - datetime.utcnow()).total_seconds() / 60)
+            logger.warning(f"Login attempt blocked for locked account: {email}")
+            raise ValueError(
+                f"Account is temporarily locked due to too many failed login attempts. "
+                f"Please try again in {minutes_remaining} minutes."
+            )
+
+    async def check_login_anomalies(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        days: int = 7,
+    ) -> Dict[str, Any]:
+        """
+        Check for login anomalies for a user.
+
+        This method analyzes recent login attempts to detect suspicious patterns
+        such as brute force attacks, credential stuffing, geographic impossibilities,
+        and other security concerns.
+
+        Args:
+            db: Database session
+            user_id: User ID to check
+            days: Number of days to analyze (default: 7)
+
+        Returns:
+            Dictionary with anomaly detection results including:
+                - has_anomaly: Boolean indicating if anomalies were detected
+                - anomalies: List of detected anomalies with details
+                - risk_score: Overall risk score (0-100)
+                - recommendations: List of recommended actions
+
+        Example:
+            >>> auth = AuthService()
+            >>> result = await auth.check_login_anomalies(db, user_id)
+            >>> if result["has_anomaly"]:
+            ...     print(f"Risk score: {result['risk_score']}")
+            ...     for rec in result["recommendations"]:
+            ...         print(f"- {rec}")
+        """
+        try:
+            # Import here to avoid circular dependency
+            from services.session_analytics_service import get_session_analytics_service
+
+            analytics_service = get_session_analytics_service()
+            result = await analytics_service.detect_anomaly(str(user_id), days=days)
+
+            # Log high-risk anomalies
+            if result.get("risk_score", 0) >= 70:
+                logger.error(
+                    f"High-risk login anomalies detected for user {user_id}: "
+                    f"risk_score={result['risk_score']}, "
+                    f"anomalies={len(result.get('anomalies', []))}"
+                )
+            elif result.get("risk_score", 0) >= 40:
+                logger.warning(
+                    f"Medium-risk login anomalies detected for user {user_id}: "
+                    f"risk_score={result['risk_score']}"
+                )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error checking login anomalies for user {user_id}: {e}", exc_info=True)
+            return {
+                "has_anomaly": False,
+                "anomalies": [],
+                "risk_score": 0,
+                "recommendations": [],
+                "error": str(e),
+            }
 
 
 def get_auth_service() -> AuthService:

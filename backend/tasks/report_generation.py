@@ -9,9 +9,7 @@ import asyncio
 import logging
 import time
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
+from email.message import EmailMessage
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -30,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import get_settings
 from database import async_session_maker
 from models import Report, ScheduledReport
+from models.audit_log import AuditLog, AuditActionType
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -385,6 +384,86 @@ def format_report_as_csv(
         return None
 
 
+def _send_email_with_attachments(
+    recipients: List[str],
+    subject: str,
+    body: str,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """
+    Internal helper function to send email with attachments via SMTP.
+
+    Внутренняя вспомогательная функция для отправки email с вложениями через SMTP.
+
+    Args:
+        recipients: Список email адресов получателей / List of recipient email addresses
+        subject: Тема письма / Email subject
+        body: Текстовое содержимое / Plain text body
+        attachments: Список вложений (опционально) / List of attachments (optional):
+            [
+                {"filename": "report.pdf", "content": b"...", "content_type": "application/pdf"},
+                {"filename": "data.csv", "content": b"...", "content_type": "text/csv"}
+            ]
+
+    Raises:
+        smtplib.SMTPException: Для ошибок SMTP / For SMTP errors
+        Exception: Для других ошибок отправки / For other sending errors
+    """
+    # Check if SMTP is configured
+    if not settings.smtp_username or not settings.smtp_password:
+        logger.warning("SMTP not configured, logging email instead of sending")
+        logger.info(f"Would send email to: {', '.join(recipients)}")
+        logger.info(f"Subject: {subject}")
+        logger.info(f"Body: {body[:200]}...")
+        if attachments:
+            logger.info(f"Attachments: {', '.join(a.get('filename', 'unknown') for a in attachments)}")
+        return
+
+    # Create email message
+    msg = EmailMessage()
+    msg["From"] = settings.smtp_default_from
+    msg["To"] = ", ".join(recipients)
+    msg["Subject"] = subject
+
+    msg.set_content(body)
+
+    # Add attachments if provided
+    if attachments:
+        for attachment in attachments:
+            filename = attachment.get('filename')
+            content = attachment.get('content')
+            content_type = attachment.get('content_type', 'application/octet-stream')
+
+            if filename and content:
+                # Parse content type
+                maintype, subtype = content_type.split('/', 1) if '/' in content_type else ('application', 'octet-stream')
+                msg.add_attachment(
+                    content,
+                    maintype=maintype,
+                    subtype=subtype,
+                    filename=filename
+                )
+                logger.debug(f"Attached file: {filename} ({len(content)} bytes)")
+
+    # Send via SMTP
+    try:
+        if settings.smtp_use_tls:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                server.starttls()
+                server.login(settings.smtp_username, settings.smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                server.login(settings.smtp_username, settings.smtp_password)
+                server.send_message(msg)
+
+        logger.info(f"Email successfully sent to {', '.join(recipients)}")
+
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP error sending email to {', '.join(recipients)}: {e}")
+        raise
+
+
 def send_report_via_email(
     recipients: List[str],
     report_name: str,
@@ -395,7 +474,7 @@ def send_report_via_email(
     Send report via email to specified recipients.
 
     This function handles sending generated reports via email with optional
-    attachments (PDF, CSV, etc.) using Python's smtplib or SendGrid.
+    attachments (PDF, CSV, etc.) using the notification service pattern.
 
     The email is composed with report summary and key metrics in the body,
     with formatted report files attached.
@@ -426,7 +505,6 @@ def send_report_via_email(
         >>> result['success']
         True
     """
-    import time
     start_time = time.time()
 
     logger.info(
@@ -434,32 +512,6 @@ def send_report_via_email(
     )
 
     try:
-        # Get email configuration from settings
-        smtp_host = getattr(settings, 'smtp_host', None)
-        smtp_port = getattr(settings, 'smtp_port', 587)
-        smtp_use_tls = getattr(settings, 'smtp_use_tls', True)
-        smtp_username = getattr(settings, 'smtp_username', None)
-        smtp_password = getattr(settings, 'smtp_password', None)
-        from_email = getattr(settings, 'smtp_default_from', 'noreply@agenthr.com')
-
-        # Check if SMTP is configured
-        if not smtp_host:
-            logger.warning(
-                "SMTP not configured, skipping actual email sending. "
-                "Set smtp_host in settings to enable email delivery."
-            )
-            processing_time = int((time.time() - start_time) * 1000)
-
-            return {
-                "success": True,
-                "method": "email",
-                "recipients_count": len(recipients),
-                "attachments_count": len(attachments) if attachments else 0,
-                "sent_at": time.time(),
-                "processing_time_ms": processing_time,
-                "note": "Email not sent (SMTP not configured)",
-            }
-
         # Compose email subject
         subject = f"Report: {report_name}"
 
@@ -488,48 +540,8 @@ def send_report_via_email(
 
         body = "\n".join(body_lines)
 
-        # Create MIME multipart message
-        msg = MIMEMultipart()
-        msg['From'] = from_email
-        msg['To'] = ', '.join(recipients)
-        msg['Subject'] = subject
-
-        # Attach body
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Attach files if provided
-        if attachments:
-            for attachment in attachments:
-                filename = attachment.get('filename')
-                content = attachment.get('content')
-                content_type = attachment.get('content_type', 'application/octet-stream')
-
-                if filename and content:
-                    part = MIMEApplication(content)
-                    part.add_header('Content-Disposition', 'attachment', filename=filename)
-                    msg.attach(part)
-                    logger.debug(f"Attached file: {filename} ({len(content)} bytes)")
-
-        # Log email details
-        logger.info(f"Email composed: subject='{subject}', to={', '.join(recipients)}")
-        logger.info(f"Email body length: {len(body)} characters")
-        if attachments:
-            logger.info(f"Attachments: {', '.join(a.get('filename', 'unknown') for a in attachments)}")
-
-        # Send email using SMTP
-        logger.info(f"Connecting to SMTP server: {smtp_host}:{smtp_port}")
-
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-            if smtp_use_tls:
-                server.starttls()
-                logger.debug("TLS enabled")
-
-            if smtp_username and smtp_password:
-                server.login(smtp_username, smtp_password)
-                logger.debug("Authenticated with SMTP server")
-
-            server.sendmail(from_email, recipients, msg.as_string())
-            logger.info(f"Email sent successfully to {len(recipients)} recipients")
+        # Send email using helper function
+        _send_email_with_attachments(recipients, subject, body, attachments)
 
         processing_time = int((time.time() - start_time) * 1000)
 
@@ -547,26 +559,10 @@ def send_report_via_email(
             "processing_time_ms": processing_time,
         }
 
-    except smtplib.SMTPAuthenticationError as e:
-        processing_time = int((time.time() - start_time) * 1000)
-        logger.error(
-            f"SMTP authentication failed: {e}",
-            exc_info=True
-        )
-
-        return {
-            "success": False,
-            "method": "email",
-            "recipients_count": len(recipients),
-            "attachments_count": len(attachments) if attachments else 0,
-            "error": f"SMTP authentication failed: {str(e)}",
-            "processing_time_ms": processing_time,
-        }
-
     except smtplib.SMTPException as e:
         processing_time = int((time.time() - start_time) * 1000)
         logger.error(
-            f"SMTP error occurred: {e}",
+            f"SMTP error sending report email: {e}",
             exc_info=True
         )
 
@@ -746,13 +742,68 @@ async def _update_scheduled_report_timestamps(
             return False, f"Database error: {str(e)}"
 
 
+async def _create_audit_log_entry(
+    scheduled_report_id: str,
+    action_data: Dict[str, Any],
+    organization_id: Optional[str] = None,
+) -> Tuple[bool, Optional[str]]:
+    """
+    Create an audit log entry for report generation (async).
+
+    This function creates an audit log entry to track when a scheduled report
+    was generated and delivered, including details about formats, recipients,
+    and delivery status.
+
+    Args:
+        scheduled_report_id: UUID of the scheduled report
+        action_data: Dictionary containing report generation details:
+            - formats_generated: List of formats (pdf, csv)
+            - delivery_method: Delivery method used (email)
+            - recipients_count: Number of recipients
+            - delivery_successful: Whether delivery was successful
+            - processing_time_ms: Processing time in milliseconds
+        organization_id: Optional UUID of the organization (if available)
+
+    Returns:
+        Tuple of (success, error_message)
+        If successful, error_message is None
+    """
+    async with async_session_maker() as db:
+        try:
+            # Create audit log entry
+            audit_log = AuditLog(
+                action_type=AuditActionType.REPORT_GENERATED,
+                entity_type="scheduled_report",
+                entity_id=scheduled_report_id,
+                organization_id=organization_id,
+                action_data=action_data,
+            )
+
+            db.add(audit_log)
+            await db.commit()
+
+            logger.info(
+                f"Audit log created for scheduled report {scheduled_report_id}: "
+                f"formats={action_data.get('formats_generated')}, "
+                f"recipients={action_data.get('recipients_count')}, "
+                f"delivery_successful={action_data.get('delivery_successful')}"
+            )
+
+            return True, None
+
+        except Exception as e:
+            logger.error(f"Database error creating audit log: {e}", exc_info=True)
+            await db.rollback()
+            return False, f"Database error: {str(e)}"
+
+
 @shared_task(
-    name="tasks.report_generation.generate_scheduled_reports",
+    name="tasks.report_generation.generate_scheduled_report",
     bind=True,
     max_retries=2,
     default_retry_delay=60,
 )
-def generate_scheduled_reports(
+def generate_scheduled_report(
     self,
     scheduled_report_id: str,
 ) -> Dict[str, Any]:
@@ -795,8 +846,8 @@ def generate_scheduled_reports(
         Exception: For database, generation, or delivery errors
 
     Example:
-        >>> from tasks.report_generation import generate_scheduled_reports
-        >>> task = generate_scheduled_reports.delay("abc-123-def")
+        >>> from tasks.report_generation import generate_scheduled_report
+        >>> task = generate_scheduled_report.delay("abc-123-def")
         >>> result = task.get()
         >>> print(result['status'])
         'completed'
@@ -1046,6 +1097,42 @@ def generate_scheduled_reports(
             f"time: {processing_time_ms}ms"
         )
 
+        # Create audit log entry for report generation
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # Extract organization_id from scheduled_report if available
+                organization_id = scheduled_report.get("organization_id")
+
+                # Prepare audit log action data
+                audit_action_data = {
+                    "report_name": scheduled_report['name'],
+                    "formats_generated": result['formats_generated'],
+                    "delivery_method": delivery_method,
+                    "recipients_count": len(recipients),
+                    "delivery_successful": delivery_successful,
+                    "processing_time_ms": processing_time_ms,
+                }
+
+                audit_success, audit_error = loop.run_until_complete(
+                    _create_audit_log_entry(
+                        scheduled_report_id,
+                        audit_action_data,
+                        organization_id,
+                    )
+                )
+            finally:
+                loop.close()
+
+            if not audit_success:
+                logger.warning(f"Failed to create audit log: {audit_error}")
+                # Continue anyway - the report was still generated successfully
+
+        except Exception as e:
+            logger.error(f"Error creating audit log: {e}", exc_info=True)
+            # Continue anyway - don't let audit log failure prevent task completion
+
         return result
 
     except SoftTimeLimitExceeded:
@@ -1083,7 +1170,7 @@ def process_all_pending_reports(
 
     Task Workflow:
     1. Query all active scheduled reports where next_run_at <= now
-    2. For each pending report, trigger generate_scheduled_reports task
+    2. For each pending report, trigger generate_scheduled_report task
     3. Update next_run_at based on schedule config
     4. Return summary of processed reports
 
@@ -1127,7 +1214,7 @@ def process_all_pending_reports(
         for report_id in pending_reports:
             try:
                 # Trigger report generation task
-                generate_scheduled_reports.delay(report_id)
+                generate_scheduled_report.delay(report_id)
                 reports_triggered += 1
                 logger.info(f"Triggered report generation for: {report_id}")
 

@@ -20,7 +20,7 @@ import {
   InputLabel,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import type {
   ScreeningRule,
   ScreeningRuleCreate,

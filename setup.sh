@@ -11,9 +11,61 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# Help function
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --profile <name>    Select Docker Compose profile to run"
+    echo "                      Available profiles:"
+    echo "                        - dev (default): Full development stack"
+    echo "                        - minimal: Database and backend only"
+    echo "                        - frontend: Frontend development with minimal backend"
+    echo "                        - production: Production-optimized stack"
+    echo "  --help             Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                          # Run with default (dev) profile"
+    echo "  $0 --profile minimal        # Run minimal stack"
+    echo "  $0 --profile frontend       # Run frontend development stack"
+    echo ""
+    exit 0
+}
+
+# Parse arguments
+PROFILE="dev"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --profile)
+            PROFILE="$2"
+            shift 2
+            ;;
+        --help)
+            show_help
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Validate profile
+case $PROFILE in
+    dev|minimal|frontend|production)
+        ;;
+    *)
+        echo -e "${RED}Invalid profile: $PROFILE${NC}"
+        echo "Use --help to see available profiles"
+        exit 1
+        ;;
+esac
+
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  TEAM7 Resume Analysis Platform${NC}"
 echo -e "${BLUE}  Local Development Setup${NC}"
+echo -e "${BLUE}  Profile: ${PROFILE}${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -91,9 +143,9 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Build and start all services
-docker-compose build
-docker-compose up -d
+# Build and start all services with selected profile
+docker-compose --profile ${PROFILE} build
+docker-compose --profile ${PROFILE} up -d
 echo ""
 
 # 6. Wait for services and health check
@@ -122,6 +174,7 @@ fi
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Setup Complete!${NC}"
+echo -e "${GREEN}  Profile: ${PROFILE}${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Services running at:"
@@ -131,9 +184,9 @@ echo "  - API Docs:        ${BLUE}http://localhost:8000/docs${NC}"
 echo "  - Flower Monitor:  ${BLUE}http://localhost:5555${NC}"
 echo ""
 echo "Useful commands:"
-echo "  - View logs:       ${YELLOW}docker-compose logs -f${NC}"
+echo "  - View logs:       ${YELLOW}docker-compose --profile ${PROFILE} logs -f${NC}"
 echo "  - Stop services:   ${YELLOW}docker-compose down${NC}"
-echo "  - Restart:         ${YELLOW}docker-compose restart${NC}"
+echo "  - Restart:         ${YELLOW}docker-compose --profile ${PROFILE} restart${NC}"
 echo ""
 echo "Load test data (65 resumes + 5 vacancies):"
 echo "  - ${YELLOW}bash scripts/load_test_data.sh${NC}"

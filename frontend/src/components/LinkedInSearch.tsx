@@ -32,7 +32,7 @@ import {
   Error as ErrorIcon,
   CheckCircle as SuccessIcon,
 } from '@mui/icons-material';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import type {
   LinkedInProfileSummary,
   LinkedInSearchResponse,

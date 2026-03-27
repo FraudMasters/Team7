@@ -72,6 +72,10 @@ class JobApplication(Base, UUIDMixin, TimestampMixin):
         "Resume",
         back_populates="job_applications"
     )
+    candidate_documents: Mapped[list["CandidateDocument"]] = relationship(
+        "CandidateDocument",
+        back_populates="application"
+    )
 
     def __repr__(self) -> str:
         return f"<JobApplication(id={self.id}, user_id={self.user_id}, vacancy_id={self.vacancy_id}, status={self.status.value})>"

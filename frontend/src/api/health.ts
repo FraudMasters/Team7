@@ -33,7 +33,7 @@
  * ```
  */
 
-import { apiClient } from '@/api/client';
+import { apiClient } from './client';
 import type {
   HealthResponse,
   DetailedHealthResponse,

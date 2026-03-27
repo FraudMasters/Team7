@@ -16,6 +16,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import DateRangeFilter, { DateRangeFilter as DateRangeFilterType } from '@components/analytics/DateRangeFilter';
 import FairnessDashboard from '@components/analytics/FairnessDashboard';
+import FairnessTrendsChart from '@components/analytics/FairnessTrendsChart';
 import { BiasReportExport } from '@/components/BiasReportExport';
 import { fairness } from '@/api/fairness';
 import type { BiasReport } from '@/types/api';
@@ -202,6 +203,11 @@ const BiasDetectionDashboardPage: React.FC = () => {
             endDate={dateRange.endDate}
             alertDays={30}
           />
+        </Box>
+
+        {/* Fairness Trends Over Time */}
+        <Box sx={{ mb: 4 }}>
+          <FairnessTrendsChart defaultPeriod="30d" />
         </Box>
       </Container>
 

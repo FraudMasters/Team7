@@ -47,3 +47,11 @@ ats_fit_weight: 0.2
 backup_s3_enabled: false
 backup_incremental_enabled: false
 backup_compression_enabled: false
+
+# Rate Limiting Configuration
+rate_limit_enabled: true
+rate_limit_storage: memory
+rate_limit_per_minute: 60
+rate_limit_per_minute_expensive: 10
+rate_limit_per_minute_upload: 5
+rate_limit_per_minute_auth: 5

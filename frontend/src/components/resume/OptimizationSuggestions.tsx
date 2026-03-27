@@ -8,10 +8,14 @@ import {
   Stack,
   CircularProgress,
   Alert,
+  AlertTitle,
   Divider,
   Tooltip,
   Collapse,
   IconButton,
+  Paper,
+  Grid,
+  LinearProgress,
 } from '@/components/ui';
 import { Icon } from '@/components/ui/primitives';
 import type {
@@ -19,6 +23,7 @@ import type {
   OptimizationSuggestion,
   OptimizationPriority,
   OptimizationCategory,
+  ATSEvaluationResult,
 } from '@/types/api';
 
 /**
@@ -116,11 +121,20 @@ const getCategoryLabel = (category: OptimizationCategory): string => {
 };
 
 /**
- * Get score color based on value
+ * Get score color based on value (0-100 scale)
  */
 const getScoreColor = (score: number): 'success' | 'warning' | 'error' => {
   if (score >= 80) return 'success';
   if (score >= 60) return 'warning';
+  return 'error';
+};
+
+/**
+ * Get ATS score color based on value (0-1 scale)
+ */
+const getATSScoreColor = (score: number): 'success' | 'warning' | 'error' => {
+  if (score >= 0.7) return 'success';
+  if (score >= 0.5) return 'warning';
   return 'error';
 };
 
@@ -378,6 +392,181 @@ const OptimizationSuggestions: React.FC<OptimizationSuggestionsProps> = ({
           />
         </Stack>
 
+        {/* ATS Compatibility Section */}
+        {optimizationData.ats_result && (
+          <Box css={{ mb: 2 }}>
+            <Divider css={{ mb: 2 }} />
+            <Box css={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Icon name="scan" css={{ color: 'primary.main' }} />
+              <Typography fontWeight={600}>ATS Compatibility</Typography>
+            </Box>
+
+            {/* ATS Status Alert */}
+            <Alert
+              severity={
+                optimizationData.ats_result.disqualified
+                  ? 'error'
+                  : optimizationData.ats_result.passed
+                    ? 'success'
+                    : 'warning'
+              }
+              icon={
+                optimizationData.ats_result.disqualified
+                  ? <Icon name="x-circle" />
+                  : optimizationData.ats_result.passed
+                    ? <Icon name="check-circle" />
+                    : <Icon name="alert-triangle" />
+              }
+              css={{ mb: 2 }}
+            >
+              <AlertTitle>
+                {optimizationData.ats_result.disqualified
+                  ? 'Resume Disqualified'
+                  : optimizationData.ats_result.passed
+                    ? 'Resume Passed ATS Check'
+                    : 'Resume Did Not Pass ATS Check'}
+              </AlertTitle>
+              <Typography css={{ fontSize: '0.875rem' }}>
+                {optimizationData.ats_result.feedback}
+              </Typography>
+            </Alert>
+
+            {/* ATS Score Metrics */}
+            <Grid container spacing={2} css={{ mb: 2 }}>
+              <Grid item xs={6} sm={3}>
+                <Paper css={{ p: 2, textAlign: 'center' }}>
+                  <Typography
+                    css={{ fontSize: '1.5rem', fontWeight: 700 }}
+                    color={`${getATSScoreColor(optimizationData.ats_result.overall_score)}.main`}
+                  >
+                    {Math.round(optimizationData.ats_result.overall_score * 100)}%
+                  </Typography>
+                  <Typography css={{ fontSize: '0.75rem' }} color="text.secondary">
+                    Overall Score
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={optimizationData.ats_result.overall_score * 100}
+                    color={getATSScoreColor(optimizationData.ats_result.overall_score)}
+                    css={{ mt: 1 }}
+                  />
+                </Paper>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Paper css={{ p: 2, textAlign: 'center' }}>
+                  <Typography
+                    css={{ fontSize: '1.5rem', fontWeight: 700 }}
+                    color={`${getATSScoreColor(optimizationData.ats_result.keyword_score)}.main`}
+                  >
+                    {Math.round(optimizationData.ats_result.keyword_score * 100)}%
+                  </Typography>
+                  <Typography css={{ fontSize: '0.75rem' }} color="text.secondary">
+                    Keyword Match
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={optimizationData.ats_result.keyword_score * 100}
+                    color={getATSScoreColor(optimizationData.ats_result.keyword_score)}
+                    css={{ mt: 1 }}
+                  />
+                </Paper>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Paper css={{ p: 2, textAlign: 'center' }}>
+                  <Typography
+                    css={{ fontSize: '1.5rem', fontWeight: 700 }}
+                    color={`${getATSScoreColor(optimizationData.ats_result.experience_score)}.main`}
+                  >
+                    {Math.round(optimizationData.ats_result.experience_score * 100)}%
+                  </Typography>
+                  <Typography css={{ fontSize: '0.75rem' }} color="text.secondary">
+                    Experience
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={optimizationData.ats_result.experience_score * 100}
+                    color={getATSScoreColor(optimizationData.ats_result.experience_score)}
+                    css={{ mt: 1 }}
+                  />
+                </Paper>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Paper css={{ p: 2, textAlign: 'center' }}>
+                  <Typography
+                    css={{ fontSize: '1.5rem', fontWeight: 700 }}
+                    color={`${getATSScoreColor(optimizationData.ats_result.fit_score)}.main`}
+                  >
+                    {Math.round(optimizationData.ats_result.fit_score * 100)}%
+                  </Typography>
+                  <Typography css={{ fontSize: '0.75rem' }} color="text.secondary">
+                    Overall Fit
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={optimizationData.ats_result.fit_score * 100}
+                    color={getATSScoreColor(optimizationData.ats_result.fit_score)}
+                    css={{ mt: 1 }}
+                  />
+                </Paper>
+              </Grid>
+            </Grid>
+
+            {/* ATS Issues */}
+            {optimizationData.ats_result.ats_issues && optimizationData.ats_result.ats_issues.length > 0 && (
+              <Box css={{ mb: 2 }}>
+                <Box css={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                  <Icon name="alert-triangle" css={{ fontSize: '0.875rem', color: 'error.main' }} />
+                  <Typography css={{ fontSize: '0.875rem', fontWeight: 600 }} color="error.dark">
+                    ATS Issues ({optimizationData.ats_result.ats_issues.length})
+                  </Typography>
+                </Box>
+                <Paper css={{ p: 1.5, backgroundColor: 'error.light' }}>
+                  <Stack spacing={0.5}>
+                    {optimizationData.ats_result.ats_issues.slice(0, 3).map((issue, idx) => (
+                      <Typography key={idx} css={{ fontSize: '0.85rem' }} color="text.secondary">
+                        • {issue}
+                      </Typography>
+                    ))}
+                    {optimizationData.ats_result.ats_issues.length > 3 && (
+                      <Typography css={{ fontSize: '0.85rem', fontStyle: 'italic' }} color="text.secondary">
+                        ... and {optimizationData.ats_result.ats_issues.length - 3} more
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Box>
+            )}
+
+            {/* Visual Issues */}
+            {optimizationData.ats_result.visual_issues && optimizationData.ats_result.visual_issues.length > 0 && (
+              <Box css={{ mb: 2 }}>
+                <Box css={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                  <Icon name="eye-off" css={{ fontSize: '0.875rem', color: 'warning.main' }} />
+                  <Typography css={{ fontSize: '0.875rem', fontWeight: 600 }} color="warning.dark">
+                    Visual/Format Issues ({optimizationData.ats_result.visual_issues.length})
+                  </Typography>
+                </Box>
+                <Paper css={{ p: 1.5, backgroundColor: 'warning.light' }}>
+                  <Stack spacing={0.5}>
+                    {optimizationData.ats_result.visual_issues.slice(0, 3).map((issue, idx) => (
+                      <Typography key={idx} css={{ fontSize: '0.85rem' }} color="text.secondary">
+                        • {issue}
+                      </Typography>
+                    ))}
+                    {optimizationData.ats_result.visual_issues.length > 3 && (
+                      <Typography css={{ fontSize: '0.85rem', fontStyle: 'italic' }} color="text.secondary">
+                        ... and {optimizationData.ats_result.visual_issues.length - 3} more
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Box>
+            )}
+
+            <Divider css={{ mt: 2 }} />
+          </Box>
+        )}
+
         {/* Missing Keywords Section */}
         {optimizationData.missing_keywords && optimizationData.missing_keywords.length > 0 && (
           <>
@@ -415,6 +604,8 @@ const OptimizationSuggestions: React.FC<OptimizationSuggestionsProps> = ({
             </Box>
           </>
         )}
+
+        <Divider css={{ mb: 2 }} />
 
         {/* Suggestions List */}
         <Stack spacing={1.5}>

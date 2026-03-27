@@ -13,7 +13,7 @@ from .learning_tasks import (
     retrain_skill_matching_model,
 )
 from .report_generation import (
-    generate_scheduled_reports,
+    generate_scheduled_report,
     process_all_pending_reports,
 )
 from .backup_tasks import (
@@ -27,6 +27,7 @@ from .backup_tasks import (
     backup_health_check_task,
 )
 from .audit_cleanup import cleanup_old_audit_logs_task
+from .audit_alerting import check_and_alert_suspicious_activity
 from .health_monitoring import (
     monitor_health_and_alert,
     check_component_task,
@@ -40,7 +41,7 @@ __all__ = [
     "review_and_activate_synonyms",
     "periodic_feedback_aggregation",
     "retrain_skill_matching_model",
-    "generate_scheduled_reports",
+    "generate_scheduled_report",
     "process_all_pending_reports",
     "daily_backup_task",
     "create_backup_task",
@@ -51,6 +52,7 @@ __all__ = [
     "sync_all_to_s3_task",
     "backup_health_check_task",
     "cleanup_old_audit_logs_task",
+    "check_and_alert_suspicious_activity",
     "monitor_health_and_alert",
     "check_component_task",
     "check_essential_services_task",

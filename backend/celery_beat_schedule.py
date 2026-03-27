@@ -15,6 +15,7 @@ Schedule Overview:
 - Weekly analytics email report: Sends weekly summary on configured day
 - Daily search alert processing: Processes pending alerts for daily-frequency saved searches
 - Weekly search alert processing: Processes pending alerts for weekly-frequency saved searches
+- Scheduled report processing: Processes pending scheduled reports at configured intervals
 
 Feedback Volume Trigger:
 - Monitors accumulated feedback counts per model
@@ -30,6 +31,12 @@ Search Alert Processing:
 - Daily alerts: Processes pending alerts for saved searches with daily frequency
 - Weekly alerts: Processes pending alerts for saved searches with weekly frequency
 - Configurable timing via alert_schedule settings
+
+Scheduled Report Processing:
+- Daily reports: Processes pending scheduled reports with daily frequency
+- Weekly reports: Processes pending scheduled reports with weekly frequency
+- Monthly reports: Processes pending scheduled reports with monthly frequency
+- Configurable timing via scheduled_report_schedule settings
 
 The schedule uses Celery's crontab schedule for precise timing control
 and allows configuration via environment variables.
@@ -186,6 +193,46 @@ def get_elasticsearch_indexing_config() -> Dict[str, Any]:
         "minute": getattr(settings, "elasticsearch_indexing_minute", 0),
         "day_of_week": getattr(settings, "elasticsearch_indexing_day", 0),  # Sunday
         "batch_size": getattr(settings, "elasticsearch_indexing_batch_size", 100),
+    }
+
+
+def get_scheduled_report_config() -> Dict[str, Any]:
+    """
+    Get scheduled report processing configuration from settings.
+
+    Returns schedule configuration with defaults for:
+    - enabled: Whether scheduled reports are enabled (default: True)
+    - daily_hour: Hour for daily report processing (default: 7 AM)
+    - daily_minute: Minute for daily report processing (default: 0)
+    - weekly_day: Day of week for weekly report processing (default: 1 = Monday)
+    - weekly_hour: Hour for weekly report processing (default: 8 AM)
+    - weekly_minute: Minute for weekly report processing (default: 0)
+    - monthly_day: Day of month for monthly report processing (default: 1)
+    - monthly_hour: Hour for monthly report processing (default: 9 AM)
+    - monthly_minute: Minute for monthly report processing (default: 0)
+    - batch_size: Number of reports to process in one batch (default: 50)
+
+    Returns:
+        Dictionary containing schedule configuration
+
+    Example:
+        >>> config = get_scheduled_report_config()
+        >>> print(config['daily_hour'])
+        7
+        >>> print(config['weekly_day'])
+        1
+    """
+    return {
+        "enabled": getattr(settings, "scheduled_reports_enabled", True),
+        "daily_hour": getattr(settings, "scheduled_report_daily_hour", 7),
+        "daily_minute": getattr(settings, "scheduled_report_daily_minute", 0),
+        "weekly_day": getattr(settings, "scheduled_report_weekly_day", 1),  # Monday
+        "weekly_hour": getattr(settings, "scheduled_report_weekly_hour", 8),
+        "weekly_minute": getattr(settings, "scheduled_report_weekly_minute", 0),
+        "monthly_day": getattr(settings, "scheduled_report_monthly_day", 1),  # 1st of month
+        "monthly_hour": getattr(settings, "scheduled_report_monthly_hour", 9),
+        "monthly_minute": getattr(settings, "scheduled_report_monthly_minute", 0),
+        "batch_size": getattr(settings, "scheduled_report_batch_size", 50),
     }
 
 
@@ -396,6 +443,59 @@ beat_schedule: Dict[str, Dict[str, Any]] = {
             "queue": "default",  # Use default queue for indexing tasks
         },
     },
+    # ==============================================
+    # Scheduled Report Processing Schedule
+    # ==============================================
+    "daily-scheduled-report-processing": {
+        "task": "tasks.scheduled_reports.process_scheduled_reports",
+        "schedule": crontab(
+            hour=get_scheduled_report_config()["daily_hour"],
+            minute=get_scheduled_report_config()["daily_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "frequency": "daily",  # Process daily frequency reports
+            "batch_size": get_scheduled_report_config()["batch_size"],
+        },
+        "options": {
+            "expires": 3600,  # Task expires if not run within 1 hour
+            "queue": "default",  # Use default queue for report tasks
+        },
+    },
+    "weekly-scheduled-report-processing": {
+        "task": "tasks.scheduled_reports.process_scheduled_reports",
+        "schedule": crontab(
+            day_of_week=get_scheduled_report_config()["weekly_day"],
+            hour=get_scheduled_report_config()["weekly_hour"],
+            minute=get_scheduled_report_config()["weekly_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "frequency": "weekly",  # Process weekly frequency reports
+            "batch_size": get_scheduled_report_config()["batch_size"],
+        },
+        "options": {
+            "expires": 7200,  # Task expires if not run within 2 hours
+            "queue": "default",  # Use default queue for report tasks
+        },
+    },
+    "monthly-scheduled-report-processing": {
+        "task": "tasks.scheduled_reports.process_scheduled_reports",
+        "schedule": crontab(
+            day_of_month=get_scheduled_report_config()["monthly_day"],
+            hour=get_scheduled_report_config()["monthly_hour"],
+            minute=get_scheduled_report_config()["monthly_minute"],
+        ),
+        "args": (),  # No positional args
+        "kwargs": {
+            "frequency": "monthly",  # Process monthly frequency reports
+            "batch_size": get_scheduled_report_config()["batch_size"],
+        },
+        "options": {
+            "expires": 14400,  # Task expires if not run within 4 hours
+            "queue": "default",  # Use default queue for report tasks
+        },
+    },
 }
 
 
@@ -422,6 +522,7 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     analytics_config = get_analytics_report_schedule_config()
     alert_config = get_alert_schedule_config()
     elasticsearch_config = get_elasticsearch_indexing_config()
+    scheduled_report_config = get_scheduled_report_config()
 
     if not config["enabled"] and enabled_only:
         logger.info("Automated retraining is disabled in settings")
@@ -435,12 +536,16 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
     if not elasticsearch_config["enabled"] and enabled_only:
         logger.info("Elasticsearch bulk indexing is disabled in settings")
 
+    if not scheduled_report_config["enabled"] and enabled_only:
+        logger.info("Scheduled reports are disabled in settings")
+
     # If all are disabled and we only want enabled tasks, return empty
     if (
         not config["enabled"]
         and not analytics_config["enabled"]
         and not alert_config["enabled"]
         and not elasticsearch_config["enabled"]
+        and not scheduled_report_config["enabled"]
         and enabled_only
     ):
         return {}
@@ -450,7 +555,8 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
         f"retraining_enabled={config['enabled']}, models={config['models']}, "
         f"analytics_reports_enabled={analytics_config['enabled']}, "
         f"search_alerts_enabled={alert_config['enabled']}, "
-        f"elasticsearch_indexing_enabled={elasticsearch_config['enabled']}"
+        f"elasticsearch_indexing_enabled={elasticsearch_config['enabled']}, "
+        f"scheduled_reports_enabled={scheduled_report_config['enabled']}"
     )
 
     if enabled_only:
@@ -493,6 +599,11 @@ def get_beat_schedule(enabled_only: bool = True) -> Dict[str, Dict[str, Any]]:
             # Skip elasticsearch indexing tasks if indexing is disabled
             if "elasticsearch" in task_name:
                 if not elasticsearch_config["enabled"]:
+                    continue
+
+            # Skip scheduled report tasks if scheduled reports are disabled
+            if "scheduled-report" in task_name:
+                if not scheduled_report_config["enabled"]:
                     continue
 
             # Include other tasks
@@ -593,6 +704,7 @@ def list_scheduled_tasks() -> Dict[str, Dict[str, Any]]:
 schedule_config = get_retraining_schedule_config()
 analytics_config = get_analytics_report_schedule_config()
 alert_config = get_alert_schedule_config()
+scheduled_report_config = get_scheduled_report_config()
 logger.info(
     f"Celery Beat schedule loaded: "
     f"daily at {schedule_config['daily_hour']:02d}:{schedule_config['daily_minute']:02d}, "
@@ -606,7 +718,11 @@ logger.info(
     f"analytics_weekly_on_day_{analytics_config['weekly_day']}_at_{analytics_config['weekly_hour']:02d}:{analytics_config['weekly_minute']:02d}, "
     f"search_alerts_enabled={alert_config['enabled']}, "
     f"search_alert_daily_at={alert_config['daily_hour']:02d}:{alert_config['daily_minute']:02d}, "
-    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}"
+    f"search_alert_weekly_on_day_{alert_config['weekly_day']}_at_{alert_config['weekly_hour']:02d}:{alert_config['weekly_minute']:02d}, "
+    f"scheduled_reports_enabled={scheduled_report_config['enabled']}, "
+    f"scheduled_report_daily_at={scheduled_report_config['daily_hour']:02d}:{scheduled_report_config['daily_minute']:02d}, "
+    f"scheduled_report_weekly_on_day_{scheduled_report_config['weekly_day']}_at_{scheduled_report_config['weekly_hour']:02d}:{scheduled_report_config['weekly_minute']:02d}, "
+    f"scheduled_report_monthly_on_day_{scheduled_report_config['monthly_day']}_at_{scheduled_report_config['monthly_hour']:02d}:{scheduled_report_config['monthly_minute']:02d}"
 )
 
 
@@ -618,6 +734,7 @@ __all__ = [
     "get_retraining_schedule_config",
     "get_analytics_report_schedule_config",
     "get_alert_schedule_config",
+    "get_scheduled_report_config",
     "add_scheduled_task",
     "remove_scheduled_task",
     "list_scheduled_tasks",

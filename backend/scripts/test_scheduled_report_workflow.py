@@ -173,12 +173,12 @@ def trigger_celery_task(scheduled_report_id: str) -> str:
 
     try:
         # Import here to avoid issues if backend not available
-        from tasks.report_generation import generate_scheduled_reports
+        from tasks.report_generation import generate_scheduled_report
 
         print_info(f"Triggering task for scheduled report: {scheduled_report_id}")
 
         # Trigger the task asynchronously
-        result = generate_scheduled_reports.delay(scheduled_report_id)
+        result = generate_scheduled_report.delay(scheduled_report_id)
 
         print_success(f"Celery task triggered successfully")
         print_info(f"Task ID: {result.id}")

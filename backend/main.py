@@ -272,6 +272,7 @@ from api import (
     reports,
     vacancies,
     ranking,
+    ranking_weights,
     candidates,
     candidate_queue,
     industry_classifier,
@@ -289,6 +290,7 @@ from api import (
     candidate_tags,
     candidate_notes,
     candidate_activities,
+    candidate_appeals,
     search,
     search_analytics,
     job_search,
@@ -297,10 +299,13 @@ from api import (
     config,
     websocket,
     auth,
+    oauth,
     inbound_email,
     hiring_manager,
     parsing_corrections,
     filter_suggestions,
+    oauth,
+    candidate_scheduling,
 )
 
 app.include_router(resumes.router, prefix="/api/resumes", tags=["Resumes"])
@@ -320,6 +325,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(fairness.router, prefix="/api/fairness", tags=["Fairness"])
 app.include_router(vacancies.router, prefix="/api/vacancies", tags=["Vacancies"])
 app.include_router(ranking.router, prefix="/api/ranking", tags=["Ranking"])
+app.include_router(ranking_weights.router, prefix="/api/ranking-weights", tags=["Ranking Weights"])
 app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
 app.include_router(candidate_queue.router, prefix="/api/candidate-queue", tags=["Candidate Queue"])
 app.include_router(industry_classifier.router, prefix="/api/industry-classifier", tags=["Industry Classifier"])
@@ -337,9 +343,11 @@ app.include_router(workflow_stages.router, prefix="/api/workflow-stages", tags=[
 app.include_router(candidate_tags.router, prefix="/api/candidate-tags", tags=["Candidate Tags"])
 app.include_router(candidate_notes.router, prefix="/api/candidate-notes", tags=["Candidate Notes"])
 app.include_router(candidate_activities.router, prefix="/api/candidate-activities", tags=["Candidate Activities"])
+app.include_router(candidate_appeals.router, prefix="/api/candidate-appeals", tags=["Candidate Appeals"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(search_analytics.router, prefix="/api/search/analytics", tags=["Search Analytics"])
 app.include_router(filter_suggestions.router, prefix="/api/filter-suggestions", tags=["Filter Suggestions"])
+app.include_router(oauth.router, prefix="/api/oauth", tags=["OAuth"])
 app.include_router(job_search.router, prefix="/api/job-search", tags=["Job Search"])
 app.include_router(job_applications.router, prefix="/api/job-applications", tags=["Job Applications"])
 app.include_router(saved_jobs.router, prefix="/api/saved-jobs", tags=["Saved Jobs"])
@@ -347,8 +355,10 @@ app.include_router(job_descriptions.router, prefix="/api/job-descriptions", tags
 app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(oauth.router, prefix="/api/oauth", tags=["OAuth"])
 app.include_router(hiring_manager.router, prefix="/api/hiring-manager", tags=["Hiring Manager"])
 app.include_router(parsing_corrections.router, prefix="/api/parsing-corrections", tags=["Parsing Corrections"])
+app.include_router(candidate_scheduling.router, prefix="/api/candidate-scheduling", tags=["Candidate Scheduling"])
 
 
 if __name__ == "__main__":

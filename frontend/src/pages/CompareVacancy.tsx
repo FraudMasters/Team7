@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Box, Container, Typography, Paper, Alert, Stack, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, CircularProgress, IconButton } from '@/components/ui';
 import ResumeComparisonMatrix from '@components/ResumeComparisonMatrix';
 import ComparisonControls from '@components/ComparisonControls';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/api';
 import type { ComparisonCreate } from '@/types/api';
 
 /**

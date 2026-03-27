@@ -17,6 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from config import get_settings
 from database import init_db, close_db
 from api.notifications import router as notifications_router
+from api.templates import router as templates_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -92,6 +93,7 @@ app.add_middleware(
 
 # Подключение роутеров
 app.include_router(notifications_router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(templates_router, prefix="/api/templates", tags=["Templates"])
 
 
 # Обработчики исключений

@@ -30,6 +30,8 @@ from .skill_gap import SkillGapReport
 from .learning_resource import LearningResource
 from .skill_development_plan import SkillDevelopmentPlan
 from .matching_weights import MatchingWeightProfile, MatchingWeightVersion, PRESET_PROFILES, create_preset_profiles
+from .ranking_weights_profile import RankingWeightProfile
+from .ranking_weights_history import RankingWeightVersion
 from .backup import Backup, BackupConfig, BackupType, BackupStatus
 from .ats_result import ATSResult
 from .saved_search import SavedSearch
@@ -44,6 +46,10 @@ from .built_resume import BuiltResume
 from .search_analytics import SearchQuery, PopularSearch
 from .recent_search import RecentSearch
 from .search_relevance_config import SearchRelevanceConfig
+from .token_blacklist import TokenBlacklist
+from .oauth_provider import OAuthProvider
+from .oauth_token import OAuthToken
+from .login_attempt import LoginAttempt
 
 __all__ = [
     "Base",
@@ -83,6 +89,8 @@ __all__ = [
     "MatchingWeightVersion",
     "PRESET_PROFILES",
     "create_preset_profiles",
+    "RankingWeightProfile",
+    "RankingWeightVersion",
     "Backup",
     "BackupConfig",
     "BackupType",
@@ -103,4 +111,8 @@ __all__ = [
     "PopularSearch",
     "RecentSearch",
     "SearchRelevanceConfig",
+    "TokenBlacklist",
+    "OAuthProvider",
+    "OAuthToken",
+    "LoginAttempt",
 ]

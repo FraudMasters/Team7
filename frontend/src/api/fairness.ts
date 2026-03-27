@@ -46,6 +46,7 @@ import type {
   GenerateBiasReportRequest,
   AcknowledgeAlertResponse,
   FairnessScorecard,
+  FairnessTrendsResponse,
   ApiError,
 } from '@/types/api';
 
@@ -482,6 +483,47 @@ export class FairnessClient {
           responseType: 'blob',
         }
       );
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
+  }
+
+  /**
+   * Get historical fairness metrics as time series data
+   *
+   * @param options - Required start_date and end_date, optional filters
+   * @returns Fairness trends time series data
+   * @throws ApiError if fetch fails
+   *
+   * @example
+   * ```ts
+   * const trends = await fairness.getTrends({
+   *   start_date: '2026-01-01',
+   *   end_date: '2026-03-21',
+   *   protected_attribute: 'gender',
+   * });
+   * ```
+   */
+  async getTrends(options: {
+    start_date: string;
+    end_date: string;
+    model_name?: string;
+    model_version?: string;
+    protected_attribute?: string;
+  }): Promise<FairnessTrendsResponse> {
+    try {
+      const params = new URLSearchParams();
+      params.append('start_date', options.start_date);
+      params.append('end_date', options.end_date);
+
+      if (options.model_name) params.append('model_name', options.model_name);
+      if (options.model_version) params.append('model_version', options.model_version);
+      if (options.protected_attribute) params.append('protected_attribute', options.protected_attribute);
+
+      const url = `/api/fairness/trends?${params.toString()}`;
+
+      const response = await this.client.get<FairnessTrendsResponse>(url);
       return response.data;
     } catch (error) {
       throw transformError(error);

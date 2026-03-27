@@ -31,6 +31,8 @@ from models.analytics_event import AnalyticsEvent, AnalyticsEventType
 from models.candidate_tag import CandidateTag
 from models.candidate_note import CandidateNote
 from models.candidate_activity import CandidateActivity, CandidateActivityType
+from models.client_tenant import ClientTenant
+from middleware.tenant_context import get_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +273,32 @@ async def list_candidates(
             f"tag_id: {tag_id}, search: {search}, skip: {skip}, limit: {limit}"
         )
 
+        # Get tenant context for data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id_filter = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id for filtering
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id_filter = client_tenant.organization_id
+            logger.info(f"Filtering candidates by organization_id: {organization_id_filter} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id_filter = org_id_header
+                logger.info(f"Filtering candidates by organization_id from header: {organization_id_filter}")
+
         # Validate tag_id and fetch resume IDs with this tag if provided
         tag_resume_ids = None
         if tag_id:
@@ -354,6 +382,10 @@ async def list_candidates(
                 HiringStage.workflow_stage_config_id == WorkflowStageConfig.id,
             )
         )
+
+        # Apply tenant/organization filter for data isolation
+        if organization_id_filter:
+            query = query.where(Resume.organization_id == organization_id_filter)
 
         # Apply filters
         if stage_id:
@@ -577,8 +609,37 @@ async def get_candidate(
                 detail=f"Invalid candidate ID format: {candidate_id}",
             )
 
+        # Get tenant context for data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id_filter = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id for filtering
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id_filter = client_tenant.organization_id
+            logger.info(f"Filtering candidate by organization_id: {organization_id_filter} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id_filter = org_id_header
+                logger.info(f"Filtering candidate by organization_id from header: {organization_id_filter}")
+
         # Get the resume
         resume_query = select(Resume).where(Resume.id == candidate_uuid)
+        if organization_id_filter:
+            resume_query = resume_query.where(Resume.organization_id == organization_id_filter)
+
         resume_result = await db.execute(resume_query)
         resume = resume_result.scalar_one_or_none()
 
@@ -1119,6 +1180,7 @@ async def bulk_move_candidates(
     tags=["Candidates"],
 )
 async def get_candidates_for_vacancy(
+    request: Request,
     vacancy_id: str,
     limit: int = Query(50, ge=1, le=200, description="Maximum candidates to return"),
     db: AsyncSession = Depends(get_db),
@@ -1186,6 +1248,32 @@ async def get_candidates_for_vacancy(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Invalid vacancy UUID format",
             )
+
+        # Get tenant context for data isolation
+        tenant_id = get_tenant_context(request)
+        organization_id_filter = None
+
+        if tenant_id:
+            # Get client tenant to retrieve organization_id for filtering
+            tenant_result = await db.execute(
+                select(ClientTenant).where(ClientTenant.id == tenant_id)
+            )
+            client_tenant = tenant_result.scalars().first()
+
+            if not client_tenant:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid tenant context - tenant not found"
+                )
+
+            organization_id_filter = client_tenant.organization_id
+            logger.info(f"Filtering vacancy candidates by organization_id: {organization_id_filter} (tenant: {tenant_id})")
+        else:
+            # Backward compatibility: Check for X-Organization-ID header
+            org_id_header = request.headers.get("X-Organization-ID")
+            if org_id_header:
+                organization_id_filter = org_id_header
+                logger.info(f"Filtering vacancy candidates by organization_id from header: {organization_id_filter}")
 
         # Get ranking service
         ranking_service = get_ranking_service()

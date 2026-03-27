@@ -9,6 +9,8 @@ This module provides comprehensive backup functionality including:
 - S3-compatible off-site storage
 - Restore functionality
 - Retention policy management
+- Prometheus metrics export for monitoring
+- Email notifications for failures and warnings
 """
 import asyncio
 import bz2
@@ -34,6 +36,21 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Import monitoring and notification services
+try:
+    from services.backup_metrics_exporter import get_backup_metrics
+    METRICS_AVAILABLE = True
+except ImportError:
+    logger.warning("BackupMetricsExporter not available, metrics will be disabled")
+    METRICS_AVAILABLE = False
+
+try:
+    from services.email_notification_service import send_backup_notification
+    NOTIFICATIONS_AVAILABLE = True
+except ImportError:
+    logger.warning("Email notification service not available, notifications will be disabled")
+    NOTIFICATIONS_AVAILABLE = False
 
 
 # Backup directory structure
@@ -171,6 +188,8 @@ class BackupService:
         db_url: Optional[str] = None,
         backup_dir: Optional[Path] = None,
         s3_config: Optional[Dict[str, Any]] = None,
+        enable_notifications: bool = True,
+        enable_metrics: bool = True,
     ):
         """
         Initialize the backup service.
@@ -180,17 +199,111 @@ class BackupService:
             backup_dir: Base backup directory (uses default if not provided)
             s3_config: S3 configuration dict with keys: enabled, bucket, endpoint,
                        access_key, secret_key, region
+            enable_notifications: Enable email notifications for failures/warnings
+            enable_metrics: Enable Prometheus metrics recording
         """
         self.db_url = db_url or settings.database_url
         self.backup_dir = backup_dir or BACKUP_BASE_DIR
         self.s3_config = s3_config or {}
         self.db_params = parse_database_url(self.db_url)
+        self.enable_notifications = enable_notifications
+        self.enable_metrics = enable_metrics
 
         ensure_backup_dirs()
 
         # Set PGPASSWORD for pg_dump
         if self.db_params.get("password"):
             os.environ["PGPASSWORD"] = self.db_params["password"]
+
+        # Initialize metrics exporter if available and enabled
+        self.metrics = None
+        if METRICS_AVAILABLE and self.enable_metrics:
+            try:
+                self.metrics = get_backup_metrics()
+                logger.info("Backup metrics exporter initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize metrics exporter: {e}")
+
+        # Get notification email from settings
+        self.notification_email = getattr(settings, 'backup_notification_email', None)
+
+    def _record_metric_start(self, backup_type: str) -> None:
+        """Record backup operation start metric."""
+        if self.metrics:
+            try:
+                self.metrics.record_backup_start(backup_type)
+            except Exception as e:
+                logger.warning(f"Failed to record start metric for {backup_type}: {e}")
+
+    def _record_metric_success(
+        self,
+        backup_type: str,
+        size_bytes: int,
+        duration_seconds: float
+    ) -> None:
+        """Record successful backup metric."""
+        if self.metrics:
+            try:
+                self.metrics.record_backup_success(backup_type, size_bytes, duration_seconds)
+            except Exception as e:
+                logger.warning(f"Failed to record success metric for {backup_type}: {e}")
+
+    def _record_metric_failure(
+        self,
+        backup_type: str,
+        error_type: str,
+        duration_seconds: Optional[float] = None
+    ) -> None:
+        """Record failed backup metric."""
+        if self.metrics:
+            try:
+                self.metrics.record_backup_failure(backup_type, error_type, duration_seconds)
+            except Exception as e:
+                logger.warning(f"Failed to record failure metric for {backup_type}: {e}")
+
+    def _send_failure_notification(
+        self,
+        operation: str,
+        error_message: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Send failure notification email."""
+        if not self.enable_notifications or not self.notification_email:
+            return
+
+        if NOTIFICATIONS_AVAILABLE:
+            try:
+                send_backup_notification(
+                    notification_type='failure',
+                    operation=operation,
+                    error_message=error_message,
+                    context=context or {},
+                )
+                logger.info(f"Failure notification sent for {operation}")
+            except Exception as e:
+                logger.warning(f"Failed to send failure notification: {e}")
+
+    def _send_warning_notification(
+        self,
+        warning_type: str,
+        message: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Send warning notification email."""
+        if not self.enable_notifications or not self.notification_email:
+            return
+
+        if NOTIFICATIONS_AVAILABLE:
+            try:
+                send_backup_notification(
+                    notification_type='warning',
+                    warning_type=warning_type,
+                    message=message,
+                    context=context or {},
+                )
+                logger.info(f"Warning notification sent: {warning_type}")
+            except Exception as e:
+                logger.warning(f"Failed to send warning notification: {e}")
 
     def create_database_backup(
         self,
@@ -220,6 +333,10 @@ class BackupService:
             temp_file = TEMP_BACKUP_DIR / f"{backup_name}.sql.gz"
             output_file = DATABASE_BACKUP_DIR / f"{backup_name}.sql.gz"
 
+        # Record backup start
+        self._record_metric_start("database")
+
+        start_time = time.time()
         try:
             logger.info(f"Starting database backup: {backup_name}")
 
@@ -236,8 +353,6 @@ class BackupService:
             ]
 
             # Execute pg_dump
-            start_time = time.time()
-
             if compression:
                 # Use gzip compression
                 with open(temp_file, "wb") as f_out:
@@ -302,6 +417,9 @@ class BackupService:
                 f"({format_size(size_bytes)}, {tables_count} tables, {elapsed:.1f}s)"
             )
 
+            # Record success metrics
+            self._record_metric_success("database", size_bytes, elapsed)
+
             return {
                 "path": str(output_file),
                 "size_bytes": size_bytes,
@@ -311,10 +429,30 @@ class BackupService:
             }
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"pg_dump failed: {e.stderr if e.stderr else str(e)}")
+            elapsed = time.time() - start_time
+            error_msg = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"pg_dump failed: {error_msg}")
+
+            # Record failure metrics and send notification
+            self._record_metric_failure("database", "database_error", elapsed)
+            self._send_failure_notification(
+                operation="create_database_backup",
+                error_message=error_msg,
+                context={"backup_name": backup_name}
+            )
             raise
         except Exception as e:
-            logger.error(f"Database backup failed: {e}")
+            elapsed = time.time() - start_time
+            error_msg = str(e)
+            logger.error(f"Database backup failed: {error_msg}")
+
+            # Record failure metrics and send notification
+            self._record_metric_failure("database", "unknown_error", elapsed)
+            self._send_failure_notification(
+                operation="create_database_backup",
+                error_message=error_msg,
+                context={"backup_name": backup_name}
+            )
             raise
 
     def create_files_backup(
@@ -341,17 +479,20 @@ class BackupService:
 
         ensure_backup_dirs()
 
+        # Record backup start
+        self._record_metric_start("files")
+
         source_dir = UPLOADS_SOURCE_DIR
         if not source_dir.exists():
             logger.warning(f"Source directory does not exist: {source_dir}")
             source_dir.mkdir(parents=True, exist_ok=True)
 
+        start_time = time.time()
+
         if incremental and parent_backup_path:
             # Incremental backup using rsync
             backup_path = FILES_BACKUP_DIR / f"{backup_name}"
             backup_path.mkdir(parents=True, exist_ok=True)
-
-            start_time = time.time()
 
             try:
                 rsync_cmd = [
@@ -390,6 +531,9 @@ class BackupService:
                     f"({format_size(size_bytes)}, {files_count} files, {elapsed:.1f}s)"
                 )
 
+                # Record success metrics
+                self._record_metric_success("files", size_bytes, elapsed)
+
                 return {
                     "path": str(tar_path),
                     "size_bytes": size_bytes,
@@ -400,7 +544,30 @@ class BackupService:
                 }
 
             except subprocess.CalledProcessError as e:
-                logger.error(f"rsync failed: {e.stderr}")
+                elapsed = time.time() - start_time
+                error_msg = e.stderr if e.stderr else str(e)
+                logger.error(f"rsync failed: {error_msg}")
+
+                # Record failure metrics and send notification
+                self._record_metric_failure("files", "rsync_error", elapsed)
+                self._send_failure_notification(
+                    operation="create_files_backup",
+                    error_message=error_msg,
+                    context={"backup_name": backup_name, "type": "incremental"}
+                )
+                raise
+            except Exception as e:
+                elapsed = time.time() - start_time
+                error_msg = str(e)
+                logger.error(f"Files backup failed: {error_msg}")
+
+                # Record failure metrics and send notification
+                self._record_metric_failure("files", "unknown_error", elapsed)
+                self._send_failure_notification(
+                    operation="create_files_backup",
+                    error_message=error_msg,
+                    context={"backup_name": backup_name, "type": "incremental"}
+                )
                 raise
         else:
             # Full backup
@@ -408,32 +575,48 @@ class BackupService:
             if compression:
                 tar_path = FILES_BACKUP_DIR / f"{backup_name}.tar.gz"
 
-            start_time = time.time()
+            try:
+                # Count files before archiving
+                files_count = sum(1 for _ in source_dir.rglob("*") if _.is_file())
 
-            # Count files before archiving
-            files_count = sum(1 for _ in source_dir.rglob("*") if _.is_file())
+                mode = "w:gz" if compression else "w"
+                with tarfile.open(tar_path, mode) as tar:
+                    tar.add(source_dir, arcname="uploads")
 
-            mode = "w:gz" if compression else "w"
-            with tarfile.open(tar_path, mode) as tar:
-                tar.add(source_dir, arcname="uploads")
+                size_bytes = tar_path.stat().st_size
+                checksum = calculate_checksum(tar_path)
+                elapsed = time.time() - start_time
 
-            size_bytes = tar_path.stat().st_size
-            checksum = calculate_checksum(tar_path)
-            elapsed = time.time() - start_time
+                logger.info(
+                    f"Files backup completed: {backup_name} "
+                    f"({format_size(size_bytes)}, {files_count} files, {elapsed:.1f}s)"
+                )
 
-            logger.info(
-                f"Files backup completed: {backup_name} "
-                f"({format_size(size_bytes)}, {files_count} files, {elapsed:.1f}s)"
-            )
+                # Record success metrics
+                self._record_metric_success("files", size_bytes, elapsed)
 
-            return {
-                "path": str(tar_path),
-                "size_bytes": size_bytes,
-                "checksum": checksum,
-                "files_count": files_count,
-                "elapsed_seconds": elapsed,
-                "is_incremental": False,
-            }
+                return {
+                    "path": str(tar_path),
+                    "size_bytes": size_bytes,
+                    "checksum": checksum,
+                    "files_count": files_count,
+                    "elapsed_seconds": elapsed,
+                    "is_incremental": False,
+                }
+
+            except Exception as e:
+                elapsed = time.time() - start_time
+                error_msg = str(e)
+                logger.error(f"Files backup failed: {error_msg}")
+
+                # Record failure metrics and send notification
+                self._record_metric_failure("files", "archive_error", elapsed)
+                self._send_failure_notification(
+                    operation="create_files_backup",
+                    error_message=error_msg,
+                    context={"backup_name": backup_name, "type": "full"}
+                )
+                raise
 
     def create_models_backup(
         self,
@@ -455,6 +638,9 @@ class BackupService:
 
         ensure_backup_dirs()
 
+        # Record backup start
+        self._record_metric_start("models")
+
         source_dir = MODELS_SOURCE_DIR
         if not source_dir.exists():
             logger.warning(f"Models cache directory does not exist: {source_dir}")
@@ -466,29 +652,47 @@ class BackupService:
 
         start_time = time.time()
 
-        # Count files
-        files_count = sum(1 for _ in source_dir.rglob("*") if _.is_file())
+        try:
+            # Count files
+            files_count = sum(1 for _ in source_dir.rglob("*") if _.is_file())
 
-        mode = "w:gz" if compression else "w"
-        with tarfile.open(tar_path, mode) as tar:
-            tar.add(source_dir, arcname="models_cache")
+            mode = "w:gz" if compression else "w"
+            with tarfile.open(tar_path, mode) as tar:
+                tar.add(source_dir, arcname="models_cache")
 
-        size_bytes = tar_path.stat().st_size
-        checksum = calculate_checksum(tar_path)
-        elapsed = time.time() - start_time
+            size_bytes = tar_path.stat().st_size
+            checksum = calculate_checksum(tar_path)
+            elapsed = time.time() - start_time
 
-        logger.info(
-            f"Models backup completed: {backup_name} "
-            f"({format_size(size_bytes)}, {files_count} files, {elapsed:.1f}s)"
-        )
+            logger.info(
+                f"Models backup completed: {backup_name} "
+                f"({format_size(size_bytes)}, {files_count} files, {elapsed:.1f}s)"
+            )
 
-        return {
-            "path": str(tar_path),
-            "size_bytes": size_bytes,
-            "checksum": checksum,
-            "files_count": files_count,
-            "elapsed_seconds": elapsed,
-        }
+            # Record success metrics
+            self._record_metric_success("models", size_bytes, elapsed)
+
+            return {
+                "path": str(tar_path),
+                "size_bytes": size_bytes,
+                "checksum": checksum,
+                "files_count": files_count,
+                "elapsed_seconds": elapsed,
+            }
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            error_msg = str(e)
+            logger.error(f"Models backup failed: {error_msg}")
+
+            # Record failure metrics and send notification
+            self._record_metric_failure("models", "archive_error", elapsed)
+            self._send_failure_notification(
+                operation="create_models_backup",
+                error_message=error_msg,
+                context={"backup_name": backup_name}
+            )
+            raise
 
     def create_full_backup(
         self,
@@ -839,6 +1043,10 @@ class BackupService:
         backup_file = Path(backup_path)
 
         if not backup_file.exists():
+            # Record integrity check failure
+            if self.metrics:
+                self.metrics.record_integrity_check(result="fail")
+
             return {
                 "valid": False,
                 "error": "Backup file not found",
@@ -856,6 +1064,21 @@ class BackupService:
             if expected_checksum:
                 checksum_match = actual_checksum == expected_checksum
 
+            # Record integrity check result
+            if self.metrics:
+                if checksum_match:
+                    self.metrics.record_integrity_check(result="pass")
+                else:
+                    self.metrics.record_integrity_check(result="fail")
+
+            # Send warning if checksum doesn't match
+            if not checksum_match:
+                self._send_warning_notification(
+                    warning_type="integrity_check_failed",
+                    message=f"Backup integrity check failed: checksum mismatch for {backup_file.name}",
+                    context={"backup_path": backup_path}
+                )
+
             return {
                 "valid": True,
                 "checksum_match": checksum_match,
@@ -867,6 +1090,11 @@ class BackupService:
 
         except Exception as e:
             logger.error(f"Backup verification failed: {e}")
+
+            # Record integrity check failure
+            if self.metrics:
+                self.metrics.record_integrity_check(result="fail")
+
             return {
                 "valid": False,
                 "error": str(e),
@@ -973,11 +1201,49 @@ class BackupService:
                 total_bytes += file_path.stat().st_size
                 file_count += 1
 
-        return {
-            "total_bytes": total_bytes,
-            "total_human": format_size(total_bytes),
-            "file_count": file_count,
-        }
+        # Get system disk usage
+        try:
+            stat = os.statvfs(str(self.backup_dir))
+            free_bytes = stat.f_bavail * stat.f_frsize
+            total_disk_bytes = stat.f_blocks * stat.f_frsize
+            used_disk_bytes = (stat.f_blocks - stat.f_bfree) * stat.f_frsize
+
+            # Record disk usage metrics
+            if self.metrics:
+                self.metrics.set_disk_usage_metrics(
+                    used_bytes=used_disk_bytes,
+                    free_bytes=free_bytes,
+                    total_bytes=total_disk_bytes
+                )
+
+            # Check for low disk space (warn if less than 10% free)
+            free_percentage = (free_bytes / total_disk_bytes * 100) if total_disk_bytes > 0 else 0
+            if free_percentage < 10:
+                self._send_warning_notification(
+                    warning_type="low_disk_space",
+                    message=f"Low disk space: {free_percentage:.1f}% free ({format_size(free_bytes)} available)",
+                    context={
+                        "free_bytes": free_bytes,
+                        "total_bytes": total_disk_bytes,
+                        "free_percentage": free_percentage
+                    }
+                )
+
+            return {
+                "total_bytes": total_bytes,
+                "total_human": format_size(total_bytes),
+                "file_count": file_count,
+                "disk_free_bytes": free_bytes,
+                "disk_total_bytes": total_disk_bytes,
+                "disk_free_percentage": free_percentage,
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get disk usage: {e}")
+            return {
+                "total_bytes": total_bytes,
+                "total_human": format_size(total_bytes),
+                "file_count": file_count,
+            }
 
     def upload_to_s3(
         self,
@@ -1015,10 +1281,13 @@ class BackupService:
             region_name=self.s3_config.get("region", "us-east-1"),
         )
 
+        # Record S3 sync start
+        if self.metrics:
+            self.metrics.record_s3_sync_start()
+
+        start_time = time.time()
         try:
             logger.info(f"Uploading {backup_file.name} to S3: {s3_key}")
-
-            start_time = time.time()
 
             # Upload with multipart upload for large files
             s3_client.upload_file(
@@ -1029,19 +1298,41 @@ class BackupService:
             )
 
             elapsed = time.time() - start_time
+            size_bytes = backup_file.stat().st_size
 
             logger.info(f"S3 upload completed in {elapsed:.1f}s")
+
+            # Record S3 sync success
+            if self.metrics:
+                self.metrics.record_s3_sync_success(size_bytes, elapsed)
 
             return {
                 "success": True,
                 "s3_key": s3_key,
                 "bucket": self.s3_config["bucket"],
-                "size_bytes": backup_file.stat().st_size,
+                "size_bytes": size_bytes,
                 "elapsed_seconds": elapsed,
             }
 
         except (ClientError, BotoCoreError) as e:
-            logger.error(f"S3 upload failed: {e}")
+            elapsed = time.time() - start_time
+            error_msg = str(e)
+            logger.error(f"S3 upload failed: {error_msg}")
+
+            # Record S3 sync failure
+            if self.metrics:
+                self.metrics.record_s3_sync_failure(error_type="s3_error")
+
+            # Send failure notification
+            self._send_failure_notification(
+                operation="upload_to_s3",
+                error_message=error_msg,
+                context={
+                    "backup_path": str(backup_file),
+                    "s3_key": s3_key,
+                    "bucket": self.s3_config.get("bucket")
+                }
+            )
             raise
 
     def download_from_s3(
@@ -1174,7 +1465,30 @@ class BackupService:
 
         logger.info(f"Cleaned up {len(deleted)} old backups older than {retention_days} days")
 
+        # Update retention metrics
+        self._update_retention_metrics()
+
         return deleted
+
+    def _update_retention_metrics(self) -> None:
+        """Update retention metrics for all backup types."""
+        if not self.metrics:
+            return
+
+        backup_types = ["database", "files", "models", "full"]
+        for backup_type in backup_types:
+            try:
+                backups = self.get_backups_list(backup_type=backup_type)
+                count = len(backups)
+                total_size = sum(b["size_bytes"] for b in backups)
+
+                self.metrics.set_backup_retention_metrics(
+                    backup_type=backup_type,
+                    count=count,
+                    total_size_bytes=total_size
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update retention metrics for {backup_type}: {e}")
 
     def find_parent_backup(
         self,

@@ -133,21 +133,72 @@ class TestExplainabilityE2E:
         if response.status_code == 200:
             explanation = response.json()
 
-            # Verify explanation structure
-            assert "resume_id" in explanation
+            # Verify core explanation structure (backward compatibility)
+            # Enhanced API uses "candidate_id" instead of "resume_id"
+            assert "candidate_id" in explanation or "resume_id" in explanation, \
+                "candidate_id or resume_id missing from response"
             assert "vacancy_id" in explanation
             assert "rank_score" in explanation
             assert "narrative" in explanation
-            assert "feature_explanations" in explanation
             assert "strengths" in explanation
             assert "weaknesses" in explanation
-            assert "recommendation" in explanation
 
-            # Verify data types
+            # Verify enhanced fields are present (new structure)
+            assert "feature_categories" in explanation, \
+                "Enhanced field feature_categories missing from response"
+            assert "percentile_data" in explanation, \
+                "Enhanced field percentile_data missing from response"
+            assert "skills_match" in explanation, \
+                "Enhanced field skills_match missing from response"
+            assert "factors" in explanation, \
+                "Enhanced field factors missing from response"
+
+            # Verify data types for core fields
             assert isinstance(explanation["rank_score"], (int, float))
-            assert isinstance(explanation["feature_explanations"], list)
             assert isinstance(explanation["strengths"], list)
             assert isinstance(explanation["weaknesses"], list)
+
+            # Verify data types for enhanced fields
+            assert isinstance(explanation["feature_categories"], list), \
+                "feature_categories should be a list"
+            assert isinstance(explanation["percentile_data"], dict), \
+                "percentile_data should be a dict"
+            assert isinstance(explanation["skills_match"], dict), \
+                "skills_match should be a dict"
+            assert isinstance(explanation["factors"], list), \
+                "factors should be a list"
+
+            # Verify percentile_data structure
+            percentile_data = explanation["percentile_data"]
+            assert "overall_percentile" in percentile_data, \
+                "overall_percentile missing from percentile_data"
+            assert "category_percentiles" in percentile_data, \
+                "category_percentiles missing from percentile_data"
+            assert "rank_position" in percentile_data, \
+                "rank_position missing from percentile_data"
+            assert "total_candidates" in percentile_data, \
+                "total_candidates missing from percentile_data"
+
+            # Verify skills_match structure
+            skills_match = explanation["skills_match"]
+            assert "matched_skills" in skills_match, \
+                "matched_skills missing from skills_match"
+            assert "missing_skills" in skills_match, \
+                "missing_skills missing from skills_match"
+            assert "additional_skills" in skills_match, \
+                "additional_skills missing from skills_match"
+            assert "match_percentage" in skills_match, \
+                "match_percentage missing from skills_match"
+
+            # Verify factors structure (if not empty)
+            if explanation["factors"]:
+                factor = explanation["factors"][0]
+                assert "factor_name" in factor, "factor_name missing from factors"
+                assert "score" in factor, "score missing from factors"
+                assert "weight" in factor, "weight missing from factors"
+                assert "contribution" in factor, "contribution missing from factors"
+                assert "description" in factor, "description missing from factors"
+
         elif response.status_code == 404:
             # Ranking exists but no explainability data - acceptable
             pass
@@ -378,6 +429,104 @@ class TestExplainabilityE2E:
             else:
                 assert recommendation in ["maybe", "poor"]
 
+    def test_enhanced_data_completeness(self, test_vacancy, test_resumes, test_rankings):
+        """
+        Test that enhanced explainability data is complete and consistent.
+
+        Verifies:
+        1. All enhanced fields are populated with proper data
+        2. Percentile calculations are consistent
+        3. Feature categories cover all features
+        4. Skills match calculations are accurate
+        """
+        if not test_rankings.get("ranked_candidates"):
+            pytest.skip("Rankings not available")
+
+        top_candidate = test_rankings["ranked_candidates"][0]
+        resume_id = top_candidate["resume_id"]
+        vacancy_id = test_vacancy["id"]
+
+        explanation_request = {
+            "resume_id": resume_id,
+            "vacancy_id": vacancy_id,
+            "use_llm": False,
+        }
+
+        response = requests.post(
+            f"{self.BASE_URL}/api/explainability/explain",
+            json=explanation_request
+        )
+
+        if response.status_code == 200:
+            explanation = response.json()
+
+            # Verify feature_categories are non-empty and cover main categories
+            feature_categories = explanation.get("feature_categories", [])
+            if feature_categories:
+                category_names = [cat["category_name"] for cat in feature_categories]
+
+                # Should have at least 2 categories (Skills and Experience are most common)
+                assert len(category_names) >= 1, \
+                    "Should have at least one feature category"
+
+                # Each category should have features
+                for category in feature_categories:
+                    assert len(category["features_in_category"]) > 0, \
+                        f"Category {category['category_name']} has no features"
+
+                    # Category score should be in valid range
+                    assert 0 <= category["category_score"] <= 1, \
+                        f"Invalid category_score: {category['category_score']}"
+
+            # Verify percentile_data consistency
+            percentile_data = explanation.get("percentile_data", {})
+            if percentile_data:
+                overall_percentile = percentile_data.get("overall_percentile", 0)
+                rank_position = percentile_data.get("rank_position", 0)
+                total_candidates = percentile_data.get("total_candidates", 0)
+
+                # If this is the top candidate (rank_position == 1), percentile should be high
+                if rank_position == 1 and total_candidates > 1:
+                    assert overall_percentile >= 50, \
+                        f"Top candidate should have high percentile, got {overall_percentile}"
+
+                # Percentile and rank_position should be consistent
+                if total_candidates > 0:
+                    expected_percentile = ((total_candidates - rank_position) / total_candidates) * 100
+                    # Allow for some calculation variance
+                    assert abs(overall_percentile - expected_percentile) < 20, \
+                        f"Percentile {overall_percentile} inconsistent with rank {rank_position}/{total_candidates}"
+
+            # Verify skills_match has meaningful data
+            skills_match = explanation.get("skills_match", {})
+            if skills_match:
+                matched = skills_match.get("matched_skills", [])
+                missing = skills_match.get("missing_skills", [])
+                match_percentage = skills_match.get("match_percentage", 0)
+
+                # If there are matched or missing skills, match_percentage should reflect it
+                if len(matched) > 0 or len(missing) > 0:
+                    total_required = len(matched) + len(missing)
+                    if total_required > 0:
+                        expected_percentage = (len(matched) / total_required) * 100
+                        # Allow for some calculation variance
+                        assert abs(match_percentage - expected_percentage) < 10, \
+                            f"Match percentage {match_percentage} inconsistent with matched/missing skills"
+
+            # Verify factors are meaningful
+            factors = explanation.get("factors", [])
+            if factors:
+                total_contribution = sum(factor.get("contribution", 0) for factor in factors)
+
+                # Total contribution should be non-zero if we have factors
+                assert total_contribution != 0, \
+                    "Factors present but total contribution is zero"
+
+                # Each factor should have a description
+                for factor in factors:
+                    assert factor.get("description"), \
+                        f"Factor {factor.get('factor_name')} missing description"
+
     def test_explainability_endpoints_error_handling(self, test_vacancy):
         """Test error handling across explainability endpoints."""
         # Test with non-existent UUID
@@ -436,6 +585,84 @@ class TestExplainabilityE2E:
         # All requests should complete without error (though may return 404)
         for result in results:
             assert result.status_code in [200, 404, 500]
+
+    def test_backward_compatibility_with_enhanced_api(self, test_vacancy, test_resumes, test_rankings):
+        """
+        Test that enhanced API maintains backward compatibility.
+
+        Verifies that old client code expecting legacy fields can still work
+        with the enhanced API response.
+        """
+        if not test_rankings.get("ranked_candidates"):
+            pytest.skip("Rankings not available")
+
+        top_candidate = test_rankings["ranked_candidates"][0]
+        resume_id = top_candidate["resume_id"]
+        vacancy_id = test_vacancy["id"]
+
+        explanation_request = {
+            "resume_id": resume_id,
+            "vacancy_id": vacancy_id,
+            "use_llm": False,
+        }
+
+        response = requests.post(
+            f"{self.BASE_URL}/api/explainability/explain",
+            json=explanation_request
+        )
+
+        if response.status_code == 200:
+            explanation = response.json()
+
+            # Old clients expect these core fields - verify they're still present
+            legacy_required_fields = [
+                "vacancy_id",
+                "rank_score",
+                "narrative",
+                "strengths",
+                "weaknesses",
+            ]
+
+            for field in legacy_required_fields:
+                assert field in explanation, \
+                    f"Legacy field '{field}' missing from response - breaks backward compatibility"
+
+            # Old clients may expect "resume_id" but new API uses "candidate_id"
+            # Verify at least one is present
+            assert "candidate_id" in explanation or "resume_id" in explanation, \
+                "Neither candidate_id nor resume_id in response"
+
+            # Verify data types match legacy expectations
+            assert isinstance(explanation["rank_score"], (int, float)), \
+                "rank_score should be numeric"
+            assert isinstance(explanation["narrative"], str), \
+                "narrative should be string"
+            assert isinstance(explanation["strengths"], list), \
+                "strengths should be list"
+            assert isinstance(explanation["weaknesses"], list), \
+                "weaknesses should be list"
+
+            # Enhanced fields should be present but optional for legacy clients
+            enhanced_fields = [
+                "feature_categories",
+                "percentile_data",
+                "skills_match",
+                "factors",
+            ]
+
+            for field in enhanced_fields:
+                assert field in explanation, \
+                    f"Enhanced field '{field}' missing - new clients need this"
+
+            # Old clients may ignore enhanced fields, but they should be valid
+            # if present, so new clients can use them
+            if explanation.get("percentile_data"):
+                assert isinstance(explanation["percentile_data"], dict), \
+                    "percentile_data should be dict for new clients"
+
+            if explanation.get("skills_match"):
+                assert isinstance(explanation["skills_match"], dict), \
+                    "skills_match should be dict for new clients"
 
 
 class TestExplainabilityWithLLMMock:

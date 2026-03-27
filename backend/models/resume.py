@@ -41,14 +41,16 @@ class Resume(Base, UUIDMixin, TimestampMixin):
         status: Current processing status
         raw_text: Extracted text content from resume
         language: Detected language (en, ru, etc.)
+        source: Source of the resume (linkedin, direct_application, referral, etc.)
         error_message: Error message if processing failed
+        content_hash: SHA-256 hash of file content for duplicate detection
         uploaded_at: Timestamp when resume was uploaded (inherited from TimestampMixin)
     """
 
     __tablename__ = "resumes"
 
-    organization_id: Mapped[str] = mapped_column(
-        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    organization_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
     )
     vacancy_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("job_vacancies.id", ondelete="SET NULL"), nullable=True, index=True
@@ -61,7 +63,9 @@ class Resume(Base, UUIDMixin, TimestampMixin):
     )
     raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
 
     # Relationships
     job_applications: Mapped[list["JobApplication"]] = relationship(
